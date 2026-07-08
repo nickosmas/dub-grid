@@ -36,24 +36,25 @@ const FIELD_LABELS: Record<string, string> = {
   departmentIds: "Departments",
 };
 
-const STATUS_STYLES: Record<ProfileChangeRequest["status"], { label: string; className: string }> = {
-  pending: {
-    label: "Pending",
-    className: "bg-[var(--color-warning-bg)] text-[var(--color-warning-text)]",
-  },
-  approved: {
-    label: "Approved",
-    className: "bg-[var(--color-success-bg)] text-[var(--color-success-text)]",
-  },
-  rejected: {
-    label: "Rejected",
-    className: "bg-[var(--color-danger-bg)] text-[var(--color-danger-text)]",
-  },
-  cancelled: {
-    label: "Cancelled",
-    className: "bg-[var(--color-bg)] text-[var(--color-text-muted)]",
-  },
-};
+const STATUS_STYLES: Record<ProfileChangeRequest["status"], { label: string; className: string }> =
+  {
+    pending: {
+      label: "Pending",
+      className: "bg-[var(--color-warning-bg)] text-[var(--color-warning-text)]",
+    },
+    approved: {
+      label: "Approved",
+      className: "bg-[var(--color-success-bg)] text-[var(--color-success-text)]",
+    },
+    rejected: {
+      label: "Rejected",
+      className: "bg-[var(--color-danger-bg)] text-[var(--color-danger-text)]",
+    },
+    cancelled: {
+      label: "Cancelled",
+      className: "bg-[var(--color-bg)] text-[var(--color-text-muted)]",
+    },
+  };
 
 function formatDate(value: string | null): string {
   if (!value) return "Not recorded";
@@ -98,11 +99,7 @@ function formatReferenceValue(value: unknown, items: ReferenceItem[]): string {
   return match?.name ?? match?.abbr ?? String(value);
 }
 
-function formatFieldValue(
-  field: string,
-  value: unknown,
-  references: RequestReferenceData,
-): string {
+function formatFieldValue(field: string, value: unknown, references: RequestReferenceData): string {
   switch (field) {
     case "employmentType":
       return formatEmploymentType(value);
@@ -179,7 +176,11 @@ function ProfileUpdateDetails({
             {formatFieldValue(field, request.currentValues[field], references)}
           </div>
           <div className="px-3 py-2 font-semibold text-[var(--color-text-primary)]">
-            {formatFieldValue(field, request.requestedChanges[field as keyof typeof request.requestedChanges], references)}
+            {formatFieldValue(
+              field,
+              request.requestedChanges[field as keyof typeof request.requestedChanges],
+              references,
+            )}
           </div>
         </div>
       ))}
@@ -194,7 +195,8 @@ function AccountDeletionDetails({ request }: { request: ProfileChangeRequest }) 
         Account deletion request
       </div>
       <p className="m-0 mt-1 text-[13px] leading-5 text-[var(--color-danger-text)]">
-        Approving will permanently delete this user&apos;s account and remove them from your organization. This can&apos;t be undone.
+        Approving will permanently delete this user&apos;s account and remove them from your
+        organization. This can&apos;t be undone.
       </p>
     </div>
   );
@@ -217,7 +219,10 @@ function RequestQueueSkeleton() {
               {Array.from({ length: 3 }).map((__, j) => (
                 <div key={j} className="flex flex-col gap-2">
                   <div className="dg-skeleton" style={{ width: 90, height: 10, borderRadius: 4 }} />
-                  <div className="dg-skeleton" style={{ width: "80%", height: 12, borderRadius: 4 }} />
+                  <div
+                    className="dg-skeleton"
+                    style={{ width: "80%", height: 12, borderRadius: 4 }}
+                  />
                 </div>
               ))}
             </div>
@@ -257,9 +262,7 @@ export function ProfileChangeRequestQueue({
 
   useEffect(() => {
     if (requestsQuery.isError) {
-      toast.error(
-        extractErrorMessage(requestsQuery.error, "Failed to load profile requests."),
-      );
+      toast.error(extractErrorMessage(requestsQuery.error, "Failed to load profile requests."));
     }
   }, [requestsQuery.isError, requestsQuery.error]);
 
@@ -276,13 +279,10 @@ export function ProfileChangeRequestQueue({
     onSuccess: (_, variables) => {
       queryClient.setQueryData<ProfileChangeRequest[]>(
         queryKeys.org.peopleChangeRequests(orgId, "pending"),
-        (current) =>
-          (current ?? []).filter((request) => request.id !== variables.requestId),
+        (current) => (current ?? []).filter((request) => request.id !== variables.requestId),
       );
       setPendingResolution(null);
-      toast.success(
-        variables.action === "approve" ? "Request approved." : "Request rejected.",
-      );
+      toast.success(variables.action === "approve" ? "Request approved." : "Request rejected.");
     },
     onError: (error) => {
       toast.error(extractErrorMessage(error, "Failed to resolve request."));
@@ -290,7 +290,7 @@ export function ProfileChangeRequestQueue({
   });
 
   const resolvingId = resolveMutation.isPending
-    ? resolveMutation.variables?.requestId ?? null
+    ? (resolveMutation.variables?.requestId ?? null)
     : null;
 
   return (
@@ -324,7 +324,9 @@ export function ProfileChangeRequestQueue({
                   {request.requesterName || request.requesterEmail || "Unknown user"}
                 </div>
               </div>
-              <span className={`rounded-full px-2 py-1 text-[11px] font-bold uppercase ${STATUS_STYLES[request.status].className}`}>
+              <span
+                className={`rounded-full px-2 py-1 text-[11px] font-bold uppercase ${STATUS_STYLES[request.status].className}`}
+              >
                 {STATUS_STYLES[request.status].label}
               </span>
             </div>

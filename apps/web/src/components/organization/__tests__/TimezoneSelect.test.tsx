@@ -10,11 +10,7 @@ vi.mock("@/components/ui/popover", () => ({
   PopoverContent: (props: PropsWithChildren<Record<string, unknown>>) => {
     popoverContentSpy(props);
 
-    return (
-      <div>
-        {props.children}
-      </div>
-    );
+    return <div>{props.children}</div>;
   },
 }));
 
@@ -28,12 +24,7 @@ describe("TimezoneSelect", () => {
   it("keeps the popup viewport-capped and the list scrollable", async () => {
     const user = userEvent.setup();
 
-    render(
-      <TimezoneSelect
-        value="America/Los_Angeles"
-        onChange={vi.fn()}
-      />,
-    );
+    render(<TimezoneSelect value="America/Los_Angeles" onChange={vi.fn()} />);
 
     await user.click(
       screen.getByRole("button", {
@@ -47,8 +38,7 @@ describe("TimezoneSelect", () => {
         align: "start",
         positionMethod: "fixed",
         style: expect.objectContaining({
-          maxHeight:
-            "min(420px, var(--available-height, calc(100vh - 24px)))",
+          maxHeight: "min(420px, var(--available-height, calc(100vh - 24px)))",
         }),
       }),
     );

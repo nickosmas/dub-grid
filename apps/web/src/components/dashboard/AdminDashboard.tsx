@@ -38,17 +38,13 @@ export default function AdminDashboard(props: DashboardContentProps) {
     () =>
       buildActionItems({
         isAdmin: true,
-        pendingApproval: permissions.canApproveShiftRequests
-          ? shiftRequests.pendingApproval
-          : [],
+        pendingApproval: permissions.canApproveShiftRequests ? shiftRequests.pendingApproval : [],
         swapProposals: [],
         openPickups: [],
         openShifts,
         draftTotal,
         currentEmpId,
-        onResolve: permissions.canApproveShiftRequests
-          ? shiftRequests.resolve
-          : undefined,
+        onResolve: permissions.canApproveShiftRequests ? shiftRequests.resolve : undefined,
       }),
     [
       currentEmpId,

@@ -18,8 +18,7 @@ vi.mock("@/app/api/shared/schedule", () => ({
 }));
 
 vi.mock("@/features/notifications/server", () => ({
-  dispatchNotificationEvent: (...args: unknown[]) =>
-    dispatchNotificationEvent(...args),
+  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
 import { POST } from "./route";

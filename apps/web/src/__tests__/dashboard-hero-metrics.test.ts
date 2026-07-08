@@ -48,10 +48,7 @@ describe("Dashboard Hero Metrics", () => {
       },
     ];
 
-    const openGapCount = openShifts.reduce(
-      (total, shift) => total + shift.needed,
-      0,
-    );
+    const openGapCount = openShifts.reduce((total, shift) => total + shift.needed, 0);
     expect(openGapCount).toBe(3);
   });
 

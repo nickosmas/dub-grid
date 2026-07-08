@@ -1,7 +1,4 @@
-import {
-  supabase, logAudit, formatDateKey,
-  fetchAllRows,
-} from "./shared";
+import { supabase, logAudit, formatDateKey, fetchAllRows } from "./shared";
 import type { DbScheduleNote, RecurringDraft } from "./types";
 import { generateSeriesDates } from "./mappers";
 import { upsertShift, deleteShift } from "./shifts";
@@ -228,11 +225,17 @@ export async function fetchPublishHistory(
 
 // ── Schedule Notes ───────────────────────────────────────────────────────────
 
-export async function fetchScheduleNotes(orgId: string, startDate?: string, endDate?: string): Promise<ScheduleNote[]> {
+export async function fetchScheduleNotes(
+  orgId: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<ScheduleNote[]> {
   const buildPage = (from: number, to: number) => {
     let query = supabase
       .from("schedule_notes")
-      .select("id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at")
+      .select(
+        "id, org_id, emp_id, date, indicator_type_id, focus_area_id, status, created_by, created_at, updated_at",
+      )
       .eq("org_id", orgId);
     if (startDate) query = query.gte("date", startDate);
     if (endDate) query = query.lte("date", endDate);
@@ -265,13 +268,13 @@ export async function upsertScheduleNote(
   date: string,
   indicatorTypeId: number,
   focusAreaId: number,
-  existingStatus?: 'published' | 'draft' | 'draft_deleted',
+  existingStatus?: "published" | "draft" | "draft_deleted",
 ): Promise<void> {
-  let status: 'draft' | 'published' | 'draft_deleted' = 'draft';
+  let status: "draft" | "published" | "draft_deleted" = "draft";
 
   // If we are "adding" a note that was marked for deletion, set it back to published
-  if (existingStatus === 'draft_deleted') {
-    status = 'published';
+  if (existingStatus === "draft_deleted") {
+    status = "published";
   }
 
   const { error } = await supabase.from("schedule_notes").upsert(
@@ -286,7 +289,13 @@ export async function upsertScheduleNote(
     { onConflict: "emp_id,date,indicator_type_id,focus_area_id" },
   );
   if (error) throw error;
-  void logAudit("schedule_note.upserted", "schedule_note", `${empId}_${date}`, { indicatorTypeId, focusAreaId, status }, orgId);
+  void logAudit(
+    "schedule_note.upserted",
+    "schedule_note",
+    `${empId}_${date}`,
+    { indicatorTypeId, focusAreaId, status },
+    orgId,
+  );
 }
 
 export async function deleteScheduleNote(
@@ -295,9 +304,9 @@ export async function deleteScheduleNote(
   date: string,
   indicatorTypeId: number,
   focusAreaId: number,
-  existingStatus?: 'published' | 'draft' | 'draft_deleted',
+  existingStatus?: "published" | "draft" | "draft_deleted",
 ): Promise<void> {
-  if (existingStatus === 'draft') {
+  if (existingStatus === "draft") {
     // If it was a new draft note, just delete it
     const { error } = await supabase
       .from("schedule_notes")
@@ -312,7 +321,7 @@ export async function deleteScheduleNote(
     // If it was already published, mark it as draft_deleted
     const { error } = await supabase
       .from("schedule_notes")
-      .update({ status: 'draft_deleted' })
+      .update({ status: "draft_deleted" })
       .eq("org_id", orgId)
       .eq("emp_id", empId)
       .eq("date", date)
@@ -320,12 +329,21 @@ export async function deleteScheduleNote(
       .eq("focus_area_id", focusAreaId);
     if (error) throw error;
   }
-  void logAudit("schedule_note.deleted", "schedule_note", `${empId}_${date}`, { indicatorTypeId, focusAreaId, existingStatus }, orgId);
+  void logAudit(
+    "schedule_note.deleted",
+    "schedule_note",
+    `${empId}_${date}`,
+    { indicatorTypeId, focusAreaId, existingStatus },
+    orgId,
+  );
 }
 
 // ── Recurring Shifts Draft Sessions ───────────────────────────────────────────
 
-export async function getRecurringDraft(orgId: string, userId: string): Promise<RecurringDraft | null> {
+export async function getRecurringDraft(
+  orgId: string,
+  userId: string,
+): Promise<RecurringDraft | null> {
   const { data, error } = await supabase
     .from("recurring_shifts_draft_sessions")
     .select("id, org_id, saved_by, draft_data, saved_at")
@@ -366,14 +384,12 @@ export async function saveRecurringDraft(
       .eq("id", existing.id);
     if (error) throw error;
   } else {
-    const { error } = await supabase
-      .from("recurring_shifts_draft_sessions")
-      .insert({
-        org_id: orgId,
-        saved_by: savedBy,
-        draft_data: draftData,
-        saved_at: new Date().toISOString(),
-      });
+    const { error } = await supabase.from("recurring_shifts_draft_sessions").insert({
+      org_id: orgId,
+      saved_by: savedBy,
+      draft_data: draftData,
+      saved_at: new Date().toISOString(),
+    });
     if (error) throw error;
   }
 }
@@ -422,19 +438,17 @@ export async function createShiftSeries(
   reportProgress?.(5);
 
   // 1. Create the series master record
-  const { error } = await supabase
-    .from("shift_series")
-    .insert({
-      id,
-      emp_id: empId,
-      org_id: orgId,
-      state: normalizedInput,
-      frequency,
-      days_of_week: daysOfWeek,
-      start_date: startDate,
-      end_date: endDate,
-      max_occurrences: maxOccurrences,
-    });
+  const { error } = await supabase.from("shift_series").insert({
+    id,
+    emp_id: empId,
+    org_id: orgId,
+    state: normalizedInput,
+    frequency,
+    days_of_week: daysOfWeek,
+    start_date: startDate,
+    end_date: endDate,
+    max_occurrences: maxOccurrences,
+  });
   if (error) throw new Error(error.message);
 
   // 2. Generate and upsert occurrence rows
@@ -449,15 +463,7 @@ export async function createShiftSeries(
     for (let i = 0; i < dates.length; i += batchSize) {
       const batch = dates.slice(i, i + batchSize);
       await Promise.all(
-        batch.map((date) =>
-          upsertShift(
-            empId,
-            date,
-            baseInput,
-            orgId,
-            existingVersions.get(date),
-          ),
-        ),
+        batch.map((date) => upsertShift(empId, date, baseInput, orgId, existingVersions.get(date))),
       );
 
       const inserted = Math.min(dates.length, i + batch.length);
@@ -570,6 +576,12 @@ export async function deleteShiftSeries(seriesId: string, orgId: string): Promis
   if (clearSeriesError) throw new Error(clearSeriesError.message);
 
   const deletedCount = typedCells.length;
-  void logAudit("shift_series.archived", "shift_series", seriesId, { shiftsAffected: deletedCount }, orgId);
+  void logAudit(
+    "shift_series.archived",
+    "shift_series",
+    seriesId,
+    { shiftsAffected: deletedCount },
+    orgId,
+  );
   return deletedCount;
 }

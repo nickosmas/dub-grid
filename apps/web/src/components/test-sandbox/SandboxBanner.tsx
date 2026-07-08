@@ -21,10 +21,7 @@ export default function SandboxBanner() {
   const org = bootstrapQuery.data?.org ?? null;
   if (!org || org.workspaceKind !== "sandbox") return null;
 
-  async function postSandboxAction(
-    action: "exit" | "reset",
-    errorFallback: string,
-  ) {
+  async function postSandboxAction(action: "exit" | "reset", errorFallback: string) {
     setPendingAction(action);
     setError(null);
     try {
@@ -64,13 +61,8 @@ export default function SandboxBanner() {
     }
   }
 
-  const handleExit = () =>
-    postSandboxAction("exit", "We couldn't exit sandbox mode right now.");
-  const handleReset = () =>
-    postSandboxAction(
-      "reset",
-      "We couldn't reset the sandbox right now.",
-    );
+  const handleExit = () => postSandboxAction("exit", "We couldn't exit sandbox mode right now.");
+  const handleReset = () => postSandboxAction("reset", "We couldn't reset the sandbox right now.");
 
   return (
     <div
@@ -115,15 +107,12 @@ export default function SandboxBanner() {
             whiteSpace: "nowrap",
           }}
         >
-          You&rsquo;re in sandbox mode — changes won&rsquo;t affect your real
-          organization.
+          You&rsquo;re in sandbox mode — changes won&rsquo;t affect your real organization.
         </span>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        {error ? (
-          <span style={{ fontWeight: 500, opacity: 0.85 }}>{error}</span>
-        ) : null}
+        {error ? <span style={{ fontWeight: 500, opacity: 0.85 }}>{error}</span> : null}
         <button
           type="button"
           onClick={handleReset}

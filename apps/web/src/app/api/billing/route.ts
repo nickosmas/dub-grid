@@ -46,9 +46,6 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     Sentry.captureException(error, { extra: { context: "billing-summary" } });
     logger.error({ error, orgId: parsed.data.orgId }, "Failed to load billing summary");
-    return NextResponse.json(
-      { error: "Failed to load billing" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load billing" }, { status: 500 });
   }
 }

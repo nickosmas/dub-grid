@@ -3,7 +3,13 @@ import { AssignmentDefinition, ShiftDisplayMode } from "@/types";
 // Excluded from legend — internal/meta entries with no printed meaning
 const EXCLUDED = new Set(["OFF", "0.3"]);
 
-export default function PrintLegend({ assignments, shiftDisplayMode = "code" }: { assignments: AssignmentDefinition[]; shiftDisplayMode?: ShiftDisplayMode }) {
+export default function PrintLegend({
+  assignments,
+  shiftDisplayMode = "code",
+}: {
+  assignments: AssignmentDefinition[];
+  shiftDisplayMode?: ShiftDisplayMode;
+}) {
   const isNameMode = shiftDisplayMode === "name";
   const items = assignments.filter((s) => !EXCLUDED.has(s.label));
 
@@ -21,7 +27,7 @@ export default function PrintLegend({ assignments, shiftDisplayMode = "code" }: 
                 color: s.text,
               }}
             >
-              {isNameMode ? (s.name || s.label) : s.label}
+              {isNameMode ? s.name || s.label : s.label}
             </span>
             {!isNameMode && <span className="print-legend__name">{s.name}</span>}
           </div>

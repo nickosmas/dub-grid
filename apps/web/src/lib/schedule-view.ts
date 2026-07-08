@@ -21,11 +21,7 @@ function parseDateOnly(value: string | null | undefined): Date | null {
   const date = new Date(year, month - 1, day);
   date.setHours(0, 0, 0, 0);
 
-  if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
-  ) {
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
     return null;
   }
 
@@ -33,9 +29,7 @@ function parseDateOnly(value: string | null | undefined): Date | null {
 }
 
 function toUtcDayNumber(date: Date): number {
-  return Math.floor(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / MS_PER_DAY,
-  );
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / MS_PER_DAY);
 }
 
 function mod(value: number, divisor: number): number {
@@ -65,10 +59,7 @@ export function getScheduleStartForSpan(args: {
   }
 
   if (span === 2) {
-    return (
-      getContainingPayPeriodStart(date, payPeriodStartDate) ??
-      getWeekStart(date)
-    );
+    return getContainingPayPeriodStart(date, payPeriodStartDate) ?? getWeekStart(date);
   }
 
   return getWeekStart(date);

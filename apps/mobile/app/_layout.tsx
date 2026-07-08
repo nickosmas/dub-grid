@@ -61,22 +61,13 @@ export default function RootLayout() {
                       <ConsentGate>
                         <Stack screenOptions={commonStackOptions}>
                           <Stack.Screen name="index" options={{ headerShown: false }} />
-                          <Stack.Screen
-                            name="(auth)/login"
-                            options={{ headerShown: false }}
-                          />
+                          <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
                           <Stack.Screen
                             name="(auth)/onboarding"
                             options={{ headerShown: false, animation: "fade" }}
                           />
-                          <Stack.Screen
-                            name="(tabs)"
-                            options={{ headerShown: false }}
-                          />
-                          <Stack.Screen
-                            name="alerts"
-                            options={{ headerShown: false }}
-                          />
+                          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                          <Stack.Screen name="alerts" options={{ headerShown: false }} />
                           <Stack.Screen
                             name="shift/[employeeId]/[date]"
                             options={createDetailStackOptions("Shift Detail")}

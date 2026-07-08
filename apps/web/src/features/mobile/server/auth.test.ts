@@ -61,14 +61,10 @@ function createServiceClient(input?: {
   const setupComplete = input?.setupComplete ?? true;
   const setupResults: Record<string, unknown> = {
     focus_areas: createSetupResult(
-      setupComplete
-        ? [{ id: 1, department_id: 10, archived_at: null }]
-        : [],
+      setupComplete ? [{ id: 1, department_id: 10, archived_at: null }] : [],
     ),
     shift_categories: createSetupResult(
-      setupComplete
-        ? [{ id: 2, focus_area_id: 1, archived_at: null }]
-        : [],
+      setupComplete ? [{ id: 2, focus_area_id: 1, archived_at: null }] : [],
     ),
     jobs: createSetupResult(
       setupComplete
@@ -85,16 +81,10 @@ function createServiceClient(input?: {
           ]
         : [],
     ),
-    certifications: createSetupResult(
-      setupComplete ? [{ id: 4, archived_at: null }] : [],
-    ),
-    organization_roles: createSetupResult(
-      setupComplete ? [{ id: 5, archived_at: null }] : [],
-    ),
+    certifications: createSetupResult(setupComplete ? [{ id: 4, archived_at: null }] : []),
+    organization_roles: createSetupResult(setupComplete ? [{ id: 5, archived_at: null }] : []),
     departments: createSetupResult(
-      setupComplete
-        ? [{ id: 10, type: "scheduled", archived_at: null }]
-        : [],
+      setupComplete ? [{ id: 10, type: "scheduled", archived_at: null }] : [],
     ),
     employees: createSetupResult([], setupComplete ? 1 : 0),
   };

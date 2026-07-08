@@ -58,9 +58,7 @@ describe("ManagementStaffPanel access gating", () => {
         canManageManagementAccess={false}
       />,
     );
-    expect(
-      screen.queryByRole("button", { name: /manage permissions/i }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /manage permissions/i })).toBeNull();
   });
 
   it("offers the permission matrix for an admin when access management is granted", () => {
@@ -73,9 +71,7 @@ describe("ManagementStaffPanel access gating", () => {
         onPermissionsChange={vi.fn(async () => {})}
       />,
     );
-    expect(
-      screen.getByRole("button", { name: /manage permissions/i }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /manage permissions/i })).toBeTruthy();
   });
 
   it("shows the role control for a super_admin (no permission matrix)", () => {
@@ -89,9 +85,7 @@ describe("ManagementStaffPanel access gating", () => {
       />,
     );
     expect(screen.getByText("Role")).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: /manage permissions/i }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /manage permissions/i })).toBeNull();
   });
 
   it("offers access controls for an employee-linked admin too", () => {
@@ -108,8 +102,6 @@ describe("ManagementStaffPanel access gating", () => {
         onPermissionsChange={vi.fn(async () => {})}
       />,
     );
-    expect(
-      screen.getByRole("button", { name: /manage permissions/i }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: /manage permissions/i })).toBeTruthy();
   });
 });

@@ -9,15 +9,18 @@ All required and optional env vars are validated at startup by
 runtime:
 
 **Always required (all environments):**
+
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase public anon key (baked into client bundle)
 - `SUPABASE_SERVICE_ROLE_KEY` — Server-only service role key (never `NEXT_PUBLIC_`)
 
 **Required in production (`NODE_ENV=production` + `VERCEL_ENV=production` or `STRICT_PROD_ENV_VALIDATION=1`):**
+
 - `UPSTASH_REDIS_REST_URL` — Rate limiter; fail-closed if absent (503)
 - `UPSTASH_REDIS_REST_TOKEN` — Rate limiter token
 
 **Optional (warn in dev, degrade gracefully):**
+
 - `RESEND_API_KEY` — Transactional email (invites, password resets)
 - `EXPO_ACCESS_TOKEN` — Expo push notifications
 - `STRIPE_SECRET_KEY` — Stripe billing
@@ -119,11 +122,11 @@ Used for Turborepo remote cache.
 
 ## Rotation Schedule
 
-| Quarter | Secrets to Rotate |
-|---------|------------------|
-| Q1 (Jan) | Supabase keys, Resend API key |
-| Q2 (Apr) | Stripe keys, Upstash tokens |
-| Q3 (Jul) | Sentry token, PostHog keys |
+| Quarter  | Secrets to Rotate               |
+| -------- | ------------------------------- |
+| Q1 (Jan) | Supabase keys, Resend API key   |
+| Q2 (Apr) | Stripe keys, Upstash tokens     |
+| Q3 (Jul) | Sentry token, PostHog keys      |
 | Q4 (Oct) | All keys (annual full rotation) |
 
 ---
@@ -139,13 +142,13 @@ If a secret is compromised:
 
 ### What to check per secret
 
-| Secret | Check |
-|--------|-------|
+| Secret                      | Check                                                   |
+| --------------------------- | ------------------------------------------------------- |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase audit logs for unexpected service-role queries |
-| `STRIPE_SECRET_KEY` | Stripe Dashboard > Logs for unexpected API calls |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook delivery logs for signature failures |
-| `RESEND_API_KEY` | Resend logs for unexpected email sends |
-| `UPSTASH_REDIS_REST_TOKEN` | Upstash logs for unexpected key reads/writes |
+| `STRIPE_SECRET_KEY`         | Stripe Dashboard > Logs for unexpected API calls        |
+| `STRIPE_WEBHOOK_SECRET`     | Stripe webhook delivery logs for signature failures     |
+| `RESEND_API_KEY`            | Resend logs for unexpected email sends                  |
+| `UPSTASH_REDIS_REST_TOKEN`  | Upstash logs for unexpected key reads/writes            |
 
 ---
 

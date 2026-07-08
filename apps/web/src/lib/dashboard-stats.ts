@@ -22,6 +22,7 @@ import {
 } from "@/lib/schedule-logic";
 import { hasShiftStartedAtTimeRanges } from "@dubgrid/schedule-core";
 import type { CoverageRuleConfig } from "@dubgrid/domain";
+import { formatDateKey } from "@/lib/utils";
 
 // ─── Exported Types ─────────────────────────────────────
 
@@ -146,9 +147,7 @@ function formatTime12h(time: string): string {
   const [h, m] = time.split(":").map(Number);
   const ampm = h >= 12 ? "pm" : "am";
   const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return m
-    ? `${hour12}:${String(m).padStart(2, "0")}${ampm}`
-    : `${hour12}${ampm}`;
+  return m ? `${hour12}:${String(m).padStart(2, "0")}${ampm}` : `${hour12}${ampm}`;
 }
 
 function parseShiftKey(key: string): { empId: string; dateKey: string } {
@@ -165,13 +164,6 @@ function hasWorkShift(
 }
 
 // ─── Date Helpers ───────────────────────────────────────
-
-export function formatDateKey(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 export function getWeekDates(weekStart: Date): Date[] {
   return getDatesInRange(weekStart, 7);
@@ -245,20 +237,13 @@ export function computeShiftDurationHours(
       for (let i = 0; i < Math.max(starts.length, ends.length); i++) {
         const s = starts[i] || "";
         const e = ends[i] || "";
-        const sc =
-          assignmentIds[i] != null
-            ? assignmentById.get(assignmentIds[i])
-            : undefined;
+        const sc = assignmentIds[i] != null ? assignmentById.get(assignmentIds[i]) : undefined;
         if (s && e) {
           let h = durationHoursFromTimes(s, e);
-          if (sc)
-            h = Math.max(0, h - resolveBreakMinutes(sc, categoryById) / 60);
+          if (sc) h = Math.max(0, h - resolveBreakMinutes(sc, categoryById) / 60);
           total += h;
         } else if (sc?.defaultStartTime && sc.defaultEndTime) {
-          let h = durationHoursFromTimes(
-            sc.defaultStartTime,
-            sc.defaultEndTime,
-          );
+          let h = durationHoursFromTimes(sc.defaultStartTime, sc.defaultEndTime);
           h = Math.max(0, h - resolveBreakMinutes(sc, categoryById) / 60);
           total += h;
         }
@@ -282,10 +267,7 @@ export function computeShiftDurationHours(
     if (!sc) continue;
     if (sc.defaultStartTime && sc.defaultEndTime) {
       // Level 2: shift code custom times
-      let hours = durationHoursFromTimes(
-        sc.defaultStartTime,
-        sc.defaultEndTime,
-      );
+      let hours = durationHoursFromTimes(sc.defaultStartTime, sc.defaultEndTime);
       hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
       total += hours;
     } else if (categoryById && sc.categoryId != null) {
@@ -296,13 +278,9 @@ export function computeShiftDurationHours(
         hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
         total += hours;
       }
-    } else if (
-      sc.defaultDurationHours != null ||
-      sc.defaultDurationMinutes != null
-    ) {
+    } else if (sc.defaultDurationHours != null || sc.defaultDurationMinutes != null) {
       // General codes: use duration
-      let hours =
-        (sc.defaultDurationHours ?? 0) + (sc.defaultDurationMinutes ?? 0) / 60;
+      let hours = (sc.defaultDurationHours ?? 0) + (sc.defaultDurationMinutes ?? 0) / 60;
       hours = Math.max(0, hours - resolveBreakMinutes(sc, categoryById) / 60);
       total += hours;
     }
@@ -398,9 +376,7 @@ export function computeOTAlerts(
       const fa = faId != null ? faMap.get(faId) : undefined;
       return {
         empId: h.empId,
-        empName: emp
-          ? `${emp.firstName.charAt(0)}. ${emp.lastName}`
-          : "Unknown",
+        empName: emp ? `${emp.firstName.charAt(0)}. ${emp.lastName}` : "Unknown",
         totalHours: h.totalHours,
         overtimeHours: h.overtimeHours,
         focusAreaName: fa?.name ?? "",
@@ -418,10 +394,7 @@ export function countShifts(
   let count = 0;
   for (const entry of Object.values(weekShifts)) {
     if (entry.isDelete) continue;
-    if (
-      entry.assignmentIds.length > 0 &&
-      hasWorkShift(entry.assignmentIds, assignmentById)
-    ) {
+    if (entry.assignmentIds.length > 0 && hasWorkShift(entry.assignmentIds, assignmentById)) {
       count++;
     }
   }
@@ -436,10 +409,7 @@ export function countStaffScheduled(
   for (const key of Object.keys(weekShifts)) {
     const entry = weekShifts[key];
     if (entry.isDelete) continue;
-    if (
-      entry.assignmentIds.length > 0 &&
-      hasWorkShift(entry.assignmentIds, assignmentById)
-    ) {
+    if (entry.assignmentIds.length > 0 && hasWorkShift(entry.assignmentIds, assignmentById)) {
       empIds.add(parseShiftKey(key).empId);
     }
   }
@@ -469,10 +439,7 @@ export function computeCoveragePctAndSlots(
   }
 
   const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
-  const coverageCreditForKey = createCoverageCreditResolver(
-    shifts,
-    coverageRuleConfig,
-  );
+  const coverageCreditForKey = createCoverageCreditResolver(shifts, coverageRuleConfig);
   const snapshots = computeCoverageCategorySnapshots(
     focusAreas,
     [],
@@ -480,8 +447,7 @@ export function computeCoveragePctAndSlots(
     requirements,
     weekDates,
     empsByFa,
-    (empId, lookupDate) =>
-      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
+    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
     codesByFa,
     undefined,
     coverageCreditForKey,
@@ -494,8 +460,7 @@ export function computeCoveragePctAndSlots(
     totalFilled += Math.min(snapshot.status.actual, snapshot.status.required);
   }
 
-  const pct =
-    totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
+  const pct = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
   return { pct, openSlots: totalRequired - totalFilled, totalRequired };
 }
 
@@ -507,8 +472,7 @@ export function coverageFromSections(sections: SectionCoverage[]): {
   const totalRequired = sections.reduce((s, sec) => s + sec.requiredTotal, 0);
   const totalFilled = sections.reduce((s, sec) => s + sec.filledTotal, 0);
   return {
-    pct:
-      totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100,
+    pct: totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100,
     openSlots: totalRequired - totalFilled,
   };
 }
@@ -576,10 +540,7 @@ export function computeCoverageBySection(
   }
 
   const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
-  const coverageCreditForKey = createCoverageCreditResolver(
-    shifts,
-    coverageRuleConfig,
-  );
+  const coverageCreditForKey = createCoverageCreditResolver(shifts, coverageRuleConfig);
   const snapshots = computeCoverageCategorySnapshots(
     focusAreas,
     [],
@@ -587,8 +548,7 @@ export function computeCoverageBySection(
     coverageRequirements,
     weekDates,
     empsByFa,
-    (empId, lookupDate) =>
-      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
+    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
     codesByFa,
     undefined,
     coverageCreditForKey,
@@ -597,9 +557,7 @@ export function computeCoverageBySection(
   const allSections = focusAreas.map((fa) => {
     const faEmps = empsByFa.get(fa.id) ?? [];
     const faCodes = codesByFa.get(fa.id) ?? new Set();
-    const faSnapshots = snapshots.filter(
-      (snapshot) => snapshot.focusAreaId === fa.id,
-    );
+    const faSnapshots = snapshots.filter((snapshot) => snapshot.focusAreaId === fa.id);
     let totalFilled = 0;
     let totalRequired = 0;
 
@@ -628,13 +586,7 @@ export function computeCoverageBySection(
 
       const ratio = dayRequired > 0 ? dayFilled / dayRequired : 1;
       const status: SectionCoverage["daily"][number]["status"] =
-        dayRequired === 0
-          ? "none"
-          : ratio >= 1
-            ? "green"
-            : dayFilled > 0
-              ? "amber"
-              : "red";
+        dayRequired === 0 ? "none" : ratio >= 1 ? "green" : dayFilled > 0 ? "amber" : "red";
       return {
         dateKey,
         dayLabel: DAY_LABELS[date.getDay()],
@@ -645,8 +597,7 @@ export function computeCoverageBySection(
       };
     });
 
-    const pct =
-      totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
+    const pct = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
 
     return {
       focusAreaId: fa.id,
@@ -690,10 +641,7 @@ export function computeOpenShifts(
   }
 
   const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
-  const coverageCreditForKey = createCoverageCreditResolver(
-    shifts,
-    coverageRuleConfig,
-  );
+  const coverageCreditForKey = createCoverageCreditResolver(shifts, coverageRuleConfig);
   const snapshots = computeCoverageCategorySnapshots(
     focusAreas,
     [],
@@ -701,8 +649,7 @@ export function computeOpenShifts(
     coverageRequirements,
     weekDates,
     empsByFa,
-    (empId, lookupDate) =>
-      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
+    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
     codesByFa,
     assignmentLabelMap,
     coverageCreditForKey,
@@ -728,20 +675,11 @@ export function computeOpenShifts(
     ) {
       continue;
     }
-    const requirementAssignmentDefinitionId =
-      snapshot.preferredOpenAssignmentDefinitionId;
+    const requirementAssignmentDefinitionId = snapshot.preferredOpenAssignmentDefinitionId;
 
-    const daysUntil = Math.floor(
-      (snapshot.date.getTime() - today.getTime()) / 86400000,
-    );
+    const daysUntil = Math.floor((snapshot.date.getTime() - today.getTime()) / 86400000);
     const urgency: OpenShift["urgency"] =
-      daysUntil < 0
-        ? "low"
-        : daysUntil <= 1
-          ? "high"
-          : daysUntil <= 3
-            ? "medium"
-            : "low";
+      daysUntil < 0 ? "low" : daysUntil <= 1 ? "high" : daysUntil <= 3 ? "medium" : "low";
 
     let timeRange = "";
     if (sc.defaultStartTime && sc.defaultEndTime) {
@@ -761,8 +699,7 @@ export function computeOpenShifts(
       focusAreaId: snapshot.focusAreaId,
       requirementAssignmentDefinitionId,
       eligibleAssignmentDefinitionIds: snapshot.eligibleAssignmentDefinitionIds,
-      preferredOpenAssignmentDefinitionId:
-        snapshot.preferredOpenAssignmentDefinitionId,
+      preferredOpenAssignmentDefinitionId: snapshot.preferredOpenAssignmentDefinitionId,
       ruleLabel: label,
       assignmentLabel: label,
       focusAreaName: snapshot.focusAreaName,
@@ -823,8 +760,7 @@ export function computeShiftBreakdown(
           return {
             assignmentId: codeId,
             assignmentLabel:
-              assignmentLabelMap?.get(codeId) ??
-              (sc?.name || sc?.label || "Unknown"),
+              assignmentLabelMap?.get(codeId) ?? (sc?.name || sc?.label || "Unknown"),
             color: sc?.color || "#CED4DA",
             count,
           };
@@ -902,11 +838,7 @@ export function buildActivityFeed(
         id: `chg_${historyEntry.id}_${change.empId}_${change.date}_${change.kind}`,
         type: "shift_change",
         iconVariant:
-          change.kind === "new"
-            ? "success"
-            : change.kind === "deleted"
-              ? "danger"
-              : "warning",
+          change.kind === "new" ? "success" : change.kind === "deleted" ? "danger" : "warning",
         description:
           change.kind === "new"
             ? `Shift added · ${change.date}`
@@ -925,21 +857,13 @@ export function buildActivityFeed(
     const isPickup = req.type === "pickup";
     const shiftName = getShiftRequestDisplayShiftName(req);
     const statusLabel =
-      req.status === "open"
-        ? "Open"
-        : req.status === "pending_approval"
-          ? "Pending"
-          : req.status;
+      req.status === "open" ? "Open" : req.status === "pending_approval" ? "Pending" : req.status;
 
     items.push({
       id: `req_${req.id}`,
       type: "request",
       iconVariant:
-        req.status === "open"
-          ? "warning"
-          : req.status === "approved"
-            ? "success"
-            : "neutral",
+        req.status === "open" ? "warning" : req.status === "approved" ? "success" : "neutral",
       description: isPickup
         ? `Pickup request · ${shiftName}`
         : `Swap request · ${req.requesterName}`,
@@ -965,10 +889,7 @@ export function buildActivityFeed(
   }
 
   return items
-    .sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-    )
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, maxItems);
 }
 

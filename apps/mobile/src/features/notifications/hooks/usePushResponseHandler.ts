@@ -5,8 +5,7 @@ import { Platform } from "react-native";
 import type * as Notifications from "expo-notifications";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 
-const isExpoGo =
-  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 const pushUnsupported = Platform.OS === "web" || isExpoGo;
 
 // Lazy-load expo-notifications so importing this hook in Expo Go doesn't
@@ -40,8 +39,7 @@ function navigateForPayload(data: Record<string, unknown> | null | undefined) {
     return;
   }
 
-  const notificationId =
-    typeof data.notificationId === "string" ? data.notificationId : null;
+  const notificationId = typeof data.notificationId === "string" ? data.notificationId : null;
 
   if (notificationId) {
     router.push({
@@ -96,14 +94,11 @@ export function usePushResponseHandler(enabled: boolean) {
         });
       });
 
-      const responseSub = notifications.addNotificationResponseReceivedListener(
-        (response) => {
-          const data = response.notification.request.content.data as
-            | Record<string, unknown>
-            | undefined;
-          navigateForPayload(data ?? null);
-        },
-      );
+      const responseSub = notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data as
+          Record<string, unknown> | undefined;
+        navigateForPayload(data ?? null);
+      });
 
       cleanup = () => {
         receivedSub.remove();

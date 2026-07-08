@@ -20,12 +20,17 @@ export function PersonDetailRouteContent({ employeeId }: { employeeId: string })
   useEffect(() => {
     let cancelled = false;
 
-    if (authLoading || permsLoading) return () => { cancelled = true; };
+    if (authLoading || permsLoading)
+      return () => {
+        cancelled = true;
+      };
 
     if (!user || !orgId) {
       setIsSelfRoute(false);
       setSelfCheckResolved(true);
-      return () => { cancelled = true; };
+      return () => {
+        cancelled = true;
+      };
     }
 
     setIsSelfRoute(false);
@@ -49,7 +54,9 @@ export function PersonDetailRouteContent({ employeeId }: { employeeId: string })
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [authLoading, employeeId, orgId, permsLoading, router, user]);
 
   if (!selfCheckResolved || isSelfRoute) return null;
@@ -57,11 +64,7 @@ export function PersonDetailRouteContent({ employeeId }: { employeeId: string })
   return <StaffDetailPage employeeId={employeeId} />;
 }
 
-export default function PersonDetailRoute({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function PersonDetailRoute({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
 
   if (!UUID_RE.test(id)) notFound();

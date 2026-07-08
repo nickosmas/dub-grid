@@ -56,7 +56,9 @@ function AcceptInviteContent() {
         .then(({ orgName: name }) => {
           if (name) setOrgName(name);
         })
-        .catch(() => { /* best-effort */ });
+        .catch(() => {
+          /* best-effort */
+        });
     }
   }, []);
 
@@ -108,7 +110,7 @@ function AcceptInviteContent() {
           throw new Error(
             signInError.message.toLowerCase().includes("email not confirmed")
               ? "Please check your email to confirm your account, then try again."
-              : "Unable to sign in. Please try again or contact support."
+              : "Unable to sign in. Please try again or contact support.",
           );
         }
       }
@@ -119,7 +121,8 @@ function AcceptInviteContent() {
         const result = await acceptInvitation(token!);
         slug = result.orgSlug;
       } catch (acceptErr: unknown) {
-        const msg: string = (acceptErr instanceof Error ? acceptErr.message : String(acceptErr)) ?? "";
+        const msg: string =
+          (acceptErr instanceof Error ? acceptErr.message : String(acceptErr)) ?? "";
         const code: string = (acceptErr as { code?: string })?.code ?? "";
         // "Already accepted" is fine — just proceed to success.
         // Match on Postgres error code P0001 (RAISE EXCEPTION) + message, or message alone as fallback.
@@ -129,7 +132,7 @@ function AcceptInviteContent() {
         if (!isAlreadyAccepted) {
           throw new Error(
             "Your account was created, but this invitation is no longer valid. " +
-            "Please contact your organization administrator for a new invitation."
+              "Please contact your organization administrator for a new invitation.",
           );
         }
         // Try to look up the org slug for redirect
@@ -201,9 +204,13 @@ function AcceptInviteContent() {
                 marginBottom: "24px",
               }}
             >
-              {orgName
-                ? <>Set your password to join <strong>{orgName}</strong> on DubGrid.</>
-                : "Set your password to join your organization on DubGrid."}
+              {orgName ? (
+                <>
+                  Set your password to join <strong>{orgName}</strong> on DubGrid.
+                </>
+              ) : (
+                "Set your password to join your organization on DubGrid."
+              )}
             </p>
 
             <form
@@ -226,7 +233,10 @@ function AcceptInviteContent() {
                   autoComplete="email"
                   style={
                     emailFromUrl
-                      ? { background: "var(--color-bg-secondary)", color: "var(--color-text-subtle)" }
+                      ? {
+                          background: "var(--color-bg-secondary)",
+                          color: "var(--color-text-subtle)",
+                        }
                       : undefined
                   }
                 />
@@ -269,7 +279,11 @@ function AcceptInviteContent() {
               {formError && (
                 <p
                   id="invite-form-error"
-                  style={{ color: "var(--color-danger-dark)", fontSize: "var(--dg-fs-body-sm)", margin: 0 }}
+                  style={{
+                    color: "var(--color-danger-dark)",
+                    fontSize: "var(--dg-fs-body-sm)",
+                    margin: 0,
+                  }}
                 >
                   {formError}
                 </p>
@@ -299,11 +313,21 @@ function AcceptInviteContent() {
                 />
                 <span>
                   I agree to the{" "}
-                  <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-brand)", textDecoration: "underline" }}>
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+                  >
                     Terms of Service
-                  </a>
-                  {" "}and{" "}
-                  <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: "var(--color-brand)", textDecoration: "underline" }}>
+                  </a>{" "}
+                  and{" "}
+                  <a
+                    href="/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+                  >
                     Privacy Policy
                   </a>
                 </span>
@@ -315,7 +339,13 @@ function AcceptInviteContent() {
                 className="dg-auth-submit"
                 style={{ marginTop: "4px" }}
               >
-                <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Set Password & Accept</ButtonLoading>
+                <ButtonLoading
+                  loading={loading}
+                  spinnerColor="var(--color-text-inverse)"
+                  spinnerSize={28}
+                >
+                  Set Password & Accept
+                </ButtonLoading>
               </button>
             </form>
           </>
@@ -356,8 +386,8 @@ function SuccessState({
       heading="You're all set"
       message={
         <>
-          Your account has been created and invitation accepted. Sign in to get
-          started with your onboarding.
+          Your account has been created and invitation accepted. Sign in to get started with your
+          onboarding.
           {countdown > 0 ? ` Redirecting in ${countdown}...` : " Redirecting..."}
         </>
       }

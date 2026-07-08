@@ -27,9 +27,7 @@ export function getCookieConsent(): CookiePreferences | null {
   try {
     // Cookie is the primary store (works cross-subdomain in production).
     // localStorage is a fallback for localhost where subdomain cookies are unreliable.
-    const cookieEntry = document.cookie
-      .split("; ")
-      .find((c) => c.startsWith(`${STORAGE_KEY}=`));
+    const cookieEntry = document.cookie.split("; ").find((c) => c.startsWith(`${STORAGE_KEY}=`));
     if (cookieEntry) {
       const value = decodeURIComponent(cookieEntry.split("=")[1]);
       return JSON.parse(value) as CookiePreferences;
@@ -74,7 +72,9 @@ function writeStoredConsent(prefs: CookiePreferences) {
   // Write to localStorage (primary — works reliably on localhost subdomains)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(withVersion));
-  } catch { /* storage full or blocked — cookie fallback below */ }
+  } catch {
+    /* storage full or blocked — cookie fallback below */
+  }
   // Also write to cookie for cross-subdomain support in production
   const expires = new Date();
   expires.setFullYear(expires.getFullYear() + 1);
@@ -222,7 +222,12 @@ export default function CookieConsent() {
         aria-label="Close and keep essential cookies only"
         title="Close"
         className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-md sm:right-3 sm:top-3"
-        style={{ color: "var(--color-text-muted)", background: "none", border: "none", cursor: "pointer" }}
+        style={{
+          color: "var(--color-text-muted)",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+        }}
       >
         <X size={18} />
       </button>
@@ -235,8 +240,8 @@ export default function CookieConsent() {
               color: "var(--color-text-secondary)",
             }}
           >
-            We use essential cookies to make DubGrid work. We&apos;d also like to set
-            analytics cookies to help us improve.{" "}
+            We use essential cookies to make DubGrid work. We&apos;d also like to set analytics
+            cookies to help us improve.{" "}
             <a
               href="/cookie-policy"
               style={{ color: "var(--color-brand)", textDecoration: "underline" }}
@@ -281,7 +286,12 @@ export default function CookieConsent() {
             title="Essential"
             description="Required for sign-in, security, and core features. Includes error monitoring so we can keep DubGrid running. These can't be turned off."
           >
-            <Switch checked disabled onChange={() => {}} ariaLabel="Essential cookies (always on)" />
+            <Switch
+              checked
+              disabled
+              onChange={() => {}}
+              ariaLabel="Essential cookies (always on)"
+            />
           </ConsentCategory>
 
           <ConsentCategory

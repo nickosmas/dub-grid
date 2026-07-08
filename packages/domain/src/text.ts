@@ -16,9 +16,7 @@ export function indefiniteArticle(word: string): "a" | "an" {
   // Vowel-letter words with a leading consonant sound take "a":
   // "you"-sound u-words (unique, university, use, utility, ubiquitous),
   // all eu- words (European, eulogy), and "one"/"once".
-  if (
-    /^(u(ni(?!n)|se|su|ti|to|ten|biq|ku|nan|sur)|eu|once|one\b|one[- ])/.test(w)
-  ) {
+  if (/^(u(ni(?!n)|se|su|ti|to|ten|biq|ku|nan|sur)|eu|once|one\b|one[- ])/.test(w)) {
     return "a";
   }
   return /^[aeiou]/.test(w) ? "an" : "a";

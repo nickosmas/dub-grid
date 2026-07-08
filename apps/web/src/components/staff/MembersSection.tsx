@@ -127,7 +127,7 @@ export function MembersSection({
   const currentUserId = currentUser?.id ?? null;
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
-  const directoryOrgId = canViewManagementUsers ? orgId ?? null : null;
+  const directoryOrgId = canViewManagementUsers ? (orgId ?? null) : null;
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
@@ -187,8 +187,7 @@ export function MembersSection({
     };
   }, [filterOpen]);
 
-  const { selectedIds, toggleSelect, toggleSelectAll, clearSelection } =
-    useStaffSelection();
+  const { selectedIds, toggleSelect, toggleSelectAll, clearSelection } = useStaffSelection();
   const reorder = useStaffReorder({ sorted, onSave });
   const {
     isReordering,
@@ -260,140 +259,153 @@ export function MembersSection({
 
   useEffect(() => cancelSettleAnimation, [cancelSettleAnimation]);
 
-  const getRowHeight = useCallback((index: number) => {
-    const employee = baseList[index];
-    if (!employee) return 56;
-    return rowRectsRef.current.get(employee.id)?.height ?? 56;
-  }, [baseList]);
+  const getRowHeight = useCallback(
+    (index: number) => {
+      const employee = baseList[index];
+      if (!employee) return 56;
+      return rowRectsRef.current.get(employee.id)?.height ?? 56;
+    },
+    [baseList],
+  );
 
-  const getDraggedTargetDelta = useCallback((sourceIdx: number, dropIdx: number) => {
-    if (sourceIdx === dropIdx) return 0;
+  const getDraggedTargetDelta = useCallback(
+    (sourceIdx: number, dropIdx: number) => {
+      if (sourceIdx === dropIdx) return 0;
 
-    let targetDelta = 0;
-    if (sourceIdx < dropIdx) {
-      for (let index = sourceIdx + 1; index <= dropIdx; index += 1) {
-        targetDelta += getRowHeight(index);
+      let targetDelta = 0;
+      if (sourceIdx < dropIdx) {
+        for (let index = sourceIdx + 1; index <= dropIdx; index += 1) {
+          targetDelta += getRowHeight(index);
+        }
+        return targetDelta;
+      }
+
+      for (let index = dropIdx; index < sourceIdx; index += 1) {
+        targetDelta -= getRowHeight(index);
       }
       return targetDelta;
-    }
+    },
+    [getRowHeight],
+  );
 
-    for (let index = dropIdx; index < sourceIdx; index += 1) {
-      targetDelta -= getRowHeight(index);
-    }
-    return targetDelta;
-  }, [getRowHeight]);
+  const handleReorderPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>, index: number) => {
+      if (!isReordering || event.button !== 0) return;
 
-  const handleReorderPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>, index: number) => {
-    if (!isReordering || event.button !== 0) return;
+      const centers = baseList.map((employee) => {
+        const rect =
+          rowRectsRef.current.get(employee.id) ??
+          rowNodesRef.current.get(employee.id)?.getBoundingClientRect();
 
-    const centers = baseList.map((employee) => {
-      const rect =
-        rowRectsRef.current.get(employee.id) ??
-        rowNodesRef.current.get(employee.id)?.getBoundingClientRect();
+        return rect ? rect.top + rect.height / 2 : null;
+      });
 
-      return rect ? rect.top + rect.height / 2 : null;
-    });
+      if (centers.some((center) => center === null)) return;
 
-    if (centers.some((center) => center === null)) return;
+      if (!baseList[index]) return;
 
-    if (!baseList[index]) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
 
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+      dragSessionRef.current = {
+        pointerId: event.pointerId,
+        draggedIdx: index,
+        startY: event.clientY,
+        dropIdx: index,
+        centers: centers as number[],
+      };
 
-    dragSessionRef.current = {
-      pointerId: event.pointerId,
-      draggedIdx: index,
-      startY: event.clientY,
-      dropIdx: index,
-      centers: centers as number[],
-    };
+      cancelSettleAnimation();
+      setDragDeltaY(0);
+      setDragPhase("dragging");
+      handleDragStart(index);
+    },
+    [baseList, cancelSettleAnimation, handleDragStart, isReordering],
+  );
 
-    cancelSettleAnimation();
-    setDragDeltaY(0);
-    setDragPhase("dragging");
-    handleDragStart(index);
-  }, [baseList, cancelSettleAnimation, handleDragStart, isReordering]);
+  const handleReorderPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const session = dragSessionRef.current;
+      if (!session || session.pointerId !== event.pointerId) return;
 
-  const handleReorderPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const session = dragSessionRef.current;
-    if (!session || session.pointerId !== event.pointerId) return;
+      event.preventDefault();
 
-    event.preventDefault();
+      const deltaY = event.clientY - session.startY;
+      const draggedCenter = session.centers[session.draggedIdx] + deltaY;
+      let nextDropIdx = 0;
 
-    const deltaY = event.clientY - session.startY;
-    const draggedCenter = session.centers[session.draggedIdx] + deltaY;
-    let nextDropIdx = 0;
-
-    for (let index = 0; index < session.centers.length; index += 1) {
-      if (index !== session.draggedIdx && draggedCenter > session.centers[index]) {
-        nextDropIdx += 1;
+      for (let index = 0; index < session.centers.length; index += 1) {
+        if (index !== session.draggedIdx && draggedCenter > session.centers[index]) {
+          nextDropIdx += 1;
+        }
       }
-    }
 
-    session.dropIdx = nextDropIdx;
-    setDragDeltaY(deltaY);
-    handleDragMove(nextDropIdx);
-  }, [handleDragMove]);
+      session.dropIdx = nextDropIdx;
+      setDragDeltaY(deltaY);
+      handleDragMove(nextDropIdx);
+    },
+    [handleDragMove],
+  );
 
-  const handleReorderPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const session = dragSessionRef.current;
-    if (!session || session.pointerId !== event.pointerId) return;
+  const handleReorderPointerEnd = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const session = dragSessionRef.current;
+      if (!session || session.pointerId !== event.pointerId) return;
 
-    event.preventDefault();
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    dragSessionRef.current = null;
+      event.preventDefault();
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      dragSessionRef.current = null;
 
-    const currentDelta = event.clientY - session.startY;
-    const targetDelta = getDraggedTargetDelta(session.draggedIdx, session.dropIdx);
-    setDragDeltaY(currentDelta);
+      const currentDelta = event.clientY - session.startY;
+      const targetDelta = getDraggedTargetDelta(session.draggedIdx, session.dropIdx);
+      setDragDeltaY(currentDelta);
 
-    settleFrameRef.current = window.requestAnimationFrame(() => {
-      settleFrameRef.current = null;
-      setDragPhase("settling");
-      setDragDeltaY(targetDelta);
-    });
+      settleFrameRef.current = window.requestAnimationFrame(() => {
+        settleFrameRef.current = null;
+        setDragPhase("settling");
+        setDragDeltaY(targetDelta);
+      });
 
-    settleTimeoutRef.current = window.setTimeout(() => {
-      settleTimeoutRef.current = null;
+      settleTimeoutRef.current = window.setTimeout(() => {
+        settleTimeoutRef.current = null;
+        setDragPhase(null);
+        setDragDeltaY(0);
+        handleDrop(session.dropIdx, session.draggedIdx);
+      }, REORDER_SETTLE_MS + 10);
+    },
+    [getDraggedTargetDelta, handleDrop],
+  );
+
+  const handleReorderPointerCancel = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const session = dragSessionRef.current;
+      if (!session || session.pointerId !== event.pointerId) return;
+
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+
+      dragSessionRef.current = null;
+      cancelSettleAnimation();
       setDragPhase(null);
       setDragDeltaY(0);
-      handleDrop(session.dropIdx, session.draggedIdx);
-    }, REORDER_SETTLE_MS + 10);
-  }, [getDraggedTargetDelta, handleDrop]);
-
-  const handleReorderPointerCancel = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const session = dragSessionRef.current;
-    if (!session || session.pointerId !== event.pointerId) return;
-
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-
-    dragSessionRef.current = null;
-    cancelSettleAnimation();
-    setDragPhase(null);
-    setDragDeltaY(0);
-    handleDragEnd();
-  }, [cancelSettleAnimation, handleDragEnd]);
+      handleDragEnd();
+    },
+    [cancelSettleAnimation, handleDragEnd],
+  );
 
   const rowDragOffsets = useMemo(() => {
     const offsets = new Map<string, number>();
-    if (
-      !isReordering ||
-      draggedIdx === null ||
-      dragOverIdx === null
-    ) {
+    if (!isReordering || draggedIdx === null || dragOverIdx === null) {
       return offsets;
     }
 
     const draggedEmployee = baseList[draggedIdx];
     if (!draggedEmployee) return offsets;
 
-    const draggedHeight =
-      rowRectsRef.current.get(draggedEmployee.id)?.height ?? 56;
+    const draggedHeight = rowRectsRef.current.get(draggedEmployee.id)?.height ?? 56;
 
     if (draggedIdx < dragOverIdx) {
       for (let index = draggedIdx + 1; index <= dragOverIdx; index += 1) {
@@ -454,10 +466,7 @@ export function MembersSection({
         if (cancelled) return;
         setPendingInvitations(
           invites.filter(
-            (inv) =>
-              !inv.acceptedAt &&
-              !inv.revokedAt &&
-              new Date(inv.expiresAt) > new Date(),
+            (inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date(),
           ),
         );
       })
@@ -491,8 +500,11 @@ export function MembersSection({
     return map;
   }, [pendingInvitations, nowMs]);
 
-  const { directory, truncated: directoryTruncated, cap: directoryCap } =
-    useDirectory(directoryOrgId);
+  const {
+    directory,
+    truncated: directoryTruncated,
+    cap: directoryCap,
+  } = useDirectory(directoryOrgId);
   // Access role (org_role) per linked employee, sourced from the directory.
   // Only populated when the viewer can load directory data; staff with no
   // linked login simply resolve to null and render an em dash.
@@ -555,10 +567,10 @@ export function MembersSection({
   const [showManagement, setShowManagement] = useState(false);
   const [deptFilterId, setDeptFilterId] = useState<number | null>(null);
   const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
-  const [managementAccessEmployee, setManagementAccessEmployee] =
-    useState<Employee | null>(null);
-  const [managementSchedulePerson, setManagementSchedulePerson] =
-    useState<DirectoryPerson | null>(null);
+  const [managementAccessEmployee, setManagementAccessEmployee] = useState<Employee | null>(null);
+  const [managementSchedulePerson, setManagementSchedulePerson] = useState<DirectoryPerson | null>(
+    null,
+  );
 
   const filteredDeptUsers = useMemo(() => {
     let list = departmentUsers;
@@ -566,9 +578,7 @@ export function MembersSection({
     if (deptFilterId === -1) {
       list = list.filter((user) => user.managementDepartmentIds.length === 0);
     } else if (deptFilterId !== null) {
-      list = list.filter((user) =>
-        user.managementDepartmentIds.includes(deptFilterId),
-      );
+      list = list.filter((user) => user.managementDepartmentIds.includes(deptFilterId));
     }
 
     if (showManagement && searchQuery) {
@@ -662,9 +672,7 @@ export function MembersSection({
       const failed = results.length - succeeded;
 
       if (failed === 0 && droppedSelfCount === 0) {
-        toast.success(
-          `${succeeded} ${succeeded === 1 ? "person" : "people"} updated`,
-        );
+        toast.success(`${succeeded} ${succeeded === 1 ? "person" : "people"} updated`);
       } else if (failed === 0) {
         toast.success(
           `${succeeded} updated. Your own account was skipped (you can't run that action on yourself).`,
@@ -694,19 +702,14 @@ export function MembersSection({
       .then((invites) => {
         setPendingInvitations(
           invites.filter(
-            (inv) =>
-              !inv.acceptedAt &&
-              !inv.revokedAt &&
-              new Date(inv.expiresAt) > new Date(),
+            (inv) => !inv.acceptedAt && !inv.revokedAt && new Date(inv.expiresAt) > new Date(),
           ),
         );
       })
       .catch(() => {});
   }
 
-  async function handleRevokeInvitation(
-    invitationId: string,
-  ): Promise<boolean> {
+  async function handleRevokeInvitation(invitationId: string): Promise<boolean> {
     if (!orgId) return false;
     setRevokingId(invitationId);
 
@@ -775,8 +778,7 @@ export function MembersSection({
         {
           key: "all",
           label: "All",
-          count:
-            employees.length + inactiveEmployees.length + removedEmployees.length,
+          count: employees.length + inactiveEmployees.length + removedEmployees.length,
         },
         { key: "active", label: "Active", count: employees.length },
         { key: "inactive", label: "Inactive", count: inactiveEmployees.length },
@@ -785,16 +787,15 @@ export function MembersSection({
     : [{ key: "active", label: "Active", count: employees.length }];
 
   const selectedEmployee = expandedEmpId
-    ? [...employees, ...inactiveEmployees, ...removedEmployees].find(
+    ? ([...employees, ...inactiveEmployees, ...removedEmployees].find(
         (employee) => employee.id === expandedEmpId,
-      ) ?? null
+      ) ?? null)
     : null;
   const selectedEmployeeDirectoryPerson = selectedEmployee
-    ? directory.find((person) => person.employeeId === selectedEmployee.id) ??
-      null
+    ? (directory.find((person) => person.employeeId === selectedEmployee.id) ?? null)
     : null;
   const selectedPerson = expandedPersonId
-    ? departmentUsers.find((user) => user.personId === expandedPersonId) ?? null
+    ? (departmentUsers.find((user) => user.personId === expandedPersonId) ?? null)
     : null;
 
   const syncDirectoryPersonInCaches = useCallback(
@@ -841,9 +842,7 @@ export function MembersSection({
     (person: DirectoryPerson, employee: Employee) => {
       if (!orgId) return;
       syncExistingEmployeeInCaches(employee);
-      syncDirectoryPersonInCaches(
-        mergeEmployeeIntoDirectoryPerson(person, employee),
-      );
+      syncDirectoryPersonInCaches(mergeEmployeeIntoDirectoryPerson(person, employee));
     },
     [orgId, syncDirectoryPersonInCaches, syncExistingEmployeeInCaches],
   );
@@ -857,9 +856,7 @@ export function MembersSection({
     (id: string | null): Employee | null => {
       if (!id) return null;
       if (orgId) {
-        const cached = queryClient.getQueryData<Employee[]>(
-          queryKeys.employees.all(orgId),
-        );
+        const cached = queryClient.getQueryData<Employee[]>(queryKeys.employees.all(orgId));
         const hit = cached?.find((employee) => employee.id === id);
         if (hit) return hit;
       }
@@ -890,8 +887,8 @@ export function MembersSection({
               role="alert"
               className="rounded-md border border-amber-300/70 bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100"
             >
-              Showing the first {directoryCap ?? 500} members. Use search or
-              filters to find specific people. Full pagination is coming soon.
+              Showing the first {directoryCap ?? 500} members. Use search or filters to find
+              specific people. Full pagination is coming soon.
             </div>
           )}
 
@@ -979,9 +976,7 @@ export function MembersSection({
                             style={{
                               width: 1,
                               height: 16,
-                              background: showDivider
-                                ? "var(--color-border)"
-                                : "transparent",
+                              background: showDivider ? "var(--color-border)" : "transparent",
                               flexShrink: 0,
                               alignSelf: "center",
                             }}
@@ -1013,9 +1008,7 @@ export function MembersSection({
                               background: active
                                 ? "rgba(255,255,255,0.25)"
                                 : "var(--color-border-light)",
-                              color: active
-                                ? "inherit"
-                                : "var(--color-text-muted)",
+                              color: active ? "inherit" : "var(--color-text-muted)",
                               marginLeft: 3,
                             }}
                           >
@@ -1051,10 +1044,7 @@ export function MembersSection({
                           deptFilterId === null
                             ? "rgba(255,255,255,0.25)"
                             : "var(--color-border-light)",
-                        color:
-                          deptFilterId === null
-                            ? "inherit"
-                            : "var(--color-text-muted)",
+                        color: deptFilterId === null ? "inherit" : "var(--color-text-muted)",
                         marginLeft: 3,
                       }}
                     >
@@ -1077,17 +1067,13 @@ export function MembersSection({
                             style={{
                               width: 1,
                               height: 16,
-                              background: showDivider
-                                ? "var(--color-border)"
-                                : "transparent",
+                              background: showDivider ? "var(--color-border)" : "transparent",
                               flexShrink: 0,
                               alignSelf: "center",
                             }}
                           />
                           <button
-                            onClick={() =>
-                              setDeptFilterId(active ? null : department.id)
-                            }
+                            onClick={() => setDeptFilterId(active ? null : department.id)}
                             className={`dg-span-tab${active ? " active" : ""}`}
                           >
                             {department.name}
@@ -1106,9 +1092,7 @@ export function MembersSection({
                                 background: active
                                   ? "rgba(255,255,255,0.25)"
                                   : "var(--color-border-light)",
-                                color: active
-                                  ? "inherit"
-                                  : "var(--color-text-muted)",
+                                color: active ? "inherit" : "var(--color-text-muted)",
                                 marginLeft: 3,
                               }}
                             >
@@ -1121,10 +1105,7 @@ export function MembersSection({
                 </div>
               )}
 
-              <div
-                className="relative"
-                style={{ flex: "1 1 300px", minWidth: 300, maxWidth: 380 }}
-              >
+              <div className="relative" style={{ flex: "1 1 300px", minWidth: 300, maxWidth: 380 }}>
                 <svg
                   width="14"
                   height="14"
@@ -1161,28 +1142,21 @@ export function MembersSection({
                 </button>
               )}
 
-              {!showManagement &&
-                canViewManagementUsers &&
-                orgId &&
-                !isMobile && (
-                  <button
-                    onClick={() => setExportConfirm(true)}
-                    className="dg-btn dg-btn-secondary dg-btn-sm"
-                    disabled={!hasExportableStaffRows}
-                  >
-                    <Upload size={14} />
-                    Export
-                  </button>
-                )}
+              {!showManagement && canViewManagementUsers && orgId && !isMobile && (
+                <button
+                  onClick={() => setExportConfirm(true)}
+                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                  disabled={!hasExportableStaffRows}
+                >
+                  <Upload size={14} />
+                  Export
+                </button>
+              )}
 
               {((showManagement && canManageManagementAccess) ||
                 (!showManagement && canManageEmployees)) && (
                 <button
-                  onClick={
-                    showManagement
-                      ? () => setShowManagementInvite(true)
-                      : onAdd
-                  }
+                  onClick={showManagement ? () => setShowManagementInvite(true) : onAdd}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
                   + Add
@@ -1310,33 +1284,20 @@ export function MembersSection({
                         <div className="dg-staff-directory-head-cell flex">
                           <span className="inline-flex items-center gap-1">
                             Name{" "}
-                            <SortIcon
-                              active={sortConfig.key === "name"}
-                              dir={sortConfig.dir}
-                            />
+                            <SortIcon active={sortConfig.key === "name"} dir={sortConfig.dir} />
                           </span>
                         </div>
-                        <div className="dg-staff-directory-head-cell flex">
-                          Employment
-                        </div>
-                        <div className="dg-staff-directory-head-cell flex">
-                          Status
-                        </div>
+                        <div className="dg-staff-directory-head-cell flex">Employment</div>
+                        <div className="dg-staff-directory-head-cell flex">Status</div>
                         <div className="dg-staff-directory-head-cell hidden md:flex">
                           {focusAreaLabel}
                         </div>
                         <div className="dg-staff-directory-head-cell hidden md:flex">
                           {certificationLabel}
                         </div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">
-                          Roles
-                        </div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">
-                          Account
-                        </div>
-                        <div className="dg-staff-directory-head-cell hidden lg:flex">
-                          Access
-                        </div>
+                        <div className="dg-staff-directory-head-cell hidden lg:flex">Roles</div>
+                        <div className="dg-staff-directory-head-cell hidden lg:flex">Account</div>
+                        <div className="dg-staff-directory-head-cell hidden lg:flex">Access</div>
                         <div className="dg-staff-directory-head-cell hidden lg:flex">
                           Date Joined
                         </div>
@@ -1345,11 +1306,10 @@ export function MembersSection({
                       <div className="dg-staff-directory-body">
                         {paginatedList.map((employee, index) => {
                           const isDragging =
-                            draggedIdx !== null &&
-                            baseList[draggedIdx]?.id === employee.id;
+                            draggedIdx !== null && baseList[draggedIdx]?.id === employee.id;
                           const dragOffsetY = isDragging
                             ? dragDeltaY
-                            : rowDragOffsets.get(employee.id) ?? 0;
+                            : (rowDragOffsets.get(employee.id) ?? 0);
 
                           return (
                             <StaffReorderListRow
@@ -1359,7 +1319,7 @@ export function MembersSection({
                               isExpanded={false}
                               isReordering
                               isDragging={isDragging}
-                              dragPhase={isDragging ? dragPhase ?? undefined : undefined}
+                              dragPhase={isDragging ? (dragPhase ?? undefined) : undefined}
                               canManageEmployees={canManageEmployees}
                               canViewEmployeeDetails={canViewEmployeeDetails}
                               canNavigateToDetailsPage={canManageEmployees}
@@ -1422,10 +1382,7 @@ export function MembersSection({
                           >
                             <span className="inline-flex items-center gap-1">
                               Name{" "}
-                              <SortIcon
-                                active={sortConfig.key === "name"}
-                                dir={sortConfig.dir}
-                              />
+                              <SortIcon active={sortConfig.key === "name"} dir={sortConfig.dir} />
                             </span>
                           </TableHead>
                           {canViewEmployeeDetails && (
@@ -1493,9 +1450,7 @@ export function MembersSection({
                               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
                               onToggleSelect={toggleSelect}
                               onRowClick={(employeeId) =>
-                                setExpandedEmpId(
-                                  isExpanded ? null : employeeId,
-                                )
+                                setExpandedEmpId(isExpanded ? null : employeeId)
                               }
                             />
                           );
@@ -1523,7 +1478,8 @@ export function MembersSection({
               />
             ))}
 
-          {canViewManagementUsers && showManagement &&
+          {canViewManagementUsers &&
+            showManagement &&
             (filteredDeptUsers.length > 0 ? (
               <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-surface)]">
                 <Table>
@@ -1557,18 +1513,13 @@ export function MembersSection({
                     {filteredDeptUsers.map((person) => {
                       const personDepts = person.managementDepartmentIds
                         .map((departmentId) =>
-                          managementDepts.find(
-                            (department) => department.id === departmentId,
-                          ),
+                          managementDepts.find((department) => department.id === departmentId),
                         )
                         .filter(
-                          (
-                            department,
-                          ): department is NonNullable<typeof department> =>
+                          (department): department is NonNullable<typeof department> =>
                             department != null,
                         );
-                      const isPending =
-                        person.invitationStatus !== null && !person.hasAppAccess;
+                      const isPending = person.invitationStatus !== null && !person.hasAppAccess;
                       const isExpanded = person.personId === expandedPersonId;
                       const statusLabel = isPending
                         ? person.invitationStatus === "expired"
@@ -1598,9 +1549,10 @@ export function MembersSection({
                                 background: "var(--color-success-bg)",
                                 color: "var(--color-success-text)",
                               };
-                      const displayName = person.firstName || person.lastName
-                        ? `${person.firstName} ${person.lastName}`.trim()
-                        : person.email;
+                      const displayName =
+                        person.firstName || person.lastName
+                          ? `${person.firstName} ${person.lastName}`.trim()
+                          : person.email;
                       const initials = getAvatarInitials(displayName);
 
                       return (
@@ -1611,11 +1563,7 @@ export function MembersSection({
                               ? "bg-[var(--color-control-active-bg)]"
                               : "hover:bg-[var(--color-bg)]"
                           }`}
-                          onClick={() =>
-                            setExpandedPersonId(
-                              isExpanded ? null : person.personId,
-                            )
-                          }
+                          onClick={() => setExpandedPersonId(isExpanded ? null : person.personId)}
                           style={{ opacity: isPending ? 0.7 : 1 }}
                         >
                           <TableCell className="w-[100px] border-r border-[var(--color-border-light)] py-4 pl-6">
@@ -1879,9 +1827,7 @@ export function MembersSection({
           onClose={() => setExpandedEmpId(null)}
           onInvite={(employee) => setInviteEmployee(employee)}
           canManageManagementAccess={canManageManagementAccess}
-          hasManagementAccess={
-            selectedEmployeeDirectoryPerson?.isManagementUser ?? false
-          }
+          hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
           hasPendingManagementInvite={
             !!selectedEmployeeDirectoryPerson &&
             selectedEmployeeDirectoryPerson.managementDepartmentIds.length > 0 &&
@@ -1917,8 +1863,7 @@ export function MembersSection({
             selectedEmployeeDirectoryPerson?.membershipUpdatedAt
               ? async (newRole) => {
                   const person = selectedEmployeeDirectoryPerson;
-                  if (!orgId || !person?.userId || !person?.membershipUpdatedAt)
-                    return;
+                  if (!orgId || !person?.userId || !person?.membershipUpdatedAt) return;
                   await updateOrganizationMembershipGuarded({
                     orgId,
                     userId: person.userId,
@@ -1940,8 +1885,7 @@ export function MembersSection({
             selectedEmployeeDirectoryPerson?.membershipUpdatedAt
               ? async (perms) => {
                   const person = selectedEmployeeDirectoryPerson;
-                  if (!orgId || !person?.userId || !person?.membershipUpdatedAt)
-                    return;
+                  if (!orgId || !person?.userId || !person?.membershipUpdatedAt) return;
                   await updateOrganizationMembershipGuarded({
                     orgId,
                     userId: person.userId,
@@ -1969,9 +1913,7 @@ export function MembersSection({
           canManageManagementAccess={canManageManagementAccess}
           isSelf={isSelfAction(currentUserId, selectedPerson.userId)}
           onRoleChange={
-            canManageManagementAccess &&
-            selectedPerson.userId &&
-            selectedPerson.membershipUpdatedAt
+            canManageManagementAccess && selectedPerson.userId && selectedPerson.membershipUpdatedAt
               ? async (newRole) => {
                   const userId = selectedPerson.userId;
                   const expectedUpdatedAt = selectedPerson.membershipUpdatedAt;
@@ -1992,9 +1934,7 @@ export function MembersSection({
               : undefined
           }
           onPermissionsChange={
-            canManageManagementAccess &&
-            selectedPerson.userId &&
-            selectedPerson.membershipUpdatedAt
+            canManageManagementAccess && selectedPerson.userId && selectedPerson.membershipUpdatedAt
               ? async (perms) => {
                   const userId = selectedPerson.userId;
                   const expectedUpdatedAt = selectedPerson.membershipUpdatedAt;
@@ -2020,10 +1960,7 @@ export function MembersSection({
 
             let updatedEmployee: Employee | null = null;
 
-            if (
-              selectedPerson.source === "employee" &&
-              selectedPerson.employeeId
-            ) {
+            if (selectedPerson.source === "employee" && selectedPerson.employeeId) {
               const currentEmployee = findEmployeeById(selectedPerson.employeeId);
               if (!currentEmployee) {
                 toast.error("Could not load the latest employee record. Refresh and try again.");
@@ -2039,9 +1976,7 @@ export function MembersSection({
                 phone: data.phone,
                 expectedVersion: currentEmployee.version,
               });
-              const pendingInvitation = pendingInviteByEmployeeId.get(
-                selectedPerson.employeeId,
-              );
+              const pendingInvitation = pendingInviteByEmployeeId.get(selectedPerson.employeeId);
               if (selectedPerson.userId) {
                 await updateAppOnlyUser(selectedPerson.userId, orgId, {
                   departmentIds: data.managementDepartmentIds,
@@ -2058,17 +1993,13 @@ export function MembersSection({
 
               updatedEmployee = identityResult.employee;
             } else if (selectedPerson.source === "pending_invite") {
-              await updatePendingInvitation(
-                selectedPerson.personId.replace("inv:", ""),
-                orgId,
-                {
-                  firstName: data.firstName,
-                  lastName: data.lastName,
-                  email: data.email || undefined,
-                  phone: data.phone,
-                  departmentIds: data.managementDepartmentIds,
-                },
-              );
+              await updatePendingInvitation(selectedPerson.personId.replace("inv:", ""), orgId, {
+                firstName: data.firstName,
+                lastName: data.lastName,
+                email: data.email || undefined,
+                phone: data.phone,
+                departmentIds: data.managementDepartmentIds,
+              });
             } else if (selectedPerson.userId) {
               await updateAppOnlyUser(selectedPerson.userId, orgId, {
                 firstName: data.firstName,
@@ -2082,9 +2013,7 @@ export function MembersSection({
               syncExistingEmployeeInCaches(updatedEmployee);
             }
 
-            syncDirectoryPersonInCaches(
-              applyManagementDirectoryUpdate(selectedPerson, data),
-            );
+            syncDirectoryPersonInCaches(applyManagementDirectoryUpdate(selectedPerson, data));
             refreshInvitations();
             void queryClient.invalidateQueries({
               queryKey: queryKeys.org.directory(orgId),
@@ -2126,39 +2055,36 @@ export function MembersSection({
         />
       )}
 
-      {managementSchedulePerson && orgId && (() => {
-        const existingEmployee = findEmployeeById(
-          managementSchedulePerson.employeeId,
-        );
-        if (!existingEmployee) return null;
-        return (
-          <AddManagementUserToScheduleModal
-            orgId={orgId}
-            person={managementSchedulePerson}
-            employee={existingEmployee}
-            focusAreas={focusAreas}
-            certifications={certifications}
-            roles={roles}
-            focusAreaLabel={focusAreaLabel}
-            certificationLabel={certificationLabel}
-            roleLabel={roleLabel}
-            onClose={() => setManagementSchedulePerson(null)}
-            onAdded={(employee) => {
-              syncManagementScheduleEmployeeInCaches(
-                managementSchedulePerson,
-                employee,
-              );
-              setManagementSchedulePerson(null);
-              void queryClient.invalidateQueries({
-                queryKey: queryKeys.org.directory(orgId),
-              });
-              void queryClient.invalidateQueries({
-                queryKey: queryKeys.employees.all(orgId),
-              });
-            }}
-          />
-        );
-      })()}
+      {managementSchedulePerson &&
+        orgId &&
+        (() => {
+          const existingEmployee = findEmployeeById(managementSchedulePerson.employeeId);
+          if (!existingEmployee) return null;
+          return (
+            <AddManagementUserToScheduleModal
+              orgId={orgId}
+              person={managementSchedulePerson}
+              employee={existingEmployee}
+              focusAreas={focusAreas}
+              certifications={certifications}
+              roles={roles}
+              focusAreaLabel={focusAreaLabel}
+              certificationLabel={certificationLabel}
+              roleLabel={roleLabel}
+              onClose={() => setManagementSchedulePerson(null)}
+              onAdded={(employee) => {
+                syncManagementScheduleEmployeeInCaches(managementSchedulePerson, employee);
+                setManagementSchedulePerson(null);
+                void queryClient.invalidateQueries({
+                  queryKey: queryKeys.org.directory(orgId),
+                });
+                void queryClient.invalidateQueries({
+                  queryKey: queryKeys.employees.all(orgId),
+                });
+              }}
+            />
+          );
+        })()}
 
       {managementAccessEmployee && orgId && canManageManagementAccess && (
         <EmployeeManagementAccessModal
@@ -2182,61 +2108,63 @@ export function MembersSection({
         />
       )}
 
-      {bulkConfirm ? (() => {
-        const count = bulkConfirm.employeeIds.length;
-        const plural = count === 1 ? "" : "s";
-        const showReason = bulkConfirm.action !== "activate";
-        const summary =
-          bulkConfirm.action === "deactivate"
-            ? `Deactivate ${count} selected staff member${plural}? They'll be hidden from active scheduling and can be reactivated anytime.`
-            : bulkConfirm.action === "activate"
-              ? `Activate ${count} selected staff member${plural}? They'll return to active scheduling.`
-              : `Remove ${count} selected staff member${plural}? They'll lose access and won't appear in active staff lists.`;
-        return (
-          <ConfirmDialog
-            title={
+      {bulkConfirm
+        ? (() => {
+            const count = bulkConfirm.employeeIds.length;
+            const plural = count === 1 ? "" : "s";
+            const showReason = bulkConfirm.action !== "activate";
+            const summary =
               bulkConfirm.action === "deactivate"
-                ? "Deactivate Selected Staff?"
+                ? `Deactivate ${count} selected staff member${plural}? They'll be hidden from active scheduling and can be reactivated anytime.`
                 : bulkConfirm.action === "activate"
-                  ? "Activate Selected Staff?"
-                  : "Remove Selected Staff?"
-            }
-            message={
-              showReason ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <span>{summary}</span>
-                  <input
-                    className="dg-input"
-                    value={bulkNote}
-                    onChange={(e) => setBulkNote(e.target.value)}
-                    disabled={isBulkActionRunning}
-                    placeholder="Reason (optional, applies to all selected)"
-                    style={{ fontSize: "var(--dg-fs-label)" }}
-                  />
-                </div>
-              ) : (
-                summary
-              )
-            }
-            confirmLabel={
-              bulkConfirm.action === "deactivate"
-                ? "Deactivate"
-                : bulkConfirm.action === "activate"
-                  ? "Activate"
-                  : "Remove"
-            }
-            variant={bulkConfirm.action === "remove" ? "danger" : "warning"}
-            isLoading={isBulkActionRunning}
-            onConfirm={handleConfirmBulkAction}
-            onCancel={() => {
-              if (!isBulkActionRunning) {
-                setBulkConfirm(null);
-                setBulkNote("");
-              }
-            }}
-          />
-        );
-      })() : null}
+                  ? `Activate ${count} selected staff member${plural}? They'll return to active scheduling.`
+                  : `Remove ${count} selected staff member${plural}? They'll lose access and won't appear in active staff lists.`;
+            return (
+              <ConfirmDialog
+                title={
+                  bulkConfirm.action === "deactivate"
+                    ? "Deactivate Selected Staff?"
+                    : bulkConfirm.action === "activate"
+                      ? "Activate Selected Staff?"
+                      : "Remove Selected Staff?"
+                }
+                message={
+                  showReason ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      <span>{summary}</span>
+                      <input
+                        className="dg-input"
+                        value={bulkNote}
+                        onChange={(e) => setBulkNote(e.target.value)}
+                        disabled={isBulkActionRunning}
+                        placeholder="Reason (optional, applies to all selected)"
+                        style={{ fontSize: "var(--dg-fs-label)" }}
+                      />
+                    </div>
+                  ) : (
+                    summary
+                  )
+                }
+                confirmLabel={
+                  bulkConfirm.action === "deactivate"
+                    ? "Deactivate"
+                    : bulkConfirm.action === "activate"
+                      ? "Activate"
+                      : "Remove"
+                }
+                variant={bulkConfirm.action === "remove" ? "danger" : "warning"}
+                isLoading={isBulkActionRunning}
+                onConfirm={handleConfirmBulkAction}
+                onCancel={() => {
+                  if (!isBulkActionRunning) {
+                    setBulkConfirm(null);
+                    setBulkNote("");
+                  }
+                }}
+              />
+            );
+          })()
+        : null}
 
       {exportConfirm ? (
         <ConfirmDialog

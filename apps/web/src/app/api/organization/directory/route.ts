@@ -10,9 +10,7 @@ const searchSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const parsed = searchSchema.safeParse(
-      Object.fromEntries(req.nextUrl.searchParams.entries()),
-    );
+    const parsed = searchSchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
     if (!parsed.success) {
       return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
@@ -34,8 +32,7 @@ export async function GET(req: NextRequest) {
     // Only super_admins/gridmasters may edit (and therefore see) the per-user
     // permission matrix; redact it for everyone else even though the directory
     // itself is visible to canViewStaff.
-    const canSeePermissions =
-      orgAuth.permissions.isSuperAdmin || orgAuth.permissions.isGridmaster;
+    const canSeePermissions = orgAuth.permissions.isSuperAdmin || orgAuth.permissions.isGridmaster;
     const { data, error } = await serviceClient.rpc("get_org_directory", {
       // Use the auth-effective orgId — when the caller is in sandbox
       // mode, this is the sandbox id, not the body's real-org id.
@@ -83,9 +80,9 @@ export async function GET(req: NextRequest) {
         employeeStatus: (row.employee_status as EmployeeStatus | null) ?? null,
         orgRole: (row.org_role as OrganizationRole | null) ?? null,
         hasAppAccess,
-        focusAreaIds: ((row.focus_area_ids as number[]) ?? []),
+        focusAreaIds: (row.focus_area_ids as number[]) ?? [],
         certificationId: (row.certification_id as number | null) ?? null,
-        roleIds: ((row.role_ids as number[]) ?? []),
+        roleIds: (row.role_ids as number[]) ?? [],
         seniority: (row.seniority as number | null) ?? null,
         lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
         invitationStatus: (row.invitation_status as "pending" | "expired" | null) ?? null,
@@ -109,9 +106,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("organization directory GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load organization directory" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load organization directory" }, { status: 500 });
   }
 }

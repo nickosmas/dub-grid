@@ -11,12 +11,7 @@ import {
 import type { ShellNavGroup, ShellNavItem } from "@/components/settings/SettingsShell";
 
 export type ProfileSectionId =
-  | "profile"
-  | "security"
-  | "notifications"
-  | "data-privacy"
-  | "overview"
-  | "schedule";
+  "profile" | "security" | "notifications" | "data-privacy" | "overview" | "schedule";
 
 export const VALID_PROFILE_SECTIONS: ProfileSectionId[] = [
   "profile",
@@ -43,16 +38,13 @@ export interface ProfileNavContext {
   isOnSchedule: boolean;
 }
 
-export function buildProfileNavGroups(
-  ctx: ProfileNavContext,
-): ShellNavGroup<ProfileSectionId>[] {
+export function buildProfileNavGroups(ctx: ProfileNavContext): ShellNavGroup<ProfileSectionId>[] {
   const accountItems: ShellNavItem<ProfileSectionId>[] = [
     {
       id: "profile",
       label: "Profile",
       Icon: ProfileIcon,
-      description:
-        "Your name, email, and phone — the basics about how you appear in DubGrid.",
+      description: "Your name, email, and phone — the basics about how you appear in DubGrid.",
     },
     {
       id: "security",
@@ -65,8 +57,7 @@ export function buildProfileNavGroups(
       id: "notifications",
       label: "Alerts",
       Icon: NotificationsIcon,
-      description:
-        "Choose how and when DubGrid contacts you.",
+      description: "Choose how and when DubGrid contacts you.",
     },
   ];
 
@@ -83,15 +74,13 @@ export function buildProfileNavGroups(
           id: "overview",
           label: "Overview",
           Icon: DashboardIcon,
-          description:
-            "Your role, focus areas, certifications, and what you're working this week.",
+          description: "Your role, focus areas, certifications, and what you're working this week.",
         },
         {
           id: "schedule",
           label: "Schedule",
           Icon: ScheduleIcon,
-          description:
-            "Your upcoming shifts, recurring schedule, and a calendar subscription URL.",
+          description: "Your upcoming shifts, recurring schedule, and a calendar subscription URL.",
         },
       ],
     });

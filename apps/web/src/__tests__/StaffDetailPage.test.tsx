@@ -9,10 +9,7 @@ import {
   fetchEmployeeInvitations,
   fetchEmployeeRoleHistory,
 } from "@/features/employees/client";
-import {
-  fetchRecurringShifts,
-  fetchShiftRequests,
-} from "@/features/schedule/client";
+import { fetchRecurringShifts, fetchShiftRequests } from "@/features/schedule/client";
 
 const mockReplace = vi.fn();
 const mockToastInfo = vi.fn();
@@ -66,8 +63,7 @@ vi.mock("@/features/schedule/client", () => ({
 }));
 
 vi.mock("@/components/ProgressBar", () => ({
-  default: ({ loading }: { loading?: boolean }) =>
-    loading ? <div>Loading...</div> : null,
+  default: ({ loading }: { loading?: boolean }) => (loading ? <div>Loading...</div> : null),
 }));
 
 vi.mock("@/components/staff-detail/StaffDetailHeader", () => ({
@@ -82,7 +78,11 @@ vi.mock("@/components/staff-detail/StaffDetailHeader", () => ({
   }) => (
     <div>
       <div>Personal details header</div>
-      {canEditDetails ? <button onClick={onToggleEditDetails}>{showManagementPanel ? "Hide Edit Details" : "Edit Details"}</button> : null}
+      {canEditDetails ? (
+        <button onClick={onToggleEditDetails}>
+          {showManagementPanel ? "Hide Edit Details" : "Edit Details"}
+        </button>
+      ) : null}
     </div>
   ),
 }));
@@ -209,9 +209,7 @@ describe("StaffDetailPage", () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
     await waitFor(() => {
-      expect(mockToastInfo).toHaveBeenCalledWith(
-        "You don't have access to employee details.",
-      );
+      expect(mockToastInfo).toHaveBeenCalledWith("You don't have access to employee details.");
       expect(mockReplace).toHaveBeenCalledWith("/people");
     });
   });
@@ -330,7 +328,18 @@ describe("StaffDetailPage", () => {
       shiftCategories: [],
       certifications: [],
       orgRoles: [],
-      departments: [{ id: 1, orgId: "org-1", name: "HR", abbr: "", type: "management", sortOrder: 0, archivedAt: null, permissions: null }],
+      departments: [
+        {
+          id: 1,
+          orgId: "org-1",
+          name: "HR",
+          abbr: "",
+          type: "management",
+          sortOrder: 0,
+          archivedAt: null,
+          permissions: null,
+        },
+      ],
       assignmentLabelMap: new Map(),
       absenceTypeMap: new Map(),
       loading: false,

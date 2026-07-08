@@ -5,14 +5,21 @@
 // for everyone. Session Replay records user sessions, so it is gated behind
 // analytics consent and only attached once the user opts in (here at boot if
 // already granted, or live via the consent-changed event).
-import { init, replayIntegration, addIntegration, getClient, captureRouterTransitionStart } from "@/lib/sentry";
+import {
+  init,
+  replayIntegration,
+  addIntegration,
+  getClient,
+  captureRouterTransitionStart,
+} from "@/lib/sentry";
 import { getAnalyticsConsentSnapshot, subscribeToConsentChanges } from "@/components/CookieConsent";
 
 function beforeSend(event: Record<string, unknown>) {
-  const exception = event.exception as { values?: Array<{ stacktrace?: { frames?: Array<{ filename?: string }> } }> } | undefined;
+  const exception = event.exception as
+    { values?: Array<{ stacktrace?: { frames?: Array<{ filename?: string }> } }> } | undefined;
   if (
-    exception?.values?.[0]?.stacktrace?.frames?.some(
-      (frame) => frame.filename?.includes("chrome-extension://"),
+    exception?.values?.[0]?.stacktrace?.frames?.some((frame) =>
+      frame.filename?.includes("chrome-extension://"),
     )
   ) {
     return null;

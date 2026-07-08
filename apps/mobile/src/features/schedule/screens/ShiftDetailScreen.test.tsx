@@ -15,9 +15,7 @@ const useLocalSearchParams = vi.fn();
 const routerReplace = vi.fn();
 const pushToast = vi.fn();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
@@ -39,9 +37,7 @@ vi.mock("expo-router", () => ({
   useLocalSearchParams,
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("../../../shared/components/QueryStateCard", async () =>
   createQueryStateCardModule(await import("react")),
@@ -69,17 +65,11 @@ beforeAll(async () => {
 
 describe("ShiftDetailScreen", () => {
   function confirmDialog(label: string) {
-    fireEvent.click(
-      within(screen.getByRole("alert")).getByRole("button", { name: label }),
-    );
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: label }));
   }
 
   function selectFridaySwapDate() {
-    fireEvent.click(
-      screen.getByLabelText(
-        "Show eligible teammates for Friday, April 17, 2026",
-      ),
-    );
+    fireEvent.click(screen.getByLabelText("Show eligible teammates for Friday, April 17, 2026"));
   }
 
   beforeEach(() => {
@@ -440,25 +430,19 @@ describe("ShiftDetailScreen", () => {
     render(<ShiftDetailScreen />);
 
     expect(screen.getByLabelText("Thu, Apr 16")).toBeInTheDocument();
-    expect(
-      screen.queryByText("Thursday, April 16, 2026"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Thursday, April 16, 2026")).not.toBeInTheDocument();
     expect(
       screen.getByLabelText("Published Apr 15, 2026, 11:30 AM by Mina Diaz"),
     ).toBeInTheDocument();
     expect(screen.getByText("Mentor")).toBeInTheDocument();
     expect(screen.getByText("(Mentored)")).toBeInTheDocument();
-    const mentoredJobPill = screen.getByLabelText(
-      "Job Mentor mentored assignment",
-    );
+    const mentoredJobPill = screen.getByLabelText("Job Mentor mentored assignment");
     expect(mentoredJobPill).toHaveTextContent("Mentor");
     expect(mentoredJobPill).toHaveTextContent("(Mentored)");
     expect(mentoredJobPill).not.toHaveTextContent("(MENTORED)");
     expect(screen.getByText("ICU")).toBeInTheDocument();
     expect(screen.getByLabelText("Focus area ICU")).toBeInTheDocument();
-    expect(
-      screen.queryByText(/Assignment: Training, Float/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Assignment: Training, Float/)).not.toBeInTheDocument();
     expect(screen.queryByText("Indicators")).not.toBeInTheDocument();
     expect(screen.getByText("Working with")).toBeInTheDocument();
     expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
@@ -468,12 +452,8 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Jordan Lee").closest("article")).toBeNull();
     const detailCardText = screen.getByTestId("shift-detail-card").textContent;
     expect(detailCardText).toBeDefined();
-    expect(detailCardText!.indexOf("Day Shift")).toBeLessThan(
-      detailCardText!.indexOf("Mentor"),
-    );
-    expect(detailCardText!.indexOf("Mentor")).toBeLessThan(
-      detailCardText!.indexOf("ICU"),
-    );
+    expect(detailCardText!.indexOf("Day Shift")).toBeLessThan(detailCardText!.indexOf("Mentor"));
+    expect(detailCardText!.indexOf("Mentor")).toBeLessThan(detailCardText!.indexOf("ICU"));
     expect(detailCardText!.indexOf("ICU")).toBeLessThan(
       detailCardText!.indexOf("7:00 AM - 3:00 PM"),
     );
@@ -628,12 +608,8 @@ describe("ShiftDetailScreen", () => {
     expect(detailCardText!.indexOf("Day Shift")).toBeLessThan(
       detailCardText!.indexOf("Supervisor"),
     );
-    expect(detailCardText!.indexOf("Supervisor")).toBeLessThan(
-      detailCardText!.indexOf("Bri Shaw"),
-    );
-    expect(detailCardText!.indexOf("Bri Shaw")).toBeLessThan(
-      detailCardText!.indexOf("Emergency"),
-    );
+    expect(detailCardText!.indexOf("Supervisor")).toBeLessThan(detailCardText!.indexOf("Bri Shaw"));
+    expect(detailCardText!.indexOf("Bri Shaw")).toBeLessThan(detailCardText!.indexOf("Emergency"));
     expect(detailCardText!.indexOf("Emergency")).toBeLessThan(
       detailCardText!.indexOf("7:00 AM - 3:00 PM"),
     );
@@ -949,9 +925,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getAllByText("3:30 PM - 11:30 PM").length).toBeGreaterThan(0);
     expect(screen.getByText("Bri Shaw")).toBeInTheDocument();
     expect(screen.getByText("Chris Hall")).toBeInTheDocument();
-    expect(screen.getByLabelText("Mentored assignment")).toHaveTextContent(
-      "Mentored",
-    );
+    expect(screen.getByLabelText("Mentored assignment")).toHaveTextContent("Mentored");
     expect(screen.queryByText("(Mentored)")).not.toBeInTheDocument();
     expect(screen.getAllByText("ICU").length).toBeGreaterThan(0);
   });
@@ -1096,21 +1070,13 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByText("Unassigned")).not.toBeInTheDocument();
     expect(screen.queryByText("Time")).not.toBeInTheDocument();
     expect(screen.queryByText("Working with")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Shift actions unavailable"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Custom times unavailable"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Shift actions unavailable")).not.toBeInTheDocument();
+    expect(screen.queryByText("Custom times unavailable")).not.toBeInTheDocument();
     expect(screen.getByText("Absence")).toBeInTheDocument();
     expect(screen.getByText("Off Day")).toBeInTheDocument();
     expect(screen.getByLabelText("Absence Off Day")).toBeInTheDocument();
-    expect(screen.getByLabelText("Absence Off Day")).toHaveTextContent(
-      "Absence",
-    );
-    expect(screen.getByLabelText("Absence Off Day")).not.toHaveTextContent(
-      "Off Day",
-    );
+    expect(screen.getByLabelText("Absence Off Day")).toHaveTextContent("Absence");
+    expect(screen.getByLabelText("Absence Off Day")).not.toHaveTextContent("Off Day");
   });
 
   it("keeps general shift names as the detail card heading with an under-title type pill", () => {
@@ -1168,12 +1134,8 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("General shift")).toBeInTheDocument();
     expect(screen.getByText("Admin")).toBeInTheDocument();
     expect(screen.getByLabelText("General shift Admin")).toBeInTheDocument();
-    expect(screen.getByLabelText("General shift Admin")).toHaveTextContent(
-      "General shift",
-    );
-    expect(screen.getByLabelText("General shift Admin")).not.toHaveTextContent(
-      "Admin",
-    );
+    expect(screen.getByLabelText("General shift Admin")).toHaveTextContent("General shift");
+    expect(screen.getByLabelText("General shift Admin")).not.toHaveTextContent("Admin");
   });
 
   it("filters swap options behind a horizontal date selector", () => {
@@ -1196,24 +1158,16 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("Eligible teammates")).toBeInTheDocument();
     expect(screen.getByLabelText("Eligible swap dates")).toBeInTheDocument();
     expect(
-      screen.getByLabelText(
-        "Show eligible teammates for Sunday, April 12, 2026",
-      ),
+      screen.getByLabelText("Show eligible teammates for Sunday, April 12, 2026"),
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText(
-        "Show eligible teammates for Friday, April 17, 2026",
-      ),
+      screen.getByLabelText("Show eligible teammates for Friday, April 17, 2026"),
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText(
-        "Show eligible teammates for Saturday, April 18, 2026",
-      ),
+      screen.getByLabelText("Show eligible teammates for Saturday, April 18, 2026"),
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText(
-        "Show eligible teammates for Friday, April 17, 2026",
-      ),
+      screen.getByLabelText("Show eligible teammates for Friday, April 17, 2026"),
     ).toHaveAttribute("aria-selected", "true");
 
     expect(screen.getByText("Chris Hall")).toBeInTheDocument();
@@ -1223,9 +1177,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("3:00 PM - 11:00 PM")).toBeInTheDocument();
     expect(screen.getAllByText("Emergency").length).toBeGreaterThan(0);
     expect(screen.queryByText("Submit")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Choose a teammate shift"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Choose a teammate shift")).not.toBeInTheDocument();
   });
 
   it("keeps the swap teammate query within the mobile schedule range limit", () => {
@@ -1273,9 +1225,7 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Swap"));
 
     expect(
-      screen.getByLabelText(
-        "Show eligible teammates for Sunday, April 12, 2026",
-      ),
+      screen.getByLabelText("Show eligible teammates for Sunday, April 12, 2026"),
     ).toBeInTheDocument();
     expect(screen.getByText("Apr 12 - Apr 18")).toBeInTheDocument();
     const nextWeekButton = screen.getByRole("button", {
@@ -1283,9 +1233,7 @@ describe("ShiftDetailScreen", () => {
     });
     expect(nextWeekButton).not.toBeDisabled();
     expect(
-      screen.queryByLabelText(
-        "Show eligible teammates for Thursday, April 23, 2026",
-      ),
+      screen.queryByLabelText("Show eligible teammates for Thursday, April 23, 2026"),
     ).not.toBeInTheDocument();
 
     fireEvent.click(nextWeekButton);
@@ -1296,12 +1244,8 @@ describe("ShiftDetailScreen", () => {
     expect(selectedDate).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Apr 26 - May 2")).toBeInTheDocument();
     expect(screen.getByText("Sam Rivera")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Go to next week" }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "Go to previous week" }),
-    ).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Go to next week" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Go to previous week" })).not.toBeDisabled();
   });
 
   it("shows shift actions when published-shift metadata is missing", () => {
@@ -1541,9 +1485,7 @@ describe("ShiftDetailScreen", () => {
     render(<ShiftDetailScreen />);
 
     expect(screen.getByText("Request already in progress")).toBeInTheDocument();
-    expect(
-      screen.getByText("Manager note: Reviewing coverage now."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Manager note: Reviewing coverage now.")).toBeInTheDocument();
     expect(screen.queryByText("Drop shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Swap")).not.toBeInTheDocument();
   });
@@ -1684,20 +1626,14 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Swap"));
 
     expect(
-      screen.getByLabelText(
-        "Show eligible teammates for Thursday, April 16, 2026",
-      ),
+      screen.getByLabelText("Show eligible teammates for Thursday, April 16, 2026"),
     ).toBeInTheDocument();
     expect(screen.getByText("Bri Shaw")).toBeInTheDocument();
     expect(screen.queryByText("Chris Hall")).not.toBeInTheDocument();
     expect(screen.queryByText("Dana Moss")).not.toBeInTheDocument();
     expect(screen.queryByText("Evan Cole")).not.toBeInTheDocument();
 
-    fireEvent.click(
-      screen.getByLabelText(
-        "Show eligible teammates for Friday, April 17, 2026",
-      ),
-    );
+    fireEvent.click(screen.getByLabelText("Show eligible teammates for Friday, April 17, 2026"));
 
     expect(screen.queryByText("Bri Shaw")).not.toBeInTheDocument();
     expect(screen.getByText("Chris Hall")).toBeInTheDocument();
@@ -1824,9 +1760,7 @@ describe("ShiftDetailScreen", () => {
     expect(screen.queryByText("Bri Shaw")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Eligible swap dates")).toBeInTheDocument();
     expect(
-      screen.getByLabelText(
-        "Show eligible teammates for Wednesday, April 15, 2026",
-      ),
+      screen.getByLabelText("Show eligible teammates for Wednesday, April 15, 2026"),
     ).toBeInTheDocument();
 
     selectFridaySwapDate();
@@ -1851,21 +1785,13 @@ describe("ShiftDetailScreen", () => {
     expect(screen.getByText("You get")).toBeInTheDocument();
     expect(screen.getByText("From Chris Hall")).toBeInTheDocument();
     expect(screen.getByText("7:00 AM - 3:00 PM · ICU")).toBeInTheDocument();
-    expect(
-      screen.getByText("3:00 PM - 11:00 PM · Emergency"),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByLabelText("Eligible swap dates"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Back to eligible teammates"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("3:00 PM - 11:00 PM · Emergency")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Eligible swap dates")).not.toBeInTheDocument();
+    expect(screen.queryByText("Back to eligible teammates")).not.toBeInTheDocument();
     expect(screen.getAllByText("Back")).toHaveLength(1);
     expect(screen.getByText("Submit")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "Review the trade below, then submit your swap request.",
-      ),
+      screen.getByText("Review the trade below, then submit your swap request."),
     ).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("Back"));
@@ -1982,9 +1908,7 @@ describe("ShiftDetailScreen", () => {
     expect(nextWeekButton).toBeDisabled();
     fireEvent.click(nextWeekButton);
 
-    expect(
-      screen.queryByText("Refreshing shift details."),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Refreshing shift details.")).not.toBeInTheDocument();
     expect(screen.getByText("Your shift")).toBeInTheDocument();
   });
 
@@ -2304,8 +2228,7 @@ describe("ShiftDetailScreen", () => {
     const zoeRow = screen.getByText("Zoe Adams");
     const jordanRow = screen.getByText("Jordan Lee");
     expect(
-      zoeRow.compareDocumentPosition(jordanRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      zoeRow.compareDocumentPosition(jordanRow) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
     fireEvent.click(screen.getByText("Jordan Lee"));
@@ -2319,9 +2242,7 @@ describe("ShiftDetailScreen", () => {
 
     expect(mutate).not.toHaveBeenCalled();
     expect(screen.getByText("Send a pickup request?")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Jordan Lee will be asked to pick up your/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Jordan Lee will be asked to pick up your/)).toBeInTheDocument();
 
     confirmDialog("Send Request");
 
@@ -2356,9 +2277,7 @@ describe("ShiftDetailScreen", () => {
 
     expect(mutate).not.toHaveBeenCalled();
     expect(screen.getByText("Submit this call-off?")).toBeInTheDocument();
-    expect(
-      screen.getByText(/A Sick absence will be submitted/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/A Sick absence will be submitted/)).toBeInTheDocument();
 
     confirmDialog("Submit Call-off");
 
@@ -2433,9 +2352,7 @@ describe("ShiftDetailScreen", () => {
     fireEvent.click(screen.getByText("Submit"));
 
     expect(screen.getByText("Submit this call-off?")).toBeInTheDocument();
-    expect(
-      screen.getByText(/A Paid time off absence will be submitted/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/A Paid time off absence will be submitted/)).toBeInTheDocument();
   });
 
   it("confirms before submitting a swap request", () => {

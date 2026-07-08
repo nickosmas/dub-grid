@@ -9,9 +9,7 @@ export interface EmployeeContactConflict {
   message: string;
 }
 
-export function getEmployeeContactConflict(
-  error: unknown,
-): EmployeeContactConflict | null {
+export function getEmployeeContactConflict(error: unknown): EmployeeContactConflict | null {
   if (!error || typeof error !== "object") {
     return null;
   }
@@ -26,11 +24,7 @@ export function getEmployeeContactConflict(
     return null;
   }
 
-  const text = [
-    record.constraint,
-    record.details,
-    record.message,
-  ]
+  const text = [record.constraint, record.details, record.message]
     .filter((value): value is string => typeof value === "string")
     .join(" ");
 

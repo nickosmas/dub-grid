@@ -16,10 +16,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import {
-  useSetMobileSubNav,
-  type SubNavItem,
-} from "@/components/MobileSubNavContext";
+import { useSetMobileSubNav, type SubNavItem } from "@/components/MobileSubNavContext";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import type {
   AbsenceType,
@@ -55,7 +52,6 @@ const MEMBERS_ICON = (
     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
-
 
 const REQUESTS_ICON = (
   <svg
@@ -168,7 +164,9 @@ export default function StaffView({
   const scheduledDepartmentLabel = departmentLabelProp || "Scheduled Departments";
   const managementDepartmentLabel = "Management Departments";
   const canAccessPeopleAdminSurfaces = Boolean(canManageEmployees || isSuperAdmin || isGridmaster);
-  const canAccessPeopleRecurring = Boolean(orgId && canViewRecurringShifts && canAccessPeopleAdminSurfaces);
+  const canAccessPeopleRecurring = Boolean(
+    orgId && canViewRecurringShifts && canAccessPeopleAdminSurfaces,
+  );
 
   const allowedSections: StaffSection[] = [
     "directory",
@@ -179,14 +177,11 @@ export default function StaffView({
   const resolvedSection =
     sectionParam === ("members" as string)
       ? ("directory" as StaffSection)
-      : sectionParam === ("users" as string) ||
-          sectionParam === ("access" as string)
+      : sectionParam === ("users" as string) || sectionParam === ("access" as string)
         ? ("directory" as StaffSection)
         : sectionParam;
   const activeSection: StaffSection =
-    resolvedSection && allowedSections.includes(resolvedSection)
-      ? resolvedSection
-      : "directory";
+    resolvedSection && allowedSections.includes(resolvedSection) ? resolvedSection : "directory";
 
   const links: { id: StaffSection; label: string; icon: ReactNode }[] = useMemo(
     () => [
@@ -256,9 +251,7 @@ export default function StaffView({
                         render={
                           <Link
                             href={
-                              link.id === "directory"
-                                ? "/people"
-                                : `/people?section=${link.id}`
+                              link.id === "directory" ? "/people" : `/people?section=${link.id}`
                             }
                             replace
                           />
@@ -360,25 +353,23 @@ export default function StaffView({
               />
             )}
 
-            {activeSection === "recurring-schedule" &&
-              orgId &&
-              canAccessPeopleRecurring && (
-                <RecurringScheduleSection
-                  employees={employees}
-                  orgId={orgId}
-                  currentUserId={user?.id ?? null}
-                  assignments={assignments ?? []}
-                  shiftCategories={shiftCategories ?? []}
-                  jobs={jobs ?? []}
-                  orgRoles={roles}
-                  assignmentMap={assignmentLabelMap ?? EMPTY_CODE_MAP}
-                  canManage={canManageRecurringShifts ?? false}
-                  focusAreas={focusAreas}
-                  certifications={certifications}
-                  absenceTypes={absenceTypes}
-                  shiftDisplayMode={shiftDisplayMode}
-                />
-              )}
+            {activeSection === "recurring-schedule" && orgId && canAccessPeopleRecurring && (
+              <RecurringScheduleSection
+                employees={employees}
+                orgId={orgId}
+                currentUserId={user?.id ?? null}
+                assignments={assignments ?? []}
+                shiftCategories={shiftCategories ?? []}
+                jobs={jobs ?? []}
+                orgRoles={roles}
+                assignmentMap={assignmentLabelMap ?? EMPTY_CODE_MAP}
+                canManage={canManageRecurringShifts ?? false}
+                focusAreas={focusAreas}
+                certifications={certifications}
+                absenceTypes={absenceTypes}
+                shiftDisplayMode={shiftDisplayMode}
+              />
+            )}
           </div>
         )}
       </SidebarInset>

@@ -3,9 +3,10 @@ import { fetchAllRows, type PagedQueryResult } from "@/lib/db/shared";
 
 describe("fetchAllRows", () => {
   it("returns an empty array after a single call for an empty result set", async () => {
-    const fetchPage = vi.fn(
-      async (): Promise<PagedQueryResult<number>> => ({ data: [], error: null }),
-    );
+    const fetchPage = vi.fn(async (): Promise<PagedQueryResult<number>> => ({
+      data: [],
+      error: null,
+    }));
 
     const rows = await fetchAllRows(fetchPage, 3);
 
@@ -14,9 +15,10 @@ describe("fetchAllRows", () => {
   });
 
   it("returns all rows after one call when the page is shorter than pageSize", async () => {
-    const fetchPage = vi.fn(
-      async (): Promise<PagedQueryResult<number>> => ({ data: [1, 2], error: null }),
-    );
+    const fetchPage = vi.fn(async (): Promise<PagedQueryResult<number>> => ({
+      data: [1, 2],
+      error: null,
+    }));
 
     const rows = await fetchAllRows(fetchPage, 5);
 
@@ -60,12 +62,10 @@ describe("fetchAllRows", () => {
   });
 
   it("propagates an error from the first page without calling again", async () => {
-    const fetchPage = vi.fn(
-      async (): Promise<PagedQueryResult<number>> => ({
-        data: null,
-        error: { message: "boom" },
-      }),
-    );
+    const fetchPage = vi.fn(async (): Promise<PagedQueryResult<number>> => ({
+      data: null,
+      error: { message: "boom" },
+    }));
 
     await expect(fetchAllRows(fetchPage, 3)).rejects.toEqual({ message: "boom" });
     expect(fetchPage).toHaveBeenCalledTimes(1);

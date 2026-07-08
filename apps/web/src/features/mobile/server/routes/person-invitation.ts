@@ -14,11 +14,7 @@ import {
 } from "@dubgrid/data-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireMobileAuth } from "@/features/mobile/server";
-import {
-  createNameMismatchResponseBody,
-  hasCompleteName,
-  namesMatch,
-} from "@/lib/account-linking";
+import { createNameMismatchResponseBody, hasCompleteName, namesMatch } from "@/lib/account-linking";
 import { createElement } from "react";
 import { render } from "@react-email/components";
 import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
@@ -49,11 +45,7 @@ async function loadMobilePerson(
   orgId: string,
   employeeId: string,
 ) {
-  const row = await fetchMobileEmployeeRowById(
-    serviceClient,
-    orgId,
-    employeeId,
-  );
+  const row = await fetchMobileEmployeeRowById(serviceClient, orgId, employeeId);
   if (!row) return null;
 
   const pendingInvitation = await fetchMobilePendingInvitationRowByEmployeeId(
@@ -81,22 +73,16 @@ function getInvitationEmailConfig(): InvitationEmailConfig | null {
     return null;
   }
 
-  const from =
-    process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+  const from = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
   if (!process.env.RESEND_FROM_EMAIL) {
-    logger.warn(
-      "RESEND_FROM_EMAIL not set - using test domain for mobile invite",
-    );
+    logger.warn("RESEND_FROM_EMAIL not set - using test domain for mobile invite");
   }
 
   return { apiKey, from };
 }
 
 function createInvitationEmailUnavailableResponse() {
-  return NextResponse.json(
-    { error: "Email service not configured" },
-    { status: 503 },
-  );
+  return NextResponse.json({ error: "Email service not configured" }, { status: 503 });
 }
 
 async function sendInvitationEmail(input: {
@@ -126,9 +112,7 @@ async function sendInvitationEmail(input: {
     apiKey: input.config.apiKey,
     from: input.config.from,
     to: input.email,
-    subject: sanitizeHeaderValue(
-      `You're invited to join ${input.orgName} on DubGrid`,
-    ),
+    subject: sanitizeHeaderValue(`You're invited to join ${input.orgName} on DubGrid`),
     html,
   });
 }
@@ -152,9 +136,7 @@ async function findExistingOrganizationMemberByEmail(input: {
     ),
   );
 
-  const match = users.find(
-    (result) => result.data.user?.email?.toLowerCase() === normalizedEmail,
-  );
+  const match = users.find((result) => result.data.user?.email?.toLowerCase() === normalizedEmail);
 
   return match?.data.user
     ? {
@@ -213,8 +195,7 @@ async function linkExistingOrganizationMember(input: {
   if ((otherEmployees?.length ?? 0) > 0) {
     return NextResponse.json(
       {
-        error:
-          "That account is already linked to another employee in this organization.",
+        error: "That account is already linked to another employee in this organization.",
       },
       { status: 409 },
     );
@@ -258,10 +239,7 @@ async function linkExistingOrganizationMember(input: {
   }
 
   if (!namesAlreadyMatch && !input.reconcileName) {
-    return NextResponse.json(
-      createNameMismatchResponseBody(challengeDetails),
-      { status: 409 },
-    );
+    return NextResponse.json(createNameMismatchResponseBody(challengeDetails), { status: 409 });
   }
 
   const updatePayload = {
@@ -349,35 +327,22 @@ async function requireManageableEmployee(req: NextRequest, employeeId: string) {
     };
   }
 
-  const employee = await loadMobilePerson(
-    auth.serviceClient,
-    auth.currentOrg.id,
-    employeeId,
-  );
+  const employee = await loadMobilePerson(auth.serviceClient, auth.currentOrg.id, employeeId);
   if (!employee) {
     return {
-      response: NextResponse.json(
-        { error: "Employee not found" },
-        { status: 404 },
-      ),
+      response: NextResponse.json({ error: "Employee not found" }, { status: 404 }),
     };
   }
   if (employee.status === "removed" || employee.userId) {
     return {
-      response: NextResponse.json(
-        { error: "This employee cannot be invited." },
-        { status: 400 },
-      ),
+      response: NextResponse.json({ error: "This employee cannot be invited." }, { status: 400 }),
     };
   }
 
   return { auth, employee };
 }
 
-export async function POST(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const loaded = await requireManageableEmployee(req, id);
   if ("response" in loaded) return loaded.response;
@@ -435,16 +400,13 @@ export async function POST(
     return createInvitationEmailUnavailableResponse();
   }
 
-  const invitation = await createMobileEmployeeInvitationRow(
-    loaded.auth.serviceClient,
-    {
-      orgId: loaded.auth.currentOrg.id,
-      employeeId: id,
-      invitedBy: loaded.auth.user.id,
-      email: parsed.data.email,
-      roleToAssign: "user",
-    },
-  );
+  const invitation = await createMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
+    orgId: loaded.auth.currentOrg.id,
+    employeeId: id,
+    invitedBy: loaded.auth.user.id,
+    email: parsed.data.email,
+    roleToAssign: "user",
+  });
   try {
     await sendInvitationEmail({
       config: emailConfig,
@@ -490,11 +452,7 @@ export async function POST(
     user_agent: req.headers?.get("user-agent") ?? null,
   });
 
-  const person = await loadMobilePerson(
-    loaded.auth.serviceClient,
-    loaded.auth.currentOrg.id,
-    id,
-  );
+  const person = await loadMobilePerson(loaded.auth.serviceClient, loaded.auth.currentOrg.id, id);
   return NextResponse.json(
     mobilePersonInvitationResponseSchema.parse({
       success: true,
@@ -504,10 +462,7 @@ export async function POST(
   );
 }
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const loaded = await requireManageableEmployee(req, id);
   if ("response" in loaded) return loaded.response;
@@ -527,14 +482,11 @@ export async function PATCH(
     return createInvitationEmailUnavailableResponse();
   }
 
-  const invitation = await refreshMobileEmployeeInvitationRow(
-    loaded.auth.serviceClient,
-    {
-      orgId: loaded.auth.currentOrg.id,
-      invitationId: parsed.data.invitationId,
-      expectedUpdatedAt: parsed.data.expectedUpdatedAt,
-    },
-  );
+  const invitation = await refreshMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
+    orgId: loaded.auth.currentOrg.id,
+    invitationId: parsed.data.invitationId,
+    expectedUpdatedAt: parsed.data.expectedUpdatedAt,
+  });
   if (!invitation || invitation.employee_id !== id) {
     return NextResponse.json(
       { error: "Invitation changed elsewhere. Refresh and try again." },
@@ -579,11 +531,7 @@ export async function PATCH(
     );
   }
 
-  const person = await loadMobilePerson(
-    loaded.auth.serviceClient,
-    loaded.auth.currentOrg.id,
-    id,
-  );
+  const person = await loadMobilePerson(loaded.auth.serviceClient, loaded.auth.currentOrg.id, id);
   return NextResponse.json(
     mobilePersonInvitationResponseSchema.parse({
       success: true,
@@ -593,10 +541,7 @@ export async function PATCH(
   );
 }
 
-export async function DELETE(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const loaded = await requireManageableEmployee(req, id);
   if ("response" in loaded) return loaded.response;
@@ -611,14 +556,11 @@ export async function DELETE(
     );
   }
 
-  const invitation = await revokeMobileEmployeeInvitationRow(
-    loaded.auth.serviceClient,
-    {
-      orgId: loaded.auth.currentOrg.id,
-      invitationId: parsed.data.invitationId,
-      expectedUpdatedAt: parsed.data.expectedUpdatedAt,
-    },
-  );
+  const invitation = await revokeMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
+    orgId: loaded.auth.currentOrg.id,
+    invitationId: parsed.data.invitationId,
+    expectedUpdatedAt: parsed.data.expectedUpdatedAt,
+  });
   if (!invitation || invitation.employee_id !== id) {
     return NextResponse.json(
       { error: "Invitation changed elsewhere. Refresh and try again." },
@@ -642,11 +584,7 @@ export async function DELETE(
     user_agent: req.headers?.get("user-agent") ?? null,
   });
 
-  const person = await loadMobilePerson(
-    loaded.auth.serviceClient,
-    loaded.auth.currentOrg.id,
-    id,
-  );
+  const person = await loadMobilePerson(loaded.auth.serviceClient, loaded.auth.currentOrg.id, id);
   return NextResponse.json(
     mobilePersonInvitationResponseSchema.parse({
       success: true,

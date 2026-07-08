@@ -4,10 +4,7 @@ import type {
   MobileNotificationsCursor,
   ScheduleCellState,
 } from "@dubgrid/contracts";
-import type {
-  AdminPermissions,
-  PlatformRole,
-} from "@dubgrid/domain";
+import type { AdminPermissions, PlatformRole } from "@dubgrid/domain";
 import type {
   DbAbsenceType,
   DbCoverageRequirement,
@@ -25,22 +22,19 @@ import type {
 } from "@dubgrid/db-types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const FOCUS_AREA_COLS =
-  "id, org_id, department_id, name, color, sort_order, archived_at";
+const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, archived_at";
 const SHIFT_CATEGORY_COLS =
   "id, org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes, archived_at";
 const JOB_COLS =
   "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, shift_time_overrides, shift_color_overrides, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
-const NAMED_ITEM_COLS =
-  "id, org_id, name, abbr, department_id, sort_order, archived_at";
+const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_id, sort_order, archived_at";
 const ORG_ROLE_COLS =
   "id, org_id, name, abbr, is_schedule_role, department_id, sort_order, archived_at";
 const EMPLOYEE_COLS =
   "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 const COVERAGE_REQ_COLS =
   "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff";
-const DEPARTMENT_COLS =
-  "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
+const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
 const INVITATION_COLS =
   "id, org_id, invited_by, email, role_to_assign, token, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids";
 
@@ -72,23 +66,18 @@ function andFilter(clauses: string[]): string {
   return clauses.length === 1 ? clauses[0] : `and(${clauses.join(",")})`;
 }
 
-export interface MobileAbsenceTypeRow
-  extends Pick<
-    DbAbsenceType,
-    "id" | "label" | "name" | "color" | "border_color" | "text_color"
-  > {}
+export interface MobileAbsenceTypeRow extends Pick<
+  DbAbsenceType,
+  "id" | "label" | "name" | "color" | "border_color" | "text_color"
+> {}
 
-export interface MobileFocusAreaRow
-  extends Pick<DbFocusArea, "id" | "name" | "department_id"> {}
+export interface MobileFocusAreaRow extends Pick<DbFocusArea, "id" | "name" | "department_id"> {}
 
-export interface MobileNamedItemRow
-  extends Pick<DbNamedItem, "id" | "name" | "abbr"> {}
+export interface MobileNamedItemRow extends Pick<DbNamedItem, "id" | "name" | "abbr"> {}
 
-export interface MobileDepartmentRow
-  extends Pick<DbDepartment, "id" | "name" | "abbr" | "type"> {}
+export interface MobileDepartmentRow extends Pick<DbDepartment, "id" | "name" | "abbr" | "type"> {}
 
-export interface MobileJobNameRow
-  extends Pick<DbJobDefinition, "id" | "name"> {}
+export interface MobileJobNameRow extends Pick<DbJobDefinition, "id" | "name"> {}
 
 export interface MobileProfileNameRow {
   id: string;
@@ -103,17 +92,16 @@ export interface MobilePublishHistoryRow {
   published_at: string;
 }
 
-export interface MobileOrganizationMembershipRow
-  extends Pick<
-    DbOrganizationMembership,
-    | "user_id"
-    | "org_role"
-    | "admin_permissions"
-    | "joined_at"
-    | "updated_at"
-    | "department_ids"
-    | "dept_admin_ids"
-  > {
+export interface MobileOrganizationMembershipRow extends Pick<
+  DbOrganizationMembership,
+  | "user_id"
+  | "org_role"
+  | "admin_permissions"
+  | "joined_at"
+  | "updated_at"
+  | "department_ids"
+  | "dept_admin_ids"
+> {
   organization: {
     id: string;
     name: string;
@@ -121,11 +109,10 @@ export interface MobileOrganizationMembershipRow
   };
 }
 
-export interface MobileManagementMembershipRow
-  extends Pick<
-    DbOrganizationMembership,
-    "user_id" | "department_ids" | "dept_admin_ids" | "org_role"
-  > {}
+export interface MobileManagementMembershipRow extends Pick<
+  DbOrganizationMembership,
+  "user_id" | "department_ids" | "dept_admin_ids" | "org_role"
+> {}
 
 export interface MobileEmbeddedEmployeeRow {
   id: string;
@@ -157,8 +144,7 @@ export interface MobileAssignmentSeedRows {
   certificationRows: DbNamedItem[];
 }
 
-export interface MobileOpenShiftContextRows
-  extends MobileAssignmentSeedRows {
+export interface MobileOpenShiftContextRows extends MobileAssignmentSeedRows {
   organizationRow: Pick<DbOrganization, "coverage_rule_config"> | null;
   coverageRequirementRows: DbCoverageRequirement[];
   employeeRows: DbEmployee[];
@@ -215,21 +201,20 @@ export interface MobilePeopleQueryRow {
   version: number | null;
 }
 
-export interface MobileInvitationRow
-  extends Pick<
-    DbInvitation,
-    | "id"
-    | "org_id"
-    | "email"
-    | "token"
-    | "expires_at"
-    | "accepted_at"
-    | "revoked_at"
-    | "updated_at"
-    | "employee_id"
-    | "department_ids"
-    | "dept_admin_ids"
-  > {}
+export interface MobileInvitationRow extends Pick<
+  DbInvitation,
+  | "id"
+  | "org_id"
+  | "email"
+  | "token"
+  | "expires_at"
+  | "accepted_at"
+  | "revoked_at"
+  | "updated_at"
+  | "employee_id"
+  | "department_ids"
+  | "dept_admin_ids"
+> {}
 
 export interface MobilePushTokenRow {
   expo_push_token: string;
@@ -297,12 +282,9 @@ function normalizeEmbeddedEmployee(value: unknown): MobileEmbeddedEmployeeRow | 
     first_name: candidate.first_name,
     last_name: candidate.last_name,
     org_id: candidate.org_id,
-    seniority:
-      typeof candidate.seniority === "number" ? candidate.seniority : null,
+    seniority: typeof candidate.seniority === "number" ? candidate.seniority : null,
     focus_area_ids: Array.isArray(candidate.focus_area_ids)
-      ? candidate.focus_area_ids.filter(
-          (entry): entry is number => typeof entry === "number",
-        )
+      ? candidate.focus_area_ids.filter((entry): entry is number => typeof entry === "number")
       : [],
   };
 }
@@ -402,16 +384,18 @@ export async function fetchMobileOrganizationMembershipRows(
     throw error;
   }
 
-  return ((data ?? []) as Array<{
-    user_id: string;
-    org_role: string | null;
-    admin_permissions: AdminPermissions | null;
-    joined_at: string;
-    updated_at: string | null;
-    department_ids: number[] | null;
-    dept_admin_ids: number[] | null;
-    organizations: unknown;
-  }>).map((row) => {
+  return (
+    (data ?? []) as Array<{
+      user_id: string;
+      org_role: string | null;
+      admin_permissions: AdminPermissions | null;
+      joined_at: string;
+      updated_at: string | null;
+      department_ids: number[] | null;
+      dept_admin_ids: number[] | null;
+      organizations: unknown;
+    }>
+  ).map((row) => {
     const organization = normalizeMembershipOrganization(row.organizations);
     if (!organization) {
       throw new Error("Invalid organization membership relation shape");
@@ -451,12 +435,14 @@ export async function fetchMobileManagementMembershipRowsByUserIds(
     throw error;
   }
 
-  return ((data ?? []) as Array<{
-    user_id: string;
-    department_ids: number[] | null;
-    dept_admin_ids: number[] | null;
-    org_role: string;
-  }>).map((row) => ({
+  return (
+    (data ?? []) as Array<{
+      user_id: string;
+      department_ids: number[] | null;
+      dept_admin_ids: number[] | null;
+      org_role: string;
+    }>
+  ).map((row) => ({
     user_id: row.user_id,
     department_ids: row.department_ids ?? [],
     dept_admin_ids: row.dept_admin_ids ?? [],
@@ -504,43 +490,38 @@ export async function fetchMobileAssignmentSeedRows(
   serviceClient: SupabaseClient,
   orgId: string,
 ): Promise<MobileAssignmentSeedRows> {
-  const [
-    focusAreaResult,
-    shiftResult,
-    jobResult,
-    roleResult,
-    certificationResult,
-  ] = await Promise.all([
-    serviceClient
-      .from("focus_areas")
-      .select(FOCUS_AREA_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null),
-    serviceClient
-      .from("shift_categories")
-      .select(SHIFT_CATEGORY_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("jobs")
-      .select(JOB_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("organization_roles")
-      .select(ORG_ROLE_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-    serviceClient
-      .from("certifications")
-      .select(NAMED_ITEM_COLS)
-      .eq("org_id", orgId)
-      .is("archived_at", null)
-      .order("sort_order"),
-  ]);
+  const [focusAreaResult, shiftResult, jobResult, roleResult, certificationResult] =
+    await Promise.all([
+      serviceClient
+        .from("focus_areas")
+        .select(FOCUS_AREA_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+      serviceClient
+        .from("shift_categories")
+        .select(SHIFT_CATEGORY_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order"),
+      serviceClient
+        .from("jobs")
+        .select(JOB_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order"),
+      serviceClient
+        .from("organization_roles")
+        .select(ORG_ROLE_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order"),
+      serviceClient
+        .from("certifications")
+        .select(NAMED_ITEM_COLS)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .order("sort_order"),
+    ]);
 
   if (focusAreaResult.error) throw focusAreaResult.error;
   if (shiftResult.error) throw shiftResult.error;
@@ -774,10 +755,7 @@ export async function fetchMobileOpenShiftContextRows(
         .select("coverage_rule_config")
         .eq("id", orgId)
         .maybeSingle(),
-      serviceClient
-        .from("coverage_requirements")
-        .select(COVERAGE_REQ_COLS)
-        .eq("org_id", orgId),
+      serviceClient.from("coverage_requirements").select(COVERAGE_REQ_COLS).eq("org_id", orgId),
       serviceClient
         .from("employees")
         .select(EMPLOYEE_COLS)
@@ -793,12 +771,8 @@ export async function fetchMobileOpenShiftContextRows(
   return {
     ...assignmentSeedRows,
     organizationRow:
-      (organizationResult.data as Pick<
-        DbOrganization,
-        "coverage_rule_config"
-      > | null) ?? null,
-    coverageRequirementRows:
-      (coverageResult.data ?? []) as DbCoverageRequirement[],
+      (organizationResult.data as Pick<DbOrganization, "coverage_rule_config"> | null) ?? null,
+    coverageRequirementRows: (coverageResult.data ?? []) as DbCoverageRequirement[],
     employeeRows: (employeeResult.data ?? []) as DbEmployee[],
   };
 }
@@ -1140,21 +1114,19 @@ export async function upsertMobilePushTokenRow(
   },
 ): Promise<void> {
   const now = new Date().toISOString();
-  const { error } = await serviceClient
-    .from("mobile_device_tokens")
-    .upsert(
-      {
-        user_id: input.userId,
-        org_id: input.orgId,
-        platform: input.platform,
-        expo_push_token: input.expoPushToken,
-        last_seen_at: now,
-        disabled_at: input.disabled ? now : null,
-      },
-      {
-        onConflict: "expo_push_token",
-      },
-    );
+  const { error } = await serviceClient.from("mobile_device_tokens").upsert(
+    {
+      user_id: input.userId,
+      org_id: input.orgId,
+      platform: input.platform,
+      expo_push_token: input.expoPushToken,
+      last_seen_at: now,
+      disabled_at: input.disabled ? now : null,
+    },
+    {
+      onConflict: "expo_push_token",
+    },
+  );
 
   if (error) {
     throw error;
@@ -1185,18 +1157,14 @@ export async function fetchActiveMobilePushTokenRows(
 export async function fetchMobileUnreadNotificationCount(
   userClient: SupabaseClient,
 ): Promise<number> {
-  const { data, error } = await userClient.rpc(
-    "get_unread_notification_count",
-  );
+  const { data, error } = await userClient.rpc("get_unread_notification_count");
 
   if (error) throw error;
 
   return (data as number) ?? 0;
 }
 
-export async function fetchMobileNotificationFacets(
-  userClient: SupabaseClient,
-): Promise<{
+export async function fetchMobileNotificationFacets(userClient: SupabaseClient): Promise<{
   totalInbox: number;
   totalUnread: number;
   totalArchived: number;
@@ -1304,13 +1272,8 @@ export async function fetchMobileNotificationsPage(
     );
   }
 
-  const [
-    { data: rows, error: notificationError },
-    { data: unreadCount, error: unreadError },
-  ] = await Promise.all([
-    query,
-    userClient.rpc("get_unread_notification_count"),
-  ]);
+  const [{ data: rows, error: notificationError }, { data: unreadCount, error: unreadError }] =
+    await Promise.all([query, userClient.rpc("get_unread_notification_count")]);
 
   if (notificationError) throw notificationError;
   if (unreadError) throw unreadError;

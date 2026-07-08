@@ -8,10 +8,7 @@ import {
   fetchOrganizationEmployeeCount,
   updateOrganizationSettings,
 } from "@/features/organization/client";
-import {
-  fetchGridmasterBilling,
-  updateGridmasterSubscription,
-} from "@/features/gridmaster/client";
+import { fetchGridmasterBilling, updateGridmasterSubscription } from "@/features/gridmaster/client";
 import type { Organization } from "@/types";
 
 vi.mock("@/features/organization/client", () => ({
@@ -116,11 +113,7 @@ function makeOrganization(overrides: Partial<Organization> = {}): Organization {
 
 function renderWithQueryClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      {ui}
-    </QueryClientProvider>,
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
 describe("gridmaster dirty save controls", () => {

@@ -38,9 +38,7 @@ export async function GET(req: NextRequest) {
     }
 
     const serviceClient = getServiceClient();
-    const impersonation = getImpersonationFromCookie(
-      req.headers.get("cookie") ?? "",
-    );
+    const impersonation = getImpersonationFromCookie(req.headers.get("cookie") ?? "");
 
     if (impersonation && auth.claims.platform_role === "gridmaster") {
       const targetOrgId = impersonation.targetOrgId;
@@ -78,9 +76,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const inactive = orgId
-      ? await isCallerInactive(serviceClient, auth.user.id, orgId)
-      : false;
+    const inactive = orgId ? await isCallerInactive(serviceClient, auth.user.id, orgId) : false;
 
     if (effectiveRole === "admin" && orgId) {
       const { data } = await serviceClient

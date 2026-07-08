@@ -13,18 +13,9 @@ export default function DashboardLoading() {
           border: "1px solid var(--color-border)",
         }}
       >
-        <Skeleton
-          className="dg-skeleton dg-skeleton--pill"
-          style={{ width: "22%", height: 20 }}
-        />
-        <Skeleton
-          className="dg-skeleton dg-skeleton--heading"
-          style={{ width: "35%" }}
-        />
-        <Skeleton
-          className="dg-skeleton dg-skeleton--text"
-          style={{ width: "80%" }}
-        />
+        <Skeleton className="dg-skeleton dg-skeleton--pill" style={{ width: "22%", height: 20 }} />
+        <Skeleton className="dg-skeleton dg-skeleton--heading" style={{ width: "35%" }} />
+        <Skeleton className="dg-skeleton dg-skeleton--text" style={{ width: "80%" }} />
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <Skeleton
             className="dg-skeleton dg-skeleton--button"

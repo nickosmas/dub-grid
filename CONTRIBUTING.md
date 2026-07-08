@@ -90,31 +90,36 @@ DubGrid is an npm-workspaces monorepo orchestrated by Turborepo. Put code in the
 These constraints break the app or create security issues if violated:
 
 ### Migrations
+
 All schema lives in exactly **4 files**:
 
-| File | Contents |
-| ---- | -------- |
-| `supabase/migrations/001_schema.sql` | Enums, tables, FKs, indexes, Realtime |
-| `supabase/migrations/002_functions_triggers.sql` | Functions, triggers, JWT hook, RPCs |
-| `supabase/migrations/003_rls_policies.sql` | RLS enable + all policies |
-| `supabase/migrations/004_grants.sql` | Grants + default privileges |
+| File                                             | Contents                              |
+| ------------------------------------------------ | ------------------------------------- |
+| `supabase/migrations/001_schema.sql`             | Enums, tables, FKs, indexes, Realtime |
+| `supabase/migrations/002_functions_triggers.sql` | Functions, triggers, JWT hook, RPCs   |
+| `supabase/migrations/003_rls_policies.sql`       | RLS enable + all policies             |
+| `supabase/migrations/004_grants.sql`             | Grants + default privileges           |
 
 **Never create a 005 or later migration file.** Add new content to the appropriate existing file in the correct section.
 
 When adding a table that the JWT hook reads, add explicit `GRANT SELECT ON <table> TO supabase_auth_admin` in `004_grants.sql` and test via `signInWithPassword`, not just direct SQL.
 
 ### Routes
+
 All web routes must be **simple page files** (e.g., `apps/web/src/app/people/page.tsx`). Catch-all routes (`[...slug]`) break static prerendering on Vercel. Do not introduce them.
 
 ### Naming
+
 - `gridmaster` = `platform_role`. Route: `/gridmaster`. Never call it "admin portal."
 - `admin` = `org_role` (tier 2). Per-user configurable permissions.
 - Tenant = "Organization" in all user-facing copy. Never "workspace" (except the `workspace_kind` DB column). URL identifier = "subdomain" in copy.
 
 ### Cookie Consent
+
 When adding or removing cookies, or changing analytics providers, bump `CONSENT_VERSION` in `apps/web/src/components/CookieConsent.tsx`. This re-prompts all existing users to re-consent on their next visit.
 
 ### Design System
+
 Two parallel component vocabularies exist. Do not mix them:
 
 - **`dg-btn-*` / `dg-input` / `dg-label` / `dg-form-error`** — inside the authenticated app (schedule, people, settings, profile, dashboard, reports).

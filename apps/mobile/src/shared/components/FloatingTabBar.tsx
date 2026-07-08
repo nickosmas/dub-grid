@@ -50,12 +50,7 @@ const TAB_CONFIG: Record<
   },
 };
 
-export function FloatingTabBar({
-  state,
-  descriptors,
-  navigation,
-  insets,
-}: BottomTabBarProps) {
+export function FloatingTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
   return (
     <View
       style={[
@@ -108,9 +103,7 @@ export function FloatingTabBar({
             }}
             style={styles.tab}
           >
-            <View
-              style={[styles.iconPill, focused && styles.iconPillActive]}
-            >
+            <View style={[styles.iconPill, focused && styles.iconPillActive]}>
               <config.family
                 name={focused ? config.filled : config.outline}
                 size={22}
@@ -119,10 +112,7 @@ export function FloatingTabBar({
             </View>
             <Text
               numberOfLines={1}
-              style={[
-                styles.label,
-                focused ? styles.labelActive : styles.labelInactive,
-              ]}
+              style={[styles.label, focused ? styles.labelActive : styles.labelInactive]}
             >
               {label}
             </Text>

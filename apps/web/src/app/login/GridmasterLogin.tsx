@@ -55,7 +55,9 @@ export default function GridmasterLogin() {
 
       if (!res.ok) {
         if (res.status === 429) {
-          toast.error(extractErrorMessage(result.error, "Too many login attempts. Please try again later."));
+          toast.error(
+            extractErrorMessage(result.error, "Too many login attempts. Please try again later."),
+          );
           setLoading(false);
           return;
         }
@@ -127,22 +129,14 @@ export default function GridmasterLogin() {
   }
 
   if (mfaRequired) {
-    return (
-      <MFAVerify
-        onVerified={handleMFAVerified}
-        onCancel={handleMFACancel}
-      />
-    );
+    return <MFAVerify onVerified={handleMFAVerified} onCancel={handleMFACancel} />;
   }
 
   return (
     <PublicRoute>
       <PageShell>
         <Card>
-          <a
-            href={landingUrl}
-            className="dg-auth-logo-block"
-          >
+          <a href={landingUrl} className="dg-auth-logo-block">
             <DubGridLogo size={52} />
             <span
               style={{
@@ -157,9 +151,7 @@ export default function GridmasterLogin() {
             </span>
           </a>
 
-          <h1 className="dg-auth-heading">
-            Platform Admin Sign In
-          </h1>
+          <h1 className="dg-auth-heading">Platform Admin Sign In</h1>
 
           <EmailPasswordForm
             email={email}
@@ -188,17 +180,12 @@ export default function GridmasterLogin() {
             >
               Back to Standard Login
             </a>
-            <a
-              href={landingUrl}
-              className="dg-auth-link"
-            >
+            <a href={landingUrl} className="dg-auth-link">
               Back to Home
             </a>
           </div>
         </Card>
-        {accountDisabled && (
-          <AccountDisabledModal onClose={() => setAccountDisabled(false)} />
-        )}
+        {accountDisabled && <AccountDisabledModal onClose={() => setAccountDisabled(false)} />}
       </PageShell>
     </PublicRoute>
   );

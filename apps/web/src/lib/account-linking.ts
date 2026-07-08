@@ -14,14 +14,16 @@ export function normalizeDisplayName(value: string | null | undefined): string {
 }
 
 export function hasCompleteName(name: NameParts): boolean {
-  return normalizeNamePart(name.firstName).length > 0 && normalizeNamePart(name.lastName).length > 0;
+  return (
+    normalizeNamePart(name.firstName).length > 0 && normalizeNamePart(name.lastName).length > 0
+  );
 }
 
 export function namesMatch(employeeName: NameParts, accountName: NameParts): boolean {
   if (!hasCompleteName(employeeName) || !hasCompleteName(accountName)) return false;
   return (
-    normalizeNamePart(employeeName.firstName) === normalizeNamePart(accountName.firstName)
-    && normalizeNamePart(employeeName.lastName) === normalizeNamePart(accountName.lastName)
+    normalizeNamePart(employeeName.firstName) === normalizeNamePart(accountName.firstName) &&
+    normalizeNamePart(employeeName.lastName) === normalizeNamePart(accountName.lastName)
   );
 }
 
@@ -56,18 +58,19 @@ export function parseNameMismatchResponse(payload: unknown): NameMismatchError |
 
   const typedDetails = details as Partial<NameMismatchDetails>;
   if (
-    typeof typedDetails.userId !== "string"
-    || typeof typedDetails.employeeFirstName !== "string"
-    || typeof typedDetails.employeeLastName !== "string"
-    || typeof typedDetails.accountFirstName !== "string"
-    || typeof typedDetails.accountLastName !== "string"
+    typeof typedDetails.userId !== "string" ||
+    typeof typedDetails.employeeFirstName !== "string" ||
+    typeof typedDetails.employeeLastName !== "string" ||
+    typeof typedDetails.accountFirstName !== "string" ||
+    typeof typedDetails.accountLastName !== "string"
   ) {
     return null;
   }
 
-  const message = typeof (payload as { error?: unknown }).error === "string"
-    ? (payload as { error: string }).error
-    : undefined;
+  const message =
+    typeof (payload as { error?: unknown }).error === "string"
+      ? (payload as { error: string }).error
+      : undefined;
 
   return new NameMismatchError(
     createNameMismatchDetails({

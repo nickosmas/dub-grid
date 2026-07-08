@@ -12,10 +12,7 @@ interface StatusPillProps {
   "aria-label"?: string;
 }
 
-const TONE_VARS: Record<
-  StatusPillTone,
-  { bg: string; text: string; border: string }
-> = {
+const TONE_VARS: Record<StatusPillTone, { bg: string; text: string; border: string }> = {
   success: {
     bg: "var(--color-success-bg)",
     text: "var(--color-success-text)",

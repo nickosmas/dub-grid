@@ -33,8 +33,7 @@ vi.mock("@/lib/employee-contact-conflicts", () => ({
 vi.mock("@/lib/logger", () => ({ default: { error: vi.fn(), info: vi.fn() } }));
 vi.mock("@/lib/sentry", () => ({ captureException: vi.fn() }));
 vi.mock("@/lib/staff-validation", () => ({
-  buildStaffValidationErrorResponse: () =>
-    NextResponse.json({ error: "invalid" }, { status: 422 }),
+  buildStaffValidationErrorResponse: () => NextResponse.json({ error: "invalid" }, { status: 422 }),
   getStaffFieldErrorsFromZod: () => ({}),
 }));
 vi.mock("@dubgrid/contracts", async () => {
@@ -87,23 +86,29 @@ function makeServiceClient(opts: {
   profileUpdate?: ReturnType<typeof vi.fn>;
 }) {
   const employeeUpdate = vi.fn(() => ({
-    eq: vi.fn(function this1() { return this1.bind({}); }),
+    eq: vi.fn(function this1() {
+      return this1.bind({});
+    }),
   }));
   const auditInsert = opts.auditInsert ?? vi.fn(async () => ({ error: null }));
-  const profileUpdate = opts.profileUpdate ?? vi.fn(() => ({
-    eq: vi.fn(async () => ({ error: null })),
-  }));
+  const profileUpdate =
+    opts.profileUpdate ??
+    vi.fn(() => ({
+      eq: vi.fn(async () => ({ error: null })),
+    }));
 
   // Track which UPDATE select chain to return (updatedRow may be null).
   function buildUpdateChain() {
     const select = vi.fn(() => ({
       maybeSingle: vi.fn(async () => ({
-        data: opts.updatedRow === undefined ? opts.current ?? null : opts.updatedRow,
+        data: opts.updatedRow === undefined ? (opts.current ?? null) : opts.updatedRow,
         error: null,
       })),
     }));
     const chain: { eq: (...args: unknown[]) => unknown; select: typeof select } = {
-      eq: vi.fn(function eq() { return chain; }),
+      eq: vi.fn(function eq() {
+        return chain;
+      }),
       select,
     };
     return chain;
@@ -112,7 +117,9 @@ function makeServiceClient(opts: {
   function buildSelectChain(row: ReturnType<typeof dbEmployee> | null) {
     const single = vi.fn(async () => ({ data: row, error: null }));
     const chain: { eq: (...args: unknown[]) => unknown; single: typeof single } = {
-      eq: vi.fn(function eq() { return chain; }),
+      eq: vi.fn(function eq() {
+        return chain;
+      }),
       single,
     };
     return chain;
@@ -199,17 +206,9 @@ describe("PATCH /api/employees/identity", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(resolveEffectiveOrgId).toHaveBeenCalledWith(
-      expect.anything(),
-      ACTOR_ID,
-      REAL_ORG_ID,
-    );
+    expect(resolveEffectiveOrgId).toHaveBeenCalledWith(expect.anything(), ACTOR_ID, REAL_ORG_ID);
     // Permission check ran against the SANDBOX org, not the body-supplied real org.
-    expect(canManageEmployees).toHaveBeenCalledWith(
-      expect.anything(),
-      ACTOR_ID,
-      SANDBOX_ORG_ID,
-    );
+    expect(canManageEmployees).toHaveBeenCalledWith(expect.anything(), ACTOR_ID, SANDBOX_ORG_ID);
   });
 
   it("returns 409 EMPLOYEE_IDENTITY_CONFLICT when expectedVersion mismatches", async () => {
@@ -266,8 +265,20 @@ describe("PATCH /api/employees/identity", () => {
       }) => ({ error: null }),
     );
     const service = makeServiceClient({
-      current: dbEmployee({ first_name: "Old", last_name: "Name", phone: "", email: "old@x.com", version: 3 }),
-      updatedRow: dbEmployee({ first_name: "New", last_name: "Name", phone: "", email: "new@x.com", version: 4 }),
+      current: dbEmployee({
+        first_name: "Old",
+        last_name: "Name",
+        phone: "",
+        email: "old@x.com",
+        version: 3,
+      }),
+      updatedRow: dbEmployee({
+        first_name: "New",
+        last_name: "Name",
+        phone: "",
+        email: "new@x.com",
+        version: 4,
+      }),
       auditInsert,
     });
     getServiceClient.mockReturnValue(service);

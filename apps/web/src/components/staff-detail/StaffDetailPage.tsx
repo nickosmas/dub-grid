@@ -28,12 +28,8 @@ import {
 } from "@/features/employees/client";
 import { queryKeys } from "@/lib/query-keys";
 import { mergeEmployeeIntoDirectoryPerson, upsertEmployeeInList } from "@/lib/staff-directory";
-import {
-  computeEmployeeWeeklyHours,
-  formatDateKey,
-  getWeekDates,
-  getWeekStart,
-} from "@/lib/dashboard-stats";
+import { computeEmployeeWeeklyHours, getWeekDates, getWeekStart } from "@/lib/dashboard-stats";
+import { formatDateKey } from "@/lib/utils";
 import type {
   DirectoryPerson,
   Employee,
@@ -48,10 +44,7 @@ import {
   fetchScheduleActorNames,
   fetchShiftRequests,
 } from "@/features/schedule/client";
-import {
-  removeUserFromOrganization,
-  revokeInvitation,
-} from "@/features/organization/client";
+import { removeUserFromOrganization, revokeInvitation } from "@/features/organization/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { StaffDetailHeader } from "./StaffDetailHeader";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
@@ -90,12 +83,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [shiftRequests, setShiftRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<"overview" | "schedule" | "activity">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "schedule" | "activity">(
+    "overview",
+  );
   const [showManagementPanel, setShowManagementPanel] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showManagementAccessModal, setShowManagementAccessModal] = useState(false);
-  const [quickRevokeInviteConfirm, setQuickRevokeInviteConfirm] =
-    useState<Invitation | null>(null);
+  const [quickRevokeInviteConfirm, setQuickRevokeInviteConfirm] = useState<Invitation | null>(null);
   const [quickRevokingInvite, setQuickRevokingInvite] = useState(false);
 
   const orgId = perms.orgId ?? org?.id ?? null;
@@ -196,7 +190,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [
     employeeId,
     orgId,
@@ -228,128 +224,165 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     void queryClient.invalidateQueries({ queryKey: queryKeys.org.directory(orgId) });
   }, [orgId, queryClient]);
 
-  const syncEmployeeCaches = useCallback((updatedEmployee?: Employee | null) => {
-    if (!orgId || !updatedEmployee) return;
+  const syncEmployeeCaches = useCallback(
+    (updatedEmployee?: Employee | null) => {
+      if (!orgId || !updatedEmployee) return;
 
-    setEmployee(updatedEmployee);
-    queryClient.setQueryData(
-      queryKeys.employees.all(orgId),
-      (current: Employee[] | undefined) =>
+      setEmployee(updatedEmployee);
+      queryClient.setQueryData(queryKeys.employees.all(orgId), (current: Employee[] | undefined) =>
         current ? upsertEmployeeInList(current, updatedEmployee) : current,
-    );
-    queryClient.setQueryData(
-      queryKeys.org.directory(orgId),
-      (current: DirectoryPerson[] | undefined) =>
-        current?.map((person) => (
-          person.employeeId === updatedEmployee.id
-            ? mergeEmployeeIntoDirectoryPerson(person, updatedEmployee)
-            : person
-        )) ?? current,
-    );
-  }, [orgId, queryClient]);
-
-  const handleSaveEmployee = useCallback(async (updatedEmployee: Employee) => {
-    if (!orgId || !employee) return;
-    const previousEmployee = employee;
-    setEmployee(updatedEmployee);
-    try {
-      await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
-      syncEmployeeCaches(updatedEmployee);
-      toast.success("Employee saved");
-      refreshDirectory();
-    } catch (err) {
-      if (err instanceof OptimisticLockError) {
-        const latestEmployee = await fetchEmployeeById(updatedEmployee.id, orgId);
-        if (latestEmployee) {
-          setEmployee(latestEmployee);
-          syncEmployeeCaches(latestEmployee);
-        } else {
-          setEmployee(previousEmployee);
-        }
-        toast.error("Employee details changed elsewhere. Review the latest values and try again.");
-        return;
-      }
-      setEmployee(previousEmployee);
-      toast.error(
-        err instanceof EmployeeContactConflictError
-          ? err.message
-          : "Failed to save employee",
       );
-    }
-  }, [employee, orgId, refreshDirectory, syncEmployeeCaches]);
+      queryClient.setQueryData(
+        queryKeys.org.directory(orgId),
+        (current: DirectoryPerson[] | undefined) =>
+          current?.map((person) =>
+            person.employeeId === updatedEmployee.id
+              ? mergeEmployeeIntoDirectoryPerson(person, updatedEmployee)
+              : person,
+          ) ?? current,
+      );
+    },
+    [orgId, queryClient],
+  );
+
+  const handleSaveEmployee = useCallback(
+    async (updatedEmployee: Employee) => {
+      if (!orgId || !employee) return;
+      const previousEmployee = employee;
+      setEmployee(updatedEmployee);
+      try {
+        await updateEmployee(updatedEmployee, orgId, previousEmployee.version);
+        syncEmployeeCaches(updatedEmployee);
+        toast.success("Employee saved");
+        refreshDirectory();
+      } catch (err) {
+        if (err instanceof OptimisticLockError) {
+          const latestEmployee = await fetchEmployeeById(updatedEmployee.id, orgId);
+          if (latestEmployee) {
+            setEmployee(latestEmployee);
+            syncEmployeeCaches(latestEmployee);
+          } else {
+            setEmployee(previousEmployee);
+          }
+          toast.error(
+            "Employee details changed elsewhere. Review the latest values and try again.",
+          );
+          return;
+        }
+        setEmployee(previousEmployee);
+        toast.error(
+          err instanceof EmployeeContactConflictError ? err.message : "Failed to save employee",
+        );
+      }
+    },
+    [employee, orgId, refreshDirectory, syncEmployeeCaches],
+  );
 
   // ── Status action handlers ──────────────────────────────────────────────────
-  const handleDeactivate = useCallback(async (empId: string, note?: string) => {
-    if (!orgId || !employee) return;
-    setEmployee((prev) => prev ? { ...prev, status: "inactive" as const, statusNote: note ?? "", statusChangedAt: new Date().toISOString() } : prev);
-    try {
-      const updatedEmployee = await deactivateEmployee(empId, note, orgId, employee.version);
-      syncEmployeeCaches(updatedEmployee);
-      toast.success("Employee marked inactive");
-    } catch (err) {
-      if (err instanceof EmployeeStatusConflictError) {
-        setEmployee(err.latestEmployee);
-        syncEmployeeCaches(err.latestEmployee);
-        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
-        return;
+  const handleDeactivate = useCallback(
+    async (empId: string, note?: string) => {
+      if (!orgId || !employee) return;
+      setEmployee((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "inactive" as const,
+              statusNote: note ?? "",
+              statusChangedAt: new Date().toISOString(),
+            }
+          : prev,
+      );
+      try {
+        const updatedEmployee = await deactivateEmployee(empId, note, orgId, employee.version);
+        syncEmployeeCaches(updatedEmployee);
+        toast.success("Employee marked inactive");
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setEmployee(err.latestEmployee);
+          syncEmployeeCaches(err.latestEmployee);
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        // Revert on failure
+        setEmployee((prev) =>
+          prev ? { ...prev, status: "active" as const, statusNote: "" } : prev,
+        );
+        if (err instanceof SelfActionForbiddenError) {
+          toast.error(err.message);
+          return;
+        }
+        toast.error("Failed to update employee status");
       }
-      // Revert on failure
-      setEmployee((prev) => prev ? { ...prev, status: "active" as const, statusNote: "" } : prev);
-      if (err instanceof SelfActionForbiddenError) {
-        toast.error(err.message);
-        return;
-      }
-      toast.error("Failed to update employee status");
-    }
-  }, [employee, orgId, syncEmployeeCaches]);
+    },
+    [employee, orgId, syncEmployeeCaches],
+  );
 
-  const handleActivate = useCallback(async (empId: string) => {
-    if (!orgId || !employee) return;
-    const prevStatus = employee?.status;
-    setEmployee((prev) => prev ? { ...prev, status: "active" as const, statusNote: "", statusChangedAt: new Date().toISOString() } : prev);
-    try {
-      const updatedEmployee = await activateEmployee(empId, orgId, employee.version);
-      syncEmployeeCaches(updatedEmployee);
-      toast.success("Employee activated");
-    } catch (err) {
-      if (err instanceof EmployeeStatusConflictError) {
-        setEmployee(err.latestEmployee);
-        syncEmployeeCaches(err.latestEmployee);
-        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
-        return;
+  const handleActivate = useCallback(
+    async (empId: string) => {
+      if (!orgId || !employee) return;
+      const prevStatus = employee?.status;
+      setEmployee((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "active" as const,
+              statusNote: "",
+              statusChangedAt: new Date().toISOString(),
+            }
+          : prev,
+      );
+      try {
+        const updatedEmployee = await activateEmployee(empId, orgId, employee.version);
+        syncEmployeeCaches(updatedEmployee);
+        toast.success("Employee activated");
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setEmployee(err.latestEmployee);
+          syncEmployeeCaches(err.latestEmployee);
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        setEmployee((prev) => (prev ? { ...prev, status: prevStatus ?? "inactive" } : prev));
+        if (err instanceof SelfActionForbiddenError) {
+          toast.error(err.message);
+          return;
+        }
+        toast.error("Failed to activate employee");
       }
-      setEmployee((prev) => prev ? { ...prev, status: prevStatus ?? "inactive" } : prev);
-      if (err instanceof SelfActionForbiddenError) {
-        toast.error(err.message);
-        return;
-      }
-      toast.error("Failed to activate employee");
-    }
-  }, [employee, orgId, syncEmployeeCaches]);
+    },
+    [employee, orgId, syncEmployeeCaches],
+  );
 
-  const handleRemove = useCallback(async (empId: string, note?: string) => {
-    if (!orgId || !employee) return;
-    const prevStatus = employee?.status;
-    setEmployee((prev) => prev ? { ...prev, status: "removed" as const, statusChangedAt: new Date().toISOString() } : prev);
-    try {
-      const updatedEmployee = await removeEmployee(empId, orgId, employee.version, note);
-      syncEmployeeCaches(updatedEmployee);
-      toast.success("Employee removed");
-    } catch (err) {
-      if (err instanceof EmployeeStatusConflictError) {
-        setEmployee(err.latestEmployee);
-        syncEmployeeCaches(err.latestEmployee);
-        toast.error("Employee status changed elsewhere. Review the latest values and try again.");
-        return;
+  const handleRemove = useCallback(
+    async (empId: string, note?: string) => {
+      if (!orgId || !employee) return;
+      const prevStatus = employee?.status;
+      setEmployee((prev) =>
+        prev
+          ? { ...prev, status: "removed" as const, statusChangedAt: new Date().toISOString() }
+          : prev,
+      );
+      try {
+        const updatedEmployee = await removeEmployee(empId, orgId, employee.version, note);
+        syncEmployeeCaches(updatedEmployee);
+        toast.success("Employee removed");
+      } catch (err) {
+        if (err instanceof EmployeeStatusConflictError) {
+          setEmployee(err.latestEmployee);
+          syncEmployeeCaches(err.latestEmployee);
+          toast.error("Employee status changed elsewhere. Review the latest values and try again.");
+          return;
+        }
+        setEmployee((prev) => (prev ? { ...prev, status: prevStatus ?? "active" } : prev));
+        if (err instanceof SelfActionForbiddenError) {
+          toast.error(err.message);
+          return;
+        }
+        toast.error("Failed to remove employee");
       }
-      setEmployee((prev) => prev ? { ...prev, status: prevStatus ?? "active" } : prev);
-      if (err instanceof SelfActionForbiddenError) {
-        toast.error(err.message);
-        return;
-      }
-      toast.error("Failed to remove employee");
-    }
-  }, [employee, orgId, syncEmployeeCaches]);
+    },
+    [employee, orgId, syncEmployeeCaches],
+  );
 
   const thisWeekHours = useMemo(() => {
     if (!employee) return null;
@@ -393,11 +426,17 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         // Non-critical — audit names are informational
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [orgId, shifts]);
 
   const pendingInvite = useMemo(() => {
-    return invitations.find(i => !i.acceptedAt && !i.revokedAt && new Date(i.expiresAt) > new Date()) ?? null;
+    return (
+      invitations.find(
+        (i) => !i.acceptedAt && !i.revokedAt && new Date(i.expiresAt) > new Date(),
+      ) ?? null
+    );
   }, [invitations]);
 
   const canEditDetails = perms.canManageEmployees || perms.isSuperAdmin;
@@ -406,40 +445,48 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     () => directory.find((person) => person.employeeId === employee?.id) ?? null,
     [directory, employee?.id],
   );
-  const hasPendingManagementInvite = !!directoryPerson
-    && directoryPerson.managementDepartmentIds.length > 0
-    && directoryPerson.invitationStatus !== null
-    && !directoryPerson.hasAppAccess;
+  const hasPendingManagementInvite =
+    !!directoryPerson &&
+    directoryPerson.managementDepartmentIds.length > 0 &&
+    directoryPerson.invitationStatus !== null &&
+    !directoryPerson.hasAppAccess;
 
-  const handleRevokeInvitation = useCallback(async (invitationId: string) => {
-    if (!orgId) return false;
-    try {
-      await revokeInvitation(invitationId, orgId);
-      await refreshInvitations();
-      refreshDirectory();
-      toast.success("Invitation revoked");
-      return true;
-    } catch {
-      toast.error("Failed to revoke invitation");
-      return false;
-    }
-  }, [orgId, refreshDirectory, refreshInvitations]);
+  const handleRevokeInvitation = useCallback(
+    async (invitationId: string) => {
+      if (!orgId) return false;
+      try {
+        await revokeInvitation(invitationId, orgId);
+        await refreshInvitations();
+        refreshDirectory();
+        toast.success("Invitation revoked");
+        return true;
+      } catch {
+        toast.error("Failed to revoke invitation");
+        return false;
+      }
+    },
+    [orgId, refreshDirectory, refreshInvitations],
+  );
 
-  const handleRevokeAccess = useCallback(async (userId: string) => {
-    if (!orgId || !perms.isSuperAdmin) return;
-    try {
-      await removeUserFromOrganization(userId, orgId);
-      refreshDirectory();
-      toast.success("App access revoked");
-    } catch {
-      toast.error("Failed to revoke app access");
-    }
-  }, [orgId, perms.isSuperAdmin, refreshDirectory]);
+  const handleRevokeAccess = useCallback(
+    async (userId: string) => {
+      if (!orgId || !perms.isSuperAdmin) return;
+      try {
+        await removeUserFromOrganization(userId, orgId);
+        refreshDirectory();
+        toast.success("App access revoked");
+      } catch {
+        toast.error("Failed to revoke app access");
+      }
+    },
+    [orgId, perms.isSuperAdmin, refreshDirectory],
+  );
 
-  const showQuickActions = perms.canManageEmployees
-    || canManageManagementAccess
-    || (perms.canManageEmployees && !!pendingInvite)
-    || (perms.canManageEmployees && !employee?.userId && !!employee?.email);
+  const showQuickActions =
+    perms.canManageEmployees ||
+    canManageManagementAccess ||
+    (perms.canManageEmployees && !!pendingInvite) ||
+    (perms.canManageEmployees && !employee?.userId && !!employee?.email);
 
   const isLoading = loading || orgLoading || perms.isLoading;
 
@@ -491,7 +538,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   <div className="dg-card-header">
                     <div>
                       <div className="dg-card-title">Actions</div>
-                      <div className="dg-card-subtitle">Common staffing and access actions for this person.</div>
+                      <div className="dg-card-subtitle">
+                        Common staffing and access actions for this person.
+                      </div>
                     </div>
                   </div>
                   <div className="dg-card-body flex flex-col gap-4">
@@ -515,15 +564,18 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                         </>
                       )}
 
-                      {perms.canManageEmployees && !pendingInvite && !employee.userId && employee.email && (
-                        <button
-                          type="button"
-                          onClick={() => setShowInviteModal(true)}
-                          className="dg-btn dg-btn-secondary dg-btn-sm"
-                        >
-                          Send Invitation
-                        </button>
-                      )}
+                      {perms.canManageEmployees &&
+                        !pendingInvite &&
+                        !employee.userId &&
+                        employee.email && (
+                          <button
+                            type="button"
+                            onClick={() => setShowInviteModal(true)}
+                            className="dg-btn dg-btn-secondary dg-btn-sm"
+                          >
+                            Send Invitation
+                          </button>
+                        )}
 
                       {canManageManagementAccess && employee.status !== "removed" && (
                         <button
@@ -563,31 +615,31 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
               </section>
             )}
 
-            {canEditDetails && (
-              showManagementPanel && (
-                <section>
-                  <div className="dg-card">
-                    <div className="dg-card-header">
-                      <div>
-                        <div className="dg-card-title">Edit details</div>
-                        <div className="dg-card-subtitle">Update biodata, assignments, and account-related staff settings.</div>
+            {canEditDetails && showManagementPanel && (
+              <section>
+                <div className="dg-card">
+                  <div className="dg-card-header">
+                    <div>
+                      <div className="dg-card-title">Edit details</div>
+                      <div className="dg-card-subtitle">
+                        Update biodata, assignments, and account-related staff settings.
                       </div>
                     </div>
-
-                    <EditEmployeePanel
-                      employee={employee}
-                      focusAreas={focusAreas}
-                      certifications={certifications}
-                      roles={orgRoles}
-                      focusAreaLabel={org?.focusAreaLabel}
-                      certificationLabel={org?.certificationLabel}
-                      roleLabel={org?.roleLabel}
-                      onSave={handleSaveEmployee}
-                      onCancel={() => setShowManagementPanel(false)}
-                    />
                   </div>
-                </section>
-              )
+
+                  <EditEmployeePanel
+                    employee={employee}
+                    focusAreas={focusAreas}
+                    certifications={certifications}
+                    roles={orgRoles}
+                    focusAreaLabel={org?.focusAreaLabel}
+                    certificationLabel={org?.certificationLabel}
+                    roleLabel={org?.roleLabel}
+                    onSave={handleSaveEmployee}
+                    onCancel={() => setShowManagementPanel(false)}
+                  />
+                </div>
+              </section>
             )}
 
             <section className="space-y-4">
@@ -609,7 +661,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     { id: "activity", label: "Activity" },
                   ]}
                   activeTab={activeSection}
-                  onChange={(tabId) => setActiveSection(tabId as "overview" | "schedule" | "activity")}
+                  onChange={(tabId) =>
+                    setActiveSection(tabId as "overview" | "schedule" | "activity")
+                  }
                   className="dg-span-tabs dg-span-tabs--light"
                 />
               </div>
@@ -680,7 +734,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           employee={employee}
           orgId={orgId}
           orgName={org.name || "your organization"}
-          managementDepartments={(departments ?? []).filter((department) => department.type === "management")}
+          managementDepartments={(departments ?? []).filter(
+            (department) => department.type === "management",
+          )}
           directoryPerson={directoryPerson}
           pendingInvitation={pendingInvite ?? undefined}
           onClose={() => setShowManagementAccessModal(false)}

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireGridmasterSession,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
@@ -60,9 +57,7 @@ async function loadGridmasterAccounts(): Promise<GridmasterAccount[]> {
         firstName: (profile.first_name as string | null) ?? null,
         lastName: (profile.last_name as string | null) ?? null,
         createdAt:
-          (profile.created_at as string | null) ??
-          user?.created_at ??
-          new Date(0).toISOString(),
+          (profile.created_at as string | null) ?? user?.created_at ?? new Date(0).toISOString(),
         lastSignInAt: user?.last_sign_in_at ?? null,
         deactivatedAt: (profile.deactivated_at as string | null) ?? null,
         deactivatedBy: (profile.deactivated_by as string | null) ?? null,
@@ -91,10 +86,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("gridmaster accounts GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load gridmaster accounts" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load gridmaster accounts" }, { status: 500 });
   }
 }
 
@@ -130,11 +122,7 @@ export async function POST(req: NextRequest) {
         p_email: parsed.data.email,
       });
       if (result.error) {
-        return apiErrorResponse(
-          result.error,
-          "Failed to promote gridmaster account",
-          400,
-        );
+        return apiErrorResponse(result.error, "Failed to promote gridmaster account", 400);
       }
       const payload = getRpcPayload(result.data);
       const userId = (payload.user_id as string | undefined) ?? null;
@@ -157,11 +145,7 @@ export async function POST(req: NextRequest) {
         p_org_role: parsed.data.orgRole,
       });
       if (result.error) {
-        return apiErrorResponse(
-          result.error,
-          "Failed to demote gridmaster account",
-          400,
-        );
+        return apiErrorResponse(result.error, "Failed to demote gridmaster account", 400);
       }
       await writeGridmasterAuditLog({
         serviceClient,
@@ -185,11 +169,7 @@ export async function POST(req: NextRequest) {
       p_deactivate: parsed.data.deactivate,
     });
     if (result.error) {
-      return apiErrorResponse(
-        result.error,
-        "Failed to update gridmaster account",
-        400,
-      );
+      return apiErrorResponse(result.error, "Failed to update gridmaster account", 400);
     }
     await writeGridmasterAuditLog({
       serviceClient,
@@ -208,9 +188,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("gridmaster accounts POST failed", error);
-    return NextResponse.json(
-      { error: "Failed to update gridmaster account" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update gridmaster account" }, { status: 500 });
   }
 }

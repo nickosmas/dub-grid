@@ -69,14 +69,8 @@ export default function OnboardingWizard({
     if (role === "admin") return ADMIN_STEPS;
     return USER_STEPS;
   }, [role, effectiveIsOrgSetup]);
-  const {
-    currentStepIndex,
-    currentStep,
-    goNext,
-    goBack,
-    completeOnboarding,
-    isFirstStep,
-  } = useOnboardingState(userId, orgId, steps);
+  const { currentStepIndex, currentStep, goNext, goBack, completeOnboarding, isFirstStep } =
+    useOnboardingState(userId, orgId, steps);
 
   const [skipLoading, setSkipLoading] = useState(false);
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
@@ -111,15 +105,18 @@ export default function OnboardingWizard({
         return <SuperAdminOrientationStep onNext={goNext} onBack={goBack} />;
       case "completion":
         return (
-          <CompletionStep role={role} onComplete={completeOnboarding} isOrgSetup={effectiveIsOrgSetup} />
+          <CompletionStep
+            role={role}
+            onComplete={completeOnboarding}
+            isOrgSetup={effectiveIsOrgSetup}
+          />
         );
       default:
         return null;
     }
   }
 
-  const hideStepper =
-    currentStep.id === "welcome" || currentStep.id === "completion";
+  const hideStepper = currentStep.id === "welcome" || currentStep.id === "completion";
 
   // Skip only escapes the per-user orientation phase. During org-config
   // (isOrgSetup === false) the gate re-triggers on reload because the

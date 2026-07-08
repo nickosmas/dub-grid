@@ -102,9 +102,7 @@ export function getActiveUserSessionCutoff(now: Date = new Date()): string {
   return new Date(now.getTime() - USER_SESSION_ACTIVE_WINDOW_MS).toISOString();
 }
 
-export async function trackUserSessionForUser(
-  input: TrackUserSessionInput,
-): Promise<void> {
+export async function trackUserSessionForUser(input: TrackUserSessionInput): Promise<void> {
   const { error } = await getServiceClient()
     .from("user_sessions")
     .upsert(
@@ -143,9 +141,7 @@ export async function revokeUserSessionForUser(
 }
 
 function hashSupabaseSessionId(sessionId: string): string {
-  return createHash("sha256")
-    .update(`supabase-session:${sessionId}`)
-    .digest("hex");
+  return createHash("sha256").update(`supabase-session:${sessionId}`).digest("hex");
 }
 
 function isUserSessionPlatform(value: unknown): value is UserSessionPlatform {

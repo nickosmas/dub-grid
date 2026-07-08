@@ -116,10 +116,7 @@ vi.mock("@/lib/supabase-service", () => ({
                 Promise.resolve({
                   data: setupRowsByTable[table],
                   error: null,
-                  count:
-                    table === "employees" && options?.count === "exact"
-                      ? 1
-                      : null,
+                  count: table === "employees" && options?.count === "exact" ? 1 : null,
                 }).then(resolve, reject),
               ),
             };

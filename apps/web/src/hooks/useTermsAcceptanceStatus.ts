@@ -2,10 +2,7 @@
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  fetchTermsAcceptanceStatus,
-  type TermsAcceptanceStatus,
-} from "@/features/account/client";
+import { fetchTermsAcceptanceStatus, type TermsAcceptanceStatus } from "@/features/account/client";
 
 /**
  * Shared current-terms acceptance status for the signed-in user.

@@ -3,13 +3,7 @@
 import { parseNameMismatchResponse } from "@/lib/account-linking";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { SELF_ACTION_FORBIDDEN_CODE, SelfActionForbiddenError } from "@dubgrid/domain";
-import type {
-  AuditLogEntry,
-  Employee,
-  EmployeeStatus,
-  Invitation,
-  ShiftMap,
-} from "@/types";
+import type { AuditLogEntry, Employee, EmployeeStatus, Invitation, ShiftMap } from "@/types";
 
 export interface UpdateEmployeeIdentityInput {
   employeeId: string;
@@ -64,21 +58,16 @@ function resolveClientUrl(path: string): string {
   return path;
 }
 
-async function requestEmployeesJson<T>(
-  input: string,
-  init?: RequestInit,
-): Promise<T> {
+async function requestEmployeesJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(resolveClientUrl(input), init);
-  const payload = await response.json().catch(() => null) as
-    | {
-        code?: string;
-        error?: string;
-        employee?: Employee;
-        field?: "email" | "phone";
-        message?: string;
-        status?: string;
-      }
-    | null;
+  const payload = (await response.json().catch(() => null)) as {
+    code?: string;
+    error?: string;
+    employee?: Employee;
+    field?: "email" | "phone";
+    message?: string;
+    status?: string;
+  } | null;
   const mismatchError = parseNameMismatchResponse(payload);
   if (mismatchError) {
     throw mismatchError;
@@ -99,9 +88,7 @@ async function requestEmployeesJson<T>(
   return payload as T;
 }
 
-async function requestEmployeeAction<T>(
-  body: Record<string, unknown>,
-): Promise<T> {
+async function requestEmployeeAction<T>(body: Record<string, unknown>): Promise<T> {
   return requestEmployeesJson<T>("/api/employees/manage", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -112,20 +99,14 @@ async function requestEmployeeAction<T>(
 export async function updateEmployeeIdentity(
   input: UpdateEmployeeIdentityInput,
 ): Promise<{ success: true; employee: Employee }> {
-  return requestEmployeesJson<{ success: true; employee: Employee }>(
-    "/api/employees/identity",
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    },
-  );
+  return requestEmployeesJson<{ success: true; employee: Employee }>("/api/employees/identity", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }
 
-export function fetchEmployees(
-  orgId: string,
-  statuses?: EmployeeStatus[],
-): Promise<Employee[]> {
+export function fetchEmployees(orgId: string, statuses?: EmployeeStatus[]): Promise<Employee[]> {
   return requestEmployeeAction<{ employees: Employee[] }>({
     action: "fetchEmployees",
     orgId,
@@ -133,10 +114,7 @@ export function fetchEmployees(
   }).then((data) => data.employees);
 }
 
-export function insertEmployee(
-  employee: Omit<Employee, "id">,
-  orgId: string,
-): Promise<Employee> {
+export function insertEmployee(employee: Omit<Employee, "id">, orgId: string): Promise<Employee> {
   return requestEmployeeAction<{ employee: Employee }>({
     action: "insertEmployee",
     orgId,
@@ -160,15 +138,13 @@ export async function updateEmployee(
     }),
   });
 
-  const body = (await response.json().catch(() => null)) as
-    | {
-        code?: string;
-        error?: string;
-        employee?: Employee;
-        field?: "email" | "phone";
-        message?: string;
-      }
-    | null;
+  const body = (await response.json().catch(() => null)) as {
+    code?: string;
+    error?: string;
+    employee?: Employee;
+    field?: "email" | "phone";
+    message?: string;
+  } | null;
 
   if (
     response.status === 409 &&
@@ -194,10 +170,7 @@ export async function updateEmployee(
   }
 }
 
-export function fetchEmployeeById(
-  employeeId: string,
-  orgId: string,
-): Promise<Employee | null> {
+export function fetchEmployeeById(employeeId: string, orgId: string): Promise<Employee | null> {
   return requestEmployeeAction<{ employee: Employee | null }>({
     action: "fetchEmployeeById",
     orgId,
@@ -205,10 +178,7 @@ export function fetchEmployeeById(
   }).then((data) => data.employee);
 }
 
-export function fetchEmployeeByUserId(
-  userId: string,
-  orgId: string,
-): Promise<Employee | null> {
+export function fetchEmployeeByUserId(userId: string, orgId: string): Promise<Employee | null> {
   return requestEmployeeAction<{ employee: Employee | null }>({
     action: "fetchEmployeeByUserId",
     orgId,
@@ -235,10 +205,7 @@ export function fetchEmployeeShifts(
   }).then((data) => data.shifts);
 }
 
-export function fetchEmployeeInvitations(
-  orgId: string,
-  employeeId: string,
-): Promise<Invitation[]> {
+export function fetchEmployeeInvitations(orgId: string, employeeId: string): Promise<Invitation[]> {
   return requestEmployeeAction<{ invitations: Invitation[] }>({
     action: "fetchEmployeeInvitations",
     orgId,
@@ -246,10 +213,7 @@ export function fetchEmployeeInvitations(
   }).then((data) => data.invitations);
 }
 
-export function fetchEmployeeRoleHistory(
-  userId: string,
-  orgId: string,
-): Promise<AuditLogEntry[]> {
+export function fetchEmployeeRoleHistory(userId: string, orgId: string): Promise<AuditLogEntry[]> {
   return requestEmployeeAction<{ entries: AuditLogEntry[] }>({
     action: "fetchEmployeeRoleHistory",
     orgId,
@@ -270,9 +234,11 @@ async function updateEmployeeStatus(input: {
     body: JSON.stringify(input),
   });
 
-  const body = (await response.json().catch(() => null)) as
-    | { error?: string; code?: string; employee?: Employee }
-    | null;
+  const body = (await response.json().catch(() => null)) as {
+    error?: string;
+    code?: string;
+    employee?: Employee;
+  } | null;
 
   if (response.status === 409 && body?.employee) {
     throw new EmployeeStatusConflictError(body.employee);

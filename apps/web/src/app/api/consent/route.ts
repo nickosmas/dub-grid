@@ -58,7 +58,9 @@ export async function POST(req: NextRequest) {
 
     // Get authenticated user if available (nullable for anonymous visitors)
     const userClient = getUserClient(req);
-    const { data: { user: authedUser } } = await userClient.auth.getUser();
+    const {
+      data: { user: authedUser },
+    } = await userClient.auth.getUser();
 
     // Hash IP for privacy-safe audit trail
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";

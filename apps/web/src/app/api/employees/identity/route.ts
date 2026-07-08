@@ -45,8 +45,7 @@ function getRequestIp(req: NextRequest): string | null {
 function buildConflictResponse(employee: ReturnType<typeof rowToEmployee>) {
   return NextResponse.json(
     {
-      error:
-        "Employee details changed elsewhere. Refresh and try again.",
+      error: "Employee details changed elsewhere. Refresh and try again.",
       code: "EMPLOYEE_IDENTITY_CONFLICT",
       employee,
     },
@@ -77,21 +76,15 @@ export async function PATCH(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: API_ERRORS.INVALID_BODY },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
-    return buildStaffValidationErrorResponse(
-      getStaffFieldErrorsFromZod(parsed.error),
-    );
+    return buildStaffValidationErrorResponse(getStaffFieldErrorsFromZod(parsed.error));
   }
 
-  const { employeeId, userId, firstName, lastName, phone, email, expectedVersion } =
-    parsed.data;
+  const { employeeId, userId, firstName, lastName, phone, email, expectedVersion } = parsed.data;
   // Effective (sandbox-redirected) org; resolved inside the try, declared here
   // so the catch block can reference it for logging. (H-1)
   let orgId = parsed.data.orgId;
@@ -103,16 +96,9 @@ export async function PATCH(req: NextRequest) {
     // (otherwise a sandbox user could mutate the real org). See H-1.
     orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
 
-    const hasPermission = await canManageEmployees(
-      serviceClient,
-      user.id,
-      orgId,
-    );
+    const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
     if (!hasPermission) {
-      return NextResponse.json(
-        { error: API_ERRORS.FORBIDDEN },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
     }
 
     const { data: currentRow, error: currentError } = await serviceClient
@@ -188,33 +174,31 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (changedFields.length > 0) {
-      const { error: auditError } = await serviceClient
-        .from("audit_log")
-        .insert({
-          org_id: orgId,
-          actor_id: user.id,
-          actor_email: user.email ?? null,
-          action: "employee.identity_updated",
-          resource_type: "employee",
-          resource_id: employeeId,
-          details: {
-            changedFields,
-            from: {
-              firstName: currentEmployee.firstName,
-              lastName: currentEmployee.lastName,
-              phone: currentEmployee.phone ?? "",
-              ...(email !== undefined ? { email: currentEmployee.email ?? "" } : {}),
-            },
-            to: {
-              firstName,
-              lastName,
-              phone: phone ?? "",
-              ...(email !== undefined ? { email: email ?? "" } : {}),
-            },
+      const { error: auditError } = await serviceClient.from("audit_log").insert({
+        org_id: orgId,
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        action: "employee.identity_updated",
+        resource_type: "employee",
+        resource_id: employeeId,
+        details: {
+          changedFields,
+          from: {
+            firstName: currentEmployee.firstName,
+            lastName: currentEmployee.lastName,
+            phone: currentEmployee.phone ?? "",
+            ...(email !== undefined ? { email: currentEmployee.email ?? "" } : {}),
           },
-          ip_address: getRequestIp(req),
-          user_agent: req.headers.get("user-agent"),
-        });
+          to: {
+            firstName,
+            lastName,
+            phone: phone ?? "",
+            ...(email !== undefined ? { email: email ?? "" } : {}),
+          },
+        },
+        ip_address: getRequestIp(req),
+        user_agent: req.headers.get("user-agent"),
+      });
 
       if (auditError) {
         logger.error(
@@ -233,9 +217,6 @@ export async function PATCH(req: NextRequest) {
 
     Sentry.captureException(error, { extra: { context: "employees/identity", employeeId, orgId } });
     logger.error({ error, employeeId, orgId }, "Employee identity update failed");
-    return NextResponse.json(
-      { error: "Failed to update employee identity" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update employee identity" }, { status: 500 });
   }
 }

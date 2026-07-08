@@ -49,18 +49,21 @@ export function useStaffReorder({ sorted, onSave }: UseStaffReorderOptions) {
     setDragOverIdx((current) => (current === idx ? current : idx));
   }, []);
 
-  const handleDrop = useCallback((dropIdx = dragOverIdx, sourceIdx = draggedIdx) => {
-    if (sourceIdx === null || dropIdx === null || !pendingOrder) return;
-    const list = [...pendingOrder];
-    const [item] = list.splice(sourceIdx, 1);
-    if (!item) return;
+  const handleDrop = useCallback(
+    (dropIdx = dragOverIdx, sourceIdx = draggedIdx) => {
+      if (sourceIdx === null || dropIdx === null || !pendingOrder) return;
+      const list = [...pendingOrder];
+      const [item] = list.splice(sourceIdx, 1);
+      if (!item) return;
 
-    const boundedDropIdx = Math.max(0, Math.min(dropIdx, list.length));
-    list.splice(boundedDropIdx, 0, item);
-    setPendingOrder(list);
-    setDraggedIdx(null);
-    setDragOverIdx(null);
-  }, [draggedIdx, dragOverIdx, pendingOrder]);
+      const boundedDropIdx = Math.max(0, Math.min(dropIdx, list.length));
+      list.splice(boundedDropIdx, 0, item);
+      setPendingOrder(list);
+      setDraggedIdx(null);
+      setDragOverIdx(null);
+    },
+    [draggedIdx, dragOverIdx, pendingOrder],
+  );
 
   const handleDragEnd = useCallback(() => {
     setDraggedIdx(null);

@@ -1,0 +1,15 @@
+.next/
+apps/web/.next/
+out/
+build/
+dist/
+packages/*/dist/
+next-env.d.ts
+apps/web/next-env.d.ts
+coverage/
+.turbo/
+node_modules/
+package-lock.json
+apps/mobile/ios/
+apps/mobile/android/
+apps/web/src/lib/database.types.ts

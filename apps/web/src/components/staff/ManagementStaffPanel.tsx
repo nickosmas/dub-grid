@@ -122,25 +122,25 @@ export function ManagementStaffPanel({
   const [email, setEmail] = useState(person.email);
   const [phone, setPhone] = useState(person.phone);
   const [deptIds, setDeptIds] = useState<number[]>(person.managementDepartmentIds);
-  const [savedDraft, setSavedDraft] = useState<ManagementStaffDraft>(() => getManagementStaffDraft(person));
+  const [savedDraft, setSavedDraft] = useState<ManagementStaffDraft>(() =>
+    getManagementStaffDraft(person),
+  );
   const [saving, setSaving] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [resending, setResending] = useState(false);
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const personDraft = useMemo(() => normalizeManagementStaffDraft({
-    firstName: person.firstName,
-    lastName: person.lastName,
-    email: person.email,
-    phone: person.phone,
-    managementDepartmentIds: person.managementDepartmentIds,
-  }), [
-    person.firstName,
-    person.lastName,
-    person.email,
-    person.phone,
-    person.managementDepartmentIds,
-  ]);
+  const personDraft = useMemo(
+    () =>
+      normalizeManagementStaffDraft({
+        firstName: person.firstName,
+        lastName: person.lastName,
+        email: person.email,
+        phone: person.phone,
+        managementDepartmentIds: person.managementDepartmentIds,
+      }),
+    [person.firstName, person.lastName, person.email, person.phone, person.managementDepartmentIds],
+  );
 
   // Reset form when person changes
   useEffect(() => {
@@ -178,7 +178,8 @@ export function ManagementStaffPanel({
     currentDraft.lastName !== savedDraft.lastName ||
     currentDraft.email !== savedDraft.email ||
     currentDraft.phone !== savedDraft.phone ||
-    JSON.stringify(currentDraft.managementDepartmentIds) !== JSON.stringify(savedDraft.managementDepartmentIds);
+    JSON.stringify(currentDraft.managementDepartmentIds) !==
+      JSON.stringify(savedDraft.managementDepartmentIds);
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
     hasUnsavedChanges: hasChanges,
     onDiscard: closePanel,
@@ -229,19 +230,11 @@ export function ManagementStaffPanel({
   const fieldErrors = useMemo(
     () => ({
       firstName:
-        !isEmployee && touched.firstName
-          ? validateRequired(firstName, "First name")
-          : null,
-      lastName:
-        !isEmployee && touched.lastName
-          ? validateRequired(lastName, "Last name")
-          : null,
+        !isEmployee && touched.firstName ? validateRequired(firstName, "First name") : null,
+      lastName: !isEmployee && touched.lastName ? validateRequired(lastName, "Last name") : null,
       // Email is optional everywhere now (so admins can schedule before
       // onboarding). Only complain about formatting when a value is present.
-      email:
-        touched.email && email.trim()
-          ? getOptionalStaffEmailError(email)
-          : null,
+      email: touched.email && email.trim() ? getOptionalStaffEmailError(email) : null,
       phone: touched.phone ? validatePhone(phone) : null,
       managementDepartmentIds:
         !isEmployee && touched.managementDepartmentIds && deptIds.length === 0
@@ -253,20 +246,22 @@ export function ManagementStaffPanel({
 
   const showScheduleOnlyHint = isEmployee && deptIds.length === 0;
 
-  const toggleDepartment = useCallback((departmentId: number) => {
-    markTouched("managementDepartmentIds");
-    setDeptIds((prev) =>
-      prev.includes(departmentId)
-        ? prev.filter((id) => id !== departmentId)
-        : [...prev, departmentId],
-    );
-  }, [markTouched]);
+  const toggleDepartment = useCallback(
+    (departmentId: number) => {
+      markTouched("managementDepartmentIds");
+      setDeptIds((prev) =>
+        prev.includes(departmentId)
+          ? prev.filter((id) => id !== departmentId)
+          : [...prev, departmentId],
+      );
+    },
+    [markTouched],
+  );
 
   const handleSave = async () => {
     if (
       !isEmployee &&
-      (validateRequired(firstName, "First name") ||
-        validateRequired(lastName, "Last name"))
+      (validateRequired(firstName, "First name") || validateRequired(lastName, "Last name"))
     ) {
       setTouched((prev) => ({
         ...prev,
@@ -435,11 +430,7 @@ export function ManagementStaffPanel({
       <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
         {/* Header */}
         <div className="staff-detail-header">
-          <button
-            className="staff-detail-close"
-            onClick={handleRequestClose}
-            aria-label="Close"
-          >
+          <button className="staff-detail-close" onClick={handleRequestClose} aria-label="Close">
             <svg
               width="15"
               height="15"
@@ -470,12 +461,8 @@ export function ManagementStaffPanel({
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
-                background: isPending
-                  ? "var(--color-surface)"
-                  : `hsl(${hue}, 65%, 94%)`,
-                color: isPending
-                  ? "var(--color-text-muted)"
-                  : `hsl(${hue}, 60%, 38%)`,
+                background: isPending ? "var(--color-surface)" : `hsl(${hue}, 65%, 94%)`,
+                color: isPending ? "var(--color-text-muted)" : `hsl(${hue}, 60%, 38%)`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -675,7 +662,7 @@ export function ManagementStaffPanel({
                     </button>
                   ) : undefined
                 }
-                secondaryAction={(
+                secondaryAction={
                   <button
                     onClick={handleDismissClick}
                     disabled={saving}
@@ -683,8 +670,8 @@ export function ManagementStaffPanel({
                   >
                     {dismissLabel}
                   </button>
-                )}
-                primaryAction={(
+                }
+                primaryAction={
                   <button
                     onClick={handleSave}
                     disabled={saving || !hasChanges}
@@ -694,7 +681,7 @@ export function ManagementStaffPanel({
                       {EDITOR_ACTION_LABELS.save}
                     </ButtonLoading>
                   </button>
-                )}
+                }
               />
               <div
                 style={{
@@ -720,8 +707,7 @@ export function ManagementStaffPanel({
               >
                 <div>
                   <label style={labelStyle}>
-                    First name{" "}
-                    <span style={{ color: "var(--color-danger)" }}>*</span>
+                    First name <span style={{ color: "var(--color-danger)" }}>*</span>
                   </label>
                   <input
                     value={firstName}
@@ -748,8 +734,7 @@ export function ManagementStaffPanel({
                 </div>
                 <div>
                   <label style={labelStyle}>
-                    Last name{" "}
-                    <span style={{ color: "var(--color-danger)" }}>*</span>
+                    Last name <span style={{ color: "var(--color-danger)" }}>*</span>
                   </label>
                   <input
                     value={lastName}
@@ -877,7 +862,7 @@ export function ManagementStaffPanel({
               {accessControls}
 
               <EditorActionRow
-                secondaryAction={(
+                secondaryAction={
                   <button
                     onClick={handleDismissClick}
                     disabled={saving}
@@ -885,8 +870,8 @@ export function ManagementStaffPanel({
                   >
                     {dismissLabel}
                   </button>
-                )}
-                primaryAction={(
+                }
+                primaryAction={
                   <button
                     onClick={handleSave}
                     disabled={
@@ -902,7 +887,7 @@ export function ManagementStaffPanel({
                       {EDITOR_ACTION_LABELS.save}
                     </ButtonLoading>
                   </button>
-                )}
+                }
               />
             </>
           )}
@@ -924,9 +909,7 @@ export function ManagementStaffPanel({
                 >
                   Contact
                 </div>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
-                >
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <a
                     href={`mailto:${person.email}`}
                     style={{
@@ -1043,11 +1026,8 @@ export function ManagementStaffPanel({
                             fontSize: "var(--dg-fs-caption)",
                             fontWeight: 600,
                             background:
-                              ROLE_COLORS[person.orgRole]?.bg ??
-                              "var(--color-border-light)",
-                            color:
-                              ROLE_COLORS[person.orgRole]?.text ??
-                              "var(--color-text-muted)",
+                              ROLE_COLORS[person.orgRole]?.bg ?? "var(--color-border-light)",
+                            color: ROLE_COLORS[person.orgRole]?.text ?? "var(--color-text-muted)",
                           }}
                         >
                           {ROLE_LABELS[person.orgRole] ?? person.orgRole}
@@ -1069,9 +1049,7 @@ export function ManagementStaffPanel({
                         >
                           {departmentLabel}
                         </div>
-                        <div
-                          style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
-                        >
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                           {personDepts.map((d) => (
                             <span
                               key={d.id}
@@ -1177,30 +1155,30 @@ export function ManagementStaffPanel({
                 person.isManagementUser &&
                 person.userId &&
                 onAddToSchedule && (
-                <button
-                  onClick={() => onAddToSchedule(person)}
-                  className="dg-btn dg-btn-secondary"
-                  style={{ width: "100%" }}
-                >
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="mr-2"
+                  <button
+                    onClick={() => onAddToSchedule(person)}
+                    className="dg-btn dg-btn-secondary"
+                    style={{ width: "100%" }}
                   >
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                  Add to Schedule
-                </button>
-              )}
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="mr-2"
+                    >
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    Add to Schedule
+                  </button>
+                )}
 
               {/* Resend invitation */}
               {canManageManagementAccess && isPending && !isExpired && onResendInvitation && (

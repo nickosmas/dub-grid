@@ -80,9 +80,7 @@ function makeServiceClient(input: {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
             is: vi.fn(() => ({
-              data: input.existingMemberUserId
-                ? [{ user_id: input.existingMemberUserId }]
-                : [],
+              data: input.existingMemberUserId ? [{ user_id: input.existingMemberUserId }] : [],
               error: null,
             })),
           })),
@@ -205,10 +203,7 @@ describe("mobile person invitation route", () => {
     });
 
     const { POST } = await import("./person-invitation");
-    const response = await POST(
-      makeRequest({ email: "mina@example.com" }),
-      makeContext(),
-    );
+    const response = await POST(makeRequest({ email: "mina@example.com" }), makeContext());
     const payload = await response.json();
 
     expect(response.status).toBe(409);
@@ -244,9 +239,7 @@ describe("mobile person invitation route", () => {
     });
     rowToEmployee
       .mockReturnValueOnce(makeEmployee())
-      .mockReturnValueOnce(
-        makeEmployee({ userId: "33333333-3333-4333-8333-333333333333" }),
-      );
+      .mockReturnValueOnce(makeEmployee({ userId: "33333333-3333-4333-8333-333333333333" }));
 
     const { POST } = await import("./person-invitation");
     const response = await POST(
@@ -292,10 +285,7 @@ describe("mobile person invitation route", () => {
     });
 
     const { POST } = await import("./person-invitation");
-    const response = await POST(
-      makeRequest({ email: "mina@example.com" }),
-      makeContext(),
-    );
+    const response = await POST(makeRequest({ email: "mina@example.com" }), makeContext());
     const payload = await response.json();
 
     expect(response.status).toBe(409);
@@ -416,18 +406,16 @@ describe("mobile person invitation route", () => {
         email: "admin@example.com",
       },
     });
-    rowToEmployee
-      .mockReturnValueOnce(makeEmployee())
-      .mockReturnValueOnce(
-        makeEmployee({
-          pendingInvitation: {
-            id: "22222222-2222-4222-8222-222222222222",
-            email: "mina@example.com",
-            expiresAt: "2026-05-05T00:00:00.000Z",
-            updatedAt: null,
-          },
-        }),
-      );
+    rowToEmployee.mockReturnValueOnce(makeEmployee()).mockReturnValueOnce(
+      makeEmployee({
+        pendingInvitation: {
+          id: "22222222-2222-4222-8222-222222222222",
+          email: "mina@example.com",
+          expiresAt: "2026-05-05T00:00:00.000Z",
+          updatedAt: null,
+        },
+      }),
+    );
     fetchMobilePendingInvitationRowByEmployeeId
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
@@ -439,10 +427,7 @@ describe("mobile person invitation route", () => {
       });
 
     const { POST } = await import("./person-invitation");
-    const response = await POST(
-      makeRequest({ email: "mina@example.com" }),
-      makeContext(),
-    );
+    const response = await POST(makeRequest({ email: "mina@example.com" }), makeContext());
     const payload = await response.json();
 
     expect(response.status).toBe(200);
@@ -497,10 +482,7 @@ describe("mobile person invitation route", () => {
     });
 
     const { POST } = await import("./person-invitation");
-    const response = await POST(
-      makeRequest({ email: "mina@example.com" }),
-      makeContext(),
-    );
+    const response = await POST(makeRequest({ email: "mina@example.com" }), makeContext());
     const payload = await response.json();
 
     expect(response.status).toBe(503);
@@ -532,24 +514,18 @@ describe("mobile person invitation route", () => {
     sendResendEmail.mockRejectedValue(new Error("Resend unavailable"));
 
     const { POST } = await import("./person-invitation");
-    const response = await POST(
-      makeRequest({ email: "mina@example.com" }),
-      makeContext(),
-    );
+    const response = await POST(makeRequest({ email: "mina@example.com" }), makeContext());
     const payload = await response.json();
 
     expect(response.status).toBe(502);
     expect(payload).toEqual({
       error: "Invitation email could not be sent. Try again in a moment.",
     });
-    expect(revokeMobileEmployeeInvitationRow).toHaveBeenCalledWith(
-      serviceClient,
-      {
-        orgId: "44444444-4444-4444-8444-444444444444",
-        invitationId: "22222222-2222-4222-8222-222222222222",
-        expectedUpdatedAt: "2026-05-02T21:30:00.000Z",
-      },
-    );
+    expect(revokeMobileEmployeeInvitationRow).toHaveBeenCalledWith(serviceClient, {
+      orgId: "44444444-4444-4444-8444-444444444444",
+      invitationId: "22222222-2222-4222-8222-222222222222",
+      expectedUpdatedAt: "2026-05-02T21:30:00.000Z",
+    });
     expect(insertMobileAuditLogEntry).not.toHaveBeenCalled();
     expect(loggerError).toHaveBeenCalledWith(
       expect.objectContaining({

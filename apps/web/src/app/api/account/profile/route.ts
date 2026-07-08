@@ -31,15 +31,11 @@ export async function PATCH(req: NextRequest) {
     }
     const parsed = accountProfileUpdateSchema.safeParse(await req.json());
     if (!parsed.success) {
-      return buildStaffValidationErrorResponse(
-        getStaffFieldErrorsFromZod(parsed.error),
-      );
+      return buildStaffValidationErrorResponse(getStaffFieldErrorsFromZod(parsed.error));
     }
 
     const serviceClient = getServiceClient();
-    const { effectiveRole, orgId: claimOrgId } = extractJwtClaims(
-      auth.session.access_token,
-    );
+    const { effectiveRole, orgId: claimOrgId } = extractJwtClaims(auth.session.access_token);
     const targetOrgId = parsed.data.orgId ?? claimOrgId ?? null;
     const canEditDirectly =
       effectiveRole === "gridmaster" ||
@@ -63,16 +59,12 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json(
       {
-        error:
-          "Profile details are changed by admins. Submit a profile change request instead.",
+        error: "Profile details are changed by admins. Submit a profile change request instead.",
       },
       { status: 403 },
     );
   } catch (error) {
     console.error("account profile PATCH failed", error);
-    return NextResponse.json(
-      { error: "Failed to update account details" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update account details" }, { status: 500 });
   }
 }

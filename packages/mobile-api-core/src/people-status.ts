@@ -135,8 +135,7 @@ export async function updateMobilePersonStatus(
   if (currentEmployee.version !== input.body.expectedVersion) {
     return {
       kind: "conflict",
-      error:
-        "Employee status changed elsewhere. Review the latest values before saving again.",
+      error: "Employee status changed elsewhere. Review the latest values before saving again.",
       code: "EMPLOYEE_STATUS_CONFLICT",
       person: deps.mapEmployeeToMobilePerson(currentEmployee),
       status: 409,
@@ -150,8 +149,7 @@ export async function updateMobilePersonStatus(
       : input.body.action === "remove"
         ? "removed"
         : "active";
-  const nextStatusNote =
-    input.body.action === "deactivate" ? (input.body.note ?? "") : "";
+  const nextStatusNote = input.body.action === "deactivate" ? (input.body.note ?? "") : "";
   const action =
     input.body.action === "deactivate"
       ? "employee.deactivated"
@@ -167,11 +165,7 @@ export async function updateMobilePersonStatus(
     statusNote: nextStatusNote,
     statusChangedAt: now,
     archivedAt:
-      input.body.action === "activate"
-        ? null
-        : input.body.action === "remove"
-          ? now
-          : undefined,
+      input.body.action === "activate" ? null : input.body.action === "remove" ? now : undefined,
   });
 
   if (!updatedEmployee) {
@@ -191,8 +185,7 @@ export async function updateMobilePersonStatus(
 
     return {
       kind: "conflict",
-      error:
-        "Employee status changed elsewhere. Review the latest values before saving again.",
+      error: "Employee status changed elsewhere. Review the latest values before saving again.",
       code: "EMPLOYEE_STATUS_CONFLICT",
       person: deps.mapEmployeeToMobilePerson(latestEmployee),
       status: 409,

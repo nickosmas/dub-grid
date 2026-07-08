@@ -37,16 +37,9 @@ export function getMobileRealtimeInvalidationKeys(
   const person = ["mobile", "person", accessToken] as const;
   const schedule = ["mobile", "schedule"] as const;
   const requests = ["mobile", "requests"] as const;
-  const profileChangeRequests = [
-    "mobile",
-    "profile-change-requests",
-  ] as const;
+  const profileChangeRequests = ["mobile", "profile-change-requests"] as const;
   const notifications = ["mobile", "notifications-infinite"] as const;
-  const notificationFacets = [
-    "mobile",
-    "notification-facets",
-    accessToken,
-  ] as const;
+  const notificationFacets = ["mobile", "notification-facets", accessToken] as const;
 
   switch (table) {
     case "organizations":

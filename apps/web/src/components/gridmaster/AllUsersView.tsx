@@ -8,10 +8,7 @@ import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { sectionStyle, thStyle, tdStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
-import {
-  formatClientErrorMessage,
-  formatOrganizationRoleLabel,
-} from "@/lib/client-facing";
+import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { MaybeHint } from "@/components/ui/hint";
 import {
   fetchGridmasterUserMemberships,
@@ -236,7 +233,15 @@ export default function AllUsersView({
         <div className="dg-skeleton dg-skeleton--heading" style={{ marginBottom: 16 }} />
         <div style={sectionStyle}>
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} style={{ display: "flex", gap: 16, padding: "12px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                gap: 16,
+                padding: "12px 14px",
+                borderBottom: "1px solid var(--color-border-light)",
+              }}
+            >
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "25%" }} />
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "12%" }} />
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "12%" }} />
@@ -253,12 +258,29 @@ export default function AllUsersView({
 
   return (
     <>
-      <h2 style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2
+        style={{
+          margin: "0 0 16px",
+          fontSize: "var(--dg-fs-page-title)",
+          fontWeight: 700,
+          color: "var(--color-text-primary)",
+        }}
+      >
         All Users
       </h2>
 
       {usersQuery.error instanceof Error && (
-        <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--dg-radius-lg)", fontSize: "var(--dg-fs-label)", fontWeight: 600, marginBottom: 16 }}>
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "var(--color-danger-bg)",
+            color: "var(--color-danger)",
+            borderRadius: "var(--dg-radius-lg)",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            marginBottom: 16,
+          }}
+        >
           {formatClientErrorMessage(usersQuery.error, "Failed to load users")}
         </div>
       )}
@@ -266,7 +288,17 @@ export default function AllUsersView({
       {/* Toolbar */}
       <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 700, color: "var(--color-text-subtle)", textTransform: "uppercase", whiteSpace: "nowrap" }}>Filter</span>
+          <span
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              fontWeight: 700,
+              color: "var(--color-text-subtle)",
+              textTransform: "uppercase",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Filter
+          </span>
           <CustomSelect
             value={roleFilter}
             options={[
@@ -303,10 +335,20 @@ export default function AllUsersView({
           />
           {(search || roleFilter !== "all" || orgFilter !== "all" || statusFilter !== "all") && (
             <button
-              onClick={() => { setSearch(""); setRoleFilter("all"); setOrgFilter("all"); setStatusFilter("all"); }}
+              onClick={() => {
+                setSearch("");
+                setRoleFilter("all");
+                setOrgFilter("all");
+                setStatusFilter("all");
+              }}
               style={{
-                background: "none", border: "none", color: "var(--color-today-text)", fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600, cursor: "pointer", padding: "4px 8px",
+                background: "none",
+                border: "none",
+                color: "var(--color-today-text)",
+                fontSize: "var(--dg-fs-caption)",
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: "4px 8px",
               }}
             >
               Clear
@@ -317,22 +359,48 @@ export default function AllUsersView({
         <div style={{ flex: 1 }} />
 
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span aria-live="polite" style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
+          <span
+            aria-live="polite"
+            style={{
+              fontSize: "var(--dg-fs-caption)",
+              color: "var(--color-text-muted)",
+              whiteSpace: "nowrap",
+            }}
+          >
             Showing {filtered.length} of {users.length}
           </span>
           <div style={{ position: "relative", minWidth: 180, maxWidth: 240 }}>
             <svg
-              width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--color-text-faint)" }}
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                position: "absolute",
+                left: 10,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "var(--color-text-faint)",
+              }}
             >
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             <input
               className="dg-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search..."
-              style={{ paddingLeft: 32, fontSize: "var(--dg-fs-caption)", background: "var(--color-surface)", border: "1px solid var(--color-border-light)" }}
+              style={{
+                paddingLeft: 32,
+                fontSize: "var(--dg-fs-caption)",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border-light)",
+              }}
             />
           </div>
         </div>
@@ -360,7 +428,11 @@ export default function AllUsersView({
                 {filtered.map((u) => {
                   const isDeactivated = !!u.deactivatedAt;
                   return (
-                    <tr key={u.id} style={{ opacity: isDeactivated ? 0.6 : 1, cursor: "pointer" }} onClick={() => handleSelectUser(u)}>
+                    <tr
+                      key={u.id}
+                      style={{ opacity: isDeactivated ? 0.6 : 1, cursor: "pointer" }}
+                      onClick={() => handleSelectUser(u)}
+                    >
                       <td style={{ ...tdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}>
                         {u.email ?? "—"}
                         <StatusBadge deactivatedAt={u.deactivatedAt as string | null} />
@@ -368,16 +440,24 @@ export default function AllUsersView({
                       <td style={tdStyle}>
                         {u.platformRole !== "none" && <RoleBadge role={u.platformRole} />}
                       </td>
-                      <td style={tdStyle}>
-                        {u.orgRole && <RoleBadge role={u.orgRole} />}
-                      </td>
+                      <td style={tdStyle}>{u.orgRole && <RoleBadge role={u.orgRole} />}</td>
                       <td style={tdStyle}>
                         {u.orgName ? (
                           <button
-                            onClick={(e) => { e.stopPropagation(); if (u.orgId) onNavigateToOrg(u.orgId); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (u.orgId) onNavigateToOrg(u.orgId);
+                            }}
                             style={{
-                              background: "none", border: "none", color: "var(--color-info)", cursor: "pointer",
-                              fontSize: "var(--dg-fs-label)", fontWeight: 500, fontFamily: "inherit", padding: 0, textDecoration: "underline",
+                              background: "none",
+                              border: "none",
+                              color: "var(--color-info)",
+                              cursor: "pointer",
+                              fontSize: "var(--dg-fs-label)",
+                              fontWeight: 500,
+                              fontFamily: "inherit",
+                              padding: 0,
+                              textDecoration: "underline",
                             }}
                           >
                             {u.orgName}
@@ -386,29 +466,65 @@ export default function AllUsersView({
                           <span style={{ color: "var(--color-text-muted)" }}>—</span>
                         )}
                       </td>
-                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace" }}>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontSize: "var(--dg-fs-caption)",
+                          fontFamily: "var(--font-dm-mono), monospace",
+                        }}
+                      >
                         {u.activeSessionCount ?? 0}
                       </td>
-                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace" }}>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontSize: "var(--dg-fs-caption)",
+                          fontFamily: "var(--font-dm-mono), monospace",
+                        }}
+                      >
                         {u.mobileDeviceCount ?? 0}
                       </td>
-                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace" }}>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontSize: "var(--dg-fs-caption)",
+                          fontFamily: "var(--font-dm-mono), monospace",
+                        }}
+                      >
                         {u.membershipCount ?? (u.orgId ? 1 : 0)}
                       </td>
-                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--color-text-muted)",
+                          whiteSpace: "nowrap",
+                          fontFamily: "var(--font-dm-mono), monospace",
+                        }}
+                      >
                         <MaybeHint
                           content={
-                            u.lastSignInAt
-                              ? new Date(u.lastSignInAt).toLocaleString()
-                              : "Never"
+                            u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleString() : "Never"
                           }
                           side="bottom"
                         >
                           <span>{formatRelativeDate(u.lastSignInAt)}</span>
                         </MaybeHint>
                       </td>
-                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
-                        {new Date(u.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--color-text-muted)",
+                          whiteSpace: "nowrap",
+                          fontFamily: "var(--font-dm-mono), monospace",
+                        }}
+                      >
+                        {new Date(u.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
                       </td>
                     </tr>
                   );
@@ -420,7 +536,21 @@ export default function AllUsersView({
       ) : (
         <EmptyState
           icon={
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
           }
           title="No users found"
           description="There are no matching users for these filters."
@@ -471,202 +601,451 @@ export default function AllUsersView({
       )}
 
       {/* User detail side panel */}
-      {selectedUser && (() => {
-        const u = selectedUser;
-        const isDeactivated = !!u.deactivatedAt;
-        const isGM = u.platformRole === "gridmaster";
-        const emailName = u.email?.split("@")[0] ?? "";
-        const initials = emailName.slice(0, 2).toUpperCase();
-        const badgeColor = isGM ? "var(--color-brand)" : ROLE_BADGE_COLORS[u.orgRole ?? "user"]?.bg ?? "var(--color-bg-secondary)";
-        return (
-          <>
-            <div className={`staff-detail-overlay${closing ? " closing" : ""}`} onClick={handleClosePanel} />
-            <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
-              {/* Header */}
-              <div className="staff-detail-header">
-                <button className="staff-detail-close" onClick={handleClosePanel}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-                <div style={{
-                  width: 56, height: 56, borderRadius: "50%",
-                  background: badgeColor, color: "#fff",
-                  display: "grid", placeItems: "center",
-                  fontSize: "var(--dg-fs-body)", fontWeight: 700, letterSpacing: "0.02em",
-                  marginBottom: 10,
-                }}>
-                  {initials}
+      {selectedUser &&
+        (() => {
+          const u = selectedUser;
+          const isDeactivated = !!u.deactivatedAt;
+          const isGM = u.platformRole === "gridmaster";
+          const emailName = u.email?.split("@")[0] ?? "";
+          const initials = emailName.slice(0, 2).toUpperCase();
+          const badgeColor = isGM
+            ? "var(--color-brand)"
+            : (ROLE_BADGE_COLORS[u.orgRole ?? "user"]?.bg ?? "var(--color-bg-secondary)");
+          return (
+            <>
+              <div
+                className={`staff-detail-overlay${closing ? " closing" : ""}`}
+                onClick={handleClosePanel}
+              />
+              <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
+                {/* Header */}
+                <div className="staff-detail-header">
+                  <button className="staff-detail-close" onClick={handleClosePanel}>
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                  <div
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: "50%",
+                      background: badgeColor,
+                      color: "#fff",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: "var(--dg-fs-body)",
+                      fontWeight: 700,
+                      letterSpacing: "0.02em",
+                      marginBottom: 10,
+                    }}
+                  >
+                    {initials}
+                  </div>
+                  <h3
+                    style={{
+                      margin: "0 0 6px",
+                      fontSize: "var(--dg-fs-body-sm)",
+                      fontWeight: 700,
+                      color: "var(--color-text-primary)",
+                      textAlign: "center",
+                      wordBreak: "break-all",
+                    }}
+                  >
+                    {u.email ?? "Unknown"}
+                  </h3>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 6,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {isGM && <RoleBadge role={u.platformRole} />}
+                    {!isGM && u.orgRole && <RoleBadge role={u.orgRole} />}
+                    {isDeactivated && <StatusBadge deactivatedAt={u.deactivatedAt as string} />}
+                  </div>
                 </div>
-                <h3 style={{ margin: "0 0 6px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-primary)", textAlign: "center", wordBreak: "break-all" }}>
-                  {u.email ?? "Unknown"}
-                </h3>
-                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
-                  {isGM && <RoleBadge role={u.platformRole} />}
-                  {!isGM && u.orgRole && <RoleBadge role={u.orgRole} />}
-                  {isDeactivated && <StatusBadge deactivatedAt={u.deactivatedAt as string} />}
-                </div>
-              </div>
 
-              {/* Content */}
-              <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
-                {/* Info grid */}
-                <div style={{
-                  display: "grid", gridTemplateColumns: "1fr 1fr",
-                  gap: "14px 24px", fontSize: "var(--dg-fs-label)",
-                  padding: 16, background: "var(--color-bg)", borderRadius: "var(--dg-radius-md)",
-                }}>
-                  <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Last Login</span>
-                    <div style={{ color: "var(--color-text-primary)", marginTop: 2, fontWeight: 500 }}>{formatRelativeDate(u.lastSignInAt)}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Date Joined</span>
-                    <div style={{ color: "var(--color-text-primary)", marginTop: 2, fontWeight: 500 }}>{new Date(u.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
-                  </div>
-                  {u.orgName && (
+                {/* Content */}
+                <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 20 }}>
+                  {/* Info grid */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "14px 24px",
+                      fontSize: "var(--dg-fs-label)",
+                      padding: 16,
+                      background: "var(--color-bg)",
+                      borderRadius: "var(--dg-radius-md)",
+                    }}
+                  >
                     <div>
-                      <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Current Org</span>
-                      <div style={{ marginTop: 2 }}>
-                        <button
-                          onClick={() => { handleClosePanel(); setTimeout(() => u.orgId && onNavigateToOrg(u.orgId), 220); }}
-                          style={{ background: "none", border: "none", color: "var(--color-info)", cursor: "pointer", fontSize: "var(--dg-fs-label)", fontWeight: 500, fontFamily: "inherit", padding: 0, textDecoration: "underline" }}
-                        >
-                          {u.orgName}
-                        </button>
+                      <span
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        Last Login
+                      </span>
+                      <div
+                        style={{
+                          color: "var(--color-text-primary)",
+                          marginTop: 2,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {formatRelativeDate(u.lastSignInAt)}
                       </div>
                     </div>
-                  )}
-                  <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>User ID</span>
-                    <div style={{ color: "var(--color-text-muted)", marginTop: 2, fontSize: "var(--dg-fs-footnote)", fontFamily: "var(--font-dm-mono), monospace" }}>{u.id.slice(0, 8)}…</div>
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Active Sessions</span>
-                    <div style={{ color: "var(--color-text-primary)", marginTop: 2, fontWeight: 500 }}>{u.activeSessionCount ?? 0}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Mobile Devices</span>
-                    <div style={{ color: "var(--color-text-primary)", marginTop: 2, fontWeight: 500 }}>{u.mobileDeviceCount ?? 0}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>Last Force Logout</span>
-                    <div style={{ color: "var(--color-text-primary)", marginTop: 2, fontWeight: 500 }}>{formatRelativeDate(u.lastForceLogoutAt)}</div>
-                  </div>
-                </div>
-
-                {/* Memberships */}
-                {(membershipsLoading || memberships.length > 0) && (
-                  <div>
-                    <h4 style={{ margin: "0 0 8px", fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                      Organization Memberships
-                    </h4>
-                    {membershipsLoading ? (
-                      <table style={{ width: "100%", borderCollapse: "collapse" }} aria-hidden>
-                        <thead>
-                          <tr>
-                            <th style={thStyle}>Organization</th>
-                            <th style={thStyle}>Role</th>
-                            <th style={thStyle}>Date Joined</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {Array.from({ length: 3 }).map((_, i) => (
-                            <tr key={i}>
-                              <td style={tdStyle}>
-                                <div className="dg-skeleton" style={{ width: "70%", height: 12, borderRadius: 4 }} />
-                              </td>
-                              <td style={tdStyle}>
-                                <div className="dg-skeleton" style={{ width: 64, height: 18, borderRadius: 999 }} />
-                              </td>
-                              <td style={tdStyle}>
-                                <div className="dg-skeleton" style={{ width: 96, height: 12, borderRadius: 4 }} />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    ) : membershipsQuery.error instanceof Error ? (
-                      <div style={{ padding: 16, color: "var(--color-danger)", fontSize: "var(--dg-fs-label)" }}>
-                        {formatClientErrorMessage(membershipsQuery.error, "Failed to load memberships")}
-                      </div>
-                    ) : (
-                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead>
-                          <tr>
-                            <th style={thStyle}>Organization</th>
-                            <th style={thStyle}>Role</th>
-                            <th style={thStyle}>Date Joined</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {memberships.map((m) => (
-                            <tr key={m.org_id}>
-                              <td style={{ ...tdStyle, fontWeight: 600 }}>
-                                <button
-                                  onClick={() => { handleClosePanel(); setTimeout(() => onNavigateToOrg(m.org_id), 220); }}
-                                  style={{ background: "none", border: "none", color: "var(--color-info)", cursor: "pointer", fontSize: "var(--dg-fs-label)", fontWeight: 600, fontFamily: "inherit", padding: 0, textDecoration: "underline" }}
-                                >
-                                  {m.org_name}
-                                </button>
-                              </td>
-                              <td style={tdStyle}><RoleBadge role={m.org_role} /></td>
-                              <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
-                                {new Date(m.joined_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-                {/* Actions */}
-                {!isGM && (
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingTop: 16, borderTop: "1px solid var(--color-border-light)" }}>
-                    <button
-                      className="dg-btn dg-btn-secondary"
-                      style={{ fontSize: "var(--dg-fs-label)" }}
-                      onClick={() => { handleClosePanel(); setTimeout(() => onImpersonate(u.id, u.orgId ?? undefined), 220); }}
-                    >
-                      Impersonate
-                    </button>
-                    {u.orgId && (
-                      <button
-                        className="dg-btn dg-btn-secondary"
-                        style={{ fontSize: "var(--dg-fs-label)", color: isDeactivated ? "var(--color-success, green)" : "var(--color-warning, orange)" }}
-                        onClick={() => setDeactivateConfirm(u)}
-                        disabled={actionLoading === u.id}
+                    <div>
+                      <span
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
                       >
-                        {isDeactivated ? "Reactivate" : "Deactivate"}
-                      </button>
+                        Date Joined
+                      </span>
+                      <div
+                        style={{
+                          color: "var(--color-text-primary)",
+                          marginTop: 2,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {new Date(u.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </div>
+                    </div>
+                    {u.orgName && (
+                      <div>
+                        <span
+                          style={{
+                            color: "var(--color-text-muted)",
+                            fontSize: "var(--dg-fs-footnote)",
+                            fontWeight: 600,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.04em",
+                          }}
+                        >
+                          Current Org
+                        </span>
+                        <div style={{ marginTop: 2 }}>
+                          <button
+                            onClick={() => {
+                              handleClosePanel();
+                              setTimeout(() => u.orgId && onNavigateToOrg(u.orgId), 220);
+                            }}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "var(--color-info)",
+                              cursor: "pointer",
+                              fontSize: "var(--dg-fs-label)",
+                              fontWeight: 500,
+                              fontFamily: "inherit",
+                              padding: 0,
+                              textDecoration: "underline",
+                            }}
+                          >
+                            {u.orgName}
+                          </button>
+                        </div>
+                      </div>
                     )}
-                    <button
-                      className="dg-btn dg-btn-secondary"
-                      style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-danger)" }}
-                      onClick={() => setForceLogoutConfirm(u)}
-                      disabled={actionLoading === u.id}
+                    <div>
+                      <span
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        User ID
+                      </span>
+                      <div
+                        style={{
+                          color: "var(--color-text-muted)",
+                          marginTop: 2,
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontFamily: "var(--font-dm-mono), monospace",
+                        }}
+                      >
+                        {u.id.slice(0, 8)}…
+                      </div>
+                    </div>
+                    <div>
+                      <span
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        Active Sessions
+                      </span>
+                      <div
+                        style={{
+                          color: "var(--color-text-primary)",
+                          marginTop: 2,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {u.activeSessionCount ?? 0}
+                      </div>
+                    </div>
+                    <div>
+                      <span
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        Mobile Devices
+                      </span>
+                      <div
+                        style={{
+                          color: "var(--color-text-primary)",
+                          marginTop: 2,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {u.mobileDeviceCount ?? 0}
+                      </div>
+                    </div>
+                    <div>
+                      <span
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        Last Force Logout
+                      </span>
+                      <div
+                        style={{
+                          color: "var(--color-text-primary)",
+                          marginTop: 2,
+                          fontWeight: 500,
+                        }}
+                      >
+                        {formatRelativeDate(u.lastForceLogoutAt)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Memberships */}
+                  {(membershipsLoading || memberships.length > 0) && (
+                    <div>
+                      <h4
+                        style={{
+                          margin: "0 0 8px",
+                          fontSize: "var(--dg-fs-caption)",
+                          fontWeight: 700,
+                          color: "var(--color-text-primary)",
+                        }}
+                      >
+                        Organization Memberships
+                      </h4>
+                      {membershipsLoading ? (
+                        <table style={{ width: "100%", borderCollapse: "collapse" }} aria-hidden>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>Organization</th>
+                              <th style={thStyle}>Role</th>
+                              <th style={thStyle}>Date Joined</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Array.from({ length: 3 }).map((_, i) => (
+                              <tr key={i}>
+                                <td style={tdStyle}>
+                                  <div
+                                    className="dg-skeleton"
+                                    style={{ width: "70%", height: 12, borderRadius: 4 }}
+                                  />
+                                </td>
+                                <td style={tdStyle}>
+                                  <div
+                                    className="dg-skeleton"
+                                    style={{ width: 64, height: 18, borderRadius: 999 }}
+                                  />
+                                </td>
+                                <td style={tdStyle}>
+                                  <div
+                                    className="dg-skeleton"
+                                    style={{ width: 96, height: 12, borderRadius: 4 }}
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : membershipsQuery.error instanceof Error ? (
+                        <div
+                          style={{
+                            padding: 16,
+                            color: "var(--color-danger)",
+                            fontSize: "var(--dg-fs-label)",
+                          }}
+                        >
+                          {formatClientErrorMessage(
+                            membershipsQuery.error,
+                            "Failed to load memberships",
+                          )}
+                        </div>
+                      ) : (
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>Organization</th>
+                              <th style={thStyle}>Role</th>
+                              <th style={thStyle}>Date Joined</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {memberships.map((m) => (
+                              <tr key={m.org_id}>
+                                <td style={{ ...tdStyle, fontWeight: 600 }}>
+                                  <button
+                                    onClick={() => {
+                                      handleClosePanel();
+                                      setTimeout(() => onNavigateToOrg(m.org_id), 220);
+                                    }}
+                                    style={{
+                                      background: "none",
+                                      border: "none",
+                                      color: "var(--color-info)",
+                                      cursor: "pointer",
+                                      fontSize: "var(--dg-fs-label)",
+                                      fontWeight: 600,
+                                      fontFamily: "inherit",
+                                      padding: 0,
+                                      textDecoration: "underline",
+                                    }}
+                                  >
+                                    {m.org_name}
+                                  </button>
+                                </td>
+                                <td style={tdStyle}>
+                                  <RoleBadge role={m.org_role} />
+                                </td>
+                                <td
+                                  style={{
+                                    ...tdStyle,
+                                    fontSize: "var(--dg-fs-caption)",
+                                    color: "var(--color-text-muted)",
+                                  }}
+                                >
+                                  {new Date(m.joined_at).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  })}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  {!isGM && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        paddingTop: 16,
+                        borderTop: "1px solid var(--color-border-light)",
+                      }}
                     >
-                      Force Logout
-                    </button>
-                    {u.email && (
                       <button
                         className="dg-btn dg-btn-secondary"
                         style={{ fontSize: "var(--dg-fs-label)" }}
-                        onClick={() => setResetConfirm(u)}
+                        onClick={() => {
+                          handleClosePanel();
+                          setTimeout(() => onImpersonate(u.id, u.orgId ?? undefined), 220);
+                        }}
+                      >
+                        Impersonate
+                      </button>
+                      {u.orgId && (
+                        <button
+                          className="dg-btn dg-btn-secondary"
+                          style={{
+                            fontSize: "var(--dg-fs-label)",
+                            color: isDeactivated
+                              ? "var(--color-success, green)"
+                              : "var(--color-warning, orange)",
+                          }}
+                          onClick={() => setDeactivateConfirm(u)}
+                          disabled={actionLoading === u.id}
+                        >
+                          {isDeactivated ? "Reactivate" : "Deactivate"}
+                        </button>
+                      )}
+                      <button
+                        className="dg-btn dg-btn-secondary"
+                        style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-danger)" }}
+                        onClick={() => setForceLogoutConfirm(u)}
                         disabled={actionLoading === u.id}
                       >
-                        Reset Password
+                        Force Logout
                       </button>
-                    )}
-                  </div>
-                )}
+                      {u.email && (
+                        <button
+                          className="dg-btn dg-btn-secondary"
+                          style={{ fontSize: "var(--dg-fs-label)" }}
+                          onClick={() => setResetConfirm(u)}
+                          disabled={actionLoading === u.id}
+                        >
+                          Reset Password
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </>
-        );
-      })()}
+            </>
+          );
+        })()}
     </>
   );
 }

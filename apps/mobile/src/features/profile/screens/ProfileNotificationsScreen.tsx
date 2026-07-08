@@ -12,38 +12,28 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { usePushRegistration } from "../../notifications/hooks/usePushRegistration";
-import {
-  ProfilePanel,
-  ProfileSection,
-} from "../components/ProfilePrimitives";
+import { ProfilePanel, ProfileSection } from "../components/ProfilePrimitives";
 
 const CATEGORIES = [
   {
     key: "schedule",
     label: "Schedule updates",
-    description:
-      "When a schedule is published or one of your shifts changes.",
+    description: "When a schedule is published or one of your shifts changes.",
   },
   {
     key: "shift_requests",
     label: "Shift requests",
-    description:
-      "New requests to approve and updates on your own pickup/swap requests.",
+    description: "New requests to approve and updates on your own pickup/swap requests.",
   },
   {
     key: "system",
     label: "System & account",
-    description:
-      "Account-level activity such as role changes and impersonation alerts.",
+    description: "Account-level activity such as role changes and impersonation alerts.",
   },
 ] as const;
 
@@ -115,10 +105,7 @@ export default function ProfileNotificationsScreen() {
       return saveProfileNotificationPreferences(accessToken, next);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(
-        ["mobile", "notification-preferences", accessToken],
-        data,
-      );
+      queryClient.setQueryData(["mobile", "notification-preferences", accessToken], data);
     },
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
@@ -139,10 +126,7 @@ export default function ProfileNotificationsScreen() {
         [channel]: !localPrefs[category][channel],
       },
     };
-    queryClient.setQueryData(
-      ["mobile", "notification-preferences", accessToken],
-      { prefs: next },
-    );
+    queryClient.setQueryData(["mobile", "notification-preferences", accessToken], { prefs: next });
     saveMutation.mutate(next);
   };
 
@@ -209,9 +193,7 @@ export default function ProfileNotificationsScreen() {
                 </View>
                 <Switch
                   accessibilityLabel="Push notifications"
-                  disabled={
-                    !pushSwitchEnabled || push.permissionState === "denied"
-                  }
+                  disabled={!pushSwitchEnabled || push.permissionState === "denied"}
                   value={push.permissionState === "granted"}
                   onValueChange={() => {
                     void togglePush();
@@ -252,9 +234,7 @@ export default function ProfileNotificationsScreen() {
             </ProfilePanel>
           </ProfileSection>
 
-          {saveMutation.isPending ? (
-            <Text style={styles.savingNote}>Saving…</Text>
-          ) : null}
+          {saveMutation.isPending ? <Text style={styles.savingNote}>Saving…</Text> : null}
         </View>
       )}
     </Screen>
@@ -268,12 +248,7 @@ interface ChannelToggleProps {
   onValueChange: () => void;
 }
 
-function ChannelToggle({
-  icon,
-  label,
-  value,
-  onValueChange,
-}: ChannelToggleProps) {
+function ChannelToggle({ icon, label, value, onValueChange }: ChannelToggleProps) {
   return (
     <Pressable
       accessibilityRole="switch"

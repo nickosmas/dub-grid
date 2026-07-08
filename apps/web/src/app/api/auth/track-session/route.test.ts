@@ -8,8 +8,7 @@ const dispatchNotificationEvent = vi.fn();
 const newDeviceLookup = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedSession: (req: NextRequest) =>
-    requireAuthenticatedSession(req),
+  requireAuthenticatedSession: (req: NextRequest) => requireAuthenticatedSession(req),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -21,8 +20,7 @@ vi.mock("@/features/account/server", () => ({
 }));
 
 vi.mock("@/features/notifications/server/events", () => ({
-  dispatchNotificationEvent: (...args: unknown[]) =>
-    dispatchNotificationEvent(...args),
+  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -70,10 +68,7 @@ describe("POST /api/auth/track-session", () => {
   });
 
   it("rejects unauthenticated requests", async () => {
-    const unauthenticated = NextResponse.json(
-      { error: "Unauthenticated" },
-      { status: 401 },
-    );
+    const unauthenticated = NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
     requireAuthenticatedSession.mockResolvedValueOnce({
       response: unauthenticated,
     });
@@ -184,6 +179,5 @@ function createJwt(payload: Record<string, unknown>): string {
 }
 
 function encodeJwtSegment(value: Record<string, unknown>): string {
-  return Buffer.from(JSON.stringify(value))
-    .toString("base64url");
+  return Buffer.from(JSON.stringify(value)).toString("base64url");
 }

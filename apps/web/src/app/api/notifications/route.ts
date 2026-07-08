@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireAuthenticatedUser,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import type {
-  Notification,
-  NotificationPriority,
-  NotificationType,
-} from "@/types";
+import type { Notification, NotificationPriority, NotificationType } from "@/types";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const searchSchema = z.object({
@@ -18,12 +11,14 @@ const searchSchema = z.object({
   includeNotifications: z.enum(["0", "1"]).optional(),
 });
 
-const patchSchema = z.object({
-  notificationId: z.string().uuid().optional(),
-  markAll: z.boolean().optional(),
-}).refine((value) => value.markAll === true || typeof value.notificationId === "string", {
-  message: "notificationId or markAll is required",
-});
+const patchSchema = z
+  .object({
+    notificationId: z.string().uuid().optional(),
+    markAll: z.boolean().optional(),
+  })
+  .refine((value) => value.markAll === true || typeof value.notificationId === "string", {
+    message: "notificationId or markAll is required",
+  });
 
 export function mapNotificationRow(row: Record<string, unknown>): Notification {
   return {
@@ -49,9 +44,7 @@ export async function GET(req: NextRequest) {
     }
     void auth;
 
-    const parsed = searchSchema.safeParse(
-      Object.fromEntries(req.nextUrl.searchParams.entries()),
-    );
+    const parsed = searchSchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
     if (!parsed.success) {
       return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
@@ -78,17 +71,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       unreadCount: (unreadCountResult.data as number | null) ?? 0,
       notifications: includeNotifications
-        ? ((notificationsResult.data ?? []) as Record<string, unknown>[]).map(
-            mapNotificationRow,
-          )
+        ? ((notificationsResult.data ?? []) as Record<string, unknown>[]).map(mapNotificationRow)
         : undefined,
     });
   } catch (error) {
     console.error("notifications GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load notifications" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load notifications" }, { status: 500 });
   }
 }
 
@@ -130,9 +118,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("notifications PATCH failed", error);
-    return NextResponse.json(
-      { error: "Failed to update notifications" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 });
   }
 }

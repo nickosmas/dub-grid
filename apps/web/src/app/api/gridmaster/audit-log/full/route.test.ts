@@ -135,10 +135,7 @@ describe("GET /api/gridmaster/audit-log/full", () => {
         };
         if (!isAllowed(permissions)) {
           return {
-            response: NextResponse.json(
-              { error: "Insufficient permissions" },
-              { status: 403 },
-            ),
+            response: NextResponse.json({ error: "Insufficient permissions" }, { status: 403 }),
           };
         }
         return {
@@ -212,10 +209,7 @@ describe("GET /api/gridmaster/audit-log/full", () => {
         };
         if (!isAllowed(permissions)) {
           return {
-            response: NextResponse.json(
-              { error: "Insufficient permissions" },
-              { status: 403 },
-            ),
+            response: NextResponse.json({ error: "Insufficient permissions" }, { status: 403 }),
           };
         }
         throw new Error("Unexpected authorization success");

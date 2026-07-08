@@ -14,9 +14,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(overview);
   } catch (error) {
     console.error("gridmaster overview GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load gridmaster overview" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load gridmaster overview" }, { status: 500 });
   }
 }

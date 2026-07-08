@@ -28,11 +28,29 @@ import ScrollableTabs from "@/components/ScrollableTabs";
 import { fetchRepeatOverwriteCount } from "@/features/schedule/client";
 
 const DAY_NAMES_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-const DAY_NAMES_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAY_NAMES_FULL = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 const CALENDAR_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" });
-const FIELD_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
-const DAY_ARIA_FORMATTER = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+const FIELD_DATE_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+const DAY_ARIA_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
 
 interface RepeatFormProps {
   empId: string;
@@ -60,12 +78,12 @@ export interface RepeatFormHandle {
   submit: () => void;
 }
 
-type EndType = 'never' | 'on_date' | 'after_n';
+type EndType = "never" | "on_date" | "after_n";
 
 function formatLocalDate(date: Date): string {
   const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 
@@ -116,7 +134,9 @@ function CalendarField({
   const selectedDate = value ? parseLocalDate(value) : null;
   const minSelectableDate = parseLocalDate(minDate);
   const [expanded, setExpanded] = useState(true);
-  const [visibleMonth, setVisibleMonth] = useState<Date>(startOfMonth(selectedDate ?? minSelectableDate));
+  const [visibleMonth, setVisibleMonth] = useState<Date>(
+    startOfMonth(selectedDate ?? minSelectableDate),
+  );
   const calendarDays = useMemo(() => buildCalendarDays(visibleMonth), [visibleMonth]);
 
   function handleSelect(day: Date) {
@@ -155,7 +175,13 @@ function CalendarField({
               {selectionLabel}
             </span>
           )}
-          <span className={cn("block truncate font-medium", compact ? "text-[12px]" : "text-[13px]", value ? "text-[var(--color-text-secondary)]" : "text-[var(--color-text-faint)]")}>
+          <span
+            className={cn(
+              "block truncate font-medium",
+              compact ? "text-[12px]" : "text-[13px]",
+              value ? "text-[var(--color-text-secondary)]" : "text-[var(--color-text-faint)]",
+            )}
+          >
             {value ? formatFieldDate(value) : placeholder}
           </span>
         </span>
@@ -163,7 +189,9 @@ function CalendarField({
           <span className="text-[11px] font-medium text-[var(--color-text-faint)]">
             {expanded ? "Close" : "Edit"}
           </span>
-          <ChevronDown className={cn("size-4 transition-transform duration-200", expanded && "rotate-180")} />
+          <ChevronDown
+            className={cn("size-4 transition-transform duration-200", expanded && "rotate-180")}
+          />
         </span>
       </button>
 
@@ -241,7 +269,10 @@ function CalendarField({
                       : isDisabled
                         ? "cursor-not-allowed text-[var(--color-text-faint)] opacity-35"
                         : "text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)]",
-                    !isSelected && !isDisabled && !isCurrentMonth && "text-[var(--color-text-faint)]",
+                    !isSelected &&
+                      !isDisabled &&
+                      !isCurrentMonth &&
+                      "text-[var(--color-text-faint)]",
                   )}
                 >
                   <span>{day.getDate()}</span>
@@ -272,27 +303,30 @@ function countOccurrences(
   maxOccurrences: number | null,
 ): string[] {
   const dates: string[] = [];
-  const start = new Date(startDate + 'T00:00:00');
+  const start = new Date(startDate + "T00:00:00");
   const cap = maxOccurrences ?? MAX_SERIES_OCCURRENCES;
 
   const maxEnd = endDate
-    ? new Date(endDate + 'T00:00:00')
+    ? new Date(endDate + "T00:00:00")
     : new Date(start.getFullYear(), start.getMonth() + 7, start.getDate());
-  const startDayOfWeek = new Date(Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())).getUTCDay();
+  const startDayOfWeek = new Date(
+    Date.UTC(start.getFullYear(), start.getMonth(), start.getDate()),
+  ).getUTCDay();
 
   for (const { dateKey, dayOfWeek, dayIndex } of iterateDateRange(start, maxEnd)) {
     if (dates.length >= cap) break;
 
     let include = false;
-    const dayMatch = (daysOfWeek === null || daysOfWeek.length === 0)
-      ? dayOfWeek === startDayOfWeek
-      : daysOfWeek.includes(dayOfWeek);
+    const dayMatch =
+      daysOfWeek === null || daysOfWeek.length === 0
+        ? dayOfWeek === startDayOfWeek
+        : daysOfWeek.includes(dayOfWeek);
 
-    if (frequency === 'daily') {
+    if (frequency === "daily") {
       include = true;
-    } else if (frequency === 'weekly') {
+    } else if (frequency === "weekly") {
       include = dayMatch;
-    } else if (frequency === 'biweekly') {
+    } else if (frequency === "biweekly") {
       const weekNum = Math.floor(dayIndex / 7);
       include = weekNum % 2 === 0 && dayMatch;
     }
@@ -303,52 +337,50 @@ function countOccurrences(
   return dates;
 }
 
-const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function RepeatForm({
-  empId,
-  shiftLabel,
-  selectionInput,
-  selectionSegments = [],
-  startDate,
-  assignments,
-  shiftCategories = [],
-  jobs = [],
-  shiftDisplayMode = "code",
-  onConfirm,
-  absenceType,
-}: RepeatFormProps, ref) {
+const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function RepeatForm(
+  {
+    empId,
+    shiftLabel,
+    selectionInput,
+    selectionSegments = [],
+    startDate,
+    assignments,
+    shiftCategories = [],
+    jobs = [],
+    shiftDisplayMode = "code",
+    onConfirm,
+    absenceType,
+  }: RepeatFormProps,
+  ref,
+) {
   const isAbsence = absenceType != null || selectionInput?.kind === "absence";
-  const [frequency, setFrequency] = useState<SeriesFrequency>('weekly');
+  const [frequency, setFrequency] = useState<SeriesFrequency>("weekly");
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([startDate.getDay()]);
   const todayStr = formatLocalDate(new Date());
   const [start, setStart] = useState<string>(formatLocalDate(startDate));
-  const [endType, setEndType] = useState<EndType>('never');
-  const [endDate, setEndDate] = useState<string>('');
+  const [endType, setEndType] = useState<EndType>("never");
+  const [endDate, setEndDate] = useState<string>("");
   const [afterN, setAfterN] = useState<number>(10);
   const [overwrites, setOverwrites] = useState(0);
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const primarySegment = selectionSegments[0] ?? null;
-  const assignment = assignments.find(
-    (shift) => shift.id === (primarySegment?.assignmentId ?? -1),
-  );
+  const assignment = assignments.find((shift) => shift.id === (primarySegment?.assignmentId ?? -1));
   const shiftCategoryId =
-    primarySegment?.shiftId ??
-    assignment?.shiftId ??
-    assignment?.categoryId ??
-    null;
-  const shiftCategory = shiftCategoryId != null
-    ? shiftCategories.find((category) => category.id === shiftCategoryId) ?? null
-    : null;
-  const shiftJob = (primarySegment?.jobId ?? assignment?.jobId ?? null) != null
-    ? jobs.find((job) => job.id === (primarySegment?.jobId ?? assignment?.jobId ?? -1)) ?? null
-    : null;
+    primarySegment?.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
+  const shiftCategory =
+    shiftCategoryId != null
+      ? (shiftCategories.find((category) => category.id === shiftCategoryId) ?? null)
+      : null;
+  const shiftJob =
+    (primarySegment?.jobId ?? assignment?.jobId ?? null) != null
+      ? (jobs.find((job) => job.id === (primarySegment?.jobId ?? assignment?.jobId ?? -1)) ?? null)
+      : null;
   const previewDisplayParts = useMemo(() => {
     if (absenceType) {
       return {
         primaryLabel:
-          shiftDisplayMode === "name"
-            ? (absenceType.name || absenceType.label)
-            : absenceType.label,
+          shiftDisplayMode === "name" ? absenceType.name || absenceType.label : absenceType.label,
         secondaryLabel: null,
       };
     }
@@ -366,44 +398,40 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
       primaryLabel: shiftLabel,
       secondaryLabel: null,
     };
-  }, [
-    absenceType,
-    shiftCategory,
-    assignment,
-    shiftDisplayMode,
-    shiftJob,
-    shiftLabel,
-  ]);
-  const previewBackground =
-    absenceType?.color ?? assignment?.color ?? "var(--color-bg-secondary)";
-  const previewText =
-    absenceType?.text ?? assignment?.text ?? "var(--color-text-secondary)";
-  const previewBorder =
-    absenceType?.border ?? assignment?.border ?? "var(--color-border)";
+  }, [absenceType, shiftCategory, assignment, shiftDisplayMode, shiftJob, shiftLabel]);
+  const previewBackground = absenceType?.color ?? assignment?.color ?? "var(--color-bg-secondary)";
+  const previewText = absenceType?.text ?? assignment?.text ?? "var(--color-text-secondary)";
+  const previewBorder = absenceType?.border ?? assignment?.border ?? "var(--color-border)";
 
   function toggleDay(day: number) {
-    setDaysOfWeek(prev =>
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    setDaysOfWeek((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort(),
     );
   }
 
-  const resolvedDays = frequency === 'daily' ? null : daysOfWeek.length > 0 ? daysOfWeek : null;
-  const resolvedEnd = endType === 'on_date' ? endDate || null : null;
-  const resolvedMax = endType === 'after_n' ? afterN : null;
+  const resolvedDays = frequency === "daily" ? null : daysOfWeek.length > 0 ? daysOfWeek : null;
+  const resolvedEnd = endType === "on_date" ? endDate || null : null;
+  const resolvedMax = endType === "after_n" ? afterN : null;
 
   const originDateKey = formatLocalDate(startDate);
   const generatedDates = useMemo(() => {
-    if (frequency !== 'daily' && daysOfWeek.length === 0) return [];
+    if (frequency !== "daily" && daysOfWeek.length === 0) return [];
     return countOccurrences(frequency, resolvedDays, start, resolvedEnd, resolvedMax);
   }, [frequency, daysOfWeek, resolvedDays, start, resolvedEnd, resolvedMax]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (generatedDates.length === 0) { setOverwrites(0); return; }
+    if (generatedDates.length === 0) {
+      setOverwrites(0);
+      return;
+    }
 
     let cancelled = false;
-    const datesToCheck = new Set(generatedDates.filter(d => d !== originDateKey));
-    if (datesToCheck.size === 0) { setOverwrites(0); return; }
+    const datesToCheck = new Set(generatedDates.filter((d) => d !== originDateKey));
+    if (datesToCheck.size === 0) {
+      setOverwrites(0);
+      return;
+    }
 
     const sortedDates = [...datesToCheck].sort();
 
@@ -419,26 +447,21 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
       Sentry.captureException(error);
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [generatedDates, empId, originDateKey]);
 
   const preview = { total: generatedDates.length, overwrites };
-  const showDayPicker = frequency === 'weekly' || frequency === 'biweekly';
+  const showDayPicker = frequency === "weekly" || frequency === "biweekly";
   const missingDays = showDayPicker && daysOfWeek.length === 0;
-  const missingEndDate = endType === 'on_date' && endDate === '';
-  const endDateInvalid = endType === 'on_date' && endDate !== '' && endDate < start;
+  const missingEndDate = endType === "on_date" && endDate === "";
+  const endDateInvalid = endType === "on_date" && endDate !== "" && endDate < start;
 
   const handleConfirm = useCallback(() => {
     setSubmitAttempted(true);
     if (missingDays || missingEndDate || endDateInvalid) return;
-    onConfirm(
-      frequency,
-      resolvedDays,
-      start,
-      resolvedEnd,
-      resolvedMax,
-      preview.total,
-    );
+    onConfirm(frequency, resolvedDays, start, resolvedEnd, resolvedMax, preview.total);
   }, [
     endDateInvalid,
     frequency,
@@ -452,11 +475,15 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     start,
   ]);
 
-  useImperativeHandle(ref, () => ({
-    submit: handleConfirm,
-  }), [handleConfirm]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      submit: handleConfirm,
+    }),
+    [handleConfirm],
+  );
 
-  const isCapped = preview.total >= MAX_SERIES_OCCURRENCES && endType !== 'after_n';
+  const isCapped = preview.total >= MAX_SERIES_OCCURRENCES && endType !== "after_n";
 
   return (
     <div style={formLayoutStyle}>
@@ -530,9 +557,14 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                   onClick={() => setFrequency(f)}
                   className={`dg-span-tab${isActive ? " active" : ""}`}
                   aria-pressed={isActive}
-                  style={{ flex: 1, textAlign: "center", textTransform: "capitalize", whiteSpace: "nowrap" }}
+                  style={{
+                    flex: 1,
+                    textAlign: "center",
+                    textTransform: "capitalize",
+                    whiteSpace: "nowrap",
+                  }}
                 >
-                  {f === 'biweekly' ? 'Biweekly' : f}
+                  {f === "biweekly" ? "Biweekly" : f}
                 </button>
               </Fragment>
             );
@@ -574,7 +606,13 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
             })}
           </div>
           {(daysOfWeek.length === 0 || (submitAttempted && missingDays)) && (
-            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }}>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--color-danger)",
+                marginTop: 4,
+              }}
+            >
               Select at least one day.
             </div>
           )}
@@ -597,29 +635,55 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
       <fieldset style={sectionFieldsetStyle}>
         <legend style={sectionLabelStyle}>Ends</legend>
         <div style={endOptionsStyle}>
-          {(["never", "on_date", "after_n"] as EndType[]).map(type => (
+          {(["never", "on_date", "after_n"] as EndType[]).map((type) => (
             <label
               key={type}
-              style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", minHeight: 36 }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                cursor: "pointer",
+                minHeight: 36,
+              }}
             >
               <input
                 type="radio"
                 name="repeat-end-type"
                 checked={endType === type}
                 onChange={() => setEndType(type)}
-                aria-label={type === 'never' ? 'Never' : type === 'on_date' ? 'On date' : 'After N occurrences'}
+                aria-label={
+                  type === "never"
+                    ? "Never"
+                    : type === "on_date"
+                      ? "On date"
+                      : "After N occurrences"
+                }
                 style={{ accentColor: "var(--color-brand)" }}
               />
-              <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)", fontWeight: 500 }}>
-                {type === 'never' ? 'Never' : type === 'on_date' ? 'On date' : 'After N occurrences'}
+              <span
+                style={{
+                  fontSize: "var(--dg-fs-label)",
+                  color: "var(--color-text-secondary)",
+                  fontWeight: 500,
+                }}
+              >
+                {type === "never"
+                  ? "Never"
+                  : type === "on_date"
+                    ? "On date"
+                    : "After N occurrences"}
               </span>
-              {type === 'after_n' && endType === 'after_n' && (
+              {type === "after_n" && endType === "after_n" && (
                 <input
                   type="number"
                   min={1}
                   max={MAX_SERIES_OCCURRENCES}
                   value={afterN}
-                  onChange={e => setAfterN(Math.min(MAX_SERIES_OCCURRENCES, Math.max(1, parseInt(e.target.value) || 1)))}
+                  onChange={(e) =>
+                    setAfterN(
+                      Math.min(MAX_SERIES_OCCURRENCES, Math.max(1, parseInt(e.target.value) || 1)),
+                    )
+                  }
                   className="dg-input"
                   style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 8px", width: 70 }}
                 />
@@ -627,7 +691,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
             </label>
           ))}
         </div>
-        {endType === 'on_date' && (
+        {endType === "on_date" && (
           <div style={{ marginTop: 10 }}>
             <CalendarField
               value={endDate}
@@ -641,12 +705,24 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
           </div>
         )}
         {submitAttempted && missingEndDate && (
-          <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }}>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--color-danger)",
+              marginTop: 4,
+            }}
+          >
             Select an end date.
           </div>
         )}
         {endDateInvalid && (
-          <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", marginTop: 4 }}>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              color: "var(--color-danger)",
+              marginTop: 4,
+            }}
+          >
             End date must be on or after start date.
           </div>
         )}
@@ -659,7 +735,8 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
             marginTop: 8,
             padding: "10px 12px",
             borderRadius: 8,
-            background: preview.overwrites > 0 ? "var(--color-warning-bg)" : "var(--color-success-bg)",
+            background:
+              preview.overwrites > 0 ? "var(--color-warning-bg)" : "var(--color-success-bg)",
             border: `1px solid ${preview.overwrites > 0 ? "var(--color-warning)" : "var(--color-info-border)"}`,
             fontSize: "var(--dg-fs-caption)",
             lineHeight: 1.5,
@@ -667,24 +744,29 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
           }}
         >
           <div style={{ fontWeight: 600 }}>
-            {preview.total} {isAbsence ? "off day" : "shift"}{preview.total === 1 ? '' : 's'} will be created
-            {endType === 'never' && (
-              <span style={{ fontWeight: 400, color: "var(--color-text-subtle)" }}> (6-month max)</span>
+            {preview.total} {isAbsence ? "off day" : "shift"}
+            {preview.total === 1 ? "" : "s"} will be created
+            {endType === "never" && (
+              <span style={{ fontWeight: 400, color: "var(--color-text-subtle)" }}>
+                {" "}
+                (6-month max)
+              </span>
             )}
           </div>
           {isCapped && (
             <div style={{ marginTop: 4, color: "var(--color-warning-text)", fontWeight: 500 }}>
-              Series capped at {MAX_SERIES_OCCURRENCES} occurrences (~6 months). Use a shorter date range or &ldquo;After N occurrences&rdquo; for more control.
+              Series capped at {MAX_SERIES_OCCURRENCES} occurrences (~6 months). Use a shorter date
+              range or &ldquo;After N occurrences&rdquo; for more control.
             </div>
           )}
           {preview.overwrites > 0 && (
             <div style={{ marginTop: 4, color: "var(--color-warning-text)", fontWeight: 500 }}>
-              {preview.overwrites} existing {isAbsence ? "entry" : "shift"}{preview.overwrites === 1 ? '' : 's'} will be overwritten.
+              {preview.overwrites} existing {isAbsence ? "entry" : "shift"}
+              {preview.overwrites === 1 ? "" : "s"} will be overwritten.
             </div>
           )}
         </div>
       )}
-
     </div>
   );
 });

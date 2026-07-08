@@ -1,18 +1,12 @@
 import { useEffect, useState } from "react";
-import {
-  AppState,
-  type AppStateStatus,
-} from "react-native";
+import { AppState, type AppStateStatus } from "react-native";
 
 const MINUTE_IN_MS = 60 * 1000;
 
 function getMillisecondsUntilNextMinute(value: Date): number {
-  const millisecondsIntoMinute =
-    value.getSeconds() * 1000 + value.getMilliseconds();
+  const millisecondsIntoMinute = value.getSeconds() * 1000 + value.getMilliseconds();
 
-  return millisecondsIntoMinute === 0
-    ? MINUTE_IN_MS
-    : MINUTE_IN_MS - millisecondsIntoMinute;
+  return millisecondsIntoMinute === 0 ? MINUTE_IN_MS : MINUTE_IN_MS - millisecondsIntoMinute;
 }
 
 export function useRealtimeNow(): Date {
@@ -43,14 +37,11 @@ export function useRealtimeNow(): Date {
 
     scheduleNextTick();
 
-    const subscription = AppState.addEventListener(
-      "change",
-      (nextState: AppStateStatus) => {
-        if (nextState === "active") {
-          syncNow();
-        }
-      },
-    );
+    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      if (nextState === "active") {
+        syncNow();
+      }
+    });
 
     return () => {
       clearScheduledTick();

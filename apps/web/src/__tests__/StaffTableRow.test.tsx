@@ -81,22 +81,14 @@ describe("StaffReorderListRow", () => {
 
     const { container } = render(
       <>
-        <StaffReorderListRow
-          {...commonProps}
-          emp={first}
-          globalIndex={0}
-        />
-        <StaffReorderListRow
-          {...commonProps}
-          emp={second}
-          globalIndex={1}
-        />
+        <StaffReorderListRow {...commonProps} emp={first} globalIndex={0} />
+        <StaffReorderListRow {...commonProps} emp={second} globalIndex={1} />
       </>,
     );
 
-    const ranks = Array.from(
-      container.querySelectorAll(".dg-staff-directory-cell--rank span"),
-    ).map((node) => node.textContent);
+    const ranks = Array.from(container.querySelectorAll(".dg-staff-directory-cell--rank span")).map(
+      (node) => node.textContent,
+    );
 
     expect(ranks).toEqual(["1", "2"]);
   });

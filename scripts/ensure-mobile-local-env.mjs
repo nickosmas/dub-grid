@@ -47,11 +47,10 @@ function isHostedSupabaseHost(hostname) {
 
 function regenerate(reason) {
   console.log(`[ensure-mobile-local-env] ${reason} Re-running use:mobile:local…`);
-  const result = spawnSync(
-    process.execPath,
-    [resolve(repoRoot, "scripts/use-mobile-local.mjs")],
-    { stdio: "inherit", cwd: repoRoot },
-  );
+  const result = spawnSync(process.execPath, [resolve(repoRoot, "scripts/use-mobile-local.mjs")], {
+    stdio: "inherit",
+    cwd: repoRoot,
+  });
 
   if (result.status !== 0) {
     console.warn(

@@ -46,9 +46,7 @@ describe("summarizeImportPreviousOutcomes", () => {
     expect(breakdown.disqualifiedCert).toBe(1);
     expect(breakdown.skippedSourceEmpty).toBe(1);
     expect(breakdown.skippedOther).toBe(0);
-    expect(
-      breakdown.imported + breakdown.totalSkipped,
-    ).toBe(breakdown.totalSource);
+    expect(breakdown.imported + breakdown.totalSkipped).toBe(breakdown.totalSource);
   });
 
   it("buckets unknown skip reasons into skippedOther so totals stay tight", () => {
@@ -82,9 +80,7 @@ describe("formatImportPreviousSkipDescription", () => {
   it("returns an empty string when nothing was skipped", () => {
     const outcomes = [row({ outcome: "imported" })];
     const breakdown = summarizeImportPreviousOutcomes(outcomes);
-    expect(
-      formatImportPreviousSkipDescription(outcomes, breakdown, new Map()),
-    ).toBe("");
+    expect(formatImportPreviousSkipDescription(outcomes, breakdown, new Map())).toBe("");
   });
 
   it("groups qualification reasons under one count and names example employees", () => {
@@ -115,11 +111,7 @@ describe("formatImportPreviousSkipDescription", () => {
       ["doug", "Doug Beale"],
     ]);
 
-    const description = formatImportPreviousSkipDescription(
-      outcomes,
-      breakdown,
-      names,
-    );
+    const description = formatImportPreviousSkipDescription(outcomes, breakdown, names);
     expect(description).toContain("1 employee no longer active");
     expect(description).toContain("2 qualification changes");
     expect(description).toContain("Sarah Kim on 7/3");
@@ -137,11 +129,7 @@ describe("formatImportPreviousSkipDescription", () => {
       }),
     ];
     const breakdown = summarizeImportPreviousOutcomes(outcomes);
-    const description = formatImportPreviousSkipDescription(
-      outcomes,
-      breakdown,
-      new Map(),
-    );
+    const description = formatImportPreviousSkipDescription(outcomes, breakdown, new Map());
     expect(description).toContain("an employee on 7/4");
   });
 });
@@ -150,9 +138,7 @@ describe("getSkipReasonLabel", () => {
   it("labels each documented reason code", () => {
     expect(getSkipReasonLabel("target_has_data")).toBe("Target already had data");
     expect(getSkipReasonLabel("employee_inactive")).toBe("Employee no longer active");
-    expect(getSkipReasonLabel("source_has_no_content")).toBe(
-      "Source cell had no usable content",
-    );
+    expect(getSkipReasonLabel("source_has_no_content")).toBe("Source cell had no usable content");
     expect(getSkipReasonLabel("disqualified:focus_area")).toBe("Qualification change");
     expect(getSkipReasonLabel("disqualified:role")).toBe("Qualification change");
     expect(getSkipReasonLabel("disqualified:cert")).toBe("Qualification change");

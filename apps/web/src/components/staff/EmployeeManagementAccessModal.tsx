@@ -66,13 +66,10 @@ export function EmployeeManagementAccessModal({
   const [saving, setSaving] = useState(false);
   const [email, setEmail] = useState(employee.email || pendingInvitation?.email || "");
   const [role, setRole] = useState<AssignableOrganizationRole>(
-    pendingInvitation?.roleToAssign
-      ?? (directoryPerson?.orgRole === "admin" ? "admin" : "user"),
+    pendingInvitation?.roleToAssign ?? (directoryPerson?.orgRole === "admin" ? "admin" : "user"),
   );
   const [managementDepartmentIds, setManagementDepartmentIds] = useState<number[]>(
-    pendingInvitation?.departmentIds
-      ?? directoryPerson?.managementDepartmentIds
-      ?? [],
+    pendingInvitation?.departmentIds ?? directoryPerson?.managementDepartmentIds ?? [],
   );
 
   useEffect(() => {
@@ -93,7 +90,7 @@ export function EmployeeManagementAccessModal({
   }, [orgId]);
 
   const linkedUser = useMemo(
-    () => (employee.userId ? orgUsers.find((user) => user.id === employee.userId) ?? null : null),
+    () => (employee.userId ? (orgUsers.find((user) => user.id === employee.userId) ?? null) : null),
     [employee.userId, orgUsers],
   );
 
@@ -115,10 +112,7 @@ export function EmployeeManagementAccessModal({
     // Only surface Super Admin for the invitation path. The matched-user branch
     // updates an existing membership in place and is outside the invite scope.
     if (!matchedUser && canAssignSuperAdmin) {
-      return [
-        ...ROLE_OPTIONS,
-        { value: "super_admin" as const, label: "Super Admin" },
-      ];
+      return [...ROLE_OPTIONS, { value: "super_admin" as const, label: "Super Admin" }];
     }
     return ROLE_OPTIONS;
   }, [matchedUser, canAssignSuperAdmin]);
@@ -127,18 +121,17 @@ export function EmployeeManagementAccessModal({
   const baseRole: AssignableOrganizationRole =
     linkedUser?.orgRole === "admin" || linkedUser?.orgRole === "user"
       ? linkedUser.orgRole
-      : pendingInvitation?.roleToAssign
-        ?? (directoryPerson?.orgRole === "admin" ? "admin" : "user");
+      : (pendingInvitation?.roleToAssign ??
+        (directoryPerson?.orgRole === "admin" ? "admin" : "user"));
   const baseManagementDepartmentIds =
-    pendingInvitation?.departmentIds
-    ?? directoryPerson?.managementDepartmentIds
-    ?? [];
+    pendingInvitation?.departmentIds ?? directoryPerson?.managementDepartmentIds ?? [];
   const hasUnsavedChanges =
     JSON.stringify({
       email,
       role,
       managementDepartmentIds: [...managementDepartmentIds].sort((left, right) => left - right),
-    }) !== JSON.stringify({
+    }) !==
+    JSON.stringify({
       email: employee.email || pendingInvitation?.email || "",
       role: baseRole,
       managementDepartmentIds: [...baseManagementDepartmentIds].sort((left, right) => left - right),
@@ -154,9 +147,11 @@ export function EmployeeManagementAccessModal({
   }, [onClose, requestClose, saving]);
 
   const hasExistingManagementAccess =
-    (pendingInvitation?.departmentIds?.length ?? 0) > 0
-    || (directoryPerson?.managementDepartmentIds.length ?? 0) > 0;
-  const emailError = !effectiveEmail.trim() ? "Email address is required" : validateEmail(effectiveEmail);
+    (pendingInvitation?.departmentIds?.length ?? 0) > 0 ||
+    (directoryPerson?.managementDepartmentIds.length ?? 0) > 0;
+  const emailError = !effectiveEmail.trim()
+    ? "Email address is required"
+    : validateEmail(effectiveEmail);
   const canSubmit =
     !isInSandbox &&
     !loadingUsers &&
@@ -164,8 +159,7 @@ export function EmployeeManagementAccessModal({
     (managementDepartmentIds.length > 0 || hasExistingManagementAccess) &&
     !saving;
   const isEditingExistingAccess =
-    (directoryPerson?.managementDepartmentIds.length ?? 0) > 0
-    || !!pendingInvitation;
+    (directoryPerson?.managementDepartmentIds.length ?? 0) > 0 || !!pendingInvitation;
 
   function toggleDepartment(departmentId: number) {
     setManagementDepartmentIds((prev) =>
@@ -185,7 +179,9 @@ export function EmployeeManagementAccessModal({
     if (!response.ok) {
       try {
         const parsed = JSON.parse(body) as { error?: string };
-        throw new Error(formatClientErrorMessage(parsed.error, "We couldn't send the invitation email."));
+        throw new Error(
+          formatClientErrorMessage(parsed.error, "We couldn't send the invitation email."),
+        );
       } catch {
         throw new Error("We couldn't send the invitation email.");
       }
@@ -280,7 +276,10 @@ export function EmployeeManagementAccessModal({
       }
       onClose();
     } catch (err) {
-      if (err instanceof OrganizationAccessConflictError || err instanceof InvitationAccessConflictError) {
+      if (
+        err instanceof OrganizationAccessConflictError ||
+        err instanceof InvitationAccessConflictError
+      ) {
         toast.error("Access changed elsewhere. Review the latest values and try again.");
         return;
       }
@@ -298,128 +297,137 @@ export function EmployeeManagementAccessModal({
         onRequestClose={() => !saving && requestClose()}
         style={{ maxWidth: 560, width: "100%" }}
       >
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div>
-          <label style={fieldLabelStyle}>Login email</label>
-          <input
-            className="dg-input"
-            type="email"
-            value={effectiveEmail}
-            onChange={(e) => setEmail(e.target.value)}
-            disabled={!!linkedUser}
-            style={emailError ? { borderColor: "var(--color-danger)" } : undefined}
-          />
-          {linkedUser && (
-            <div style={{ marginTop: 4, fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
-              This employee is already linked to an org member. Their login email is managed on that account.
-            </div>
-          )}
-          {emailError && <FieldError message={emailError} />}
-        </div>
-
-        <div style={{ maxWidth: 220 }}>
-          <label style={fieldLabelStyle}>Role</label>
-          <CustomSelect
-            value={matchedUser?.orgRole === "super_admin" ? "super_admin" : role}
-            options={roleOptions}
-            onChange={(value) => setRole(value as AssignableOrganizationRole)}
-            disabled={matchedUser?.orgRole === "super_admin"}
-          />
-        </div>
-
-        <div>
-          <label style={fieldLabelStyle}>
-            Management departments
-            {!hasExistingManagementAccess && <span style={{ color: "var(--color-danger)" }}> *</span>}
-          </label>
-          {managementDepartments.length === 0 ? (
-            <div
-              style={{
-                marginTop: 4,
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-muted)",
-              }}
-            >
-              You don't have any management departments yet. Add one in Settings,
-              under Departments, then come back to assign it here.
-            </div>
-          ) : (
-            <>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {managementDepartments.map((department) => (
-                  <SelectableTag
-                    key={department.id}
-                    selected={managementDepartmentIds.includes(department.id)}
-                    onClick={() => toggleDepartment(department.id)}
-                    padding="5px 12px"
-                    unselectedBackground="var(--color-bg-secondary)"
-                    unselectedBorderColor="transparent"
-                    unselectedTextColor="var(--color-text-faint)"
-                  >
-                    {department.name}
-                  </SelectableTag>
-                ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <label style={fieldLabelStyle}>Login email</label>
+            <input
+              className="dg-input"
+              type="email"
+              value={effectiveEmail}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={!!linkedUser}
+              style={emailError ? { borderColor: "var(--color-danger)" } : undefined}
+            />
+            {linkedUser && (
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-text-muted)",
+                }}
+              >
+                This employee is already linked to an org member. Their login email is managed on
+                that account.
               </div>
-              {managementDepartmentIds.length === 0 && !hasExistingManagementAccess && (
-                <FieldError message="Select at least one management department" />
+            )}
+            {emailError && <FieldError message={emailError} />}
+          </div>
+
+          <div style={{ maxWidth: 220 }}>
+            <label style={fieldLabelStyle}>Role</label>
+            <CustomSelect
+              value={matchedUser?.orgRole === "super_admin" ? "super_admin" : role}
+              options={roleOptions}
+              onChange={(value) => setRole(value as AssignableOrganizationRole)}
+              disabled={matchedUser?.orgRole === "super_admin"}
+            />
+          </div>
+
+          <div>
+            <label style={fieldLabelStyle}>
+              Management departments
+              {!hasExistingManagementAccess && (
+                <span style={{ color: "var(--color-danger)" }}> *</span>
               )}
-            </>
-          )}
-          {managementDepartmentIds.length === 0 && hasExistingManagementAccess && (
-            <div
+            </label>
+            {managementDepartments.length === 0 ? (
+              <div
+                style={{
+                  marginTop: 4,
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-text-muted)",
+                }}
+              >
+                You don't have any management departments yet. Add one in Settings, under
+                Departments, then come back to assign it here.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {managementDepartments.map((department) => (
+                    <SelectableTag
+                      key={department.id}
+                      selected={managementDepartmentIds.includes(department.id)}
+                      onClick={() => toggleDepartment(department.id)}
+                      padding="5px 12px"
+                      unselectedBackground="var(--color-bg-secondary)"
+                      unselectedBorderColor="transparent"
+                      unselectedTextColor="var(--color-text-faint)"
+                    >
+                      {department.name}
+                    </SelectableTag>
+                  ))}
+                </div>
+                {managementDepartmentIds.length === 0 && !hasExistingManagementAccess && (
+                  <FieldError message="Select at least one management department" />
+                )}
+              </>
+            )}
+            {managementDepartmentIds.length === 0 && hasExistingManagementAccess && (
+              <div
+                style={{
+                  marginTop: 6,
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-text-muted)",
+                }}
+              >
+                Saving now removes their management access. They'll stay on the schedule.
+              </div>
+            )}
+          </div>
+
+          {isInSandbox && (
+            <p
               style={{
-                marginTop: 6,
-                fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-muted)",
+                color: "var(--color-info-text)",
+                fontSize: "var(--dg-fs-body-sm)",
+                margin: 0,
+                padding: "8px 12px",
+                background: "var(--color-info-bg)",
+                border: "1px solid var(--color-info-border)",
+                borderRadius: "var(--dg-radius-md)",
               }}
             >
-              Saving now removes their management access. They'll stay on the schedule.
-            </div>
+              Granting management access isn't available in sandbox mode. Exit the sandbox to update
+              access on your real organization.
+            </p>
           )}
-        </div>
 
-        {isInSandbox && (
-          <p
-            style={{
-              color: "var(--color-info-text)",
-              fontSize: "var(--dg-fs-body-sm)",
-              margin: 0,
-              padding: "8px 12px",
-              background: "var(--color-info-bg)",
-              border: "1px solid var(--color-info-border)",
-              borderRadius: "var(--dg-radius-md)",
-            }}
-          >
-            Granting management access isn't available in sandbox mode. Exit the
-            sandbox to update access on your real organization.
-          </p>
-        )}
-
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
-            {EDITOR_ACTION_LABELS.close}
-          </button>
-          {hasExistingManagementAccess && managementDepartmentIds.length > 0 && (
-            <button
-              className="dg-btn dg-btn-ghost"
-              onClick={() => setManagementDepartmentIds([])}
-              style={{ color: "var(--color-danger)" }}
-            >
-              Remove from Management
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+              {EDITOR_ACTION_LABELS.close}
             </button>
-          )}
-          <button
-            className="dg-btn dg-btn-primary"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            style={{ opacity: canSubmit ? 1 : 0.5 }}
-          >
-            <ButtonLoading loading={saving} spinnerSize={16}>
-              Save Access
-            </ButtonLoading>
-          </button>
+            {hasExistingManagementAccess && managementDepartmentIds.length > 0 && (
+              <button
+                className="dg-btn dg-btn-ghost"
+                onClick={() => setManagementDepartmentIds([])}
+                style={{ color: "var(--color-danger)" }}
+              >
+                Remove from Management
+              </button>
+            )}
+            <button
+              className="dg-btn dg-btn-primary"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              style={{ opacity: canSubmit ? 1 : 0.5 }}
+            >
+              <ButtonLoading loading={saving} spinnerSize={16}>
+                Save Access
+              </ButtonLoading>
+            </button>
+          </div>
         </div>
-      </div>
       </Modal>
       {unsavedChangesDialog}
     </>

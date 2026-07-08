@@ -7,8 +7,7 @@ const shiftRequestsUpdate = vi.fn();
 const invitationsSelect = vi.fn();
 
 vi.mock("@/features/notifications/server/events", () => ({
-  dispatchNotificationEvent: (...args: unknown[]) =>
-    dispatchNotificationEvent(...args),
+  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
 let fromCallIndex = 0;
@@ -29,9 +28,7 @@ vi.mock("@/lib/supabase-service", () => ({
         }));
         builder.lt = vi.fn(() => builder);
         builder.in = vi.fn(() => builder);
-        builder.limit = vi.fn(() =>
-          myIndex === 0 ? shiftRequestsSelect() : { data: [] },
-        );
+        builder.limit = vi.fn(() => (myIndex === 0 ? shiftRequestsSelect() : { data: [] }));
         return builder;
       }
       if (table === "invitations") {
@@ -116,9 +113,7 @@ describe("GET /api/cron/expire-requests", () => {
 
   it("dispatches invitation_expired for stale invitations", async () => {
     invitationsSelect.mockResolvedValueOnce({
-      data: [
-        { id: "inv-x", org_id: "org-1", email: "alex@example.com" },
-      ],
+      data: [{ id: "inv-x", org_id: "org-1", email: "alex@example.com" }],
       error: null,
     });
 

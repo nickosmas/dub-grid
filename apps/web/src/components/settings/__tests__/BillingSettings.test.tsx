@@ -134,22 +134,13 @@ describe("BillingSettings", () => {
     const trialEndsLabel = screen.getByText("Trial ends");
     const operationsHeading = screen.getByText("Recent billing operations");
     expect(operationsHeading).toBeInTheDocument();
-    expect(
-      screen.getByRole("region", { name: "Recent billing operations" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Recent billing operations" })).toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Activity" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Source" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "When" })).toBeInTheDocument();
     expect(
-      screen.getByRole("columnheader", { name: "Activity" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("columnheader", { name: "Source" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("columnheader", { name: "When" }),
-    ).toBeInTheDocument();
-    expect(
-      trialEndsLabel.compareDocumentPosition(operationsHeading) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      trialEndsLabel.compareDocumentPosition(operationsHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(screen.getByText("Subscription canceled")).toBeInTheDocument();
     expect(screen.getByText("Stripe")).toBeInTheDocument();
@@ -205,9 +196,7 @@ describe("BillingSettings", () => {
     renderBillingSettings();
 
     expect(await screen.findByText("App users")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Sign out" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
   });
 
   it("shows sign out only when billing is locked", async () => {

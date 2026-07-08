@@ -51,17 +51,12 @@ describe("applyViewImplications", () => {
 
 describe("unionPermissions", () => {
   it("grants a permission if any set in the union grants it", () => {
-    const result = unionPermissions([
-      { ...READ_ONLY_PERMS, canEditShifts: true },
-      READ_ONLY_PERMS,
-    ]);
+    const result = unionPermissions([{ ...READ_ONLY_PERMS, canEditShifts: true }, READ_ONLY_PERMS]);
     expect(result.canEditShifts).toBe(true);
   });
 
   it("always forces canManageOrgSettings to false regardless of input", () => {
-    const result = unionPermissions([
-      { ...READ_ONLY_PERMS, canManageOrgSettings: true },
-    ]);
+    const result = unionPermissions([{ ...READ_ONLY_PERMS, canManageOrgSettings: true }]);
     expect(result.canManageOrgSettings).toBe(false);
   });
 });

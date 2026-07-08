@@ -2,10 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { Analytics } from "@vercel/analytics/next";
-import {
-  getAnalyticsConsentSnapshot,
-  subscribeToConsentChanges,
-} from "@/components/CookieConsent";
+import { getAnalyticsConsentSnapshot, subscribeToConsentChanges } from "@/components/CookieConsent";
 
 function getServerSnapshot() {
   return false;

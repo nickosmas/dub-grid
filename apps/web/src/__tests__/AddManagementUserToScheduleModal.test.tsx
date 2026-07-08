@@ -119,9 +119,7 @@ describe("AddManagementUserToScheduleModal", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: /add to schedule/i }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: /add to schedule/i })).toBeDisabled();
     expect(updateEmployeeMock).not.toHaveBeenCalled();
   });
 
@@ -218,11 +216,7 @@ describe("AddManagementUserToScheduleModal", () => {
     await user.tab();
     await user.click(screen.getByRole("button", { name: "North" }));
 
-    expect(
-      screen.getByText("Enter a 10-digit US phone number"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /add to schedule/i }),
-    ).toBeDisabled();
+    expect(screen.getByText("Enter a 10-digit US phone number")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /add to schedule/i })).toBeDisabled();
   });
 });

@@ -33,10 +33,7 @@ describe("mobile shift-requests route", () => {
 
   it("returns the auth failure response unchanged", async () => {
     requireMobileAuth.mockResolvedValue({
-      response: NextResponse.json(
-        { error: "Unauthenticated" },
-        { status: 401 },
-      ),
+      response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
     });
 
     const { GET } = await import("./shift-requests");

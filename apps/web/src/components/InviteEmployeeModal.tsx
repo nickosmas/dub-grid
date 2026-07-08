@@ -55,10 +55,7 @@ export default function InviteEmployeeModal({
   const isInSandbox = useIsInSandbox();
   const { isSuperAdmin, isGridmaster } = usePermissions();
   const roleOptions = useMemo(
-    () =>
-      isSuperAdmin || isGridmaster
-        ? [...ROLE_OPTIONS, SUPER_ADMIN_OPTION]
-        : ROLE_OPTIONS,
+    () => (isSuperAdmin || isGridmaster ? [...ROLE_OPTIONS, SUPER_ADMIN_OPTION] : ROLE_OPTIONS),
     [isSuperAdmin, isGridmaster],
   );
   const [email, setEmail] = useState(employee?.email || "");
@@ -111,7 +108,9 @@ export default function InviteEmployeeModal({
     }
   }, [onClose, requestClose, sending]);
   const trimmedEmail = email.trim();
-  const requiredEmailError = trimmedEmail ? validateEmail(trimmedEmail) : "Email address is required";
+  const requiredEmailError = trimmedEmail
+    ? validateEmail(trimmedEmail)
+    : "Email address is required";
 
   // Pre-flight: when the email is a valid format, check whether it already
   // maps to a DubGrid user (any org). Debounced to avoid spamming the
@@ -153,7 +152,7 @@ export default function InviteEmployeeModal({
   const canSend =
     !isInSandbox &&
     !requiredEmailError &&
-    !(emailLookup?.existsInThisOrg) &&
+    !emailLookup?.existsInThisOrg &&
     (!isManagementInvite || (!!firstName.trim() && !!lastName.trim())) &&
     (!isManagementInvite || managementDepts.length === 0 || departmentIds.length > 0) &&
     (!isManagementInvite || !validatePhone(phone)) &&
@@ -167,18 +166,16 @@ export default function InviteEmployeeModal({
   const fieldErrors = useMemo(
     () => ({
       firstName:
-        isManagementInvite && touched.firstName
-          ? validateRequired(firstName, "First name")
-          : null,
+        isManagementInvite && touched.firstName ? validateRequired(firstName, "First name") : null,
       lastName:
-        isManagementInvite && touched.lastName
-          ? validateRequired(lastName, "Last name")
-          : null,
+        isManagementInvite && touched.lastName ? validateRequired(lastName, "Last name") : null,
       email: touched.email ? requiredEmailError : null,
-      phone:
-        isManagementInvite && touched.phone ? validatePhone(phone) : null,
+      phone: isManagementInvite && touched.phone ? validatePhone(phone) : null,
       departmentIds:
-        isManagementInvite && managementDepts.length > 0 && touched.departmentIds && departmentIds.length === 0
+        isManagementInvite &&
+        managementDepts.length > 0 &&
+        touched.departmentIds &&
+        departmentIds.length === 0
           ? "Select at least one management department"
           : null,
     }),
@@ -199,9 +196,7 @@ export default function InviteEmployeeModal({
       setTouched((prev) => ({
         ...prev,
         email: true,
-        ...(isManagementInvite
-          ? { firstName: true, lastName: true, departmentIds: true }
-          : {}),
+        ...(isManagementInvite ? { firstName: true, lastName: true, departmentIds: true } : {}),
         ...(isManagementInvite ? { phone: true } : {}),
       }));
       return;
@@ -217,13 +212,8 @@ export default function InviteEmployeeModal({
         employeeId: employee?.id,
         firstName: isManagementInvite ? firstName.trim() : undefined,
         lastName: isManagementInvite ? lastName.trim() : undefined,
-        phone: isManagementInvite
-          ? normalizeOptionalUsPhone(phone) || undefined
-          : undefined,
-        departmentIds:
-          isManagementInvite && departmentIds.length > 0
-            ? departmentIds
-            : undefined,
+        phone: isManagementInvite ? normalizeOptionalUsPhone(phone) || undefined : undefined,
+        departmentIds: isManagementInvite && departmentIds.length > 0 ? departmentIds : undefined,
       });
 
       // Send the invitation email
@@ -241,12 +231,16 @@ export default function InviteEmployeeModal({
             JSON.parse(text).error,
             "We couldn't send the invitation email.",
           );
-        } catch { /* non-JSON response */ }
+        } catch {
+          /* non-JSON response */
+        }
         throw new Error(`Invitation was created, but ${detail}`);
       }
       const data = await res.json();
       if (!data.success) {
-        throw new Error(formatClientErrorMessage(data.error, "We couldn't send the invitation email."));
+        throw new Error(
+          formatClientErrorMessage(data.error, "We couldn't send the invitation email."),
+        );
       }
 
       toast.success(`Invitation email sent to ${trimmedEmail}`);
@@ -269,7 +263,11 @@ export default function InviteEmployeeModal({
   return (
     <>
       <Modal
-        title={isManagementInvite ? "Invite Management Staff" : `Invite ${getEmployeeDisplayName(employee)}`}
+        title={
+          isManagementInvite
+            ? "Invite Management Staff"
+            : `Invite ${getEmployeeDisplayName(employee)}`
+        }
         onClose={onClose}
         onRequestClose={() => !sending && requestClose()}
         style={{ maxWidth: 480 }}
@@ -288,10 +286,14 @@ export default function InviteEmployeeModal({
               color: "var(--color-text-secondary, #334766)",
             }}
           >
-            {isManagementInvite
-              ? "Invite management staff who need app access but won\u2019t appear on the schedule."
-              : <>Sending an invitation to <strong>{getEmployeeDisplayName(employee!)}</strong>. They will receive an email with a link to set their password and join your organization.</>
-            }
+            {isManagementInvite ? (
+              "Invite management staff who need app access but won\u2019t appear on the schedule."
+            ) : (
+              <>
+                Sending an invitation to <strong>{getEmployeeDisplayName(employee!)}</strong>. They
+                will receive an email with a link to set their password and join your organization.
+              </>
+            )}
           </div>
 
           {/* Name fields (management staff mode) */}
@@ -299,8 +301,7 @@ export default function InviteEmployeeModal({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div>
                 <label style={labelStyle}>
-                  First name{" "}
-                  <span style={{ color: "var(--color-danger)" }}>*</span>
+                  First name <span style={{ color: "var(--color-danger)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -329,8 +330,7 @@ export default function InviteEmployeeModal({
               </div>
               <div>
                 <label style={labelStyle}>
-                  Last name{" "}
-                  <span style={{ color: "var(--color-danger)" }}>*</span>
+                  Last name <span style={{ color: "var(--color-danger)" }}>*</span>
                 </label>
                 <input
                   type="text"
@@ -399,41 +399,48 @@ export default function InviteEmployeeModal({
                   fontSize: "var(--dg-fs-footnote)",
                 }}
               >
-                <strong>{emailLookup.displayName ?? trimmedEmail}</strong> is
-                already on your team. Find them in the People list to update
-                their record instead of inviting again.
+                <strong>{emailLookup.displayName ?? trimmedEmail}</strong> is already on your team.
+                Find them in the People list to update their record instead of inviting again.
               </div>
             )}
-            {!fieldErrors.email
-              && !emailLookupLoading
-              && emailLookup?.exists
-              && !emailLookup.existsInThisOrg && (
-              <div
-                style={{
-                  marginTop: 8,
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  background: "var(--color-info-bg)",
-                  color: "var(--color-info-text)",
-                  fontSize: "var(--dg-fs-footnote)",
-                }}
-              >
-                <strong>{emailLookup.displayName ?? trimmedEmail}</strong>
-                {" "}already has a DubGrid account. They&apos;ll join your
-                organization when they accept the invite
-                {emailLookup.displayName ? (
-                  <> — your roster will show their name as <strong>{emailLookup.displayName}</strong>.</>
-                ) : (
-                  <>.</>
-                )}
-              </div>
-            )}
+            {!fieldErrors.email &&
+              !emailLookupLoading &&
+              emailLookup?.exists &&
+              !emailLookup.existsInThisOrg && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: "8px 12px",
+                    borderRadius: 6,
+                    background: "var(--color-info-bg)",
+                    color: "var(--color-info-text)",
+                    fontSize: "var(--dg-fs-footnote)",
+                  }}
+                >
+                  <strong>{emailLookup.displayName ?? trimmedEmail}</strong> already has a DubGrid
+                  account. They&apos;ll join your organization when they accept the invite
+                  {emailLookup.displayName ? (
+                    <>
+                      {" "}
+                      — your roster will show their name as{" "}
+                      <strong>{emailLookup.displayName}</strong>.
+                    </>
+                  ) : (
+                    <>.</>
+                  )}
+                </div>
+              )}
           </div>
 
           {/* Phone (management staff mode, optional) */}
           {isManagementInvite && (
             <div>
-              <label style={labelStyle}>Phone <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>(optional)</span></label>
+              <label style={labelStyle}>
+                Phone{" "}
+                <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+                  (optional)
+                </span>
+              </label>
               <input
                 type="tel"
                 value={phone}
@@ -470,8 +477,7 @@ export default function InviteEmployeeModal({
           {isManagementInvite && managementDepts.length > 0 && (
             <div>
               <label style={labelStyle}>
-                Management departments{" "}
-                <span style={{ color: "var(--color-danger)" }}>*</span>
+                Management departments <span style={{ color: "var(--color-danger)" }}>*</span>
               </label>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {managementDepts.map((department) => (
@@ -539,7 +545,9 @@ export default function InviteEmployeeModal({
               disabled={!canSend}
               style={{ opacity: canSend ? 1 : 0.5 }}
             >
-              <ButtonLoading loading={sending} spinnerSize={16}>Send Invitation</ButtonLoading>
+              <ButtonLoading loading={sending} spinnerSize={16}>
+                Send Invitation
+              </ButtonLoading>
             </button>
           </div>
         </div>

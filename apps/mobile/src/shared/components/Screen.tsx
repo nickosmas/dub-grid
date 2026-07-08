@@ -16,12 +16,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileSpacing,
-  mobileText,
-} from "../theme/tokens";
+import { mobileColors, mobileRadii, mobileSpacing, mobileText } from "../theme/tokens";
 import {
   DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
   getScreenBottomPadding,
@@ -65,8 +60,7 @@ export function Screen({
   const overlay = renderOverlay?.({ stickyHeaderHeight });
   const useNativeContentInsets = !stickyHeader;
   const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay;
-  const resolvedStickyHeaderTopPadding =
-    stickyHeaderTopPadding ?? Math.max(insets.top, 8);
+  const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? Math.max(insets.top, 8);
   const scrollView = (
     <ScrollView
       ref={scrollViewRef}
@@ -76,9 +70,7 @@ export function Screen({
         paddingTop: stickyHeader ? stickyHeaderHeight : 0,
         paddingBottom: getScreenBottomPadding(bottomPaddingMode, insets.bottom),
       }}
-      contentInsetAdjustmentBehavior={
-        useNativeContentInsets ? "automatic" : "never"
-      }
+      contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"
       onScroll={onScroll}
@@ -157,9 +149,7 @@ export function Card({
         <View style={styles.cardHeaderCopy}>
           <Text style={styles.cardTitle}>{title}</Text>
         </View>
-        {headerAccessory ? (
-          <View style={styles.cardHeaderAccessory}>{headerAccessory}</View>
-        ) : null}
+        {headerAccessory ? <View style={styles.cardHeaderAccessory}>{headerAccessory}</View> : null}
       </View>
       {body ? <Text style={styles.cardBody}>{body}</Text> : null}
       {detail}

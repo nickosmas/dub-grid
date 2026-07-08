@@ -19,7 +19,4 @@ export const mobileTypography = mobileTypographyTokens;
 export const dubGridNavigationTheme = mobileNavigationTheme;
 export const mobileBorderColorFromText = borderColorFromText;
 
-export const mobileText = mobileTypographyTokens.text satisfies Record<
-  string,
-  TextStyle
->;
+export const mobileText = mobileTypographyTokens.text satisfies Record<string, TextStyle>;

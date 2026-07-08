@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireAuthenticatedUserWithClaims,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import type { NotificationFacets } from "@/types";
 import { mapNotificationRow } from "../route";
@@ -59,8 +56,7 @@ export async function POST(req: NextRequest) {
     // session org. Without this clause a multi-org user could see another
     // org's notifications when their session is on the wrong org. The RLS
     // policy enforces the same; this is defense-in-depth at the route layer.
-    const claimOrgId =
-      typeof claims.org_id === "string" ? claims.org_id : null;
+    const claimOrgId = typeof claims.org_id === "string" ? claims.org_id : null;
 
     let query = supabase
       .from("notifications")
@@ -107,10 +103,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    query = query
-      .order("created_at", { ascending })
-      .order("id", { ascending })
-      .limit(limit);
+    query = query.order("created_at", { ascending }).order("id", { ascending }).limit(limit);
 
     const [rowsResult, facetsResult] = await Promise.all([
       query,
@@ -126,9 +119,7 @@ export async function POST(req: NextRequest) {
     const notifications = rows.map(mapNotificationRow);
     const last = notifications[notifications.length - 1];
     const nextCursor =
-      notifications.length >= limit && last
-        ? { createdAt: last.createdAt, id: last.id }
-        : null;
+      notifications.length >= limit && last ? { createdAt: last.createdAt, id: last.id } : null;
 
     return NextResponse.json({
       notifications,
@@ -137,9 +128,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("notifications search failed", error);
-    return NextResponse.json(
-      { error: "Failed to search notifications" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to search notifications" }, { status: 500 });
   }
 }

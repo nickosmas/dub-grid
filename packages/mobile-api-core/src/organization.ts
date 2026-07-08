@@ -9,21 +9,12 @@ export type MobileOrganizationLookup = {
   trialEndsAt: string | null;
 };
 
-export function normalizeMobileOrgSlug(
-  slug: string | null | undefined,
-): string {
+export function normalizeMobileOrgSlug(slug: string | null | undefined): string {
   return slug?.trim().toLowerCase() ?? "";
 }
 
-export function isValidMobileOrgSlug(
-  slug: string,
-  reservedSlugs: ReadonlySet<string>,
-): boolean {
-  return (
-    !!slug &&
-    !reservedSlugs.has(slug) &&
-    /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(slug)
-  );
+export function isValidMobileOrgSlug(slug: string, reservedSlugs: ReadonlySet<string>): boolean {
+  return !!slug && !reservedSlugs.has(slug) && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(slug);
 }
 
 export async function findMobileOrganizationBySlug(
@@ -49,8 +40,7 @@ export async function findMobileOrganizationBySlug(
     name: data.name as string,
     slug: data.slug,
     suspendedAt: (data.suspended_at as string | null | undefined) ?? null,
-    subscriptionStatus:
-      (data.subscription_status as string | null | undefined) ?? null,
+    subscriptionStatus: (data.subscription_status as string | null | undefined) ?? null,
     trialEndsAt: (data.trial_ends_at as string | null | undefined) ?? null,
   };
 }

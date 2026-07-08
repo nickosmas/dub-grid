@@ -43,6 +43,10 @@
       "dependsOn": ["^build", "^type-check"],
       "outputs": []
     },
+    "//#lint": {
+      "inputs": ["$TURBO_DEFAULT$", "eslint.config.mjs", "eslint-rules/**"],
+      "outputs": []
+    },
     "test": {
       "dependsOn": ["^build", "^test"],
       "outputs": []

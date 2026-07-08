@@ -56,8 +56,8 @@ export default function SettingsMockup() {
             lineHeight: 1.5,
           }}
         >
-          Customize the terminology used in your organization. For example,
-          rename &lsquo;Focus Areas&rsquo; to &lsquo;Wings&rsquo; or &lsquo;Units&rsquo;.
+          Customize the terminology used in your organization. For example, rename &lsquo;Focus
+          Areas&rsquo; to &lsquo;Wings&rsquo; or &lsquo;Units&rsquo;.
         </p>
       </div>
 
@@ -108,9 +108,7 @@ export default function SettingsMockup() {
                     borderRadius: 6,
                     color: "var(--color-text-secondary)",
                     background: "var(--color-surface)",
-                    boxShadow: field.dirty
-                      ? "0 0 0 3px rgba(59,130,246,0.15)"
-                      : undefined,
+                    boxShadow: field.dirty ? "0 0 0 3px rgba(59,130,246,0.15)" : undefined,
                   }}
                 >
                   {field.value}

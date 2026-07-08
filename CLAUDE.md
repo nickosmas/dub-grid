@@ -124,6 +124,7 @@ Shared primitives to reach for before inventing a layout:
   rather than re-render the chrome.
 
 ---
+
 ---
 
 # React Best Practices
@@ -136,7 +137,7 @@ state variable for it.
 
 ```tsx
 // ❌ Unnecessary state
-const [fullName, setFullName] = useState('');
+const [fullName, setFullName] = useState("");
 useEffect(() => setFullName(`${first} ${last}`), [first, last]);
 
 // ✅ Derived inline
@@ -150,12 +151,14 @@ For expensive derivations, use `useMemo` — not `useEffect` + `useState`.
 ## useEffect: When to Use It
 
 Only use `useEffect` to synchronize with something **external** to React:
+
 - Browser APIs (timers, event listeners, IntersectionObserver, ResizeObserver)
 - WebSockets or EventEmitters
 - Third-party library initialization (maps, charts, players)
 - Network requests (though prefer React Query / SWR for data fetching)
 
 **Do not use `useEffect` to:**
+
 - Sync one state variable to another
 - Transform or filter data from props
 - Respond to user events (use event handlers instead)
@@ -171,10 +174,14 @@ not in an effect.
 ```tsx
 // ❌ Roundabout
 const [submitted, setSubmitted] = useState(false);
-useEffect(() => { if (submitted) sendToApi(data); }, [submitted]);
+useEffect(() => {
+  if (submitted) sendToApi(data);
+}, [submitted]);
 
 // ✅ Direct
-function handleSubmit() { sendToApi(data); }
+function handleSubmit() {
+  sendToApi(data);
+}
 ```
 
 ---
@@ -206,6 +213,7 @@ handle race conditions, caching, or loading/error states well.
 Apply `useMemo` and `useCallback` intentionally, not by default.
 
 Use them when:
+
 - A computation is provably expensive and re-runs frequently
 - A callback is passed as a prop to a memoized child (`React.memo`)
 - A value is used as a dependency of another hook and causes excessive re-renders
@@ -230,13 +238,14 @@ static and never reordered.
 
 ```tsx
 // ❌
-items.map((item, i) => <Row key={i} item={item} />)
+items.map((item, i) => <Row key={i} item={item} />);
 
 // ✅
-items.map(item => <Row key={item.id} item={item} />)
+items.map((item) => <Row key={item.id} item={item} />);
 ```
 
 ---
+
 ---
 
 # Next.js Best Practices
@@ -250,7 +259,7 @@ requires browser APIs, event handlers, or React hooks (useState, useEffect, etc.
 
 ```tsx
 // ❌ Unnecessary client component
-'use client';
+"use client";
 export default function UserCard({ name }: { name: string }) {
   return <div>{name}</div>;
 }
@@ -300,43 +309,21 @@ fetch(url);
 fetch(url, { next: { revalidate: 60 } });
 
 // No cache — always fresh
-fetch(url, { cache: 'no-store' });
+fetch(url, { cache: "no-store" });
 ```
 
-Use `revalidatePath` or `revalidateTag` in Server Actions after mutations instead
+Use `revalidatePath` or `revalidateTag` in Route Handlers after mutations instead
 of disabling caching globally.
-
----
-
-## Server Actions
-
-Use Server Actions for form submissions and data mutations — not API routes.
-
-```tsx
-// ✅ Server Action
-async function createItem(formData: FormData) {
-  'use server';
-  await db.insert({ name: formData.get('name') });
-  revalidatePath('/items');
-}
-
-export default function Form() {
-  return <form action={createItem}><button type="submit">Add</button></form>;
-}
-```
-
-Validate and sanitize all inputs inside Server Actions. Never trust raw FormData.
-Use Zod or a similar schema library.
 
 ---
 
 ## Route Handlers (API Routes)
 
-Use Route Handlers (`app/api/.../route.ts`) only when you need a public HTTP
-endpoint — e.g. webhooks, third-party callbacks, or a REST API consumed externally.
-
-For internal data mutations, prefer Server Actions. For internal data reads,
-fetch directly in Server Components.
+This codebase uses Route Handlers (`app/api/.../route.ts`) for **all** mutations
+and data access — internal and external alike. There are no Server Actions
+anywhere in `apps/web` (no `'use server'` directives); every write goes through
+a typed Route Handler, called from the client via the feature's `client/api.ts`
+adapter (React Query mutations) rather than a `<form action={...}>`.
 
 ```ts
 // app/api/webhook/route.ts
@@ -346,6 +333,9 @@ export async function POST(req: Request) {
   return Response.json({ received: true });
 }
 ```
+
+Validate and sanitize all inputs inside Route Handlers. Never trust raw request
+bodies. Use Zod or a similar schema library.
 
 ---
 
@@ -369,8 +359,8 @@ never via `<Head>` tags (pages router pattern).
 ```tsx
 // Static
 export const metadata: Metadata = {
-  title: 'My App',
-  description: '...',
+  title: "My App",
+  description: "...",
 };
 
 // Dynamic
@@ -396,8 +386,8 @@ export async function generateMetadata({ params }): Promise<Metadata> {
 Always use `next/image` for images. Never use a raw `<img>` tag for content images.
 
 ```tsx
-import Image from 'next/image';
-<Image src="/hero.jpg" alt="Hero" width={1200} height={600} priority />
+import Image from "next/image";
+<Image src="/hero.jpg" alt="Hero" width={1200} height={600} priority />;
 ```
 
 Set `priority` on above-the-fold images. Provide explicit `width` and `height`
@@ -410,8 +400,8 @@ to prevent layout shift.
 Use `next/font` to load fonts — never link Google Fonts via `<link>` tags.
 
 ```tsx
-import { Geist } from 'next/font/google';
-const geist = Geist({ subsets: ['latin'] });
+import { Geist } from "next/font/google";
+const geist = Geist({ subsets: ["latin"] });
 ```
 
 This eliminates external network requests and prevents layout shift.
@@ -425,13 +415,13 @@ Use `next/navigation`'s `useRouter` for programmatic navigation in Client Compon
 
 ```tsx
 // ✅
-import Link from 'next/link';
-<Link href="/dashboard">Dashboard</Link>
+import Link from "next/link";
+<Link href="/dashboard">Dashboard</Link>;
 
 // ✅ Programmatic
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 const router = useRouter();
-router.push('/dashboard');
+router.push("/dashboard");
 ```
 
 ---
@@ -455,7 +445,7 @@ Never import heavy Node.js modules or ORMs into middleware.
   the entire route out of static rendering
 
 ```tsx
-const HeavyChart = dynamic(() => import('./HeavyChart'), { ssr: false });
+const HeavyChart = dynamic(() => import("./HeavyChart"), { ssr: false });
 ```
 
 ---
@@ -469,18 +459,36 @@ app/
   loading.tsx        # Loading UI
   error.tsx          # Error boundary
   not-found.tsx      # 404
-  (groups)/          # Route groups — no URL segment
-  [param]/           # Dynamic segment
-  _components/       # Co-located, non-routable components
-  actions/           # Server Actions
-  lib/               # Utilities, db client, helpers
-  types/             # Shared TypeScript types
+  [param]/           # Dynamic segment (never catch-all — see Routes above)
+  <route>/
+    <Route>PageContent.tsx  # Route's client component, flat next to page.tsx
+    _components/           # Escape hatch when a route needs multiple
+                            # co-located pieces (rare — used by schedule/ today)
+  api/**/route.ts    # Route Handlers — the only mutation pattern (see below)
+
+features/<domain>/   # Dominant organizational unit: hooks, client API
+  client/             adapters (React Query), and (for a handful of
+  server/              domains — mobile, notifications, account,
+                        permissions) server-side logic, grouped per
+                        business domain rather than per route
+
+lib/                # Flat shared utilities, db client, helpers
+types/               # Shared TypeScript types (apps/web/src/types/index.ts)
 ```
 
-Prefix folders with `_` to co-locate components next to routes without making
-them routable. Use route groups `(name)` to share layouts without affecting URLs.
+Most routes put their client component directly in the route directory as a
+single flat file (e.g. `app/people/PeoplePageContent.tsx`) rather than a
+`_components/` folder — reserve `_components/` for routes that genuinely need
+multiple co-located, non-routable pieces. Prefix folders with `_` to co-locate
+without making them routable. Route groups `(name)` are available for sharing
+layouts without affecting URLs but aren't currently used.
+
+Business logic, hooks, and client API wrappers belong in
+`features/<domain>/`, not scattered under `app/`. This is the primary
+organizational layer for anything beyond a route's own presentation.
 
 ---
+
 ---
 
 # Security Best Practices
@@ -493,18 +501,18 @@ Validate ALL inputs at the server boundary — Server Actions, Route Handlers,
 and middleware. Never trust the client. Use Zod for schema validation.
 
 ```ts
-import { z } from 'zod';
+import { z } from "zod";
 
 const schema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email(),
-  role: z.enum(['admin', 'member']),
+  role: z.enum(["admin", "member"]),
 });
 
 async function createUser(formData: FormData) {
-  'use server';
+  "use server";
   const result = schema.safeParse(Object.fromEntries(formData));
-  if (!result.success) throw new Error('Invalid input');
+  if (!result.success) throw new Error("Invalid input");
   // proceed with result.data
 }
 ```
@@ -525,11 +533,11 @@ Never pass raw user input to database queries, shell commands, or file paths.
 ```ts
 // ✅ Check auth inside the action, not just at the route level
 async function deletePost(id: string) {
-  'use server';
+  "use server";
   const session = await getSession();
-  if (!session) throw new Error('Unauthenticated');
+  if (!session) throw new Error("Unauthenticated");
   const post = await db.posts.findById(id);
-  if (post.authorId !== session.user.id) throw new Error('Unauthorized');
+  if (post.authorId !== session.user.id) throw new Error("Unauthorized");
   await db.posts.delete(id);
 }
 ```
@@ -546,8 +554,8 @@ async function deletePost(id: string) {
 
 ```ts
 // env.ts — validates on startup, throws if misconfigured
-import { createEnv } from '@t3-oss/env-nextjs';
-import { z } from 'zod';
+import { createEnv } from "@t3-oss/env-nextjs";
+import { z } from "zod";
 
 export const env = createEnv({
   server: {
@@ -573,7 +581,7 @@ user input directly into query strings.
 const user = await db.query(`SELECT * FROM users WHERE id = '${id}'`);
 
 // ✅ Parameterized
-const user = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+const user = await db.query("SELECT * FROM users WHERE id = $1", [id]);
 
 // ✅ ORM
 const user = await prisma.user.findUnique({ where: { id } });
@@ -623,20 +631,20 @@ Set security headers in `apps/web/next.config.ts` for every response:
 
 ```ts
 const securityHeaders = [
-  { key: 'X-DNS-Prefetch-Control', value: 'on' },
-  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-  { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+  { key: "X-DNS-Prefetch-Control", value: "on" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
   {
-    key: 'Strict-Transport-Security',
-    value: 'max-age=63072000; includeSubDomains; preload',
+    key: "Strict-Transport-Security",
+    value: "max-age=63072000; includeSubDomains; preload",
   },
 ];
 
 export default {
   async headers() {
-    return [{ source: '/(.*)', headers: securityHeaders }];
+    return [{ source: "/(.*)", headers: securityHeaders }];
   },
 };
 ```
@@ -650,18 +658,18 @@ especially auth endpoints, contact forms, and anything that sends email or
 triggers side effects. Use Upstash Rate Limit, or equivalent.
 
 ```ts
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
 const ratelimit = new Ratelimit({
   redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, '10 s'),
+  limiter: Ratelimit.slidingWindow(10, "10 s"),
 });
 
 export async function POST(req: Request) {
-  const ip = req.headers.get('x-forwarded-for') ?? 'anonymous';
+  const ip = req.headers.get("x-forwarded-for") ?? "anonymous";
   const { success } = await ratelimit.limit(ip);
-  if (!success) return new Response('Too many requests', { status: 429 });
+  if (!success) return new Response("Too many requests", { status: 429 });
   // ...
 }
 ```
@@ -702,7 +710,7 @@ return Response.json({ error: err.message }, { status: 500 });
 
 // ✅ Generic client message, full error logged server-side
 console.error(err);
-return Response.json({ error: 'Something went wrong' }, { status: 500 });
+return Response.json({ error: "Something went wrong" }, { status: 500 });
 ```
 
 Use `error.tsx` boundaries to show safe fallback UI. Log full errors to a
@@ -727,8 +735,8 @@ Audit what data each script sends and whether it needs access to the full page.
 Prefer `strategy="lazyOnload"` for non-critical analytics/marketing scripts.
 
 ```tsx
-import Script from 'next/script';
-<Script src="https://analytics.example.com/script.js" strategy="lazyOnload" />
+import Script from "next/script";
+<Script src="https://analytics.example.com/script.js" strategy="lazyOnload" />;
 ```
 
 Never paste raw third-party `<script>` tags into layouts — they bypass CSP

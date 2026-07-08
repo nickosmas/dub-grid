@@ -29,9 +29,7 @@ export default function ImpersonationPanel() {
       setSessionId(result.sessionId);
       setExpiresAt(result.expiresAt);
     } catch (err) {
-      setError(
-        formatClientErrorMessage(err, "We couldn't start that support session."),
-      );
+      setError(formatClientErrorMessage(err, "We couldn't start that support session."));
     } finally {
       setLoading(false);
     }
@@ -47,9 +45,7 @@ export default function ImpersonationPanel() {
       setExpiresAt(null);
       setTargetUserId("");
     } catch (err) {
-      setError(
-        formatClientErrorMessage(err, "We couldn't end that support session."),
-      );
+      setError(formatClientErrorMessage(err, "We couldn't end that support session."));
     } finally {
       setLoading(false);
     }
@@ -58,8 +54,7 @@ export default function ImpersonationPanel() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
-        Start a support session for a selected user. Sessions are
-        capped at 30 minutes.
+        Start a support session for a selected user. Sessions are capped at 30 minutes.
       </p>
 
       <div
@@ -89,13 +84,11 @@ export default function ImpersonationPanel() {
           onClick={start}
           disabled={loading || !targetUserId.trim() || justification.trim().length < 10}
         >
-          <ButtonLoading loading={loading} spinnerSize={16}>Start session</ButtonLoading>
+          <ButtonLoading loading={loading} spinnerSize={16}>
+            Start session
+          </ButtonLoading>
         </button>
-        <button
-          className="dg-btn dg-btn-secondary"
-          onClick={end}
-          disabled={loading || !sessionId}
-        >
+        <button className="dg-btn dg-btn-secondary" onClick={end} disabled={loading || !sessionId}>
           End session
         </button>
       </div>
@@ -103,13 +96,13 @@ export default function ImpersonationPanel() {
       {sessionId && (
         <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
           Active support session
-          {expiresAt
-            ? ` until ${formatDateTimeLabel(expiresAt)}`
-            : ""}
+          {expiresAt ? ` until ${formatDateTimeLabel(expiresAt)}` : ""}
         </div>
       )}
 
-      {error && <div style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-danger)" }}>{error}</div>}
+      {error && (
+        <div style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-danger)" }}>{error}</div>
+      )}
     </div>
   );
 }

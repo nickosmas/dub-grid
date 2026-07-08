@@ -35,9 +35,7 @@ vi.mock("sonner", () => ({
   },
 }));
 
-const createOrganizationInvitationMock = vi.mocked(
-  createOrganizationInvitation,
-);
+const createOrganizationInvitationMock = vi.mocked(createOrganizationInvitation);
 const useIsInSandboxMock = vi.mocked(useIsInSandbox);
 
 const employee: Employee = {
@@ -164,9 +162,7 @@ describe("InviteEmployeeModal", () => {
       name: /send invitation/i,
     });
 
-    expect(
-      screen.getByText(/isn't available in sandbox mode/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/isn't available in sandbox mode/i)).toBeInTheDocument();
 
     const emailInput = screen.getByPlaceholderText("employee@example.com");
     await user.type(emailInput, "manager@example.com");
@@ -281,20 +277,13 @@ describe("InviteEmployeeModal", () => {
 
     await user.type(screen.getByPlaceholderText("Jane"), "Jordan");
     await user.type(screen.getByPlaceholderText("Smith"), "Lee");
-    await user.type(
-      screen.getByPlaceholderText("employee@example.com"),
-      "manager@example.com",
-    );
+    await user.type(screen.getByPlaceholderText("employee@example.com"), "manager@example.com");
     const phoneInput = screen.getByPlaceholderText("+1 555-123-4567");
     await user.type(phoneInput, "123");
     fireEvent.blur(phoneInput);
 
-    expect(
-      screen.getByText("Enter a 10-digit US phone number"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /send invitation/i }),
-    ).toBeDisabled();
+    expect(screen.getByText("Enter a 10-digit US phone number")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send invitation/i })).toBeDisabled();
   });
 
   it("keeps employee invite mode sendable without separate name fields", async () => {
@@ -332,5 +321,4 @@ describe("InviteEmployeeModal", () => {
       });
     });
   });
-
 });

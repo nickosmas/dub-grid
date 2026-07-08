@@ -1,8 +1,4 @@
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 
 type MobileOrgRole = "super_admin" | "admin" | "user" | null;
 type OrgRole = NonNullable<MobileOrgRole>;

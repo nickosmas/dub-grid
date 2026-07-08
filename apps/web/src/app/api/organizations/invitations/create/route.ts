@@ -9,15 +9,9 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-service";
-import {
-  canManageEmployees,
-  isOrgSuperAdminOrGridmaster,
-} from "@/app/api/employees/shared";
+import { canManageEmployees, isOrgSuperAdminOrGridmaster } from "@/app/api/employees/shared";
 import type { AssignableOrganizationRole } from "@/types";
-import {
-  buildStaffValidationErrorResponse,
-  getStaffFieldErrors,
-} from "@/lib/staff-validation";
+import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/staff-validation";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -89,11 +83,7 @@ export async function POST(req: NextRequest) {
     // Tier guard: only super_admin or gridmaster can hand out the super_admin
     // role. Regular admins with canManageEmployees can still invite admin/user.
     if (role === "super_admin") {
-      const allowed = await isOrgSuperAdminOrGridmaster(
-        serviceClient,
-        user.id,
-        orgId,
-      );
+      const allowed = await isOrgSuperAdminOrGridmaster(serviceClient, user.id, orgId);
       if (!allowed) {
         return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
       }
@@ -126,8 +116,7 @@ export async function POST(req: NextRequest) {
             ? normalizeStaffName(lastName)
             : null
           : null,
-      p_phone:
-        typeof phone === "string" ? normalizeOptionalUsPhone(phone) || null : null,
+      p_phone: typeof phone === "string" ? normalizeOptionalUsPhone(phone) || null : null,
       p_department_ids: departmentIds ?? [],
       p_dept_admin_ids: deptAdminIds ?? [],
     });
@@ -182,8 +171,7 @@ export async function POST(req: NextRequest) {
     if (text.includes("employee already has a linked user")) {
       return NextResponse.json(
         {
-          error:
-            "That employee record is already linked to a user account.",
+          error: "That employee record is already linked to a user account.",
         },
         { status: 409 },
       );
@@ -200,9 +188,6 @@ export async function POST(req: NextRequest) {
         { status: 403 },
       );
     }
-    return NextResponse.json(
-      { error: "Failed to create invitation" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to create invitation" }, { status: 500 });
   }
 }

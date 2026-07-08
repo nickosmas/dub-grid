@@ -5,10 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Modal from "@/components/Modal";
 import { usePermissions, useTermsAcceptanceStatus } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  fetchTrialWelcomeState,
-  dismissTrialWelcome,
-} from "@/features/billing/client";
+import { fetchTrialWelcomeState, dismissTrialWelcome } from "@/features/billing/client";
 
 function formatTrialEndDate(value: string | null): string {
   if (!value) return "soon";
@@ -84,8 +81,7 @@ export default function TrialWelcomeModal() {
             margin: 0,
           }}
         >
-          Your 14-day free trial is now active, and every feature is unlocked.
-          The trial ends on{" "}
+          Your 14-day free trial is now active, and every feature is unlocked. The trial ends on{" "}
           <strong style={{ color: "var(--color-text-primary)" }}>
             {formatTrialEndDate(data.trialEndsAt)}
           </strong>
@@ -99,8 +95,8 @@ export default function TrialWelcomeModal() {
             margin: 0,
           }}
         >
-          To keep using DubGrid after the trial, add a subscription before it
-          ends. You can do that any time from Billing in Settings.
+          To keep using DubGrid after the trial, add a subscription before it ends. You can do that
+          any time from Billing in Settings.
         </p>
       </div>
     </Modal>

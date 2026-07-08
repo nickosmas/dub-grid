@@ -16,15 +16,13 @@ vi.mock("@/lib/csrf", () => ({
 }));
 
 vi.mock("@/features/account/server", () => ({
-  fetchActiveUserSessionsForUser: (userId: string) =>
-    fetchActiveUserSessionsForUser(userId),
+  fetchActiveUserSessionsForUser: (userId: string) => fetchActiveUserSessionsForUser(userId),
   revokeUserSessionForUser: (userId: string, refreshTokenHash: string) =>
     revokeUserSessionForUser(userId, refreshTokenHash),
 }));
 
 vi.mock("@/features/notifications/server/events", () => ({
-  dispatchNotificationEvent: (...args: unknown[]) =>
-    dispatchNotificationEvent(...args),
+  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -58,9 +56,7 @@ describe("/api/account/sessions", () => {
   });
 
   it("loads only active sessions for the signed-in user", async () => {
-    const response = await GET(
-      new NextRequest("http://localhost/api/account/sessions"),
-    );
+    const response = await GET(new NextRequest("http://localhost/api/account/sessions"));
 
     expect(response.status).toBe(200);
     expect(fetchActiveUserSessionsForUser).toHaveBeenCalledWith("user-id");
@@ -72,9 +68,7 @@ describe("/api/account/sessions", () => {
       response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
     });
 
-    const response = await GET(
-      new NextRequest("http://localhost/api/account/sessions"),
-    );
+    const response = await GET(new NextRequest("http://localhost/api/account/sessions"));
 
     expect(response.status).toBe(401);
     expect(fetchActiveUserSessionsForUser).not.toHaveBeenCalled();

@@ -89,7 +89,9 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
     try {
       const accountEmail = user?.email?.trim();
       if (!accountEmail) {
-        setError("This account does not have an email address available for password verification.");
+        setError(
+          "This account does not have an email address available for password verification.",
+        );
         return;
       }
       const verify = await signInBrowserWithPassword({
@@ -213,7 +215,13 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                 />
               </div>
               {error && (
-                <p style={{ color: "var(--color-danger-dark)", fontSize: "var(--dg-fs-body-sm)", margin: 0 }}>
+                <p
+                  style={{
+                    color: "var(--color-danger-dark)",
+                    fontSize: "var(--dg-fs-body-sm)",
+                    margin: 0,
+                  }}
+                >
                   {error}
                 </p>
               )}
@@ -223,7 +231,11 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                   disabled={saving || !currentPassword || !newPassword || !confirmPassword}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
-                  <ButtonLoading loading={saving} spinnerColor="var(--color-text-inverse)" spinnerSize={16}>
+                  <ButtonLoading
+                    loading={saving}
+                    spinnerColor="var(--color-text-inverse)"
+                    spinnerSize={16}
+                  >
                     Update Password
                   </ButtonLoading>
                 </button>

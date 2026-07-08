@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { mobileNotificationFacetsSchema } from "@dubgrid/contracts";
-import {
-  fetchMobileNotificationFacets,
-  requireMobileAuth,
-} from "@/features/mobile/server";
+import { fetchMobileNotificationFacets, requireMobileAuth } from "@/features/mobile/server";
 
 export const dynamic = "force-dynamic";
 

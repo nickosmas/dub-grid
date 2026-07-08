@@ -93,27 +93,15 @@ export function StatusBanner({
       ]}
     >
       <View style={styles.copyRow}>
-        <Ionicons
-          color={palette.iconColor}
-          name={palette.iconName}
-          size={24}
-          style={styles.icon}
-        />
+        <Ionicons color={palette.iconColor} name={palette.iconName} size={24} style={styles.icon} />
         <View style={styles.copy}>
           <Text style={[styles.title, { color: palette.titleColor }]}>{title}</Text>
-          {body ? (
-            <Text style={[styles.body, { color: palette.bodyColor }]}>{body}</Text>
-          ) : null}
+          {body ? <Text style={[styles.body, { color: palette.bodyColor }]}>{body}</Text> : null}
         </View>
       </View>
       {actionLabel && onAction ? (
         <View style={styles.actionRow}>
-          <Button
-            compact
-            label={actionLabel}
-            onPress={onAction}
-            tone={palette.inlineActionTone}
-          />
+          <Button compact label={actionLabel} onPress={onAction} tone={palette.inlineActionTone} />
         </View>
       ) : null}
     </View>

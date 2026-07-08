@@ -9,10 +9,7 @@ interface CreateSandboxDialogProps {
   onClose: () => void;
 }
 
-export default function CreateSandboxDialog({
-  orgName,
-  onClose,
-}: CreateSandboxDialogProps) {
+export default function CreateSandboxDialog({ orgName, onClose }: CreateSandboxDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,10 +25,7 @@ export default function CreateSandboxDialog({
       const body = (await response.json()) as Record<string, unknown>;
       if (!response.ok) {
         setError(
-          formatClientErrorMessage(
-            body?.error,
-            "We couldn't enter sandbox mode right now.",
-          ),
+          formatClientErrorMessage(body?.error, "We couldn't enter sandbox mode right now."),
         );
         setIsLoading(false);
         return;
@@ -57,12 +51,12 @@ export default function CreateSandboxDialog({
     <div>
       <p style={{ margin: "0 0 12px 0" }}>
         Sandbox mode gives you a private, fully-isolated copy of{sourceLabel}
-        &nbsp;you can experiment in. Create, edit, publish, delete — none of it
-        touches your real data.
+        &nbsp;you can experiment in. Create, edit, publish, delete — none of it touches your real
+        data.
       </p>
       <p style={{ margin: "0 0 12px 0" }}>
-        You stay signed in on this same page. Exit at any time from the banner
-        at the top of the screen and everything is discarded.
+        You stay signed in on this same page. Exit at any time from the banner at the top of the
+        screen and everything is discarded.
       </p>
       {error ? (
         <div

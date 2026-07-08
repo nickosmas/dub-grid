@@ -19,8 +19,8 @@ describe("getAccountRealtimeInvalidationKeys", () => {
   });
 
   it("invalidates notification preferences on notification_preferences changes", () => {
-    expect(
-      getAccountRealtimeInvalidationKeys(USER, "notification_preferences"),
-    ).toEqual([[...queryKeys.account.notificationPrefs(USER)]]);
+    expect(getAccountRealtimeInvalidationKeys(USER, "notification_preferences")).toEqual([
+      [...queryKeys.account.notificationPrefs(USER)],
+    ]);
   });
 });

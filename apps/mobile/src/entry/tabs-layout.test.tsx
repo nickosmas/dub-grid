@@ -18,8 +18,7 @@ vi.mock("react-native", async () => {
     Platform: {
       OS: "ios",
     },
-    View: ({ children }: { children: React.ReactNode }) =>
-      React.createElement("div", {}, children),
+    View: ({ children }: { children: React.ReactNode }) => React.createElement("div", {}, children),
   };
 });
 
@@ -32,8 +31,7 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
 vi.mock("expo-router", async () => {
   const React = await import("react");
   const Stack = Object.assign(
-    ({ children }: { children: React.ReactNode }) =>
-      React.createElement("div", {}, children),
+    ({ children }: { children: React.ReactNode }) => React.createElement("div", {}, children),
     {
       Screen: (props: Record<string, unknown>) => {
         stackScreenMock(props);
@@ -43,8 +41,7 @@ vi.mock("expo-router", async () => {
   );
 
   return {
-    Redirect: ({ href }: { href: string }) =>
-      React.createElement("div", {}, `redirect:${href}`),
+    Redirect: ({ href }: { href: string }) => React.createElement("div", {}, `redirect:${href}`),
     Stack,
   };
 });
@@ -68,8 +65,7 @@ vi.mock("expo-router/unstable-native-tabs", async () => {
     return React.createElement("div");
   };
 
-  const VectorIcon = (props: Record<string, unknown>) =>
-    React.createElement("div", props);
+  const VectorIcon = (props: Record<string, unknown>) => React.createElement("div", props);
 
   return { Icon, Label, NativeTabs, VectorIcon };
 });
@@ -78,8 +74,7 @@ vi.mock("../shared/components/LoadingScreen", async () => {
   const React = await import("react");
 
   return {
-    LoadingScreen: ({ title }: { title: string }) =>
-      React.createElement("div", {}, title),
+    LoadingScreen: ({ title }: { title: string }) => React.createElement("div", {}, title),
   };
 });
 
@@ -101,16 +96,8 @@ vi.mock("../features/auth/screens/OrganizationLockedScreen", async () => {
         {},
         React.createElement("h1", {}, "Organization unavailable"),
         React.createElement("p", {}, message),
-        React.createElement(
-          "button",
-          { type: "button", onClick: onRetry },
-          "Try again",
-        ),
-        React.createElement(
-          "button",
-          { type: "button", onClick: onSignOut },
-          "Sign out",
-        ),
+        React.createElement("button", { type: "button", onClick: onRetry }, "Try again"),
+        React.createElement("button", { type: "button", onClick: onSignOut }, "Sign out"),
       ),
   };
 });
@@ -187,9 +174,7 @@ describe("TabsLayout", () => {
 
     expect(triggerIconMock).toHaveBeenCalledTimes(5);
 
-    const [homeProps, ...restProps] = triggerIconMock.mock.calls.map(
-      ([props]) => props,
-    );
+    const [homeProps, ...restProps] = triggerIconMock.mock.calls.map(([props]) => props);
 
     expect(homeProps).toMatchObject({ src: expect.any(Object) });
     expect(homeProps).not.toHaveProperty("sf");

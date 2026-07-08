@@ -10,10 +10,7 @@ import * as Sentry from "@/lib/sentry";
 import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
 import { EMPLOYEE_COLS } from "@/lib/db/shared";
-import {
-  SELF_ACTION_FORBIDDEN_CODE,
-  SELF_ACTION_FORBIDDEN_MESSAGE,
-} from "@dubgrid/domain";
+import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
@@ -29,8 +26,7 @@ const bodySchema = z.object({
 function buildConflictResponse(employee: ReturnType<typeof rowToEmployee>) {
   return NextResponse.json(
     {
-      error:
-        "Employee status changed elsewhere. Review the latest values before saving again.",
+      error: "Employee status changed elsewhere. Review the latest values before saving again.",
       code: "EMPLOYEE_STATUS_CONFLICT",
       employee,
     },
@@ -103,11 +99,7 @@ export async function POST(req: NextRequest) {
         .eq("user_id", user.id)
         .eq("org_id", orgId)
         .maybeSingle(),
-      serviceClient
-        .from("profiles")
-        .select("platform_role")
-        .eq("id", user.id)
-        .single(),
+      serviceClient.from("profiles").select("platform_role").eq("id", user.id).single(),
     ]);
 
     const isGridmaster = profile?.platform_role === "gridmaster";
@@ -116,9 +108,7 @@ export async function POST(req: NextRequest) {
     const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
 
     const hasPermission =
-      isGridmaster ||
-      isSuperAdmin ||
-      (isAdmin && adminPerms?.canManageEmployees === true);
+      isGridmaster || isSuperAdmin || (isAdmin && adminPerms?.canManageEmployees === true);
 
     if (!hasPermission) {
       return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
@@ -218,22 +208,20 @@ export async function POST(req: NextRequest) {
 
     const updatedEmployee = rowToEmployee(updatedRow as DbEmployee);
 
-    const { error: auditError } = await serviceClient
-      .from("audit_log")
-      .insert({
-        org_id: orgId,
-        actor_id: user.id,
-        actor_email: user.email ?? null,
-        action: auditAction,
-        resource_type: "employee",
-        resource_id: empId,
-        details: {
-          ...auditDetails,
-          changedFields: ["status"],
-        },
-        ip_address: getRequestIp(req),
-        user_agent: req.headers.get("user-agent"),
-      });
+    const { error: auditError } = await serviceClient.from("audit_log").insert({
+      org_id: orgId,
+      actor_id: user.id,
+      actor_email: user.email ?? null,
+      action: auditAction,
+      resource_type: "employee",
+      resource_id: empId,
+      details: {
+        ...auditDetails,
+        changedFields: ["status"],
+      },
+      ip_address: getRequestIp(req),
+      user_agent: req.headers.get("user-agent"),
+    });
 
     if (auditError) {
       logger.error(

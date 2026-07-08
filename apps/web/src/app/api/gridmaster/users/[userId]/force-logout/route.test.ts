@@ -35,8 +35,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 vi.mock("@/features/notifications/server/events", () => ({
-  dispatchNotificationEvent: (...args: unknown[]) =>
-    dispatchNotificationEvent(...args),
+  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
 import { POST } from "./route";
@@ -44,10 +43,9 @@ import { POST } from "./route";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
 function makeRequest() {
-  return new NextRequest(
-    `http://localhost/api/gridmaster/users/${USER_ID}/force-logout`,
-    { method: "POST" },
-  );
+  return new NextRequest(`http://localhost/api/gridmaster/users/${USER_ID}/force-logout`, {
+    method: "POST",
+  });
 }
 
 describe("POST /api/gridmaster/users/[userId]/force-logout", () => {

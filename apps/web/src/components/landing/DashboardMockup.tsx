@@ -45,15 +45,24 @@ const HERO_METRICS: Metric[] = [
 /* ── Metric icon accents — match DashboardHero.tsx getMetricAccent ── */
 const METRIC_ACCENTS: Record<Metric["icon"], { iconBg: string; iconColor: string }> = {
   coverage: { iconBg: "#EFF6FF", iconColor: "#2563EB" },
-  gap:      { iconBg: "#fee2e2", iconColor: "#b91c1c" },
+  gap: { iconBg: "#fee2e2", iconColor: "#b91c1c" },
   approval: { iconBg: "#fef3c7", iconColor: "#b45309" },
-  bars:     { iconBg: "#dbeafe", iconColor: "#1d4ed8" },
+  bars: { iconBg: "#dbeafe", iconColor: "#1d4ed8" },
 };
 
 function MetricGlyph({ icon, color }: { icon: Metric["icon"]; color: string }) {
   if (icon === "coverage") {
     return (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M9 2.5l5 2v4.3c0 3.3-2.1 5.6-5 6.7-2.9-1.1-5-3.4-5-6.7V4.5l5-2Z" />
         <path d="m6.4 8.9 1.7 1.7 3.6-3.8" />
       </svg>
@@ -61,7 +70,16 @@ function MetricGlyph({ icon, color }: { icon: Metric["icon"]; color: string }) {
   }
   if (icon === "gap") {
     return (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <circle cx="9" cy="9" r="6.25" />
         <path d="M9 5.8v3.6" />
         <path d="M9 12.3h.01" />
@@ -70,14 +88,32 @@ function MetricGlyph({ icon, color }: { icon: Metric["icon"]; color: string }) {
   }
   if (icon === "approval") {
     return (
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill="none"
+        stroke={color}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M5.2 3.2h7.6a1.6 1.6 0 0 1 1.6 1.6v8.4a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6V4.8a1.6 1.6 0 0 1 1.6-1.6Z" />
         <path d="m6.4 9 1.6 1.6 3.7-3.8" />
       </svg>
     );
   }
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      stroke={color}
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 13.5h10" />
       <path d="M5.5 13.5V8.2" />
       <path d="M9 13.5V4.8" />
@@ -276,7 +312,8 @@ export default function DashboardMockup() {
                 lineHeight: 1.45,
               }}
             >
-              Coverage, gaps, and unpublished changes across the schedule. Jump straight to whatever needs your attention.
+              Coverage, gaps, and unpublished changes across the schedule. Jump straight to whatever
+              needs your attention.
             </p>
           </div>
           {/* Action button — matches dg-btn-brand (filled brand, white text) */}
@@ -379,10 +416,7 @@ export default function DashboardMockup() {
       </div>
 
       {/* ── Coverage + Activity ── */}
-      <div
-        className="grid grid-cols-1 lg:grid-cols-2"
-        style={{ gap: 16 }}
-      >
+      <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 16 }}>
         {/* Coverage by focus area card — matches CoverageBySectionCard */}
         <div
           style={{
@@ -456,9 +490,7 @@ export default function DashboardMockup() {
                     {row.name}
                   </span>
                   <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span
-                      style={{ fontSize: 11, color: "var(--color-text-subtle)" }}
-                    >
+                    <span style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
                       {row.filled} / {row.req} filled
                     </span>
                     <span
@@ -538,9 +570,7 @@ export default function DashboardMockup() {
                     gap: 12,
                     padding: "12px 0",
                     borderBottom:
-                      i < ACTIVITY.length - 1
-                        ? "1px solid var(--color-border-light)"
-                        : undefined,
+                      i < ACTIVITY.length - 1 ? "1px solid var(--color-border-light)" : undefined,
                   }}
                 >
                   <div

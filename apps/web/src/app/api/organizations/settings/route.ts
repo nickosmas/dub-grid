@@ -47,9 +47,11 @@ const bodySchema = z.object({
     .nullable()
     .optional(),
   enforceConflictPrevention: z.boolean().optional(),
-  coverageRuleConfig: z.object({
-    mentoredCoverageCreditPercent: z.number().int().min(0).max(100),
-  }).optional(),
+  coverageRuleConfig: z
+    .object({
+      mentoredCoverageCreditPercent: z.number().int().min(0).max(100),
+    })
+    .optional(),
   openShiftVisibility: z
     .object({
       coverageGap: z.enum(["hidden", "matched", "always"]),
@@ -60,7 +62,10 @@ const bodySchema = z.object({
   featureOverrides: z.record(z.string(), z.boolean()).optional(),
 });
 
-function timestampsMatch(left: string | null | undefined, right: string | null | undefined): boolean {
+function timestampsMatch(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
   if (!left || !right) return false;
   return new Date(left).getTime() === new Date(right).getTime();
 }
@@ -137,9 +142,7 @@ export async function PUT(req: NextRequest) {
           }),
         }
       : {}),
-    ...(fields.phone !== undefined
-      ? { phone: getOptionalUsPhoneFieldError(fields.phone) }
-      : {}),
+    ...(fields.phone !== undefined ? { phone: getOptionalUsPhoneFieldError(fields.phone) } : {}),
     ...(fields.addressLine1 !== undefined
       ? {
           addressLine1: getLineTextError(fields.addressLine1, {
@@ -218,10 +221,7 @@ export async function PUT(req: NextRequest) {
   } as const;
   const firstFieldError = Object.values(fieldErrors).find(Boolean);
   if (firstFieldError) {
-    return NextResponse.json(
-      { error: firstFieldError, fieldErrors },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: firstFieldError, fieldErrors }, { status: 400 });
   }
 
   try {
@@ -230,9 +230,7 @@ export async function PUT(req: NextRequest) {
       req,
       bodyOrgId,
       (permissions) =>
-        permissions.isGridmaster ||
-        permissions.isSuperAdmin ||
-        permissions.canManageOrgSettings,
+        permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageOrgSettings,
       { allowDuringSetup: true },
     );
     if ("response" in orgAuth) {
@@ -305,10 +303,7 @@ export async function PUT(req: NextRequest) {
               required: true,
             })
           : currentOrg.name,
-      phone:
-        fields.phone !== undefined
-          ? normalizeOptionalUsPhone(fields.phone)
-          : currentOrg.phone,
+      phone: fields.phone !== undefined ? normalizeOptionalUsPhone(fields.phone) : currentOrg.phone,
       addressLine1: normalizedAddress.addressLine1,
       addressLine2: normalizedAddress.addressLine2,
       addressCity: normalizedAddress.addressCity,
@@ -341,25 +336,17 @@ export async function PUT(req: NextRequest) {
             })
           : currentOrg.roleLabel,
       shiftDisplayMode: fields.shiftDisplayMode ?? currentOrg.shiftDisplayMode,
-      timezone:
-        fields.timezone !== undefined
-          ? fields.timezone || null
-          : currentOrg.timezone,
+      timezone: fields.timezone !== undefined ? fields.timezone || null : currentOrg.timezone,
       payPeriodStartDate:
         fields.payPeriodStartDate !== undefined
           ? fields.payPeriodStartDate
           : currentOrg.payPeriodStartDate,
       enforceConflictPrevention:
-        fields.enforceConflictPrevention ??
-        currentOrg.enforceConflictPrevention,
-      coverageRuleConfig:
-        fields.coverageRuleConfig ?? currentOrg.coverageRuleConfig,
-      openShiftVisibility:
-        fields.openShiftVisibility ?? currentOrg.openShiftVisibility,
-      dataRetentionDays:
-        fields.dataRetentionDays ?? currentOrg.dataRetentionDays,
-      featureOverrides:
-        fields.featureOverrides ?? currentOrg.featureOverrides,
+        fields.enforceConflictPrevention ?? currentOrg.enforceConflictPrevention,
+      coverageRuleConfig: fields.coverageRuleConfig ?? currentOrg.coverageRuleConfig,
+      openShiftVisibility: fields.openShiftVisibility ?? currentOrg.openShiftVisibility,
+      dataRetentionDays: fields.dataRetentionDays ?? currentOrg.dataRetentionDays,
+      featureOverrides: fields.featureOverrides ?? currentOrg.featureOverrides,
     };
 
     const changes = buildOrganizationSettingsChanges(
@@ -444,9 +431,7 @@ export async function PUT(req: NextRequest) {
         .single();
 
       if (latestError) throw latestError;
-      return buildConflictResponse(
-        rowToOrganization(latestRow as DbOrganization),
-      );
+      return buildConflictResponse(rowToOrganization(latestRow as DbOrganization));
     }
 
     const updatedOrg = rowToOrganization(updatedRow as DbOrganization);
@@ -478,9 +463,7 @@ export async function PUT(req: NextRequest) {
       user_agent: req.headers.get("user-agent"),
     };
 
-    const { error: auditError } = await serviceClient
-      .from("audit_log")
-      .insert(auditPayload);
+    const { error: auditError } = await serviceClient.from("audit_log").insert(auditPayload);
 
     if (auditError) {
       logger.error(
@@ -490,22 +473,20 @@ export async function PUT(req: NextRequest) {
     }
 
     if (changeKeys.has("featureOverrides")) {
-      const { error: featureAuditError } = await serviceClient
-        .from("audit_log")
-        .insert({
-          org_id: orgId,
-          actor_id: user.id,
-          actor_email: user.email ?? null,
-          action: "feature_flags.updated",
-          resource_type: "organization",
-          resource_id: orgId,
-          details: {
-            from: currentOrg.featureOverrides,
-            to: nextOrg.featureOverrides,
-          },
-          ip_address: getRequestIp(req),
-          user_agent: req.headers.get("user-agent"),
-        });
+      const { error: featureAuditError } = await serviceClient.from("audit_log").insert({
+        org_id: orgId,
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        action: "feature_flags.updated",
+        resource_type: "organization",
+        resource_id: orgId,
+        details: {
+          from: currentOrg.featureOverrides,
+          to: nextOrg.featureOverrides,
+        },
+        ip_address: getRequestIp(req),
+        user_agent: req.headers.get("user-agent"),
+      });
 
       if (featureAuditError) {
         logger.error(
@@ -520,10 +501,7 @@ export async function PUT(req: NextRequest) {
     Sentry.captureException(err, {
       extra: { context: "organizations/settings", orgId: bodyOrgId },
     });
-    logger.error(
-      { error: err, orgId: bodyOrgId },
-      "Organization settings update failed",
-    );
+    logger.error({ error: err, orgId: bodyOrgId }, "Organization settings update failed");
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 }

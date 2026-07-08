@@ -1,9 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
-import {
-  mobileColors,
-  mobileRadii,
-} from "../../../../shared/theme/tokens";
+import { mobileColors, mobileRadii } from "../../../../shared/theme/tokens";
 
 export function IllustrationSwapPreview() {
   return (

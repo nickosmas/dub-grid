@@ -40,9 +40,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
 
   const visible = onlineUsers.slice(0, MAX_VISIBLE);
   const overflow = onlineUsers.length - MAX_VISIBLE;
-  const hoveredUserData = onlineUsers.find(
-    (u) => u.editorSessionId === hoveredUser,
-  );
+  const hoveredUserData = onlineUsers.find((u) => u.editorSessionId === hoveredUser);
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
@@ -142,54 +140,56 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
         </div>
       )}
 
-      {hoveredUser && tooltipPos && hoveredUserData && createPortal(
-        <div
-          style={{
-            position: "fixed",
-            left: tooltipPos.x,
-            top: tooltipPos.y - 8,
-            transform: "translate(-50%, -100%)",
-            background: "var(--color-surface)",
-            padding: "6px 12px",
-            borderRadius: 8,
-            boxShadow:
-              "0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)",
-            zIndex: 10000,
-            fontSize: "var(--dg-fs-caption)",
-            fontWeight: 600,
-            color: "var(--color-text-primary)",
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-          }}
-        >
-          {displayPresenceName(hoveredUserData)}
-          {hoveredUserData.editingCell && (
-            <span
-              style={{
-                fontWeight: 400,
-                color: "var(--color-text-muted)",
-                marginLeft: 6,
-              }}
-            >
-              editing
-            </span>
-          )}
-          {hoveredUserData.sessionCount > 1 && (
-            <span
-              style={{
-                fontWeight: 400,
-                color: "var(--color-text-muted)",
-                marginLeft: 6,
-              }}
-            >
-              {hoveredUserData.isSameUser
-                ? "another session open"
-                : `${hoveredUserData.sessionCount} sessions`}
-            </span>
-          )}
-        </div>,
-        document.body,
-      )}
+      {hoveredUser &&
+        tooltipPos &&
+        hoveredUserData &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              left: tooltipPos.x,
+              top: tooltipPos.y - 8,
+              transform: "translate(-50%, -100%)",
+              background: "var(--color-surface)",
+              padding: "6px 12px",
+              borderRadius: 8,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)",
+              zIndex: 10000,
+              fontSize: "var(--dg-fs-caption)",
+              fontWeight: 600,
+              color: "var(--color-text-primary)",
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+            }}
+          >
+            {displayPresenceName(hoveredUserData)}
+            {hoveredUserData.editingCell && (
+              <span
+                style={{
+                  fontWeight: 400,
+                  color: "var(--color-text-muted)",
+                  marginLeft: 6,
+                }}
+              >
+                editing
+              </span>
+            )}
+            {hoveredUserData.sessionCount > 1 && (
+              <span
+                style={{
+                  fontWeight: 400,
+                  color: "var(--color-text-muted)",
+                  marginLeft: 6,
+                }}
+              >
+                {hoveredUserData.isSameUser
+                  ? "another session open"
+                  : `${hoveredUserData.sessionCount} sessions`}
+              </span>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

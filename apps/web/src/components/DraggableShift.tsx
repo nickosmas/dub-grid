@@ -19,12 +19,7 @@ interface DraggableShiftProps {
   children: React.ReactNode;
 }
 
-export default function DraggableShift({
-  id,
-  data,
-  disabled,
-  children,
-}: DraggableShiftProps) {
+export default function DraggableShift({ id, data, disabled, children }: DraggableShiftProps) {
   const { setNodeRef, attributes, listeners, isDragging } = useDraggable({
     id,
     data,
@@ -45,7 +40,10 @@ export default function DraggableShift({
 
   return (
     <div
-      ref={(el) => { setNodeRef(el); nodeRef.current = el; }}
+      ref={(el) => {
+        setNodeRef(el);
+        nodeRef.current = el;
+      }}
       {...(disabled ? {} : { ...attributes, ...listeners })}
       aria-roledescription="draggable schedule entry"
       aria-label={data.label}

@@ -1,10 +1,6 @@
 "use client";
 
-import type {
-  Notification,
-  NotificationFacets,
-  NotificationPriority,
-} from "@/types";
+import type { Notification, NotificationFacets, NotificationPriority } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
 interface NotificationsResponse {
@@ -45,10 +41,7 @@ function resolveClientUrl(path: string): string {
   return path;
 }
 
-async function requestNotificationsJson<T>(
-  input: string,
-  init?: RequestInit,
-): Promise<T> {
+async function requestNotificationsJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(resolveClientUrl(input), init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -56,9 +49,7 @@ async function requestNotificationsJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "Notifications request failed."),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, "Notifications request failed."));
   }
 
   return body as T;
@@ -84,9 +75,7 @@ export async function fetchNotifications(options?: {
 }
 
 export async function fetchUnreadNotificationCount(): Promise<number> {
-  const data = await requestNotificationsJson<NotificationsResponse>(
-    "/api/notifications",
-  );
+  const data = await requestNotificationsJson<NotificationsResponse>("/api/notifications");
   return data.unreadCount;
 }
 

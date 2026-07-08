@@ -29,9 +29,7 @@ describe("buildRealtimeDraftDiff", () => {
       previousShifts,
       nextShifts,
       {
-        "emp-1_2026-04-16_4": [
-          { indicatorTypeId: 10, status: "draft" },
-        ],
+        "emp-1_2026-04-16_4": [{ indicatorTypeId: 10, status: "draft" }],
       },
       {
         "emp-1_2026-04-16_4": [],

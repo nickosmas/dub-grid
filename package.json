@@ -7,10 +7,6 @@
     "node": "22.13.x",
     "npm": "10.9.x"
   },
-  "volta": {
-    "node": "22.13.0",
-    "npm": "10.9.2"
-  },
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -25,7 +21,9 @@
     "dev:webpack": "turbo run dev:webpack --filter=@dubgrid/web",
     "build": "turbo run build --filter=@dubgrid/web",
     "start": "npm --workspace @dubgrid/web run start",
-    "lint": "eslint",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
     "test:web": "turbo run test --filter=@dubgrid/web",
@@ -98,10 +96,12 @@
     "cli-spinners": "^3.4.0",
     "eslint": "^9",
     "eslint-config-next": "^16.2.1",
+    "eslint-config-prettier": "^10",
     "fast-check": "^4.7.0",
     "jsdom": "^27.0.1",
     "kleur": "^4.1.5",
     "pg": "^8.20.0",
+    "prettier": "^3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "shadcn": "^4.5.0",

@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  getElementCornerAlign,
-  getElementCornerPlacement,
-} from "@/hooks/useAnchoredPopup";
+import { getElementCornerAlign, getElementCornerPlacement } from "@/hooks/useAnchoredPopup";
 
 const originalInnerWidth = window.innerWidth;
 
@@ -77,10 +74,7 @@ describe("useAnchoredPopup", () => {
     const placement = getElementCornerPlacement(anchor, {
       popupWidth: 560,
     });
-    const { rect, centerX, centerY, cornerX, cornerY } = getCornerPoint(
-      placement,
-      anchor,
-    );
+    const { rect, centerX, centerY, cornerX, cornerY } = getCornerPoint(placement, anchor);
 
     expect(placement.align).toBe("start");
     expect(cornerX).toBeGreaterThan(rect.left);
@@ -88,10 +82,7 @@ describe("useAnchoredPopup", () => {
     expect(cornerY).toBeGreaterThan(rect.top);
     expect(cornerY).toBeLessThan(rect.bottom);
     expect(cornerX).toBeGreaterThan(centerX);
-    expect(Math.abs(cornerX - centerX)).toBeCloseTo(
-      Math.abs(cornerY - centerY),
-      5,
-    );
+    expect(Math.abs(cornerX - centerX)).toBeCloseTo(Math.abs(cornerY - centerY), 5);
   });
 
   it("switches to the right corner only when there is not enough room to face right", () => {
@@ -119,10 +110,7 @@ describe("useAnchoredPopup", () => {
     const placement = getElementCornerPlacement(anchor, {
       popupWidth: 560,
     });
-    const { rect, centerX, centerY, cornerX, cornerY } = getCornerPoint(
-      placement,
-      anchor,
-    );
+    const { rect, centerX, centerY, cornerX, cornerY } = getCornerPoint(placement, anchor);
 
     expect(placement.align).toBe("end");
     expect(cornerX).toBeGreaterThan(rect.left);
@@ -130,9 +118,6 @@ describe("useAnchoredPopup", () => {
     expect(cornerY).toBeGreaterThan(rect.top);
     expect(cornerY).toBeLessThan(rect.bottom);
     expect(cornerX).toBeLessThan(centerX);
-    expect(Math.abs(cornerX - centerX)).toBeCloseTo(
-      Math.abs(cornerY - centerY),
-      5,
-    );
+    expect(Math.abs(cornerX - centerX)).toBeCloseTo(Math.abs(cornerY - centerY), 5);
   });
 });

@@ -20,10 +20,7 @@ describe("mobile error helpers", () => {
 
   it("maps auth messages to client-friendly copy", () => {
     expect(
-      getClientFriendlyErrorMessage(
-        new Error("Invalid login credentials"),
-        "Fallback message",
-      ),
+      getClientFriendlyErrorMessage(new Error("Invalid login credentials"), "Fallback message"),
     ).toBe("Check your email and password and try again.");
   });
 
@@ -61,9 +58,9 @@ describe("mobile error helpers", () => {
     expect(getOrgUnavailableMessage(error)).toBe(
       "Organization unavailable. Sign in on the web to finish organization setup.",
     );
-    expect(
-      getClientFriendlyErrorMessage(error, "Fallback message"),
-    ).toBe("Organization unavailable. Sign in on the web to finish organization setup.");
+    expect(getClientFriendlyErrorMessage(error, "Fallback message")).toBe(
+      "Organization unavailable. Sign in on the web to finish organization setup.",
+    );
   });
 
   it("uses a persistent network toast instead of inline copy", () => {

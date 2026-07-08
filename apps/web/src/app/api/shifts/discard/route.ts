@@ -53,16 +53,13 @@ export async function POST(req: NextRequest) {
   const { orgId, scope } = parsed.data;
 
   try {
-    const orgAuth = await requireOrgPermissions(
-      req,
-      orgId,
-      (permissions) =>
-        scope === "all"
-          ? permissions.isGridmaster || permissions.isSuperAdmin
-          : permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canEditShifts ||
-            permissions.canPublishSchedule,
+    const orgAuth = await requireOrgPermissions(req, orgId, (permissions) =>
+      scope === "all"
+        ? permissions.isGridmaster || permissions.isSuperAdmin
+        : permissions.isGridmaster ||
+          permissions.isSuperAdmin ||
+          permissions.canEditShifts ||
+          permissions.canPublishSchedule,
     );
     if ("response" in orgAuth) {
       return orgAuth.response;

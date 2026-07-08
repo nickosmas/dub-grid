@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { DubGridLogo } from "@/components/Logo";
 import { useLogout } from "@/hooks";
 
-
 /**
  * Shown to authenticated users who can't advance org config — regular users
  * and admins without any manage-* permission — when they log in before the
@@ -72,9 +71,8 @@ export default function SetupPendingScreen() {
             marginRight: "auto",
           }}
         >
-          Your administrator is still configuring the organization.
-          You&apos;ll be able to access the app once setup is complete.
-          This page refreshes automatically.
+          Your administrator is still configuring the organization. You&apos;ll be able to access
+          the app once setup is complete. This page refreshes automatically.
         </p>
 
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>

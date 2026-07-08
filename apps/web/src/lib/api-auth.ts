@@ -12,17 +12,12 @@ type Claims = JwtPayload & {
   in_sandbox?: unknown;
 };
 
-type AuthResult =
-  | { session: Session; user: User }
-  | { response: NextResponse };
+type AuthResult = { session: Session; user: User } | { response: NextResponse };
 
-type UserAuthResult =
-  | { user: User }
-  | { response: NextResponse };
+type UserAuthResult = { user: User } | { response: NextResponse };
 
 type ClaimsAuthResult =
-  | { session: Session; user: User; claims: Claims }
-  | { response: NextResponse };
+  { session: Session; user: User; claims: Claims } | { response: NextResponse };
 
 export function createRequestSupabaseClient(req: NextRequest) {
   return createServerClient(
@@ -74,9 +69,7 @@ export function createAnonClient() {
   );
 }
 
-export async function requireAuthenticatedSession(
-  req: NextRequest,
-): Promise<AuthResult> {
+export async function requireAuthenticatedSession(req: NextRequest): Promise<AuthResult> {
   const supabase = createRequestSupabaseClient(req);
   const [
     {
@@ -85,10 +78,7 @@ export async function requireAuthenticatedSession(
     {
       data: { user },
     },
-  ] = await Promise.all([
-    supabase.auth.getSession(),
-    supabase.auth.getUser(),
-  ]);
+  ] = await Promise.all([supabase.auth.getSession(), supabase.auth.getUser()]);
 
   if (!session?.access_token || !user) {
     return {
@@ -102,9 +92,7 @@ export async function requireAuthenticatedSession(
   return { session, user };
 }
 
-export async function requireAuthenticatedUser(
-  req: NextRequest,
-): Promise<UserAuthResult> {
+export async function requireAuthenticatedUser(req: NextRequest): Promise<UserAuthResult> {
   const supabase = createRequestSupabaseClient(req);
   const {
     data: { user },
@@ -183,9 +171,7 @@ export async function requireAuthenticatedUserWithClaims(
   // /api/test-sandbox; this is the third gate.
   const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
   if (sandboxCookieValue) {
-    const sb = getSandboxFromCookie(
-      `${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`,
-    );
+    const sb = getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`);
     if (sb && sb.userId === auth.user.id) {
       try {
         const serviceClient = getServiceClient();
@@ -228,9 +214,7 @@ export async function requireAuthenticatedUserWithClaims(
   return { ...auth, claims };
 }
 
-export async function requireGridmasterSession(
-  req: NextRequest,
-): Promise<AuthResult> {
+export async function requireGridmasterSession(req: NextRequest): Promise<AuthResult> {
   const auth = await requireAuthenticatedUserWithClaims(req);
   if ("response" in auth) {
     return auth;

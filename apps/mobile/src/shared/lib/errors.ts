@@ -61,10 +61,7 @@ type ClientFriendlyToastInput = {
  * the shared `formatClientErrorMessage` — kept for the mobile-friendly name and
  * its required (non-optional) fallback argument.
  */
-export function getClientFriendlyErrorMessage(
-  error: unknown,
-  fallbackMessage: string,
-): string {
+export function getClientFriendlyErrorMessage(error: unknown, fallbackMessage: string): string {
   return formatClientErrorMessage(error, fallbackMessage);
 }
 
@@ -90,10 +87,7 @@ export function pushClientFriendlyErrorToast(
   pushToast({
     tone: "error",
     title: input.title,
-    message: getClientFriendlyErrorMessage(
-      input.error,
-      input.fallbackMessage,
-    ),
+    message: getClientFriendlyErrorMessage(input.error, input.fallbackMessage),
   });
 }
 

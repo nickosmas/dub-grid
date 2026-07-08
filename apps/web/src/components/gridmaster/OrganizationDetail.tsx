@@ -81,7 +81,14 @@ interface InvitationRow {
 }
 import ConfirmDialog from "@/components/ConfirmDialog";
 import PermissionsEditor from "@/components/PermissionsEditor";
-import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, thStyle, tdStyle, labelStyle } from "@/lib/styles";
+import {
+  sectionStyle,
+  sectionHeaderStyle,
+  sectionBodyStyle,
+  thStyle,
+  tdStyle,
+  labelStyle,
+} from "@/lib/styles";
 import {
   formatBillingStatusLabel,
   formatClientLabel,
@@ -104,7 +111,16 @@ import {
   updateGridmasterSubscription,
 } from "@/features/gridmaster/client";
 
-export type OrganizationDetailTab = "overview" | "billing" | "users" | "employees" | "config" | "activity" | "invitations" | "schedule" | "features";
+export type OrganizationDetailTab =
+  | "overview"
+  | "billing"
+  | "users"
+  | "employees"
+  | "config"
+  | "activity"
+  | "invitations"
+  | "schedule"
+  | "features";
 
 const BILLING_STATUSES = [
   "trialing",
@@ -136,9 +152,21 @@ function StatusDot({ status }: { status: string }) {
         ? "var(--color-warning)"
         : "var(--color-danger)";
   return (
-    <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--dg-fs-caption)", fontWeight: 500 }}>
-      <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
-      <span style={{ textTransform: "capitalize", color: "var(--color-text-secondary)" }}>{status}</span>
+    <span
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: "var(--dg-fs-caption)",
+        fontWeight: 500,
+      }}
+    >
+      <span
+        style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }}
+      />
+      <span style={{ textTransform: "capitalize", color: "var(--color-text-secondary)" }}>
+        {status}
+      </span>
     </span>
   );
 }
@@ -146,10 +174,20 @@ function StatusDot({ status }: { status: string }) {
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-      <span style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-subtle)", minWidth: 120, flexShrink: 0 }}>
+      <span
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          fontWeight: 600,
+          color: "var(--color-text-subtle)",
+          minWidth: 120,
+          flexShrink: 0,
+        }}
+      >
         {label}
       </span>
-      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-primary)" }}>{value || "—"}</span>
+      <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-primary)" }}>
+        {value || "—"}
+      </span>
     </div>
   );
 }
@@ -165,8 +203,24 @@ function MiniStat({ label, value }: { label: string; value: number }) {
         minWidth: 80,
       }}
     >
-      <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{value}</div>
-      <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 2 }}>{label}</div>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-card-title)",
+          fontWeight: 700,
+          color: "var(--color-text-primary)",
+        }}
+      >
+        {value}
+      </div>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-footnote)",
+          color: "var(--color-text-muted)",
+          marginTop: 2,
+        }}
+      >
+        {label}
+      </div>
     </div>
   );
 }
@@ -178,7 +232,8 @@ function formatBillingDate(value: string | null) {
 function billingStatusTone(status: string | null) {
   if (status === "active" || status === "trialing") return "var(--color-success)";
   if (status === "past_due" || status === "incomplete") return "var(--color-warning)";
-  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired") return "var(--color-danger)";
+  if (status === "canceled" || status === "unpaid" || status === "incomplete_expired")
+    return "var(--color-danger)";
   return "var(--color-text-muted)";
 }
 
@@ -208,10 +263,24 @@ function BillingMetric({
 
   return (
     <div style={{ ...sectionStyle, padding: "14px 16px" }}>
-      <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 800, color, fontFamily: "var(--font-dm-mono), monospace" }}>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-card-title)",
+          fontWeight: 800,
+          color,
+          fontFamily: "var(--font-dm-mono), monospace",
+        }}
+      >
         {value}
       </div>
-      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", marginTop: 2 }}>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          fontWeight: 700,
+          color: "var(--color-text-muted)",
+          marginTop: 2,
+        }}
+      >
         {label}
       </div>
     </div>
@@ -230,7 +299,8 @@ function BillingTab({ organization }: { organization: Organization }) {
     queryFn: fetchGridmasterBilling,
     staleTime: 30_000,
   });
-  const billingOrg = billingQuery.data?.organizations.find((org) => org.orgId === organization.id) ?? null;
+  const billingOrg =
+    billingQuery.data?.organizations.find((org) => org.orgId === organization.id) ?? null;
 
   useEffect(() => {
     if (!billingOrg?.status) return;
@@ -362,7 +432,9 @@ function BillingTab({ organization }: { organization: Organization }) {
   if (billingQuery.isLoading) {
     return (
       <div style={sectionStyle}>
-        <div style={{ padding: 24, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+        <div
+          style={{ padding: 24, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}
+        >
           Loading billing…
         </div>
       </div>
@@ -371,7 +443,16 @@ function BillingTab({ organization }: { organization: Organization }) {
 
   if (billingQuery.error instanceof Error) {
     return (
-      <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--dg-radius-lg)", fontSize: "var(--dg-fs-label)", fontWeight: 600 }}>
+      <div
+        style={{
+          padding: "12px 16px",
+          background: "var(--color-danger-bg)",
+          color: "var(--color-danger)",
+          borderRadius: "var(--dg-radius-lg)",
+          fontSize: "var(--dg-fs-label)",
+          fontWeight: 600,
+        }}
+      >
         {formatClientErrorMessage(billingQuery.error, "Failed to load billing")}
       </div>
     );
@@ -381,10 +462,18 @@ function BillingTab({ organization }: { organization: Organization }) {
     return (
       <div style={sectionStyle}>
         <div style={{ padding: 24 }}>
-          <h3 style={{ margin: "0 0 6px", fontSize: "var(--dg-fs-section-title)", color: "var(--color-text-primary)" }}>
+          <h3
+            style={{
+              margin: "0 0 6px",
+              fontSize: "var(--dg-fs-section-title)",
+              color: "var(--color-text-primary)",
+            }}
+          >
             Billing summary unavailable
           </h3>
-          <p style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+          <p
+            style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}
+          >
             Refresh billing oversight to rebuild this organization&apos;s billing snapshot.
           </p>
         </div>
@@ -392,23 +481,47 @@ function BillingTab({ organization }: { organization: Organization }) {
     );
   }
 
-  const deltaTone = billingOrg.seatDelta == null
-    ? "neutral"
-    : billingOrg.seatDelta < 0
-      ? "danger"
-      : billingOrg.seatDelta > 0
-        ? "warning"
-        : "good";
+  const deltaTone =
+    billingOrg.seatDelta == null
+      ? "neutral"
+      : billingOrg.seatDelta < 0
+        ? "danger"
+        : billingOrg.seatDelta > 0
+          ? "warning"
+          : "good";
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
         <div>
-          <h2 style={{ margin: 0, fontSize: "var(--dg-fs-heading)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: "var(--dg-fs-heading)",
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+            }}
+          >
             Billing
           </h2>
-          <p style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", fontWeight: 600 }}>
-            Manage this organization&apos;s Stripe status, trial timing, cancellation state, and billable app-user seat count.
+          <p
+            style={{
+              margin: "4px 0 0",
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--color-text-muted)",
+              fontWeight: 600,
+            }}
+          >
+            Manage this organization&apos;s Stripe status, trial timing, cancellation state, and
+            billable app-user seat count.
           </p>
         </div>
         <button
@@ -421,23 +534,37 @@ function BillingTab({ organization }: { organization: Organization }) {
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: 12,
+        }}
+      >
         <BillingMetric label="Stripe seats" value={billingOrg.seats ?? "—"} />
         <BillingMetric label="App users" value={billingOrg.appUsers} />
         <BillingMetric label="Seat delta" value={billingOrg.seatDelta ?? "—"} tone={deltaTone} />
         <BillingMetric label="Employees" value={billingOrg.employeeCount} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 16 }}
+      >
         <div style={sectionStyle}>
           <div style={sectionHeaderStyle}>Subscription State</div>
           <div style={sectionBodyStyle}>
             <InfoRow
               label="Status"
               value={
-                billingStatusIsPending(billingOrg.status, billingOrg.trialEndsAt)
-                  ? <span style={{ color: "var(--color-text-muted)", fontWeight: 800 }}>Trial pending</span>
-                  : <span style={{ color: billingStatusTone(billingOrg.status), fontWeight: 800 }}>{formatBillingStatusLabel(billingOrg.status)}</span>
+                billingStatusIsPending(billingOrg.status, billingOrg.trialEndsAt) ? (
+                  <span style={{ color: "var(--color-text-muted)", fontWeight: 800 }}>
+                    Trial pending
+                  </span>
+                ) : (
+                  <span style={{ color: billingStatusTone(billingOrg.status), fontWeight: 800 }}>
+                    {formatBillingStatusLabel(billingOrg.status)}
+                  </span>
+                )
               }
             />
             <InfoRow
@@ -482,10 +609,15 @@ function BillingTab({ organization }: { organization: Organization }) {
                   >
                     {billingOrg.stripeCustomerId}
                   </a>
-                ) : "Not connected"
+                ) : (
+                  "Not connected"
+                )
               }
             />
-            <InfoRow label="Subscription" value={billingOrg.stripeSubscriptionId ?? "Not connected"} />
+            <InfoRow
+              label="Subscription"
+              value={billingOrg.stripeSubscriptionId ?? "Not connected"}
+            />
             <InfoRow label="Org slug" value={billingOrg.orgSlug ?? "—"} />
           </div>
         </div>
@@ -506,7 +638,9 @@ function BillingTab({ organization }: { organization: Organization }) {
             <button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
-              disabled={busy || !billingOrg.stripeSubscriptionId || billingOrg.seats === billingOrg.appUsers}
+              disabled={
+                busy || !billingOrg.stripeSubscriptionId || billingOrg.seats === billingOrg.appUsers
+              }
               onClick={() => handleSyncSeats(billingOrg)}
             >
               True up seats
@@ -522,7 +656,12 @@ function BillingTab({ organization }: { organization: Organization }) {
             <button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
-              disabled={busy || !billingOrg.stripeSubscriptionId || billingOrg.status === "canceled" || !!billingOrg.cancelAt}
+              disabled={
+                busy ||
+                !billingOrg.stripeSubscriptionId ||
+                billingOrg.status === "canceled" ||
+                !!billingOrg.cancelAt
+              }
               onClick={() => handleCancelAtPeriodEnd(billingOrg)}
             >
               End period
@@ -563,7 +702,11 @@ function BillingTab({ organization }: { organization: Organization }) {
         </div>
       </div>
 
-      <AuditLogView orgId={organization.id} title="Billing Activity" initialActionFilter="billing." />
+      <AuditLogView
+        orgId={organization.id}
+        title="Billing Activity"
+        initialActionFilter="billing."
+      />
       <BillingConfirmDialog
         action={confirmAction}
         isLoading={subscriptionMutation.isPending || syncMutation.isPending}
@@ -686,16 +829,22 @@ export default function OrganizationDetail({
             ? configQuery
             : null;
   const tabLoading = activeTabQuery?.isLoading ?? false;
-  const tabError =
-    activeTabQuery?.error
-      ? formatClientErrorMessage(activeTabQuery.error, "Failed to load this section")
-      : null;
+  const tabError = activeTabQuery?.error
+    ? formatClientErrorMessage(activeTabQuery.error, "Failed to load this section")
+    : null;
 
   return (
     <div>
       {/* Organization header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-fs-page-title)",
+            fontWeight: 700,
+            color: "var(--color-text-primary)",
+          }}
+        >
           {organization.name}
         </h2>
         {organization.slug && (
@@ -744,7 +893,13 @@ export default function OrganizationDetail({
         )}
       </div>
       {organization.timezone && (
-        <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", marginBottom: 20 }}>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-caption)",
+            color: "var(--color-text-subtle)",
+            marginBottom: 20,
+          }}
+        >
           {formatTimezoneLabel(organization.timezone)} · {organization.timezone}
         </div>
       )}
@@ -753,26 +908,104 @@ export default function OrganizationDetail({
         <div style={{ display: "grid", gap: 16, marginBottom: 20 }}>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <MiniStat label="Oversight" value={orgHealthQuery.data.oversightScore} />
-            <MiniStat label="Active users 30d" value={orgHealthQuery.data.supportSnapshot.activeUsers30d} />
+            <MiniStat
+              label="Active users 30d"
+              value={orgHealthQuery.data.supportSnapshot.activeUsers30d}
+            />
             <MiniStat label="Sessions" value={orgHealthQuery.data.supportSnapshot.activeSessions} />
-            <MiniStat label="Open Requests" value={orgHealthQuery.data.supportSnapshot.openShiftRequests} />
-            <MiniStat label="Pending Invites" value={orgHealthQuery.data.supportSnapshot.pendingInvitations} />
-            <MiniStat label="Mobile Devices" value={orgHealthQuery.data.supportSnapshot.mobileDevices} />
+            <MiniStat
+              label="Open Requests"
+              value={orgHealthQuery.data.supportSnapshot.openShiftRequests}
+            />
+            <MiniStat
+              label="Pending Invites"
+              value={orgHealthQuery.data.supportSnapshot.pendingInvitations}
+            />
+            <MiniStat
+              label="Mobile Devices"
+              value={orgHealthQuery.data.supportSnapshot.mobileDevices}
+            />
           </div>
           <div style={sectionStyle}>
-            <div style={{ ...sectionHeaderStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div
+              style={{
+                ...sectionHeaderStyle,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
               <span>Support Snapshot</span>
-              <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 700, color: orgHealthQuery.data.setup.isComplete ? "var(--color-success)" : "var(--color-warning)" }}>
-                {orgHealthQuery.data.setup.isComplete ? "Setup complete" : `Missing ${orgHealthQuery.data.setup.missing.join(", ")}`}
+              <span
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  fontWeight: 700,
+                  color: orgHealthQuery.data.setup.isComplete
+                    ? "var(--color-success)"
+                    : "var(--color-warning)",
+                }}
+              >
+                {orgHealthQuery.data.setup.isComplete
+                  ? "Setup complete"
+                  : `Missing ${orgHealthQuery.data.setup.missing.join(", ")}`}
               </span>
             </div>
-            <div style={{ ...sectionBodyStyle, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-              <InfoRow label="Last login" value={orgHealthQuery.data.supportSnapshot.lastLoginAt ? new Date(orgHealthQuery.data.supportSnapshot.lastLoginAt).toLocaleString() : "Never"} />
-              <InfoRow label="Last publish" value={orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt ? new Date(orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt).toLocaleString() : "—"} />
-              <InfoRow label="Settings change" value={orgHealthQuery.data.supportSnapshot.recentSettingsChangeAt ? new Date(orgHealthQuery.data.supportSnapshot.recentSettingsChangeAt).toLocaleString() : "—"} />
-              <InfoRow label="Cells created 30d" value={String(orgHealthQuery.data.supportSnapshot.scheduleCellsCreated30d)} />
-              <InfoRow label="Runtime overrides" value={Object.keys(orgHealthQuery.data.featureOverrides).length ? Object.keys(orgHealthQuery.data.featureOverrides).join(", ") : "None"} />
-              <InfoRow label="Risk flags" value={orgHealthQuery.data.riskFlags.length ? orgHealthQuery.data.riskFlags.map(formatClientLabel).join(", ") : "None"} />
+            <div
+              style={{
+                ...sectionBodyStyle,
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <InfoRow
+                label="Last login"
+                value={
+                  orgHealthQuery.data.supportSnapshot.lastLoginAt
+                    ? new Date(orgHealthQuery.data.supportSnapshot.lastLoginAt).toLocaleString()
+                    : "Never"
+                }
+              />
+              <InfoRow
+                label="Last publish"
+                value={
+                  orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt
+                    ? new Date(
+                        orgHealthQuery.data.supportSnapshot.lastSchedulePublishAt,
+                      ).toLocaleString()
+                    : "—"
+                }
+              />
+              <InfoRow
+                label="Settings change"
+                value={
+                  orgHealthQuery.data.supportSnapshot.recentSettingsChangeAt
+                    ? new Date(
+                        orgHealthQuery.data.supportSnapshot.recentSettingsChangeAt,
+                      ).toLocaleString()
+                    : "—"
+                }
+              />
+              <InfoRow
+                label="Cells created 30d"
+                value={String(orgHealthQuery.data.supportSnapshot.scheduleCellsCreated30d)}
+              />
+              <InfoRow
+                label="Runtime overrides"
+                value={
+                  Object.keys(orgHealthQuery.data.featureOverrides).length
+                    ? Object.keys(orgHealthQuery.data.featureOverrides).join(", ")
+                    : "None"
+                }
+              />
+              <InfoRow
+                label="Risk flags"
+                value={
+                  orgHealthQuery.data.riskFlags.length
+                    ? orgHealthQuery.data.riskFlags.map(formatClientLabel).join(", ")
+                    : "None"
+                }
+              />
             </div>
           </div>
         </div>
@@ -832,7 +1065,14 @@ export default function OrganizationDetail({
       )}
 
       {tabLoading && (
-        <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+        <div
+          style={{
+            padding: 32,
+            textAlign: "center",
+            color: "var(--color-text-muted)",
+            fontSize: "var(--dg-fs-label)",
+          }}
+        >
           Loading…
         </div>
       )}
@@ -840,9 +1080,7 @@ export default function OrganizationDetail({
       {!tabLoading && tab === "overview" && (
         <OverviewTab organization={organization} stats={stats} onOrgUpdated={onOrgUpdated} />
       )}
-      {!tabLoading && tab === "billing" && (
-        <BillingTab organization={organization} />
-      )}
+      {!tabLoading && tab === "billing" && <BillingTab organization={organization} />}
       {!tabLoading && tab === "users" && usersQuery.data && (
         <UsersTab
           users={usersQuery.data ?? []}
@@ -928,7 +1166,9 @@ function OverviewTab({
   const [editAddressLine2, setEditAddressLine2] = useState(initialAddress.addressLine2);
   const [editAddressCity, setEditAddressCity] = useState(initialAddress.addressCity);
   const [editAddressState, setEditAddressState] = useState(initialAddress.addressState);
-  const [editAddressPostalCode, setEditAddressPostalCode] = useState(initialAddress.addressPostalCode);
+  const [editAddressPostalCode, setEditAddressPostalCode] = useState(
+    initialAddress.addressPostalCode,
+  );
   const [editAddressCountry, setEditAddressCountry] = useState(initialAddress.addressCountry);
   const [editFocusAreaLabel, setEditFocusAreaLabel] = useState(organization.focusAreaLabel);
   const [editCertLabel, setEditCertLabel] = useState(organization.certificationLabel);
@@ -936,8 +1176,12 @@ function OverviewTab({
   const [saving, setSaving] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [editShiftDisplayMode, setEditShiftDisplayMode] = useState(organization.shiftDisplayMode);
-  const [editEnforceConflictPrevention, setEditEnforceConflictPrevention] = useState(organization.enforceConflictPrevention);
-  const [editDataRetentionDays, setEditDataRetentionDays] = useState(organization.dataRetentionDays ?? 365);
+  const [editEnforceConflictPrevention, setEditEnforceConflictPrevention] = useState(
+    organization.enforceConflictPrevention,
+  );
+  const [editDataRetentionDays, setEditDataRetentionDays] = useState(
+    organization.dataRetentionDays ?? 365,
+  );
   const [archiveConfirm, setArchiveConfirm] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [suspendConfirm, setSuspendConfirm] = useState(false);
@@ -945,49 +1189,46 @@ function OverviewTab({
   const [suspending, setSuspending] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
 
-  const nextOrganization = useMemo<Organization>(
-    () => {
-      const updated: Organization = {
-        ...organization,
-        name: editName.trim(),
-        phone: editPhone.trim(),
-        ...withComposedOrganizationAddress({
-          addressLine1: editAddressLine1.trim(),
-          addressLine2: editAddressLine2.trim(),
-          addressCity: editAddressCity.trim(),
-          addressState: editAddressState.trim(),
-          addressPostalCode: editAddressPostalCode.trim(),
-          addressCountry: editAddressCountry.trim(),
-        }),
-        timezone: editTimezone || null,
-        focusAreaLabel: editFocusAreaLabel.trim() || "Focus Areas",
-        certificationLabel: editCertLabel.trim() || "Certifications",
-        roleLabel: editRoleLabel.trim() || "Roles",
-        shiftDisplayMode: editShiftDisplayMode,
-        enforceConflictPrevention: editEnforceConflictPrevention,
-        dataRetentionDays: editDataRetentionDays,
-      };
-      return updated;
-    },
-    [
-      editAddressCity,
-      editAddressCountry,
-      editAddressLine1,
-      editAddressLine2,
-      editAddressPostalCode,
-      editAddressState,
-      editCertLabel,
-      editDataRetentionDays,
-      editEnforceConflictPrevention,
-      editFocusAreaLabel,
-      editName,
-      editPhone,
-      editRoleLabel,
-      editShiftDisplayMode,
-      editTimezone,
-      organization,
-    ],
-  );
+  const nextOrganization = useMemo<Organization>(() => {
+    const updated: Organization = {
+      ...organization,
+      name: editName.trim(),
+      phone: editPhone.trim(),
+      ...withComposedOrganizationAddress({
+        addressLine1: editAddressLine1.trim(),
+        addressLine2: editAddressLine2.trim(),
+        addressCity: editAddressCity.trim(),
+        addressState: editAddressState.trim(),
+        addressPostalCode: editAddressPostalCode.trim(),
+        addressCountry: editAddressCountry.trim(),
+      }),
+      timezone: editTimezone || null,
+      focusAreaLabel: editFocusAreaLabel.trim() || "Focus Areas",
+      certificationLabel: editCertLabel.trim() || "Certifications",
+      roleLabel: editRoleLabel.trim() || "Roles",
+      shiftDisplayMode: editShiftDisplayMode,
+      enforceConflictPrevention: editEnforceConflictPrevention,
+      dataRetentionDays: editDataRetentionDays,
+    };
+    return updated;
+  }, [
+    editAddressCity,
+    editAddressCountry,
+    editAddressLine1,
+    editAddressLine2,
+    editAddressPostalCode,
+    editAddressState,
+    editCertLabel,
+    editDataRetentionDays,
+    editEnforceConflictPrevention,
+    editFocusAreaLabel,
+    editName,
+    editPhone,
+    editRoleLabel,
+    editShiftDisplayMode,
+    editTimezone,
+    organization,
+  ]);
 
   const reviewChanges = useMemo(
     () =>
@@ -1143,13 +1384,24 @@ function OverviewTab({
 
       {/* Organization info */}
       <div style={sectionStyle}>
-        <div style={{ ...sectionHeaderStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          style={{
+            ...sectionHeaderStyle,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <span>Organization Details</span>
           {!editing && (
-            <button className="dg-btn dg-btn-ghost" style={{ fontSize: "var(--dg-fs-caption)" }} onClick={() => {
+            <button
+              className="dg-btn dg-btn-ghost"
+              style={{ fontSize: "var(--dg-fs-caption)" }}
+              onClick={() => {
                 resetEditState();
                 setEditing(true);
-              }}>
+              }}
+            >
               Edit
             </button>
           )}
@@ -1159,7 +1411,11 @@ function OverviewTab({
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div>
                 <label style={labelStyle}>Name</label>
-                <input className="dg-input" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                <input
+                  className="dg-input"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                />
               </div>
               <OrganizationLocationFields
                 value={{
@@ -1179,14 +1435,22 @@ function OverviewTab({
                   if (patch.addressLine2 !== undefined) setEditAddressLine2(patch.addressLine2);
                   if (patch.addressCity !== undefined) setEditAddressCity(patch.addressCity);
                   if (patch.addressState !== undefined) setEditAddressState(patch.addressState);
-                  if (patch.addressPostalCode !== undefined) setEditAddressPostalCode(patch.addressPostalCode);
-                  if (patch.addressCountry !== undefined) setEditAddressCountry(patch.addressCountry);
+                  if (patch.addressPostalCode !== undefined)
+                    setEditAddressPostalCode(patch.addressPostalCode);
+                  if (patch.addressCountry !== undefined)
+                    setEditAddressCountry(patch.addressCountry);
                 }}
                 employeeCount={employeeCount}
                 employeeCountLoading={employeeCountLoading}
                 gridTemplateColumns="repeat(auto-fit, minmax(220px, 1fr))"
               />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 16,
+                }}
+              >
                 <div>
                   <label style={labelStyle}>Shift Display</label>
                   <CustomSelect
@@ -1205,16 +1469,27 @@ function OverviewTab({
                     checked={editEnforceConflictPrevention}
                     onChange={(e) => setEditEnforceConflictPrevention(e.target.checked)}
                   />
-                  <label htmlFor="editConflictPrevention" style={{ ...labelStyle, marginBottom: 0, cursor: "pointer" }}>Conflict Prevention</label>
+                  <label
+                    htmlFor="editConflictPrevention"
+                    style={{ ...labelStyle, marginBottom: 0, cursor: "pointer" }}
+                  >
+                    Conflict Prevention
+                  </label>
                 </div>
                 <div>
                   <label style={labelStyle}>Data Retention (days)</label>
-                  <input className="dg-input" type="number" min={1} value={editDataRetentionDays} onChange={(e) => setEditDataRetentionDays(Number(e.target.value))} />
+                  <input
+                    className="dg-input"
+                    type="number"
+                    min={1}
+                    value={editDataRetentionDays}
+                    onChange={(e) => setEditDataRetentionDays(Number(e.target.value))}
+                  />
                 </div>
               </div>
               <EditorActionRow
                 style={{ gridColumn: "1 / -1", marginTop: 8 }}
-                secondaryAction={(
+                secondaryAction={
                   <button
                     className="dg-btn dg-btn-secondary"
                     onClick={hasChanges ? handleDiscardEditing : handleCancelEditing}
@@ -1222,12 +1497,16 @@ function OverviewTab({
                   >
                     {getEditorDismissLabel({ hasUnsavedChanges: hasChanges })}
                   </button>
-                )}
-                primaryAction={(
-                  <button className="dg-btn dg-btn-primary" onClick={handleReview} disabled={saving || !hasChanges}>
+                }
+                primaryAction={
+                  <button
+                    className="dg-btn dg-btn-primary"
+                    onClick={handleReview}
+                    disabled={saving || !hasChanges}
+                  >
                     Review &amp; Save
                   </button>
-                )}
+                }
               />
             </div>
           ) : (
@@ -1236,7 +1515,14 @@ function OverviewTab({
               <InfoRow label="Slug" value={organization.slug} />
               <InfoRow label="Address" value={organization.address} />
               <InfoRow label="Phone" value={organization.phone} />
-              <InfoRow label="Timezone" value={organization.timezone ? `${formatTimezoneLabel(organization.timezone)} · ${organization.timezone}` : null} />
+              <InfoRow
+                label="Timezone"
+                value={
+                  organization.timezone
+                    ? `${formatTimezoneLabel(organization.timezone)} · ${organization.timezone}`
+                    : null
+                }
+              />
               <InfoRow
                 label="Employee count"
                 value={
@@ -1258,24 +1544,47 @@ function OverviewTab({
 
       {/* Custom labels */}
       <div style={sectionStyle}>
-        <div style={{ ...sectionHeaderStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          style={{
+            ...sectionHeaderStyle,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <span>Custom Labels</span>
-          {editing && <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)" }}>Editing above</span>}
+          {editing && (
+            <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)" }}>
+              Editing above
+            </span>
+          )}
         </div>
         <div style={sectionBodyStyle}>
           {editing ? (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
               <div>
                 <label style={labelStyle}>Focus Areas</label>
-                <input className="dg-input" value={editFocusAreaLabel} onChange={(e) => setEditFocusAreaLabel(e.target.value)} />
+                <input
+                  className="dg-input"
+                  value={editFocusAreaLabel}
+                  onChange={(e) => setEditFocusAreaLabel(e.target.value)}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Certifications</label>
-                <input className="dg-input" value={editCertLabel} onChange={(e) => setEditCertLabel(e.target.value)} />
+                <input
+                  className="dg-input"
+                  value={editCertLabel}
+                  onChange={(e) => setEditCertLabel(e.target.value)}
+                />
               </div>
               <div>
                 <label style={labelStyle}>Roles</label>
-                <input className="dg-input" value={editRoleLabel} onChange={(e) => setEditRoleLabel(e.target.value)} />
+                <input
+                  className="dg-input"
+                  value={editRoleLabel}
+                  onChange={(e) => setEditRoleLabel(e.target.value)}
+                />
               </div>
             </div>
           ) : (
@@ -1298,8 +1607,7 @@ function OverviewTab({
             value={
               organization.trialEndsAt
                 ? new Date(organization.trialEndsAt).toLocaleDateString()
-                : organization.subscriptionStatus === "trialing" ||
-                    !organization.subscriptionStatus
+                : organization.subscriptionStatus === "trialing" || !organization.subscriptionStatus
                   ? "Not started"
                   : "—"
             }
@@ -1325,13 +1633,40 @@ function OverviewTab({
       </div>
 
       {/* Danger zone: Archive / Restore */}
-      <div style={{ ...sectionStyle, borderColor: organization.archivedAt ? "var(--color-warning)" : "var(--color-danger)" }}>
-        <div style={{ ...sectionHeaderStyle, borderBottomColor: organization.archivedAt ? "var(--color-warning)" : "var(--color-danger)", color: organization.archivedAt ? "var(--color-warning)" : "var(--color-danger)" }}>
+      <div
+        style={{
+          ...sectionStyle,
+          borderColor: organization.archivedAt ? "var(--color-warning)" : "var(--color-danger)",
+        }}
+      >
+        <div
+          style={{
+            ...sectionHeaderStyle,
+            borderBottomColor: organization.archivedAt
+              ? "var(--color-warning)"
+              : "var(--color-danger)",
+            color: organization.archivedAt ? "var(--color-warning)" : "var(--color-danger)",
+          }}
+        >
           Danger Zone
         </div>
-        <div style={{ ...sectionBodyStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div
+          style={{
+            ...sectionBodyStyle,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           <div>
-            <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4 }}>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
+                marginBottom: 4,
+              }}
+            >
               {organization.archivedAt ? "Restore this organization" : "Archive this organization"}
             </div>
             <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
@@ -1353,9 +1688,11 @@ function OverviewTab({
       {archiveConfirm && (
         <ConfirmDialog
           title={organization.archivedAt ? "Restore Organization" : "Archive Organization"}
-          message={organization.archivedAt
-            ? `Are you sure you want to restore "${organization.name}"?`
-            : `Are you sure you want to archive "${organization.name}"? The organization will be hidden from active listings but all data will be preserved.`}
+          message={
+            organization.archivedAt
+              ? `Are you sure you want to restore "${organization.name}"?`
+              : `Are you sure you want to archive "${organization.name}"? The organization will be hidden from active listings but all data will be preserved.`
+          }
           confirmLabel={organization.archivedAt ? "Restore" : "Archive"}
           variant={organization.archivedAt ? "info" : "danger"}
           isLoading={archiving}
@@ -1365,19 +1702,46 @@ function OverviewTab({
       )}
 
       {/* Suspension */}
-      <div style={{ ...sectionStyle, borderColor: organization.suspendedAt ? "var(--color-warning)" : "var(--color-border)" }}>
-        <div style={{ ...sectionHeaderStyle, borderBottomColor: organization.suspendedAt ? "var(--color-warning)" : undefined, color: organization.suspendedAt ? "var(--color-warning)" : undefined }}>
+      <div
+        style={{
+          ...sectionStyle,
+          borderColor: organization.suspendedAt ? "var(--color-warning)" : "var(--color-border)",
+        }}
+      >
+        <div
+          style={{
+            ...sectionHeaderStyle,
+            borderBottomColor: organization.suspendedAt ? "var(--color-warning)" : undefined,
+            color: organization.suspendedAt ? "var(--color-warning)" : undefined,
+          }}
+        >
           Suspension
         </div>
-        <div style={{ ...sectionBodyStyle, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div
+          style={{
+            ...sectionBodyStyle,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
           {organization.suspendedAt ? (
             <>
               <div>
-                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-warning)", marginBottom: 4 }}>
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-label)",
+                    fontWeight: 600,
+                    color: "var(--color-warning)",
+                    marginBottom: 4,
+                  }}
+                >
                   Organization is suspended
                 </div>
                 {organization.suspendedReason && (
-                  <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                  <div
+                    style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}
+                  >
                     Reason: {organization.suspendedReason}
                   </div>
                 )}
@@ -1394,7 +1758,14 @@ function OverviewTab({
           ) : (
             <>
               <div>
-                <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 4 }}>
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-label)",
+                    fontWeight: 600,
+                    color: "var(--color-text-primary)",
+                    marginBottom: 4,
+                  }}
+                >
                   Suspend this organization
                 </div>
                 <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
@@ -1418,7 +1789,10 @@ function OverviewTab({
           title="Suspend Organization"
           message={
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <span>Are you sure you want to suspend &quot;{organization.name}&quot;? All members will be blocked from accessing the app.</span>
+              <span>
+                Are you sure you want to suspend &quot;{organization.name}&quot;? All members will
+                be blocked from accessing the app.
+              </span>
               <textarea
                 className="dg-input"
                 placeholder="Reason for suspension (required)"
@@ -1439,12 +1813,13 @@ function OverviewTab({
             }
             setSuspending(true);
             try {
-              await suspendGridmasterOrganization(
-                organization.id,
-                suspendReason.trim(),
-              );
+              await suspendGridmasterOrganization(organization.id, suspendReason.trim());
               toast.success("Organization suspended");
-              onOrgUpdated?.({ ...organization, suspendedAt: new Date().toISOString(), suspendedReason: suspendReason.trim() });
+              onOrgUpdated?.({
+                ...organization,
+                suspendedAt: new Date().toISOString(),
+                suspendedReason: suspendReason.trim(),
+              });
               setSuspendConfirm(false);
               setSuspendReason("");
             } catch (err: unknown) {
@@ -1453,7 +1828,10 @@ function OverviewTab({
               setSuspending(false);
             }
           }}
-          onCancel={() => { setSuspendConfirm(false); setSuspendReason(""); }}
+          onCancel={() => {
+            setSuspendConfirm(false);
+            setSuspendReason("");
+          }}
         />
       )}
 
@@ -1629,12 +2007,28 @@ function UsersTab({
           {users.length} user{users.length !== 1 ? "s" : ""}
         </span>
         <div style={{ flex: 1 }} />
-        <button className="dg-btn dg-btn-primary" style={{ padding: "7px 14px", fontSize: "var(--dg-fs-label)" }} onClick={() => setShowAddForm(!showAddForm)}>
+        <button
+          className="dg-btn dg-btn-primary"
+          style={{ padding: "7px 14px", fontSize: "var(--dg-fs-label)" }}
+          onClick={() => setShowAddForm(!showAddForm)}
+        >
           {showAddForm ? (
             "Cancel"
           ) : (
             <>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
               Add
             </>
           )}
@@ -1668,7 +2062,12 @@ function UsersTab({
                 style={{ width: "100%" }}
               />
             </div>
-            <button type="submit" className="dg-btn dg-btn-primary" disabled={adding} style={{ fontSize: "var(--dg-fs-caption)" }}>
+            <button
+              type="submit"
+              className="dg-btn dg-btn-primary"
+              disabled={adding}
+              style={{ fontSize: "var(--dg-fs-caption)" }}
+            >
               {adding ? "Adding…" : "Add"}
             </button>
           </div>
@@ -1690,16 +2089,22 @@ function UsersTab({
             <tbody>
               {users.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>
+                  <td
+                    colSpan={4}
+                    style={{
+                      ...tdStyle,
+                      textAlign: "center",
+                      color: "var(--color-text-muted)",
+                      padding: 32,
+                    }}
+                  >
                     No users found
                   </td>
                 </tr>
               ) : (
                 users.map((u) => (
                   <tr key={u.id}>
-                    <td style={{ ...tdStyle, fontWeight: 600 }}>
-                      {u.email ?? "—"}
-                    </td>
+                    <td style={{ ...tdStyle, fontWeight: 600 }}>{u.email ?? "—"}</td>
                     <td style={tdStyle}>
                       <CustomSelect
                         value={u.orgRole}
@@ -1714,16 +2119,20 @@ function UsersTab({
                         fontSize={12}
                       />
                     </td>
-                    <td style={{ ...tdStyle, fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        fontSize: "var(--dg-fs-footnote)",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
                       {u.orgRole === "admin" ? (
                         <button
                           className="dg-btn dg-btn-ghost"
                           style={{ fontSize: "var(--dg-fs-footnote)", padding: "2px 6px" }}
                           onClick={() => setEditingPerms(u)}
                         >
-                          {u.adminPermissions
-                            ? formatPermissions(u.adminPermissions)
-                            : "Configure"}
+                          {u.adminPermissions ? formatPermissions(u.adminPermissions) : "Configure"}
                         </button>
                       ) : u.orgRole === "super_admin" ? (
                         "All"
@@ -1732,26 +2141,63 @@ function UsersTab({
                       )}
                     </td>
                     <td style={tdStyle}>
-                      {(onImpersonate && u.platformRole !== "gridmaster") || u.orgRole !== "super_admin" ? (
-                        <div style={{ position: "relative" }} ref={openMenuId === u.id ? menuRef : undefined}>
+                      {(onImpersonate && u.platformRole !== "gridmaster") ||
+                      u.orgRole !== "super_admin" ? (
+                        <div
+                          style={{ position: "relative" }}
+                          ref={openMenuId === u.id ? menuRef : undefined}
+                        >
                           <button
                             className="dg-btn dg-btn-ghost"
                             style={{ padding: "4px 8px", lineHeight: 1 }}
                             onClick={() => setOpenMenuId(openMenuId === u.id ? null : u.id)}
                           >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" />
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <circle cx="12" cy="5" r="1" />
+                              <circle cx="12" cy="12" r="1" />
+                              <circle cx="12" cy="19" r="1" />
                             </svg>
                           </button>
                           {openMenuId === u.id && (
-                            <div className="dg-menu" style={{ position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 200, minWidth: 150 }}>
+                            <div
+                              className="dg-menu"
+                              style={{
+                                position: "absolute",
+                                top: "calc(100% + 4px)",
+                                right: 0,
+                                zIndex: 200,
+                                minWidth: 150,
+                              }}
+                            >
                               {onImpersonate && u.platformRole !== "gridmaster" && (
                                 <button
                                   className="dg-menu-item"
-                                  onClick={() => { setOpenMenuId(null); onImpersonate(u.id, orgId); }}
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    onImpersonate(u.id, orgId);
+                                  }}
                                 >
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+                                  <svg
+                                    width="13"
+                                    height="13"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                                    <circle cx="12" cy="7" r="4" />
                                   </svg>
                                   Impersonate
                                 </button>
@@ -1759,10 +2205,23 @@ function UsersTab({
                               {u.orgRole === "admin" && (
                                 <button
                                   className="dg-menu-item"
-                                  onClick={() => { setOpenMenuId(null); setEditingPerms(u); }}
+                                  onClick={() => {
+                                    setOpenMenuId(null);
+                                    setEditingPerms(u);
+                                  }}
                                 >
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                                  <svg
+                                    width="13"
+                                    height="13"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <circle cx="12" cy="12" r="3" />
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                                   </svg>
                                   Permissions
                                 </button>
@@ -1772,10 +2231,26 @@ function UsersTab({
                                   <div className="dg-menu-divider" />
                                   <button
                                     className="dg-menu-item dg-menu-item--danger"
-                                    onClick={() => { setOpenMenuId(null); setRemoveConfirm(u); }}
+                                    onClick={() => {
+                                      setOpenMenuId(null);
+                                      setRemoveConfirm(u);
+                                    }}
                                   >
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                      <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                                    <svg
+                                      width="13"
+                                      height="13"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <polyline points="3 6 5 6 21 6" />
+                                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                      <path d="M10 11v6" />
+                                      <path d="M14 11v6" />
+                                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                                     </svg>
                                     Remove
                                   </button>
@@ -1798,7 +2273,12 @@ function UsersTab({
       {editingPerms && (
         <PermissionsEditor
           title={`Admin Permissions \u2014 ${[editingPerms.firstName, editingPerms.lastName].filter(Boolean).join(" ") || editingPerms.email || "User"}`}
-          subtitle={<>Configure which actions this admin can perform. <em>View Schedule</em> and <em>View Staff</em> are always enabled.</>}
+          subtitle={
+            <>
+              Configure which actions this admin can perform. <em>View Schedule</em> and{" "}
+              <em>View Staff</em> are always enabled.
+            </>
+          }
           initialPermissions={editingPerms.adminPermissions}
           buildReview={(perms) => {
             const changes = buildMembershipAccessChanges(editingPerms, {
@@ -1808,7 +2288,8 @@ function UsersTab({
             return changes.length > 0
               ? {
                   title: "Review Permission Changes",
-                  description: "Review these permission changes before saving. Admin access changes affect what this person can see and do across the organization.",
+                  description:
+                    "Review these permission changes before saving. Admin access changes affect what this person can see and do across the organization.",
                   changes,
                   confirmLabel: "Confirm Save",
                   warningText: "This save updates sensitive admin permissions.",
@@ -1830,7 +2311,9 @@ function UsersTab({
               onUsersChanged();
             } catch (err) {
               if (err instanceof OrganizationAccessConflictError) {
-                toast.error("Permissions changed elsewhere. Review the latest values and try again.");
+                toast.error(
+                  "Permissions changed elsewhere. Review the latest values and try again.",
+                );
                 onUsersChanged();
                 throw err;
               }
@@ -1884,7 +2367,12 @@ function UsersTab({
 function formatPermissions(p: AdminPermissions): string {
   const granted = Object.entries(p)
     .filter(([, v]) => v === true)
-    .map(([k]) => k.replace(/^can/, "").replace(/([A-Z])/g, " $1").trim());
+    .map(([k]) =>
+      k
+        .replace(/^can/, "")
+        .replace(/([A-Z])/g, " $1")
+        .trim(),
+    );
   if (granted.length === 0) return "None";
   if (granted.length > 3) return `${granted.length} permissions`;
   return granted.join(", ");
@@ -1909,11 +2397,26 @@ function EmployeesTab({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Status tabs */}
       <div style={{ display: "flex", gap: 0, borderBottom: "1px solid var(--color-border)" }}>
-        {([
-          { key: "active" as const, label: "Active", count: active.length, color: "var(--color-today-text)" },
-          { key: "inactive" as const, label: "Inactive", count: inactive.length, color: "var(--color-warning)" },
-          { key: "removed" as const, label: "Removed", count: removed.length, color: "var(--color-danger)" },
-        ]).map((tab) => {
+        {[
+          {
+            key: "active" as const,
+            label: "Active",
+            count: active.length,
+            color: "var(--color-today-text)",
+          },
+          {
+            key: "inactive" as const,
+            label: "Inactive",
+            count: inactive.length,
+            color: "var(--color-warning)",
+          },
+          {
+            key: "removed" as const,
+            label: "Removed",
+            count: removed.length,
+            color: "var(--color-danger)",
+          },
+        ].map((tab) => {
           const isActive = showStatus === tab.key;
           return (
             <button
@@ -1971,7 +2474,15 @@ function EmployeesTab({
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>
+                  <td
+                    colSpan={5}
+                    style={{
+                      ...tdStyle,
+                      textAlign: "center",
+                      color: "var(--color-text-muted)",
+                      padding: 32,
+                    }}
+                  >
                     No {showStatus} employees
                   </td>
                 </tr>
@@ -1979,10 +2490,28 @@ function EmployeesTab({
                 list.map((emp) => (
                   <tr key={emp.id}>
                     <td style={{ ...tdStyle, fontWeight: 600 }}>{getEmployeeDisplayName(emp)}</td>
-                    <td style={tdStyle}><StatusDot status={emp.status} /></td>
+                    <td style={tdStyle}>
+                      <StatusDot status={emp.status} />
+                    </td>
                     <td style={{ ...tdStyle, textAlign: "center" }}>#{emp.employeeNumber}</td>
-                    <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>{emp.phone || "—"}</td>
-                    <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>{emp.email || "—"}</td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      {emp.phone || "—"}
+                    </td>
+                    <td
+                      style={{
+                        ...tdStyle,
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      {emp.email || "—"}
+                    </td>
                   </tr>
                 ))
               )}
@@ -2034,14 +2563,23 @@ function ConfigTab({
         <div style={sectionHeaderStyle}>
           {organization.focusAreaLabel || "Focus Areas"} ({activeFocusAreas.length})
           {archivedFocusAreas.length > 0 && (
-            <span style={{ fontWeight: 400, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginLeft: 8 }}>
+            <span
+              style={{
+                fontWeight: 400,
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginLeft: 8,
+              }}
+            >
               +{archivedFocusAreas.length} archived
             </span>
           )}
         </div>
         <div style={sectionBodyStyle}>
           {activeFocusAreas.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              None configured
+            </span>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {activeFocusAreas.map((fa) => (
@@ -2070,14 +2608,28 @@ function ConfigTab({
         <div style={sectionHeaderStyle}>
           Shifts ({activeShiftCategories.length})
           {archivedShiftCategories.length > 0 && (
-            <span style={{ fontWeight: 400, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginLeft: 8 }}>
+            <span
+              style={{
+                fontWeight: 400,
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginLeft: 8,
+              }}
+            >
               +{archivedShiftCategories.length} archived
             </span>
           )}
         </div>
-        <div style={{ ...sectionBodyStyle, padding: activeShiftCategories.length > 0 ? 0 : sectionBodyStyle.padding }}>
+        <div
+          style={{
+            ...sectionBodyStyle,
+            padding: activeShiftCategories.length > 0 ? 0 : sectionBodyStyle.padding,
+          }}
+        >
           {activeShiftCategories.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              None configured
+            </span>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -2108,7 +2660,12 @@ function ConfigTab({
                   const hasTime = shift.startTime || shift.endTime;
                   return (
                     <tr key={shift.id}>
-                      <td style={{ padding: "8px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+                      <td
+                        style={{
+                          padding: "8px 14px",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
                         <span
                           style={{
                             display: "inline-flex",
@@ -2128,13 +2685,40 @@ function ConfigTab({
                           {shift.name}
                         </span>
                       </td>
-                      <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", borderBottom: "1px solid var(--color-border-light)" }}>
+                      <td
+                        style={{
+                          padding: "8px 14px",
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                          color: "var(--color-text-primary)",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
                         {shift.abbr?.trim() || "—"}
                       </td>
-                      <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)", whiteSpace: "nowrap" }}>
+                      <td
+                        style={{
+                          padding: "8px 14px",
+                          fontSize: "var(--dg-fs-caption)",
+                          fontFamily: "var(--font-dm-mono), monospace",
+                          color: "var(--color-text-muted)",
+                          borderBottom: "1px solid var(--color-border-light)",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {hasTime ? `${shift.startTime ?? "—"} – ${shift.endTime ?? "—"}` : "—"}
                       </td>
-                      <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", color: faName ? "var(--color-text-secondary)" : "var(--color-text-subtle)", fontWeight: faName ? 600 : 400, borderBottom: "1px solid var(--color-border-light)" }}>
+                      <td
+                        style={{
+                          padding: "8px 14px",
+                          fontSize: "var(--dg-fs-caption)",
+                          color: faName
+                            ? "var(--color-text-secondary)"
+                            : "var(--color-text-subtle)",
+                          fontWeight: faName ? 600 : 400,
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
                         {faName ?? "Global"}
                       </td>
                     </tr>
@@ -2151,14 +2735,28 @@ function ConfigTab({
         <div style={sectionHeaderStyle}>
           Jobs ({activeJobs.length})
           {archivedJobs.length > 0 && (
-            <span style={{ fontWeight: 400, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginLeft: 8 }}>
+            <span
+              style={{
+                fontWeight: 400,
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginLeft: 8,
+              }}
+            >
               +{archivedJobs.length} archived
             </span>
           )}
         </div>
-        <div style={{ ...sectionBodyStyle, padding: activeJobs.length > 0 ? 0 : sectionBodyStyle.padding }}>
+        <div
+          style={{
+            ...sectionBodyStyle,
+            padding: activeJobs.length > 0 ? 0 : sectionBodyStyle.padding,
+          }}
+        >
           {activeJobs.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              None configured
+            </span>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -2186,20 +2784,50 @@ function ConfigTab({
               <tbody>
                 {activeJobs.map((job) => (
                   <tr key={job.id}>
-                    <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", borderBottom: "1px solid var(--color-border-light)" }}>
+                    <td
+                      style={{
+                        padding: "8px 14px",
+                        fontSize: "var(--dg-fs-label)",
+                        fontWeight: 600,
+                        color: "var(--color-text-primary)",
+                        borderBottom: "1px solid var(--color-border-light)",
+                      }}
+                    >
                       {job.name}
                     </td>
-                    <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", fontFamily: "var(--font-dm-mono), monospace", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)" }}>
+                    <td
+                      style={{
+                        padding: "8px 14px",
+                        fontSize: "var(--dg-fs-caption)",
+                        fontFamily: "var(--font-dm-mono), monospace",
+                        color: "var(--color-text-muted)",
+                        borderBottom: "1px solid var(--color-border-light)",
+                      }}
+                    >
                       {job.abbr}
                     </td>
-                    <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", borderBottom: "1px solid var(--color-border-light)" }}>
+                    <td
+                      style={{
+                        padding: "8px 14px",
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--color-text-secondary)",
+                        borderBottom: "1px solid var(--color-border-light)",
+                      }}
+                    >
                       {job.assignmentMode === "shiftless"
                         ? "Job-only"
                         : job.assignmentMode === "both"
                           ? "Shift + job or job-only"
                           : "Shift + job"}
                     </td>
-                    <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", borderBottom: "1px solid var(--color-border-light)" }}>
+                    <td
+                      style={{
+                        padding: "8px 14px",
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--color-text-secondary)",
+                        borderBottom: "1px solid var(--color-border-light)",
+                      }}
+                    >
                       {job.showOnGrid ? "Shown on grid" : "Hidden on grid"}
                     </td>
                   </tr>
@@ -2215,14 +2843,28 @@ function ConfigTab({
         <div style={sectionHeaderStyle}>
           Absence Types ({activeAbsenceTypes.length})
           {archivedAbsenceTypes.length > 0 && (
-            <span style={{ fontWeight: 400, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginLeft: 8 }}>
+            <span
+              style={{
+                fontWeight: 400,
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginLeft: 8,
+              }}
+            >
               +{archivedAbsenceTypes.length} archived
             </span>
           )}
         </div>
-        <div style={{ ...sectionBodyStyle, padding: activeAbsenceTypes.length > 0 ? 0 : sectionBodyStyle.padding }}>
+        <div
+          style={{
+            ...sectionBodyStyle,
+            padding: activeAbsenceTypes.length > 0 ? 0 : sectionBodyStyle.padding,
+          }}
+        >
           {activeAbsenceTypes.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              None configured
+            </span>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -2250,7 +2892,12 @@ function ConfigTab({
               <tbody>
                 {activeAbsenceTypes.map((at) => (
                   <tr key={at.id}>
-                    <td style={{ padding: "8px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+                    <td
+                      style={{
+                        padding: "8px 14px",
+                        borderBottom: "1px solid var(--color-border-light)",
+                      }}
+                    >
                       <span
                         style={{
                           display: "inline-flex",
@@ -2270,10 +2917,23 @@ function ConfigTab({
                         {at.label}
                       </span>
                     </td>
-                    <td style={{ padding: "8px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", borderBottom: "1px solid var(--color-border-light)" }}>
+                    <td
+                      style={{
+                        padding: "8px 14px",
+                        fontSize: "var(--dg-fs-label)",
+                        fontWeight: 600,
+                        color: "var(--color-text-primary)",
+                        borderBottom: "1px solid var(--color-border-light)",
+                      }}
+                    >
                       {at.name}
                     </td>
-                    <td style={{ padding: "8px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+                    <td
+                      style={{
+                        padding: "8px 14px",
+                        borderBottom: "1px solid var(--color-border-light)",
+                      }}
+                    >
                       <span
                         style={{
                           display: "inline-block",
@@ -2301,7 +2961,9 @@ function ConfigTab({
         </div>
         <div style={sectionBodyStyle}>
           {activeCerts.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              None configured
+            </span>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {activeCerts.map((c) => (
@@ -2332,7 +2994,9 @@ function ConfigTab({
         </div>
         <div style={sectionBodyStyle}>
           {activeRoles.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              None configured
+            </span>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {activeRoles.map((r) => (
@@ -2358,12 +3022,12 @@ function ConfigTab({
 
       {/* Indicator Types */}
       <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          Indicator Types ({activeIndicators.length})
-        </div>
+        <div style={sectionHeaderStyle}>Indicator Types ({activeIndicators.length})</div>
         <div style={sectionBodyStyle}>
           {activeIndicators.length === 0 ? (
-            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>None configured</span>
+            <span style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+              None configured
+            </span>
           ) : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {activeIndicators.map((ind) => (
@@ -2381,7 +3045,15 @@ function ConfigTab({
                     color: "var(--color-text-secondary)",
                   }}
                 >
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: ind.color, flexShrink: 0 }} />
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: ind.color,
+                      flexShrink: 0,
+                    }}
+                  />
                   {ind.name}
                 </span>
               ))}
@@ -2408,9 +3080,12 @@ function InvitationsTab({
   const [revokeConfirm, setRevokeConfirm] = useState<InvitationRow | null>(null);
 
   function getStatus(inv: InvitationRow): { label: string; color: string; bg: string } {
-    if (inv.accepted_at) return { label: "Accepted", color: "var(--color-success)", bg: "var(--color-success-bg)" };
-    if (inv.revoked_at) return { label: "Revoked", color: "var(--color-danger)", bg: "var(--color-danger-bg)" };
-    if (new Date(inv.expires_at) < new Date()) return { label: "Expired", color: "var(--color-warning)", bg: "var(--color-warning-bg)" };
+    if (inv.accepted_at)
+      return { label: "Accepted", color: "var(--color-success)", bg: "var(--color-success-bg)" };
+    if (inv.revoked_at)
+      return { label: "Revoked", color: "var(--color-danger)", bg: "var(--color-danger-bg)" };
+    if (new Date(inv.expires_at) < new Date())
+      return { label: "Expired", color: "var(--color-warning)", bg: "var(--color-warning-bg)" };
     return { label: "Pending", color: "var(--color-today-text)", bg: "var(--color-today-bg)" };
   }
 
@@ -2465,7 +3140,15 @@ function InvitationsTab({
             <tbody>
               {invitations.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)", padding: 32 }}>
+                  <td
+                    colSpan={6}
+                    style={{
+                      ...tdStyle,
+                      textAlign: "center",
+                      color: "var(--color-text-muted)",
+                      padding: 32,
+                    }}
+                  >
                     No invitations found
                   </td>
                 </tr>
@@ -2492,17 +3175,33 @@ function InvitationsTab({
                           {status.label}
                         </span>
                       </td>
-                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
                         {new Date(inv.created_at).toLocaleDateString()}
                       </td>
-                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
                         {new Date(inv.expires_at).toLocaleDateString()}
                       </td>
                       <td style={tdStyle}>
                         {isPending && (
                           <button
                             className="dg-btn dg-btn-ghost"
-                            style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 6px", color: "var(--color-danger)" }}
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              padding: "3px 6px",
+                              color: "var(--color-danger)",
+                            }}
                             onClick={() => setRevokeConfirm(inv)}
                             disabled={revoking === inv.id}
                           >

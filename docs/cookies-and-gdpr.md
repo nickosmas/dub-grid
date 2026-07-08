@@ -23,16 +23,16 @@ This document covers DubGrid's cookie implementation, consent management, analyt
 
 ## Cookie Inventory
 
-| Cookie | Category | Purpose | Duration | Set By |
-|--------|----------|---------|----------|--------|
-| `dubgrid-cookie-consent` | Essential | Stores consent preference (essential/analytics) + version. Also mirrored in `localStorage` for localhost reliability. | 1 year | Client JS (`CookieConsent.tsx`) |
-| `sb-<project-ref>-auth-token` | Essential | Supabase authentication session (access + refresh tokens). May be chunked into `.0`, `.1`, etc. for large JWTs. | ~400 days (auto-refreshed) | `@supabase/ssr` |
-| `dubgrid-sandbox` | Essential | Activates Test Sandbox mode for the calling user. `HttpOnly`, read and written server-side only. | 7 days (cleared on exit) | Server Route Handler (`/api/test-sandbox`) |
-| `dubgrid-impersonation` | Essential | Gridmaster support impersonation session data. | Dynamic, up to 30 min | Client JS (`impersonation.ts`) |
-| `sidebar_state` | Essential | Remembers sidebar open/collapsed state. | 7 days | Client JS (`ui/sidebar.tsx`) |
-| PostHog cookies | Analytics | Product analytics session tracking (consent-gated). | Varies (PostHog-managed) | PostHog SDK |
-| Vercel Analytics | Analytics | Web performance metrics (consent-gated). | Varies (Vercel-managed) | `@vercel/analytics` |
-| Sentry Session Replay | Analytics | Privacy-masked session replay for bug reproduction (consent-gated). Error monitoring itself is always-on and sets no additional cookies. | Varies (Sentry-managed) | Sentry SDK |
+| Cookie                        | Category  | Purpose                                                                                                                                  | Duration                   | Set By                                     |
+| ----------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------ |
+| `dubgrid-cookie-consent`      | Essential | Stores consent preference (essential/analytics) + version. Also mirrored in `localStorage` for localhost reliability.                    | 1 year                     | Client JS (`CookieConsent.tsx`)            |
+| `sb-<project-ref>-auth-token` | Essential | Supabase authentication session (access + refresh tokens). May be chunked into `.0`, `.1`, etc. for large JWTs.                          | ~400 days (auto-refreshed) | `@supabase/ssr`                            |
+| `dubgrid-sandbox`             | Essential | Activates Test Sandbox mode for the calling user. `HttpOnly`, read and written server-side only.                                         | 7 days (cleared on exit)   | Server Route Handler (`/api/test-sandbox`) |
+| `dubgrid-impersonation`       | Essential | Gridmaster support impersonation session data.                                                                                           | Dynamic, up to 30 min      | Client JS (`impersonation.ts`)             |
+| `sidebar_state`               | Essential | Remembers sidebar open/collapsed state.                                                                                                  | 7 days                     | Client JS (`ui/sidebar.tsx`)               |
+| PostHog cookies               | Analytics | Product analytics session tracking (consent-gated).                                                                                      | Varies (PostHog-managed)   | PostHog SDK                                |
+| Vercel Analytics              | Analytics | Web performance metrics (consent-gated).                                                                                                 | Varies (Vercel-managed)    | `@vercel/analytics`                        |
+| Sentry Session Replay         | Analytics | Privacy-masked session replay for bug reproduction (consent-gated). Error monitoring itself is always-on and sets no additional cookies. | Varies (Sentry-managed)    | Sentry SDK                                 |
 
 ---
 
@@ -62,6 +62,7 @@ The landing-page footer, auth-flow footer, request-demo footer, and Profile > Pr
 ```
 
 Stored as:
+
 - **Cookie:** `dubgrid-cookie-consent={url-encoded JSON}; expires={1 year}; path=/{domain suffix}; SameSite=Lax[; Secure]`
   - `domain` is omitted on `localhost` (subdomain cookies are unreliable there).
   - In production, the root domain is used (e.g. `.dubgrid.com`) so the preference is readable across all subdomains.
@@ -80,6 +81,7 @@ const CONSENT_VERSION = "1.1";
 **Current version: `"1.1"`**
 
 Version history:
+
 - `1.1` — Sentry Session Replay moved behind analytics consent; error monitoring stays always-on.
 
 The mobile app (`apps/mobile/src/features/consent/lib/consent.ts`) mirrors this constant. Bump both in lockstep so both platforms re-prompt together when the policy changes.
@@ -107,10 +109,12 @@ User visits app
 ### Consent Withdrawal
 
 Users can change their preference at any time via:
+
 - Any **Cookie preferences** link (landing footer, auth footer, request-demo footer, Profile > Privacy & data)
 - The on-page toggle at `/cookie-policy`
 
 Switching from "Accept all" to "Essential only":
+
 1. Updates the cookie + localStorage
 2. Records the change server-side (`/api/consent`)
 3. Fires `dubgrid:consent-changed`; PostHog, Sentry Session Replay, and Vercel Analytics all respond in place (no reload required)
@@ -125,6 +129,7 @@ Switching from "Accept all" to "Essential only":
 - **Storage:** Inserts into `cookie_consents` (append-only, never updated or deleted)
 
 Database schema:
+
 ```sql
 cookie_consents (
   id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -138,6 +143,7 @@ cookie_consents (
 ```
 
 RLS policies:
+
 - Authenticated users can insert their own records and read their own records.
 - Anonymous visitors can insert records with `user_id = NULL`.
 - Gridmasters can read all records.
@@ -145,6 +151,7 @@ RLS policies:
 ### When to Bump CONSENT_VERSION
 
 Bump `CONSENT_VERSION` in `apps/web/src/components/CookieConsent.tsx` (and mirror the value in `apps/mobile/src/features/consent/lib/consent.ts`) whenever:
+
 - A cookie is added or removed
 - An analytics or tracking service is added or removed
 - What a cookie stores changes materially
@@ -167,13 +174,14 @@ All three analytics/tracking integrations are **blocked by default** and only ac
 `PostHogProvider` uses `useSyncExternalStore` (subscribing to `subscribeToConsentChanges`) so it reacts live to consent changes without a reload. When consent is granted, it calls `enablePostHog()` (which calls `initPostHog()` then `posthog.opt_in_capturing()`). When consent is revoked, it calls `disablePostHog()` (`posthog.opt_out_capturing()` + `posthog.reset()`).
 
 PostHog is initialized with:
+
 ```typescript
 posthog.init(key, {
   api_host: host,
   capture_pageview: true,
   capture_pageleave: true,
   persistence: "localStorage+cookie",
-  autocapture: false,   // manual events only
+  autocapture: false, // manual events only
 });
 ```
 
@@ -207,20 +215,20 @@ All providers and consent-gated scripts are composed in `apps/web/src/app/layout
 ```tsx
 <body>
   <AuthProvider>
-    <PostHogProvider>           {/* consent-reactive via useSyncExternalStore */}
+    <PostHogProvider>
+      {" "}
+      {/* consent-reactive via useSyncExternalStore */}
       <QueryProvider>
         <TermsAcceptanceGate>
-          <OnboardingGate>
-            ...children...
-          </OnboardingGate>
+          <OnboardingGate>...children...</OnboardingGate>
         </TermsAcceptanceGate>
       </QueryProvider>
     </PostHogProvider>
   </AuthProvider>
   <AppToaster />
-  <CookieConsent />             {/* banner + re-open via footers */}
-  <ConsentGatedAnalytics />     {/* consent-reactive Vercel Analytics */}
-  <WebVitals />                 {/* dev/perf-baseline only, no external calls */}
+  <CookieConsent /> {/* banner + re-open via footers */}
+  <ConsentGatedAnalytics /> {/* consent-reactive Vercel Analytics */}
+  <WebVitals /> {/* dev/perf-baseline only, no external calls */}
 </body>
 ```
 
@@ -244,12 +252,12 @@ Managed entirely by `@supabase/ssr`. DubGrid does not set or modify these cookie
 
 The `custom_access_token_hook` (in `supabase/migrations/002_functions_triggers.sql`) runs on every token issue/refresh and sets top-level JWT claims:
 
-| Claim | Description |
-|-------|-------------|
-| `platform_role` | `gridmaster` or `none` |
-| `org_role` | `super_admin`, `admin`, or `user` |
-| `org_id` | Current organization UUID (per-session, from `user_sessions.active_org_id`) |
-| `org_slug` | Current organization slug |
+| Claim           | Description                                                                 |
+| --------------- | --------------------------------------------------------------------------- |
+| `platform_role` | `gridmaster` or `none`                                                      |
+| `org_role`      | `super_admin`, `admin`, or `user`                                           |
+| `org_id`        | Current organization UUID (per-session, from `user_sessions.active_org_id`) |
+| `org_slug`      | Current organization slug                                                   |
 
 The hook also updates `profiles.last_sign_in_at` (debounced to 5-minute intervals) for GDPR account-cleanup tracking.
 
@@ -366,13 +374,13 @@ A simple UI-state preference cookie.
 
 ### Security Flags Matrix
 
-| Cookie | Secure | HttpOnly | SameSite |
-|--------|--------|----------|----------|
-| `dubgrid-cookie-consent` | Yes (HTTPS) | No | Lax |
-| `sb-*-auth-token` | Yes (HTTPS) | No (`@supabase/ssr` default) | Lax (`@supabase/ssr` default) |
-| `dubgrid-sandbox` | Yes (production) | **Yes** | Lax |
-| `dubgrid-impersonation` | Yes (HTTPS) | No | Lax |
-| `sidebar_state` | Yes (HTTPS) | No | Lax |
+| Cookie                   | Secure           | HttpOnly                     | SameSite                      |
+| ------------------------ | ---------------- | ---------------------------- | ----------------------------- |
+| `dubgrid-cookie-consent` | Yes (HTTPS)      | No                           | Lax                           |
+| `sb-*-auth-token`        | Yes (HTTPS)      | No (`@supabase/ssr` default) | Lax (`@supabase/ssr` default) |
+| `dubgrid-sandbox`        | Yes (production) | **Yes**                      | Lax                           |
+| `dubgrid-impersonation`  | Yes (HTTPS)      | No                           | Lax                           |
+| `sidebar_state`          | Yes (HTTPS)      | No                           | Lax                           |
 
 ### Notes
 
@@ -384,6 +392,7 @@ A simple UI-state preference cookie.
 ### Security Headers
 
 `apps/web/next.config.ts` sets the following headers on all responses:
+
 - `X-DNS-Prefetch-Control: on`
 - `X-Frame-Options: SAMEORIGIN`
 - `X-Content-Type-Options: nosniff`
@@ -406,16 +415,16 @@ Every consent decision is recorded in `cookie_consents` (see [Consent Management
 
 Downloads all user data as a JSON file. Rate-limited to one export per hour (enforced by querying `audit_log` for recent `data.exported` entries).
 
-| Data | Source Table |
-|------|-------------|
-| Profile | `profiles` |
-| Organization memberships | `organization_memberships` |
-| Linked employee records | `employees` (where `user_id` matches) |
-| Shift assignments | `shifts` (limit 5,000) |
-| Audit log | `audit_log` (limit 1,000 most recent) |
-| Cookie consent records | `cookie_consents` |
-| Terms acceptances | `terms_acceptances` |
-| Notification preferences | `notification_preferences` |
+| Data                     | Source Table                          |
+| ------------------------ | ------------------------------------- |
+| Profile                  | `profiles`                            |
+| Organization memberships | `organization_memberships`            |
+| Linked employee records  | `employees` (where `user_id` matches) |
+| Shift assignments        | `shifts` (limit 5,000)                |
+| Audit log                | `audit_log` (limit 1,000 most recent) |
+| Cookie consent records   | `cookie_consents`                     |
+| Terms acceptances        | `terms_acceptances`                   |
+| Notification preferences | `notification_preferences`            |
 
 **Response:** JSON file with `Content-Disposition: attachment` and `Cache-Control: no-store`.
 
@@ -444,6 +453,7 @@ Calls the `gdpr_erase_user_data(p_user_id)` RPC which:
 **Confirmation:** Requires `{ confirmation: "DELETE MY ACCOUNT" }` in the request body.
 
 Follows the same erasure path with additional guards:
+
 - Gridmasters cannot self-delete.
 - Sole super_admins cannot delete their account (must transfer ownership first).
 
@@ -452,12 +462,14 @@ Follows the same erasure path with additional guards:
 Two SQL functions handle inactive-account lifecycle:
 
 **`flag_inactive_accounts(retention_days INT DEFAULT 730)`** (`002_functions_triggers.sql`)
+
 - Finds profiles where `last_sign_in_at` is older than `retention_days` (default: 2 years)
 - Skips gridmasters and already-flagged profiles
 - Sets `scheduled_deletion_at = NOW() + 30 days` (grace period) and `deactivation_warned_at = NOW()`
 - Returns count of flagged accounts
 
 **`purge_scheduled_accounts()`** (`002_functions_triggers.sql`)
+
 - Finds profiles where `scheduled_deletion_at <= NOW()`
 - Skips gridmasters
 - Calls `gdpr_erase_user_data()` for each profile
@@ -471,6 +483,7 @@ Two SQL functions handle inactive-account lifecycle:
 ### Org Soft-Delete
 
 When a super_admin deletes their organization via Settings > Danger Zone, `organizations.archived_at` is set. This timestamp acts as an access-revocation signal:
+
 - Middleware blocks access for non-gridmaster users to archived orgs.
 - `get_my_organizations` RPC excludes archived orgs.
 - The JWT hook and `switch_org` respect `archived_at`.
@@ -554,6 +567,7 @@ Data export ───────────────────► GET /ap
 ### When to bump consent version
 
 Bump `CONSENT_VERSION` in `apps/web/src/components/CookieConsent.tsx` **and** `apps/mobile/src/features/consent/lib/consent.ts` when:
+
 - A cookie is added or removed
 - An analytics or tracking service is added or removed
 - What a cookie stores changes materially
@@ -587,28 +601,28 @@ Bump `CONSENT_VERSION` in `apps/web/src/components/CookieConsent.tsx` **and** `a
 
 ### Key files
 
-| File | Purpose |
-|------|---------|
-| `apps/web/src/components/CookieConsent.tsx` | Consent banner, cookie read/write, `CONSENT_VERSION`, server sync, exported helpers |
-| `apps/web/src/components/ConsentGatedAnalytics.tsx` | Wraps `<Analytics />` behind consent (reactive) |
-| `apps/web/src/components/PostHogProvider.tsx` | PostHog initialization, consent-reactive via `useSyncExternalStore` |
-| `apps/web/src/app/api/consent/route.ts` | Records consent to DB (POST) |
-| `apps/web/src/app/api/auth/data-export/route.ts` | GDPR data export (GET) |
-| `apps/web/src/app/api/auth/gdpr-erase/route.ts` | GDPR data erasure (POST) |
-| `apps/web/src/app/api/auth/delete-account/route.ts` | Account deletion (DELETE) |
-| `apps/web/src/lib/posthog.ts` | PostHog client helpers (`initPostHog`, `enablePostHog`, `disablePostHog`, etc.) |
-| `apps/web/src/lib/impersonation.ts` | Impersonation cookie utilities |
-| `apps/web/src/lib/sandbox-cookie.ts` | Sandbox cookie parse/encode utilities |
-| `apps/web/src/app/api/test-sandbox/route.ts` | Sandbox enter/exit/reset + cookie lifecycle |
-| `apps/web/src/components/ui/sidebar.tsx` | Sidebar state cookie |
-| `apps/web/src/app/cookie-policy/page.tsx` | Public cookie policy page + `CookiePreferencesManager` |
-| `apps/web/src/app/privacy/page.tsx` | Public privacy policy page |
-| `apps/web/src/instrumentation-client.ts` | Sentry client config (`sendDefaultPii: false`, replay consent gate) |
-| `apps/web/sentry.server.config.ts` | Server-side Sentry bootstrap |
-| `apps/web/sentry.edge.config.ts` | Edge runtime Sentry bootstrap |
-| `supabase/migrations/001_schema.sql` | `cookie_consents`, `profiles`, `user_sessions` schema |
-| `supabase/migrations/002_functions_triggers.sql` | `custom_access_token_hook`, `flag_inactive_accounts`, `purge_scheduled_accounts`, `gdpr_erase_user_data` |
-| `supabase/migrations/003_rls_policies.sql` | `cookie_consents` RLS policies |
-| `apps/web/middleware.ts` | Auth cookie verification, sandbox + impersonation handling, RBAC |
-| `apps/mobile/src/features/consent/lib/consent.ts` | Mobile consent store + ATT scaffolding |
-| `apps/mobile/src/features/consent/components/ConsentGate.tsx` | Mobile first-launch consent sheet |
+| File                                                          | Purpose                                                                                                  |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/CookieConsent.tsx`                   | Consent banner, cookie read/write, `CONSENT_VERSION`, server sync, exported helpers                      |
+| `apps/web/src/components/ConsentGatedAnalytics.tsx`           | Wraps `<Analytics />` behind consent (reactive)                                                          |
+| `apps/web/src/components/PostHogProvider.tsx`                 | PostHog initialization, consent-reactive via `useSyncExternalStore`                                      |
+| `apps/web/src/app/api/consent/route.ts`                       | Records consent to DB (POST)                                                                             |
+| `apps/web/src/app/api/auth/data-export/route.ts`              | GDPR data export (GET)                                                                                   |
+| `apps/web/src/app/api/auth/gdpr-erase/route.ts`               | GDPR data erasure (POST)                                                                                 |
+| `apps/web/src/app/api/auth/delete-account/route.ts`           | Account deletion (DELETE)                                                                                |
+| `apps/web/src/lib/posthog.ts`                                 | PostHog client helpers (`initPostHog`, `enablePostHog`, `disablePostHog`, etc.)                          |
+| `apps/web/src/lib/impersonation.ts`                           | Impersonation cookie utilities                                                                           |
+| `apps/web/src/lib/sandbox-cookie.ts`                          | Sandbox cookie parse/encode utilities                                                                    |
+| `apps/web/src/app/api/test-sandbox/route.ts`                  | Sandbox enter/exit/reset + cookie lifecycle                                                              |
+| `apps/web/src/components/ui/sidebar.tsx`                      | Sidebar state cookie                                                                                     |
+| `apps/web/src/app/cookie-policy/page.tsx`                     | Public cookie policy page + `CookiePreferencesManager`                                                   |
+| `apps/web/src/app/privacy/page.tsx`                           | Public privacy policy page                                                                               |
+| `apps/web/src/instrumentation-client.ts`                      | Sentry client config (`sendDefaultPii: false`, replay consent gate)                                      |
+| `apps/web/sentry.server.config.ts`                            | Server-side Sentry bootstrap                                                                             |
+| `apps/web/sentry.edge.config.ts`                              | Edge runtime Sentry bootstrap                                                                            |
+| `supabase/migrations/001_schema.sql`                          | `cookie_consents`, `profiles`, `user_sessions` schema                                                    |
+| `supabase/migrations/002_functions_triggers.sql`              | `custom_access_token_hook`, `flag_inactive_accounts`, `purge_scheduled_accounts`, `gdpr_erase_user_data` |
+| `supabase/migrations/003_rls_policies.sql`                    | `cookie_consents` RLS policies                                                                           |
+| `apps/web/middleware.ts`                                      | Auth cookie verification, sandbox + impersonation handling, RBAC                                         |
+| `apps/mobile/src/features/consent/lib/consent.ts`             | Mobile consent store + ATT scaffolding                                                                   |
+| `apps/mobile/src/features/consent/components/ConsentGate.tsx` | Mobile first-launch consent sheet                                                                        |

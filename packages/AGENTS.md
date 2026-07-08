@@ -7,18 +7,18 @@ both. Package changes can break multiple apps.
 
 ## Verified Packages
 
-| Package | Path | Purpose |
-|---------|------|---------|
-| `@dubgrid/api-client` | `packages/api-client` | Fetch/header utilities, query-param helpers |
-| `@dubgrid/authz` | `packages/authz` | Role levels (`ROLE_LEVEL`), permission builders (`buildPerms`, `buildPermissionContext`, `unionPermissions`), JWT claim extraction (`extractJwtClaims`), `READ_ONLY_PERMS` |
-| `@dubgrid/client-errors` | `packages/client-errors` | Platform-neutral error translation: `formatClientErrorMessage`, `isNetworkConnectionError`, `translateErrorMessage`, canonical copy constants (`NETWORK_ERROR_MESSAGE`, `DEFAULT_ERROR_FALLBACK`) |
-| `@dubgrid/contracts` | `packages/contracts` | Zod schemas for API contracts. Two exports: `.` (main) and `./mobile` (mobile-specific schemas) |
-| `@dubgrid/data-access` | `packages/data-access` | Supabase query helpers and mobile data queries |
-| `@dubgrid/db-types` | `packages/db-types` | Generated DB type subsets (catalog, organization, requests, schedule, staff) |
-| `@dubgrid/design-tokens` | `packages/design-tokens` | Color and spacing tokens shared by web and mobile (`colorTokens`, etc.) |
-| `@dubgrid/domain` | `packages/domain` | Core domain types and helpers: `Organization`, `AdminPermissions`, `PlatformRole`, `OrganizationRole`, `WorkspaceKind`, `isSelfAction`, `assertNotSelf`, `SelfActionForbiddenError`, billing helpers, notification metadata, request types |
-| `@dubgrid/mobile-api-core` | `packages/mobile-api-core` | Server-side logic for mobile API route handlers (auth, org, people-status, push, read, write, shift-requests, setup) |
-| `@dubgrid/schedule-core` | `packages/schedule-core` | Schedule entry types, shift display logic |
+| Package                    | Path                       | Purpose                                                                                                                                                                                                                                    |
+| -------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@dubgrid/api-client`      | `packages/api-client`      | Fetch/header utilities, query-param helpers                                                                                                                                                                                                |
+| `@dubgrid/authz`           | `packages/authz`           | Role levels (`ROLE_LEVEL`), permission builders (`buildPerms`, `buildPermissionContext`, `unionPermissions`), JWT claim extraction (`extractJwtClaims`), `READ_ONLY_PERMS`                                                                 |
+| `@dubgrid/client-errors`   | `packages/client-errors`   | Platform-neutral error translation: `formatClientErrorMessage`, `isNetworkConnectionError`, `translateErrorMessage`, canonical copy constants (`NETWORK_ERROR_MESSAGE`, `DEFAULT_ERROR_FALLBACK`)                                          |
+| `@dubgrid/contracts`       | `packages/contracts`       | Zod schemas for API contracts. Two exports: `.` (main) and `./mobile` (mobile-specific schemas)                                                                                                                                            |
+| `@dubgrid/data-access`     | `packages/data-access`     | Supabase query helpers and mobile data queries                                                                                                                                                                                             |
+| `@dubgrid/db-types`        | `packages/db-types`        | Generated DB type subsets (catalog, organization, requests, schedule, staff)                                                                                                                                                               |
+| `@dubgrid/design-tokens`   | `packages/design-tokens`   | Color and spacing tokens shared by web and mobile (`colorTokens`, etc.)                                                                                                                                                                    |
+| `@dubgrid/domain`          | `packages/domain`          | Core domain types and helpers: `Organization`, `AdminPermissions`, `PlatformRole`, `OrganizationRole`, `WorkspaceKind`, `isSelfAction`, `assertNotSelf`, `SelfActionForbiddenError`, billing helpers, notification metadata, request types |
+| `@dubgrid/mobile-api-core` | `packages/mobile-api-core` | Server-side logic for mobile API route handlers (auth, org, people-status, push, read, write, shift-requests, setup)                                                                                                                       |
+| `@dubgrid/schedule-core`   | `packages/schedule-core`   | Schedule entry types, shift display logic                                                                                                                                                                                                  |
 
 There is no `packages/shared` or `packages/ui` directory.
 
@@ -53,6 +53,7 @@ the Supabase SSR/browser-specific setup code itself.
 - Do not duplicate logic already owned by a package.
 
 Prefer existing boundaries:
+
 - Zod schemas/API contracts: `@dubgrid/contracts`
 - Domain types and enums: `@dubgrid/domain`
 - Permission/role logic: `@dubgrid/authz`

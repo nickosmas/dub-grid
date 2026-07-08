@@ -5,10 +5,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie } from "@/lib/api-auth";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
-import {
-  countBillableAppUsers,
-  resolveBillingReturnUrl,
-} from "@/features/billing/server";
+import { countBillableAppUsers, resolveBillingReturnUrl } from "@/features/billing/server";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -59,10 +56,7 @@ export async function POST(req: NextRequest) {
       `billing-checkout:${auth.actor.id}:${orgId}`,
     );
     if (misconfigured) {
-      return NextResponse.json(
-        { error: "Service temporarily unavailable" },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -105,10 +99,7 @@ export async function POST(req: NextRequest) {
         if (authUser?.user?.email) email = authUser.user.email;
       }
       if (!email) {
-        return NextResponse.json(
-          { error: "Billing contact email required" },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: "Billing contact email required" }, { status: 400 });
       }
 
       const customer = await createStripeCustomer(orgId, org.name, email);

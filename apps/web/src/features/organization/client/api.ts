@@ -40,10 +40,7 @@ function resolveClientUrl(path: string): string {
   return path;
 }
 
-async function requestOrganizationJson<T>(
-  input: string,
-  init?: RequestInit,
-): Promise<T> {
+async function requestOrganizationJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(resolveClientUrl(input), init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -51,9 +48,7 @@ async function requestOrganizationJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "Organization request failed."),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, "Organization request failed."));
   }
 
   return body as T;
@@ -80,9 +75,7 @@ export function fetchOrganizationDirectory(
   return requestOrganizationJson(`/api/organization/directory?${params}`);
 }
 
-export function fetchOrganizationEmployeeCount(
-  orgId: string,
-): Promise<{ employeeCount: number }> {
+export function fetchOrganizationEmployeeCount(orgId: string): Promise<{ employeeCount: number }> {
   const params = new URLSearchParams({ orgId });
   return requestOrganizationJson(`/api/organization/employee-count?${params}`);
 }

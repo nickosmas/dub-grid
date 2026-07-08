@@ -67,16 +67,10 @@ function assertApiBaseUrl(): string {
 }
 
 function isAbortError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    (error.name === "AbortError" || /aborted/i.test(error.message))
-  );
+  return error instanceof Error && (error.name === "AbortError" || /aborted/i.test(error.message));
 }
 
-function createMobileTransportErrorMessage(
-  baseUrl: string,
-  error: unknown,
-): string {
+function createMobileTransportErrorMessage(baseUrl: string, error: unknown): string {
   void baseUrl;
   if (isAbortError(error)) {
     return "DubGrid took too long to respond. Check your internet connection and try again.";
@@ -85,11 +79,7 @@ function createMobileTransportErrorMessage(
   return "We couldn't connect to DubGrid from this device. Check your internet connection and try again.";
 }
 
-function createNonJsonApiErrorMessage(
-  baseUrl: string,
-  path: string,
-  response: Response,
-): string {
+function createNonJsonApiErrorMessage(baseUrl: string, path: string, response: Response): string {
   void baseUrl;
   void path;
   void response;
@@ -243,8 +233,7 @@ function parseMobileAccountLinkDetails(
   }
 
   return {
-    employeeId:
-      typeof details.employeeId === "string" ? details.employeeId : null,
+    employeeId: typeof details.employeeId === "string" ? details.employeeId : null,
     userId: details.userId,
     employeeFirstName: details.employeeFirstName,
     employeeLastName: details.employeeLastName,
@@ -253,9 +242,7 @@ function parseMobileAccountLinkDetails(
   };
 }
 
-export function parseMobileAccountLinkChallenge(
-  error: unknown,
-): MobileAccountLinkChallenge | null {
+export function parseMobileAccountLinkChallenge(error: unknown): MobileAccountLinkChallenge | null {
   if (!(error instanceof ApiResponseError)) {
     return null;
   }
@@ -285,9 +272,7 @@ export function parseMobileAccountLinkChallenge(
   return null;
 }
 
-export function parseMobileNameMismatchError(
-  error: unknown,
-): MobileNameMismatchError | null {
+export function parseMobileNameMismatchError(error: unknown): MobileNameMismatchError | null {
   const challenge = parseMobileAccountLinkChallenge(error);
   if (challenge?.kind !== "name_mismatch") {
     return null;
@@ -296,32 +281,19 @@ export function parseMobileNameMismatchError(
   return new MobileNameMismatchError(challenge.details);
 }
 
-export function getBootstrap(
-  accessToken: string,
-): Promise<MobileBootstrapResponse> {
-  return mobileApiRequest(
-    "/api/mobile/v1/bootstrap",
-    accessToken,
-    { method: "GET" },
-    (value) => mobileBootstrapResponseSchema.parse(value),
+export function getBootstrap(accessToken: string): Promise<MobileBootstrapResponse> {
+  return mobileApiRequest("/api/mobile/v1/bootstrap", accessToken, { method: "GET" }, (value) =>
+    mobileBootstrapResponseSchema.parse(value),
   );
 }
 
-export function getProfile(
-  accessToken: string,
-): Promise<MobileProfileResponse> {
-  return mobileApiRequest(
-    "/api/mobile/v1/profile",
-    accessToken,
-    { method: "GET" },
-    (value) => mobileProfileResponseSchema.parse(value),
+export function getProfile(accessToken: string): Promise<MobileProfileResponse> {
+  return mobileApiRequest("/api/mobile/v1/profile", accessToken, { method: "GET" }, (value) =>
+    mobileProfileResponseSchema.parse(value),
   );
 }
 
-export function updateProfilePhone(
-  accessToken: string,
-  body: MobileProfilePhoneUpdateBody,
-) {
+export function updateProfilePhone(accessToken: string, body: MobileProfilePhoneUpdateBody) {
   return mobileApiRequest(
     "/api/mobile/v1/profile/phone",
     accessToken,
@@ -333,10 +305,7 @@ export function updateProfilePhone(
   );
 }
 
-export function updateProfileAccount(
-  accessToken: string,
-  body: MobileProfileAccountUpdateBody,
-) {
+export function updateProfileAccount(accessToken: string, body: MobileProfileAccountUpdateBody) {
   return mobileApiRequest(
     "/api/mobile/v1/profile/account",
     accessToken,
@@ -430,10 +399,7 @@ export function getProfileSessions(accessToken: string) {
   );
 }
 
-export function revokeProfileSession(
-  accessToken: string,
-  refreshTokenHash: string,
-) {
+export function revokeProfileSession(accessToken: string, refreshTokenHash: string) {
   return mobileApiRequest(
     "/api/mobile/v1/profile/sessions",
     accessToken,
@@ -508,10 +474,9 @@ export async function verifyMobileTotpFactor(input: {
     throw error;
   }
 
-  const { data: refreshData, error: refreshError } =
-    await mfaClient.auth.refreshSession({
-      refresh_token: data.refresh_token,
-    });
+  const { data: refreshData, error: refreshError } = await mfaClient.auth.refreshSession({
+    refresh_token: data.refresh_token,
+  });
 
   if (refreshError) {
     throw refreshError;
@@ -524,9 +489,7 @@ export async function verifyMobileTotpFactor(input: {
   return mapSupabaseSessionToMobileAuthSession(refreshData.session);
 }
 
-export function registerMobileSessionPresence(
-  accessToken: string,
-): Promise<{ success: true }> {
+export function registerMobileSessionPresence(accessToken: string): Promise<{ success: true }> {
   const platform = getNativeSessionPlatform();
   if (!platform) {
     return Promise.resolve({ success: true });
@@ -556,10 +519,7 @@ export function registerMobileSessionPresence(
   );
 }
 
-export function getMySchedule(
-  accessToken: string,
-  query?: MobileScheduleRange,
-) {
+export function getMySchedule(accessToken: string, query?: MobileScheduleRange) {
   return mobileApiRequest(
     withQuery("/api/mobile/v1/me/schedule", query),
     accessToken,
@@ -576,10 +536,7 @@ function getNativeSessionPlatform(): "ios" | "android" | null {
   return null;
 }
 
-export function getOrgSchedule(
-  accessToken: string,
-  query?: MobileScheduleRange,
-) {
+export function getOrgSchedule(accessToken: string, query?: MobileScheduleRange) {
   return mobileApiRequest(
     withQuery("/api/mobile/v1/org/schedule", query),
     accessToken,
@@ -588,10 +545,7 @@ export function getOrgSchedule(
   );
 }
 
-export function getShiftRequests(
-  accessToken: string,
-  query?: MobileScheduleRange,
-) {
+export function getShiftRequests(accessToken: string, query?: MobileScheduleRange) {
   return mobileApiRequest(
     withQuery("/api/mobile/v1/shift-requests", query),
     accessToken,
@@ -615,10 +569,7 @@ export function getShiftSwapOptions(
   );
 }
 
-export function createShiftRequest(
-  accessToken: string,
-  body: MobileCreateShiftRequestBody,
-) {
+export function createShiftRequest(accessToken: string, body: MobileCreateShiftRequestBody) {
   return mobileApiRequest(
     "/api/mobile/v1/shift-requests",
     accessToken,
@@ -659,10 +610,7 @@ export type MobileNotificationsListParams = {
   sort?: "asc" | "desc";
 };
 
-export function getNotifications(
-  accessToken: string,
-  params: MobileNotificationsListParams = {},
-) {
+export function getNotifications(accessToken: string, params: MobileNotificationsListParams = {}) {
   const query: Record<string, string | undefined> = {
     limit: params.limit ? String(params.limit) : undefined,
     cursorCreatedAt: params.cursorCreatedAt,
@@ -683,10 +631,7 @@ export function getNotifications(
   );
 }
 
-export function markNotificationRead(
-  accessToken: string,
-  notificationId: string,
-) {
+export function markNotificationRead(accessToken: string, notificationId: string) {
   return mobileApiRequest(
     `/api/mobile/v1/notifications/${notificationId}`,
     accessToken,
@@ -732,11 +677,8 @@ export function bulkUpdateNotifications(
 }
 
 export function getPeople(accessToken: string) {
-  return mobileApiRequest(
-    "/api/mobile/v1/people",
-    accessToken,
-    { method: "GET" },
-    (value) => mobilePeopleResponseSchema.parse(value),
+  return mobileApiRequest("/api/mobile/v1/people", accessToken, { method: "GET" }, (value) =>
+    mobilePeopleResponseSchema.parse(value),
   );
 }
 

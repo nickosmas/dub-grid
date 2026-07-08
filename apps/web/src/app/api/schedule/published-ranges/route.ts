@@ -12,9 +12,7 @@ const querySchema = z.object({
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const parsed = querySchema.safeParse(
-    Object.fromEntries(req.nextUrl.searchParams.entries()),
-  );
+  const parsed = querySchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   }
@@ -23,9 +21,7 @@ export async function GET(req: NextRequest) {
     req,
     parsed.data.orgId,
     (permissions) =>
-      permissions.isGridmaster ||
-      permissions.isSuperAdmin ||
-      permissions.canViewSchedule,
+      permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
   );
   if ("response" in auth) {
     return auth.response;

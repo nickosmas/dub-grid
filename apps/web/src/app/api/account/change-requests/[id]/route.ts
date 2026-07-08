@@ -5,10 +5,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { apiErrorResponse } from "@/lib/error-handling";
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
 

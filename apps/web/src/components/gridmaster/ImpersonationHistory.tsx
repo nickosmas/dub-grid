@@ -25,10 +25,25 @@ function StatusBadge({ entry, now }: { entry: ImpersonationHistoryEntry; now: nu
   const isActive = !isEnded && !isExpired;
 
   const config = isActive
-    ? { bg: "var(--color-warning-bg)", text: "var(--color-warning)", border: "var(--color-warning-border)", label: "Active" }
+    ? {
+        bg: "var(--color-warning-bg)",
+        text: "var(--color-warning)",
+        border: "var(--color-warning-border)",
+        label: "Active",
+      }
     : isEnded
-      ? { bg: "var(--color-success-bg)", text: "var(--color-success)", border: "var(--color-success-border)", label: "Ended" }
-      : { bg: "var(--color-bg-secondary)", text: "var(--color-text-muted)", border: "var(--color-border)", label: "Expired" };
+      ? {
+          bg: "var(--color-success-bg)",
+          text: "var(--color-success)",
+          border: "var(--color-success-border)",
+          label: "Ended",
+        }
+      : {
+          bg: "var(--color-bg-secondary)",
+          text: "var(--color-text-muted)",
+          border: "var(--color-border)",
+          label: "Expired",
+        };
 
   return (
     <span
@@ -50,11 +65,14 @@ function StatusBadge({ entry, now }: { entry: ImpersonationHistoryEntry; now: nu
   );
 }
 
-function formatDuration(startStr: string, endStr: string | null, expiresStr: string, now: number): string {
+function formatDuration(
+  startStr: string,
+  endStr: string | null,
+  expiresStr: string,
+  now: number,
+): string {
   const start = new Date(startStr).getTime();
-  const end = endStr
-    ? new Date(endStr).getTime()
-    : Math.min(now, new Date(expiresStr).getTime());
+  const end = endStr ? new Date(endStr).getTime() : Math.min(now, new Date(expiresStr).getTime());
   const diffMs = Math.max(0, end - start);
   const mins = Math.floor(diffMs / 60000);
   const secs = Math.floor((diffMs % 60000) / 1000);
@@ -68,10 +86,14 @@ function formatDuration(startStr: string, endStr: string | null, expiresStr: str
 function formatReason(reason: string | null): string {
   if (!reason) return "—";
   switch (reason) {
-    case "manual": return "Manual";
-    case "expired": return "Expired";
-    case "navigation": return "Navigation";
-    default: return reason;
+    case "manual":
+      return "Manual";
+    case "expired":
+      return "Expired";
+    case "navigation":
+      return "Navigation";
+    default:
+      return reason;
   }
 }
 
@@ -89,22 +111,44 @@ export default function ImpersonationHistory() {
     staleTime: 30_000,
   });
   const entries = historyQuery.data ?? [];
-  const error =
-    historyQuery.error
-      ? formatClientErrorMessage(historyQuery.error, "Failed to load impersonation history")
-      : null;
+  const error = historyQuery.error
+    ? formatClientErrorMessage(historyQuery.error, "Failed to load impersonation history")
+    : null;
 
   return (
     <>
-      <h2 style={{ margin: "0 0 4px", fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2
+        style={{
+          margin: "0 0 4px",
+          fontSize: "var(--dg-fs-page-title)",
+          fontWeight: 700,
+          color: "var(--color-text-primary)",
+        }}
+      >
         Impersonation History
       </h2>
-      <p style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+      <p
+        style={{
+          margin: "0 0 16px",
+          fontSize: "var(--dg-fs-label)",
+          color: "var(--color-text-muted)",
+        }}
+      >
         Audit trail of all impersonation sessions.
       </p>
 
       {error && (
-        <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--dg-radius-lg)", fontSize: "var(--dg-fs-label)", fontWeight: 600, marginBottom: 16 }}>
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "var(--color-danger-bg)",
+            color: "var(--color-danger)",
+            borderRadius: "var(--dg-radius-lg)",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            marginBottom: 16,
+          }}
+        >
           {error}
         </div>
       )}
@@ -112,7 +156,15 @@ export default function ImpersonationHistory() {
       {historyQuery.isLoading ? (
         <div style={sectionStyle}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} style={{ display: "flex", gap: 12, padding: "12px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                gap: 12,
+                padding: "12px 14px",
+                borderBottom: "1px solid var(--color-border-light)",
+              }}
+            >
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "8%" }} />
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "16%" }} />
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "14%" }} />
@@ -153,46 +205,125 @@ export default function ImpersonationHistory() {
                           <td style={tdStyle}>
                             <StatusBadge entry={e} now={now} />
                           </td>
-                          <td style={{ ...tdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              fontWeight: 600,
+                              fontSize: "var(--dg-fs-caption)",
+                            }}
+                          >
                             {e.targetEmail}
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-text-muted)",
+                            }}
+                          >
                             {e.targetOrgName ?? "—"}
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-text-muted)",
+                            }}
+                          >
                             {e.gridmasterEmail}
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-primary)", maxWidth: 200 }}>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-text-primary)",
+                              maxWidth: 200,
+                            }}
+                          >
                             <MaybeHint content={e.justification} side="bottom">
                               <span
-                                style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                                style={{
+                                  display: "block",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
                               >
                                 {e.justification || "—"}
                               </span>
                             </MaybeHint>
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
-                            {startDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                            {" "}
-                            {startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                          <td
+                            style={{
+                              ...tdStyle,
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-text-muted)",
+                              whiteSpace: "nowrap",
+                              fontFamily: "var(--font-dm-mono), monospace",
+                            }}
+                          >
+                            {startDate.toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}{" "}
+                            {startDate.toLocaleTimeString("en-US", {
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
-                            {endDate
-                              ? <>
-                                  {endDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                  {" "}
-                                  {endDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                                </>
-                              : "—"
-                            }
+                          <td
+                            style={{
+                              ...tdStyle,
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-text-muted)",
+                              whiteSpace: "nowrap",
+                              fontFamily: "var(--font-dm-mono), monospace",
+                            }}
+                          >
+                            {endDate ? (
+                              <>
+                                {endDate.toLocaleDateString("en-US", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}{" "}
+                                {endDate.toLocaleTimeString("en-US", {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })}
+                              </>
+                            ) : (
+                              "—"
+                            )}
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono, monospace)" }}>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-text-muted)",
+                              fontFamily: "var(--font-dm-mono, monospace)",
+                            }}
+                          >
                             {formatDuration(e.createdAt, e.endedAt, e.expiresAt, now)}
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-text-muted)",
+                            }}
+                          >
                             {formatReason(e.endReason)}
                           </td>
-                          <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono, monospace)" }}>
+                          <td
+                            style={{
+                              ...tdStyle,
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-text-muted)",
+                              fontFamily: "var(--font-dm-mono, monospace)",
+                            }}
+                          >
                             {e.ipAddress ?? "—"}
                           </td>
                         </tr>
@@ -205,7 +336,16 @@ export default function ImpersonationHistory() {
           ) : (
             <EmptyState
               icon={
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
@@ -215,7 +355,15 @@ export default function ImpersonationHistory() {
           )}
 
           {/* Pagination */}
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", alignItems: "center", marginTop: 16 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              justifyContent: "center",
+              alignItems: "center",
+              marginTop: 16,
+            }}
+          >
             <button
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={page === 0}
@@ -223,7 +371,13 @@ export default function ImpersonationHistory() {
             >
               Previous
             </button>
-            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace" }}>
+            <span
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                fontFamily: "var(--font-dm-mono), monospace",
+              }}
+            >
               {page * PAGE_SIZE + 1}–{page * PAGE_SIZE + entries.length}
             </span>
             <button

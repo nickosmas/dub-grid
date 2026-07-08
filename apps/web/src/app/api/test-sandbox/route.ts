@@ -4,10 +4,7 @@ import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-service";
-import {
-  SANDBOX_COOKIE_NAME,
-  encodeSandboxCookieValue,
-} from "@/lib/sandbox-cookie";
+import { SANDBOX_COOKIE_NAME, encodeSandboxCookieValue } from "@/lib/sandbox-cookie";
 import {
   createSandboxForUser,
   deleteSandboxForUser,
@@ -32,9 +29,7 @@ const requestSchema = z.discriminatedUnion("action", [
 const SANDBOX_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 function getClaimOrgId(claims: { org_id?: unknown }): string | null {
-  return typeof claims.org_id === "string" && claims.org_id.length > 0
-    ? claims.org_id
-    : null;
+  return typeof claims.org_id === "string" && claims.org_id.length > 0 ? claims.org_id : null;
 }
 
 export async function POST(req: NextRequest) {
@@ -76,15 +71,9 @@ export async function POST(req: NextRequest) {
     // far more expensive than exit — rate-limit them (per user) so a client
     // can't spam reset and hammer the clone path. Exit is intentionally not
     // throttled: a user must always be able to leave sandbox mode.
-    const { limited, reset, misconfigured } = await checkRateLimit(
-      apiLimiter,
-      auth.user.id,
-    );
+    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, auth.user.id);
     if (misconfigured) {
-      return NextResponse.json(
-        { error: "Service temporarily unavailable" },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -104,8 +93,7 @@ export async function POST(req: NextRequest) {
       .select("org_id")
       .eq("id", auth.user.id)
       .maybeSingle();
-    const sourceOrgId =
-      (profile?.org_id as string | undefined) ?? getClaimOrgId(auth.claims);
+    const sourceOrgId = (profile?.org_id as string | undefined) ?? getClaimOrgId(auth.claims);
     if (!sourceOrgId) {
       return NextResponse.json(
         { error: "Pick an organization before entering sandbox mode." },
@@ -118,9 +106,7 @@ export async function POST(req: NextRequest) {
     // For "enter": reuse the existing sandbox if there is one (typical case is
     // the user re-clicking enter from another tab and expecting their
     // in-progress work back). For "reset": ignore it — we recreate below.
-    const existing = isReset
-      ? null
-      : await findActiveSandboxForUser(serviceClient, auth.user.id);
+    const existing = isReset ? null : await findActiveSandboxForUser(serviceClient, auth.user.id);
 
     // Defense in depth: when we're about to CLONE (reset, or enter with no
     // existing sandbox), clone only an org the user is an active member of.
@@ -182,9 +168,7 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "We couldn't toggle sandbox mode right now.";
+      error instanceof Error ? error.message : "We couldn't toggle sandbox mode right now.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

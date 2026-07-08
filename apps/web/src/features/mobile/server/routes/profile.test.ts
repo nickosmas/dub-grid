@@ -105,9 +105,7 @@ describe("mobile profile routes", () => {
 
   it("returns the authenticated user's current-organization profile", async () => {
     const { GET } = await import("./profile");
-    const response = await GET(
-      new Request("http://localhost/api/mobile/v1/profile") as never,
-    );
+    const response = await GET(new Request("http://localhost/api/mobile/v1/profile") as never);
     const payload = await response.json();
 
     expect(response.status).toBe(200);
@@ -149,9 +147,7 @@ describe("mobile profile routes", () => {
     ]);
 
     const { GET } = await import("./profile");
-    const response = await GET(
-      new Request("http://localhost/api/mobile/v1/profile") as never,
-    );
+    const response = await GET(new Request("http://localhost/api/mobile/v1/profile") as never);
     const payload = await response.json();
 
     expect(response.status).toBe(200);
@@ -168,9 +164,7 @@ describe("mobile profile routes", () => {
     ]);
 
     const { GET } = await import("./profile");
-    const response = await GET(
-      new Request("http://localhost/api/mobile/v1/profile") as never,
-    );
+    const response = await GET(new Request("http://localhost/api/mobile/v1/profile") as never);
     const payload = await response.json();
 
     expect(response.status).toBe(200);
@@ -297,9 +291,7 @@ describe("mobile profile preference and session routes", () => {
 
     const { GET } = await import("./profile-notification-preferences");
     const response = await GET(
-      new Request(
-        "http://localhost/api/mobile/v1/profile/notification-preferences",
-      ) as never,
+      new Request("http://localhost/api/mobile/v1/profile/notification-preferences") as never,
     );
     const payload = await response.json();
 
@@ -320,13 +312,10 @@ describe("mobile profile preference and session routes", () => {
 
     const { PUT } = await import("./profile-notification-preferences");
     const response = await PUT(
-      new Request(
-        "http://localhost/api/mobile/v1/profile/notification-preferences",
-        {
-          method: "PUT",
-          body: JSON.stringify({ prefs }),
-        },
-      ) as never,
+      new Request("http://localhost/api/mobile/v1/profile/notification-preferences", {
+        method: "PUT",
+        body: JSON.stringify({ prefs }),
+      }) as never,
     );
 
     expect(response.status).toBe(200);

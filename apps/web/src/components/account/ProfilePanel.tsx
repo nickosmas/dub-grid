@@ -45,16 +45,14 @@ interface ProfilePanelProps {
   setEmployee: Dispatch<SetStateAction<Employee | null>>;
 }
 
-type PendingConfirm =
-  | "account-details"
-  | "name-change-request"
-  | "account-deletion"
-  | null;
+type PendingConfirm = "account-details" | "name-change-request" | "account-deletion" | null;
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <span className="dg-label" style={{ marginBottom: 0 }}>{label}</span>
+      <span className="dg-label" style={{ marginBottom: 0 }}>
+        {label}
+      </span>
       <span
         style={{
           fontSize: "var(--dg-fs-body-sm)",
@@ -300,9 +298,7 @@ export function ProfilePanel({
     setCancellingId(request.id);
     try {
       const result = await cancelOwnProfileChangeRequest(request.id);
-      setChangeRequests((cur) =>
-        cur.map((r) => (r.id === result.request.id ? result.request : r)),
-      );
+      setChangeRequests((cur) => cur.map((r) => (r.id === result.request.id ? result.request : r)));
       toast.success(
         request.type === "account_deletion"
           ? "Account deletion request cancelled."
@@ -502,9 +498,7 @@ export function ProfilePanel({
                   value={requestFirstName}
                   onChange={(e) => setRequestFirstName(e.target.value)}
                 />
-                {requestFirstNameError && (
-                  <p className="dg-form-error">{requestFirstNameError}</p>
-                )}
+                {requestFirstNameError && <p className="dg-form-error">{requestFirstNameError}</p>}
               </div>
               <div>
                 <input
@@ -515,9 +509,7 @@ export function ProfilePanel({
                   value={requestLastName}
                   onChange={(e) => setRequestLastName(e.target.value)}
                 />
-                {requestLastNameError && (
-                  <p className="dg-form-error">{requestLastNameError}</p>
-                )}
+                {requestLastNameError && <p className="dg-form-error">{requestLastNameError}</p>}
               </div>
             </div>
             <textarea
@@ -572,10 +564,7 @@ export function ProfilePanel({
             }}
           >
             <div>
-              <div
-                className="text-[14px] font-semibold"
-                style={{ color: "var(--color-danger)" }}
-              >
+              <div className="text-[14px] font-semibold" style={{ color: "var(--color-danger)" }}>
                 Delete account
               </div>
               <p className="mb-0 mt-1 text-[13px] text-[var(--color-text-muted)]">

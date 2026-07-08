@@ -22,10 +22,11 @@ export default function TimezoneSelect({
   style,
 }: TimezoneSelectProps) {
   const options = useMemo(
-    () => buildTimezoneOptions({
-      selectedTimeZone: value || null,
-      detectedTimeZone: getBrowserTimezone(),
-    }),
+    () =>
+      buildTimezoneOptions({
+        selectedTimeZone: value || null,
+        detectedTimeZone: getBrowserTimezone(),
+      }),
     [value],
   );
   const selectedOption = options.find((option) => option.value === value) ?? null;
@@ -50,125 +51,140 @@ export default function TimezoneSelect({
 
   const triggerLabel = selectedOption?.triggerLabel ?? placeholder;
 
-  const menu = open && !disabled
-    ? (
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverContent
-            anchor={triggerRef}
-            side="bottom"
-            align="start"
-            sideOffset={6}
-            positionMethod="fixed"
-            collisionPadding={12}
-            collisionAvoidance={{
-              side: "flip",
-              align: "shift",
-              fallbackAxisSide: "none",
+  const menu =
+    open && !disabled ? (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverContent
+          anchor={triggerRef}
+          side="bottom"
+          align="start"
+          sideOffset={6}
+          positionMethod="fixed"
+          collisionPadding={12}
+          collisionAvoidance={{
+            side: "flip",
+            align: "shift",
+            fallbackAxisSide: "none",
+          }}
+          initialFocus={false}
+          className="dg-menu"
+          style={{
+            padding: 10,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            width: "min(max(var(--anchor-width), 340px), calc(100vw - 24px))",
+            maxHeight: "min(420px, var(--available-height, calc(100vh - 24px)))",
+          }}
+        >
+          <input
+            ref={searchRef}
+            className="dg-input"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setFocusedIndex(0);
             }}
-            initialFocus={false}
-            className="dg-menu"
-            style={{
-              padding: 10,
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              width: "min(max(var(--anchor-width), 340px), calc(100vw - 24px))",
-              maxHeight: "min(420px, var(--available-height, calc(100vh - 24px)))",
-            }}
-          >
-            <input
-              ref={searchRef}
-              className="dg-input"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                setFocusedIndex(0);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "ArrowDown") {
-                  event.preventDefault();
-                  setFocusedIndex((prev) => Math.min(prev + 1, Math.max(filteredOptions.length - 1, 0)));
-                } else if (event.key === "ArrowUp") {
-                  event.preventDefault();
-                  setFocusedIndex((prev) => Math.max(prev - 1, 0));
-                } else if (event.key === "Enter") {
-                  event.preventDefault();
-                  const option = filteredOptions[focusedIndex];
-                  if (option) {
-                    onChange(option.value);
-                    setOpen(false);
-                  }
-                } else if (event.key === "Escape") {
-                  event.preventDefault();
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setFocusedIndex((prev) =>
+                  Math.min(prev + 1, Math.max(filteredOptions.length - 1, 0)),
+                );
+              } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setFocusedIndex((prev) => Math.max(prev - 1, 0));
+              } else if (event.key === "Enter") {
+                event.preventDefault();
+                const option = filteredOptions[focusedIndex];
+                if (option) {
+                  onChange(option.value);
                   setOpen(false);
                 }
-              }}
-              placeholder="Search time zones…"
-            />
-            <div
-              role="listbox"
-              aria-label="Time zones"
-              style={{
-                flex: 1,
-                minHeight: 0,
-                overflowY: "auto",
-                overscrollBehavior: "contain",
-                display: "flex",
-                flexDirection: "column",
-                gap: 4,
-              }}
-            >
-              {filteredOptions.length === 0 ? (
-                <div
-                  style={{
-                    padding: "10px 12px",
-                    fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-muted)",
-                  }}
-                >
-                  No matching time zones
-                </div>
-              ) : (
-                filteredOptions.map((option, index) => {
-                  const isSelected = option.value === value;
-                  const isFocused = index === focusedIndex;
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                setOpen(false);
+              }
+            }}
+            placeholder="Search time zones…"
+          />
+          <div
+            role="listbox"
+            aria-label="Time zones"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              overscrollBehavior: "contain",
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
+            {filteredOptions.length === 0 ? (
+              <div
+                style={{
+                  padding: "10px 12px",
+                  fontSize: "var(--dg-fs-label)",
+                  color: "var(--color-text-muted)",
+                }}
+              >
+                No matching time zones
+              </div>
+            ) : (
+              filteredOptions.map((option, index) => {
+                const isSelected = option.value === value;
+                const isFocused = index === focusedIndex;
 
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      className="dg-menu-item"
-                      onClick={() => {
-                        onChange(option.value);
-                        setOpen(false);
-                      }}
-                      onMouseEnter={() => setFocusedIndex(index)}
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    className="dg-menu-item"
+                    onClick={() => {
+                      onChange(option.value);
+                      setOpen(false);
+                    }}
+                    onMouseEnter={() => setFocusedIndex(index)}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      gap: 2,
+                      background: isFocused
+                        ? "var(--color-bg-secondary)"
+                        : isSelected
+                          ? "var(--color-border-light)"
+                          : undefined,
+                    }}
+                  >
+                    <span
                       style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "flex-start",
-                        gap: 2,
-                        background: isFocused ? "var(--color-bg-secondary)" : isSelected ? "var(--color-border-light)" : undefined,
+                        fontWeight: isSelected ? 700 : 600,
+                        color: "var(--color-text-primary)",
                       }}
                     >
-                      <span style={{ fontWeight: isSelected ? 700 : 600, color: "var(--color-text-primary)" }}>
-                        {option.label}
-                      </span>
-                      <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
-                        {option.value}
-                      </span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-      )
-    : null;
+                      {option.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      {option.value}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    ) : null;
 
   return (
     <>

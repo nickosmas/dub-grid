@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { clientEnv } from "@/lib/env";
 
 /**
  * Extract the root domain from a hostname (e.g., "acme.dubgrid.com" → "dubgrid.com").
@@ -27,17 +28,12 @@ function getRootDomain(hostname: string): string {
 export function validateCsrfOrigin(req: NextRequest): NextResponse | null {
   const origin = req.headers.get("origin");
   const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.NEXT_PUBLIC_VERCEL_URL
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : null);
+    clientEnv?.NEXT_PUBLIC_SITE_URL ||
+    (clientEnv?.NEXT_PUBLIC_VERCEL_URL ? `https://${clientEnv.NEXT_PUBLIC_VERCEL_URL}` : null);
 
   if (!origin || !siteUrl) {
     if (process.env.NODE_ENV === "production") {
-      return NextResponse.json(
-        { success: false, error: "Forbidden" },
-        { status: 403 },
-      );
+      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
     return null;
   }
@@ -48,10 +44,7 @@ export function validateCsrfOrigin(req: NextRequest): NextResponse | null {
   const originRoot = getRootDomain(new URL(origin).hostname);
 
   if (originRoot !== allowedRoot) {
-    return NextResponse.json(
-      { success: false, error: "Forbidden" },
-      { status: 403 },
-    );
+    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
   }
 
   return null;

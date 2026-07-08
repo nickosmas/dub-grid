@@ -50,8 +50,7 @@ export default function ImportResultsModal({
         }}
       >
         Imported {breakdown.imported} of {breakdown.totalSource} shift
-        {breakdown.totalSource === 1 ? "" : "s"} from {sourceRange} into{" "}
-        {targetRange}.
+        {breakdown.totalSource === 1 ? "" : "s"} from {sourceRange} into {targetRange}.
       </p>
 
       {breakdown.totalSkipped === 0 ? null : (

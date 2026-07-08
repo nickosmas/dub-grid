@@ -53,9 +53,7 @@ export function useNotificationsRealtime({
         invalidate();
       } else if (status === "CHANNEL_ERROR") {
         hadError = true;
-        Sentry.captureException(
-          err ?? new Error("notifications realtime channel error"),
-        );
+        Sentry.captureException(err ?? new Error("notifications realtime channel error"));
       }
     });
 

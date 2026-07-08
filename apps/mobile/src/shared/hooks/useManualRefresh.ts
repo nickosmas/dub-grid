@@ -2,9 +2,7 @@ import { useCallback, useRef, useState } from "react";
 
 const REFRESH_COOLDOWN_MS = 500;
 
-export function useManualRefresh(
-  onRefresh: () => Promise<unknown> | unknown,
-) {
+export function useManualRefresh(onRefresh: () => Promise<unknown> | unknown) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   // Track the last completion time to suppress rapid back-to-back pulls.
   const lastCompletedAtRef = useRef(0);

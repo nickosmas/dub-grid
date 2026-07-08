@@ -156,9 +156,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
     });
 
     const { GET } = await import("./route");
-    const response = await GET(
-      new Request("http://localhost/api/mobile/v1/bootstrap") as never,
-    );
+    const response = await GET(new Request("http://localhost/api/mobile/v1/bootstrap") as never);
     const payload = await response.json();
 
     expect(response.status).toBe(200);

@@ -50,11 +50,7 @@ import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -87,11 +83,7 @@ type EditDraft = {
 };
 
 function getFullName(person: MobilePerson): string {
-  return (
-    `${person.firstName} ${person.lastName}`.trim() ||
-    person.email ||
-    "Unnamed person"
-  );
+  return `${person.firstName} ${person.lastName}`.trim() || person.email || "Unnamed person";
 }
 
 function formatStatusLabel(status: MobilePerson["status"]): string {
@@ -135,8 +127,7 @@ export default function PersonDetailScreen() {
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
-  const [showDiscardCancelConfirmation, setShowDiscardCancelConfirmation] =
-    useState(false);
+  const [showDiscardCancelConfirmation, setShowDiscardCancelConfirmation] = useState(false);
   const [inactiveNote, setInactiveNote] = useState("");
   const [showCollapsedHeader, setShowCollapsedHeader] = useState(false);
   const [accountLinkChallenge, setAccountLinkChallenge] =
@@ -150,18 +141,12 @@ export default function PersonDetailScreen() {
   const manualRefresh = useManualRefresh(() =>
     Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]),
   );
-  const canManageEmployees = Boolean(
-    bootstrapQuery.data?.permissions.canManageEmployees,
-  );
+  const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const currentUserId = bootstrapQuery.data?.user?.id ?? null;
   const rawPerson = personQuery.data?.person ?? null;
   const person =
-    rawPerson && (canManageEmployees || rawPerson.status === "active")
-      ? rawPerson
-      : null;
-  const isSelf = Boolean(
-    currentUserId && person?.userId && person.userId === currentUserId,
-  );
+    rawPerson && (canManageEmployees || rawPerson.status === "active") ? rawPerson : null;
+  const isSelf = Boolean(currentUserId && person?.userId && person.userId === currentUserId);
   const canEdit = canManageEmployees && person?.status !== "removed";
   const contentState = getMobileQueryContentState({
     hasData: personQuery.data !== undefined,
@@ -182,10 +167,7 @@ export default function PersonDetailScreen() {
     }
   }, [editing, person]);
 
-  const maps = useMemo(
-    () => buildLookupMaps(bootstrapQuery.data),
-    [bootstrapQuery.data],
-  );
+  const maps = useMemo(() => buildLookupMaps(bootstrapQuery.data), [bootstrapQuery.data]);
 
   function updateCachedPerson(nextPerson: MobilePerson) {
     queryClient.setQueryData(["mobile", "person", accessToken, nextPerson.id], {
@@ -196,9 +178,7 @@ export default function PersonDetailScreen() {
       (current: { people: MobilePerson[] } | undefined) =>
         current
           ? {
-              people: current.people.map((item) =>
-                item.id === nextPerson.id ? nextPerson : item,
-              ),
+              people: current.people.map((item) => (item.id === nextPerson.id ? nextPerson : item)),
             }
           : current,
     );
@@ -428,13 +408,11 @@ export default function PersonDetailScreen() {
     );
   }
 
-  const focusAreaLabel =
-    bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
+  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
   const roleLabel = bootstrapQuery.data?.currentOrg.labels.role ?? "Roles";
   const certificationLabel =
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certification";
-  const departmentLabel =
-    bootstrapQuery.data?.currentOrg.labels.department ?? "Departments";
+  const departmentLabel = bootstrapQuery.data?.currentOrg.labels.department ?? "Departments";
   const focusAreaNames = formatIdList(person.focusAreaIds, maps.focusAreas);
   const scheduledDepartmentNames = formatIdList(
     getScheduledDepartmentIds(person.focusAreaIds, bootstrapQuery.data),
@@ -445,8 +423,7 @@ export default function PersonDetailScreen() {
     person.certificationId != null
       ? (maps.certifications.get(person.certificationId) ?? "Unknown")
       : "None";
-  const employmentLabel =
-    person.employmentType === "part_time" ? "Part-time" : "Full-time";
+  const employmentLabel = person.employmentType === "part_time" ? "Part-time" : "Full-time";
   const avatarTone = getAvatarTone(person.id);
   const fullName = getFullName(person);
   const orgRoleBadge = getMobileOrgRoleBadge(person.orgRole);
@@ -539,9 +516,7 @@ export default function PersonDetailScreen() {
         }
       />
 
-      <Stack.Screen
-        options={createDetailStackOptions(showCollapsedHeader ? fullName : "")}
-      />
+      <Stack.Screen options={createDetailStackOptions(showCollapsedHeader ? fullName : "")} />
 
       <ProfileHero
         avatarStyle={{
@@ -569,11 +544,7 @@ export default function PersonDetailScreen() {
             disabled={!person.phone}
             label="Call"
             leadingAccessory={
-              <Ionicons
-                color={mobileColors.successText}
-                name="call-outline"
-                size={18}
-              />
+              <Ionicons color={mobileColors.successText} name="call-outline" size={18} />
             }
             onPress={() => {
               if (person.phone) void Linking.openURL(`tel:${person.phone}`);
@@ -584,13 +555,7 @@ export default function PersonDetailScreen() {
             compact
             disabled={!person.email}
             label="Email"
-            leadingAccessory={
-              <Ionicons
-                color={mobileColors.brand}
-                name="mail-outline"
-                size={18}
-              />
-            }
+            leadingAccessory={<Ionicons color={mobileColors.brand} name="mail-outline" size={18} />}
             onPress={() => {
               if (person.email) void Linking.openURL(`mailto:${person.email}`);
             }}
@@ -601,11 +566,7 @@ export default function PersonDetailScreen() {
               compact
               label="Edit"
               leadingAccessory={
-                <Ionicons
-                  color={mobileColors.brand}
-                  name="create-outline"
-                  size={18}
-                />
+                <Ionicons color={mobileColors.brand} name="create-outline" size={18} />
               }
               onPress={() => {
                 setEditing(true);
@@ -641,11 +602,7 @@ export default function PersonDetailScreen() {
         <>
           <ProfileSection title="Staff profile">
             <ProfileList>
-              <ProfileInfoRow
-                iconName="person-circle-outline"
-                label="Name"
-                value={fullName}
-              />
+              <ProfileInfoRow iconName="person-circle-outline" label="Name" value={fullName} />
               <ProfileInfoRow
                 iconName="pulse-outline"
                 label="Status"
@@ -668,10 +625,7 @@ export default function PersonDetailScreen() {
               />
               <ProfileInfoRow
                 iconName="albums-outline"
-                isLast={
-                  !canManageEmployees ||
-                  (!person.statusChangedAt && !person.statusNote)
-                }
+                isLast={!canManageEmployees || (!person.statusChangedAt && !person.statusNote)}
                 label={focusAreaLabel}
                 value={focusAreaNames}
               />
@@ -766,17 +720,13 @@ export default function PersonDetailScreen() {
                 tone="dangerFilled"
               />
             ) : null}
-            {!person.userId &&
-            person.status !== "removed" &&
-            person.email ? (
+            {!person.userId && person.status !== "removed" && person.email ? (
               person.pendingInvitation ? (
                 <View style={styles.actionRow}>
                   <Button
                     compact
                     disabled={invitationMutation.isPending}
-                    label={
-                      invitationMutation.isPending ? "Sending..." : "Reinvite"
-                    }
+                    label={invitationMutation.isPending ? "Sending..." : "Reinvite"}
                     onPress={() => setInvitationConfirmAction("resend")}
                     tone="link"
                   />
@@ -792,11 +742,7 @@ export default function PersonDetailScreen() {
                 <Button
                   compact
                   disabled={invitationMutation.isPending}
-                  label={
-                    invitationMutation.isPending
-                      ? "Sending..."
-                      : "Send Invitation"
-                  }
+                  label={invitationMutation.isPending ? "Sending..." : "Send Invitation"}
                   onPress={() => setInvitationConfirmAction("create")}
                   tone="link"
                 />
@@ -860,9 +806,7 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body={invitationConfirmationBody}
         confirmLabel={invitationConfirmationLabel}
-        confirmTone={
-          invitationConfirmAction === "revoke" ? "dangerFilled" : "primary"
-        }
+        confirmTone={invitationConfirmAction === "revoke" ? "dangerFilled" : "primary"}
         loading={invitationMutation.isPending}
         onCancel={() => setInvitationConfirmAction(null)}
         onConfirm={confirmInvitationAction}
@@ -905,11 +849,7 @@ function AccountLinkChallengeModal({
     : "Confirm that this is the right app account.";
 
   return (
-    <BottomSheetModal
-      dismissDisabled={isPending}
-      onDismiss={onCancel}
-      visible={challenge != null}
-    >
+    <BottomSheetModal dismissDisabled={isPending} onDismiss={onCancel} visible={challenge != null}>
       <View style={styles.sheetHeader}>
         <Text style={styles.sheetTitle}>{title}</Text>
         <Text style={styles.sheetSubtitle}>{subtitle}</Text>
@@ -917,9 +857,7 @@ function AccountLinkChallengeModal({
 
       <View style={styles.modalInfoPanel}>
         <Text style={styles.modalInfoTitle}>
-          {isMismatch
-            ? "The account name is different"
-            : "Existing app account found"}
+          {isMismatch ? "The account name is different" : "Existing app account found"}
         </Text>
         <Text style={styles.modalInfoText}>
           {isMismatch
@@ -937,21 +875,12 @@ function AccountLinkChallengeModal({
         <Button
           disabled={isPending}
           label={
-            isPending
-              ? "Linking..."
-              : isMismatch
-                ? "Use Account Name"
-                : "Link Existing Account"
+            isPending ? "Linking..." : isMismatch ? "Use Account Name" : "Link Existing Account"
           }
           onPress={onConfirm}
           tone="secondary"
         />
-        <Button
-          disabled={isPending}
-          label="Cancel"
-          onPress={onCancel}
-          tone="neutral"
-        />
+        <Button disabled={isPending} label="Cancel" onPress={onCancel} tone="neutral" />
       </View>
     </BottomSheetModal>
   );
@@ -959,16 +888,10 @@ function AccountLinkChallengeModal({
 
 function buildLookupMaps(data: MobileBootstrapResponse | undefined) {
   return {
-    focusAreas: new Map(
-      (data?.focusAreas ?? []).map((item) => [item.id, item.name]),
-    ),
+    focusAreas: new Map((data?.focusAreas ?? []).map((item) => [item.id, item.name])),
     roles: new Map((data?.roles ?? []).map((item) => [item.id, item.name])),
-    certifications: new Map(
-      (data?.certifications ?? []).map((item) => [item.id, item.name]),
-    ),
-    departments: new Map(
-      (data?.departments ?? []).map((item) => [item.id, item.name]),
-    ),
+    certifications: new Map((data?.certifications ?? []).map((item) => [item.id, item.name])),
+    departments: new Map((data?.departments ?? []).map((item) => [item.id, item.name])),
   };
 }
 
@@ -1004,9 +927,7 @@ function sameIds(left: number[], right: number[]): boolean {
 }
 
 function formatIdList(ids: number[], map: Map<number, string>): string {
-  const values = ids
-    .map((id) => map.get(id))
-    .filter((value): value is string => Boolean(value));
+  const values = ids.map((id) => map.get(id)).filter((value): value is string => Boolean(value));
   return values.length > 0 ? values.join(", ") : "None";
 }
 
@@ -1058,8 +979,7 @@ function EditPanel({
     phone: getOptionalUsPhoneError(draft.phone),
     email: getOptionalStaffEmailError(draft.email),
     contactNotes: getStaffNotesError(draft.contactNotes),
-    focusAreaIds:
-      draft.focusAreaIds.length === 0 ? "Select at least one focus area" : null,
+    focusAreaIds: draft.focusAreaIds.length === 0 ? "Select at least one focus area" : null,
   };
   const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
   const hasChanges =
@@ -1080,9 +1000,7 @@ function EditPanel({
     const current = draft[key];
     setField(
       key,
-      current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id],
+      current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     );
   };
 
@@ -1165,9 +1083,7 @@ function EditPanel({
             ]}
             label="Employment"
             selectedIds={[draft.employmentType === "part_time" ? 1 : 0]}
-            onToggle={(id) =>
-              setField("employmentType", id === 1 ? "part_time" : "full_time")
-            }
+            onToggle={(id) => setField("employmentType", id === 1 ? "part_time" : "full_time")}
           />
           <ProfileChoiceGroup
             items={[
@@ -1179,12 +1095,8 @@ function EditPanel({
               })),
             ]}
             label={certificationLabel}
-            selectedIds={
-              draft.certificationId == null ? [-1] : [draft.certificationId]
-            }
-            onToggle={(id) =>
-              setField("certificationId", id === -1 ? null : id)
-            }
+            selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
+            onToggle={(id) => setField("certificationId", id === -1 ? null : id)}
           />
         </ProfilePanel>
       </ProfileSection>

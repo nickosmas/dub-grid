@@ -3,15 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildPermissionContext } from "@dubgrid/authz";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import type { AdminPermissions, OrganizationRole } from "@/types";
-import {
-  createRequestSupabaseClient,
-  requireAuthenticatedUser,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
-import {
-  getSandboxFromCookie,
-  SANDBOX_COOKIE_NAME,
-} from "@/lib/sandbox-cookie";
+import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 type PermissionContext = ReturnType<typeof buildPermissionContext>;
@@ -49,10 +43,7 @@ export interface AuthorizedOrgRequest {
 }
 
 function forbiddenResponse() {
-  return NextResponse.json(
-    { error: API_ERRORS.FORBIDDEN },
-    { status: 403 },
-  );
+  return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
 }
 
 function lockedOrganizationResponse() {
@@ -78,10 +69,7 @@ async function isOrganizationSetupComplete(
     departmentsResult,
     employeesResult,
   ] = await Promise.all([
-    serviceClient
-      .from("focus_areas")
-      .select("id, department_id, archived_at")
-      .eq("org_id", orgId),
+    serviceClient.from("focus_areas").select("id, department_id, archived_at").eq("org_id", orgId),
     serviceClient
       .from("shift_categories")
       .select("id, focus_area_id, archived_at")
@@ -92,18 +80,9 @@ async function isOrganizationSetupComplete(
         "id, assignment_mode, show_on_grid, focus_area_ids, department_ids, applicable_shift_ids, archived_at",
       )
       .eq("org_id", orgId),
-    serviceClient
-      .from("certifications")
-      .select("id, archived_at")
-      .eq("org_id", orgId),
-    serviceClient
-      .from("organization_roles")
-      .select("id, archived_at")
-      .eq("org_id", orgId),
-    serviceClient
-      .from("departments")
-      .select("id, type, archived_at")
-      .eq("org_id", orgId),
+    serviceClient.from("certifications").select("id, archived_at").eq("org_id", orgId),
+    serviceClient.from("organization_roles").select("id, archived_at").eq("org_id", orgId),
+    serviceClient.from("departments").select("id, type, archived_at").eq("org_id", orgId),
     serviceClient
       .from("employees")
       .select("id", { count: "exact", head: true })
@@ -133,10 +112,7 @@ async function isOrganizationSetupComplete(
   }[];
   const scheduledDepartmentIds = new Set(
     departments
-      .filter(
-        (department) =>
-          department.type === "scheduled" && !department.archived_at,
-      )
+      .filter((department) => department.type === "scheduled" && !department.archived_at)
       .map((department) => department.id),
   );
 
@@ -146,16 +122,13 @@ async function isOrganizationSetupComplete(
     archived_at: string | null;
   }[];
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archived_at);
-  const activeFocusAreaIds = new Set(
-    activeFocusAreas.map((focusArea) => focusArea.id),
-  );
+  const activeFocusAreaIds = new Set(activeFocusAreas.map((focusArea) => focusArea.id));
   const focusAreasPlaced =
     scheduledDepartmentIds.size > 0 &&
     activeFocusAreas.length > 0 &&
     activeFocusAreas.every(
       (focusArea) =>
-        focusArea.department_id != null &&
-        scheduledDepartmentIds.has(focusArea.department_id),
+        focusArea.department_id != null && scheduledDepartmentIds.has(focusArea.department_id),
     );
 
   const shiftCategories = (shiftCategoriesResult.data ?? []) as {
@@ -167,9 +140,7 @@ async function isOrganizationSetupComplete(
   const shiftsPlaced =
     activeShifts.length > 0 &&
     activeShifts.every(
-      (shift) =>
-        shift.focus_area_id != null &&
-        activeFocusAreaIds.has(shift.focus_area_id),
+      (shift) => shift.focus_area_id != null && activeFocusAreaIds.has(shift.focus_area_id),
     );
 
   const jobs = (jobsResult.data ?? []) as {
@@ -180,9 +151,7 @@ async function isOrganizationSetupComplete(
     applicable_shift_ids: number[] | null;
     archived_at: string | null;
   }[];
-  const visibleJobs = jobs.filter(
-    (job) => !job.archived_at && job.show_on_grid !== false,
-  );
+  const visibleJobs = jobs.filter((job) => !job.archived_at && job.show_on_grid !== false);
   const jobsPlaced =
     visibleJobs.length > 0 &&
     visibleJobs.every((job) => {
@@ -239,9 +208,7 @@ export async function resolveEffectiveOrgId(
 ): Promise<string> {
   const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
   if (!sandboxCookieValue) return requestedOrgId;
-  const sb = getSandboxFromCookie(
-    `${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`,
-  );
+  const sb = getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`);
   if (!sb || sb.userId !== userId || sb.sandboxOrgId === requestedOrgId) {
     return requestedOrgId;
   }
@@ -294,9 +261,7 @@ export async function requireOrgPermissions(
     ? null
     : req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
   if (sandboxCookieValue) {
-    const sb = getSandboxFromCookie(
-      `${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`,
-    );
+    const sb = getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`);
     if (sb && sb.userId === auth.user.id && sb.sandboxOrgId !== orgId) {
       const { data: ownedSandbox } = await serviceClient
         .from("organizations")
@@ -328,11 +293,7 @@ export async function requireOrgPermissions(
       .eq("org_id", orgId)
       .is("archived_at", null)
       .maybeSingle(),
-    serviceClient
-      .from("profiles")
-      .select("platform_role")
-      .eq("id", auth.user.id)
-      .maybeSingle(),
+    serviceClient.from("profiles").select("platform_role").eq("id", auth.user.id).maybeSingle(),
     serviceClient
       .from("organizations")
       .select("suspended_at, subscription_status, trial_ends_at")
@@ -360,11 +321,7 @@ export async function requireOrgPermissions(
     subscriptionStatus: organization?.subscription_status ?? null,
     trialEndsAt: organization?.trial_ends_at ?? null,
   });
-  if (
-    billingAccess.isLocked &&
-    !options?.allowLockedOrganization &&
-    !permissions.isGridmaster
-  ) {
+  if (billingAccess.isLocked && !options?.allowLockedOrganization && !permissions.isGridmaster) {
     return { response: lockedOrganizationResponse() };
   }
 

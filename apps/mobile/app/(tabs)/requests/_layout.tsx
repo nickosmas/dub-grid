@@ -4,10 +4,7 @@ import { createTopLevelStackOptions } from "../../../src/shared/navigation/top-l
 export default function RequestsLayout() {
   return (
     <Stack>
-      <Stack.Screen
-        name="index"
-        options={createTopLevelStackOptions("Requests")}
-      />
+      <Stack.Screen name="index" options={createTopLevelStackOptions("Requests")} />
     </Stack>
   );
 }

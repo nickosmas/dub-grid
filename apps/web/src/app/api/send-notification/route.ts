@@ -4,10 +4,7 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
-import {
-  dispatchNotificationEvent,
-  type NotificationEvent,
-} from "@/features/notifications/server";
+import { dispatchNotificationEvent, type NotificationEvent } from "@/features/notifications/server";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -15,11 +12,7 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 // ── Input schemas ────────────────────────────────────────────────────────
 
 const shiftRequestSchema = z.object({
-  action: z.enum([
-    "shift_request_created",
-    "shift_request_claimed",
-    "shift_request_resolved",
-  ]),
+  action: z.enum(["shift_request_created", "shift_request_claimed", "shift_request_resolved"]),
   orgId: z.string().uuid(),
   requestId: z.string().uuid(),
   requestType: z.enum(["pickup", "swap", "calloff"]),
@@ -63,15 +56,9 @@ export async function POST(req: NextRequest) {
   const { user, claims } = auth;
 
   // ── Rate limit ──────────────────────────────────────────────────────
-  const { limited, reset, misconfigured } = await checkRateLimit(
-    apiLimiter,
-    user.id,
-  );
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json(
-      { error: "Service temporarily unavailable" },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
   }
   if (limited) {
     const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 60;
@@ -114,18 +101,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await dispatchNotificationEvent(
-      user.id,
-      data as NotificationEvent,
-    );
+    const result = await dispatchNotificationEvent(user.id, data as NotificationEvent);
     if (!result.success) {
       Sentry.captureException(new Error(result.error), {
         extra: { context: "send-notification", action: data.action },
       });
-      return NextResponse.json(
-        { error: "Failed to send notification" },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "Failed to send notification" }, { status: 500 });
     }
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -133,13 +114,7 @@ export async function POST(req: NextRequest) {
     // unexpected throw (e.g. cycle of imports failing), not a notification
     // pipeline failure.
     Sentry.captureException(err, { extra: { context: "send-notification" } });
-    logger.error(
-      { err, action: data.action },
-      "Failed to send notification",
-    );
-    return NextResponse.json(
-      { error: "Failed to send notification" },
-      { status: 500 },
-    );
+    logger.error({ err, action: data.action }, "Failed to send notification");
+    return NextResponse.json({ error: "Failed to send notification" }, { status: 500 });
   }
 }

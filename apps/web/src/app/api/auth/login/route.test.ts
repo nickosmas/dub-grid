@@ -60,7 +60,10 @@ function createJwt(payload: Record<string, unknown>): string {
   ].join(".");
 }
 
-function makeSession(claims: Record<string, unknown>, overrides?: Partial<Record<string, unknown>>) {
+function makeSession(
+  claims: Record<string, unknown>,
+  overrides?: Partial<Record<string, unknown>>,
+) {
   return {
     access_token: createJwt({ sub: USER_ID, ...claims }),
     refresh_token: "refresh-token",
@@ -70,7 +73,10 @@ function makeSession(claims: Record<string, unknown>, overrides?: Partial<Record
   };
 }
 
-function makeRequest(host: string, body: unknown = { email: "user@example.com", password: "password123" }) {
+function makeRequest(
+  host: string,
+  body: unknown = { email: "user@example.com", password: "password123" },
+) {
   return new NextRequest("http://localhost/api/auth/login", {
     method: "POST",
     headers: { host, "content-type": "application/json" },
@@ -85,7 +91,10 @@ describe("POST /api/auth/login", () => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     validateCsrfOrigin.mockReturnValue(null);
-    fetchTermsAcceptanceStatus.mockResolvedValue({ acceptedCurrentTerms: true, acceptedVersion: "v1" });
+    fetchTermsAcceptanceStatus.mockResolvedValue({
+      acceptedCurrentTerms: true,
+      acceptedVersion: "v1",
+    });
     rpc.mockResolvedValue({ data: null, error: null });
     refreshSession.mockResolvedValue({ data: { session: null }, error: null });
   });
@@ -241,7 +250,9 @@ describe("POST /api/auth/login", () => {
       error: null,
     });
     refreshSession.mockResolvedValueOnce({
-      data: { session: makeSession({ platform_role: "gridmaster" }, { access_token: "gm-refreshed" }) },
+      data: {
+        session: makeSession({ platform_role: "gridmaster" }, { access_token: "gm-refreshed" }),
+      },
       error: null,
     });
 
@@ -289,7 +300,10 @@ describe("POST /api/auth/login", () => {
       },
       error: null,
     });
-    fetchTermsAcceptanceStatus.mockResolvedValueOnce({ acceptedCurrentTerms: false, acceptedVersion: "v0" });
+    fetchTermsAcceptanceStatus.mockResolvedValueOnce({
+      acceptedCurrentTerms: false,
+      acceptedVersion: "v0",
+    });
 
     const res = await POST(makeRequest("acme.localhost"));
     const body = await res.json();

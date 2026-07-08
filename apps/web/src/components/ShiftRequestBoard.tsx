@@ -60,12 +60,36 @@ function timeRemainingLabel(expiresAt: string): string {
 }
 
 const STATUS_COLORS: Record<ShiftRequestStatus, { bg: string; text: string; border: string }> = {
-  open: { bg: "var(--color-info-bg)", text: "var(--color-info-text)", border: "var(--color-info-border)" },
-  pending_approval: { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)", border: "var(--color-warning-border)" },
-  approved: { bg: "var(--color-success-bg)", text: "var(--color-success-text)", border: "var(--color-success)" },
-  rejected: { bg: "var(--color-danger-bg)", text: "var(--color-danger-dark)", border: "var(--color-danger-border)" },
-  cancelled: { bg: "var(--color-bg-secondary)", text: "var(--color-text-subtle)", border: "var(--color-border)" },
-  expired: { bg: "var(--color-bg-secondary)", text: "var(--color-text-subtle)", border: "var(--color-border)" },
+  open: {
+    bg: "var(--color-info-bg)",
+    text: "var(--color-info-text)",
+    border: "var(--color-info-border)",
+  },
+  pending_approval: {
+    bg: "var(--color-warning-bg)",
+    text: "var(--color-warning-text)",
+    border: "var(--color-warning-border)",
+  },
+  approved: {
+    bg: "var(--color-success-bg)",
+    text: "var(--color-success-text)",
+    border: "var(--color-success)",
+  },
+  rejected: {
+    bg: "var(--color-danger-bg)",
+    text: "var(--color-danger-dark)",
+    border: "var(--color-danger-border)",
+  },
+  cancelled: {
+    bg: "var(--color-bg-secondary)",
+    text: "var(--color-text-subtle)",
+    border: "var(--color-border)",
+  },
+  expired: {
+    bg: "var(--color-bg-secondary)",
+    text: "var(--color-text-subtle)",
+    border: "var(--color-border)",
+  },
 };
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -129,20 +153,23 @@ export default function ShiftRequestBoard({
 
   function getTabData(): ShiftRequest[] {
     switch (activeTab) {
-      case "available": return openPickups;
-      case "mine": return myRequests;
-      case "approval": return managerQueue;
+      case "available":
+        return openPickups;
+      case "mine":
+        return myRequests;
+      case "approval":
+        return managerQueue;
     }
   }
 
   function getEmptyMessage(): string {
     switch (activeTab) {
-      case "available": return "No available shifts";
-      case "mine": return "No requests yet";
+      case "available":
+        return "No available shifts";
+      case "mine":
+        return "No requests yet";
       case "approval":
-        return canApprove
-          ? "No active requests"
-          : "No organization requests";
+        return canApprove ? "No active requests" : "No organization requests";
     }
   }
 
@@ -150,7 +177,8 @@ export default function ShiftRequestBoard({
 
   function renderStatusBadge(status: ShiftRequestStatus) {
     const colors = STATUS_COLORS[status];
-    const label = status === "pending_approval" ? "Pending" : status.charAt(0).toUpperCase() + status.slice(1);
+    const label =
+      status === "pending_approval" ? "Pending" : status.charAt(0).toUpperCase() + status.slice(1);
     return (
       <span
         style={{
@@ -202,7 +230,8 @@ export default function ShiftRequestBoard({
     const isCalloff = req.type === "calloff";
     const isOwnRequest = currentEmpId === req.requesterEmpId;
     const isTarget = currentEmpId === req.targetEmpId;
-    const absenceType = isCalloff && req.absenceTypeId ? absenceTypeMap?.get(req.absenceTypeId) : null;
+    const absenceType =
+      isCalloff && req.absenceTypeId ? absenceTypeMap?.get(req.absenceTypeId) : null;
     const requesterLabel = req.requesterSegments?.length
       ? joinShiftJobSegmentNames(req.requesterSegments)
       : req.requesterShiftLabel;
@@ -214,7 +243,9 @@ export default function ShiftRequestBoard({
       <div
         key={req.id}
         style={{
-          border: isCalloff ? "1px solid var(--color-danger-border, #FCA5A5)" : "1px solid var(--color-border)",
+          border: isCalloff
+            ? "1px solid var(--color-danger-border, #FCA5A5)"
+            : "1px solid var(--color-border)",
           borderRadius: "var(--dg-radius-md)",
           padding: "14px 16px",
           background: "var(--color-surface)",
@@ -224,7 +255,9 @@ export default function ShiftRequestBoard({
         }}
       >
         {/* Top row: name + status */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
+        >
           <span
             style={{
               fontSize: "var(--dg-fs-label)",
@@ -362,7 +395,8 @@ export default function ShiftRequestBoard({
               message: (
                 <>
                   Claim <strong>{req.requesterShiftLabel}</strong> on{" "}
-                  <strong>{formatShiftDate(req.requesterShiftDate)}</strong>? This will be sent for manager approval.
+                  <strong>{formatShiftDate(req.requesterShiftDate)}</strong>? This will be sent for
+                  manager approval.
                 </>
               ),
               onConfirm: () => onClaim(req.id),
@@ -378,11 +412,7 @@ export default function ShiftRequestBoard({
     }
 
     // Target of a swap or targeted pickup with open status: Accept / Decline
-    if (
-      isTarget &&
-      (req.type === "swap" || req.type === "pickup") &&
-      req.status === "open"
-    ) {
+    if (isTarget && (req.type === "swap" || req.type === "pickup") && req.status === "open") {
       actions.push(
         <button
           key="accept"
@@ -441,13 +471,14 @@ export default function ShiftRequestBoard({
 
       if (isRejecting) {
         actions.push(
-          <div key="reject-form" style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
+          <div
+            key="reject-form"
+            style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}
+          >
             <textarea
               placeholder="Optional note..."
               value={rejectNotes[req.id] ?? ""}
-              onChange={(e) =>
-                setRejectNotes((prev) => ({ ...prev, [req.id]: e.target.value }))
-              }
+              onChange={(e) => setRejectNotes((prev) => ({ ...prev, [req.id]: e.target.value }))}
               style={{
                 width: "100%",
                 minHeight: 56,
@@ -473,7 +504,8 @@ export default function ShiftRequestBoard({
                     key: `reject:${req.id}`,
                     message: (
                       <>
-                        Reject {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>? The original schedule will stay in place.
+                        Reject {req.requesterName}&apos;s request for{" "}
+                        <strong>{requestLabel}</strong>? The original schedule will stay in place.
                       </>
                     ),
                     onConfirm: async () => {
@@ -499,9 +531,7 @@ export default function ShiftRequestBoard({
               </button>
               <button
                 className="dg-btn dg-btn-ghost"
-                onClick={() =>
-                  setShowRejectInput((prev) => ({ ...prev, [req.id]: false }))
-                }
+                onClick={() => setShowRejectInput((prev) => ({ ...prev, [req.id]: false }))}
                 style={{
                   fontSize: "var(--dg-fs-caption)",
                   padding: "7px 14px",
@@ -525,7 +555,8 @@ export default function ShiftRequestBoard({
                 key: `approve:${req.id}`,
                 message: (
                   <>
-                    Approve {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>? This will finalize the staffing change.
+                    Approve {req.requesterName}&apos;s request for <strong>{requestLabel}</strong>?
+                    This will finalize the staffing change.
                   </>
                 ),
                 onConfirm: () => onResolve(req.id, true),
@@ -540,9 +571,7 @@ export default function ShiftRequestBoard({
           <button
             key="reject"
             className="dg-btn dg-btn-ghost"
-            onClick={() =>
-              setShowRejectInput((prev) => ({ ...prev, [req.id]: true }))
-            }
+            onClick={() => setShowRejectInput((prev) => ({ ...prev, [req.id]: true }))}
             style={{
               fontSize: "var(--dg-fs-caption)",
               padding: "7px 14px",
@@ -569,7 +598,8 @@ export default function ShiftRequestBoard({
               key: `cancel:${req.id}`,
               message: (
                 <>
-                  Cancel your request for <strong>{requestLabel}</strong>? It will no longer be available for review.
+                  Cancel your request for <strong>{requestLabel}</strong>? It will no longer be
+                  available for review.
                 </>
               ),
               onConfirm: () => onCancel(req.id),
@@ -591,11 +621,7 @@ export default function ShiftRequestBoard({
 
     if (actions.length === 0) return null;
 
-    return (
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
-        {actions}
-      </div>
-    );
+    return <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>{actions}</div>;
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -736,7 +762,9 @@ export default function ShiftRequestBoard({
                     color: isActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
                     background: "transparent",
                     border: "none",
-                    borderBottom: isActive ? "2px solid var(--color-text-primary)" : "2px solid transparent",
+                    borderBottom: isActive
+                      ? "2px solid var(--color-text-primary)"
+                      : "2px solid transparent",
                     cursor: "pointer",
                     fontFamily: "inherit",
                     display: "flex",
@@ -783,7 +811,16 @@ export default function ShiftRequestBoard({
             loading ? null : (
               <EmptyState
                 icon={
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                     <line x1="16" y1="2" x2="16" y2="6" />
                     <line x1="8" y1="2" x2="8" y2="6" />

@@ -35,8 +35,8 @@ describe("getOrgRealtimeInvalidationKeys", () => {
   });
 
   it("invalidates the pending people-change-requests queue on profile_change_requests changes", () => {
-    expect(
-      getOrgRealtimeInvalidationKeys(ORG, "profile_change_requests"),
-    ).toEqual([[...queryKeys.org.peopleChangeRequests(ORG, "pending")]]);
+    expect(getOrgRealtimeInvalidationKeys(ORG, "profile_change_requests")).toEqual([
+      [...queryKeys.org.peopleChangeRequests(ORG, "pending")],
+    ]);
   });
 });

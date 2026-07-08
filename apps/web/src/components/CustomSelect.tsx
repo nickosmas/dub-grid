@@ -50,12 +50,15 @@ export default function CustomSelect<T extends string | number>({
   const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
   const displayLabel = selected?.label ?? placeholder ?? "—";
 
-  const setMenuRef = useCallback((node: HTMLDivElement | null) => {
-    menuRef.current = node;
-    if (node && open) {
-      node.focus({ preventScroll: true });
-    }
-  }, [open]);
+  const setMenuRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      menuRef.current = node;
+      if (node && open) {
+        node.focus({ preventScroll: true });
+      }
+    },
+    [open],
+  );
 
   const trigger = (
     <div ref={ref} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
@@ -127,82 +130,92 @@ export default function CustomSelect<T extends string | number>({
     </div>
   );
 
-  const menu = open && !disabled ? (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverContent
-        anchor={ref}
-        side="bottom"
-        align="start"
-        sideOffset={6}
-        positionMethod="fixed"
-        collisionPadding={12}
-        collisionAvoidance={{
-          side: "flip",
-          align: "shift",
-          fallbackAxisSide: "none",
-        }}
-        initialFocus={false}
-        ref={setMenuRef}
-        role="listbox"
-        tabIndex={-1}
-        aria-label={`${ariaLabel ?? displayLabel} options`}
-        aria-activedescendant={focusedIndex >= 0 ? `option-${String(options[focusedIndex]?.value)}` : undefined}
-        className="dg-menu"
-        onKeyDown={(e) => {
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setFocusedIndex((i) => (i + 1) % options.length);
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setFocusedIndex((i) => (i - 1 + options.length) % options.length);
-          } else if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            if (focusedIndex >= 0 && focusedIndex < options.length) {
-              onChange(options[focusedIndex].value);
+  const menu =
+    open && !disabled ? (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverContent
+          anchor={ref}
+          side="bottom"
+          align="start"
+          sideOffset={6}
+          positionMethod="fixed"
+          collisionPadding={12}
+          collisionAvoidance={{
+            side: "flip",
+            align: "shift",
+            fallbackAxisSide: "none",
+          }}
+          initialFocus={false}
+          ref={setMenuRef}
+          role="listbox"
+          tabIndex={-1}
+          aria-label={`${ariaLabel ?? displayLabel} options`}
+          aria-activedescendant={
+            focusedIndex >= 0 ? `option-${String(options[focusedIndex]?.value)}` : undefined
+          }
+          className="dg-menu"
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setFocusedIndex((i) => (i + 1) % options.length);
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setFocusedIndex((i) => (i - 1 + options.length) % options.length);
+            } else if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              if (focusedIndex >= 0 && focusedIndex < options.length) {
+                onChange(options[focusedIndex].value);
+                setOpen(false);
+              }
+            } else if (e.key === "Escape") {
+              e.preventDefault();
               setOpen(false);
             }
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            setOpen(false);
-          }
-        }}
-        style={{
-          minWidth: "var(--anchor-width)",
-          width: "max-content",
-          maxWidth: "min(350px, 90vw)",
-          maxHeight: "min(420px, var(--available-height, calc(100vh - 24px)))",
-          overflowY: "auto",
-          overflowX: "hidden",
-          overscrollBehavior: "contain",
-          scrollbarWidth: "none",
-        }}
-      >
-        {options.map((opt, idx) => {
-          const isActive = opt.value === value;
-          const isFocused = idx === focusedIndex;
-          return (
-            <button
-              key={String(opt.value)}
-              id={`option-${String(opt.value)}`}
-              type="button"
-              role="option"
-              aria-selected={isActive}
-              className="dg-menu-item"
-              onClick={() => { onChange(opt.value); setOpen(false); }}
-              onMouseEnter={() => setFocusedIndex(idx)}
-              style={{
-                fontWeight: isActive ? 700 : undefined,
-                color: isActive ? "var(--color-text-primary)" : undefined,
-                background: isFocused ? "var(--color-bg-secondary)" : isActive ? "var(--color-border-light)" : undefined,
-              }}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </PopoverContent>
-    </Popover>
-  ) : null;
+          }}
+          style={{
+            minWidth: "var(--anchor-width)",
+            width: "max-content",
+            maxWidth: "min(350px, 90vw)",
+            maxHeight: "min(420px, var(--available-height, calc(100vh - 24px)))",
+            overflowY: "auto",
+            overflowX: "hidden",
+            overscrollBehavior: "contain",
+            scrollbarWidth: "none",
+          }}
+        >
+          {options.map((opt, idx) => {
+            const isActive = opt.value === value;
+            const isFocused = idx === focusedIndex;
+            return (
+              <button
+                key={String(opt.value)}
+                id={`option-${String(opt.value)}`}
+                type="button"
+                role="option"
+                aria-selected={isActive}
+                className="dg-menu-item"
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                onMouseEnter={() => setFocusedIndex(idx)}
+                style={{
+                  fontWeight: isActive ? 700 : undefined,
+                  color: isActive ? "var(--color-text-primary)" : undefined,
+                  background: isFocused
+                    ? "var(--color-bg-secondary)"
+                    : isActive
+                      ? "var(--color-border-light)"
+                      : undefined,
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </PopoverContent>
+      </Popover>
+    ) : null;
 
   return (
     <>

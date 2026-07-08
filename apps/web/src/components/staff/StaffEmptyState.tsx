@@ -47,11 +47,17 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
       }
       title={title}
       description={description}
-      action={hasFilters ? (
-        <button onClick={onClearFilters} className="dg-btn dg-btn-secondary" style={{ marginTop: 8 }}>
-          Clear filters
-        </button>
-      ) : undefined}
+      action={
+        hasFilters ? (
+          <button
+            onClick={onClearFilters}
+            className="dg-btn dg-btn-secondary"
+            style={{ marginTop: 8 }}
+          >
+            Clear filters
+          </button>
+        ) : undefined
+      }
     />
   );
 }

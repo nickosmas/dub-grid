@@ -50,12 +50,7 @@ export default function IndexScreen() {
   }, []);
 
   useEffect(() => {
-    if (
-      isLoading ||
-      !minimumElapsed ||
-      !onboardingChecked ||
-      hasNavigatedRef.current
-    ) {
+    if (isLoading || !minimumElapsed || !onboardingChecked || hasNavigatedRef.current) {
       return;
     }
 
@@ -69,21 +64,9 @@ export default function IndexScreen() {
       hasNavigatedRef.current = true;
       router.replace("/(auth)/onboarding");
     }
-  }, [
-    accessToken,
-    isLoading,
-    minimumElapsed,
-    needsOnboarding,
-    onboardingChecked,
-  ]);
+  }, [accessToken, isLoading, minimumElapsed, needsOnboarding, onboardingChecked]);
 
-  if (
-    isLoading ||
-    !minimumElapsed ||
-    !onboardingChecked ||
-    accessToken ||
-    needsOnboarding
-  ) {
+  if (isLoading || !minimumElapsed || !onboardingChecked || accessToken || needsOnboarding) {
     return <AppSplashScreen />;
   }
 

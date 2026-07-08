@@ -124,8 +124,16 @@ export default function CoverageBySectionCard({
                   border: "1px solid var(--color-border)",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: "var(--color-text-secondary)" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "baseline",
+                  }}
+                >
+                  <span
+                    style={{ fontSize: 12, fontWeight: 500, color: "var(--color-text-secondary)" }}
+                  >
                     {sec.focusAreaName}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -137,7 +145,14 @@ export default function CoverageBySectionCard({
                     </span>
                   </div>
                 </div>
-                <div style={{ height: 6, background: "var(--color-border)", borderRadius: 3, overflow: "hidden" }}>
+                <div
+                  style={{
+                    height: 6,
+                    background: "var(--color-border)",
+                    borderRadius: 3,
+                    overflow: "hidden",
+                  }}
+                >
                   <div
                     style={{
                       height: 6,
@@ -231,10 +246,10 @@ export default function CoverageBySectionCard({
                           justifyContent: "center",
                           fontSize: 10,
                           fontWeight: 600,
-                        background: colors.bg,
-                        color: colors.text,
-                        cursor: "default",
-                      }}
+                          background: colors.bg,
+                          color: colors.text,
+                          cursor: "default",
+                        }}
                         aria-label={ariaLabel}
                       >
                         {cellLabel}

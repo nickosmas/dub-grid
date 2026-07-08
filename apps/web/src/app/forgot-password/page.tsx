@@ -55,18 +55,15 @@ function ForgotPasswordContent() {
             heading="Check your email"
             message={
               <>
-                If an account exists for <strong>{email}</strong>, we&apos;ve sent
-                a password reset link. Check your inbox and spam folder.
+                If an account exists for <strong>{email}</strong>, we&apos;ve sent a password reset
+                link. Check your inbox and spam folder.
               </>
             }
             secondaryCta={{ label: "Back to login", href: "/login" }}
           />
         ) : (
           <>
-            <h1
-              className="dg-auth-heading"
-              style={{ marginBottom: "8px" }}
-            >
+            <h1 className="dg-auth-heading" style={{ marginBottom: "8px" }}>
               Forgot Password
             </h1>
             <p
@@ -78,8 +75,7 @@ function ForgotPasswordContent() {
                 marginBottom: "24px",
               }}
             >
-              Enter your email address and we&apos;ll send you a link to reset
-              your password.
+              Enter your email address and we&apos;ll send you a link to reset your password.
             </p>
 
             <form

@@ -96,7 +96,7 @@ const generalShift: AssignmentDefinition = {
   name: "Cross Wing",
   color: "#F1F5F9",
   border: "#CBD5E1",
-  text:"#475569",
+  text: "#475569",
   sortOrder: 3,
   jobId: 101,
   isGeneral: true,
@@ -308,11 +308,7 @@ function renderRequestPanel(
     getAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
     isRequestableShift?: (empId: string, date: Date) => boolean;
     isShiftStarted?: (empId: string, date: Date) => boolean;
-    isShiftSegmentStarted?: (
-      empId: string,
-      date: Date,
-      segmentIndex: number,
-    ) => boolean;
+    isShiftSegmentStarted?: (empId: string, date: Date, segmentIndex: number) => boolean;
     availableSwapDates?: string[];
     absenceTypesOverride?: AbsenceType[];
     currentShift?: string;
@@ -346,19 +342,12 @@ function renderRequestPanel(
       onMakeAvailable={onMakeAvailable}
       onCallOff={onCallOff}
       employees={employees}
-      shiftForKey={(_, date) =>
-        date.toISOString().startsWith("2026-05-05") ? "Night" : "Day"
-      }
+      shiftForKey={(_, date) => (date.toISOString().startsWith("2026-05-05") ? "Night" : "Day")}
       shiftNameForKey={
         overrides.shiftNameForKey ??
-        ((_, date) =>
-          date.toISOString().startsWith("2026-05-05")
-            ? "Evening Shift"
-            : "Day Shift")
+        ((_, date) => (date.toISOString().startsWith("2026-05-05") ? "Evening Shift" : "Day Shift"))
       }
-      isRequestableShift={
-        overrides.isRequestableShift ?? ((empId) => empId === "emp-2")
-      }
+      isRequestableShift={overrides.isRequestableShift ?? ((empId) => empId === "emp-2")}
       availableSwapDates={overrides.availableSwapDates}
       isShiftStarted={overrides.isShiftStarted}
       isShiftSegmentStarted={overrides.isShiftSegmentStarted}
@@ -368,8 +357,7 @@ function renderRequestPanel(
       getAbsenceTypeIdForKey={
         overrides.getAbsenceTypeIdForKey ??
         ((empId, date) =>
-          (empId === "emp-2" || empId === "emp-3") &&
-          date.toISOString().startsWith("2026-05-04")
+          (empId === "emp-2" || empId === "emp-3") && date.toISOString().startsWith("2026-05-04")
             ? 7
             : null)
       }
@@ -399,8 +387,7 @@ function derivePanelSelection(
 
   if (input.kind === "absence") {
     const absenceType =
-      absenceTypes.find((candidate) => candidate.id === input.absenceTypeId) ??
-      null;
+      absenceTypes.find((candidate) => candidate.id === input.absenceTypeId) ?? null;
     return {
       currentShift: absenceType?.label ?? null,
       currentAssignmentIds: [],
@@ -408,16 +395,14 @@ function derivePanelSelection(
     };
   }
 
-  const orderedSegments = [...input.segments].sort(
-    (left, right) => left.position - right.position,
-  );
+  const orderedSegments = [...input.segments].sort((left, right) => left.position - right.position);
   const currentAssignmentIds = orderedSegments
     .map(
       (segment) =>
         assignments.find(
           (assignment) =>
-            (assignment.shiftId ?? assignment.categoryId ?? null) ===
-              (segment.shiftId ?? null) && assignment.jobId === segment.jobId,
+            (assignment.shiftId ?? assignment.categoryId ?? null) === (segment.shiftId ?? null) &&
+            assignment.jobId === segment.jobId,
         )?.id ?? null,
     )
     .filter((id): id is number => id != null);
@@ -426,25 +411,20 @@ function derivePanelSelection(
       const assignment =
         assignments.find(
           (candidate) =>
-            (candidate.shiftId ?? candidate.categoryId ?? null) ===
-              (segment.shiftId ?? null) && candidate.jobId === segment.jobId,
+            (candidate.shiftId ?? candidate.categoryId ?? null) === (segment.shiftId ?? null) &&
+            candidate.jobId === segment.jobId,
         ) ?? null;
       const job = jobs.find((candidate) => candidate.id === segment.jobId) ?? null;
 
       if (!assignment) {
-        return shiftDisplayMode === "name"
-          ? (job?.name ?? "?")
-          : (job?.abbr ?? "?");
+        return shiftDisplayMode === "name" ? (job?.name ?? "?") : (job?.abbr ?? "?");
       }
 
-      const primaryLabel =
-        shiftDisplayMode === "name" ? assignment.name : assignment.label;
+      const primaryLabel = shiftDisplayMode === "name" ? assignment.name : assignment.label;
       const secondaryLabel =
         shiftDisplayMode === "name" ? (job?.name ?? null) : (job?.abbr ?? null);
 
-      return secondaryLabel
-        ? `${primaryLabel} · ${secondaryLabel}`
-        : primaryLabel;
+      return secondaryLabel ? `${primaryLabel} · ${secondaryLabel}` : primaryLabel;
     })
     .join("/");
 
@@ -513,9 +493,7 @@ function RepeatAbsenceFlowPanel() {
 }
 
 function RepeatNameFlowPanel() {
-  const [currentShift, setCurrentShift] = useState<string | null>(
-    "Day Shift · Supervisor",
-  );
+  const [currentShift, setCurrentShift] = useState<string | null>("Day Shift · Supervisor");
   const [currentAssignmentIds, setCurrentAssignmentIds] = useState<number[]>([1]);
 
   return (
@@ -682,7 +660,7 @@ describe("ShiftEditPanel", () => {
     it("clicking the backdrop overlay calls onClose", () => {
       const { container, onClose } = renderPanel();
       // The backdrop uses className="dg-panel-overlay" with no inline inset style
-      const backdrop = container.querySelector('.dg-panel-overlay');
+      const backdrop = container.querySelector(".dg-panel-overlay");
       expect(backdrop).not.toBeNull();
       fireEvent.click(backdrop!);
       expect(onClose).toHaveBeenCalledTimes(1);
@@ -702,17 +680,13 @@ describe("ShiftEditPanel", () => {
       renderPanel();
       // North appears as tab + section heading
       expect(screen.getAllByText("North").length).toBeGreaterThanOrEqual(1);
-      expect(
-        screen.getByRole("button", { name: "Day Shift - Supervisor" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Day Shift - Supervisor" })).toBeInTheDocument();
     });
 
     it("clicking another focus area tab shows that area's shifts", () => {
       renderPanel();
       // Initially on North; South's shift is not visible until that tab is opened.
-      expect(
-        screen.getByRole("button", { name: "Day Shift - Supervisor" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Day Shift - Supervisor" })).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "Evening Shift - Supervisor" }),
       ).not.toBeInTheDocument();
@@ -729,9 +703,7 @@ describe("ShiftEditPanel", () => {
   describe("Shift buttons", () => {
     it("clicking a shift button calls onSelect with canonical schedule state", () => {
       const { onSelect } = renderPanel();
-      fireEvent.click(
-        screen.getByRole("button", { name: "Day Shift - Supervisor" }),
-      );
+      fireEvent.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
       expect(onSelect).toHaveBeenCalledWith(
         {
           kind: "worked",
@@ -795,9 +767,7 @@ describe("ShiftEditPanel", () => {
       });
 
       await user.click(screen.getByRole("button", { name: /add another shift/i }));
-      await user.click(
-        screen.getByRole("button", { name: "Evening Shift - Supervisor" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Evening Shift - Supervisor" }));
 
       expect(onSelect).toHaveBeenLastCalledWith(
         {
@@ -899,14 +869,10 @@ describe("ShiftEditPanel", () => {
         container.querySelectorAll("[data-shift-diff-badge]"),
       ) as HTMLElement[];
 
-      expect(
-        container.querySelector('[data-shift-diff-index="0"]'),
-      ).toBeNull();
+      expect(container.querySelector('[data-shift-diff-index="0"]')).toBeNull();
       expect(badges).toHaveLength(0);
 
-      const firstCard = container.querySelector(
-        '[data-shift-edit-card="0"]',
-      ) as HTMLElement | null;
+      const firstCard = container.querySelector('[data-shift-edit-card="0"]') as HTMLElement | null;
       const secondCard = container.querySelector(
         '[data-shift-edit-card="1"]',
       ) as HTMLElement | null;
@@ -927,15 +893,11 @@ describe("ShiftEditPanel", () => {
         publishedAssignmentIds: [1],
       });
 
-      const card = container.querySelector(
-        '[data-shift-edit-card="0"]',
-      ) as HTMLElement | null;
+      const card = container.querySelector('[data-shift-edit-card="0"]') as HTMLElement | null;
       const header = container.querySelector(
         '[data-shift-edit-card-header="0"]',
       ) as HTMLElement | null;
-      const body = container.querySelector(
-        '[data-shift-edit-card-body="0"]',
-      ) as HTMLElement | null;
+      const body = container.querySelector('[data-shift-edit-card-body="0"]') as HTMLElement | null;
 
       expect(card?.style.borderRadius).toBe("var(--dg-radius-md)");
       expect(header?.style.borderRadius).toBe(
@@ -959,17 +921,11 @@ describe("ShiftEditPanel", () => {
         publishedCustomEndTime: "15:00",
       });
 
+      expect(container.querySelector('[data-shift-diff-index="0"]')?.textContent).toBe("Time");
       expect(
-        container.querySelector('[data-shift-diff-index="0"]')?.textContent,
-      ).toBe("Time");
-      expect(
-        (
-          container.querySelector('[data-shift-diff-index="0"]') as HTMLElement
-        )?.style.background,
+        (container.querySelector('[data-shift-diff-index="0"]') as HTMLElement)?.style.background,
       ).toBe("var(--color-warning)");
-      expect(
-        container.querySelector('[data-shift-diff-index="1"]'),
-      ).toBeNull();
+      expect(container.querySelector('[data-shift-diff-index="1"]')).toBeNull();
     });
 
     it("keeps a brand-new shift with custom time border-only", () => {
@@ -981,9 +937,7 @@ describe("ShiftEditPanel", () => {
         draftKind: "new",
       });
 
-      expect(
-        container.querySelector('[data-shift-diff-badge="new"]'),
-      ).toBeNull();
+      expect(container.querySelector('[data-shift-diff-badge="new"]')).toBeNull();
     });
 
     it("renders stale split custom times as a single clean custom time after one shift remains", () => {
@@ -1019,10 +973,9 @@ describe("ShiftEditPanel", () => {
         publishedAssignmentIds: [1],
       });
 
-      expect(
-        container.querySelector('[data-shift-diff-badge="modified"]')
-          ?.textContent,
-      ).toBe("Was D · SUPV");
+      expect(container.querySelector('[data-shift-diff-badge="modified"]')?.textContent).toBe(
+        "Was D · SUPV",
+      );
     });
   });
 
@@ -1030,9 +983,7 @@ describe("ShiftEditPanel", () => {
     it("general shifts appear in a 'General' section", () => {
       renderPanel();
       expect(screen.getByText("General")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Cross Wing" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cross Wing" })).toBeInTheDocument();
     });
   });
 
@@ -1083,7 +1034,7 @@ describe("ShiftEditPanel", () => {
           onSelect={vi.fn()}
           onClose={vi.fn()}
           allowShiftEdits
-        />
+        />,
       );
       expect(
         screen.queryByRole("button", { name: "Day Shift - JL Coverage" }),
@@ -1104,7 +1055,7 @@ describe("ShiftEditPanel", () => {
           onSelect={vi.fn()}
           onClose={vi.fn()}
           allowShiftEdits
-        />
+        />,
       );
       const button = screen.getByRole("button", {
         name: "Day Shift - JL Coverage",
@@ -1126,7 +1077,7 @@ describe("ShiftEditPanel", () => {
           onSelect={vi.fn()}
           onClose={vi.fn()}
           allowShiftEdits
-        />
+        />,
       );
       const button = screen.getByRole("button", {
         name: "Day Shift - Supervisor",
@@ -1147,7 +1098,7 @@ describe("ShiftEditPanel", () => {
           onSelect={vi.fn()}
           onClose={vi.fn()}
           allowShiftEdits
-        />
+        />,
       );
       expect(screen.queryByText("🔒")).not.toBeInTheDocument();
     });
@@ -1163,9 +1114,7 @@ describe("ShiftEditPanel", () => {
 
       expect(screen.getByText(/^Day Shift$/)).toBeInTheDocument();
       expect(screen.getByText(/^Supervisor$/)).toBeInTheDocument();
-      expect(
-        screen.queryByText(/^Day Shift · Supervisor$/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Day Shift · Supervisor$/)).not.toBeInTheDocument();
     });
 
     it("shows repeat mode only before local edits and keeps the sticky footer hidden while backing out", async () => {
@@ -1178,7 +1127,9 @@ describe("ShiftEditPanel", () => {
 
       await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
 
-      const createRepeatingShiftButton = screen.getByRole("button", { name: "Create Repeating Shift" });
+      const createRepeatingShiftButton = screen.getByRole("button", {
+        name: "Create Repeating Shift",
+      });
       expect(createRepeatingShiftButton).toBeInTheDocument();
       expect(createRepeatingShiftButton).toBeEnabled();
       const backButtons = screen.getAllByRole("button", { name: "Back" });
@@ -1194,8 +1145,12 @@ describe("ShiftEditPanel", () => {
 
       expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Confirm" })).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Make this a repeating shift" })).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Create Repeating Shift" })).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Make this a repeating shift" }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Create Repeating Shift" }),
+      ).not.toBeInTheDocument();
     });
 
     it("uses the custom repeat calendar", async () => {
@@ -1209,7 +1164,10 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByLabelText("Start date calendar")).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /Selected Monday, January 15, 2024/i }));
-      expect(screen.getByRole("button", { name: "Start date" })).toHaveAttribute("aria-expanded", "false");
+      expect(screen.getByRole("button", { name: "Start date" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
     });
 
     it("shows an end-date error when ending on a date without selecting one", async () => {
@@ -1232,9 +1190,7 @@ describe("ShiftEditPanel", () => {
       await user.click(screen.getByRole("button", { name: "Make this repeating" }));
 
       expect(screen.getByText("Repeating Off Day")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Create Repeating Off Day" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Create Repeating Off Day" })).toBeInTheDocument();
     });
 
     it("renders the repeat preview badge with split grid labels in name mode", async () => {
@@ -1242,18 +1198,14 @@ describe("ShiftEditPanel", () => {
 
       render(<RepeatNameFlowPanel />);
 
-      await user.click(
-        screen.getByRole("button", { name: "Make this a repeating shift" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Make this a repeating shift" }));
 
       const preview = document.querySelector(
         '[data-repeat-shift-preview="true"]',
       ) as HTMLElement | null;
 
       expect(preview).not.toBeNull();
-      expect(
-        within(preview!).getByText(/^Day Shift · Supervisor$/),
-      ).toBeInTheDocument();
+      expect(within(preview!).getByText(/^Day Shift · Supervisor$/)).toBeInTheDocument();
     });
   });
 
@@ -1279,9 +1231,7 @@ describe("ShiftEditPanel", () => {
       const dialog = screen.getByRole("dialog", {
         name: "Offer shift for pickup?",
       });
-      await user.click(
-        within(dialog).getByRole("button", { name: "Offer for pickup" }),
-      );
+      await user.click(within(dialog).getByRole("button", { name: "Offer for pickup" }));
 
       expect(onMakeAvailable).toHaveBeenCalledTimes(1);
     });
@@ -1309,9 +1259,7 @@ describe("ShiftEditPanel", () => {
 
       expect(onMakeAvailable).toHaveBeenCalledTimes(1);
       expect(confirmButton).toBeDisabled();
-      expect(
-        within(dialog).getByRole("status", { name: "Loading" }),
-      ).toBeInTheDocument();
+      expect(within(dialog).getByRole("status", { name: "Loading" })).toBeInTheDocument();
 
       await user.click(confirmButton);
       expect(onMakeAvailable).toHaveBeenCalledTimes(1);
@@ -1362,9 +1310,7 @@ describe("ShiftEditPanel", () => {
       const dialog = screen.getByRole("dialog", {
         name: "Offer shift for pickup?",
       });
-      await user.click(
-        within(dialog).getByRole("button", { name: "Offer for pickup" }),
-      );
+      await user.click(within(dialog).getByRole("button", { name: "Offer for pickup" }));
 
       expect(onMakeAvailable).toHaveBeenCalledWith({
         requesterSegmentIndex: 1,
@@ -1470,18 +1416,13 @@ describe("ShiftEditPanel", () => {
 
       await user.click(screen.getByRole("button", { name: "Drop shift" }));
       await user.click(screen.getByRole("button", { name: /Offer for pickup/i }));
-      expect(
-        screen.queryByRole("button", { name: "Go to previous week" }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: "Go to next week" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Go to previous week" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Go to next week" })).not.toBeInTheDocument();
       expect(screen.getAllByText("Vacation").length).toBeGreaterThan(0);
       const zoeButton = screen.getByRole("button", { name: /Zoe Adams/i });
       const bobButton = screen.getByRole("button", { name: /Bob Jones/i });
       expect(
-        zoeButton.compareDocumentPosition(bobButton) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        zoeButton.compareDocumentPosition(bobButton) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
       await user.click(screen.getByRole("button", { name: /Bob Jones/i }));
 
@@ -1489,9 +1430,7 @@ describe("ShiftEditPanel", () => {
       const dialog = screen.getByRole("dialog", {
         name: "Request pickup?",
       });
-      await user.click(
-        within(dialog).getByRole("button", { name: "Request pickup" }),
-      );
+      await user.click(within(dialog).getByRole("button", { name: "Request pickup" }));
 
       expect(onMakeAvailable).toHaveBeenCalledWith({
         targetEmpId: "emp-2",
@@ -1512,9 +1451,7 @@ describe("ShiftEditPanel", () => {
       const dialog = screen.getByRole("dialog", {
         name: "Submit call off request?",
       });
-      await user.click(
-        within(dialog).getByRole("button", { name: "Submit call off" }),
-      );
+      await user.click(within(dialog).getByRole("button", { name: "Submit call off" }));
 
       expect(onCallOff).toHaveBeenCalledWith(absenceTypes[0]);
     });
@@ -1541,9 +1478,7 @@ describe("ShiftEditPanel", () => {
       const dialog = screen.getByRole("dialog", {
         name: "Offer shift for pickup?",
       });
-      await user.click(
-        within(dialog).getByRole("button", { name: "Offer for pickup" }),
-      );
+      await user.click(within(dialog).getByRole("button", { name: "Offer for pickup" }));
 
       expect(onMakeAvailable).toHaveBeenCalledTimes(1);
     });
@@ -1575,9 +1510,9 @@ describe("ShiftEditPanel", () => {
       expect(screen.getByRole("button", { name: "Swap" })).toBeInTheDocument();
       expect(screen.getByText("Eligible teammates")).toBeInTheDocument();
       expect(screen.getByText("May 3 - May 9")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Go to previous week" }),
-      ).toHaveClass("dg-btn-secondary");
+      expect(screen.getByRole("button", { name: "Go to previous week" })).toHaveClass(
+        "dg-btn-secondary",
+      );
       expect(screen.getByRole("button", { name: "Go to next week" })).toHaveClass(
         "dg-btn-secondary",
       );
@@ -1594,22 +1529,16 @@ describe("ShiftEditPanel", () => {
       await user.click(teammateRow);
       expect(screen.getByText("You get")).toBeInTheDocument();
       expect(screen.getAllByText("Day Shift · Supervisor").length).toBeGreaterThan(0);
-      expect(
-        screen.getAllByText("7:00 AM - 3:00 PM · North").length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByText("7:00 AM - 3:00 PM · North").length).toBeGreaterThan(0);
       expect(screen.getByText("3:00 PM - 11:00 PM · South")).toBeInTheDocument();
 
-      await user.click(
-        screen.getByRole("button", { name: "Submit Swap Request" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Submit Swap Request" }));
 
       expect(onSubmitSwap).not.toHaveBeenCalled();
       const dialog = screen.getByRole("dialog", {
         name: "Submit swap request?",
       });
-      await user.click(
-        within(dialog).getByRole("button", { name: "Submit swap" }),
-      );
+      await user.click(within(dialog).getByRole("button", { name: "Submit swap" }));
 
       expect(onSubmitSwap).toHaveBeenCalledWith("emp-2", "2037-05-05");
     });
@@ -1628,10 +1557,7 @@ describe("ShiftEditPanel", () => {
           // The panel builds the probe Date at LOCAL midnight (new Date(`${iso}T00:00:00`)),
           // so match on the local calendar date rather than the UTC ISO string.
           const localKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-          return (
-            empId === "emp-2" &&
-            (localKey === "2037-05-05" || localKey === "2037-05-26")
-          );
+          return empId === "emp-2" && (localKey === "2037-05-05" || localKey === "2037-05-26");
         },
       });
 
@@ -1658,12 +1584,8 @@ describe("ShiftEditPanel", () => {
           name: "Show eligible teammates for Tue, May 12",
         }),
       ).not.toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: "Go to next week" }),
-      ).toBeDisabled();
-      expect(
-        screen.getByRole("button", { name: "Go to previous week" }),
-      ).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: "Go to next week" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Go to previous week" })).not.toBeDisabled();
     });
 
     it("filters swap targets by both employees' focus-area eligibility", async () => {
@@ -1717,12 +1639,8 @@ describe("ShiftEditPanel", () => {
           empId === "emp-2" && date.toISOString().startsWith("2026-05-04"),
       });
 
-      expect(
-        screen.queryByRole("button", { name: /Bob Jones/i }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.getByText("No eligible employees on this date."),
-      ).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Bob Jones/i })).not.toBeInTheDocument();
+      expect(screen.getByText("No eligible employees on this date.")).toBeInTheDocument();
     });
   });
 
@@ -1733,18 +1651,14 @@ describe("ShiftEditPanel", () => {
 
       render(<ConfirmDraftHarness onConfirmDraft={onConfirmDraft} />);
 
-      await user.click(
-        screen.getByRole("button", { name: "Day Shift - Supervisor" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
       expect(screen.getByRole("button", { name: "Undo" })).toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: "Undo" }));
       expect(screen.queryByRole("button", { name: "Undo" })).not.toBeInTheDocument();
       expect(onConfirmDraft).not.toHaveBeenCalled();
 
-      await user.click(
-        screen.getByRole("button", { name: "Day Shift - Supervisor" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
       await user.click(screen.getByRole("button", { name: "Confirm" }));
 
       expect(onConfirmDraft).toHaveBeenCalledTimes(1);
@@ -1757,9 +1671,7 @@ describe("ShiftEditPanel", () => {
 
       render(<ConfirmDraftHarness onConfirmDraft={onConfirmDraft} isStale />);
 
-      await user.click(
-        screen.getByRole("button", { name: "Day Shift - Supervisor" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Day Shift - Supervisor" }));
 
       expect(
         screen.getByText(

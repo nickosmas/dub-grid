@@ -88,14 +88,18 @@ describe("linked employee name syncing", () => {
 
     await updateEmployee(employee, "org-1");
 
-    expect(employeesBuilder.update).toHaveBeenCalledWith(expect.objectContaining({
-      first_name: "Alice",
-      last_name: "Smith",
-    }));
-    expect(profilesBuilder.update).toHaveBeenCalledWith(expect.objectContaining({
-      first_name: "Alice",
-      last_name: "Smith",
-    }));
+    expect(employeesBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        first_name: "Alice",
+        last_name: "Smith",
+      }),
+    );
+    expect(profilesBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        first_name: "Alice",
+        last_name: "Smith",
+      }),
+    );
     expect(cacheDel).toHaveBeenCalled();
     expect(logAudit).toHaveBeenCalled();
   });
@@ -117,15 +121,19 @@ describe("linked employee name syncing", () => {
       phone: "555-0199",
     });
 
-    expect(employeesBuilder.update).toHaveBeenCalledWith(expect.objectContaining({
-      first_name: "Alicia",
-      last_name: "Stone",
-      phone: "555-0199",
-    }));
-    expect(profilesBuilder.update).toHaveBeenCalledWith(expect.objectContaining({
-      first_name: "Alicia",
-      last_name: "Stone",
-    }));
+    expect(employeesBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        first_name: "Alicia",
+        last_name: "Stone",
+        phone: "555-0199",
+      }),
+    );
+    expect(profilesBuilder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        first_name: "Alicia",
+        last_name: "Stone",
+      }),
+    );
     expect(cacheDel).toHaveBeenCalled();
   });
 });

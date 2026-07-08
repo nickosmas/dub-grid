@@ -58,9 +58,7 @@ function IndicatorRow({
 
   const trimmedName = name.trim();
   const isDirty =
-    indicator.isNew ||
-    trimmedName !== indicator.name.trim() ||
-    color !== indicator.color;
+    indicator.isNew || trimmedName !== indicator.name.trim() || color !== indicator.color;
 
   const nameError =
     trimmedName.length > 0
@@ -81,8 +79,7 @@ function IndicatorRow({
         candidate.name.trim().toLowerCase() === trimmedName.toLowerCase(),
     );
 
-  const canSave =
-    isDirty && trimmedName.length > 0 && !nameError && !duplicateName;
+  const canSave = isDirty && trimmedName.length > 0 && !nameError && !duplicateName;
 
   const discardDraft = useCallback(
     (closeAfter: boolean) => {
@@ -161,20 +158,23 @@ function IndicatorRow({
     setShowDeleteConfirm(true);
   }, [indicator.id, indicator.isNew, onDeleted, orgId]);
 
-  const handleDelete = useCallback(async (hard: boolean) => {
-    setDeleting(true);
-    try {
-      await deleteIndicatorType(indicator.id, orgId, hard);
-      onDeleted(indicator.id);
-      toast.success(hard ? "Indicator deleted" : "Indicator archived");
-    } catch (error) {
-      Sentry.captureException(error);
-      toast.error(hard ? "Failed to delete indicator" : "Failed to archive indicator");
-    } finally {
-      setDeleting(false);
-      setShowDeleteConfirm(false);
-    }
-  }, [indicator.id, onDeleted, orgId]);
+  const handleDelete = useCallback(
+    async (hard: boolean) => {
+      setDeleting(true);
+      try {
+        await deleteIndicatorType(indicator.id, orgId, hard);
+        onDeleted(indicator.id);
+        toast.success(hard ? "Indicator deleted" : "Indicator archived");
+      } catch (error) {
+        Sentry.captureException(error);
+        toast.error(hard ? "Failed to delete indicator" : "Failed to archive indicator");
+      } finally {
+        setDeleting(false);
+        setShowDeleteConfirm(false);
+      }
+    },
+    [indicator.id, onDeleted, orgId],
+  );
 
   return (
     <div
@@ -209,9 +209,18 @@ function IndicatorRow({
             flexShrink: 0,
           }}
         />
-        <span style={{ flex: 1, fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+        <span
+          style={{
+            flex: 1,
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 700,
+            color: "var(--color-text-primary)",
+          }}
+        >
           {trimmedName || (
-            <span style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}>
+            <span
+              style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}
+            >
               Untitled indicator
             </span>
           )}
@@ -237,179 +246,206 @@ function IndicatorRow({
         }}
       >
         <div style={{ overflow: "hidden" }}>
-        <div
-          style={{
-            background: "var(--color-bg-secondary)",
-            borderRadius: "var(--dg-radius-lg)",
-            border: "1px solid var(--color-border-light)",
-            margin: "0 0 8px",
-            padding: "14px 16px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-            opacity: expanded ? 1 : 0,
-            transition: "opacity 180ms ease",
-            pointerEvents: expanded ? "auto" : "none",
-          }}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <div>
-            <label style={labelStyle}>INDICATOR NAME</label>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="dg-input"
-              maxLength={50}
-              placeholder="e.g. Readings"
-              disabled={!canEdit}
-              style={nameError || duplicateName ? { borderColor: "var(--color-danger)" } : undefined}
-            />
-            {nameError ? (
-              <p
-                role="alert"
-                style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
-              >
-                {nameError}
-              </p>
-            ) : duplicateName ? (
-              <p
-                role="alert"
-                style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
-              >
-                Another indicator already uses that name.
-              </p>
-            ) : null}
-          </div>
-
-          <div>
-            <label style={labelStyle}>COLOR</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              background: "var(--color-bg-secondary)",
+              borderRadius: "var(--dg-radius-lg)",
+              border: "1px solid var(--color-border-light)",
+              margin: "0 0 8px",
+              padding: "14px 16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              opacity: expanded ? 1 : 0,
+              transition: "opacity 180ms ease",
+              pointerEvents: expanded ? "auto" : "none",
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div>
+              <label style={labelStyle}>INDICATOR NAME</label>
               <input
-                type="color"
-                value={color.startsWith("#") ? color : "#2563EB"}
-                onChange={(event) => setColor(event.target.value)}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="dg-input"
+                maxLength={50}
+                placeholder="e.g. Readings"
                 disabled={!canEdit}
-                aria-label="Indicator color"
-                style={{
-                  width: 44,
-                  height: 36,
-                  padding: 4,
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "var(--dg-btn-radius)",
-                  background: "var(--color-surface)",
-                  cursor: canEdit ? "pointer" : "not-allowed",
-                  opacity: canEdit ? 1 : 0.55,
-                }}
+                style={
+                  nameError || duplicateName ? { borderColor: "var(--color-danger)" } : undefined
+                }
               />
-              <span
-                aria-hidden="true"
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: "9999px",
-                  background: color,
-                  border: "1px solid rgba(0,0,0,0.12)",
-                }}
-              />
-              <span
-                style={{
-                  fontFamily:
-                    "ui-monospace, SFMono-Regular, Menlo, monospace",
-                  fontSize: "var(--dg-fs-caption)",
-                  color: "var(--color-text-muted)",
-                  textTransform: "uppercase",
-                }}
-              >
-                {color.startsWith("#") ? color : "—"}
-              </span>
+              {nameError ? (
+                <p
+                  role="alert"
+                  style={{
+                    margin: "4px 0 0",
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--color-danger)",
+                  }}
+                >
+                  {nameError}
+                </p>
+              ) : duplicateName ? (
+                <p
+                  role="alert"
+                  style={{
+                    margin: "4px 0 0",
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--color-danger)",
+                  }}
+                >
+                  Another indicator already uses that name.
+                </p>
+              ) : null}
             </div>
-          </div>
 
-          {canEdit && (
-            <EditorActionRow
-              destructiveAction={
-                !indicator.isNew ? (
+            <div>
+              <label style={labelStyle}>COLOR</label>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="color"
+                  value={color.startsWith("#") ? color : "#2563EB"}
+                  onChange={(event) => setColor(event.target.value)}
+                  disabled={!canEdit}
+                  aria-label="Indicator color"
+                  style={{
+                    width: 44,
+                    height: 36,
+                    padding: 4,
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--dg-btn-radius)",
+                    background: "var(--color-surface)",
+                    cursor: canEdit ? "pointer" : "not-allowed",
+                    opacity: canEdit ? 1 : 0.55,
+                  }}
+                />
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: "9999px",
+                    background: color,
+                    border: "1px solid rgba(0,0,0,0.12)",
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                    fontSize: "var(--dg-fs-caption)",
+                    color: "var(--color-text-muted)",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {color.startsWith("#") ? color : "—"}
+                </span>
+              </div>
+            </div>
+
+            {canEdit && (
+              <EditorActionRow
+                destructiveAction={
+                  !indicator.isNew ? (
+                    <button
+                      onClick={handleDeleteClick}
+                      disabled={deleting}
+                      className="dg-btn dg-btn-danger dg-btn-sm"
+                    >
+                      {deleting ? "…" : "Delete"}
+                    </button>
+                  ) : undefined
+                }
+                secondaryAction={
                   <button
-                    onClick={handleDeleteClick}
-                    disabled={deleting}
-                    className="dg-btn dg-btn-danger dg-btn-sm"
+                    onClick={() =>
+                      indicator.isNew || !isDirty ? closeEditor() : discardDraft(false)
+                    }
+                    disabled={saving || deleting}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
                   >
-                    {deleting ? "…" : "Delete"}
+                    {getEditorDismissLabel({
+                      hasUnsavedChanges: isDirty,
+                      isCreating: Boolean(indicator.isNew),
+                    })}
                   </button>
-                ) : undefined
-              }
-              secondaryAction={
-                <button
-                  onClick={() => (indicator.isNew || !isDirty ? closeEditor() : discardDraft(false))}
-                  disabled={saving || deleting}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
-                >
-                  {getEditorDismissLabel({ hasUnsavedChanges: isDirty, isCreating: Boolean(indicator.isNew) })}
-                </button>
-              }
-              primaryAction={
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !canSave}
-                  className="dg-btn dg-btn-primary dg-btn-sm"
-                >
-                  {getEditorSaveLabel(saving)}
-                </button>
-              }
-            />
-          )}
-        </div>
+                }
+                primaryAction={
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || !canSave}
+                    className="dg-btn dg-btn-primary dg-btn-sm"
+                  >
+                    {getEditorSaveLabel(saving)}
+                  </button>
+                }
+              />
+            )}
+          </div>
         </div>
       </div>
 
       {unsavedChangesDialog}
-      {showDeleteConfirm && (() => {
-        const hasActive = dependencyInfo?.hasDependencies ?? false;
-        const hasAny = dependencyInfo?.hasAnyReferences ?? true;
-        if (hasActive) {
+      {showDeleteConfirm &&
+        (() => {
+          const hasActive = dependencyInfo?.hasDependencies ?? false;
+          const hasAny = dependencyInfo?.hasAnyReferences ?? true;
+          if (hasActive) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${trimmedName || "indicator"}"?`}
+                message={
+                  <>
+                    <strong>{trimmedName || "this indicator"}</strong> is currently{" "}
+                    {dependencyInfo!.summary.toLowerCase()}.
+                    <br />
+                    <br />
+                    Archiving will preserve those notes but remove the indicator from future use.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                isLoading={deleting}
+                onConfirm={() => handleDelete(false)}
+                onCancel={() => setShowDeleteConfirm(false)}
+              />
+            );
+          }
+          if (hasAny) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${trimmedName || "indicator"}"?`}
+                message={
+                  <>
+                    This will archive <strong>{trimmedName || "this indicator"}</strong>. Historical
+                    records will be preserved.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                isLoading={deleting}
+                onConfirm={() => handleDelete(false)}
+                onCancel={() => setShowDeleteConfirm(false)}
+              />
+            );
+          }
           return (
             <ConfirmDialog
-              title={`Archive "${trimmedName || "indicator"}"?`}
+              title={`Delete "${trimmedName || "indicator"}"?`}
               message={
                 <>
-                  <strong>{trimmedName || "this indicator"}</strong> is currently {dependencyInfo!.summary.toLowerCase()}.
-                  <br /><br />
-                  Archiving will preserve those notes but remove the indicator from future use.
+                  This will permanently delete <strong>{trimmedName || "this indicator"}</strong>.
+                  Nothing references it.
                 </>
               }
-              confirmLabel="Archive"
-              variant="warning"
+              confirmLabel="Delete"
+              variant="danger"
               isLoading={deleting}
-              onConfirm={() => handleDelete(false)}
+              onConfirm={() => handleDelete(true)}
               onCancel={() => setShowDeleteConfirm(false)}
             />
           );
-        }
-        if (hasAny) {
-          return (
-            <ConfirmDialog
-              title={`Archive "${trimmedName || "indicator"}"?`}
-              message={<>This will archive <strong>{trimmedName || "this indicator"}</strong>. Historical records will be preserved.</>}
-              confirmLabel="Archive"
-              variant="warning"
-              isLoading={deleting}
-              onConfirm={() => handleDelete(false)}
-              onCancel={() => setShowDeleteConfirm(false)}
-            />
-          );
-        }
-        return (
-          <ConfirmDialog
-            title={`Delete "${trimmedName || "indicator"}"?`}
-            message={<>This will permanently delete <strong>{trimmedName || "this indicator"}</strong>. Nothing references it.</>}
-            confirmLabel="Delete"
-            variant="danger"
-            isLoading={deleting}
-            onConfirm={() => handleDelete(true)}
-            onCancel={() => setShowDeleteConfirm(false)}
-          />
-        );
-      })()}
+        })()}
     </div>
   );
 }

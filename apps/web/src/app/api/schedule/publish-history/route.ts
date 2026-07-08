@@ -16,16 +16,11 @@ function formatProfileName(profile: {
   first_name: string | null;
   last_name: string | null;
 }): string {
-  return [profile.first_name, profile.last_name]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  return [profile.first_name, profile.last_name].filter(Boolean).join(" ").trim();
 }
 
 export async function GET(req: NextRequest) {
-  const parsed = querySchema.safeParse(
-    Object.fromEntries(req.nextUrl.searchParams.entries()),
-  );
+  const parsed = querySchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   }
@@ -34,9 +29,7 @@ export async function GET(req: NextRequest) {
     req,
     parsed.data.orgId,
     (permissions) =>
-      permissions.isGridmaster ||
-      permissions.isSuperAdmin ||
-      permissions.canViewSchedule,
+      permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
   );
   if ("response" in auth) {
     return auth.response;
@@ -47,9 +40,7 @@ export async function GET(req: NextRequest) {
     const offset = parsed.data.offset ?? 0;
     const { data, error } = await auth.serviceClient
       .from("publish_history")
-      .select(
-        "id, published_by, start_date, end_date, change_count, changes, published_at",
-      )
+      .select("id, published_by, start_date, end_date, change_count, changes, published_at")
       .eq("org_id", auth.orgId)
       .order("published_at", { ascending: false })
       .range(offset, offset + limit - 1);

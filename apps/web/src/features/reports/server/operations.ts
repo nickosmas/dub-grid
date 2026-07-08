@@ -31,9 +31,7 @@ export const OPERATIONS_REPORT_TYPES = [
 
 export type OperationsReportType = (typeof OPERATIONS_REPORT_TYPES)[number];
 
-export function isOperationsReportType(
-  value: string,
-): value is OperationsReportType {
+export function isOperationsReportType(value: string): value is OperationsReportType {
   return OPERATIONS_REPORT_TYPES.includes(value as OperationsReportType);
 }
 
@@ -180,8 +178,7 @@ export interface OperationsReportFilterOption {
   label: string;
 }
 
-export interface OperationsReportEmployeeFilterOption
-  extends OperationsReportFilterOption {
+export interface OperationsReportEmployeeFilterOption extends OperationsReportFilterOption {
   status: string;
   focusAreaIds: number[];
 }
@@ -330,8 +327,7 @@ function toIsoDate(date: Date): string {
 export function countRangeDays(range: OperationsReportRange): number {
   return (
     Math.floor(
-      (parseIsoDateUtc(range.endDate).getTime() -
-        parseIsoDateUtc(range.startDate).getTime()) /
+      (parseIsoDateUtc(range.endDate).getTime() - parseIsoDateUtc(range.startDate).getTime()) /
         MS_PER_DAY,
     ) + 1
   );
@@ -362,10 +358,7 @@ export function resolveCurrentPayPeriodRange(
   };
 }
 
-function formatName(row: {
-  first_name?: string | null;
-  last_name?: string | null;
-}): string {
+function formatName(row: { first_name?: string | null; last_name?: string | null }): string {
   const first = row.first_name?.trim() ?? "";
   const last = row.last_name?.trim() ?? "";
   return [first, last].filter(Boolean).join(" ") || "Unknown";
@@ -405,11 +398,7 @@ function resolveEntries(
 ): ResolvedEntry[] {
   return rows
     .map((source) => {
-      const entry = resolvePublishedScheduleEntry(
-        source,
-        new Map(),
-        absenceTypeById,
-      );
+      const entry = resolvePublishedScheduleEntry(source, new Map(), absenceTypeById);
       return entry ? { entry, source } : null;
     })
     .filter((item): item is ResolvedEntry => item != null);
@@ -474,16 +463,12 @@ function getReportEntryDurationHours(
   }
   const segments = item.entry.segments ?? [];
   if (segments.length === 0) {
-    return getEntryFocusAreaIds(item, shiftById).some((id) =>
-      focusAreaIdSet.has(id),
-    )
+    return getEntryFocusAreaIds(item, shiftById).some((id) => focusAreaIdSet.has(id))
       ? item.entry.durationHours
       : 0;
   }
   return segments
-    .filter((segment) =>
-      segmentMatchesFocusAreas(segment, item.source, shiftById, focusAreaIdSet),
-    )
+    .filter((segment) => segmentMatchesFocusAreas(segment, item.source, shiftById, focusAreaIdSet))
     .reduce((sum, segment) => sum + getSegmentDurationHours(segment), 0);
 }
 
@@ -507,9 +492,7 @@ export function buildOperationsReportPayload(
   const employeeIdSet = new Set(filters.employeeIds ?? []);
   const focusAreaIdSet = new Set(filters.focusAreaIds ?? []);
   const employeeById = new Map(source.employees.map((row) => [row.id, row]));
-  const employeeNameById = new Map(
-    source.employees.map((row) => [row.id, formatName(row)]),
-  );
+  const employeeNameById = new Map(source.employees.map((row) => [row.id, formatName(row)]));
   const focusAreaById = buildMap(source.focusAreas);
   const roleById = buildMap(source.roles);
   const certificationById = buildMap(source.certifications);
@@ -517,29 +500,21 @@ export function buildOperationsReportPayload(
   const absenceTypeById = buildMap(source.absenceTypes);
   const jobById = buildMap(source.jobs);
   const shiftById = new Map(source.shiftCategories.map((row) => [row.id, row]));
-  const shiftNameById = new Map(
-    source.shiftCategories.map((row) => [row.id, row.name]),
-  );
+  const shiftNameById = new Map(source.shiftCategories.map((row) => [row.id, row.name]));
   const reportEmployees = source.employees.filter((employee) => {
     if (employeeIdSet.size > 0 && !employeeIdSet.has(employee.id)) return false;
     return hasAnyNumber(employee.focus_area_ids, focusAreaIdSet);
   });
   const reportEmployeeIdSet = new Set(reportEmployees.map((employee) => employee.id));
-  const entries = resolveEntries(source.publishedRows, absenceTypeById).filter(
-    (item) => {
-      if (!reportDateSet.has(item.entry.date)) return false;
-      if (!reportEmployeeIdSet.has(item.entry.empId)) return false;
-      if (focusAreaIdSet.size === 0) return true;
-      return getEntryFocusAreaIds(item, shiftById).some((id) =>
-        focusAreaIdSet.has(id),
-      );
-    },
-  );
+  const entries = resolveEntries(source.publishedRows, absenceTypeById).filter((item) => {
+    if (!reportDateSet.has(item.entry.date)) return false;
+    if (!reportEmployeeIdSet.has(item.entry.empId)) return false;
+    if (focusAreaIdSet.size === 0) return true;
+    return getEntryFocusAreaIds(item, shiftById).some((id) => focusAreaIdSet.has(id));
+  });
   const shiftEntries = entries.filter((item) => item.entry.kind === "shift");
   const absenceEntries = entries.filter((item) => item.entry.kind === "absence");
-  const activeEmployees = reportEmployees.filter(
-    (employee) => employee.status === "active",
-  );
+  const activeEmployees = reportEmployees.filter((employee) => employee.status === "active");
   const overtimeThresholdHours = 40 * Math.ceil(Math.max(1, reportDates.length) / 7);
   const pendingInvitationByEmployeeId = new Map(
     source.invitations
@@ -572,32 +547,22 @@ export function buildOperationsReportPayload(
     certification:
       employee.certification_id == null
         ? ""
-        : certificationById.get(employee.certification_id) ??
-          "Unknown certification",
+        : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
     departments: formatList(employee.department_ids, departmentById, "Unknown department"),
   }));
 
   const staffHours = reportEmployees.map((employee) => {
-    const employeeEntries = entries.filter(
-      (item) => item.entry.empId === employee.id,
-    );
-    const workedEntries = employeeEntries.filter(
-      (item) => item.entry.kind === "shift",
-    );
-    const absenceCount = employeeEntries.filter(
-      (item) => item.entry.kind === "absence",
-    ).length;
+    const employeeEntries = entries.filter((item) => item.entry.empId === employee.id);
+    const workedEntries = employeeEntries.filter((item) => item.entry.kind === "shift");
+    const absenceCount = employeeEntries.filter((item) => item.entry.kind === "absence").length;
     const scheduledHours = roundHours(
       workedEntries.reduce(
-        (sum, item) =>
-          sum + getReportEntryDurationHours(item, shiftById, focusAreaIdSet),
+        (sum, item) => sum + getReportEntryDurationHours(item, shiftById, focusAreaIdSet),
         0,
       ),
     );
     const workedDays = new Set(workedEntries.map((item) => item.entry.date)).size;
-    const overtimeHours = roundHours(
-      Math.max(0, scheduledHours - overtimeThresholdHours),
-    );
+    const overtimeHours = roundHours(Math.max(0, scheduledHours - overtimeThresholdHours));
 
     return {
       employeeId: employee.id,
@@ -615,41 +580,27 @@ export function buildOperationsReportPayload(
 
   const coverage: CoverageReportRow[] = [];
   for (const requirement of source.coverageRequirements) {
-    if (
-      focusAreaIdSet.size > 0 &&
-      !focusAreaIdSet.has(requirement.focus_area_id)
-    ) {
+    if (focusAreaIdSet.size > 0 && !focusAreaIdSet.has(requirement.focus_area_id)) {
       continue;
     }
 
     for (const date of reportDates) {
       const dayOfWeek = parseIsoDateUtc(date).getUTCDay();
-      if (
-        requirement.day_of_week != null &&
-        requirement.day_of_week !== dayOfWeek
-      ) {
+      if (requirement.day_of_week != null && requirement.day_of_week !== dayOfWeek) {
         continue;
       }
 
       const scheduledEmployeeIds = new Set<string>();
       for (const { entry, source: row } of shiftEntries) {
         for (const segment of entry.segments ?? []) {
-          const segmentFocusAreaId = getSegmentFocusAreaId(
-            segment,
-            row,
-            shiftById,
-          );
-          if (
-            entry.date !== date ||
-            segmentFocusAreaId !== requirement.focus_area_id
-          ) {
+          const segmentFocusAreaId = getSegmentFocusAreaId(segment, row, shiftById);
+          if (entry.date !== date || segmentFocusAreaId !== requirement.focus_area_id) {
             continue;
           }
           const shiftMatches =
             requirement.preferred_shift_id == null ||
             segment.shiftId === requirement.preferred_shift_id;
-          const jobMatches =
-            requirement.job_id == null || segment.jobId === requirement.job_id;
+          const jobMatches = requirement.job_id == null || segment.jobId === requirement.job_id;
           if (shiftMatches && jobMatches) {
             scheduledEmployeeIds.add(entry.empId);
           }
@@ -659,10 +610,7 @@ export function buildOperationsReportPayload(
           continue;
         }
 
-        const rowFocusAreaIds = getEntryFocusAreaIds(
-          { entry, source: row },
-          shiftById,
-        );
+        const rowFocusAreaIds = getEntryFocusAreaIds({ entry, source: row }, shiftById);
         if (
           entry.date === date &&
           rowFocusAreaIds.includes(requirement.focus_area_id) &&
@@ -676,18 +624,15 @@ export function buildOperationsReportPayload(
       const scheduled = scheduledEmployeeIds.size;
       coverage.push({
         date,
-        focusArea:
-          focusAreaById.get(requirement.focus_area_id) ??
-          "Unknown focus area",
+        focusArea: focusAreaById.get(requirement.focus_area_id) ?? "Unknown focus area",
         shift:
           requirement.preferred_shift_id == null
             ? "Any shift"
-            : shiftNameById.get(requirement.preferred_shift_id) ??
-              "Unknown shift",
+            : (shiftNameById.get(requirement.preferred_shift_id) ?? "Unknown shift"),
         job:
           requirement.job_id == null
             ? "Any job"
-            : jobById.get(requirement.job_id) ?? "Unknown job",
+            : (jobById.get(requirement.job_id) ?? "Unknown job"),
         required,
         scheduled,
         openSlots: Math.max(0, required - scheduled),
@@ -703,73 +648,67 @@ export function buildOperationsReportPayload(
   );
   const totalOpenSlots = coverage.reduce((sum, row) => sum + row.openSlots, 0);
   const coveragePct = percent(totalScheduledForCoverage, totalRequired);
-  const scheduledStaffCount = new Set(shiftEntries.map((item) => item.entry.empId))
-    .size;
+  const scheduledStaffCount = new Set(shiftEntries.map((item) => item.entry.empId)).size;
 
-  const shiftRequests = source.shiftRequests.filter((request) => {
-    const requestDates = [
-      request.requester_shift_date,
-      request.target_shift_date ?? "",
-    ].filter(Boolean);
-    if (!requestDates.some((date) => reportDateSet.has(date))) return false;
-    if (employeeIdSet.size > 0) {
-      const requestEmployeeIds = [
-        request.requester_emp_id,
-        request.target_emp_id ?? "",
-      ].filter(Boolean);
-      if (!requestEmployeeIds.some((id) => employeeIdSet.has(id))) return false;
-    }
-    if (focusAreaIdSet.size > 0) {
-      const requestEmployees = [
-        employeeById.get(request.requester_emp_id),
-        request.target_emp_id ? employeeById.get(request.target_emp_id) : null,
-      ].filter((employee): employee is EmployeeReportRow => employee != null);
-      if (
-        !requestEmployees.some((employee) =>
-          hasAnyNumber(employee.focus_area_ids, focusAreaIdSet),
-        )
-      ) {
-        return false;
+  const shiftRequests = source.shiftRequests
+    .filter((request) => {
+      const requestDates = [request.requester_shift_date, request.target_shift_date ?? ""].filter(
+        Boolean,
+      );
+      if (!requestDates.some((date) => reportDateSet.has(date))) return false;
+      if (employeeIdSet.size > 0) {
+        const requestEmployeeIds = [request.requester_emp_id, request.target_emp_id ?? ""].filter(
+          Boolean,
+        );
+        if (!requestEmployeeIds.some((id) => employeeIdSet.has(id))) return false;
       }
-    }
-    return true;
-  }).map((request) => {
-    const resolvedAt = request.resolved_at ?? "";
-    const resolutionHours = request.resolved_at
-      ? roundHours(
-          (new Date(request.resolved_at).getTime() -
-            new Date(request.created_at).getTime()) /
-            3_600_000,
-        )
-      : null;
+      if (focusAreaIdSet.size > 0) {
+        const requestEmployees = [
+          employeeById.get(request.requester_emp_id),
+          request.target_emp_id ? employeeById.get(request.target_emp_id) : null,
+        ].filter((employee): employee is EmployeeReportRow => employee != null);
+        if (
+          !requestEmployees.some((employee) =>
+            hasAnyNumber(employee.focus_area_ids, focusAreaIdSet),
+          )
+        ) {
+          return false;
+        }
+      }
+      return true;
+    })
+    .map((request) => {
+      const resolvedAt = request.resolved_at ?? "";
+      const resolutionHours = request.resolved_at
+        ? roundHours(
+            (new Date(request.resolved_at).getTime() - new Date(request.created_at).getTime()) /
+              3_600_000,
+          )
+        : null;
 
-    return {
-      id: request.id,
-      type: request.type,
-      status: request.status,
-      requester:
-        employeeNameById.get(request.requester_emp_id) ??
-        "Unknown employee",
-      target: request.target_emp_id
-        ? employeeNameById.get(request.target_emp_id) ?? "Unknown employee"
-        : "",
-      requesterShiftDate: request.requester_shift_date,
-      targetShiftDate: request.target_shift_date ?? "",
-      createdAt: request.created_at,
-      resolvedAt,
-      resolutionHours,
-    };
-  });
+      return {
+        id: request.id,
+        type: request.type,
+        status: request.status,
+        requester: employeeNameById.get(request.requester_emp_id) ?? "Unknown employee",
+        target: request.target_emp_id
+          ? (employeeNameById.get(request.target_emp_id) ?? "Unknown employee")
+          : "",
+        requesterShiftDate: request.requester_shift_date,
+        targetShiftDate: request.target_shift_date ?? "",
+        createdAt: request.created_at,
+        resolvedAt,
+        resolutionHours,
+      };
+    });
 
-  const absenceRows: AbsenceCalloffReportRow[] = absenceEntries.map(
-    ({ entry }) => ({
-      kind: "absence",
-      employeeName: employeeNameById.get(entry.empId) ?? "Unknown employee",
-      date: entry.date,
-      absenceType: entry.label,
-      status: "published",
-    }),
-  );
+  const absenceRows: AbsenceCalloffReportRow[] = absenceEntries.map(({ entry }) => ({
+    kind: "absence",
+    employeeName: employeeNameById.get(entry.empId) ?? "Unknown employee",
+    date: entry.date,
+    absenceType: entry.label,
+    status: "published",
+  }));
   const calloffRows: AbsenceCalloffReportRow[] = source.shiftRequests
     .filter((request) => {
       if (request.type !== "calloff" || request.status !== "approved") {
@@ -782,15 +721,12 @@ export function buildOperationsReportPayload(
     })
     .map((request) => ({
       kind: "calloff",
-      employeeName:
-        employeeNameById.get(request.requester_emp_id) ??
-        "Unknown employee",
+      employeeName: employeeNameById.get(request.requester_emp_id) ?? "Unknown employee",
       date: request.requester_shift_date,
       absenceType:
         request.absence_type_id == null
           ? ""
-          : absenceTypeById.get(request.absence_type_id) ??
-            "Unknown absence type",
+          : (absenceTypeById.get(request.absence_type_id) ?? "Unknown absence type"),
       status: request.status,
     }));
 
@@ -804,8 +740,7 @@ export function buildOperationsReportPayload(
     certification:
       employee.certification_id == null
         ? ""
-        : certificationById.get(employee.certification_id) ??
-          "Unknown certification",
+        : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
     departments: formatList(employee.department_ids, departmentById, "Unknown department"),
     linkedAccount: Boolean(employee.user_id),
     pendingInvitation: pendingInvitationByEmployeeId.get(employee.id) ?? "",
@@ -817,8 +752,7 @@ export function buildOperationsReportPayload(
     certification:
       employee.certification_id == null
         ? ""
-        : certificationById.get(employee.certification_id) ??
-          "Unknown certification",
+        : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
     roles: formatList(employee.role_ids, roleById, "Unknown role"),
     focusAreas: formatList(employee.focus_area_ids, focusAreaById, "Unknown focus area"),
     departments: formatList(employee.department_ids, departmentById, "Unknown department"),
@@ -849,9 +783,7 @@ export function buildOperationsReportPayload(
       const cells: Record<string, string> = {};
       for (const date of reportDates) {
         const labels = entries
-          .filter(
-            (item) => item.entry.empId === employee.id && item.entry.date === date,
-          )
+          .filter((item) => item.entry.empId === employee.id && item.entry.date === date)
           .map((item) => item.entry.label);
         cells[date] = labels.join(" / ");
       }
@@ -934,7 +866,7 @@ function escapeCsvField(value: string | number | boolean | null | undefined): st
   const normalized = String(value);
   if (
     normalized.includes(",") ||
-    normalized.includes("\"") ||
+    normalized.includes('"') ||
     normalized.includes("\n") ||
     normalized.includes("\r")
   ) {
@@ -943,14 +875,9 @@ function escapeCsvField(value: string | number | boolean | null | undefined): st
   return normalized;
 }
 
-function buildCsv(
-  headers: string[],
-  rows: OperationsReportCell[][],
-): string {
+function buildCsv(headers: string[], rows: OperationsReportCell[][]): string {
   return [headers, ...rows]
-    .map((row) =>
-      row.map((cell) => escapeCsvField(formatReportCellForDisplay(cell))).join(","),
-    )
+    .map((row) => row.map((cell) => escapeCsvField(formatReportCellForDisplay(cell))).join(","))
     .join("\r\n");
 }
 
@@ -985,15 +912,11 @@ function normalizePdfText(value: OperationsReportCell): string {
     .replace(/\u00A0/g, " ")
     .replace(/[\u2010-\u2015]/g, "-")
     .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201C\u201D]/g, "\"")
+    .replace(/[\u201C\u201D]/g, '"')
     .replace(/\u2026/g, "...");
 }
 
-function wrapPdfCell(
-  value: OperationsReportCell,
-  width: number,
-  fontSize: number,
-): string[] {
+function wrapPdfCell(value: OperationsReportCell, width: number, fontSize: number): string[] {
   const text = normalizePdfText(value).replace(/\s+/g, " ").trim();
   const maxChars = Math.max(4, Math.floor(width / (fontSize * 0.56)));
   const words = text.split(" ");
@@ -1125,10 +1048,7 @@ function paethPredictor(left: number, up: number, upperLeft: number): number {
   return upperLeft;
 }
 
-function parseRgbaPng(
-  buffer: Buffer,
-  tintColor?: [number, number, number],
-): PdfPngImage {
+function parseRgbaPng(buffer: Buffer, tintColor?: [number, number, number]): PdfPngImage {
   const signature = "89504e470d0a1a0a";
   if (buffer.subarray(0, 8).toString("hex") !== signature) {
     throw new Error("Report logo must be a PNG image.");
@@ -1182,11 +1102,11 @@ function parseRgbaPng(
 
     for (let column = 0; column < rowLength; column += 1) {
       const encoded = inflated[sourceOffset + column] ?? 0;
-      const left = column >= bytesPerPixel ? raw[rowOffset + column - bytesPerPixel] ?? 0 : 0;
-      const up = row > 0 ? raw[rowOffset - rowLength + column] ?? 0 : 0;
+      const left = column >= bytesPerPixel ? (raw[rowOffset + column - bytesPerPixel] ?? 0) : 0;
+      const up = row > 0 ? (raw[rowOffset - rowLength + column] ?? 0) : 0;
       const upperLeft =
         row > 0 && column >= bytesPerPixel
-          ? raw[rowOffset - rowLength + column - bytesPerPixel] ?? 0
+          ? (raw[rowOffset - rowLength + column - bytesPerPixel] ?? 0)
           : 0;
       let decoded = encoded;
 
@@ -1270,10 +1190,7 @@ function getReportWordmark(): PdfPngImage | null {
 
   for (const candidate of candidates) {
     try {
-      cachedReportWordmark = parseRgbaPng(
-        readFileSync(candidate),
-        [0.059, 0.09, 0.141],
-      );
+      cachedReportWordmark = parseRgbaPng(readFileSync(candidate), [0.059, 0.09, 0.141]);
       return cachedReportWordmark;
     } catch {
       // Keep PDF export available if an environment does not expose public assets.
@@ -1363,9 +1280,7 @@ function buildPdfReportDetails(
         { label: "Staff records", value: String(payload.reports.rosterStatus.length) },
         {
           label: "Pending invitations",
-          value: String(
-            payload.reports.rosterStatus.filter((row) => row.pendingInvitation).length,
-          ),
+          value: String(payload.reports.rosterStatus.filter((row) => row.pendingInvitation).length),
         },
       ];
     case "certification-role-matrix":
@@ -1442,10 +1357,8 @@ function addOperationsPdfHeader(
   const renderedWordmarkWidth = hasWordmark
     ? wordmarkWidth
     : estimatePdfTextWidth(wordmark, wordmarkSize);
-  const separatorX =
-    wordmarkX + renderedWordmarkWidth + separatorPadding;
-  const separatorStrokeX =
-    separatorX + (separatorVisualWidth - separatorStrokeWidth) / 2;
+  const separatorX = wordmarkX + renderedWordmarkWidth + separatorPadding;
+  const separatorStrokeX = separatorX + (separatorVisualWidth - separatorStrokeWidth) / 2;
   const separatorY = lineCenterY - separatorHeight / 2;
   const orgX = separatorX + separatorVisualWidth + separatorPadding;
   const orgBaseline = lineCenterY - orgSize * orgTextCenterOffset;
@@ -1454,12 +1367,8 @@ function addOperationsPdfHeader(
   const titleLabel = REPORTS_WITHOUT_DATE_HEADER.has(report)
     ? table.title
     : `${table.title} - ${formatPdfDateRangeLabel(payload.range)}`;
-  const printedLabel = `Printed ${formatPdfPrintedDate(
-    payload.generatedAt,
-    payload.orgTimezone,
-  )}`;
-  const printedX =
-    margin + contentWidth - estimatePdfTextWidth(printedLabel, printedSize);
+  const printedLabel = `Printed ${formatPdfPrintedDate(payload.generatedAt, payload.orgTimezone)}`;
+  const printedX = margin + contentWidth - estimatePdfTextWidth(printedLabel, printedSize);
 
   if (hasLogo) {
     commands.push(pdfImageCommand("Logo", margin, logoTop, logoSize, logoSize));
@@ -1468,13 +1377,7 @@ function addOperationsPdfHeader(
   }
   if (hasWordmark) {
     commands.push(
-      pdfImageCommand(
-        "Wordmark",
-        wordmarkX,
-        wordmarkTop,
-        wordmarkWidth,
-        wordmarkHeight,
-      ),
+      pdfImageCommand("Wordmark", wordmarkX, wordmarkTop, wordmarkWidth, wordmarkHeight),
     );
   } else {
     commands.push(pdfTextCommand(wordmarkX, brandBaseline, wordmarkSize, wordmark, ink, "F2"));
@@ -1505,29 +1408,29 @@ function encodeWinAnsiHex(value: string): string {
       continue;
     }
     switch (codePoint) {
-      case 0x00B7:
-        bytes.push(0xB7);
+      case 0x00b7:
+        bytes.push(0xb7);
         break;
       case 0x2022:
         bytes.push(0x95);
         break;
       case 0x2027:
-        bytes.push(0xB7);
+        bytes.push(0xb7);
         break;
       case 0x2122:
         bytes.push(0x99);
         break;
-      case 0x00A9:
-        bytes.push(0xA9);
+      case 0x00a9:
+        bytes.push(0xa9);
         break;
-      case 0x00AE:
-        bytes.push(0xAE);
+      case 0x00ae:
+        bytes.push(0xae);
         break;
-      case 0x00B0:
-        bytes.push(0xB0);
+      case 0x00b0:
+        bytes.push(0xb0);
         break;
       default:
-        bytes.push(0x3F);
+        bytes.push(0x3f);
         break;
     }
   }
@@ -1572,8 +1475,7 @@ function buildPdfDocument(
 
   objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
   objects[fontObjectId] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
-  objects[boldFontObjectId] =
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>";
+  objects[boldFontObjectId] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>";
 
   if (logo) {
     let smaskObjectId: number | null = null;
@@ -1604,15 +1506,13 @@ function buildPdfDocument(
       logoObjectId == null ? "" : `/Logo ${logoObjectId} 0 R`,
       wordmarkObjectId == null ? "" : `/Wordmark ${wordmarkObjectId} 0 R`,
     ].filter(Boolean);
-    const xObjectResources =
-      xObjects.length === 0 ? "" : ` /XObject << ${xObjects.join(" ")} >>`;
+    const xObjectResources = xObjects.length === 0 ? "" : ` /XObject << ${xObjects.join(" ")} >>`;
     objects[pageId] =
       `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 792 612] /Resources << /Font << /F1 ${fontObjectId} 0 R /F2 ${boldFontObjectId} 0 R >>${xObjectResources} >> /Contents ${contentId} 0 R >>`;
     pageObjectIds.push(pageId);
   }
 
-  objects[2] =
-    `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageObjectIds.length} >>`;
+  objects[2] = `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageObjectIds.length} >>`;
 
   let pdf = "%PDF-1.4\n";
   const offsets: number[] = [0];
@@ -1678,11 +1578,7 @@ export function buildOperationsReportPdf(
 
   const details = buildPdfReportDetails(payload, report);
   if (details.length > 0) {
-    addLine(
-      details.map((metric) => `${metric.label}: ${metric.value}`).join(" | "),
-      8,
-      16,
-    );
+    addLine(details.map((metric) => `${metric.label}: ${metric.value}`).join(" | "), 8, 16);
   }
 
   const firstColumnWidth = Math.min(128, Math.max(82, contentWidth * 0.18));
@@ -1695,12 +1591,9 @@ export function buildOperationsReportPdf(
   const addTableRow = (cells: OperationsReportCell[], isHeader = false) => {
     const fontSize = isHeader ? headerFontSize : bodyFontSize;
     const verticalPadding = isHeader ? 5 : 6;
-    const wrapped = cells.map((cell, index) =>
-      wrapPdfCell(cell, widths[index] ?? 48, fontSize),
-    );
+    const wrapped = cells.map((cell, index) => wrapPdfCell(cell, widths[index] ?? 48, fontSize));
     const lineCount = Math.max(...wrapped.map((cellLines) => cellLines.length));
-    const rowHeight =
-      verticalPadding * 2 + fontSize + Math.max(0, lineCount - 1) * baseLineHeight;
+    const rowHeight = verticalPadding * 2 + fontSize + Math.max(0, lineCount - 1) * baseLineHeight;
 
     if (y - rowHeight < margin) {
       startPage();

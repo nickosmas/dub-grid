@@ -84,10 +84,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
       nextLoading={savingMode}
       wide
     >
-      <CompositeSection
-        title="Display mode"
-        description="How shifts appear on the schedule grid."
-      >
+      <CompositeSection title="Display mode" description="How shifts appear on the schedule grid.">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           {DISPLAY_MODES.map((mode) => {
             const isActive = selectedMode === mode.id;
@@ -159,11 +156,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
                 >
                   {mode.description}
                 </p>
-                <DisplayModeSample
-                  mode={mode.id}
-                  shiftCategories={shiftCategories}
-                  jobs={jobs}
-                />
+                <DisplayModeSample mode={mode.id} shiftCategories={shiftCategories} jobs={jobs} />
               </button>
             );
           })}

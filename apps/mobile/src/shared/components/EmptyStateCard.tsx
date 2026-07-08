@@ -32,11 +32,7 @@ export function EmptyStateCard({
   return (
     <View style={[variant.card, fillStyle]}>
       <View style={variant.iconFrame}>
-        <Ionicons
-          color={mobileColors.brand}
-          name={iconName}
-          size={compact ? 20 : 24}
-        />
+        <Ionicons color={mobileColors.brand} name={iconName} size={compact ? 20 : 24} />
       </View>
       <View style={variant.copy}>
         <Text style={variant.title}>{title}</Text>

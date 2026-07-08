@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
-import { formatDateKey } from "@/lib/dashboard-stats";
+import { formatDateKey } from "@/lib/utils";
 import type {
   AbsenceType,
   AssignmentDefinition,
@@ -63,7 +63,10 @@ function getDelimitedValue(
   count: number,
 ): string | null {
   if (!value) return null;
-  const parts = value.split("|").map((part) => part.trim()).filter(Boolean);
+  const parts = value
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
   if (parts.length > 1) return parts[index] ?? null;
   return count <= 1 ? (parts[0] ?? null) : null;
 }
@@ -96,16 +99,13 @@ function buildWorkedShifts(input: {
 
     const customStartTime = getDelimitedValue(entry.customStartTime, index, segmentCount);
     const customEndTime = getDelimitedValue(entry.customEndTime, index, segmentCount);
-    const startTime =
-      customStartTime ?? segment.startTime ?? assignment?.defaultStartTime ?? null;
+    const startTime = customStartTime ?? segment.startTime ?? assignment?.defaultStartTime ?? null;
     const endTime = customEndTime ?? segment.endTime ?? assignment?.defaultEndTime ?? null;
 
     shifts.push({
       label: assignment?.name || assignment?.label || segment.label || entry.label || "Shift",
       timeRange:
-        startTime && endTime
-          ? `${formatTime12h(startTime)} - ${formatTime12h(endTime)}`
-          : null,
+        startTime && endTime ? `${formatTime12h(startTime)} - ${formatTime12h(endTime)}` : null,
       background: assignment?.color ?? "var(--color-bg-secondary)",
       border: assignment?.border ?? "var(--color-border)",
       textColor: assignment?.text ?? "var(--color-text-primary)",
@@ -391,8 +391,9 @@ export default function MyScheduleRow({
     [currentEmpId, currentPeriodShifts, assignmentById, absenceTypeById, periodDates],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);
-  const { scrollRef, canScrollLeft, canScrollRight, scrollByPage } =
-    useHorizontalScrollState(days.length);
+  const { scrollRef, canScrollLeft, canScrollRight, scrollByPage } = useHorizontalScrollState(
+    days.length,
+  );
 
   if (!currentEmpId) return null;
 
@@ -414,9 +415,7 @@ export default function MyScheduleRow({
           />
         ) : (
           <div style={{ position: "relative" }}>
-            {canScrollLeft && (
-              <ScrollChevron direction="left" onClick={() => scrollByPage(-1)} />
-            )}
+            {canScrollLeft && <ScrollChevron direction="left" onClick={() => scrollByPage(-1)} />}
             <div
               ref={scrollRef}
               className="dg-no-scrollbar"
@@ -426,9 +425,7 @@ export default function MyScheduleRow({
                 <DayBox key={day.key} day={day} />
               ))}
             </div>
-            {canScrollRight && (
-              <ScrollChevron direction="right" onClick={() => scrollByPage(1)} />
-            )}
+            {canScrollRight && <ScrollChevron direction="right" onClick={() => scrollByPage(1)} />}
           </div>
         )}
       </div>

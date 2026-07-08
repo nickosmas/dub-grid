@@ -9,9 +9,7 @@ const searchSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const parsed = searchSchema.safeParse(
-      Object.fromEntries(req.nextUrl.searchParams.entries()),
-    );
+    const parsed = searchSchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
     if (!parsed.success) {
       return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
@@ -42,9 +40,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ employeeCount: count ?? 0 });
   } catch (error) {
     console.error("organization employee count GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load employee count" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load employee count" }, { status: 500 });
   }
 }

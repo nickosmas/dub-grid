@@ -11,11 +11,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -108,13 +104,7 @@ export function ProfileHero({
   );
 }
 
-export function ProfileHeroMeta({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+export function ProfileHeroMeta({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.heroMetaItem}>
       <Text style={styles.heroMetaLabel}>{label}</Text>
@@ -137,9 +127,7 @@ export function ProfileSection({
   return (
     <View style={[styles.section, style]}>
       {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
-      {description ? (
-        <Text style={styles.sectionDescription}>{description}</Text>
-      ) : null}
+      {description ? <Text style={styles.sectionDescription}>{description}</Text> : null}
       {children}
     </View>
   );
@@ -162,11 +150,7 @@ export function ProfileList({
   children: ReactNode;
   variant?: "framed" | "plain";
 }) {
-  return (
-    <View style={variant === "plain" ? styles.listPlain : styles.list}>
-      {children}
-    </View>
-  );
+  return <View style={variant === "plain" ? styles.listPlain : styles.list}>{children}</View>;
 }
 
 export function ProfileInfoRow({
@@ -234,11 +218,7 @@ export function ProfileNavRow({
           </Text>
         ) : null}
       </View>
-      <Ionicons
-        color={mobileColors.textSubtle}
-        name="chevron-forward"
-        size={22}
-      />
+      <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
     </Pressable>
   );
 }
@@ -266,11 +246,7 @@ export function ProfileTextInput({
       <Text style={styles.fieldLabel}>{label}</Text>
       {trailingAccessory ? (
         <View
-          style={[
-            styles.inputShell,
-            focused && styles.inputFocused,
-            error && styles.inputError,
-          ]}
+          style={[styles.inputShell, focused && styles.inputFocused, error && styles.inputError]}
         >
           <TextInput
             {...resolvedInputProps}
@@ -336,9 +312,7 @@ export function ProfileChoiceGroup({
                 pressed && styles.chipPressed,
               ]}
             >
-              <Text
-                style={[styles.chipText, selected && styles.chipTextSelected]}
-              >
+              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
                 {item.abbr || item.name}
               </Text>
             </Pressable>

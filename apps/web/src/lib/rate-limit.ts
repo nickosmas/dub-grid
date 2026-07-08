@@ -1,6 +1,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { createHash } from "node:crypto";
+import { serverEnv } from "@/lib/env";
 
 /**
  * SHA-256 of a normalized email, for use as a rate-limit key without storing
@@ -10,9 +11,7 @@ export function hashEmail(email: string): string {
   return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
 }
 
-const hasRedisEnv =
-  !!process.env.UPSTASH_REDIS_REST_URL &&
-  !!process.env.UPSTASH_REDIS_REST_TOKEN;
+const hasRedisEnv = !!serverEnv?.UPSTASH_REDIS_REST_URL && !!serverEnv?.UPSTASH_REDIS_REST_TOKEN;
 const isProduction = process.env.NODE_ENV === "production";
 
 function createRedis() {
@@ -22,13 +21,8 @@ function createRedis() {
 
 const redis = createRedis();
 
-function createSlidingWindowLimiter(
-  limit: number,
-  window: `${number} ${"s" | "m" | "h"}`,
-) {
-  return redis
-    ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(limit, window) })
-    : null;
+function createSlidingWindowLimiter(limit: number, window: `${number} ${"s" | "m" | "h"}`) {
+  return redis ? new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(limit, window) }) : null;
 }
 
 /**

@@ -31,7 +31,9 @@ async function main() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl?.includes("supabase.co")) {
     console.error("ERROR: .env.remote is not pointing to a remote Supabase project.");
-    console.error("Run `npm run db:reset:remote` (loads .env.remote), or `npm run db:reset` for local.");
+    console.error(
+      "Run `npm run db:reset:remote` (loads .env.remote), or `npm run db:reset` for local.",
+    );
     process.exit(1);
   }
 
@@ -109,7 +111,9 @@ async function main() {
   if (grantCount === 0) {
     await db.end();
     console.error("FATAL: No grants found for 'authenticated' role on public tables.");
-    console.error("004_grants.sql must include: GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;");
+    console.error(
+      "004_grants.sql must include: GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;",
+    );
     process.exit(1);
   }
   console.log(`  ${grantCount} table grants for 'authenticated' — OK`);
@@ -147,7 +151,9 @@ async function main() {
   const missingFns = expectedFns.filter((f) => !foundFns.includes(f));
   if (missingFns.length > 0) {
     console.error(`\nWARNING: Missing critical functions: ${missingFns.join(", ")}`);
-    console.error("002_functions_triggers.sql may have partially failed. Check the SQL for errors.");
+    console.error(
+      "002_functions_triggers.sql may have partially failed. Check the SQL for errors.",
+    );
   } else {
     console.log(`  ${foundFns.length} critical functions verified — OK`);
   }

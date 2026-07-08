@@ -3,7 +3,17 @@
 import React, { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Organization, FocusArea, ShiftCategory, IndicatorType, NamedItem, Department, CoverageRequirement, AbsenceType, JobDefinition } from "@/types";
+import {
+  Organization,
+  FocusArea,
+  ShiftCategory,
+  IndicatorType,
+  NamedItem,
+  Department,
+  CoverageRequirement,
+  AbsenceType,
+  JobDefinition,
+} from "@/types";
 import {
   checkCertificationDependencies,
   checkRoleDependencies,
@@ -12,7 +22,14 @@ import {
 } from "@/features/settings/client";
 import { toast } from "sonner";
 import ImpersonationPanel from "@/components/ImpersonationPanel";
-import { type SectionId, resolveSection, buildNavGroups, getDefaultSection, getMaxWidth, type NavPermissions } from "./nav-config";
+import {
+  type SectionId,
+  resolveSection,
+  buildNavGroups,
+  getDefaultSection,
+  getMaxWidth,
+  type NavPermissions,
+} from "./nav-config";
 import { SettingsShell } from "./SettingsShell";
 import OrganizationGeneral from "./OrganizationGeneral";
 import OrganizationLabels from "./OrganizationLabels";
@@ -112,64 +129,103 @@ export default function SettingsPage({
 }: SettingsPageProps) {
   const searchParams = useSearchParams();
 
-  const perms: NavPermissions = useMemo(() => ({
-    canManageOrg,
-    canAccessSettings,
-    isSuperAdmin,
-    isGridmaster,
-    canManageOrgLabels,
-    canViewOrgLabels,
-    canManageFocusAreas,
-    canViewFocusAreas,
-    canManageScheduleDefinitions,
-    canViewScheduleDefinitions,
-    canManageIndicatorTypes,
-    canViewIndicatorTypes,
-    canManageOrgSettings,
-    canManageCoverageRequirements,
-    canViewCoverageRequirements,
-  }), [canManageOrg, canAccessSettings, isSuperAdmin, isGridmaster, canManageOrgLabels, canViewOrgLabels, canManageFocusAreas, canViewFocusAreas, canManageScheduleDefinitions, canViewScheduleDefinitions, canManageIndicatorTypes, canViewIndicatorTypes, canManageOrgSettings, canManageCoverageRequirements, canViewCoverageRequirements]);
+  const perms: NavPermissions = useMemo(
+    () => ({
+      canManageOrg,
+      canAccessSettings,
+      isSuperAdmin,
+      isGridmaster,
+      canManageOrgLabels,
+      canViewOrgLabels,
+      canManageFocusAreas,
+      canViewFocusAreas,
+      canManageScheduleDefinitions,
+      canViewScheduleDefinitions,
+      canManageIndicatorTypes,
+      canViewIndicatorTypes,
+      canManageOrgSettings,
+      canManageCoverageRequirements,
+      canViewCoverageRequirements,
+    }),
+    [
+      canManageOrg,
+      canAccessSettings,
+      isSuperAdmin,
+      isGridmaster,
+      canManageOrgLabels,
+      canViewOrgLabels,
+      canManageFocusAreas,
+      canViewFocusAreas,
+      canManageScheduleDefinitions,
+      canViewScheduleDefinitions,
+      canManageIndicatorTypes,
+      canViewIndicatorTypes,
+      canManageOrgSettings,
+      canManageCoverageRequirements,
+      canViewCoverageRequirements,
+    ],
+  );
 
   const focusAreaLabel = organization.focusAreaLabel || "Focus Areas";
   const certificationLabel = organization.certificationLabel || "Certifications";
   const roleLabel = organization.roleLabel || "Roles";
   const scheduledDepartmentLabel = "Scheduled Departments";
-  const navGroups = useMemo(() => buildNavGroups(perms, {
-    focusAreaLabel,
-    certificationLabel,
-    roleLabel,
-  }), [perms, focusAreaLabel, certificationLabel, roleLabel]);
+  const navGroups = useMemo(
+    () =>
+      buildNavGroups(perms, {
+        focusAreaLabel,
+        certificationLabel,
+        roleLabel,
+      }),
+    [perms, focusAreaLabel, certificationLabel, roleLabel],
+  );
 
-  const allItems = useMemo(() => navGroups.flatMap(g => g.items), [navGroups]);
+  const allItems = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
   const defaultSection = getDefaultSection(perms);
   const sectionFromPath = resolveSection(searchParams.get("section"));
   const billingReturnSection =
     !sectionFromPath && searchParams.get("billing") ? "org-billing" : null;
   const requestedSection = sectionFromPath ?? billingReturnSection;
-  const activeSection: SectionId = requestedSection && allItems.some(i => i.id === requestedSection) ? requestedSection : defaultSection;
+  const activeSection: SectionId =
+    requestedSection && allItems.some((i) => i.id === requestedSection)
+      ? requestedSection
+      : defaultSection;
   const maxWidth = getMaxWidth(activeSection);
 
   // Permission notice for view-only users.
-  const banner = canAccessSettings && !isSuperAdmin && !isGridmaster ? (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 14px",
-        background: "var(--color-info-bg)",
-        borderRadius: "var(--dg-radius-sm)",
-        border: "1px solid var(--color-info-border)",
-        fontSize: "var(--dg-fs-caption)",
-        color: "var(--color-info-text)",
-      }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-      </svg>
-      Some settings are read-only based on your permissions. Contact your super admin to request changes.
-    </div>
-  ) : null;
+  const banner =
+    canAccessSettings && !isSuperAdmin && !isGridmaster ? (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 14px",
+          background: "var(--color-info-bg)",
+          borderRadius: "var(--dg-radius-sm)",
+          border: "1px solid var(--color-info-border)",
+          fontSize: "var(--dg-fs-caption)",
+          color: "var(--color-info-text)",
+        }}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ flexShrink: 0 }}
+        >
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        Some settings are read-only based on your permissions. Contact your super admin to request
+        changes.
+      </div>
+    ) : null;
 
   return (
     <SettingsShell
@@ -184,23 +240,21 @@ export default function SettingsPage({
       {/* ── General group ─────────────────────────────────────── */}
 
       {activeSection === "org-general" && isSuperAdmin && (
-        <OrganizationGeneral
-          organization={organization}
-          onSave={onOrganizationSave}
-        />
+        <OrganizationGeneral organization={organization} onSave={onOrganizationSave} />
       )}
 
       {activeSection === "org-billing" && (isSuperAdmin || isGridmaster) && (
         <BillingSettings organization={organization} />
       )}
 
-      {activeSection === "org-labels" && (isSuperAdmin || canManageOrgLabels || canViewOrgLabels) && (
-        <OrganizationLabels
-          organization={organization}
-          onSave={onOrganizationSave}
-          readOnly={!isSuperAdmin && !canManageOrgLabels}
-        />
-      )}
+      {activeSection === "org-labels" &&
+        (isSuperAdmin || canManageOrgLabels || canViewOrgLabels) && (
+          <OrganizationLabels
+            organization={organization}
+            onSave={onOrganizationSave}
+            readOnly={!isSuperAdmin && !canManageOrgLabels}
+          />
+        )}
 
       {activeSection === "org-activity" && isSuperAdmin && (
         <OrgActivityLog orgId={organization.id} />
@@ -218,63 +272,64 @@ export default function SettingsPage({
       {/* ── Scheduling group ─────────────────────────────────── */}
 
       {activeSection === "schedule-rules" && isSuperAdmin && (
-        <ScheduleRules
-          organization={organization}
-          onOrganizationSave={onOrganizationSave}
-        />
+        <ScheduleRules organization={organization} onOrganizationSave={onOrganizationSave} />
       )}
 
-      {activeSection === "schedule-shifts" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
-        <ShiftCategories
-          shiftCategories={shiftCategories}
-          focusAreas={focusAreas}
-          orgId={organization.id}
-          onChange={onShiftCategoriesChange}
-          canManageScheduleDefinitions={canManageScheduleDefinitions}
-        />
-      )}
+      {activeSection === "schedule-shifts" &&
+        (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
+          <ShiftCategories
+            shiftCategories={shiftCategories}
+            focusAreas={focusAreas}
+            orgId={organization.id}
+            onChange={onShiftCategoriesChange}
+            canManageScheduleDefinitions={canManageScheduleDefinitions}
+          />
+        )}
 
-      {activeSection === "schedule-jobs" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
-        <Jobs
-          jobs={jobs}
-          orgId={organization.id}
-          orgRoles={orgRoles}
-          certifications={certifications}
-          departments={departments}
-          focusAreas={focusAreas}
-          shiftCategories={shiftCategories}
-          roleLabel={roleLabel}
-          certificationLabel={certificationLabel}
-          onChange={onJobsChange}
-          canManageScheduleDefinitions={canManageScheduleDefinitions}
-          shiftDisplayMode={organization.shiftDisplayMode}
-        />
-      )}
+      {activeSection === "schedule-jobs" &&
+        (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
+          <Jobs
+            jobs={jobs}
+            orgId={organization.id}
+            orgRoles={orgRoles}
+            certifications={certifications}
+            departments={departments}
+            focusAreas={focusAreas}
+            shiftCategories={shiftCategories}
+            roleLabel={roleLabel}
+            certificationLabel={certificationLabel}
+            onChange={onJobsChange}
+            canManageScheduleDefinitions={canManageScheduleDefinitions}
+            shiftDisplayMode={organization.shiftDisplayMode}
+          />
+        )}
 
-      {activeSection === "schedule-absence-types" && (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
-        <AbsenceTypes
-          absenceTypes={absenceTypes}
-          orgId={organization.id}
-          onChange={onAbsenceTypesChange}
-          canManageScheduleDefinitions={canManageScheduleDefinitions}
-          shiftDisplayMode={organization.shiftDisplayMode}
-        />
-      )}
+      {activeSection === "schedule-absence-types" &&
+        (canManageScheduleDefinitions || canViewScheduleDefinitions) && (
+          <AbsenceTypes
+            absenceTypes={absenceTypes}
+            orgId={organization.id}
+            onChange={onAbsenceTypesChange}
+            canManageScheduleDefinitions={canManageScheduleDefinitions}
+            shiftDisplayMode={organization.shiftDisplayMode}
+          />
+        )}
 
-      {activeSection === "schedule-coverage" && (canManageCoverageRequirements || canViewCoverageRequirements) && (
-        <Coverage
-          orgId={organization.id}
-          focusAreas={focusAreas}
-          shiftCategories={shiftCategories}
-          jobs={jobs}
-          orgRoles={orgRoles}
-          certifications={certifications}
-          coverageRequirements={coverageRequirements}
-          onCoverageRequirementsChange={onCoverageRequirementsChange}
-          canEdit={canManageCoverageRequirements}
-          shiftDisplayMode={organization.shiftDisplayMode}
-        />
-      )}
+      {activeSection === "schedule-coverage" &&
+        (canManageCoverageRequirements || canViewCoverageRequirements) && (
+          <Coverage
+            orgId={organization.id}
+            focusAreas={focusAreas}
+            shiftCategories={shiftCategories}
+            jobs={jobs}
+            orgRoles={orgRoles}
+            certifications={certifications}
+            coverageRequirements={coverageRequirements}
+            onCoverageRequirementsChange={onCoverageRequirementsChange}
+            canEdit={canManageCoverageRequirements}
+            shiftDisplayMode={organization.shiftDisplayMode}
+          />
+        )}
 
       {/* ── Staff designations group ─────────────────────────── */}
 
@@ -338,40 +393,38 @@ export default function SettingsPage({
         />
       )}
 
-      {activeSection === "staff-departments" && (canManageFocusAreas || canViewFocusAreas || canManageOrgLabels || canViewOrgLabels) && (
-        <DepartmentsSettings
-          departments={departments}
-          focusAreas={focusAreas}
-          orgId={organization.id}
-          focusAreaLabel={focusAreaLabel}
-          departmentLabel={scheduledDepartmentLabel}
-          canManageFocusAreas={canManageFocusAreas}
-          canManageOrgLabels={canManageOrgLabels}
-          onDepartmentsChange={onDepartmentsChange}
-          onFocusAreasChange={onFocusAreasChange}
-        />
-      )}
+      {activeSection === "staff-departments" &&
+        (canManageFocusAreas || canViewFocusAreas || canManageOrgLabels || canViewOrgLabels) && (
+          <DepartmentsSettings
+            departments={departments}
+            focusAreas={focusAreas}
+            orgId={organization.id}
+            focusAreaLabel={focusAreaLabel}
+            departmentLabel={scheduledDepartmentLabel}
+            canManageFocusAreas={canManageFocusAreas}
+            canManageOrgLabels={canManageOrgLabels}
+            onDepartmentsChange={onDepartmentsChange}
+            onFocusAreasChange={onFocusAreasChange}
+          />
+        )}
 
-      {activeSection === "staff-indicators" && (canManageIndicatorTypes || canViewIndicatorTypes) && (
-        <Indicators
-          indicatorTypes={indicatorTypes}
-          orgId={organization.id}
-          onChange={onIndicatorTypesChange}
-          canManageIndicatorTypes={canManageIndicatorTypes}
-        />
-      )}
+      {activeSection === "staff-indicators" &&
+        (canManageIndicatorTypes || canViewIndicatorTypes) && (
+          <Indicators
+            indicatorTypes={indicatorTypes}
+            orgId={organization.id}
+            onChange={onIndicatorTypesChange}
+            canManageIndicatorTypes={canManageIndicatorTypes}
+          />
+        )}
 
       {/* ── Platform group ──────────────────────────────────── */}
 
-      {activeSection === "platform-impersonation" && isGridmaster && (
-        <ImpersonationPanel />
-      )}
+      {activeSection === "platform-impersonation" && isGridmaster && <ImpersonationPanel />}
 
       {/* ── Danger Zone group ───────────────────────────────── */}
 
-      {activeSection === "org-danger" && isSuperAdmin && (
-        <DangerZone organization={organization} />
-      )}
+      {activeSection === "org-danger" && isSuperAdmin && <DangerZone organization={organization} />}
     </SettingsShell>
   );
 }

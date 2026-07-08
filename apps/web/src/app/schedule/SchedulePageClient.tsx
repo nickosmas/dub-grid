@@ -36,18 +36,9 @@ import { X } from "lucide-react";
 const ShiftEditPanel = dynamic(() => import("@/components/ShiftEditPanel"), {
   ssr: false,
 });
-const PrintOptionsModal = dynamic(
-  () => import("@/components/PrintOptionsModal"),
-  { ssr: false },
-);
-const PrintScheduleView = dynamic(
-  () => import("@/components/PrintScheduleView"),
-  { ssr: false },
-);
-const ShiftRequestBoard = dynamic(
-  () => import("@/components/ShiftRequestBoard"),
-  { ssr: false },
-);
+const PrintOptionsModal = dynamic(() => import("@/components/PrintOptionsModal"), { ssr: false });
+const PrintScheduleView = dynamic(() => import("@/components/PrintScheduleView"), { ssr: false });
+const ShiftRequestBoard = dynamic(() => import("@/components/ShiftRequestBoard"), { ssr: false });
 const CoveragePanel = dynamic(() => import("@/components/CoveragePanel"), {
   ssr: false,
 });
@@ -61,9 +52,7 @@ import {
   getEmployeeDisplayName,
   iterateDateRange,
 } from "@/lib/utils";
-import {
-  hasShiftStartedAtTimeRanges,
-} from "@dubgrid/schedule-core";
+import { hasShiftStartedAtTimeRanges } from "@dubgrid/schedule-core";
 import {
   filterAndSortEmployees,
   hasVisibleGridShiftEntry,
@@ -128,10 +117,7 @@ import {
 import { exportScheduleCSV } from "@/lib/export-csv";
 import { queueNotification } from "@/lib/notify";
 import { buildRealtimeDraftDiff } from "@/lib/realtime-draft-utils";
-import {
-  getScheduleStartForSpan,
-  resolveScheduleSpan,
-} from "@/lib/schedule-view";
+import { getScheduleStartForSpan, resolveScheduleSpan } from "@/lib/schedule-view";
 import {
   usePermissions,
   useOrganizationData,
@@ -158,14 +144,9 @@ import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
 import MobileDayView from "@/components/MobileDayView";
 import { useMediaQuery, MOBILE, AUTO_ONE_WEEK } from "@/hooks";
-import {
-  useSetMobileSubNav,
-  SubNavItem,
-} from "@/components/MobileSubNavContext";
+import { useSetMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
 import { mergeDraftChangedBroadcastPayload } from "./_lib/draft-broadcast";
-import {
-  shouldRenderScheduleAuthorNames,
-} from "./_lib/editor-visibility";
+import { shouldRenderScheduleAuthorNames } from "./_lib/editor-visibility";
 import {
   cloneDraftNotes,
   cloneShiftEntry,
@@ -308,9 +289,7 @@ function SchedulerContent() {
   } = useOrganizationData();
   // Use orgId from JWT (available immediately) so employee fetch starts
   // in parallel with org data instead of waiting for it.
-  const { employees, loading: empLoading } = useEmployees(
-    orgId ?? org?.id ?? null,
-  );
+  const { employees, loading: empLoading } = useEmployees(orgId ?? org?.id ?? null);
   const segmentCompatibility = useMemo(
     () =>
       createShiftJobCompatibilityMaps({
@@ -330,8 +309,7 @@ function SchedulerContent() {
   useEffect(() => {
     const now = new Date();
     const msUntilMidnight =
-      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() -
-      now.getTime();
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
     const timer = setTimeout(() => setToday(new Date()), msUntilMidnight + 500);
     return () => clearTimeout(timer);
   }, [today]);
@@ -345,14 +323,8 @@ function SchedulerContent() {
   // seed/reset the actually-loaded window below — never as a fetch bound
   // directly, since the loaded window must follow navigation (see the
   // "sync loaded window to current view" effect further down).
-  const defaultShiftFetchStart = useMemo(
-    () => formatDateKey(addDays(today, -90)),
-    [today],
-  );
-  const defaultShiftFetchEnd = useMemo(
-    () => formatDateKey(addDays(today, 90)),
-    [today],
-  );
+  const defaultShiftFetchStart = useMemo(() => formatDateKey(addDays(today, -90)), [today]);
+  const defaultShiftFetchEnd = useMemo(() => formatDateKey(addDays(today, 90)), [today]);
 
   // The currently-loaded shift/notes window. Starts at the ±90-day default,
   // then widens (or recenters, for a far jump) to follow wherever the user
@@ -366,9 +338,7 @@ function SchedulerContent() {
   const shiftFetchStart = loadedShiftWindow.start;
   const shiftFetchEnd = loadedShiftWindow.end;
 
-  const [weekStart, setWeekStart] = useState<Date>(() =>
-    getWeekStart(new Date()),
-  );
+  const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()));
   const [activeFocusArea, setActiveFocusArea] = useState<number | null>(null);
   const [shifts, setShifts] = useState<ShiftMap>({});
   // Ref always points to the latest shifts — used in setShift to read fresh version
@@ -390,18 +360,14 @@ function SchedulerContent() {
   const notesRef = useRef(notes);
   notesRef.current = notes;
   const [editPanel, setEditPanel] = useState<EditModalState | null>(null);
-  const [editSessionDraft, setEditSessionDraft] =
-    useState<EditSessionDraft | null>(null);
+  const [editSessionDraft, setEditSessionDraft] = useState<EditSessionDraft | null>(null);
   const editSessionDraftRef = useRef<EditSessionDraft | null>(null);
   editSessionDraftRef.current = editSessionDraft;
   const isApplyingEditSessionRef = useRef(false);
   const [preferredSpan, setPreferredSpan] = useState<1 | 2 | "month">(2);
   // Auto-downgrade 2-week to 1-week on cramped tablet and small-desktop widths.
   // Wider desktops keep 2-week available and rely on the grid's readable min widths.
-  const spanWeeks: 1 | 2 | "month" = resolveScheduleSpan(
-    preferredSpan,
-    shouldAutoUseOneWeek,
-  );
+  const spanWeeks: 1 | 2 | "month" = resolveScheduleSpan(preferredSpan, shouldAutoUseOneWeek);
   useEffect(() => {
     if (spanWeeks !== 2) return;
     setWeekStart((prev) =>
@@ -416,14 +382,11 @@ function SchedulerContent() {
   const [staffSearch, setStaffSearch] = useState("");
   // My Schedule mode: for regular users, default to showing only their own shifts
   const [isPublishing, setIsPublishing] = useState(false);
-  const [cancelingMode, setCancelingMode] = useState<null | "mine" | "all">(
-    null,
-  );
+  const [cancelingMode, setCancelingMode] = useState<null | "mine" | "all">(null);
   const [, setRecurringShifts] = useState<RecurringShift[]>([]);
   const [isApplyingRecurring, setIsApplyingRecurring] = useState(false);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
-  const [activePrintConfig, setActivePrintConfig] =
-    useState<PrintConfig | null>(null);
+  const [activePrintConfig, setActivePrintConfig] = useState<PrintConfig | null>(null);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [showAutoFillConfirm, setShowAutoFillConfirm] = useState(false);
@@ -436,9 +399,7 @@ function SchedulerContent() {
     seriesId: string;
     shiftCount: number;
   } | null>(null);
-  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry[]>(
-    [],
-  );
+  const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry[]>([]);
   const [showPublishDiff, setShowPublishDiff] = useState(false);
   const [showPublishHistory, setShowPublishHistory] = useState(false);
   // Per-banner dismissals, persisted to sessionStorage so the X actually
@@ -446,38 +407,23 @@ function SchedulerContent() {
   // re-renders that previously kept re-showing the banner. Hiding is UI-only:
   // drafts and publish history are not touched, and the dismissal clears on
   // sign-out via the dg_* sweep in clearDubgridSessionState.
-  const {
-    isDismissed: outOfWindowDraftsDismissed,
-    dismiss: dismissOutOfWindowDrafts,
-  } = useDismissibleBanner("schedule-out-of-window-drafts");
-  const {
-    isDismissed: publishBannerDismissed,
-    dismiss: dismissPublishBanner,
-  } = useDismissibleBanner("schedule-publish");
-  const {
-    isDismissed: outOfWindowPublishesDismissed,
-    dismiss: dismissOutOfWindowPublishes,
-  } = useDismissibleBanner("schedule-out-of-window-publishes");
+  const { isDismissed: outOfWindowDraftsDismissed, dismiss: dismissOutOfWindowDrafts } =
+    useDismissibleBanner("schedule-out-of-window-drafts");
+  const { isDismissed: publishBannerDismissed, dismiss: dismissPublishBanner } =
+    useDismissibleBanner("schedule-publish");
+  const { isDismissed: outOfWindowPublishesDismissed, dismiss: dismissOutOfWindowPublishes } =
+    useDismissibleBanner("schedule-out-of-window-publishes");
   const lastViewedRef = useRef<string | null>(null);
   const hasShownChangeToast = useRef(false);
   const [isImportingPrevious, setIsImportingPrevious] = useState(false);
   const [showImportConfirm, setShowImportConfirm] = useState(false);
-  const [importPreview, setImportPreview] = useState<ImportPreviewState | null>(
-    null,
-  );
-  const [importResults, setImportResults] = useState<ImportResultsState | null>(
-    null,
-  );
+  const [importPreview, setImportPreview] = useState<ImportPreviewState | null>(null);
+  const [importResults, setImportResults] = useState<ImportResultsState | null>(null);
   const [showImportResults, setShowImportResults] = useState(false);
-  const [activeOperation, setActiveOperation] =
-    useState<ScheduleOperation | null>(null);
+  const [activeOperation, setActiveOperation] = useState<ScheduleOperation | null>(null);
   const [isCreatingRepeatSeries, setIsCreatingRepeatSeries] = useState(false);
-  const operationDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
-  const operationTrickleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
-    null,
-  );
+  const operationDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const operationTrickleIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Coverage Panel ─────────────────────────────────────────────────────────
   const [showCoveragePanel, setShowCoveragePanel] = useState(false);
@@ -486,10 +432,7 @@ function SchedulerContent() {
   const [showRequestBoard, setShowRequestBoard] = useState(false);
 
   const currentEmpId = useMemo(
-    () =>
-      authUser
-        ? (employees.find((e) => e.userId === authUser.id)?.id ?? null)
-        : null,
+    () => (authUser ? (employees.find((e) => e.userId === authUser.id)?.id ?? null) : null),
     [employees, authUser],
   );
   const currentEmployee = useMemo(
@@ -512,9 +455,7 @@ function SchedulerContent() {
   );
 
   // ── Open shifts (calloff-spawned pickups) ──
-  const [calloffOpenShifts, setCalloffOpenShifts] = useState<GridOpenShift[]>(
-    [],
-  );
+  const [calloffOpenShifts, setCalloffOpenShifts] = useState<GridOpenShift[]>([]);
   const [publishedDateRanges, setPublishedDateRanges] = useState<
     { startDate: string; endDate: string }[]
   >([]);
@@ -530,15 +471,8 @@ function SchedulerContent() {
   );
   const resolvedCalloffOpenShifts = useMemo(
     () =>
-      shiftRequests.loading || shiftRequests.error
-        ? calloffOpenShifts
-        : liveCalloffOpenShifts,
-    [
-      calloffOpenShifts,
-      liveCalloffOpenShifts,
-      shiftRequests.error,
-      shiftRequests.loading,
-    ],
+      shiftRequests.loading || shiftRequests.error ? calloffOpenShifts : liveCalloffOpenShifts,
+    [calloffOpenShifts, liveCalloffOpenShifts, shiftRequests.error, shiftRequests.loading],
   );
 
   const monthStart = useMemo(
@@ -546,8 +480,7 @@ function SchedulerContent() {
     [weekStart],
   );
   const currentPublishWindow = useMemo(() => {
-    const startDate =
-      spanWeeks === "month" ? new Date(monthStart) : new Date(weekStart);
+    const startDate = spanWeeks === "month" ? new Date(monthStart) : new Date(weekStart);
     const endDate =
       spanWeeks === "month"
         ? new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0)
@@ -628,11 +561,7 @@ function SchedulerContent() {
       outOfWindowDraftGroups.map((group) => {
         const end =
           spanWeeks === "month"
-            ? new Date(
-                group.periodStart.getFullYear(),
-                group.periodStart.getMonth() + 1,
-                0,
-              )
+            ? new Date(group.periodStart.getFullYear(), group.periodStart.getMonth() + 1, 0)
             : addDays(group.periodStart, spanWeeks * 7 - 1);
         return `${formatDate(group.periodStart)}–${formatDate(end)}`;
       }),
@@ -700,19 +629,13 @@ function SchedulerContent() {
   );
 
   const updateScheduleOperation = useCallback(
-    (
-      kind: ScheduleOperation["kind"],
-      updates: Partial<Omit<ScheduleOperation, "kind">>,
-    ) => {
+    (kind: ScheduleOperation["kind"], updates: Partial<Omit<ScheduleOperation, "kind">>) => {
       setActiveOperation((current) => {
         if (!current || current.kind !== kind) return current;
         return {
           ...current,
           ...updates,
-          progress:
-            updates.progress == null
-              ? current.progress
-              : clampProgress(updates.progress),
+          progress: updates.progress == null ? current.progress : clampProgress(updates.progress),
         };
       });
     },
@@ -813,10 +736,7 @@ function SchedulerContent() {
   );
 
   const buildEditSessionFingerprint = useCallback(
-    (
-      shift: ShiftMap[string] | null,
-      notesByFocusArea: Record<number, DraftNoteState[]>,
-    ): string =>
+    (shift: ShiftMap[string] | null, notesByFocusArea: Record<number, DraftNoteState[]>): string =>
       JSON.stringify({
         shift: serializeShiftSnapshot(shift),
         notes: serializeNotesSnapshot(notesByFocusArea),
@@ -829,8 +749,7 @@ function SchedulerContent() {
       baseFingerprint: string,
       draftShift: ShiftMap[string] | null,
       draftNotes: Record<number, DraftNoteState[]>,
-    ): boolean =>
-      buildEditSessionFingerprint(draftShift, draftNotes) !== baseFingerprint,
+    ): boolean => buildEditSessionFingerprint(draftShift, draftNotes) !== baseFingerprint,
     [buildEditSessionFingerprint],
   );
 
@@ -874,9 +793,9 @@ function SchedulerContent() {
     shiftLabel: string;
   } | null>(null);
   const [isBulkDeleteMode, setIsBulkDeleteMode] = useState(false);
-  const [bulkDeleteSelectedKeys, setBulkDeleteSelectedKeys] = useState<
-    Set<string>
-  >(() => new Set());
+  const [bulkDeleteSelectedKeys, setBulkDeleteSelectedKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [showBulkDeleteReview, setShowBulkDeleteReview] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [pendingPasteOver, setPendingPasteOver] = useState<{
@@ -885,8 +804,7 @@ function SchedulerContent() {
     existingLabel: string;
     pasteEntry: ScheduleCellInput;
   } | null>(null);
-  const [pendingClaimShift, setPendingClaimShift] =
-    useState<GridOpenShift | null>(null);
+  const [pendingClaimShift, setPendingClaimShift] = useState<GridOpenShift | null>(null);
   const [isClaimShiftPending, setIsClaimShiftPending] = useState(false);
   const [pendingCoverageGapVolunteer, setPendingCoverageGapVolunteer] = useState<{
     assignmentLabel: string;
@@ -894,13 +812,10 @@ function SchedulerContent() {
     focusAreaId: number;
     input: ScheduleCellInput;
   } | null>(null);
-  const [isCoverageGapVolunteerPending, setIsCoverageGapVolunteerPending] =
-    useState(false);
+  const [isCoverageGapVolunteerPending, setIsCoverageGapVolunteerPending] = useState(false);
 
   const realtimeChannelRef = useRef<BrowserRealtimeChannel | null>(null);
-  const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const draftChangedDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     sendBroadcast: sendReliableBroadcast,
     flushPendingBroadcasts,
@@ -936,11 +851,7 @@ function SchedulerContent() {
   // fetch (widened, recentered, or default) persists its actual bounds into
   // `loadedShiftWindow` so subsequent bare calls keep tracking the live window.
   const refetchScheduleData = useCallback(
-    async (opts?: {
-      ensureStart?: string;
-      ensureEnd?: string;
-      recenter?: boolean;
-    }) => {
+    async (opts?: { ensureStart?: string; ensureEnd?: string; recenter?: boolean }) => {
       if (!org) return;
       const { start, end } =
         opts?.recenter && opts.ensureStart && opts.ensureEnd
@@ -1010,8 +921,7 @@ function SchedulerContent() {
       try {
         if (!authUser) return null;
         const identity = await fetchAccountIdentity();
-        const name =
-          identity.displayName || authUser.email?.split("@")[0] || "Unknown";
+        const name = identity.displayName || authUser.email?.split("@")[0] || "Unknown";
         return { id: authUser.id, name };
       } catch {
         return null;
@@ -1028,51 +938,41 @@ function SchedulerContent() {
           lastViewed,
           initialCalloffOpenShifts,
           initialPublishedDateRanges,
-        ] =
-          await Promise.all([
-            fetchShifts(
-              orgId,
-              canEditShifts,
-              assignmentLabelMap,
-              absenceTypeMap,
-              defaultShiftFetchStart,
-              defaultShiftFetchEnd,
-              segmentCompatibility,
-            ),
-            fetchScheduleNotes(orgId, defaultShiftFetchStart, defaultShiftFetchEnd),
-            canViewRecurringShifts
-              ? fetchRecurringShifts(
-                  orgId,
-                  undefined,
-                  assignmentLabelMap,
-                  false,
-                  absenceTypeMap,
-                )
-              : Promise.resolve([] as RecurringShift[]),
-            getScheduleLastViewed(orgId).catch(() => null),
-            fetchCalloffOpenShifts(
-              orgId,
-              defaultShiftFetchStart,
-              defaultShiftFetchEnd,
-              assignmentLabelMap,
-            ).catch((err) => {
-              Sentry.captureException(err, {
-                tags: { component: "calloff_open_shifts" },
-                extra: {
-                  context: "schedule.initial_calloff_open_shifts",
-                  orgId,
-                  startDate: defaultShiftFetchStart,
-                  endDate: defaultShiftFetchEnd,
-                },
-              });
-              toast.error("Failed to load available shift opportunities");
-              return [] as GridOpenShift[];
-            }),
-            fetchPublishedDateRanges(
-              orgId,
-              defaultShiftFetchStart,
-              defaultShiftFetchEnd,
-            ).catch((err) => {
+        ] = await Promise.all([
+          fetchShifts(
+            orgId,
+            canEditShifts,
+            assignmentLabelMap,
+            absenceTypeMap,
+            defaultShiftFetchStart,
+            defaultShiftFetchEnd,
+            segmentCompatibility,
+          ),
+          fetchScheduleNotes(orgId, defaultShiftFetchStart, defaultShiftFetchEnd),
+          canViewRecurringShifts
+            ? fetchRecurringShifts(orgId, undefined, assignmentLabelMap, false, absenceTypeMap)
+            : Promise.resolve([] as RecurringShift[]),
+          getScheduleLastViewed(orgId).catch(() => null),
+          fetchCalloffOpenShifts(
+            orgId,
+            defaultShiftFetchStart,
+            defaultShiftFetchEnd,
+            assignmentLabelMap,
+          ).catch((err) => {
+            Sentry.captureException(err, {
+              tags: { component: "calloff_open_shifts" },
+              extra: {
+                context: "schedule.initial_calloff_open_shifts",
+                orgId,
+                startDate: defaultShiftFetchStart,
+                endDate: defaultShiftFetchEnd,
+              },
+            });
+            toast.error("Failed to load available shift opportunities");
+            return [] as GridOpenShift[];
+          }),
+          fetchPublishedDateRanges(orgId, defaultShiftFetchStart, defaultShiftFetchEnd).catch(
+            (err) => {
               Sentry.captureException(err, {
                 extra: {
                   context: "schedule.initial_published_ranges",
@@ -1082,17 +982,17 @@ function SchedulerContent() {
                 },
               });
               return [] as { startDate: string; endDate: string }[];
-            }),
-          ]);
+            },
+          ),
+        ]);
 
         lastViewedRef.current = lastViewed;
         setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
 
         // Fetch publish history since user's last view (falls back to 24h if null)
-        const recentPublishes = await fetchRecentPublishHistory(
-          orgId,
-          lastViewed,
-        ).catch(() => [] as PublishHistoryEntry[]);
+        const recentPublishes = await fetchRecentPublishHistory(orgId, lastViewed).catch(
+          () => [] as PublishHistoryEntry[],
+        );
 
         const noteMap: Record<
           string,
@@ -1124,12 +1024,8 @@ function SchedulerContent() {
           hasShownChangeToast.current = true;
           const allChanges = recentPublishes.flatMap((e) => e.changes);
           const newCount = allChanges.filter((c) => c.kind === "new").length;
-          const modCount = allChanges.filter(
-            (c) => c.kind === "modified",
-          ).length;
-          const delCount = allChanges.filter(
-            (c) => c.kind === "deleted",
-          ).length;
+          const modCount = allChanges.filter((c) => c.kind === "modified").length;
+          const delCount = allChanges.filter((c) => c.kind === "deleted").length;
           const parts: string[] = [];
           if (newCount > 0) parts.push(`${newCount} new`);
           if (modCount > 0) parts.push(`${modCount} modified`);
@@ -1323,11 +1219,7 @@ function SchedulerContent() {
           entry.startDate <= publishWindowDateRange.endDateKey &&
           entry.endDate >= publishWindowDateRange.startDateKey,
       ),
-    [
-      publishHistory,
-      publishWindowDateRange.endDateKey,
-      publishWindowDateRange.startDateKey,
-    ],
+    [publishHistory, publishWindowDateRange.endDateKey, publishWindowDateRange.startDateKey],
   );
   const outOfWindowPublishHistory = useMemo(
     () =>
@@ -1338,21 +1230,14 @@ function SchedulerContent() {
             entry.endDate >= publishWindowDateRange.startDateKey
           ),
       ),
-    [
-      publishHistory,
-      publishWindowDateRange.endDateKey,
-      publishWindowDateRange.startDateKey,
-    ],
+    [publishHistory, publishWindowDateRange.endDateKey, publishWindowDateRange.startDateKey],
   );
 
   // Build a lookup map from in-window publish history changes for O(1) access.
   // Iterate oldest→newest so the most recent publish wins per cell key.
   const publishChangesMap = useMemo(() => {
     if (inWindowPublishHistory.length === 0) return null;
-    const map = new Map<
-      string,
-      PublishChange & { publishedAt: string; publishedBy: string }
-    >();
+    const map = new Map<string, PublishChange & { publishedAt: string; publishedBy: string }>();
     // inWindowPublishHistory is newest-first, so iterate in reverse (oldest first) to let newer entries overwrite
     for (let i = inWindowPublishHistory.length - 1; i >= 0; i--) {
       const entry = inWindowPublishHistory[i];
@@ -1478,10 +1363,7 @@ function SchedulerContent() {
         try {
           await refetchScheduleDataRef.current();
           await refetchPublishedRangesRef.current();
-          const history = await fetchRecentPublishHistory(
-            org.id,
-            lastViewedRef.current,
-          );
+          const history = await fetchRecentPublishHistory(org.id, lastViewedRef.current);
           setPublishHistory(history);
         } catch (err) {
           Sentry.captureException(err);
@@ -1494,55 +1376,45 @@ function SchedulerContent() {
           Sentry.captureException(err);
         }
       })
-      .on(
-        "broadcast",
-        { event: "draft_changed" },
-        (msg: { payload?: Record<string, unknown> }) => {
-          if (
-            msg.payload?.senderSessionId === editorSessionIdRef.current
-          ) {
-            return;
-          }
+      .on("broadcast", { event: "draft_changed" }, (msg: { payload?: Record<string, unknown> }) => {
+        if (msg.payload?.senderSessionId === editorSessionIdRef.current) {
+          return;
+        }
 
-          const p = msg.payload;
-          if (p?.shifts) {
-            const shiftUpdates = p.shifts as Record<
-              string,
-              ShiftMap[string] | null
-            >;
-            setShifts((prev) => {
-              const next = { ...prev };
-              for (const [key, value] of Object.entries(shiftUpdates)) {
-                if (value === null) delete next[key];
-                else next[key] = value;
-              }
-              return next;
-            });
-          }
-          if (p?.notes) {
-            const noteUpdates = p.notes as Record<
-              string,
-              {
-                indicatorTypeId: number;
-                status: "published" | "draft" | "draft_deleted";
-              }[]
-            >;
-            setNotes((prev) => ({ ...prev, ...noteUpdates }));
-          }
-          if (draftChangedDebounceRef.current)
-            clearTimeout(draftChangedDebounceRef.current);
-          draftChangedDebounceRef.current = setTimeout(
-            async () => {
-              try {
-                await refetchScheduleDataRef.current();
-              } catch (err) {
-                Sentry.captureException(err);
-              }
-            },
-            p?.shifts || p?.notes ? 2000 : 150,
-          );
-        },
-      )
+        const p = msg.payload;
+        if (p?.shifts) {
+          const shiftUpdates = p.shifts as Record<string, ShiftMap[string] | null>;
+          setShifts((prev) => {
+            const next = { ...prev };
+            for (const [key, value] of Object.entries(shiftUpdates)) {
+              if (value === null) delete next[key];
+              else next[key] = value;
+            }
+            return next;
+          });
+        }
+        if (p?.notes) {
+          const noteUpdates = p.notes as Record<
+            string,
+            {
+              indicatorTypeId: number;
+              status: "published" | "draft" | "draft_deleted";
+            }[]
+          >;
+          setNotes((prev) => ({ ...prev, ...noteUpdates }));
+        }
+        if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
+        draftChangedDebounceRef.current = setTimeout(
+          async () => {
+            try {
+              await refetchScheduleDataRef.current();
+            } catch (err) {
+              Sentry.captureException(err);
+            }
+          },
+          p?.shifts || p?.notes ? 2000 : 150,
+        );
+      })
       .on(
         "broadcast",
         { event: "cell_locked" },
@@ -1586,20 +1458,14 @@ function SchedulerContent() {
               refetchPublishedRangesRef.current(),
             ]).catch(() => {});
           }
-          if (
-            currentUserRef.current &&
-            (canEditShiftsRef.current || canEditNotesRef.current)
-          ) {
+          if (currentUserRef.current && (canEditShiftsRef.current || canEditNotesRef.current)) {
             await refreshPresenceRef.current();
           }
           syncPresenceRef.current();
           await flushPendingBroadcasts();
         } else if (status === "CHANNEL_ERROR") {
           hadError = true;
-          console.warn(
-            "[Realtime] Channel error (auto-retrying):",
-            err ?? "unknown",
-          );
+          console.warn("[Realtime] Channel error (auto-retrying):", err ?? "unknown");
         }
       });
 
@@ -1610,8 +1476,7 @@ function SchedulerContent() {
       clearPresenceState();
       realtimeChannelRef.current = null;
       resetPendingBroadcasts();
-      if (draftChangedDebounceRef.current)
-        clearTimeout(draftChangedDebounceRef.current);
+      if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
       void removeBrowserRealtimeChannel(channel);
     };
   }, [
@@ -1659,18 +1524,16 @@ function SchedulerContent() {
       }
 
       if (isVisible && Date.now() - lastRefetchAtRef.current > 10_000) {
-        Promise.all([
-          refetchScheduleDataRef.current(),
-          refetchPublishedRangesRef.current(),
-        ]).catch((err) => {
-          Sentry.captureException(err);
-          toast.error("Couldn't refresh the schedule. Try reloading the page.");
-        });
+        Promise.all([refetchScheduleDataRef.current(), refetchPublishedRangesRef.current()]).catch(
+          (err) => {
+            Sentry.captureException(err);
+            toast.error("Couldn't refresh the schedule. Try reloading the page.");
+          },
+        );
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [org, unlockCell]);
 
   useEffect(() => {
@@ -1690,8 +1553,7 @@ function SchedulerContent() {
   // Skip if the initial load already used canEditShifts=true (no extra fetch needed).
   const [draftCheckComplete, setDraftCheckComplete] = useState(false);
   useEffect(() => {
-    if (permsLoading || !org || scheduleLoading || draftCheckStarted.current)
-      return;
+    if (permsLoading || !org || scheduleLoading || draftCheckStarted.current) return;
     if (!canEditShifts || initialLoadUsedEditPerms.current) {
       setDraftCheckComplete(true);
       return;
@@ -1732,8 +1594,7 @@ function SchedulerContent() {
 
     const needed = publishWindowDateRange;
     const isContained =
-      needed.startDateKey >= loadedShiftWindow.start &&
-      needed.endDateKey <= loadedShiftWindow.end;
+      needed.startDateKey >= loadedShiftWindow.start && needed.endDateKey <= loadedShiftWindow.end;
     if (isContained) return;
 
     const widened = widenFetchWindow(loadedShiftWindow.start, loadedShiftWindow.end, {
@@ -1741,8 +1602,7 @@ function SchedulerContent() {
       ensureEnd: needed.endDateKey,
     });
     const shouldRecenter =
-      daysBetweenDateKeys(widened.start, widened.end) >
-      FETCH_WINDOW_RECENTER_THRESHOLD_DAYS;
+      daysBetweenDateKeys(widened.start, widened.end) > FETCH_WINDOW_RECENTER_THRESHOLD_DAYS;
 
     const fetchOpts = shouldRecenter
       ? {
@@ -1753,10 +1613,7 @@ function SchedulerContent() {
             ),
           ),
           ensureEnd: formatDateKey(
-            addDays(
-              new Date(`${needed.endDateKey}T00:00:00`),
-              FETCH_WINDOW_RECENTER_BUFFER_DAYS,
-            ),
+            addDays(new Date(`${needed.endDateKey}T00:00:00`), FETCH_WINDOW_RECENTER_BUFFER_DAYS),
           ),
           recenter: true as const,
         }
@@ -1784,9 +1641,7 @@ function SchedulerContent() {
     () =>
       spanWeeks === "month"
         ? []
-        : Array.from({ length: spanWeeks * 7 }, (_, i) =>
-            addDays(weekStart, i),
-          ),
+        : Array.from({ length: spanWeeks * 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart, spanWeeks],
   );
   const availableSwapDates = useMemo(
@@ -1801,10 +1656,7 @@ function SchedulerContent() {
     [shiftFetchEnd, shiftFetchStart],
   );
   const week1 = useMemo(() => dates.slice(0, 7), [dates]);
-  const week2 = useMemo(
-    () => (spanWeeks === 2 ? dates.slice(7, 14) : []),
-    [dates, spanWeeks],
-  );
+  const week2 = useMemo(() => (spanWeeks === 2 ? dates.slice(7, 14) : []), [dates, spanWeeks]);
   const publishedDateSet = useMemo(
     () => buildPublishedDateSet(publishedDateRanges),
     [publishedDateRanges],
@@ -1839,9 +1691,7 @@ function SchedulerContent() {
     return new Set(
       employees
         .filter((employee) =>
-          getEmployeeDisplayName(employee)
-            .toLowerCase()
-            .includes(normalizedStaffSearch),
+          getEmployeeDisplayName(employee).toLowerCase().includes(normalizedStaffSearch),
         )
         .map((employee) => employee.id),
     );
@@ -1853,11 +1703,7 @@ function SchedulerContent() {
     }
 
     try {
-      const ranges = await fetchPublishedDateRanges(
-        org.id,
-        shiftFetchStart,
-        shiftFetchEnd,
-      );
+      const ranges = await fetchPublishedDateRanges(org.id, shiftFetchStart, shiftFetchEnd);
       setPublishedDateRanges(ranges);
     } catch (err) {
       Sentry.captureException(err, {
@@ -1899,51 +1745,37 @@ function SchedulerContent() {
 
   // ── Shift helpers ────────────────────────────────────────────────────────────
 
-  const buildEntryPayload = useCallback(
-    (entry: ShiftMap[string]): ScheduleCellInput => {
-      const input =
-        scheduleCellSnapshotToInput(
-        entry.effective ?? entry.draft ?? entry.published,
-        ) ?? {
-          kind:
-            entry.isDelete
-              ? "deleted"
-              : entry.absenceTypeId != null
-                ? "absence"
-                : "worked",
-          segments: (entry.segments ?? []).map((segment, index) => ({
-            shiftId: segment.shiftId,
-            jobId: segment.jobId,
-            position: segment.position ?? index,
-            isMentored: segment.isMentored ?? false,
-          })),
-          absenceTypeId: entry.absenceTypeId ?? null,
-          customStartTime:
-            entry.absenceTypeId != null ? null : (entry.customStartTime ?? null),
-          customEndTime:
-            entry.absenceTypeId != null ? null : (entry.customEndTime ?? null),
-          seriesId: entry.seriesId ?? null,
-          fromRecurring: entry.fromRecurring ?? false,
-        };
+  const buildEntryPayload = useCallback((entry: ShiftMap[string]): ScheduleCellInput => {
+    const input = scheduleCellSnapshotToInput(
+      entry.effective ?? entry.draft ?? entry.published,
+    ) ?? {
+      kind: entry.isDelete ? "deleted" : entry.absenceTypeId != null ? "absence" : "worked",
+      segments: (entry.segments ?? []).map((segment, index) => ({
+        shiftId: segment.shiftId,
+        jobId: segment.jobId,
+        position: segment.position ?? index,
+        isMentored: segment.isMentored ?? false,
+      })),
+      absenceTypeId: entry.absenceTypeId ?? null,
+      customStartTime: entry.absenceTypeId != null ? null : (entry.customStartTime ?? null),
+      customEndTime: entry.absenceTypeId != null ? null : (entry.customEndTime ?? null),
+      seriesId: entry.seriesId ?? null,
+      fromRecurring: entry.fromRecurring ?? false,
+    };
 
-      if (input.kind !== "worked") {
-        return input;
-      }
+    if (input.kind !== "worked") {
+      return input;
+    }
 
-      return {
-        ...input,
-        customStartTime: normalizeCustomTimeForSegmentCount(
-          input.customStartTime,
-          input.segments.length,
-        ),
-        customEndTime: normalizeCustomTimeForSegmentCount(
-          input.customEndTime,
-          input.segments.length,
-        ),
-      };
-    },
-    [],
-  );
+    return {
+      ...input,
+      customStartTime: normalizeCustomTimeForSegmentCount(
+        input.customStartTime,
+        input.segments.length,
+      ),
+      customEndTime: normalizeCustomTimeForSegmentCount(input.customEndTime, input.segments.length),
+    };
+  }, []);
 
   const getInputAssignmentDefinitionIds = useCallback(
     (input: ScheduleCellInput): number[] =>
@@ -1986,8 +1818,7 @@ function SchedulerContent() {
       }
       return resolveScheduleCellSnapshotFromInput(
         {
-          kind:
-            entry.publishedAbsenceTypeId != null ? "absence" : "worked",
+          kind: entry.publishedAbsenceTypeId != null ? "absence" : "worked",
           segments: (entry.publishedSegments ?? []).map((segment, index) => ({
             shiftId: segment.shiftId,
             jobId: segment.jobId,
@@ -2014,12 +1845,9 @@ function SchedulerContent() {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry) return null;
       if (entry.isDelete) return null;
-      if (entry.absenceTypeId != null)
-        return absenceTypeMap.get(entry.absenceTypeId) ?? "?";
+      if (entry.absenceTypeId != null) return absenceTypeMap.get(entry.absenceTypeId) ?? "?";
       if (entry.assignmentIds.length > 0)
-        return entry.assignmentIds
-          .map((id) => assignmentLabelMap.get(id) ?? "?")
-          .join("/");
+        return entry.assignmentIds.map((id) => assignmentLabelMap.get(id) ?? "?").join("/");
       return entry.label ?? null;
     },
     [shifts, assignmentLabelMap, absenceTypeMap],
@@ -2030,8 +1858,7 @@ function SchedulerContent() {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry || entry.isDelete) return null;
 
-      const absenceTypeId =
-        entry.absenceTypeId ?? entry.publishedAbsenceTypeId ?? null;
+      const absenceTypeId = entry.absenceTypeId ?? entry.publishedAbsenceTypeId ?? null;
       if (absenceTypeId != null) {
         return absenceTypeMap.get(absenceTypeId) ?? "?";
       }
@@ -2071,14 +1898,7 @@ function SchedulerContent() {
 
       return entry.label ?? null;
     },
-    [
-      absenceTypeMap,
-      assignmentLabelMap,
-      assignments,
-      jobs,
-      shiftCategories,
-      shifts,
-    ],
+    [absenceTypeMap, assignmentLabelMap, assignments, jobs, shiftCategories, shifts],
   );
 
   const getAbsenceTypeIdForKey = useCallback(
@@ -2131,10 +1951,8 @@ function SchedulerContent() {
   const panelCurrentAssignmentIds = panelShiftEntry?.assignmentIds ?? [];
   const panelCurrentAbsenceTypeId =
     editSessionDraft?.cellKey === editSessionCellKey
-      ? panelShiftEntry?.absenceTypeId ?? null
-      : (panelShiftEntry?.absenceTypeId ??
-          panelShiftEntry?.publishedAbsenceTypeId ??
-          null);
+      ? (panelShiftEntry?.absenceTypeId ?? null)
+      : (panelShiftEntry?.absenceTypeId ?? panelShiftEntry?.publishedAbsenceTypeId ?? null);
   const panelCustomStartTime = panelShiftEntry?.customStartTime ?? null;
   const panelCustomEndTime = panelShiftEntry?.customEndTime ?? null;
   const panelDraftKind = panelShiftEntry?.draftKind ?? null;
@@ -2143,9 +1961,7 @@ function SchedulerContent() {
     (empId: string, date: Date): boolean => {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry) return false;
-      return (
-        entry.absenceTypeId != null || entry.publishedAbsenceTypeId != null
-      );
+      return entry.absenceTypeId != null || entry.publishedAbsenceTypeId != null;
     },
     [shifts],
   );
@@ -2315,11 +2131,7 @@ function SchedulerContent() {
       if (!currentEmpId) return false;
       const myRanges = getShiftTimeRanges(currentEmpId, date);
       if (myRanges.length === 0) return false;
-      const openShiftRanges = getOpenShiftTimeRanges(
-        assignmentIds,
-        customStartTime,
-        customEndTime,
-      );
+      const openShiftRanges = getOpenShiftTimeRanges(assignmentIds, customStartTime, customEndTime);
       return openShiftRanges.length > 0 && timesOverlap(myRanges, openShiftRanges);
     },
     [currentEmpId, getOpenShiftTimeRanges, getShiftTimeRanges],
@@ -2386,8 +2198,7 @@ function SchedulerContent() {
       editSessionDraft?.cellKey === `${empId}_${formatDateKey(date)}`
         ? editSessionDraft.draftShift
         : shifts[`${empId}_${formatDateKey(date)}`];
-    if (!entry || (entry.assignmentIds.length === 0 && !entry.absenceTypeId))
-      return [];
+    if (!entry || (entry.assignmentIds.length === 0 && !entry.absenceTypeId)) return [];
 
     // Resolve effective start/end: custom times → shift code defaults → category defaults
     const resolveEffective = (
@@ -2398,8 +2209,7 @@ function SchedulerContent() {
       const s = customStart?.split("|")[0];
       const e = customEnd?.split("|")[0];
       if (s && e) return { start: s, end: e };
-      const code =
-        codeIds[0] != null ? assignmentById.get(codeIds[0]) : undefined;
+      const code = codeIds[0] != null ? assignmentById.get(codeIds[0]) : undefined;
       if (code?.defaultStartTime && code?.defaultEndTime) {
         return { start: code.defaultStartTime, end: code.defaultEndTime };
       }
@@ -2465,23 +2275,14 @@ function SchedulerContent() {
         const e = endParts[i] || code?.defaultEndTime || cat?.endTime;
         if (s && e) {
           pillRanges.push({ start: s, end: e });
-          pillLabels.push(
-            assignmentLabelMap.get(entry.assignmentIds[i]) ?? code?.label ?? "?",
-          );
+          pillLabels.push(assignmentLabelMap.get(entry.assignmentIds[i]) ?? code?.label ?? "?");
         }
       }
       warnings.push(...checkSameDayOverlaps(pillRanges, pillLabels));
     }
 
     return warnings;
-  }, [
-    editPanel,
-    editSessionDraft,
-    shifts,
-    assignmentById,
-    shiftCategories,
-    assignmentLabelMap,
-  ]);
+  }, [editPanel, editSessionDraft, shifts, assignmentById, shiftCategories, assignmentLabelMap]);
 
   const employeesByFocusArea = useMemo(() => {
     const next = new Map<number, Employee[]>();
@@ -2530,11 +2331,7 @@ function SchedulerContent() {
   ]);
 
   const publishedCoverageGaps = useMemo(() => {
-    if (
-      !coverageRequirements.length ||
-      !focusAreas.length ||
-      publishedVisibleDates.length === 0
-    ) {
+    if (!coverageRequirements.length || !focusAreas.length || publishedVisibleDates.length === 0) {
       return [];
     }
 
@@ -2550,9 +2347,7 @@ function SchedulerContent() {
       assignmentIdsByFocusArea,
       assignmentLabelMap,
       coverageCreditForKey,
-    ).filter(
-      (gap) => getActionableCoverageGapAssignmentIds(gap).length > 0,
-    );
+    ).filter((gap) => getActionableCoverageGapAssignmentIds(gap).length > 0);
   }, [
     coverageRequirements,
     focusAreas,
@@ -2577,77 +2372,67 @@ function SchedulerContent() {
         publishedCoverageGaps,
         canEditShifts,
       }),
-    [
-      allCoverageGaps,
-      canEditShifts,
-      getActionableCoverageGapAssignmentIds,
-      publishedCoverageGaps,
-    ],
+    [allCoverageGaps, canEditShifts, getActionableCoverageGapAssignmentIds, publishedCoverageGaps],
   );
 
   // ── Merge calloff open shifts + coverage-gap open shifts ──
   const openShifts = useMemo<GridOpenShift[]>(() => {
-    const gapShifts = visibleCoverageGaps.reduce<GridOpenShift[]>(
-      (items, gap) => {
-        const actionableAssignmentIds = getActionableCoverageGapAssignmentIds(gap);
+    const gapShifts = visibleCoverageGaps.reduce<GridOpenShift[]>((items, gap) => {
+      const actionableAssignmentIds = getActionableCoverageGapAssignmentIds(gap);
 
-        if (
-          hasPendingVolunteerRequestForCoverageGap({
-            actionableAssignmentIds,
-            employeeId: currentEmpId,
-            gap,
-            requests: shiftRequests.requests,
-          })
-        ) {
-          return items;
-        }
-
-        const remainingNeeded =
-          gap.status.required -
-          gap.status.actual -
-          countPendingVolunteerRequestsForCoverageGap({
-            actionableAssignmentIds,
-            gap,
-            requests: shiftRequests.requests,
-          });
-
-        if (remainingNeeded <= 0) {
-          return items;
-        }
-
-        const representativeAssignmentId =
-          actionableAssignmentIds.find(
-            (assignmentId) =>
-              assignmentId === gap.preferredOpenAssignmentDefinitionId,
-          ) ??
-          actionableAssignmentIds[0];
-        if (!representativeAssignmentId) {
-          return items;
-        }
-        const sc = assignmentById.get(representativeAssignmentId);
-        const representativeShiftId = sc?.shiftId ?? sc?.categoryId ?? null;
-        const representativeJobId = sc?.jobId ?? null;
-        items.push({
-          id: `gap_${gap.focusAreaId}_${gap.requirementAssignmentDefinitionId}_${formatDateKey(gap.date)}`,
-          source: "coverage_gap" as const,
-          date: formatDateKey(gap.date),
-          focusAreaId: gap.focusAreaId,
-          requirementAssignmentDefinitionId: gap.requirementAssignmentDefinitionId,
-          shiftIds: representativeJobId != null ? [representativeShiftId] : [],
-          jobIds: representativeJobId != null ? [representativeJobId] : [],
-          assignmentIds: [representativeAssignmentId],
-          eligibleAssignmentDefinitionIds: actionableAssignmentIds,
-          preferredOpenAssignmentDefinitionId: representativeAssignmentId,
-          ruleLabel: gap.ruleLabel,
-          assignmentLabel: gap.assignmentLabel,
-          customStartTime: sc?.defaultStartTime ?? null,
-          customEndTime: sc?.defaultEndTime ?? null,
-          needed: remainingNeeded,
-        });
+      if (
+        hasPendingVolunteerRequestForCoverageGap({
+          actionableAssignmentIds,
+          employeeId: currentEmpId,
+          gap,
+          requests: shiftRequests.requests,
+        })
+      ) {
         return items;
-      },
-      [],
-    );
+      }
+
+      const remainingNeeded =
+        gap.status.required -
+        gap.status.actual -
+        countPendingVolunteerRequestsForCoverageGap({
+          actionableAssignmentIds,
+          gap,
+          requests: shiftRequests.requests,
+        });
+
+      if (remainingNeeded <= 0) {
+        return items;
+      }
+
+      const representativeAssignmentId =
+        actionableAssignmentIds.find(
+          (assignmentId) => assignmentId === gap.preferredOpenAssignmentDefinitionId,
+        ) ?? actionableAssignmentIds[0];
+      if (!representativeAssignmentId) {
+        return items;
+      }
+      const sc = assignmentById.get(representativeAssignmentId);
+      const representativeShiftId = sc?.shiftId ?? sc?.categoryId ?? null;
+      const representativeJobId = sc?.jobId ?? null;
+      items.push({
+        id: `gap_${gap.focusAreaId}_${gap.requirementAssignmentDefinitionId}_${formatDateKey(gap.date)}`,
+        source: "coverage_gap" as const,
+        date: formatDateKey(gap.date),
+        focusAreaId: gap.focusAreaId,
+        requirementAssignmentDefinitionId: gap.requirementAssignmentDefinitionId,
+        shiftIds: representativeJobId != null ? [representativeShiftId] : [],
+        jobIds: representativeJobId != null ? [representativeJobId] : [],
+        assignmentIds: [representativeAssignmentId],
+        eligibleAssignmentDefinitionIds: actionableAssignmentIds,
+        preferredOpenAssignmentDefinitionId: representativeAssignmentId,
+        ruleLabel: gap.ruleLabel,
+        assignmentLabel: gap.assignmentLabel,
+        customStartTime: sc?.defaultStartTime ?? null,
+        customEndTime: sc?.defaultEndTime ?? null,
+        needed: remainingNeeded,
+      });
+      return items;
+    }, []);
     return [...resolvedCalloffOpenShifts, ...gapShifts].filter((openShift) => {
       if (isOpenShiftStarted(openShift)) return false;
       // Schedulers always see every open shift as a filling tool. The
@@ -2731,9 +2516,7 @@ function SchedulerContent() {
     (
       empId: string,
       date: Date,
-    ):
-      | (PublishChange & { publishedAt: string; publishedBy: string })
-      | null => {
+    ): (PublishChange & { publishedAt: string; publishedBy: string }) | null => {
       if (!showPublishDiff || !publishChangesMap) return null;
       return publishChangesMap.get(`${empId}_${formatDateKey(date)}`) ?? null;
     },
@@ -2813,8 +2596,7 @@ function SchedulerContent() {
       const entry = shifts[`${empId}_${formatDateKey(date)}`];
       if (!entry) return false;
       return (
-        (entry.customStartTime ?? null) !==
-          (entry.publishedCustomStartTime ?? null) ||
+        (entry.customStartTime ?? null) !== (entry.publishedCustomStartTime ?? null) ||
         (entry.customEndTime ?? null) !== (entry.publishedCustomEndTime ?? null)
       );
     },
@@ -2856,9 +2638,7 @@ function SchedulerContent() {
           const rightStart = right.segment.startTime ?? "99:99:99";
           const timeComparison = leftStart.localeCompare(rightStart);
 
-          return timeComparison === 0
-            ? left.originalIndex - right.originalIndex
-            : timeComparison;
+          return timeComparison === 0 ? left.originalIndex - right.originalIndex : timeComparison;
         })
         .map(({ segment }, index) => ({ segment, segmentIndex: index })),
     [getPublishedShiftSegments],
@@ -2895,9 +2675,7 @@ function SchedulerContent() {
         }
 
         if (assignment?.categoryId != null) {
-          const category = shiftCategories.find(
-            (item) => item.id === assignment.categoryId,
-          );
+          const category = shiftCategories.find((item) => item.id === assignment.categoryId);
           if (category?.startTime && category?.endTime) {
             ranges.push({ start: category.startTime, end: category.endTime });
           }
@@ -2912,14 +2690,10 @@ function SchedulerContent() {
   const isPublishedShiftSegmentStarted = useCallback(
     (empId: string, date: Date, segmentIndex: number): boolean => {
       const option = getPublishedShiftSegmentOptions(empId, date)[segmentIndex];
-      const sortedRanges = [...getPublishedShiftTimeRanges(empId, date)].sort(
-        (left, right) => {
-          const startComparison = left.start.localeCompare(right.start);
-          return startComparison === 0
-            ? left.end.localeCompare(right.end)
-            : startComparison;
-        },
-      );
+      const sortedRanges = [...getPublishedShiftTimeRanges(empId, date)].sort((left, right) => {
+        const startComparison = left.start.localeCompare(right.start);
+        return startComparison === 0 ? left.end.localeCompare(right.end) : startComparison;
+      });
       const range =
         option?.segment.startTime != null
           ? { start: option.segment.startTime, end: option.segment.endTime ?? "" }
@@ -2927,11 +2701,7 @@ function SchedulerContent() {
 
       return hasDateAndTimeStarted(formatDateKey(date), range ? [range] : []);
     },
-    [
-      getPublishedShiftSegmentOptions,
-      getPublishedShiftTimeRanges,
-      hasDateAndTimeStarted,
-    ],
+    [getPublishedShiftSegmentOptions, getPublishedShiftTimeRanges, hasDateAndTimeStarted],
   );
 
   /** True if the published shift date is in the past, or it's today and the published shift has already started. */
@@ -2946,9 +2716,7 @@ function SchedulerContent() {
         return true;
       }
 
-      return ranges.every((range) =>
-        hasDateAndTimeStarted(dateStr, [range]),
-      );
+      return ranges.every((range) => hasDateAndTimeStarted(dateStr, [range]));
     },
     [getPublishedRequestShift, getPublishedShiftTimeRanges, hasDateAndTimeStarted],
   );
@@ -2980,27 +2748,18 @@ function SchedulerContent() {
     (empId: string, date: Date): boolean =>
       !!currentEmpId &&
       empId === currentEmpId &&
-      (hasActiveRequestForShift(empId, date) ||
-        canCreateOwnShiftRequest(empId, date)),
-    [
-      canCreateOwnShiftRequest,
-      currentEmpId,
-      hasActiveRequestForShift,
-    ],
+      (hasActiveRequestForShift(empId, date) || canCreateOwnShiftRequest(empId, date)),
+    [canCreateOwnShiftRequest, currentEmpId, hasActiveRequestForShift],
   );
 
   const activeIndicatorIdsForKey = useCallback(
     (empId: string, date: Date, focusAreaId?: number): number[] => {
       const dateKey = formatDateKey(date);
       const key =
-        focusAreaId != null
-          ? `${empId}_${dateKey}_${focusAreaId}`
-          : `${empId}_${dateKey}`;
+        focusAreaId != null ? `${empId}_${dateKey}_${focusAreaId}` : `${empId}_${dateKey}`;
       const noteList = notes[key] ?? [];
       // Only return notes that aren't marked as deleted in draft
-      return noteList
-        .filter((n) => n.status !== "draft_deleted")
-        .map((n) => n.indicatorTypeId);
+      return noteList.filter((n) => n.status !== "draft_deleted").map((n) => n.indicatorTypeId);
     },
     [notes],
   );
@@ -3085,11 +2844,7 @@ function SchedulerContent() {
           ...prev,
           draftShift: next.draftShift,
           draftNotes: next.draftNotes,
-          isDirty: computeEditSessionDirty(
-            prev.baseFingerprint,
-            next.draftShift,
-            next.draftNotes,
-          ),
+          isDirty: computeEditSessionDirty(prev.baseFingerprint, next.draftShift, next.draftNotes),
         };
       });
     },
@@ -3222,8 +2977,7 @@ function SchedulerContent() {
         try {
           await Promise.all(
             updates.map(
-              (update) =>
-                pendingShiftWrites.current.get(update.key) ?? Promise.resolve(),
+              (update) => pendingShiftWrites.current.get(update.key) ?? Promise.resolve(),
             ),
           );
           const deleteItems: DeleteShiftBatchItem[] = updates.map((update) => ({
@@ -3232,10 +2986,7 @@ function SchedulerContent() {
             expectedVersion: update.expectedVersion,
           }));
           for (let i = 0; i < deleteItems.length; i += SCHEDULE_DELETE_BATCH_SIZE) {
-            await deleteShiftBatch(
-              orgId,
-              deleteItems.slice(i, i + SCHEDULE_DELETE_BATCH_SIZE),
-            );
+            await deleteShiftBatch(orgId, deleteItems.slice(i, i + SCHEDULE_DELETE_BATCH_SIZE));
           }
         } catch (err) {
           if (err instanceof OptimisticLockError) {
@@ -3252,12 +3003,7 @@ function SchedulerContent() {
         updates.map((update) =>
           enqueueShiftWrite(update.key, async () => {
             try {
-              await deleteShift(
-                update.empId,
-                update.dateKey,
-                orgId,
-                update.expectedVersion,
-              );
+              await deleteShift(update.empId, update.dateKey, orgId, update.expectedVersion);
             } catch (err) {
               if (err instanceof OptimisticLockError) {
                 await handleShiftWriteConflict();
@@ -3270,21 +3016,11 @@ function SchedulerContent() {
         ),
       );
     },
-    [
-      broadcastDraftChanged,
-      deleteShiftBatch,
-      enqueueShiftWrite,
-      handleShiftWriteConflict,
-      org?.id,
-    ],
+    [broadcastDraftChanged, deleteShiftBatch, enqueueShiftWrite, handleShiftWriteConflict, org?.id],
   );
 
   const setShift = useCallback(
-    (
-      empId: string,
-      date: Date,
-      entry: ScheduleCellInput | null,
-    ) => {
+    (empId: string, date: Date, entry: ScheduleCellInput | null) => {
       const orgId = org?.id;
       if (!orgId) {
         console.error("Cannot modify shifts before org is loaded");
@@ -3299,9 +3035,7 @@ function SchedulerContent() {
       const isDelete =
         !entry ||
         entry.kind === "deleted" ||
-        (entry.kind === "worked" &&
-          entry.segments.length === 0 &&
-          entry.absenceTypeId == null);
+        (entry.kind === "worked" && entry.segments.length === 0 && entry.absenceTypeId == null);
 
       if (isDelete) {
         const deleteUpdate = buildShiftDeleteUpdate(empId, dateKey);
@@ -3313,13 +3047,10 @@ function SchedulerContent() {
       } else {
         const derivedCodeIds = getInputAssignmentDefinitionIds(entry);
         // Filter out any stale/archived shift code IDs
-        const validCodeIds = derivedCodeIds.filter((id) =>
-          assignmentLabelMapRef.current.has(id),
-        );
+        const validCodeIds = derivedCodeIds.filter((id) => assignmentLabelMapRef.current.has(id));
         if (
           entry.kind === "worked" &&
-          (derivedCodeIds.length === 0 ||
-            derivedCodeIds.length !== entry.segments.length)
+          (derivedCodeIds.length === 0 || derivedCodeIds.length !== entry.segments.length)
         ) {
           toast.error("That assignment is no longer available.");
           return;
@@ -3385,13 +3116,7 @@ function SchedulerContent() {
         setShifts((prev) => ({ ...prev, [key]: upsertValue }));
         void enqueueShiftWrite(key, async () => {
           try {
-            await upsertShift(
-              empId,
-              dateKey,
-              normalizedEntry,
-              orgId,
-              existingVersion,
-            );
+            await upsertShift(empId, dateKey, normalizedEntry, orgId, existingVersion);
           } catch (err) {
             if (err instanceof OptimisticLockError) {
               await handleShiftWriteConflict();
@@ -3421,22 +3146,16 @@ function SchedulerContent() {
 
   const getShiftStyle = useCallback(
     (type: string, focusAreaName?: string): AssignmentDefinition => {
-      const fa = focusAreaName
-        ? focusAreas.find((w) => w.name === focusAreaName)
-        : null;
+      const fa = focusAreaName ? focusAreas.find((w) => w.name === focusAreaName) : null;
       const matchesType = (t: AssignmentDefinition) => t.label === type || t.name === type;
 
       // 1. Code associated with this focus area → use the code's own colors
       if (fa) {
-        const specific = assignments.find(
-          (t) => matchesType(t) && t.focusAreaId === fa.id,
-        );
+        const specific = assignments.find((t) => matchesType(t) && t.focusAreaId === fa.id);
         if (specific) return specific;
       }
       // 2. Global code (no focus area associations)
-      const general = assignments.find(
-        (t) => matchesType(t) && t.focusAreaId == null,
-      );
+      const general = assignments.find((t) => matchesType(t) && t.focusAreaId == null);
       if (general) return general;
       // 3. Cross-area code — belongs to another focus area; use its own colors.
       const crossArea = assignments.find((t) => matchesType(t));
@@ -3472,9 +3191,7 @@ function SchedulerContent() {
           return;
         }
         if (activity?.isSameUser) {
-          toast.error(
-            "This cell is already open in another tab for your account",
-          );
+          toast.error("This cell is already open in another tab for your account");
           return;
         }
         lockCell(cellKey);
@@ -3543,17 +3260,12 @@ function SchedulerContent() {
 
       if (input.kind === "worked") {
         const derivedCodeIds = getInputAssignmentDefinitionIds(input);
-        if (
-          derivedCodeIds.length === 0 ||
-          derivedCodeIds.length !== input.segments.length
-        ) {
+        if (derivedCodeIds.length === 0 || derivedCodeIds.length !== input.segments.length) {
           toast.error("That assignment is no longer available.");
           return currentShift;
         }
 
-        const validCodeIds = derivedCodeIds.filter((id) =>
-          assignmentLabelMapRef.current.has(id),
-        );
+        const validCodeIds = derivedCodeIds.filter((id) => assignmentLabelMapRef.current.has(id));
         if (validCodeIds.length < derivedCodeIds.length) {
           toast.warning("Removed assignments that are no longer available.");
           return currentShift;
@@ -3602,12 +3314,7 @@ function SchedulerContent() {
         updatedAt: currentShift?.updatedAt ?? null,
       });
     },
-    [
-      absenceTypeMap,
-      getInputAssignmentDefinitionIds,
-      getPublishedSnapshot,
-      segmentCompatibility,
-    ],
+    [absenceTypeMap, getInputAssignmentDefinitionIds, getPublishedSnapshot, segmentCompatibility],
   );
 
   const handleShiftSelect = useCallback(
@@ -3628,9 +3335,7 @@ function SchedulerContent() {
       if (!orgId || !session || !panel) return;
 
       if (session.isStale) {
-        toast.error(
-          "This cell changed while you were editing. Close and reopen it.",
-        );
+        toast.error("This cell changed while you were editing. Close and reopen it.");
         return;
       }
 
@@ -3647,14 +3352,9 @@ function SchedulerContent() {
 
         const currentShift = cloneShiftEntry(shiftsRef.current[session.cellKey]);
         const currentNotes = collectCellNotesSnapshot(panel.empId, panel.date);
-        const currentFingerprint = buildEditSessionFingerprint(
-          currentShift,
-          currentNotes,
-        );
+        const currentFingerprint = buildEditSessionFingerprint(currentShift, currentNotes);
         if (currentFingerprint !== session.baseFingerprint) {
-          setEditSessionDraft((prev) =>
-            prev ? { ...prev, isStale: true } : prev,
-          );
+          setEditSessionDraft((prev) => (prev ? { ...prev, isStale: true } : prev));
           toast.error("This shift changed in another tab or by another editor.");
           await refetchScheduleDataRef.current();
           return;
@@ -3672,11 +3372,7 @@ function SchedulerContent() {
           session.draftShift,
         );
 
-        if (
-          seriesScope === "all" &&
-          workingBaseShift?.seriesId &&
-          initialIdentityChanged
-        ) {
+        if (seriesScope === "all" && workingBaseShift?.seriesId && initialIdentityChanged) {
           if (shiftIsDeleted(session.draftShift)) {
             await deleteShiftSeries(workingBaseShift.seriesId, orgId);
           } else if (session.draftShift) {
@@ -3710,18 +3406,12 @@ function SchedulerContent() {
         const remainingTimeChanged =
           (workingBaseShift?.customStartTime ?? null) !==
             (session.draftShift?.customStartTime ?? null) ||
-          (workingBaseShift?.customEndTime ?? null) !==
-            (session.draftShift?.customEndTime ?? null);
+          (workingBaseShift?.customEndTime ?? null) !== (session.draftShift?.customEndTime ?? null);
 
         if (remainingIdentityChanged) {
           if (shiftIsDeleted(session.draftShift)) {
             if (workingShift) {
-              await deleteShift(
-                panel.empId,
-                formatDateKey(panel.date),
-                orgId,
-                expectedVersion,
-              );
+              await deleteShift(panel.empId, formatDateKey(panel.date), orgId, expectedVersion);
             }
           } else if (session.draftShift) {
             await upsertShift(
@@ -3757,12 +3447,12 @@ function SchedulerContent() {
           ]);
 
           for (const indicatorTypeId of indicatorIds) {
-            const baseStatus =
-              baseEntries.find((note) => note.indicatorTypeId === indicatorTypeId)
-                ?.status;
-            const draftStatus =
-              draftEntries.find((note) => note.indicatorTypeId === indicatorTypeId)
-                ?.status;
+            const baseStatus = baseEntries.find(
+              (note) => note.indicatorTypeId === indicatorTypeId,
+            )?.status;
+            const draftStatus = draftEntries.find(
+              (note) => note.indicatorTypeId === indicatorTypeId,
+            )?.status;
             if (baseStatus === draftStatus) continue;
 
             if (draftStatus && draftStatus !== "draft_deleted") {
@@ -3788,15 +3478,14 @@ function SchedulerContent() {
         }
 
         const refreshed = await refetchScheduleDataRef.current();
-        const realtimeDiff =
-          refreshed
-            ? buildRealtimeDraftDiff(
-                previousShifts,
-                refreshed.shiftData,
-                previousNotes,
-                refreshed.noteMap,
-              )
-            : null;
+        const realtimeDiff = refreshed
+          ? buildRealtimeDraftDiff(
+              previousShifts,
+              refreshed.shiftData,
+              previousNotes,
+              refreshed.noteMap,
+            )
+          : null;
         if (realtimeDiff) {
           broadcastDraftChanged(realtimeDiff);
         }
@@ -3804,9 +3493,7 @@ function SchedulerContent() {
         toast.success("Shift changes saved to draft");
       } catch (err) {
         if (err instanceof OptimisticLockError) {
-          setEditSessionDraft((prev) =>
-            prev ? { ...prev, isStale: true } : prev,
-          );
+          setEditSessionDraft((prev) => (prev ? { ...prev, isStale: true } : prev));
           toast.error("This shift changed in another tab or by another editor.");
           await refetchScheduleDataRef.current();
         } else {
@@ -3833,10 +3520,7 @@ function SchedulerContent() {
     if (!pendingSeriesDelete || !org) return;
     try {
       const prevShifts = shifts;
-      const deletedCount = await deleteShiftSeries(
-        pendingSeriesDelete.seriesId,
-        org.id,
-      );
+      const deletedCount = await deleteShiftSeries(pendingSeriesDelete.seriesId, org.id);
       const shiftData = await fetchShifts(
         org.id,
         canEditShifts,
@@ -3854,19 +3538,14 @@ function SchedulerContent() {
       }
       // Detect changed shifts
       for (const [k, v] of Object.entries(shiftData)) {
-        if (
-          !prevShifts[k] ||
-          JSON.stringify(prevShifts[k]) !== JSON.stringify(v)
-        ) {
+        if (!prevShifts[k] || JSON.stringify(prevShifts[k]) !== JSON.stringify(v)) {
           shiftUpdates[k] = v;
         }
       }
       if (Object.keys(shiftUpdates).length > 0) {
         broadcastDraftChanged({ shifts: shiftUpdates });
       }
-      toast.success(
-        `Series deleted (${deletedCount} shifts marked for removal on publish)`,
-      );
+      toast.success(`Series deleted (${deletedCount} shifts marked for removal on publish)`);
     } catch (err) {
       toast.error("Failed to delete series");
       Sentry.captureException(err);
@@ -3903,15 +3582,9 @@ function SchedulerContent() {
       const currentLabel = draftEntry?.label ?? shiftForKey(editPanel.empId, editPanel.date);
       if (!currentLabel || currentLabel === "OFF") return;
       const absenceTypeId =
-        draftEntry?.absenceTypeId ??
-        absenceTypeIdForKey(editPanel.empId, editPanel.date);
-      const seriesInputSource =
-        draftEntry ??
-        shiftsRef.current[cellKey] ??
-        null;
-      const seriesInput = seriesInputSource
-        ? buildEntryPayload(seriesInputSource)
-        : null;
+        draftEntry?.absenceTypeId ?? absenceTypeIdForKey(editPanel.empId, editPanel.date);
+      const seriesInputSource = draftEntry ?? shiftsRef.current[cellKey] ?? null;
+      const seriesInput = seriesInputSource ? buildEntryPayload(seriesInputSource) : null;
       if (!seriesInput || (seriesInput.kind === "worked" && seriesInput.segments.length === 0)) {
         return;
       }
@@ -3919,9 +3592,7 @@ function SchedulerContent() {
       startScheduleOperation({
         kind: "repeat_series",
         title:
-          absenceTypeId != null
-            ? "Creating repeating off day..."
-            : "Creating repeating shift...",
+          absenceTypeId != null ? "Creating repeating off day..." : "Creating repeating shift...",
         detail:
           previewTotal > 0
             ? `Creating ${previewTotal} scheduled occurrence${previewTotal === 1 ? "" : "s"} for ${currentLabel}.`
@@ -3992,10 +3663,7 @@ function SchedulerContent() {
         // Broadcast new/changed shifts to other editors
         const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
         for (const [key, value] of Object.entries(shiftData)) {
-          if (
-            !prevShifts[key] ||
-            JSON.stringify(prevShifts[key]) !== JSON.stringify(value)
-          ) {
+          if (!prevShifts[key] || JSON.stringify(prevShifts[key]) !== JSON.stringify(value)) {
             shiftUpdates[key] = value;
           }
         }
@@ -4041,15 +3709,9 @@ function SchedulerContent() {
     () => new Map(focusAreas.map((fa) => [fa.id, fa.name])),
     [focusAreas],
   );
-  const handleGridCellActivate = useCallback<
-    ScheduleGridHandlers["onActivateCell"]
-  >(
+  const handleGridCellActivate = useCallback<ScheduleGridHandlers["onActivateCell"]>(
     ({ emp, date, cellId }) => {
-      handleCellClick(
-        emp,
-        date,
-        focusAreaNameMap.get(cellId.sectionId),
-      );
+      handleCellClick(emp, date, focusAreaNameMap.get(cellId.sectionId));
     },
     [handleCellClick, focusAreaNameMap],
   );
@@ -4088,8 +3750,7 @@ function SchedulerContent() {
             certificationNames: certificationNameMap,
             orgRoles,
           });
-          const displayLabel =
-            assignmentLabelMapRef.current.get(codeId) ?? code.label;
+          const displayLabel = assignmentLabelMapRef.current.get(codeId) ?? code.label;
           return formatShiftAssignmentDisqualificationMessage({
             employeeName: getEmployeeDisplayName(emp),
             assignmentLabel: displayLabel,
@@ -4112,9 +3773,7 @@ function SchedulerContent() {
   );
 
   // ── Grid-owned drag/drop handler ─────────────────────────────────────────
-  const handleMoveGridEntry = useCallback<
-    NonNullable<ScheduleGridHandlers["onMoveEntry"]>
-  >(
+  const handleMoveGridEntry = useCallback<NonNullable<ScheduleGridHandlers["onMoveEntry"]>>(
     ({ sourceCellId, targetCellId, payload, mode }) => {
       const sourceKey = `${sourceCellId.empId}_${sourceCellId.dateKey}`;
       const targetKey = `${targetCellId.empId}_${targetCellId.dateKey}`;
@@ -4128,10 +3787,7 @@ function SchedulerContent() {
 
       const payloadAssignmentDefinitionIds = getInputAssignmentDefinitionIds(payload);
       if (payloadAssignmentDefinitionIds.length > 0) {
-        const disqualified = checkQualification(
-          targetCellId.empId,
-          payloadAssignmentDefinitionIds,
-        );
+        const disqualified = checkQualification(targetCellId.empId, payloadAssignmentDefinitionIds);
         if (disqualified) {
           toast.error(disqualified);
           return;
@@ -4142,15 +3798,11 @@ function SchedulerContent() {
       const targetEntry = shifts[targetKey];
       const targetPublishedAssignmentDefinitionIds =
         targetEntry?.publishedAssignmentDefinitionIds ?? [];
-      const targetPublishedAbsenceTypeId =
-        targetEntry?.publishedAbsenceTypeId ?? null;
+      const targetPublishedAbsenceTypeId = targetEntry?.publishedAbsenceTypeId ?? null;
       const targetPublishedLabel = targetEntry?.publishedLabel ?? "";
       const targetHasPublished =
-        targetPublishedAssignmentDefinitionIds.length > 0 ||
-        targetPublishedAbsenceTypeId != null;
-      const targetDraftKind: DraftKind = targetHasPublished
-        ? "modified"
-        : "new";
+        targetPublishedAssignmentDefinitionIds.length > 0 || targetPublishedAbsenceTypeId != null;
+      const targetDraftKind: DraftKind = targetHasPublished ? "modified" : "new";
       const movedEntry = buildScheduleCellEntryFromInput({
         input: {
           ...payload,
@@ -4167,10 +3819,7 @@ function SchedulerContent() {
         segmentCompatibility,
         absenceTypeMap,
         draftKind: targetDraftKind,
-        version:
-          shifts[targetKey]?.version != null
-            ? shifts[targetKey]!.version + 1
-            : undefined,
+        version: shifts[targetKey]?.version != null ? shifts[targetKey]!.version + 1 : undefined,
         createdBy: shifts[targetKey]?.createdBy ?? null,
         updatedBy: currentUserRef.current?.id ?? null,
         createdAt: shifts[targetKey]?.createdAt ?? null,
@@ -4199,10 +3848,7 @@ function SchedulerContent() {
                 absenceTypeMap,
                 draftKind: "deleted",
                 isDelete: true,
-                version:
-                  sourceEntry?.version != null
-                    ? sourceEntry.version + 1
-                    : undefined,
+                version: sourceEntry?.version != null ? sourceEntry.version + 1 : undefined,
                 createdBy: sourceEntry?.createdBy ?? null,
                 updatedBy: currentUserRef.current?.id ?? null,
                 createdAt: sourceEntry?.createdAt ?? null,
@@ -4258,13 +3904,9 @@ function SchedulerContent() {
         })
         .catch(async (err) => {
           if (err instanceof OptimisticLockError) {
-            toast.error(
-              "Entry was modified by another editor or another tab — refreshing",
-            );
+            toast.error("Entry was modified by another editor or another tab — refreshing");
           } else {
-            toast.error(
-              mode === "copy" ? "Failed to copy entry" : "Failed to move entry",
-            );
+            toast.error(mode === "copy" ? "Failed to copy entry" : "Failed to move entry");
             Sentry.captureException(err);
           }
           await refetchScheduleData();
@@ -4341,14 +3983,7 @@ function SchedulerContent() {
       setShift(empId, date, clipboard);
       toast.success("Entry pasted");
     },
-    [
-      clipboard,
-      setShift,
-      getCellLock,
-      getInputAssignmentDefinitionIds,
-      checkQualification,
-      shifts,
-    ],
+    [clipboard, setShift, getCellLock, getInputAssignmentDefinitionIds, checkQualification, shifts],
   );
 
   const handleClearShift = useCallback(
@@ -4400,13 +4035,11 @@ function SchedulerContent() {
       const shiftEntry = shifts[cellKey];
       const hasShift = !!(
         shiftEntry &&
-        (shiftEntry.assignmentIds.length > 0 ||
-          shiftEntry.absenceTypeId != null) &&
+        (shiftEntry.assignmentIds.length > 0 || shiftEntry.absenceTypeId != null) &&
         !shiftEntry.isDelete
       );
       const canRequestBase =
-        !shiftEntry?.absenceTypeId &&
-        canCreateOwnShiftRequest(cellId.empId, date);
+        !shiftEntry?.absenceTypeId && canCreateOwnShiftRequest(cellId.empId, date);
       const hasActiveRequest = hasActiveRequestForShift(cellId.empId, date);
       const canRequest = canRequestBase && !hasActiveRequest;
       const hasEditActions = canEditShifts && (hasShift || !!clipboard);
@@ -4440,11 +4073,7 @@ function SchedulerContent() {
     if (spanWeeks === "month") {
       return {
         startDate: new Date(monthStart),
-        endDate: new Date(
-          monthStart.getFullYear(),
-          monthStart.getMonth() + 1,
-          0,
-        ),
+        endDate: new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0),
       };
     }
     return {
@@ -4541,11 +4170,7 @@ function SchedulerContent() {
       const previousShifts = shiftsRef.current;
       const previousNotes = notesRef.current;
       // RPC reads fresh data from DB — no stale closures for recurringShifts/shifts
-      const generated = await applyRecurringSchedules(
-        org.id,
-        startDate,
-        endDate,
-      );
+      const generated = await applyRecurringSchedules(org.id, startDate, endDate);
 
       if (generated.length > 0) {
         // Refetch to get accurate state (including from_recurring flags)
@@ -4557,15 +4182,14 @@ function SchedulerContent() {
         toast.success(
           `Applied recurring templates to ${generated.length} schedule slot${generated.length === 1 ? "" : "s"}`,
         );
-        const realtimeDiff =
-          refreshed
-            ? buildRealtimeDraftDiff(
-                previousShifts,
-                refreshed.shiftData,
-                previousNotes,
-                refreshed.noteMap,
-              )
-            : null;
+        const realtimeDiff = refreshed
+          ? buildRealtimeDraftDiff(
+              previousShifts,
+              refreshed.shiftData,
+              previousNotes,
+              refreshed.noteMap,
+            )
+          : null;
         if (realtimeDiff) {
           broadcastDraftChanged(realtimeDiff);
         }
@@ -4629,17 +4253,13 @@ function SchedulerContent() {
       });
 
       if (outcomes.length === 0) {
-        toast.info(
-          "Nothing to import — the previous period has no shifts.",
-        );
+        toast.info("Nothing to import — the previous period has no shifts.");
         return;
       }
 
       const breakdown = summarizeImportPreviousOutcomes(outcomes);
       if (breakdown.imported === 0 && breakdown.totalSkipped > 0) {
-        const nameByEmpId = new Map(
-          employees.map((e) => [e.id, getEmployeeDisplayName(e)]),
-        );
+        const nameByEmpId = new Map(employees.map((e) => [e.id, getEmployeeDisplayName(e)]));
         toast.info(
           `Nothing new to import — ${formatImportPreviousSkipDescription(outcomes, breakdown, nameByEmpId)}.`,
         );
@@ -4702,14 +4322,8 @@ function SchedulerContent() {
       finishScheduleOperation("import_previous");
 
       const breakdown = summarizeImportPreviousOutcomes(outcomes);
-      const nameByEmpId = new Map(
-        employees.map((e) => [e.id, getEmployeeDisplayName(e)]),
-      );
-      const skipDescription = formatImportPreviousSkipDescription(
-        outcomes,
-        breakdown,
-        nameByEmpId,
-      );
+      const nameByEmpId = new Map(employees.map((e) => [e.id, getEmployeeDisplayName(e)]));
+      const skipDescription = formatImportPreviousSkipDescription(outcomes, breakdown, nameByEmpId);
 
       if (breakdown.totalSkipped > 0) {
         setImportResults({
@@ -4722,9 +4336,7 @@ function SchedulerContent() {
 
       if (breakdown.imported === 0) {
         toast.info(
-          skipDescription
-            ? `Nothing imported — ${skipDescription}.`
-            : "Nothing imported.",
+          skipDescription ? `Nothing imported — ${skipDescription}.` : "Nothing imported.",
           breakdown.totalSkipped > 0
             ? { action: { label: "View details", onClick: () => setShowImportResults(true) } }
             : undefined,
@@ -4779,28 +4391,20 @@ function SchedulerContent() {
         if (active) {
           if (existingStatus === "draft_deleted") {
             updated = existing.map((note) =>
-              note.indicatorTypeId === indicatorTypeId
-                ? { ...note, status: "published" }
-                : note,
+              note.indicatorTypeId === indicatorTypeId ? { ...note, status: "published" } : note,
             );
           } else {
             updated = [
-              ...existing.filter(
-                (note) => note.indicatorTypeId !== indicatorTypeId,
-              ),
+              ...existing.filter((note) => note.indicatorTypeId !== indicatorTypeId),
               { indicatorTypeId, status: "draft" },
             ];
           }
         } else if (existingStatus === "published") {
           updated = existing.map((note) =>
-            note.indicatorTypeId === indicatorTypeId
-              ? { ...note, status: "draft_deleted" }
-              : note,
+            note.indicatorTypeId === indicatorTypeId ? { ...note, status: "draft_deleted" } : note,
           );
         } else {
-          updated = existing.filter(
-            (note) => note.indicatorTypeId !== indicatorTypeId,
-          );
+          updated = existing.filter((note) => note.indicatorTypeId !== indicatorTypeId);
         }
 
         return {
@@ -4817,9 +4421,7 @@ function SchedulerContent() {
 
   const handlePrev = useCallback(() => {
     if (spanWeeks === "month") {
-      setWeekStart(
-        (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1),
-      );
+      setWeekStart((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
     } else {
       const step = isMobile ? 7 : spanWeeks * 7;
       setWeekStart((prev) =>
@@ -4834,9 +4436,7 @@ function SchedulerContent() {
 
   const handleNext = useCallback(() => {
     if (spanWeeks === "month") {
-      setWeekStart(
-        (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1),
-      );
+      setWeekStart((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
     } else {
       const step = isMobile ? 7 : spanWeeks * 7;
       setWeekStart((prev) =>
@@ -4849,36 +4449,36 @@ function SchedulerContent() {
     }
   }, [spanWeeks, isMobile, payPeriodStartDate]);
 
-  const handleToday = useCallback(
-    () => {
-      if (spanWeeks === "month") {
-        setWeekStart(new Date(today.getFullYear(), today.getMonth(), 1));
-        return;
-      }
-
-      setWeekStart(
-        getScheduleStartForSpan({
-          date: today,
-          span: spanWeeks,
-          payPeriodStartDate,
-        }),
-      );
-    },
-    [payPeriodStartDate, spanWeeks, today],
-  );
-
-  const handleSpanChange = useCallback((next: 1 | 2 | "month") => {
-    if (next !== "month") {
-      setWeekStart((prev) =>
-        getScheduleStartForSpan({
-          date: prev,
-          span: next,
-          payPeriodStartDate,
-        }),
-      );
+  const handleToday = useCallback(() => {
+    if (spanWeeks === "month") {
+      setWeekStart(new Date(today.getFullYear(), today.getMonth(), 1));
+      return;
     }
-    setPreferredSpan(next);
-  }, [payPeriodStartDate]);
+
+    setWeekStart(
+      getScheduleStartForSpan({
+        date: today,
+        span: spanWeeks,
+        payPeriodStartDate,
+      }),
+    );
+  }, [payPeriodStartDate, spanWeeks, today]);
+
+  const handleSpanChange = useCallback(
+    (next: 1 | 2 | "month") => {
+      if (next !== "month") {
+        setWeekStart((prev) =>
+          getScheduleStartForSpan({
+            date: prev,
+            span: next,
+            payPeriodStartDate,
+          }),
+        );
+      }
+      setPreferredSpan(next);
+    },
+    [payPeriodStartDate],
+  );
 
   const handlePublish = useCallback(async () => {
     if (!org) return;
@@ -4889,11 +4489,7 @@ function SchedulerContent() {
 
       if (spanWeeks === "month") {
         startDate = new Date(monthStart);
-        endDate = new Date(
-          monthStart.getFullYear(),
-          monthStart.getMonth() + 1,
-          0,
-        ); // Last day of month
+        endDate = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0); // Last day of month
       } else {
         startDate = new Date(weekStart);
         endDate = addDays(weekStart, spanWeeks * 7 - 1);
@@ -4918,10 +4514,7 @@ function SchedulerContent() {
 
       await refetchScheduleData();
       await refetchPublishedRanges();
-      const recentPublishes = await fetchRecentPublishHistory(
-        org.id,
-        lastViewedRef.current,
-      );
+      const recentPublishes = await fetchRecentPublishHistory(org.id, lastViewedRef.current);
       setPublishHistory(recentPublishes);
       setShowPublishDiff(false);
       closeEditPanel();
@@ -4959,10 +4552,7 @@ function SchedulerContent() {
       try {
         const previousShifts = shiftsRef.current;
         const previousNotes = notesRef.current;
-        await discardScheduleDrafts(
-          org.id,
-          discardAll ? undefined : user.id,
-        );
+        await discardScheduleDrafts(org.id, discardAll ? undefined : user.id);
 
         const refreshed = await refetchScheduleDataRef.current();
         setShowDiscardConfirm(false);
@@ -4973,22 +4563,19 @@ function SchedulerContent() {
           clearPendingBroadcast(DRAFT_CHANGED_BROADCAST_KEY);
           sendReliableBroadcast("drafts_discarded", {}, { key: "drafts_discarded" });
         } else {
-          const realtimeDiff =
-            refreshed
-              ? buildRealtimeDraftDiff(
-                  previousShifts,
-                  refreshed.shiftData,
-                  previousNotes,
-                  refreshed.noteMap,
-                )
-              : null;
+          const realtimeDiff = refreshed
+            ? buildRealtimeDraftDiff(
+                previousShifts,
+                refreshed.shiftData,
+                previousNotes,
+                refreshed.noteMap,
+              )
+            : null;
           if (realtimeDiff) {
             broadcastDraftChanged(realtimeDiff);
           }
         }
-        toast.success(
-          discardAll ? "All changes discarded" : "Your changes discarded",
-        );
+        toast.success(discardAll ? "All changes discarded" : "Your changes discarded");
       } catch (err: unknown) {
         toast.error("Failed to discard changes");
         Sentry.captureException(err);
@@ -4996,13 +4583,7 @@ function SchedulerContent() {
         setCancelingMode(null);
       }
     },
-    [
-      org,
-      broadcastDraftChanged,
-      closeEditPanel,
-      clearPendingBroadcast,
-      sendReliableBroadcast,
-    ],
+    [org, broadcastDraftChanged, closeEditPanel, clearPendingBroadcast, sendReliableBroadcast],
   );
 
   // Open shifts map to an exact assignment (the shift + job configured in the
@@ -5015,9 +4596,7 @@ function SchedulerContent() {
       if (!assignment) return null;
       const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
       const shift =
-        shiftId != null
-          ? (shiftCategories.find((item) => item.id === shiftId) ?? null)
-          : null;
+        shiftId != null ? (shiftCategories.find((item) => item.id === shiftId) ?? null) : null;
       const job =
         assignment.jobId != null
           ? (jobs.find((item) => item.id === assignment.jobId) ?? null)
@@ -5034,18 +4613,14 @@ function SchedulerContent() {
     [assignments, jobs, shiftCategories],
   );
 
-  const handleClaimOpenShift = useMemo<
-    ScheduleGridHandlers["onClaimOpenShift"]
-  >(
+  const handleClaimOpenShift = useMemo<ScheduleGridHandlers["onClaimOpenShift"]>(
     () =>
       currentEmpId
         ? (openShift: GridOpenShift) => {
             const dateObj = new Date(openShift.date + "T00:00:00");
             if (openShift.source === "coverage_gap" && currentEmployee) {
               if (!currentEmployee.focusAreaIds.includes(openShift.focusAreaId)) {
-                toast.error(
-                  "You are not assigned to the focus area required for this shift.",
-                );
+                toast.error("You are not assigned to the focus area required for this shift.");
                 return;
               }
 
@@ -5073,9 +4648,7 @@ function SchedulerContent() {
                 );
 
               if (eligibleAssignmentDefinitions.length === 0) {
-                toast.error(
-                  "You aren't qualified to cover this gap.",
-                );
+                toast.error("You aren't qualified to cover this gap.");
                 return;
               }
 
@@ -5117,8 +4690,7 @@ function SchedulerContent() {
 
               const preferredAssignmentDefinition =
                 eligibleAssignmentDefinitions.find(
-                  (assignment) =>
-                    assignment.id === openShift.preferredOpenAssignmentDefinitionId,
+                  (assignment) => assignment.id === openShift.preferredOpenAssignmentDefinitionId,
                 ) ?? eligibleAssignmentDefinitions[0];
 
               setCoverageGapSelection({
@@ -5205,8 +4777,7 @@ function SchedulerContent() {
           publishedAbsenceTypeIdForKey,
           hasTimeChangesForKey,
           publishDiffForKey: publishDiffKindForKey,
-          createdByNameForKey:
-            canRenderAuthorNames ? createdByNameForKey : undefined,
+          createdByNameForKey: canRenderAuthorNames ? createdByNameForKey : undefined,
           absenceTypeIdForKey,
         },
       }),
@@ -5319,10 +4890,7 @@ function SchedulerContent() {
   ]);
 
   const visibleBulkDeleteTargetByKey = useMemo(
-    () =>
-      new Map(
-        visibleBulkDeleteTargets.map((target) => [target.key, target]),
-      ),
+    () => new Map(visibleBulkDeleteTargets.map((target) => [target.key, target])),
     [visibleBulkDeleteTargets],
   );
 
@@ -5448,20 +5016,14 @@ function SchedulerContent() {
         broadcast: true,
         failureMessage: "Failed to remove one or more entries",
       });
-      toast.success(
-        `${updates.length} selected entr${updates.length === 1 ? "y" : "ies"} removed`,
-      );
+      toast.success(`${updates.length} selected entr${updates.length === 1 ? "y" : "ies"} removed`);
       setShowBulkDeleteReview(false);
       setIsBulkDeleteMode(false);
       setBulkDeleteSelectedKeys(new Set());
     } finally {
       setIsBulkDeleting(false);
     }
-  }, [
-    applyShiftDeleteUpdates,
-    buildShiftDeleteUpdate,
-    bulkDeleteSelectedTargets,
-  ]);
+  }, [applyShiftDeleteUpdates, buildShiftDeleteUpdate, bulkDeleteSelectedTargets]);
 
   const scheduleGridInteractionState = useMemo<ScheduleGridInteractionState>(() => {
     const editPanelSectionId =
@@ -5498,16 +5060,13 @@ function SchedulerContent() {
       onActivateCell: handleGridCellActivate,
       onOpenCellMenu: isBulkDeleteMode ? undefined : handleGridCellContextMenu,
       onMoveEntry: isBulkDeleteMode ? undefined : handleMoveGridEntry,
-      onCopyCell:
-        canEditShifts && !isBulkDeleteMode ? handleCopyGridCell : undefined,
-      onPasteCell:
-        canEditShifts && !isBulkDeleteMode ? handlePasteGridCell : undefined,
-      onClearCell: canEditShifts && !isBulkDeleteMode
-        ? (cellId) => handleClearShift(cellId.empId, getDateFromCellId(cellId))
-        : undefined,
-      onToggleBulkDeleteCell: isBulkDeleteMode
-        ? handleToggleBulkDeleteCell
-        : undefined,
+      onCopyCell: canEditShifts && !isBulkDeleteMode ? handleCopyGridCell : undefined,
+      onPasteCell: canEditShifts && !isBulkDeleteMode ? handlePasteGridCell : undefined,
+      onClearCell:
+        canEditShifts && !isBulkDeleteMode
+          ? (cellId) => handleClearShift(cellId.empId, getDateFromCellId(cellId))
+          : undefined,
+      onToggleBulkDeleteCell: isBulkDeleteMode ? handleToggleBulkDeleteCell : undefined,
       onClaimOpenShift: handleClaimOpenShift,
     }),
     [
@@ -5597,9 +5156,9 @@ function SchedulerContent() {
               marginBottom: 32,
             }}
           >
-            Your account is active, but it looks like your organization hasn&apos;t
-            been initialized yet. Once your administrator completes the setup,
-            you&apos;ll be able to access the schedule.
+            Your account is active, but it looks like your organization hasn&apos;t been initialized
+            yet. Once your administrator completes the setup, you&apos;ll be able to access the
+            schedule.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -5620,9 +5179,7 @@ function SchedulerContent() {
               Check Again
             </button>
             <button
-              onClick={() =>
-                (window.location.href = "mailto:support@dubgrid.com")
-              }
+              onClick={() => (window.location.href = "mailto:support@dubgrid.com")}
               style={{
                 padding: "12px 24px",
                 background: "var(--color-bg-secondary)",
@@ -5748,20 +5305,18 @@ function SchedulerContent() {
                 </div>
               </div>
             )}
-            {!isBulkDeleteMode &&
-              canEditShifts &&
-              hasUnpublishedChanges && (
-                <DraftBanner
-                  onPublish={() => setShowPublishConfirm(true)}
-                  onCancel={openDiscardConfirm}
-                  isPublishing={isPublishing}
-                  isCanceling={cancelingMode !== null}
-                  breakdown={draftBreakdown}
-                  showDiff={showDiffOverlay}
-                  onToggleDiff={() => setShowDiffOverlay((v) => !v)}
-                  canPublish={canPublishSchedule}
-                />
-              )}
+            {!isBulkDeleteMode && canEditShifts && hasUnpublishedChanges && (
+              <DraftBanner
+                onPublish={() => setShowPublishConfirm(true)}
+                onCancel={openDiscardConfirm}
+                isPublishing={isPublishing}
+                isCanceling={cancelingMode !== null}
+                breakdown={draftBreakdown}
+                showDiff={showDiffOverlay}
+                onToggleDiff={() => setShowDiffOverlay((v) => !v)}
+                canPublish={canPublishSchedule}
+              />
+            )}
             {!isBulkDeleteMode &&
               canEditShifts &&
               outOfWindowDraftGroups.length > 0 &&
@@ -5780,29 +5335,20 @@ function SchedulerContent() {
                     className="dg-draft-banner-dot"
                     style={{ background: "var(--color-info-text)" }}
                   />
-                  <span style={{ fontWeight: 600 }}>
-                    Also unpublished:
-                  </span>
+                  <span style={{ fontWeight: 600 }}>Also unpublished:</span>
                   <span style={{ opacity: 0.85 }}>
                     {(() => {
-                      const total = outOfWindowDraftGroups.reduce(
-                        (s, g) => s + g.count,
-                        0,
-                      );
-                      const unit = spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
+                      const total = outOfWindowDraftGroups.reduce((s, g) => s + g.count, 0);
+                      const unit =
+                        spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
                       return `${total} draft${total === 1 ? "" : "s"} in ${outOfWindowDraftGroups.length} other ${unit}${outOfWindowDraftGroups.length === 1 ? "" : "s"} (${outOfWindowDraftGroupRanges.join(", ")})`;
                     })()}
                   </span>
-                  <div
-                    className="dg-draft-banner-actions"
-                    style={{ flexWrap: "wrap" }}
-                  >
+                  <div className="dg-draft-banner-actions" style={{ flexWrap: "wrap" }}>
                     {outOfWindowDraftGroups.map((group, index) => (
                       <Hint
                         key={group.periodKey}
-                        content={hint(
-                          `Jump to this period to publish or discard its drafts`,
-                        )}
+                        content={hint(`Jump to this period to publish or discard its drafts`)}
                         side="bottom"
                       >
                         <button
@@ -5811,9 +5357,7 @@ function SchedulerContent() {
                           className="dg-btn dg-btn-secondary dg-btn-sm"
                         >
                           {outOfWindowDraftGroupRanges[index]}{" "}
-                          <span style={{ opacity: 0.7, marginLeft: 4 }}>
-                            ({group.count})
-                          </span>
+                          <span style={{ opacity: 0.7, marginLeft: 4 }}>({group.count})</span>
                         </button>
                       </Hint>
                     ))}
@@ -5858,22 +5402,11 @@ function SchedulerContent() {
                   }
                 }
                 const sortedGroups = [...groups.values()].sort((a, b) =>
-                  a.startDate < b.startDate
-                    ? -1
-                    : a.startDate > b.startDate
-                      ? 1
-                      : 0,
+                  a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0,
                 );
-                const totalChanges = sortedGroups.reduce(
-                  (s, g) => s + g.changeCount,
-                  0,
-                );
+                const totalChanges = sortedGroups.reduce((s, g) => s + g.changeCount, 0);
                 const noun =
-                  spanWeeks === "month"
-                    ? "month"
-                    : spanWeeks === 2
-                      ? "pay period"
-                      : "week";
+                  spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
                 return (
                   <div
                     className="dg-draft-banner no-print"
@@ -5888,31 +5421,20 @@ function SchedulerContent() {
                       className="dg-draft-banner-dot"
                       style={{ background: "var(--color-info-text)" }}
                     />
-                    <span style={{ fontWeight: 600 }}>
-                      Recently published:
-                    </span>
+                    <span style={{ fontWeight: 600 }}>Recently published:</span>
                     <span style={{ opacity: 0.85 }}>
                       {`${totalChanges} change${totalChanges === 1 ? "" : "s"} in ${sortedGroups.length} other ${noun}${sortedGroups.length === 1 ? "" : "s"}`}
                     </span>
-                    <div
-                      className="dg-draft-banner-actions"
-                      style={{ flexWrap: "wrap" }}
-                    >
+                    <div className="dg-draft-banner-actions" style={{ flexWrap: "wrap" }}>
                       {sortedGroups.map((group) => {
-                        const [sy, sm, sd] = group.startDate
-                          .split("-")
-                          .map(Number);
+                        const [sy, sm, sd] = group.startDate.split("-").map(Number);
                         const startDate = new Date(sy, sm - 1, sd);
-                        const [ey, em, ed] = group.endDate
-                          .split("-")
-                          .map(Number);
+                        const [ey, em, ed] = group.endDate.split("-").map(Number);
                         const endDate = new Date(ey, em - 1, ed);
                         return (
                           <Hint
                             key={group.key}
-                            content={hint(
-                              "Jump to this period to view what changed",
-                            )}
+                            content={hint("Jump to this period to view what changed")}
                             side="bottom"
                           >
                             <button
@@ -5921,9 +5443,7 @@ function SchedulerContent() {
                               className="dg-btn dg-btn-secondary dg-btn-sm"
                             >
                               {`${formatDate(startDate)}–${formatDate(endDate)}`}{" "}
-                              <span
-                                style={{ opacity: 0.7, marginLeft: 4 }}
-                              >
+                              <span style={{ opacity: 0.7, marginLeft: 4 }}>
                                 ({group.changeCount})
                               </span>
                             </button>
@@ -5931,9 +5451,7 @@ function SchedulerContent() {
                         );
                       })}
                       <Hint
-                        content={hint(
-                          "Hide this banner for the rest of this session",
-                        )}
+                        content={hint("Hide this banner for the rest of this session")}
                         side="bottom"
                       >
                         <button
@@ -5973,8 +5491,7 @@ function SchedulerContent() {
                     <span style={{ fontWeight: 600 }}>
                       Published{" "}
                       {(() => {
-                        const diff =
-                          Date.now() - new Date(latest.publishedAt).getTime();
+                        const diff = Date.now() - new Date(latest.publishedAt).getTime();
                         const mins = Math.floor(diff / 60000);
                         if (mins < 1) return "just now";
                         if (mins < 60) return `${mins} min ago`;
@@ -6018,12 +5535,8 @@ function SchedulerContent() {
                               style={{
                                 fontSize: "var(--dg-fs-caption)",
                                 padding: "5px 12px",
-                                background: showPublishDiff
-                                  ? "var(--color-info-bg)"
-                                  : undefined,
-                                color: showPublishDiff
-                                  ? "var(--color-accent-text)"
-                                  : undefined,
+                                background: showPublishDiff ? "var(--color-info-bg)" : undefined,
+                                color: showPublishDiff ? "var(--color-accent-text)" : undefined,
                               }}
                             >
                               {publishHasRevealableChanges
@@ -6049,8 +5562,7 @@ function SchedulerContent() {
                             onClick={async () => {
                               if (org) {
                                 void updateScheduleLastViewed(org.id);
-                                lastViewedRef.current =
-                                  new Date().toISOString();
+                                lastViewedRef.current = new Date().toISOString();
                               }
                               setPublishHistory([]);
                               setShowPublishDiff(false);
@@ -6066,9 +5578,7 @@ function SchedulerContent() {
                         </>
                       )}
                       <Hint
-                        content={hint(
-                          "Hide this banner for the rest of this session",
-                        )}
+                        content={hint("Hide this banner for the rest of this session")}
                         side="bottom"
                       >
                         <button
@@ -6102,35 +5612,22 @@ function SchedulerContent() {
                 onSpanChange={handleSpanChange}
                 onFocusAreaChange={setActiveFocusArea}
                 onStaffSearchChange={setStaffSearch}
-                canApplyRecurringSchedule={
-                  canEditShifts && canApplyRecurringSchedule
-                }
+                canApplyRecurringSchedule={canEditShifts && canApplyRecurringSchedule}
                 onApplyRecurring={handleAutoFillPreview}
                 isApplyingRecurring={isApplyingRecurring}
                 canImportPrevious={canEditShifts}
-                onImportPrevious={
-                  spanWeeks !== "month"
-                    ? handleImportPreviousPreview
-                    : undefined
-                }
+                onImportPrevious={spanWeeks !== "month" ? handleImportPreviousPreview : undefined}
                 isImportingPrevious={isImportingPrevious}
                 onPrintOpen={() => setShowPrintOptions(true)}
                 onExportCSV={
                   dates.length > 0 && filteredEmployees.length > 0
-                    ? () =>
-                        exportScheduleCSV(filteredEmployees, dates, shiftForKey)
+                    ? () => exportScheduleCSV(filteredEmployees, dates, shiftForKey)
                     : undefined
                 }
-                presenceSlot={
-                  canEditShifts ? (
-                    <PresenceAvatars onlineUsers={onlineUsers} />
-                  ) : null
-                }
+                presenceSlot={canEditShifts ? <PresenceAvatars onlineUsers={onlineUsers} /> : null}
                 showAudit={showAudit}
                 onAuditToggle={
-                  canEditShifts && !isMobile
-                    ? () => setShowAudit((prev) => !prev)
-                    : undefined
+                  canEditShifts && !isMobile ? () => setShowAudit((prev) => !prev) : undefined
                 }
                 requestsBadgeCount={shiftRequests.badgeCount}
                 onRequestsToggle={() => setShowRequestBoard((prev) => !prev)}
@@ -6177,9 +5674,7 @@ function SchedulerContent() {
                 indicatorTypes={indicatorTypes}
                 certifications={certifications}
                 orgRoles={orgRoles}
-                isCellInteractive={
-                  canEditShifts || canEditNotes || !!currentEmpId
-                }
+                isCellInteractive={canEditShifts || canEditNotes || !!currentEmpId}
                 activeIndicatorIdsForKey={activeIndicatorIdsForKey}
                 activeFocusArea={activeFocusArea}
                 draftKindForKey={draftKindForKey}
@@ -6210,29 +5705,21 @@ function SchedulerContent() {
               const cmShiftEntry = shifts[cmKey];
               const cmHasEntry = !!(
                 cmShiftEntry &&
-                (cmShiftEntry.assignmentIds.length > 0 ||
-                  cmShiftEntry.absenceTypeId != null) &&
+                (cmShiftEntry.assignmentIds.length > 0 || cmShiftEntry.absenceTypeId != null) &&
                 !cmShiftEntry.isDelete
               );
               const cmCanRequestBase =
                 !cmShiftEntry?.absenceTypeId &&
-                canCreateOwnShiftRequest(
-                  contextMenu.cellId.empId,
-                  contextMenuDate,
-                );
+                canCreateOwnShiftRequest(contextMenu.cellId.empId, contextMenuDate);
               const cmCanRequest =
                 cmCanRequestBase &&
-                !hasActiveRequestForShift(
-                  contextMenu.cellId.empId,
-                  contextMenuDate,
-                );
+                !hasActiveRequestForShift(contextMenu.cellId.empId, contextMenuDate);
               const cmHasActiveRequest = hasActiveRequestForShift(
                 contextMenu.cellId.empId,
                 contextMenuDate,
               );
               // Only show the menu when at least one action is usable
-              const hasEditActions =
-                canEditShifts && (cmHasEntry || !!clipboard);
+              const hasEditActions = canEditShifts && (cmHasEntry || !!clipboard);
               const hasRequestActions = cmCanRequest && !cmHasActiveRequest;
               if (!hasEditActions && !hasRequestActions) return null;
               return (
@@ -6245,16 +5732,9 @@ function SchedulerContent() {
                   hasActiveRequest={cmHasActiveRequest}
                   onCopy={() => handleCopyGridCell(contextMenu.cellId)}
                   onPaste={() => handlePasteGridCell(contextMenu.cellId)}
-                  onClear={() =>
-                    handleClearShift(
-                      contextMenu.cellId.empId,
-                      contextMenuDate,
-                    )
-                  }
+                  onClear={() => handleClearShift(contextMenu.cellId.empId, contextMenuDate)}
                   onNeedCoverage={() => {
-                    const emp = employees.find(
-                      (e) => e.id === contextMenu.cellId.empId,
-                    );
+                    const emp = employees.find((e) => e.id === contextMenu.cellId.empId);
                     if (!emp) return;
                     const cellKey = `${emp.id}_${contextMenu.cellId.dateKey}`;
                     const activity = getCellActivity(cellKey);
@@ -6264,9 +5744,7 @@ function SchedulerContent() {
                       return;
                     }
                     if (activity?.isSameUser) {
-                      toast.error(
-                        "This cell is already open in another tab for your account",
-                      );
+                      toast.error("This cell is already open in another tab for your account");
                       return;
                     }
                     lockCell(cellKey);
@@ -6282,9 +5760,7 @@ function SchedulerContent() {
                     });
                   }}
                   onProposeSwap={() => {
-                    const emp = employees.find(
-                      (e) => e.id === contextMenu.cellId.empId,
-                    );
+                    const emp = employees.find((e) => e.id === contextMenu.cellId.empId);
                     if (!emp) return;
                     startEditSession({
                       empId: emp.id,
@@ -6310,11 +5786,7 @@ function SchedulerContent() {
                 confirmLabel="Remove"
                 variant="danger"
                 onConfirm={() => {
-                  setShift(
-                    pendingClearShift.empId,
-                    pendingClearShift.date,
-                    null,
-                  );
+                  setShift(pendingClearShift.empId, pendingClearShift.date, null);
                   setPendingClearShift(null);
                 }}
                 onCancel={() => setPendingClearShift(null)}
@@ -6324,11 +5796,7 @@ function SchedulerContent() {
             {showBulkDeleteReview && (
               <ConfirmDialog
                 title="Review Bulk Removal"
-                message={
-                  <BulkDeleteReviewContent
-                    targets={bulkDeleteSelectedTargets}
-                  />
-                }
+                message={<BulkDeleteReviewContent targets={bulkDeleteSelectedTargets} />}
                 confirmLabel="Remove selected entries"
                 cancelLabel="Back"
                 variant="danger"
@@ -6351,25 +5819,42 @@ function SchedulerContent() {
                 style={{ maxWidth: 420 }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  <div style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-secondary)", lineHeight: 1.5 }}>
-                    <strong>{coverageGapSelection.openShift.ruleLabel ?? coverageGapSelection.openShift.assignmentLabel}</strong> on{" "}
-                    <strong>{coverageGapSelection.openShift.date}</strong> can be covered by more than one exact assignment option.
-                    Choose which option you want to volunteer for.
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-body-sm)",
+                      color: "var(--color-text-secondary)",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    <strong>
+                      {coverageGapSelection.openShift.ruleLabel ??
+                        coverageGapSelection.openShift.assignmentLabel}
+                    </strong>{" "}
+                    on <strong>{coverageGapSelection.openShift.date}</strong> can be covered by more
+                    than one exact assignment option. Choose which option you want to volunteer for.
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-muted)" }}>
+                    <span
+                      style={{
+                        fontSize: "var(--dg-fs-footnote)",
+                        fontWeight: 600,
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
                       Shift and job
                     </span>
                     <CustomSelect
                       value={String(coverageGapSelection.selectedAssignmentDefinitionId)}
-                      options={coverageGapSelection.qualifiedAssignmentDefinitions.map((assignment) => ({
-                        value: String(assignment.id),
-                        label:
-                          spellOutAssignment(assignment.id) ??
-                          assignmentLabelMap.get(assignment.id) ??
-                          (assignment.name || assignment.label),
-                      }))}
+                      options={coverageGapSelection.qualifiedAssignmentDefinitions.map(
+                        (assignment) => ({
+                          value: String(assignment.id),
+                          label:
+                            spellOutAssignment(assignment.id) ??
+                            assignmentLabelMap.get(assignment.id) ??
+                            (assignment.name || assignment.label),
+                        }),
+                      )}
                       onChange={(value) =>
                         setCoverageGapSelection((current) =>
                           current
@@ -6394,14 +5879,13 @@ function SchedulerContent() {
                       type="button"
                       className="dg-btn dg-btn-primary"
                       onClick={() => {
-                        const selectedAssignmentDefinition = coverageGapSelection.qualifiedAssignmentDefinitions.find(
-                          (assignment) =>
-                            assignment.id === coverageGapSelection.selectedAssignmentDefinitionId,
-                        );
+                        const selectedAssignmentDefinition =
+                          coverageGapSelection.qualifiedAssignmentDefinitions.find(
+                            (assignment) =>
+                              assignment.id === coverageGapSelection.selectedAssignmentDefinitionId,
+                          );
                         if (!selectedAssignmentDefinition) return;
-                        const dateObj = new Date(
-                          coverageGapSelection.openShift.date + "T00:00:00",
-                        );
+                        const dateObj = new Date(coverageGapSelection.openShift.date + "T00:00:00");
                         const selectedRange = getOpenShiftTimeRanges(
                           [selectedAssignmentDefinition.id],
                           null,
@@ -6420,10 +5904,14 @@ function SchedulerContent() {
                         }
                         const volunteerInput = buildOpenShiftInput({
                           shiftIds: [
-                            selectedAssignmentDefinition.shiftId ?? selectedAssignmentDefinition.categoryId ?? null,
+                            selectedAssignmentDefinition.shiftId ??
+                              selectedAssignmentDefinition.categoryId ??
+                              null,
                           ],
                           jobIds:
-                            selectedAssignmentDefinition.jobId != null ? [selectedAssignmentDefinition.jobId] : [],
+                            selectedAssignmentDefinition.jobId != null
+                              ? [selectedAssignmentDefinition.jobId]
+                              : [],
                           customStartTime: selectedRange?.start ?? null,
                           customEndTime: selectedRange?.end ?? null,
                         });
@@ -6454,9 +5942,9 @@ function SchedulerContent() {
                 isLoading={isCoverageGapVolunteerPending}
                 message={
                   <>
-                    Volunteer for{" "}
-                    <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong>{" "}
-                    on <strong>{pendingCoverageGapVolunteer.date}</strong>? This will be sent to your admin for approval.
+                    Volunteer for <strong>{pendingCoverageGapVolunteer.assignmentLabel}</strong> on{" "}
+                    <strong>{pendingCoverageGapVolunteer.date}</strong>? This will be sent to your
+                    admin for approval.
                   </>
                 }
                 title="Volunteer for this shift?"
@@ -6510,9 +5998,7 @@ function SchedulerContent() {
                     This will be sent to your admin for approval.
                   </>
                 }
-                confirmLabel={
-                  pendingClaimShift.source === "calloff" ? "Claim" : "Volunteer"
-                }
+                confirmLabel={pendingClaimShift.source === "calloff" ? "Claim" : "Volunteer"}
                 variant="info"
                 isLoading={isClaimShiftPending}
                 onConfirm={() => {
@@ -6524,10 +6010,7 @@ function SchedulerContent() {
                     try {
                       let completed = false;
                       if (os.source === "calloff" && os.requestId) {
-                        completed = await shiftRequests.claim(
-                          os.requestId,
-                          currentEmpId,
-                        );
+                        completed = await shiftRequests.claim(os.requestId, currentEmpId);
                       } else if (os.source === "coverage_gap") {
                         const volunteerInput = buildOpenShiftInput({
                           segments:
@@ -6635,23 +6118,18 @@ function SchedulerContent() {
               onClose={closeEditPanel}
               seriesId={
                 panelShiftEntry?.seriesId ??
-                shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
-                  ?.seriesId ??
+                shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]?.seriesId ??
                 null
               }
               fromRecurring={panelShiftEntry?.fromRecurring ?? false}
               onRepeatConfirm={
-                canEditShifts && canManageShiftSeries
-                  ? handleRepeatConfirm
-                  : undefined
+                canEditShifts && canManageShiftSeries ? handleRepeatConfirm : undefined
               }
               isCreatingRepeatSeries={isCreatingRepeatSeries}
               empId={editPanel.empId}
               customStartTime={panelCustomStartTime}
               customEndTime={panelCustomEndTime}
-              onCustomTimeChange={
-                canEditShifts ? handleCustomTimeChange : undefined
-              }
+              onCustomTimeChange={canEditShifts ? handleCustomTimeChange : undefined}
               publishedAssignmentIds={
                 panelShiftEntry?.publishedAssignmentDefinitionIds ??
                 shifts[`${editPanel.empId}_${formatDateKey(editPanel.date)}`]
@@ -6678,16 +6156,11 @@ function SchedulerContent() {
               }
               draftKind={panelDraftKind}
               isStale={editSessionDraft?.isStale ?? false}
-              auditInfo={
-                canEditShifts && canRenderAuthorNames ? auditInfo : undefined
-              }
+              auditInfo={canEditShifts && canRenderAuthorNames ? auditInfo : undefined}
               overlapWarnings={overnightOverlapWarnings}
               enforceConflicts={org?.enforceConflictPrevention ?? false}
               isOwnShift={!!currentEmpId && editPanel.empId === currentEmpId}
-              hasActiveRequest={hasActiveRequestForShift(
-                editPanel.empId,
-                editPanel.date,
-              )}
+              hasActiveRequest={hasActiveRequestForShift(editPanel.empId, editPanel.date)}
               onMakeAvailable={
                 canCreateOwnShiftRequest(editPanel.empId, editPanel.date)
                   ? async (options) => {
@@ -6766,47 +6239,44 @@ function SchedulerContent() {
           {/* ── Shift Request Board (slide-out panel) ── */}
           {showRequestBoard && (
             <ShiftRequestBoard
-              openPickups={(canEditShifts
-                ? shiftRequests.openPickups
-                : shiftRequests.openPickups.filter((req) => {
-                if (!currentEmpId) return true;
-                const dateObj = new Date(req.requesterShiftDate + "T00:00:00");
-                const myRanges = getShiftTimeRanges(currentEmpId, dateObj);
-                if (myRanges.length === 0) return true;
-                const pickupRanges: TimeRange[] = [];
-                // Use request custom times as highest priority
-                if (
-                  req.requesterCustomStartTime &&
-                  req.requesterCustomEndTime
-                ) {
-                  pickupRanges.push({
-                    start: req.requesterCustomStartTime,
-                    end: req.requesterCustomEndTime,
-                  });
-                } else {
-                  for (const codeId of req.requesterAssignmentDefinitionIds) {
-                    const sc = assignments.find((c) => c.id === codeId);
-                    if (sc?.defaultStartTime && sc?.defaultEndTime) {
-                      pickupRanges.push({
-                        start: sc.defaultStartTime,
-                        end: sc.defaultEndTime,
-                      });
-                    } else if (sc?.categoryId != null) {
-                      const cat = shiftCategories.find(
-                        (c) => c.id === sc.categoryId,
-                      );
-                      if (cat?.startTime && cat?.endTime) {
+              openPickups={
+                canEditShifts
+                  ? shiftRequests.openPickups
+                  : shiftRequests.openPickups.filter((req) => {
+                      if (!currentEmpId) return true;
+                      const dateObj = new Date(req.requesterShiftDate + "T00:00:00");
+                      const myRanges = getShiftTimeRanges(currentEmpId, dateObj);
+                      if (myRanges.length === 0) return true;
+                      const pickupRanges: TimeRange[] = [];
+                      // Use request custom times as highest priority
+                      if (req.requesterCustomStartTime && req.requesterCustomEndTime) {
                         pickupRanges.push({
-                          start: cat.startTime,
-                          end: cat.endTime,
+                          start: req.requesterCustomStartTime,
+                          end: req.requesterCustomEndTime,
                         });
+                      } else {
+                        for (const codeId of req.requesterAssignmentDefinitionIds) {
+                          const sc = assignments.find((c) => c.id === codeId);
+                          if (sc?.defaultStartTime && sc?.defaultEndTime) {
+                            pickupRanges.push({
+                              start: sc.defaultStartTime,
+                              end: sc.defaultEndTime,
+                            });
+                          } else if (sc?.categoryId != null) {
+                            const cat = shiftCategories.find((c) => c.id === sc.categoryId);
+                            if (cat?.startTime && cat?.endTime) {
+                              pickupRanges.push({
+                                start: cat.startTime,
+                                end: cat.endTime,
+                              });
+                            }
+                          }
+                        }
                       }
-                    }
-                  }
-                }
-                if (pickupRanges.length === 0) return true;
-                return !timesOverlap(myRanges, pickupRanges);
-              }))}
+                      if (pickupRanges.length === 0) return true;
+                      return !timesOverlap(myRanges, pickupRanges);
+                    })
+              }
               myRequests={shiftRequests.myRequests}
               pendingApproval={shiftRequests.pendingApproval}
               approvalQueue={canEditShifts ? shiftRequests.requests : undefined}
@@ -6822,9 +6292,7 @@ function SchedulerContent() {
                 if (!currentEmpId) return;
                 return shiftRequests.respond(id, currentEmpId, accept);
               }}
-              onResolve={(id, approved, note) =>
-                shiftRequests.resolve(id, approved, note)
-              }
+              onResolve={(id, approved, note) => shiftRequests.resolve(id, approved, note)}
               onCancel={(id) => {
                 if (!currentEmpId) return;
                 return shiftRequests.cancel(id, currentEmpId);
@@ -6846,10 +6314,7 @@ function SchedulerContent() {
             />
           )}
 
-          <PrintLegend
-            assignments={assignments}
-            shiftDisplayMode={org?.shiftDisplayMode}
-          />
+          <PrintLegend assignments={assignments} shiftDisplayMode={org?.shiftDisplayMode} />
 
           {showPrintOptions && (
             <PrintOptionsModal
@@ -7012,8 +6477,7 @@ function SchedulerContent() {
             <ConfirmDialog
               title="Import Previous Schedule?"
               message={(() => {
-                const { breakdown, sourceRange, targetRange, outcomes } =
-                  importPreview;
+                const { breakdown, sourceRange, targetRange, outcomes } = importPreview;
                 const copyLine = `This will copy ${breakdown.imported} shift${
                   breakdown.imported === 1 ? "" : "s"
                 } from ${sourceRange} into ${targetRange}.`;
@@ -7044,11 +6508,7 @@ function SchedulerContent() {
               targetRange={importResults.targetRange}
               outcomes={importResults.outcomes}
               breakdown={importResults.breakdown}
-              nameByEmpId={
-                new Map(
-                  employees.map((e) => [e.id, getEmployeeDisplayName(e)]),
-                )
-              }
+              nameByEmpId={new Map(employees.map((e) => [e.id, getEmployeeDisplayName(e)]))}
               onClose={() => setShowImportResults(false)}
             />
           )}

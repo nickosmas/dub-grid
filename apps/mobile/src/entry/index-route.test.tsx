@@ -1,15 +1,10 @@
 import { act, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createReactNativeModule,
-  createSafeAreaContextModule,
-} from "../test/native";
+import { createReactNativeModule, createSafeAreaContextModule } from "../test/native";
 
 vi.useFakeTimers();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),

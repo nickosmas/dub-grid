@@ -198,10 +198,12 @@ describe("EmployeeManagementAccessModal", () => {
       token: "token-1",
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
-    updateOrganizationInvitationGuardedMock.mockResolvedValue(makePendingInvitation({
-      updatedAt: "2026-01-02T00:00:00.000Z",
-      departmentIds: [10],
-    }));
+    updateOrganizationInvitationGuardedMock.mockResolvedValue(
+      makePendingInvitation({
+        updatedAt: "2026-01-02T00:00:00.000Z",
+        departmentIds: [10],
+      }),
+    );
     resendOrganizationInvitationGuardedMock.mockResolvedValue({
       invitation: makePendingInvitation({
         updatedAt: "2026-01-03T00:00:00.000Z",
@@ -210,10 +212,12 @@ describe("EmployeeManagementAccessModal", () => {
       token: "resent-token",
       expiresAt: "2026-12-31T00:00:00.000Z",
     });
-    revokeOrganizationInvitationGuardedMock.mockResolvedValue(makePendingInvitation({
-      revokedAt: "2026-01-02T00:00:00.000Z",
-      updatedAt: "2026-01-02T00:00:00.000Z",
-    }));
+    revokeOrganizationInvitationGuardedMock.mockResolvedValue(
+      makePendingInvitation({
+        revokedAt: "2026-01-02T00:00:00.000Z",
+        updatedAt: "2026-01-02T00:00:00.000Z",
+      }),
+    );
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -284,9 +288,7 @@ describe("EmployeeManagementAccessModal", () => {
     });
     await user.click(screen.getByRole("button", { name: "Leadership" }));
 
-    expect(
-      screen.getByText(/isn't available in sandbox mode/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/isn't available in sandbox mode/i)).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
     expect(createOrganizationInvitationMock).not.toHaveBeenCalled();
   });
@@ -302,14 +304,19 @@ describe("EmployeeManagementAccessModal", () => {
         orgId="org-1"
         orgName="Test Org"
         managementDepartments={managementDepartments}
-        directoryPerson={makeDirectoryPerson({ managementDepartmentIds: [10], invitationStatus: "pending" })}
+        directoryPerson={makeDirectoryPerson({
+          managementDepartmentIds: [10],
+          invitationStatus: "pending",
+        })}
         pendingInvitation={makePendingInvitation()}
         onClose={onClose}
         onCompleted={onCompleted}
       />,
     );
 
-    expect(await screen.findByRole("dialog", { name: /edit management access/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("dialog", { name: /edit management access/i }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Leadership" }));
     await user.click(screen.getByRole("button", { name: "Operations" }));
@@ -350,7 +357,10 @@ describe("EmployeeManagementAccessModal", () => {
         orgId="org-1"
         orgName="Test Org"
         managementDepartments={managementDepartments}
-        directoryPerson={makeDirectoryPerson({ managementDepartmentIds: [10], invitationStatus: "pending" })}
+        directoryPerson={makeDirectoryPerson({
+          managementDepartmentIds: [10],
+          invitationStatus: "pending",
+        })}
         pendingInvitation={makePendingInvitation()}
         onClose={onClose}
         onCompleted={onCompleted}
@@ -395,7 +405,10 @@ describe("EmployeeManagementAccessModal", () => {
         orgId="org-1"
         orgName="Test Org"
         managementDepartments={managementDepartments}
-        directoryPerson={makeDirectoryPerson({ managementDepartmentIds: [10], invitationStatus: "pending" })}
+        directoryPerson={makeDirectoryPerson({
+          managementDepartmentIds: [10],
+          invitationStatus: "pending",
+        })}
         pendingInvitation={makePendingInvitation()}
         onClose={onClose}
         onCompleted={vi.fn()}

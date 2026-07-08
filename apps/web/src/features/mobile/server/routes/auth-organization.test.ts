@@ -31,9 +31,7 @@ describe("mobile auth organization route", () => {
 
     const { GET } = await import("./auth-organization");
     const response = await GET({
-      nextUrl: new URL(
-        "http://localhost/api/mobile/v1/auth/organization?slug=dubgrid-health",
-      ),
+      nextUrl: new URL("http://localhost/api/mobile/v1/auth/organization?slug=dubgrid-health"),
     } as never);
 
     expect(response.status).toBe(200);
@@ -69,14 +67,10 @@ describe("mobile auth organization route", () => {
       headers: new Headers({
         origin: "http://localhost:8081",
       }),
-      nextUrl: new URL(
-        "http://localhost/api/mobile/v1/auth/organization?slug=dubgrid-health",
-      ),
+      nextUrl: new URL("http://localhost/api/mobile/v1/auth/organization?slug=dubgrid-health"),
     } as never);
 
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
-      "http://localhost:8081",
-    );
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("http://localhost:8081");
 
     const preflightResponse = await OPTIONS(
       new Request("http://localhost/api/mobile/v1/auth/organization", {
@@ -92,9 +86,7 @@ describe("mobile auth organization route", () => {
     expect(preflightResponse.headers.get("Access-Control-Allow-Origin")).toBe(
       "http://localhost:8081",
     );
-    expect(preflightResponse.headers.get("Access-Control-Allow-Methods")).toContain(
-      "GET",
-    );
+    expect(preflightResponse.headers.get("Access-Control-Allow-Methods")).toContain("GET");
   });
 
   it("returns 404 for unknown organizations", async () => {

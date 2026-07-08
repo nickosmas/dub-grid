@@ -1,4 +1,4 @@
-import type { ShiftMap } from '@/types';
+import type { ShiftMap } from "@/types";
 
 export interface DraftBreakdown {
   newShifts: number;
@@ -23,9 +23,9 @@ export interface DateRangeFilter {
  * Returns null if the key doesn't contain a recognizable date segment.
  */
 export function extractDateKeyFromCellKey(key: string): string | null {
-  const parts = key.split('_');
+  const parts = key.split("_");
   if (parts.length < 2) return null;
-  const candidate = parts[1] ?? '';
+  const candidate = parts[1] ?? "";
   return /^\d{4}-\d{2}-\d{2}$/.test(candidate) ? candidate : null;
 }
 
@@ -36,7 +36,10 @@ function isInRange(dateKey: string, range?: DateRangeFilter): boolean {
 
 export function computeDraftBreakdown(
   shifts: ShiftMap,
-  notes: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>,
+  notes: Record<
+    string,
+    { indicatorTypeId: number; status: "published" | "draft" | "draft_deleted" }[]
+  >,
   range?: DateRangeFilter,
 ): DraftBreakdown {
   let newShifts = 0;
@@ -52,9 +55,15 @@ export function computeDraftBreakdown(
       if (!dateKey || !isInRange(dateKey, range)) continue;
     }
     switch (entry.draftKind) {
-      case 'new': newShifts++; break;
-      case 'modified': modifiedShifts++; break;
-      case 'deleted': deletedShifts++; break;
+      case "new":
+        newShifts++;
+        break;
+      case "modified":
+        modifiedShifts++;
+        break;
+      case "deleted":
+        deletedShifts++;
+        break;
     }
   }
 
@@ -64,8 +73,8 @@ export function computeDraftBreakdown(
       if (!dateKey || !isInRange(dateKey, range)) continue;
     }
     for (const note of noteList) {
-      if (note.status === 'draft') newNotes++;
-      if (note.status === 'draft_deleted') deletedNotes++;
+      if (note.status === "draft") newNotes++;
+      if (note.status === "draft_deleted") deletedNotes++;
     }
   }
 
@@ -97,7 +106,10 @@ export interface OutOfWindowDraftGroup {
  */
 export function computeOutOfWindowDraftGroups(
   shifts: ShiftMap,
-  notes: Record<string, { indicatorTypeId: number; status: 'published' | 'draft' | 'draft_deleted' }[]>,
+  notes: Record<
+    string,
+    { indicatorTypeId: number; status: "published" | "draft" | "draft_deleted" }[]
+  >,
   window: DateRangeFilter,
   getPeriodKey: (dateKey: string) => string,
   parsePeriodKey: (periodKey: string) => Date,
@@ -121,7 +133,7 @@ export function computeOutOfWindowDraftGroups(
     if (!dateKey || isInRange(dateKey, window)) continue;
     const periodKey = getPeriodKey(dateKey);
     for (const note of noteList) {
-      if (note.status === 'draft' || note.status === 'draft_deleted') {
+      if (note.status === "draft" || note.status === "draft_deleted") {
         counts.set(periodKey, (counts.get(periodKey) ?? 0) + 1);
       }
     }
@@ -136,33 +148,32 @@ export function computeOutOfWindowDraftGroups(
     }));
 }
 
-export function draftBreakdownsEqual(
-  left: DraftBreakdown,
-  right: DraftBreakdown,
-): boolean {
+export function draftBreakdownsEqual(left: DraftBreakdown, right: DraftBreakdown): boolean {
   return (
-    left.newShifts === right.newShifts
-    && left.modifiedShifts === right.modifiedShifts
-    && left.deletedShifts === right.deletedShifts
-    && left.newNotes === right.newNotes
-    && left.deletedNotes === right.deletedNotes
-    && left.totalChanges === right.totalChanges
+    left.newShifts === right.newShifts &&
+    left.modifiedShifts === right.modifiedShifts &&
+    left.deletedShifts === right.deletedShifts &&
+    left.newNotes === right.newNotes &&
+    left.deletedNotes === right.deletedNotes &&
+    left.totalChanges === right.totalChanges
   );
 }
 
-export function formatDraftBreakdownSummary(
-  breakdown: DraftBreakdown,
-): string {
+export function formatDraftBreakdownSummary(breakdown: DraftBreakdown): string {
   const parts: string[] = [];
 
   if (breakdown.newShifts > 0) {
     parts.push(`${breakdown.newShifts} new shift${breakdown.newShifts === 1 ? "" : "s"}`);
   }
   if (breakdown.modifiedShifts > 0) {
-    parts.push(`${breakdown.modifiedShifts} edited shift${breakdown.modifiedShifts === 1 ? "" : "s"}`);
+    parts.push(
+      `${breakdown.modifiedShifts} edited shift${breakdown.modifiedShifts === 1 ? "" : "s"}`,
+    );
   }
   if (breakdown.deletedShifts > 0) {
-    parts.push(`${breakdown.deletedShifts} deleted shift${breakdown.deletedShifts === 1 ? "" : "s"}`);
+    parts.push(
+      `${breakdown.deletedShifts} deleted shift${breakdown.deletedShifts === 1 ? "" : "s"}`,
+    );
   }
   if (breakdown.newNotes > 0) {
     parts.push(`${breakdown.newNotes} new note${breakdown.newNotes === 1 ? "" : "s"}`);

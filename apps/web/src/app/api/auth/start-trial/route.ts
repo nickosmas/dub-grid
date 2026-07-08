@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireAuthenticatedUserWithClaims,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -52,18 +49,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.error) {
-      return NextResponse.json(
-        { error: "Failed to start trial." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Failed to start trial." }, { status: 400 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("auth start-trial POST failed", error);
-    return NextResponse.json(
-      { error: "Failed to start trial" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to start trial" }, { status: 500 });
   }
 }

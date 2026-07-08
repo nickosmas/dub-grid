@@ -10,10 +10,7 @@ import {
   removeBrowserRealtimeChannel,
 } from "@/features/account/client";
 
-type AccountRealtimeTable =
-  | "profiles"
-  | "user_sessions"
-  | "notification_preferences";
+type AccountRealtimeTable = "profiles" | "user_sessions" | "notification_preferences";
 
 export function getAccountRealtimeInvalidationKeys(
   userId: string,
@@ -105,9 +102,7 @@ export function useAccountRealtimeInvalidation({
         });
       } else if (status === "CHANNEL_ERROR") {
         hadError = true;
-        Sentry.captureException(
-          err ?? new Error("account freshness channel error"),
-        );
+        Sentry.captureException(err ?? new Error("account freshness channel error"));
       }
     });
 

@@ -22,10 +22,7 @@ vi.mock("@/lib/db/mappers", () => ({
   rowToEmployee,
 }));
 
-function makeAuth(overrides?: {
-  canManageEmployees?: boolean;
-  canViewStaff?: boolean;
-}) {
+function makeAuth(overrides?: { canManageEmployees?: boolean; canViewStaff?: boolean }) {
   return {
     currentOrg: {
       id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",

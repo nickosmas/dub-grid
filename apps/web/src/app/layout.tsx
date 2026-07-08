@@ -19,9 +19,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "https://dubgrid.com",
-  ),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://dubgrid.com"),
   title: "DubGrid",
   description: "Staff scheduling, built for care teams.",
   openGraph: {
@@ -53,11 +51,7 @@ import WebVitals from "@/components/WebVitals";
 
 const webCssVariables = createWebCssVariables() as CSSProperties;
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"

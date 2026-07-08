@@ -8,8 +8,7 @@ const sendResendEmail = vi.fn();
 const serviceFrom = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
-    requireAuthenticatedUserWithClaims(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
   forbidIfSandboxCookie: (req: NextRequest) => forbidIfSandboxCookie(req),
 }));
 
@@ -59,9 +58,7 @@ function makeQuery() {
     eq: vi.fn(() => query),
     is: vi.fn(() => query),
     // First maybeSingle in a GET is the org read; the second (if any) is the claim.
-    maybeSingle: vi.fn(() =>
-      Promise.resolve(maybeSingleCalls++ === 0 ? orgResult : claimResult),
-    ),
+    maybeSingle: vi.fn(() => Promise.resolve(maybeSingleCalls++ === 0 ? orgResult : claimResult)),
   };
   return query;
 }
@@ -148,9 +145,7 @@ describe("GET /api/trial-welcome", () => {
   });
 
   it("returns empty for non-super-admins without hitting the DB", async () => {
-    requireAuthenticatedUserWithClaims.mockResolvedValueOnce(
-      superAdminAuth({ org_role: "admin" }),
-    );
+    requireAuthenticatedUserWithClaims.mockResolvedValueOnce(superAdminAuth({ org_role: "admin" }));
 
     const res = await GET(request());
     await expect(res.json()).resolves.toEqual({
@@ -282,9 +277,7 @@ describe("POST /api/trial-welcome", () => {
   });
 
   it("forbids non-super-admins", async () => {
-    requireAuthenticatedUserWithClaims.mockResolvedValueOnce(
-      superAdminAuth({ org_role: "admin" }),
-    );
+    requireAuthenticatedUserWithClaims.mockResolvedValueOnce(superAdminAuth({ org_role: "admin" }));
 
     const res = await POST(request("POST"));
     expect(res.status).toBe(403);

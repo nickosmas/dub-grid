@@ -60,8 +60,7 @@ describe("authed routes receive the nonce CSP and must render dynamically (F-4/H
     if (!hasPage) continue; // not a routable leaf at this level
 
     it(`/${seg} is dynamically rendered`, () => {
-      const dynamicHere =
-        isDynamic(join(dir, "layout.tsx")) || isDynamic(join(dir, "page.tsx"));
+      const dynamicHere = isDynamic(join(dir, "layout.tsx")) || isDynamic(join(dir, "page.tsx"));
       expect(
         dynamicHere,
         `/${seg} is an authed route (gets the nonce CSP) but is not dynamic. ` +

@@ -29,8 +29,7 @@ vi.mock("@/lib/sentry", () => ({
 }));
 
 vi.mock("@/lib/client-facing", () => ({
-  formatClientErrorMessage: (err: unknown, fallback: string) =>
-    (err as Error)?.message ?? fallback,
+  formatClientErrorMessage: (err: unknown, fallback: string) => (err as Error)?.message ?? fallback,
 }));
 
 const organization = {
@@ -146,8 +145,6 @@ describe("DangerZone", () => {
 
     expect(captureException).toHaveBeenCalled();
     expect(toastSuccess).toHaveBeenCalledWith("Organization deleted.");
-    expect(toastError).toHaveBeenCalledWith(
-      expect.stringMatching(/sign out/i),
-    );
+    expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/sign out/i));
   });
 });

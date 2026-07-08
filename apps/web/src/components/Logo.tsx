@@ -1,13 +1,7 @@
-export function DubGridLogo({
-  size = 48,
-  color = "#2563EB",
-}: {
-  size?: number;
-  color?: string;
-}) {
+export function DubGridLogo({ size = 48, color = "#2563EB" }: { size?: number; color?: string }) {
   const cell = size / 4;
-  const gap = cell * 0.10;
-  const r = cell * 0.20;
+  const gap = cell * 0.1;
+  const r = cell * 0.2;
   const cols = [0, 1, 2, 3];
   const rows = [0, 1, 2, 3];
   // Filled cells forming a simple grid mark (all 16)
@@ -23,9 +17,7 @@ export function DubGridLogo({
             height={cell - gap * 2}
             rx={r}
             fill={color}
-            opacity={
-              row === 0 || col === 0 ? "1" : row + col <= 4 ? "0.75" : "0.3"
-            }
+            opacity={row === 0 || col === 0 ? "1" : row + col <= 4 ? "0.75" : "0.3"}
           />
         )),
       )}

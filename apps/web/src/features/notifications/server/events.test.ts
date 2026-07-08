@@ -48,10 +48,7 @@ function makeMembershipBuilder(input: {
     }),
     is: vi.fn().mockImplementation(() =>
       Promise.resolve({
-        data:
-          selectedRole === "super_admin"
-            ? (input.superAdmins ?? [])
-            : (input.admins ?? []),
+        data: selectedRole === "super_admin" ? (input.superAdmins ?? []) : (input.admins ?? []),
       }),
     ),
   };
@@ -271,10 +268,7 @@ describe("dispatchNotificationEvent", () => {
   it("notifies all affected employees when recurring schedules are applied", async () => {
     fromMock.mockImplementation((table: string) => {
       if (table === "employees") {
-        return makeListBuilder([
-          { user_id: "u1" },
-          { user_id: "u2" },
-        ]);
+        return makeListBuilder([{ user_id: "u1" }, { user_id: "u2" }]);
       }
       return makeSingleRowBuilder(null);
     });

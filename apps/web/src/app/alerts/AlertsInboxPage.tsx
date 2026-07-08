@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -38,10 +31,8 @@ import { useAuth } from "@/components/AuthProvider";
 import { usePermissions, type Permissions } from "@/hooks";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  extractNotificationAction,
-  formatNotificationMetadata,
-} from "@dubgrid/domain";
+import { formatRelativeTime } from "@/lib/utils";
+import { extractNotificationAction, formatNotificationMetadata } from "@dubgrid/domain";
 import {
   archiveNotifications,
   fetchNotificationFacets,
@@ -180,22 +171,6 @@ function NotificationIcon({ type }: { type: NotificationType }) {
     return <Shield size={16} />;
   }
   return <Bell size={16} />;
-}
-
-function formatRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 interface FilterState {
@@ -383,11 +358,7 @@ export function InboxView() {
       const action = (event as { action?: { type?: string } }).action;
       if (action?.type !== "invalidate") return;
       const key = event.query.queryKey;
-      if (
-        !Array.isArray(key) ||
-        key[0] !== "notifications" ||
-        key[1] !== userId
-      ) {
+      if (!Array.isArray(key) || key[0] !== "notifications" || key[1] !== userId) {
         return;
       }
       refreshFacets();
@@ -412,12 +383,8 @@ export function InboxView() {
   }, [cursor, loadingMore, query]);
 
   const totalSelected = selectedIds.size;
-  const allSelectedIds = useMemo(
-    () => notifications.map((n) => n.id),
-    [notifications],
-  );
-  const isAllSelected =
-    notifications.length > 0 && totalSelected === notifications.length;
+  const allSelectedIds = useMemo(() => notifications.map((n) => n.id), [notifications]);
+  const isAllSelected = notifications.length > 0 && totalSelected === notifications.length;
 
   const handleToggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -430,22 +397,13 @@ export function InboxView() {
 
   const handleToggleSelectAll = useCallback(() => {
     setSelectedIds((prev) =>
-      prev.size === notifications.length
-        ? new Set()
-        : new Set(allSelectedIds),
+      prev.size === notifications.length ? new Set() : new Set(allSelectedIds),
     );
   }, [allSelectedIds, notifications.length]);
 
   const applyOptimistic = useCallback(
-    (
-      ids: string[],
-      patch:
-        | { readAt?: string | null }
-        | { archivedAt?: string | null },
-    ) => {
-      setNotifications((prev) =>
-        prev.map((n) => (ids.includes(n.id) ? { ...n, ...patch } : n)),
-      );
+    (ids: string[], patch: { readAt?: string | null } | { archivedAt?: string | null }) => {
+      setNotifications((prev) => prev.map((n) => (ids.includes(n.id) ? { ...n, ...patch } : n)));
     },
     [],
   );
@@ -455,10 +413,7 @@ export function InboxView() {
   }, []);
 
   const handleBulk = useCallback(
-    async (
-      action: "read" | "unread" | "archive" | "unarchive",
-      ids: string[],
-    ) => {
+    async (action: "read" | "unread" | "archive" | "unarchive", ids: string[]) => {
       if (!ids.length) return;
       setBusy(true);
       try {
@@ -504,9 +459,7 @@ export function InboxView() {
     try {
       await markAllNotificationsRead();
       const now = new Date().toISOString();
-      setNotifications((prev) =>
-        prev.map((n) => (n.readAt ? n : { ...n, readAt: now })),
-      );
+      setNotifications((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: now })));
       refreshFacets();
       toast.success("All alerts marked as read");
     } catch (err) {
@@ -517,8 +470,7 @@ export function InboxView() {
     }
   }, [refreshFacets]);
 
-  const [detailNotification, setDetailNotification] =
-    useState<Notification | null>(null);
+  const [detailNotification, setDetailNotification] = useState<Notification | null>(null);
 
   const handleRowClick = useCallback(
     async (n: Notification) => {
@@ -583,19 +535,13 @@ export function InboxView() {
       </header>
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
-        <FilterSidebar
-          filters={filters}
-          facets={facets}
-          onChange={setFilters}
-        />
+        <FilterSidebar filters={filters} facets={facets} onChange={setFilters} />
 
         <main style={{ flex: 1, minWidth: 0 }}>
           <ReadFilterTabs
             value={filters.read}
             unreadCount={facets?.totalUnread ?? 0}
-            onChange={(value) =>
-              setFilters((prev) => ({ ...prev, read: value }))
-            }
+            onChange={(value) => setFilters((prev) => ({ ...prev, read: value }))}
           />
           <Toolbar
             search={filters.search}
@@ -609,24 +555,16 @@ export function InboxView() {
             priority={filters.priority}
             categories={visibleCategories}
             facets={facets}
-            onSearchChange={(value) =>
-              setFilters((prev) => ({ ...prev, search: value }))
-            }
-            onClearSearch={() =>
-              setFilters((prev) => ({ ...prev, search: "" }))
-            }
+            onSearchChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
+            onClearSearch={() => setFilters((prev) => ({ ...prev, search: "" }))}
             onSortToggle={() =>
               setFilters((prev) => ({
                 ...prev,
                 sort: prev.sort === "desc" ? "asc" : "desc",
               }))
             }
-            onCategoryChange={(value) =>
-              setFilters((prev) => ({ ...prev, category: value }))
-            }
-            onPriorityChange={(value) =>
-              setFilters((prev) => ({ ...prev, priority: value }))
-            }
+            onCategoryChange={(value) => setFilters((prev) => ({ ...prev, category: value }))}
+            onPriorityChange={(value) => setFilters((prev) => ({ ...prev, priority: value }))}
             onToggleSelectAll={handleToggleSelectAll}
             onBulk={handleBulk}
             selectedIds={[...selectedIds]}
@@ -742,10 +680,7 @@ function formatFullTimestamp(value: string): string {
   });
 }
 
-function NotificationDetailModal({
-  notification,
-  onClose,
-}: NotificationDetailModalProps) {
+function NotificationDetailModal({ notification, onClose }: NotificationDetailModalProps) {
   const entries = useMemo(
     () => formatNotificationMetadata(notification.metadata),
     [notification.metadata],
@@ -1016,9 +951,7 @@ function ReadFilterTabs({
                   fontWeight: 600,
                   padding: "1px 6px",
                   borderRadius: 999,
-                  background: active
-                    ? "var(--color-brand-bg)"
-                    : "var(--color-surface)",
+                  background: active ? "var(--color-brand-bg)" : "var(--color-surface)",
                   color: active ? "var(--color-brand)" : "var(--color-text-muted)",
                   fontVariantNumeric: "tabular-nums",
                 }}
@@ -1052,10 +985,7 @@ interface ToolbarProps {
   onCategoryChange: (value: CategoryFilter) => void;
   onPriorityChange: (value: NotificationPriority | "all") => void;
   onToggleSelectAll: () => void;
-  onBulk: (
-    action: "read" | "unread" | "archive" | "unarchive",
-    ids: string[],
-  ) => void;
+  onBulk: (action: "read" | "unread" | "archive" | "unarchive", ids: string[]) => void;
 }
 
 function Toolbar({
@@ -1137,9 +1067,7 @@ function Toolbar({
           onChange={onToggleSelectAll}
           disabled={!hasNotifications}
         />
-        {totalSelected > 0
-          ? `${totalSelected} selected`
-          : "Select"}
+        {totalSelected > 0 ? `${totalSelected} selected` : "Select"}
       </label>
 
       <div
@@ -1238,10 +1166,7 @@ function BulkActions({
   selectedIds: string[];
   busy: boolean;
   includeArchived: boolean;
-  onBulk: (
-    action: "read" | "unread" | "archive" | "unarchive",
-    ids: string[],
-  ) => void;
+  onBulk: (action: "read" | "unread" | "archive" | "unarchive", ids: string[]) => void;
 }) {
   return (
     <div
@@ -1352,9 +1277,7 @@ function NotificationRow({
           width: 32,
           height: 32,
           borderRadius: "50%",
-          background: isUnread
-            ? "var(--color-info-bg)"
-            : "var(--color-bg-secondary)",
+          background: isUnread ? "var(--color-info-bg)" : "var(--color-bg-secondary)",
           color: isUnread ? "var(--color-info)" : "var(--color-text-muted)",
           display: "flex",
           alignItems: "center",
@@ -1367,9 +1290,7 @@ function NotificationRow({
       <button
         type="button"
         onClick={onClick}
-        aria-label={`${notification.title}: ${notification.message}${
-          isUnread ? " (unread)" : ""
-        }`}
+        aria-label={`${notification.title}: ${notification.message}${isUnread ? " (unread)" : ""}`}
         style={{
           textAlign: "left",
           background: "none",
@@ -1545,8 +1466,7 @@ function ListPlaceholder() {
             display: "flex",
             gap: 12,
             padding: "16px",
-            borderBottom:
-              i < 3 ? "1px solid var(--color-border-light)" : "none",
+            borderBottom: i < 3 ? "1px solid var(--color-border-light)" : "none",
           }}
         >
           <div

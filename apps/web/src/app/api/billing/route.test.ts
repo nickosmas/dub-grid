@@ -88,10 +88,7 @@ describe("GET /api/billing", () => {
       error: null,
     });
     membershipIs.mockResolvedValue({
-      data: [
-        { user_id: "linked-user" },
-        { user_id: "management-only-user" },
-      ],
+      data: [{ user_id: "linked-user" }, { user_id: "management-only-user" }],
       error: null,
     });
     auditLimit.mockResolvedValue({

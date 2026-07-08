@@ -45,12 +45,8 @@ vi.mock("next/navigation", () => ({
 
 /** Helper: fill and submit the login form */
 function submitForm(container: HTMLElement) {
-  const emailInput = container.querySelector(
-    'input[type="email"]',
-  ) as HTMLInputElement;
-  const passwordInput = container.querySelector(
-    'input[type="password"]',
-  ) as HTMLInputElement;
+  const emailInput = container.querySelector('input[type="email"]') as HTMLInputElement;
+  const passwordInput = container.querySelector('input[type="password"]') as HTMLInputElement;
   fireEvent.change(emailInput, { target: { value: "user@example.com" } });
   fireEvent.change(passwordInput, { target: { value: "password123" } });
   fireEvent.submit(screen.getByRole("button", { name: /sign in/i }));
@@ -67,7 +63,14 @@ function validateDomainResponse() {
 describe("OrgLogin submit states", () => {
   beforeEach(() => {
     Object.defineProperty(window, "location", {
-      value: { host: "test-org.localhost", hostname: "test-org.localhost", replace: vi.fn(), reload: vi.fn(), href: "", search: "?verified=1" },
+      value: {
+        host: "test-org.localhost",
+        hostname: "test-org.localhost",
+        replace: vi.fn(),
+        reload: vi.fn(),
+        href: "",
+        search: "?verified=1",
+      },
       writable: true,
       configurable: true,
     });

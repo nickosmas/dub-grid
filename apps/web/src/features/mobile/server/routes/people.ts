@@ -1,9 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { mobilePeopleResponseSchema, type MobilePerson } from "@dubgrid/contracts";
-import {
-  loadMobilePeoplePayload,
-  MobileApiAuthorizationError,
-} from "@dubgrid/mobile-api-core";
+import { loadMobilePeoplePayload, MobileApiAuthorizationError } from "@dubgrid/mobile-api-core";
 import { fetchMobilePeople, requireMobileAuth } from "@/features/mobile/server";
 import type { Employee } from "@/types";
 

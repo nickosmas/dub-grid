@@ -13,9 +13,7 @@ const useBootstrap = vi.fn();
 const pushToast = vi.fn();
 const routerPush = vi.fn();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
@@ -45,9 +43,7 @@ vi.mock("expo-router", () => ({
   },
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("../../../shared/components/QueryStateCard", async () =>
   createQueryStateCardModule(await import("react")),
@@ -272,10 +268,7 @@ describe("PeopleScreen", () => {
 
     const zoeRow = screen.getByText("Zoe Adams");
     const minaRow = screen.getByText("Mina Diaz");
-    expect(
-      zoeRow.compareDocumentPosition(minaRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(zoeRow.compareDocumentPosition(minaRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("can switch the directory sort to alphabetical", () => {
@@ -337,10 +330,7 @@ describe("PeopleScreen", () => {
 
     const minaRow = screen.getByText("Mina Diaz");
     const zoeRow = screen.getByText("Zoe Adams");
-    expect(
-      minaRow.compareDocumentPosition(zoeRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(minaRow.compareDocumentPosition(zoeRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("hides inactive staff and status pills from regular users", () => {

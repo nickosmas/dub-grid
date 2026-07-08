@@ -58,13 +58,8 @@ function extractSupabaseSessionId(accessToken: string): string | null {
     if (!encodedPayload) return null;
 
     const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
-    const padding =
-      normalized.length % 4 === 0
-        ? ""
-        : "=".repeat(4 - (normalized.length % 4));
-    const payload = JSON.parse(
-      atob(`${normalized}${padding}`),
-    ) as Record<string, unknown>;
+    const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+    const payload = JSON.parse(atob(`${normalized}${padding}`)) as Record<string, unknown>;
     return typeof payload.session_id === "string" ? payload.session_id : null;
   } catch {
     return null;
@@ -94,8 +89,7 @@ export function SessionList() {
         lastActiveAt: row.lastActiveAt,
         refreshTokenHash: row.refreshTokenHash,
         isCurrent:
-          currentSupabaseSessionId != null &&
-          row.supabaseSessionId === currentSupabaseSessionId,
+          currentSupabaseSessionId != null && row.supabaseSessionId === currentSupabaseSessionId,
       }));
     },
     enabled: !authLoading && !!user,
@@ -115,9 +109,8 @@ export function SessionList() {
       revokeAccountSession(session.refreshTokenHash).then(() => session),
     onSuccess: (session) => {
       if (user) {
-        queryClient.setQueryData<UserSession[]>(
-          queryKeys.account.sessions(user.id),
-          (prev) => (prev ?? []).filter((s) => s.id !== session.id),
+        queryClient.setQueryData<UserSession[]>(queryKeys.account.sessions(user.id), (prev) =>
+          (prev ?? []).filter((s) => s.id !== session.id),
         );
       }
       toast.success("Session revoked");
@@ -126,9 +119,7 @@ export function SessionList() {
       toast.error("Failed to revoke session");
     },
   });
-  const revokingId = revokeMutation.isPending
-    ? revokeMutation.variables?.id ?? null
-    : null;
+  const revokingId = revokeMutation.isPending ? (revokeMutation.variables?.id ?? null) : null;
 
   function handleRevoke(session: UserSession) {
     if (session.isCurrent) {
@@ -140,7 +131,14 @@ export function SessionList() {
 
   if (loading) {
     return (
-      <div style={{ padding: 24, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+      <div
+        style={{
+          padding: 24,
+          textAlign: "center",
+          color: "var(--color-text-muted)",
+          fontSize: "var(--dg-fs-label)",
+        }}
+      >
         Loading sessions...
       </div>
     );
@@ -148,7 +146,14 @@ export function SessionList() {
 
   if (sessions.length === 0) {
     return (
-      <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+      <div
+        style={{
+          padding: "24px 16px",
+          textAlign: "center",
+          color: "var(--color-text-muted)",
+          fontSize: "var(--dg-fs-label)",
+        }}
+      >
         No active sessions
       </div>
     );
@@ -174,24 +179,39 @@ export function SessionList() {
               {device.icon === "mobile" ? <Smartphone size={18} /> : <Monitor size={18} />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-caption)",
+                  fontWeight: 600,
+                  color: "var(--color-text-primary)",
+                }}
+              >
                 {device.label}
                 {s.isCurrent && (
-                  <span style={{
-                    marginLeft: 8,
-                    fontSize: "var(--dg-fs-footnote)",
-                    fontWeight: 700,
-                    color: "var(--color-brand)",
-                    background: "var(--color-brand-bg)",
-                    padding: "1px 6px",
-                    borderRadius: 4,
-                  }}>
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "var(--dg-fs-footnote)",
+                      fontWeight: 700,
+                      color: "var(--color-brand)",
+                      background: "var(--color-brand-bg)",
+                      padding: "1px 6px",
+                      borderRadius: 4,
+                    }}
+                  >
                     Current
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 2 }}>
-                {s.ipAddress === "::1" ? "localhost" : s.ipAddress ?? "Unknown IP"} &middot; {formatRelative(s.lastActiveAt)}
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-text-muted)",
+                  marginTop: 2,
+                }}
+              >
+                {s.ipAddress === "::1" ? "localhost" : (s.ipAddress ?? "Unknown IP")} &middot;{" "}
+                {formatRelative(s.lastActiveAt)}
               </div>
             </div>
             <button

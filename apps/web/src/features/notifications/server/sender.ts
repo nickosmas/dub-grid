@@ -168,8 +168,7 @@ export async function sendNotification(
     .maybeSingle();
 
   const userPrefs = prefs?.prefs as Record<string, { in_app?: boolean; email?: boolean }> | null;
-  const emailEnabled =
-    userPrefs?.[category]?.email ?? DEFAULT_EMAIL_ENABLED[category] ?? false;
+  const emailEnabled = userPrefs?.[category]?.email ?? DEFAULT_EMAIL_ENABLED[category] ?? false;
 
   if (!emailEnabled) return;
 

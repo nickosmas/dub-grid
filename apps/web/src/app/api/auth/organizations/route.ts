@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireAuthenticatedSession,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireAuthenticatedSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -22,10 +19,7 @@ export async function GET(req: NextRequest) {
     const supabase = createRequestSupabaseClient(req);
     const result = await supabase.rpc("get_my_organizations");
     if (result.error) {
-      return NextResponse.json(
-        { error: "Unable to verify organization access." },
-        { status: 403 },
-      );
+      return NextResponse.json({ error: "Unable to verify organization access." }, { status: 403 });
     }
 
     return NextResponse.json({
@@ -33,10 +27,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("auth organizations GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load organizations" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load organizations" }, { status: 500 });
   }
 }
 
@@ -69,18 +60,12 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.error) {
-      return NextResponse.json(
-        { error: "Failed to switch organization." },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Failed to switch organization." }, { status: 400 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("auth organizations POST failed", error);
-    return NextResponse.json(
-      { error: "Failed to switch organization" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to switch organization" }, { status: 500 });
   }
 }

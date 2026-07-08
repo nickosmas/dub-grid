@@ -1,9 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import {
-  getPasswordStrengthHints,
-  PasswordStrength,
-} from "./PasswordStrength";
+import { getPasswordStrengthHints, PasswordStrength } from "./PasswordStrength";
 
 describe("PasswordStrength", () => {
   it("shows concrete password strength hints", () => {

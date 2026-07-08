@@ -3,9 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import SuperAdminDashboard from "@/components/dashboard/SuperAdminDashboard";
 import type { DashboardContentProps } from "@/components/dashboard/DashboardContentProps";
 
-function makeProps(
-  overrides: Partial<DashboardContentProps> = {},
-): DashboardContentProps {
+function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardContentProps {
   const props = {
     absenceTypeById: new Map(),
     assignmentById: new Map(),

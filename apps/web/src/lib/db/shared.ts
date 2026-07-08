@@ -6,7 +6,19 @@ import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import { parseHost } from "@/lib/subdomain";
 
 // Re-export all imports that other modules will need
-export { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit, arraysEqual, formatDateKey, iterateDateRange, MAX_SERIES_OCCURRENCES, parseHost };
+export {
+  supabase,
+  cacheThrough,
+  cacheDel,
+  CacheKey,
+  TTL,
+  logAudit,
+  arraysEqual,
+  formatDateKey,
+  iterateDateRange,
+  MAX_SERIES_OCCURRENCES,
+  parseHost,
+};
 
 // ── PostgREST filter sanitization ──────────────────────────────────────────
 // Values interpolated into .or() filter strings must not contain PostgREST
@@ -25,11 +37,12 @@ export class OptimisticLockError extends Error {
   constructor(
     public readonly shiftId: string,
     public readonly expectedVersion: number,
-    public readonly actualVersion?: number
+    public readonly actualVersion?: number,
   ) {
     super(
-      `Optimistic lock failed for shift ${shiftId}: expected version ${expectedVersion}${actualVersion !== undefined ? `, but found version ${actualVersion}` : ""
-      }`
+      `Optimistic lock failed for shift ${shiftId}: expected version ${expectedVersion}${
+        actualVersion !== undefined ? `, but found version ${actualVersion}` : ""
+      }`,
     );
     this.name = "OptimisticLockError";
   }
@@ -73,7 +86,10 @@ export async function saveNamedEntities<T extends { id: number; name: string }>(
       .from(table)
       .update({ archived_at: new Date().toISOString() })
       .eq("org_id", orgId)
-      .in("id", toDelete.map((d) => d.id));
+      .in(
+        "id",
+        toDelete.map((d) => d.id),
+      );
     if (error) throw error;
   }
 
@@ -128,11 +144,7 @@ export async function saveNamedEntities<T extends { id: number; name: string }>(
 
   await Promise.all(
     restores.map(async ({ id, row }) => {
-      const { error } = await supabase
-        .from(table)
-        .update(row)
-        .eq("org_id", orgId)
-        .eq("id", id);
+      const { error } = await supabase.from(table).update(row).eq("org_id", orgId).eq("id", id);
       if (error) throw error;
     }),
   );
@@ -211,24 +223,33 @@ export function resolveCodeLabels(
   return ids
     .map((id) => {
       const normalizedId = normalizeNumericId(id);
-      return normalizedId != null ? codeMap.get(normalizedId) ?? "?" : "?";
+      return normalizedId != null ? (codeMap.get(normalizedId) ?? "?") : "?";
     })
     .join("/");
 }
 
 // ── Column projections (avoid select('*') to reduce payload) ─────────────────
 
-export const ORGANIZATION_COLS = "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, workspace_kind, sandbox_owner_user_id, sandbox_source_org_id, enforce_conflict_prevention, coverage_rule_config, open_shift_visibility, subscription_status, trial_ends_at, trial_started_at, data_retention_days, feature_overrides, updated_at";
+export const ORGANIZATION_COLS =
+  "id, name, slug, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, archived_at, suspended_at, suspended_reason, workspace_kind, sandbox_owner_user_id, sandbox_source_org_id, enforce_conflict_prevention, coverage_rule_config, open_shift_visibility, subscription_status, trial_ends_at, trial_started_at, data_retention_days, feature_overrides, updated_at";
 export const ORGANIZATION_WITH_BILLING_COLS = `${ORGANIZATION_COLS}, stripe_customer_id, subscription_seats`;
 export const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, archived_at";
 export const DEPARTMENT_COLS = "id, org_id, name, abbr, type, sort_order, archived_at, permissions";
-export const SHIFT_CODE_COLS = "id, org_id, label, name, color, border_color, text_color, category_id, shift_id, job_id, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, archived_at";
-export const SHIFT_CATEGORY_COLS = "id, org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes, archived_at";
-export const JOB_COLS = "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, shift_time_overrides, shift_color_overrides, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
+export const SHIFT_CODE_COLS =
+  "id, org_id, label, name, color, border_color, text_color, category_id, shift_id, job_id, is_general, focus_area_id, sort_order, required_certification_ids, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, archived_at";
+export const SHIFT_CATEGORY_COLS =
+  "id, org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes, archived_at";
+export const JOB_COLS =
+  "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, shift_time_overrides, shift_color_overrides, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
 export const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_id, sort_order, archived_at";
-export const ORG_ROLE_COLS = "id, org_id, name, abbr, is_schedule_role, department_id, sort_order, archived_at";
-export const EMPLOYEE_COLS = "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
-export const COVERAGE_REQ_COLS = "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff";
-export const ABSENCE_TYPE_COLS = "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
+export const ORG_ROLE_COLS =
+  "id, org_id, name, abbr, is_schedule_role, department_id, sort_order, archived_at";
+export const EMPLOYEE_COLS =
+  "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
+export const COVERAGE_REQ_COLS =
+  "id, org_id, focus_area_id, job_id, preferred_shift_id, day_of_week, min_staff";
+export const ABSENCE_TYPE_COLS =
+  "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
 export const INDICATOR_TYPE_COLS = "id, org_id, name, color, sort_order, archived_at";
-export const RECURRING_SHIFT_COLS = "id, emp_id, org_id, day_of_week, state, effective_from, effective_until, created_at, updated_at, archived_at";
+export const RECURRING_SHIFT_COLS =
+  "id, emp_id, org_id, day_of_week, state, effective_from, effective_until, created_at, updated_at, archived_at";

@@ -45,19 +45,14 @@ export const queryKeys = {
     all: (orgId: string) => ["shiftRequests", orgId] as const,
   },
   reports: {
-    operations: (
-      orgId: string,
-      startDate: string,
-      endDate: string,
-      filters = "",
-    ) => ["reports", "operations", orgId, startDate, endDate, filters] as const,
+    operations: (orgId: string, startDate: string, endDate: string, filters = "") =>
+      ["reports", "operations", orgId, startDate, endDate, filters] as const,
   },
   account: {
     self: (userId: string, orgId: string | null) =>
       ["account", userId, orgId ?? "no-org", "self"] as const,
     sessions: (userId: string) => ["account", userId, "sessions"] as const,
-    notificationPrefs: (userId: string) =>
-      ["account", userId, "notificationPrefs"] as const,
+    notificationPrefs: (userId: string) => ["account", userId, "notificationPrefs"] as const,
     terms: (userId: string) => ["account", userId, "terms"] as const,
   },
   notifications: {
@@ -89,11 +84,8 @@ export const queryKeys = {
     auditAll: () => ["gm", "audit"] as const,
     orgAudit: (orgId: string | null, page: number, limit: number, filters = "") =>
       ["gm", "audit", orgId ?? "platform", page, limit, filters] as const,
-    orgSchedule: (
-      orgId: string,
-      startDate: string,
-      endDate: string,
-    ) => ["gm", "org", orgId, "schedule", startDate, endDate] as const,
+    orgSchedule: (orgId: string, startDate: string, endDate: string) =>
+      ["gm", "org", orgId, "schedule", startDate, endDate] as const,
     impersonation: () => ["gm", "impersonation"] as const,
     impersonationHistory: (page: number, limit: number) =>
       ["gm", "impersonation", "history", page, limit] as const,

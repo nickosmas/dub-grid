@@ -89,10 +89,7 @@ describe("AlertsInboxPage facets cache subscription", () => {
     // notifications/<userId> parent key. Seed one so invalidateQueries has
     // something to invalidate (otherwise it's a no-op and no cache event
     // fires — matching real production behavior, not a test artifact).
-    queryClient.setQueryData(
-      queryKeys.notifications.unreadCount("user-1"),
-      0,
-    );
+    queryClient.setQueryData(queryKeys.notifications.unreadCount("user-1"), 0);
 
     render(
       <QueryClientProvider client={queryClient}>

@@ -168,10 +168,7 @@ function ResetPasswordContent() {
           />
         ) : (
           <>
-            <h1
-              className="dg-auth-heading"
-              style={{ marginBottom: "8px" }}
-            >
+            <h1 className="dg-auth-heading" style={{ marginBottom: "8px" }}>
               Set New Password
             </h1>
             <p
@@ -213,9 +210,7 @@ function ResetPasswordContent() {
                   }
                   disabled={loading}
                 />
-                {password.length > 0 && (
-                  <PasswordStrength password={password} />
-                )}
+                {password.length > 0 && <PasswordStrength password={password} />}
               </div>
 
               <div>

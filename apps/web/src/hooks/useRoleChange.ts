@@ -31,13 +31,13 @@ export function generateIdempotencyKey(): string {
 
 /**
  * React Query mutation hook for changing user roles.
- * 
+ *
  * Features:
  * - Generates unique idempotency key per call to prevent double-submission
  * - Implements optimistic update for immediate UI feedback
  * - Rolls back optimistic update on error
  * - Invalidates query cache on success for data consistency
- * 
+ *
  * @returns UseMutation result with mutate/mutateAsync functions
  */
 export function useRoleChange() {
@@ -57,9 +57,10 @@ export function useRoleChange() {
         }),
       });
 
-      const body = (await response.json().catch(() => null)) as
-        | { error?: string; result?: RoleChangeResult }
-        | null;
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+        result?: RoleChangeResult;
+      } | null;
 
       if (!response.ok) {
         throw new Error(formatClientErrorMessage(body?.error, "Failed to change role"));
@@ -80,9 +81,7 @@ export function useRoleChange() {
 
       // Optimistically update to the new value
       queryClient.setQueryData<OrgMember[]>(["org-members"], (old) =>
-        old?.map((m) =>
-          m.id === vars.targetUserId ? { ...m, role: vars.newRole } : m,
-        ),
+        old?.map((m) => (m.id === vars.targetUserId ? { ...m, role: vars.newRole } : m)),
       );
 
       // Return context with the snapshotted value

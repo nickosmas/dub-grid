@@ -17,8 +17,7 @@ vi.mock("@/app/api/shared/permissions", () => ({
 }));
 
 vi.mock("@/lib/stripe", () => ({
-  createBillingPortalSession: (...args: unknown[]) =>
-    createBillingPortalSession(...args),
+  createBillingPortalSession: (...args: unknown[]) => createBillingPortalSession(...args),
   writeBillingPortalOpenedAuditLog: (...args: unknown[]) =>
     writeBillingPortalOpenedAuditLog(...args),
 }));

@@ -9,15 +9,12 @@ import {
   computeOpenShifts,
   computeShiftDurationHours,
   computeAllEmployeeHours,
-  formatDateKey,
   getDatesInRange,
   filterShiftsByWeek,
   getWeekStart,
 } from "@/lib/dashboard-stats";
-import {
-  buildPublishedDateSet,
-  filterPublishedDates,
-} from "@/lib/schedule-logic";
+import { formatDateKey } from "@/lib/utils";
+import { buildPublishedDateSet, filterPublishedDates } from "@/lib/schedule-logic";
 import type {
   ShiftMap,
   Employee,
@@ -118,9 +115,7 @@ describe("Dashboard Metrics", () => {
         label: codeIds.map((id) => (id === 101 ? "DAY" : "EVE")).join("/"),
         assignmentIds: codeIds,
         publishedAssignmentDefinitionIds: codeIds,
-        publishedLabel: codeIds
-          .map((id) => (id === 101 ? "DAY" : "EVE"))
-          .join("/"),
+        publishedLabel: codeIds.map((id) => (id === 101 ? "DAY" : "EVE")).join("/"),
         customStartTime,
         customEndTime,
         isDraft: false,
@@ -186,9 +181,7 @@ describe("Dashboard Metrics", () => {
       [coverageRequirement],
       [assignment1, assignment2],
     );
-    const mondayCoverage = sections[0]?.daily.find(
-      (day) => day.dateKey === mondayKey,
-    );
+    const mondayCoverage = sections[0]?.daily.find((day) => day.dateKey === mondayKey);
     const sundayCoverage = sections[0]?.daily[0];
 
     expect(mondayCoverage).toMatchObject({
@@ -225,13 +218,9 @@ describe("Dashboard Metrics", () => {
     // Should detect open shifts when no shifts are scheduled
     expect(openShifts.length).toBeGreaterThan(0);
     // Verify Monday date is in the detected gaps
-    const hasMonday = openShifts.some(
-      (s) => formatDateKey(s.date) === mondayKey,
-    );
+    const hasMonday = openShifts.some((s) => formatDateKey(s.date) === mondayKey);
     expect(hasMonday).toBe(true);
-    expect(
-      openShifts.every((shift) => shift.focusAreaId === focusArea1.id),
-    ).toBe(true);
+    expect(openShifts.every((shift) => shift.focusAreaId === focusArea1.id)).toBe(true);
   });
 
   it("hides dashboard open shifts when the gap falls on an unpublished date", () => {
@@ -257,9 +246,7 @@ describe("Dashboard Metrics", () => {
 
     expect(openShifts).toEqual([]);
     expect(
-      publishedDates.some(
-        (date) => formatDateKey(date) === formatDateKey(mondayDateObj),
-      ),
+      publishedDates.some((date) => formatDateKey(date) === formatDateKey(mondayDateObj)),
     ).toBe(false);
   });
 
@@ -439,10 +426,7 @@ describe("Dashboard Metrics", () => {
       `1_201_${formatDateKey(monday)}`,
       `1_202_${formatDateKey(monday)}`,
     ]);
-    expect(openShifts.map((shift) => shift.assignmentLabel).sort()).toEqual([
-      "Charge RN",
-      "RN",
-    ]);
+    expect(openShifts.map((shift) => shift.assignmentLabel).sort()).toEqual(["Charge RN", "RN"]);
   });
 
   it("uses category totals for coverage even when one exact code is short", () => {
@@ -510,12 +494,7 @@ describe("Dashboard Metrics", () => {
     const assignmentById = new Map([[101, assignment1]]);
 
     // Custom: 06:00 - 14:00 = 8 hours
-    const duration = computeShiftDurationHours(
-      [101],
-      assignmentById,
-      "06:00",
-      "14:00",
-    );
+    const duration = computeShiftDurationHours([101], assignmentById, "06:00", "14:00");
     expect(duration).toBe(8);
   });
 
@@ -533,13 +512,7 @@ describe("Dashboard Metrics", () => {
     const assignmentById = new Map([[101, assignment1]]);
     const periodDateKeys = weekDates.map(formatDateKey);
 
-    const hours = computeAllEmployeeHours(
-      [employee1],
-      periodDateKeys,
-      shifts,
-      assignmentById,
-      40,
-    );
+    const hours = computeAllEmployeeHours([employee1], periodDateKeys, shifts, assignmentById, 40);
 
     expect(hours.length).toBe(1);
     expect(hours[0]?.empId).toBe("emp1");
@@ -567,13 +540,7 @@ describe("Dashboard Metrics", () => {
     const assignmentById = new Map([[101, assignment1]]);
     const periodDateKeys = weekDates.map(formatDateKey);
 
-    const hours = computeAllEmployeeHours(
-      [employee1],
-      periodDateKeys,
-      shifts,
-      assignmentById,
-      40,
-    );
+    const hours = computeAllEmployeeHours([employee1], periodDateKeys, shifts, assignmentById, 40);
 
     expect(hours[0]?.totalHours).toBe(50);
     expect(hours[0]?.isOvertime).toBe(true);
@@ -611,13 +578,7 @@ describe("Dashboard Metrics", () => {
     const assignmentById = new Map([[101, assignment1]]);
     const periodDateKeys = twoWeekDates.map(formatDateKey);
 
-    const hours = computeAllEmployeeHours(
-      [employee1],
-      periodDateKeys,
-      shifts,
-      assignmentById,
-      40,
-    );
+    const hours = computeAllEmployeeHours([employee1], periodDateKeys, shifts, assignmentById, 40);
 
     expect(hours[0]?.totalHours).toBe(66);
     expect(hours[0]?.isOvertime).toBe(true);

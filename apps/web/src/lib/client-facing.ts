@@ -25,9 +25,7 @@ const ORGANIZATION_ROLE_LABELS: Record<string, string> = {
   user: "User",
 };
 
-export function formatOrganizationRoleLabel(
-  role: string | null | undefined,
-): string {
+export function formatOrganizationRoleLabel(role: string | null | undefined): string {
   if (!role) return "User";
   return ORGANIZATION_ROLE_LABELS[role] ?? formatClientLabel(role);
 }
@@ -38,9 +36,7 @@ const SHIFT_REQUEST_TYPE_LABELS: Record<string, string> = {
   swap: "Swap",
 };
 
-export function formatShiftRequestTypeLabel(
-  type: string | null | undefined,
-): string {
+export function formatShiftRequestTypeLabel(type: string | null | undefined): string {
   if (!type) return "Request";
   return SHIFT_REQUEST_TYPE_LABELS[type] ?? formatClientLabel(type);
 }
@@ -54,9 +50,7 @@ const SHIFT_REQUEST_STATUS_LABELS: Record<string, string> = {
   rejected: "Rejected",
 };
 
-export function formatShiftRequestStatusLabel(
-  status: string | null | undefined,
-): string {
+export function formatShiftRequestStatusLabel(status: string | null | undefined): string {
   if (!status) return "Unknown";
   return SHIFT_REQUEST_STATUS_LABELS[status] ?? formatClientLabel(status);
 }
@@ -75,9 +69,7 @@ const BILLING_STATUS_LABELS: Record<string, string> = {
   unpaid: "Unpaid",
 };
 
-export function formatBillingStatusLabel(
-  status: string | null | undefined,
-): string {
+export function formatBillingStatusLabel(status: string | null | undefined): string {
   if (!status) return "Not connected";
   return BILLING_STATUS_LABELS[status] ?? formatClientLabel(status);
 }

@@ -12,9 +12,7 @@ export function NotificationsPanel({ isGridmaster }: NotificationsPanelProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <SectionCard>
-        <NotificationPreferences
-          visibleCategories={isGridmaster ? ["system"] : undefined}
-        />
+        <NotificationPreferences visibleCategories={isGridmaster ? ["system"] : undefined} />
       </SectionCard>
     </div>
   );

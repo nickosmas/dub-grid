@@ -72,9 +72,7 @@ export function BottomSheetModal({
               {children}
             </ScrollView>
           ) : (
-            <View style={[styles.body, footer ? styles.bodyWithFooter : null]}>
-              {children}
-            </View>
+            <View style={[styles.body, footer ? styles.bodyWithFooter : null]}>{children}</View>
           )}
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </Animated.View>

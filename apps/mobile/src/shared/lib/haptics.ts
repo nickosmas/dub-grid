@@ -6,9 +6,7 @@ export function hapticSelection(): void {
   void Haptics.selectionAsync().catch(() => {});
 }
 
-export function hapticImpact(
-  strength: "light" | "medium" | "heavy" = "light",
-): void {
+export function hapticImpact(strength: "light" | "medium" | "heavy" = "light"): void {
   if (Platform.OS === "web") return;
   const style =
     strength === "heavy"

@@ -13,8 +13,7 @@ vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
-    requireAuthenticatedUserWithClaims(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: {},

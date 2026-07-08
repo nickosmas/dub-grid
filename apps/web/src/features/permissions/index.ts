@@ -6,8 +6,5 @@ export {
   unionPermissions,
 } from "./core";
 export type { PermissionContext } from "./core";
-export {
-  buildPerms,
-  getPermissionsFromSession,
-} from "./shared";
+export { buildPerms, getPermissionsFromSession } from "./shared";
 export type { Permissions } from "./shared";

@@ -3,11 +3,9 @@ export function mergeDraftChangedBroadcastPayload(
   next: Record<string, unknown>,
 ): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...current, ...next };
-  const currentShifts =
-    (current.shifts as Record<string, unknown> | undefined) ?? {};
+  const currentShifts = (current.shifts as Record<string, unknown> | undefined) ?? {};
   const nextShifts = (next.shifts as Record<string, unknown> | undefined) ?? {};
-  const currentNotes =
-    (current.notes as Record<string, unknown> | undefined) ?? {};
+  const currentNotes = (current.notes as Record<string, unknown> | undefined) ?? {};
   const nextNotes = (next.notes as Record<string, unknown> | undefined) ?? {};
 
   if (Object.keys(currentShifts).length || Object.keys(nextShifts).length) {

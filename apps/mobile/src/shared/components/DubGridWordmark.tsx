@@ -26,11 +26,7 @@ export function DubGridWordmark({
   return (
     <Text
       {...rest}
-      style={[
-        styles.wordmark,
-        { fontSize, color, letterSpacing: fontSize * -0.02 },
-        style,
-      ]}
+      style={[styles.wordmark, { fontSize, color, letterSpacing: fontSize * -0.02 }, style]}
     >
       dubgrid
     </Text>

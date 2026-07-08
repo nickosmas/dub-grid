@@ -44,8 +44,7 @@ export function ConfirmationModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const isDestructive =
-    confirmTone === "danger" || confirmTone === "dangerFilled";
+  const isDestructive = confirmTone === "danger" || confirmTone === "dangerFilled";
 
   const handleConfirm = () => {
     if (isDestructive) {
@@ -94,12 +93,7 @@ export function ConfirmationModal({
             {children}
           </View>
           <View style={styles.actions}>
-            <Button
-              disabled={loading}
-              label={cancelLabel}
-              onPress={handleCancel}
-              tone="neutral"
-            />
+            <Button disabled={loading} label={cancelLabel} onPress={handleCancel} tone="neutral" />
             <Button
               label={confirmLabel}
               loading={loading}

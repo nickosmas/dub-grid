@@ -49,8 +49,7 @@ import {
   formatProfileValue,
 } from "../components/ProfilePrimitives";
 
-const PENDING_PROFILE_CHANGE_MESSAGE =
-  "A profile change request is pending admin review.";
+const PENDING_PROFILE_CHANGE_MESSAGE = "A profile change request is pending admin review.";
 
 type LinkedEmployee = NonNullable<MobileProfileResponse["linkedEmployee"]>;
 
@@ -95,9 +94,9 @@ export default function ProfileWorkScreen() {
   const { pushToast } = useToast();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
-  const [pendingConfirmation, setPendingConfirmation] = useState<
-    "save" | "discardCancel" | null
-  >(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<"save" | "discardCancel" | null>(
+    null,
+  );
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
     queryFn: () => getProfile(accessToken!),
@@ -107,30 +106,26 @@ export default function ProfileWorkScreen() {
   const manualRefresh = useManualRefresh(() => profileQuery.refetch());
   const profile = profileQuery.data ?? null;
   const linkedEmployee = profile?.linkedEmployee ?? null;
-  const canEditProfileDirectly = Boolean(
-    bootstrapQuery.data?.permissions.canManageEmployees,
-  );
+  const canEditProfileDirectly = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const isNameRequest = Boolean(
     !canEditProfileDirectly &&
-      profile &&
-      draft &&
-      (draft.firstName.trim() !== (profile.user.firstName ?? "").trim() ||
-        draft.lastName.trim() !== (profile.user.lastName ?? "").trim()),
+    profile &&
+    draft &&
+    (draft.firstName.trim() !== (profile.user.firstName ?? "").trim() ||
+      draft.lastName.trim() !== (profile.user.lastName ?? "").trim()),
   );
   const hasOtherChanges = Boolean(
     profile &&
-      draft &&
-      (draft.email.trim().toLowerCase() !==
-        (profile.user.email ?? "").trim().toLowerCase() ||
-        (linkedEmployee && draft.phone.trim() !== (linkedEmployee.phone ?? ""))),
+    draft &&
+    (draft.email.trim().toLowerCase() !== (profile.user.email ?? "").trim().toLowerCase() ||
+      (linkedEmployee && draft.phone.trim() !== (linkedEmployee.phone ?? ""))),
   );
   const contentState = getMobileQueryContentState({
     hasData: Boolean(profile),
     isLoading: profileQuery.isLoading,
     error: profileQuery.error,
   });
-  const focusAreas =
-    bootstrapQuery.data?.focusAreas ?? profile?.focusAreas ?? [];
+  const focusAreas = bootstrapQuery.data?.focusAreas ?? profile?.focusAreas ?? [];
   const roles = bootstrapQuery.data?.roles ?? [];
   const certifications = bootstrapQuery.data?.certifications ?? [];
   const focusAreaNames =
@@ -146,8 +141,8 @@ export default function ProfileWorkScreen() {
   const certificationName = linkedEmployee
     ? linkedEmployee.certificationId == null
       ? "None"
-      : (certifications.find((item) => item.id === linkedEmployee.certificationId)
-          ?.name ?? "Not set")
+      : (certifications.find((item) => item.id === linkedEmployee.certificationId)?.name ??
+        "Not set")
     : "Not set";
 
   useEffect(() => {
@@ -292,10 +287,7 @@ export default function ProfileWorkScreen() {
   }
 
   return (
-    <Screen
-      refreshing={manualRefresh.isRefreshing}
-      onRefresh={manualRefresh.refresh}
-    >
+    <Screen refreshing={manualRefresh.isRefreshing} onRefresh={manualRefresh.refresh}>
       {contentState.kind === "loading" ? (
         <DetailSkeleton sections={3} />
       ) : contentState.kind === "error" ? (
@@ -319,10 +311,7 @@ export default function ProfileWorkScreen() {
       ) : (
         <>
           {profile.pendingProfileChangeRequest ? (
-            <StatusBanner
-              body={PENDING_PROFILE_CHANGE_MESSAGE}
-              title="Request pending"
-            />
+            <StatusBanner body={PENDING_PROFILE_CHANGE_MESSAGE} title="Request pending" />
           ) : null}
 
           <ProfileSection title="Organization">
@@ -358,23 +347,13 @@ export default function ProfileWorkScreen() {
               onDiscard={discardChanges}
               onSave={() => {
                 if (!profile || !draft) return;
-                const firstNameError = getStaffNameError(
-                  draft.firstName,
-                  "First name",
-                );
-                const lastNameError = getStaffNameError(
-                  draft.lastName,
-                  "Last name",
-                );
+                const firstNameError = getStaffNameError(draft.firstName, "First name");
+                const lastNameError = getStaffNameError(draft.lastName, "Last name");
                 const emailError = getRequiredStaffEmailError(draft.email);
-                const phoneError = linkedEmployee
-                  ? getOptionalUsPhoneError(draft.phone)
-                  : null;
+                const phoneError = linkedEmployee ? getOptionalUsPhoneError(draft.phone) : null;
                 const requestNoteError = getStaffNotesError(draft.requestNote);
                 const focusAreaError =
-                  canEditProfileDirectly &&
-                  linkedEmployee &&
-                  draft.focusAreaIds.length === 0
+                  canEditProfileDirectly && linkedEmployee && draft.focusAreaIds.length === 0
                     ? `Select at least one ${profile.currentOrg.labels.focusArea}.`
                     : null;
                 const firstError =
@@ -463,19 +442,13 @@ export default function ProfileWorkScreen() {
                     <ProfileInfoRow
                       iconName="albums-outline"
                       label={profile.currentOrg.labels.focusArea}
-                      value={
-                        focusAreaNames.length > 0
-                          ? focusAreaNames.join(", ")
-                          : "Not set"
-                      }
+                      value={focusAreaNames.length > 0 ? focusAreaNames.join(", ") : "Not set"}
                     />
                     <ProfileInfoRow
                       iconName="people-circle-outline"
                       isLast
                       label={profile.currentOrg.labels.role}
-                      value={
-                        roleNames.length > 0 ? roleNames.join(", ") : "Not set"
-                      }
+                      value={roleNames.length > 0 ? roleNames.join(", ") : "Not set"}
                     />
                   </ProfileList>
                 </ProfileSection>
@@ -494,12 +467,7 @@ export default function ProfileWorkScreen() {
               )}
 
               <View style={styles.actionsRow}>
-                <Button
-                  compact
-                  label="Edit"
-                  onPress={startEditing}
-                  tone="secondary"
-                />
+                <Button compact label="Edit" onPress={startEditing} tone="secondary" />
               </View>
             </>
           )}
@@ -522,9 +490,7 @@ export default function ProfileWorkScreen() {
           setPendingConfirmation(null);
           saveMutation.mutate();
         }}
-        title={
-          isNameRequest ? "Send name change request?" : "Save these changes?"
-        }
+        title={isNameRequest ? "Send name change request?" : "Save these changes?"}
         visible={pendingConfirmation === "save"}
       />
       <ConfirmationModal
@@ -611,33 +577,26 @@ function EditPanel({
   const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
 
   const nameChanged =
-    draft.firstName.trim() !== originalFirstName ||
-    draft.lastName.trim() !== originalLastName;
-  const emailChanged =
-    draft.email.trim().toLowerCase() !== originalEmail.trim().toLowerCase();
+    draft.firstName.trim() !== originalFirstName || draft.lastName.trim() !== originalLastName;
+  const emailChanged = draft.email.trim().toLowerCase() !== originalEmail.trim().toLowerCase();
   const phoneChanged = hasLinkedEmployee && draft.phone.trim() !== originalPhone;
   const workChanged = Boolean(
     originalWork &&
-      (draft.employmentType !== originalWork.employmentType ||
-        draft.certificationId !== originalWork.certificationId ||
-        !arrayEqual(draft.focusAreaIds, originalWork.focusAreaIds) ||
-        !arrayEqual(draft.roleIds, originalWork.roleIds)),
+    (draft.employmentType !== originalWork.employmentType ||
+      draft.certificationId !== originalWork.certificationId ||
+      !arrayEqual(draft.focusAreaIds, originalWork.focusAreaIds) ||
+      !arrayEqual(draft.roleIds, originalWork.roleIds)),
   );
   const hasChanges = nameChanged || emailChanged || phoneChanged || workChanged;
 
-  const setField = <K extends keyof ProfileDraft>(
-    key: K,
-    value: ProfileDraft[K],
-  ) => {
+  const setField = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => {
     onChange({ ...draft, [key]: value });
   };
   const toggle = (key: "focusAreaIds" | "roleIds", id: number) => {
     const current = draft[key];
     setField(
       key,
-      current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id],
+      current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     );
   };
 
@@ -721,9 +680,7 @@ function EditPanel({
                 ]}
                 label="Employment"
                 selectedIds={[draft.employmentType === "part_time" ? 1 : 0]}
-                onToggle={(id) =>
-                  setField("employmentType", id === 1 ? "part_time" : "full_time")
-                }
+                onToggle={(id) => setField("employmentType", id === 1 ? "part_time" : "full_time")}
               />
               <ProfileChoiceGroup
                 items={[
@@ -735,12 +692,8 @@ function EditPanel({
                   })),
                 ]}
                 label={certificationLabel}
-                selectedIds={
-                  draft.certificationId == null ? [-1] : [draft.certificationId]
-                }
-                onToggle={(id) =>
-                  setField("certificationId", id === -1 ? null : id)
-                }
+                selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
+                onToggle={(id) => setField("certificationId", id === -1 ? null : id)}
               />
             </ProfilePanel>
           </ProfileSection>

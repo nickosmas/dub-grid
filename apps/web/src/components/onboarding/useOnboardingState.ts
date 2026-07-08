@@ -52,8 +52,7 @@ export function useOnboardingState(
   // orientation when org setup completes), the persisted index can exceed
   // steps.length - 1. Reading steps[currentStepIndex] would be undefined and
   // crash the consumer on currentStep.id.
-  const safeStepIndex =
-    steps.length === 0 ? 0 : Math.min(currentStepIndex, steps.length - 1);
+  const safeStepIndex = steps.length === 0 ? 0 : Math.min(currentStepIndex, steps.length - 1);
 
   // Align the underlying state when it drifts so goNext/goBack work from the
   // clamped position on the next interaction rather than burning clicks.
@@ -88,10 +87,11 @@ export function useOnboardingState(
     localStorage.removeItem(key);
     // Synchronously update cache (not invalidate) to avoid async refetch race
     // that flashes the underlying route before navigation completes
-    queryClient.setQueryData(
-      ["onboarding-status", userId, orgId],
-      { completed: true, completedAt: new Date().toISOString(), tooltipToursCompleted: {} },
-    );
+    queryClient.setQueryData(["onboarding-status", userId, orgId], {
+      completed: true,
+      completedAt: new Date().toISOString(),
+      tooltipToursCompleted: {},
+    });
     // Session guard: survives remounts/refetches so no wizard re-appears after
     // completion this session (e.g. the config→orientation double-show).
     markOnboardingComplete(userId, orgId);

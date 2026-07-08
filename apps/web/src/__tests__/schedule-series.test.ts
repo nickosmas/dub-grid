@@ -66,8 +66,8 @@ describe("createShiftSeries", () => {
       if (table === "jobs") {
         return {
           select: vi.fn(() => ({
-	            eq: vi.fn(() => ({
-	              order: vi.fn().mockResolvedValue({
+            eq: vi.fn(() => ({
+              order: vi.fn().mockResolvedValue({
                 data: [
                   {
                     id: 88,

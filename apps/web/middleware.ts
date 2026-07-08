@@ -69,9 +69,7 @@ interface JWTClaims {
  * Gridmaster platform_role takes precedence over org_role.
  */
 export function calculateEffectiveRole(claims: JWTClaims): string {
-  return claims.platform_role === "gridmaster"
-    ? "gridmaster"
-    : claims.org_role ?? "user";
+  return claims.platform_role === "gridmaster" ? "gridmaster" : (claims.org_role ?? "user");
 }
 
 /**
@@ -120,7 +118,9 @@ export async function middleware(req: NextRequest) {
     base-uri 'none';
     form-action 'self';
     ${isDev ? "" : "upgrade-insecure-requests;"}
-  `.replace(/\s{2,}/g, " ").trim();
+  `
+      .replace(/\s{2,}/g, " ")
+      .trim();
 
   // Static/public pages keep 'unsafe-inline'.
   const contentSecurityPolicyHeaderValue = buildCsp(
@@ -138,9 +138,20 @@ export async function middleware(req: NextRequest) {
   // Marketing pages should only render on the apex domain — redirect
   // any subdomain (including nonsense slugs) back to the bare domain.
   if (subdomain && subdomain !== "gridmaster") {
-    const isMarketingPage = pathname === "/" || pathname === "/privacy" || pathname === "/terms" || pathname === "/request-demo";
+    const isMarketingPage =
+      pathname === "/" ||
+      pathname === "/privacy" ||
+      pathname === "/terms" ||
+      pathname === "/request-demo";
     if (isMarketingPage) {
+      // Explicitly set both pathname and host from already-trusted values
+      // (pathname, parsedHost) rather than relying on req.url's own host —
+      // under self-hosted `next start`, req.url reports the server's bind
+      // address (e.g. "localhost:3000") instead of the real incoming Host,
+      // so mutating only .host on it is a no-op and this would otherwise
+      // redirect to itself forever.
       const url = new URL(req.url);
+      url.pathname = pathname;
       url.host = `${parsedHost.rootDomain}${parsedHost.port}`;
       const res = NextResponse.redirect(url);
       res.headers.set("Content-Security-Policy", contentSecurityPolicyHeaderValue);
@@ -198,15 +209,15 @@ export async function middleware(req: NextRequest) {
           return req.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            res.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
         },
       },
-    }
+    },
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   // Unauthenticated redirect - Requirement 11.4
   if (!session) {
@@ -251,7 +262,8 @@ export async function middleware(req: NextRequest) {
   // from the caller's profile so route guards still work.
   // Gridmaster legitimately has no org_id/org_slug — skip fallback for them.
   const isGridmaster = claims.platform_role === "gridmaster";
-  const subdomainMismatch = !isGridmaster && subdomain && subdomain !== "gridmaster" && claims.org_slug !== subdomain;
+  const subdomainMismatch =
+    !isGridmaster && subdomain && subdomain !== "gridmaster" && claims.org_slug !== subdomain;
 
   if (
     !claims.platform_role ||
@@ -263,18 +275,16 @@ export async function middleware(req: NextRequest) {
 
     try {
       // 1. Fetch platform role from profile (Redis-cached, 30s TTL)
-      const profile = await timer.time("mw_profile", () => cacheThrough(
-        CacheKey.mwProfile(userId),
-        TTL.MIDDLEWARE,
-        async () => {
+      const profile = await timer.time("mw_profile", () =>
+        cacheThrough(CacheKey.mwProfile(userId), TTL.MIDDLEWARE, async () => {
           const { data } = await supabase
             .from("profiles")
             .select("platform_role, org_id")
             .eq("id", userId)
             .maybeSingle();
           return data;
-        },
-      ));
+        }),
+      );
 
       // 2. Fetch org-specific role for the current subdomain (Redis-cached, 30s TTL)
       let resolvedOrgRole = "user";
@@ -282,10 +292,8 @@ export async function middleware(req: NextRequest) {
       let resolvedOrgSlug: string | undefined = undefined;
 
       if (subdomain && subdomain !== "gridmaster") {
-        const membership = await timer.time("mw_membership", () => cacheThrough(
-          CacheKey.mwMembership(userId, subdomain),
-          TTL.MIDDLEWARE,
-          async () => {
+        const membership = await timer.time("mw_membership", () =>
+          cacheThrough(CacheKey.mwMembership(userId, subdomain), TTL.MIDDLEWARE, async () => {
             const { data } = await supabase
               .from("organization_memberships")
               .select("org_role, org_id, organizations!inner(slug)")
@@ -293,8 +301,8 @@ export async function middleware(req: NextRequest) {
               .eq("organizations.slug", subdomain)
               .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
             return data;
-          },
-        ));
+          }),
+        );
 
         if (membership) {
           resolvedOrgRole = membership.org_role;
@@ -332,18 +340,12 @@ export async function middleware(req: NextRequest) {
   if (isGridmaster) {
     const rawCookie = req.headers.get("cookie") ?? "";
     const impCookiePrefix = "dubgrid-impersonation=";
-    const impCookie = rawCookie
-      .split("; ")
-      .find((c) => c.startsWith(impCookiePrefix));
+    const impCookie = rawCookie.split("; ").find((c) => c.startsWith(impCookiePrefix));
 
     if (impCookie) {
       try {
-        const impData = JSON.parse(
-          decodeURIComponent(impCookie.slice(impCookiePrefix.length)),
-        );
-        const expired =
-          !impData.expiresAt ||
-          new Date(impData.expiresAt).getTime() <= Date.now();
+        const impData = JSON.parse(decodeURIComponent(impCookie.slice(impCookiePrefix.length)));
+        const expired = !impData.expiresAt || new Date(impData.expiresAt).getTime() <= Date.now();
 
         if (expired) {
           // Clear expired cookie
@@ -399,14 +401,16 @@ export async function middleware(req: NextRequest) {
             const svc = createClient(supabaseUrl2, serviceKey, {
               auth: { autoRefreshToken: false, persistSession: false },
             });
-            const { data } = await timer.time("mw_sandbox", async () => svc
-              .from("organizations")
-              .select("id, slug")
-              .eq("id", sandboxCookie.sandboxOrgId)
-              .eq("workspace_kind", "sandbox")
-              .eq("sandbox_owner_user_id", session?.user?.id)
-              .is("archived_at", null)
-              .maybeSingle());
+            const { data } = await timer.time("mw_sandbox", async () =>
+              svc
+                .from("organizations")
+                .select("id, slug")
+                .eq("id", sandboxCookie.sandboxOrgId)
+                .eq("workspace_kind", "sandbox")
+                .eq("sandbox_owner_user_id", session?.user?.id)
+                .is("archived_at", null)
+                .maybeSingle(),
+            );
             if (data) {
               isInSandbox = true;
               claims = {
@@ -443,18 +447,16 @@ export async function middleware(req: NextRequest) {
   // Skip for gridmasters (they manage suspended orgs) and impersonation.
   if (claims.org_id && !isGridmaster && !isImpersonating) {
     try {
-      const orgAccess = await timer.time("mw_org_access", () => cacheThrough(
-        CacheKey.mwOrgAccess(claims.org_id!),
-        TTL.MIDDLEWARE,
-        async () => {
+      const orgAccess = await timer.time("mw_org_access", () =>
+        cacheThrough(CacheKey.mwOrgAccess(claims.org_id!), TTL.MIDDLEWARE, async () => {
           const { data } = await supabase
             .from("organizations")
             .select("suspended_at, archived_at, subscription_status, trial_ends_at")
             .eq("id", claims.org_id!)
             .maybeSingle();
           return data ?? null;
-        },
-      ));
+        }),
+      );
 
       // A deleted (archived) org revokes access just like a suspended one. A
       // user with a pre-deletion JWT can still hit the app until it clears, so
@@ -476,13 +478,11 @@ export async function middleware(req: NextRequest) {
         trialEndsAt: orgAccess?.trial_ends_at ?? null,
       });
 
-      const canRecoverBilling =
-        getRoleLevel(effectiveRole) >= ROLE_HIERARCHY.super_admin;
+      const canRecoverBilling = getRoleLevel(effectiveRole) >= ROLE_HIERARCHY.super_admin;
 
       if (billingAccess.isLocked) {
         const isBillingRecoveryPath =
-          pathname === "/settings" &&
-          req.nextUrl.searchParams.get("section") === "org-billing";
+          pathname === "/settings" && req.nextUrl.searchParams.get("section") === "org-billing";
 
         if (canRecoverBilling && !isBillingRecoveryPath) {
           const billingUrl = new URL("/settings", req.url);
@@ -527,7 +527,12 @@ export async function middleware(req: NextRequest) {
 
   // Redirect /gridmaster to /dashboard on the gridmaster subdomain.
   // The gridmaster portal renders at /dashboard when the user is a gridmaster.
-  if (isGridmaster && !isImpersonating && pathname.startsWith("/gridmaster") && subdomain !== "gridmaster") {
+  if (
+    isGridmaster &&
+    !isImpersonating &&
+    pathname.startsWith("/gridmaster") &&
+    subdomain !== "gridmaster"
+  ) {
     const gridmasterHost = buildSubdomainHost("gridmaster", parsedHost);
     const url = new URL(req.url);
     url.host = gridmasterHost;
@@ -573,5 +578,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next|favicon\\.ico|api|monitoring|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)"],
+  matcher: [
+    "/((?!_next|favicon\\.ico|api|monitoring|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|css|js|woff2?|ttf|eot|txt)$).*)",
+  ],
 };

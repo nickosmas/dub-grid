@@ -67,10 +67,7 @@ export async function deliverMobilePushNotifications(
     payload: MobilePushPayload;
   },
   deps: {
-    fetchPushTokens: (input: {
-      userId: string;
-      orgId: string;
-    }) => Promise<MobilePushToken[]>;
+    fetchPushTokens: (input: { userId: string; orgId: string }) => Promise<MobilePushToken[]>;
     sendMessages: (
       messages: MobileExpoPushMessage[],
     ) => Promise<{ ok: boolean; status?: number | null }>;
@@ -98,9 +95,6 @@ export async function deliverMobilePushNotifications(
 
   const result = await deps.sendMessages(messages);
   if (!result.ok) {
-    throw new MobilePushDeliveryError(
-      "Expo push delivery failed",
-      result.status,
-    );
+    throw new MobilePushDeliveryError("Expo push delivery failed", result.status);
   }
 }

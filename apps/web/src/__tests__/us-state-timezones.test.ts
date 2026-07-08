@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { US_STATES } from "@/lib/us-states";
-import {
-  US_STATE_DEFAULT_TIMEZONE,
-  getTimezoneForUsState,
-} from "@/lib/us-state-timezones";
+import { US_STATE_DEFAULT_TIMEZONE, getTimezoneForUsState } from "@/lib/us-state-timezones";
 
 const VALID_TZ = (() => {
   if (typeof Intl.supportedValuesOf !== "function") return null;

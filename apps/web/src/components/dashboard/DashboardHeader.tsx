@@ -4,20 +4,7 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -85,11 +72,7 @@ export default function DashboardHeader({
     : VIEW_MODES;
   const isMobile = useMediaQuery(MOBILE);
   const todayLabel =
-    viewMode === "day"
-      ? "Today"
-      : viewMode === "week"
-        ? "This week"
-        : "Current period";
+    viewMode === "day" ? "Today" : viewMode === "week" ? "This week" : "Current period";
 
   const dateLabel = formatDateRange(periodStart, periodEnd, viewMode);
 
@@ -122,7 +105,16 @@ export default function DashboardHeader({
               }}
               aria-label="Go to previous period"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
@@ -155,7 +147,16 @@ export default function DashboardHeader({
               }}
               aria-label="Go to next period"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <polyline points="9 18 15 12 9 6" />
               </svg>
             </button>
@@ -309,7 +310,6 @@ export default function DashboardHeader({
           />
         ) : null}
       </div>
-
     </div>
   );
 }
@@ -326,11 +326,7 @@ function ViewModeTabs({
   style?: CSSProperties;
 }) {
   return (
-    <div
-      data-tour="dashboard-view-mode"
-      className="dg-span-tabs dg-span-tabs--light"
-      style={style}
-    >
+    <div data-tour="dashboard-view-mode" className="dg-span-tabs dg-span-tabs--light" style={style}>
       {modes.map((m, i) => {
         const isActive = viewMode === m.value;
         const prevActive = i > 0 && viewMode === modes[i - 1].value;
@@ -342,9 +338,7 @@ function ViewModeTabs({
                 style={{
                   width: 1,
                   height: 16,
-                  background: showDivider
-                    ? "var(--color-border)"
-                    : "transparent",
+                  background: showDivider ? "var(--color-border)" : "transparent",
                   flexShrink: 0,
                   alignSelf: "center",
                 }}

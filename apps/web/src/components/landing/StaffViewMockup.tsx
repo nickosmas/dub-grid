@@ -13,13 +13,37 @@ type Tone = "success" | "warning" | "danger" | "neutral";
 
 /* ── StatusPill tone palette — mirrors components/ui/status-pill.tsx ── */
 const TONES: Record<Tone, { bg: string; text: string; border: string }> = {
-  success: { bg: "var(--color-success-bg)", text: "var(--color-success-text)", border: "var(--color-success-border)" },
-  warning: { bg: "var(--color-warning-bg)", text: "var(--color-warning-text)", border: "var(--color-warning-border)" },
-  danger:  { bg: "var(--color-danger-bg)",  text: "var(--color-danger-text)",  border: "var(--color-danger-border)" },
-  neutral: { bg: "var(--color-bg-secondary)", text: "var(--color-text-secondary)", border: "var(--color-border-light)" },
+  success: {
+    bg: "var(--color-success-bg)",
+    text: "var(--color-success-text)",
+    border: "var(--color-success-border)",
+  },
+  warning: {
+    bg: "var(--color-warning-bg)",
+    text: "var(--color-warning-text)",
+    border: "var(--color-warning-border)",
+  },
+  danger: {
+    bg: "var(--color-danger-bg)",
+    text: "var(--color-danger-text)",
+    border: "var(--color-danger-border)",
+  },
+  neutral: {
+    bg: "var(--color-bg-secondary)",
+    text: "var(--color-text-secondary)",
+    border: "var(--color-border-light)",
+  },
 };
 
-function StatusPill({ tone = "neutral", children, dot }: { tone?: Tone; children: React.ReactNode; dot?: boolean }) {
+function StatusPill({
+  tone = "neutral",
+  children,
+  dot,
+}: {
+  tone?: Tone;
+  children: React.ReactNode;
+  dot?: boolean;
+}) {
   const vars = TONES[tone];
   const showDot = dot ?? tone !== "neutral";
   return (
@@ -170,7 +194,9 @@ export default function StaffViewMockup() {
                 fontSize: 13,
                 fontWeight: tab.active ? 600 : 500,
                 color: tab.active ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                borderBottom: tab.active ? "2px solid var(--color-text-primary)" : "2px solid transparent",
+                borderBottom: tab.active
+                  ? "2px solid var(--color-text-primary)"
+                  : "2px solid transparent",
                 cursor: "default",
                 display: "flex",
                 alignItems: "center",
@@ -438,7 +464,16 @@ export default function StaffViewMockup() {
               color: "var(--color-text-faint)",
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="9 6 15 12 9 18" />
             </svg>
           </div>

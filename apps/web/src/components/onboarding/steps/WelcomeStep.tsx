@@ -2,12 +2,7 @@
 
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { useOrganizationData, useOrgClaims } from "@/hooks";
-import {
-  CalendarDays,
-  Users,
-  LayoutDashboard,
-  Shield,
-} from "lucide-react";
+import { CalendarDays, Users, LayoutDashboard, Shield } from "lucide-react";
 
 interface WelcomeStepProps {
   role: string;
@@ -15,10 +10,7 @@ interface WelcomeStepProps {
   isOrgSetup?: boolean;
 }
 
-const featureCards: Record<
-  string,
-  { icon: React.ReactNode; title: string; desc: string }[]
-> = {
+const featureCards: Record<string, { icon: React.ReactNode; title: string; desc: string }[]> = {
   super_admin: [
     {
       icon: <LayoutDashboard size={20} />,

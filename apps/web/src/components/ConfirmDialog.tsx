@@ -39,20 +39,14 @@ export default function ConfirmDialog({
   secondaryConfirmDisabled = false,
 }: ConfirmDialogProps) {
   const confirmClass =
-    variant === "danger"
-      ? "dg-btn dg-btn-danger-filled"
-      : "dg-btn dg-btn-primary";
+    variant === "danger" ? "dg-btn dg-btn-danger-filled" : "dg-btn dg-btn-primary";
 
   const confirmStyle: React.CSSProperties | undefined =
-    variant === "warning"
-      ? { background: "var(--color-warning)", border: "none" }
-      : undefined;
+    variant === "warning" ? { background: "var(--color-warning)", border: "none" } : undefined;
 
   const descId = "confirm-dialog-desc";
   const actionDisabled = isLoading || isSecondaryLoading;
-  const cancelButtonStyle = wrapActions
-    ? { marginRight: "auto", minWidth: 120 }
-    : undefined;
+  const cancelButtonStyle = wrapActions ? { marginRight: "auto", minWidth: 120 } : undefined;
   const confirmButtonStyle = wrapActions
     ? {
         ...confirmStyle,
@@ -61,12 +55,7 @@ export default function ConfirmDialog({
     : confirmStyle;
 
   return (
-    <Modal
-      title={title}
-      onClose={onCancel}
-      style={{ maxWidth }}
-      aria-describedby={descId}
-    >
+    <Modal title={title} onClose={onCancel} style={{ maxWidth }} aria-describedby={descId}>
       <div
         id={descId}
         style={{
@@ -101,7 +90,9 @@ export default function ConfirmDialog({
           onClick={onConfirm}
           disabled={actionDisabled || confirmDisabled}
         >
-          <ButtonLoading loading={isLoading} spinnerSize={16}>{confirmLabel}</ButtonLoading>
+          <ButtonLoading loading={isLoading} spinnerSize={16}>
+            {confirmLabel}
+          </ButtonLoading>
         </button>
         {secondaryConfirmLabel && onSecondaryConfirm && (
           <button
@@ -110,7 +101,9 @@ export default function ConfirmDialog({
             onClick={onSecondaryConfirm}
             disabled={actionDisabled || secondaryConfirmDisabled}
           >
-            <ButtonLoading loading={isSecondaryLoading} spinnerSize={16}>{secondaryConfirmLabel}</ButtonLoading>
+            <ButtonLoading loading={isSecondaryLoading} spinnerSize={16}>
+              {secondaryConfirmLabel}
+            </ButtonLoading>
           </button>
         )}
       </div>

@@ -46,8 +46,7 @@ export default function BillingRequiredPage() {
             fontWeight: 600,
           }}
         >
-          Your organization will be available once your organization administrator
-          finishes setup.
+          Your organization will be available once your organization administrator finishes setup.
         </p>
       </section>
     </main>

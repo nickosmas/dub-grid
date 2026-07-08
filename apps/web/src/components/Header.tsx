@@ -13,7 +13,14 @@ import {
   SettingsIcon,
   type NavIconProps,
 } from "@/components/icons/NavIcons";
-import { useLogout, usePermissions, setUserViewActive, useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import {
+  useLogout,
+  usePermissions,
+  setUserViewActive,
+  useMediaQuery,
+  MOBILE,
+  TABLET,
+} from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
 import { fetchAccountIdentity } from "@/features/account/client";
 import { fetchOrganizationBilling } from "@/features/billing/client";
@@ -32,7 +39,6 @@ import {
   fetchOrganizationBootstrap,
   type OrganizationBootstrap,
 } from "@/features/organization/client/api";
-
 
 type NavIconComponent = React.ComponentType<NavIconProps>;
 
@@ -62,9 +68,7 @@ interface BillingNotice {
   tone: BillingNoticeTone;
 }
 
-function formatHeaderBillingNotice(
-  billing: OrganizationBillingSummary,
-): BillingNotice | null {
+function formatHeaderBillingNotice(billing: OrganizationBillingSummary): BillingNotice | null {
   const { billingAccess } = billing;
 
   if (billingAccess.isLocked) {
@@ -129,21 +133,13 @@ function formatHeaderBillingNotice(
   };
 }
 
-function HeaderBillingNotice({
-  orgId,
-  compact = false,
-}: {
-  orgId: string;
-  compact?: boolean;
-}) {
+function HeaderBillingNotice({ orgId, compact = false }: { orgId: string; compact?: boolean }) {
   const billingQuery = useQuery({
     queryKey: queryKeys.org.billing(orgId),
     queryFn: () => fetchOrganizationBilling(orgId),
     staleTime: 30_000,
   });
-  const notice = billingQuery.data
-    ? formatHeaderBillingNotice(billingQuery.data)
-    : null;
+  const notice = billingQuery.data ? formatHeaderBillingNotice(billingQuery.data) : null;
 
   if (!notice) return null;
 
@@ -240,7 +236,17 @@ export default function Header({ orgName }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useLogout();
-  const { orgId, isGridmaster, role, canViewStaff, canAccessSettings, isSuperAdmin, isImpersonating, isUserViewActive, actualLevel } = usePermissions();
+  const {
+    orgId,
+    isGridmaster,
+    role,
+    canViewStaff,
+    canAccessSettings,
+    isSuperAdmin,
+    isImpersonating,
+    isUserViewActive,
+    actualLevel,
+  } = usePermissions();
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
 
@@ -287,14 +293,9 @@ export default function Header({ orgName }: HeaderProps) {
     staleTime: 60_000,
     enabled: Boolean(authUser),
   });
-  const isInSandbox =
-    sandboxBootstrapQuery.data?.org?.workspaceKind === "sandbox";
+  const isInSandbox = sandboxBootstrapQuery.data?.org?.workspaceKind === "sandbox";
   const canOpenSandbox =
-    Boolean(authUser) &&
-    !isImpersonating &&
-    !isUserViewActive &&
-    !isInSandbox &&
-    actualLevel >= 2;
+    Boolean(authUser) && !isImpersonating && !isUserViewActive && !isInSandbox && actualLevel >= 2;
 
   // Hydrate cached name from sessionStorage after mount
   useEffect(() => {
@@ -322,7 +323,9 @@ export default function Header({ orgName }: HeaderProps) {
         setUserName(fallbackName);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [authUser]);
 
   useEffect(() => {
@@ -340,10 +343,7 @@ export default function Header({ orgName }: HeaderProps) {
   const initials = getAvatarInitials(userName, "?");
   const roleLabel = ROLE_LABELS[role] ?? "User";
   const canShowBillingNotice =
-    Boolean(orgId) &&
-    !isUserViewActive &&
-    !isImpersonating &&
-    (isSuperAdmin || isGridmaster);
+    Boolean(orgId) && !isUserViewActive && !isImpersonating && (isSuperAdmin || isGridmaster);
 
   const handleSignOut = useCallback(() => {
     // In sandbox mode, signing out would orphan the sandbox, so confirm the
@@ -391,10 +391,7 @@ export default function Header({ orgName }: HeaderProps) {
       <>
         <SandboxBanner />
         {sandboxDialogOpen ? (
-          <CreateSandboxDialog
-            orgName={orgName}
-            onClose={() => setSandboxDialogOpen(false)}
-          />
+          <CreateSandboxDialog orgName={orgName} onClose={() => setSandboxDialogOpen(false)} />
         ) : null}
         {logoutConfirmDialog}
         <div
@@ -413,7 +410,15 @@ export default function Header({ orgName }: HeaderProps) {
             <DubGridLogo size={26} />
             {orgName && (
               <>
-                <span style={{ color: "var(--color-border)", fontSize: "var(--dg-fs-body)", fontWeight: 300, userSelect: "none", flexShrink: 0 }}>
+                <span
+                  style={{
+                    color: "var(--color-border)",
+                    fontSize: "var(--dg-fs-body)",
+                    fontWeight: 300,
+                    userSelect: "none",
+                    flexShrink: 0,
+                  }}
+                >
                   |
                 </span>
                 <MaybeHint content={orgName} side="bottom">
@@ -435,9 +440,7 @@ export default function Header({ orgName }: HeaderProps) {
             )}
           </div>
 
-          {canShowBillingNotice && orgId && (
-            <HeaderBillingNotice orgId={orgId} compact />
-          )}
+          {canShowBillingNotice && orgId && <HeaderBillingNotice orgId={orgId} compact />}
 
           {/* Hamburger */}
           <button
@@ -491,256 +494,348 @@ export default function Header({ orgName }: HeaderProps) {
     <>
       <SandboxBanner />
       {sandboxDialogOpen ? (
-        <CreateSandboxDialog
-          orgName={orgName}
-          onClose={() => setSandboxDialogOpen(false)}
-        />
+        <CreateSandboxDialog orgName={orgName} onClose={() => setSandboxDialogOpen(false)} />
       ) : null}
       {logoutConfirmDialog}
       <div
-      style={{
-        background: "var(--color-surface)",
-        padding: isTablet ? "0 16px" : "0 24px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        height: 56,
-        borderBottom: "1px solid var(--color-border)",
-      }}
-    >
-      {/* Logo + Org Anchor */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexShrink: 0 }}>
-        <DubGridLogo size={30} />
-        <DubGridWordmark fontSize={18} color="var(--color-text-primary)" />
-        {orgName && (
-          <>
-            <span style={{ color: "var(--color-border)", fontSize: "var(--dg-fs-title)", fontWeight: 300, userSelect: "none" }}>
-              |
-            </span>
-            <MaybeHint content={orgName} side="bottom">
-              <span
-                style={{
-                  color: "var(--color-text-muted)",
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 500,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  maxWidth: isTablet ? 160 : 200,
-                }}
-              >
-                {orgName}
-              </span>
-            </MaybeHint>
-          </>
-        )}
-      </div>
-
-      {/* Nav Tabs */}
-      <div
         style={{
+          background: "var(--color-surface)",
+          padding: isTablet ? "0 16px" : "0 24px",
           display: "flex",
-          gap: 4,
           alignItems: "center",
-          flex: 1,
-          justifyContent: "center",
+          justifyContent: "space-between",
+          height: 56,
+          borderBottom: "1px solid var(--color-border)",
         }}
       >
-        {visibleNavItems.map((item) => {
-          const active = activeTab === item.id;
-          const Icon = item.Icon;
-          return (
-            <Link
-              key={item.id}
-              href={item.href}
-              className={`dg-nav-tab${active ? " active" : ""}`}
-            >
-              <Icon size={16} active={active} />
-              {item.label}
-            </Link>
-          );
-        })}
+        {/* Logo + Org Anchor */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flexShrink: 0 }}>
+          <DubGridLogo size={30} />
+          <DubGridWordmark fontSize={18} color="var(--color-text-primary)" />
+          {orgName && (
+            <>
+              <span
+                style={{
+                  color: "var(--color-border)",
+                  fontSize: "var(--dg-fs-title)",
+                  fontWeight: 300,
+                  userSelect: "none",
+                }}
+              >
+                |
+              </span>
+              <MaybeHint content={orgName} side="bottom">
+                <span
+                  style={{
+                    color: "var(--color-text-muted)",
+                    fontSize: "var(--dg-fs-label)",
+                    fontWeight: 500,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    maxWidth: isTablet ? 160 : 200,
+                  }}
+                >
+                  {orgName}
+                </span>
+              </MaybeHint>
+            </>
+          )}
+        </div>
 
-        {isGridmaster && (
+        {/* Nav Tabs */}
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            alignItems: "center",
+            flex: 1,
+            justifyContent: "center",
+          }}
+        >
+          {visibleNavItems.map((item) => {
+            const active = activeTab === item.id;
+            const Icon = item.Icon;
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className={`dg-nav-tab${active ? " active" : ""}`}
+              >
+                <Icon size={16} active={active} />
+                {item.label}
+              </Link>
+            );
+          })}
+
+          {isGridmaster && (
+            <button
+              onClick={() => router.push("/gridmaster")}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                background: "transparent",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-link)",
+                borderRadius: "var(--dg-btn-radius)",
+                padding: "5px 14px",
+                fontSize: "var(--dg-fs-label)",
+                cursor: "pointer",
+                fontWeight: 600,
+                marginLeft: 8,
+                fontFamily: "inherit",
+                transition: "background 150ms ease, border-color 150ms ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--color-bg-secondary)";
+                e.currentTarget.style.borderColor = "var(--color-border)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.borderColor = "var(--color-border)";
+              }}
+            >
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+              Gridmaster
+            </button>
+          )}
+        </div>
+
+        {/* Alerts */}
+        {!isGridmaster && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            {canShowBillingNotice && orgId && <HeaderBillingNotice orgId={orgId} />}
+            <NotificationBell />
+          </div>
+        )}
+        {isGridmaster && canShowBillingNotice && orgId && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <HeaderBillingNotice orgId={orgId} />
+          </div>
+        )}
+        <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
           <button
-            onClick={() => router.push("/gridmaster")}
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label="Account menu"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 4,
-              background: "transparent",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-link)",
+              gap: 8,
+              background: menuOpen ? "var(--color-bg-secondary)" : "transparent",
+              border: "1px solid " + (menuOpen ? "var(--color-border)" : "transparent"),
               borderRadius: "var(--dg-btn-radius)",
-              padding: "5px 14px",
-              fontSize: "var(--dg-fs-label)",
+              padding: "4px 8px 4px 4px",
+              minHeight: 44,
               cursor: "pointer",
-              fontWeight: 600,
-              marginLeft: 8,
               fontFamily: "inherit",
               transition: "background 150ms ease, border-color 150ms ease",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--color-bg-secondary)";
-              e.currentTarget.style.borderColor = "var(--color-border)";
+              if (!menuOpen) {
+                e.currentTarget.style.background = "var(--color-bg-secondary)";
+                e.currentTarget.style.borderColor = "var(--color-border)";
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.borderColor = "var(--color-border)";
+              if (!menuOpen) {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.borderColor = "transparent";
+              }
             }}
           >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              <polyline points="15 3 21 3 21 9" />
-              <line x1="10" y1="14" x2="21" y2="3" />
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: "var(--color-brand)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 700,
+                color: "var(--color-text-inverse)",
+                flexShrink: 0,
+              }}
+            >
+              {initials}
+            </div>
+            <div style={{ textAlign: "left" }}>
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-caption)",
+                  fontWeight: 600,
+                  color: "var(--color-text-primary)",
+                  lineHeight: 1.2,
+                  maxWidth: 120,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {displayName}
+              </div>
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-text-muted)",
+                  lineHeight: 1.2,
+                }}
+              >
+                {roleLabel}
+              </div>
+            </div>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--color-text-muted)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                flexShrink: 0,
+                transition: "transform 150ms ease",
+                transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            >
+              <polyline points="6 9 12 15 18 9" />
             </svg>
-            Gridmaster
           </button>
-        )}
-      </div>
 
-      {/* Alerts */}
-      {!isGridmaster && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {canShowBillingNotice && orgId && (
-            <HeaderBillingNotice orgId={orgId} />
+          {menuOpen && (
+            <div
+              className="dg-menu dg-profile-menu"
+              style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                zIndex: 200,
+              }}
+            >
+              <button
+                className="dg-menu-item"
+                onClick={() => {
+                  setMenuOpen(false);
+                  router.push("/profile");
+                }}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                Profile
+              </button>
+              {canOpenSandbox && (
+                <>
+                  <div className="dg-menu-divider" />
+                  <button
+                    type="button"
+                    className="dg-menu-item"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setSandboxDialogOpen(true);
+                    }}
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="9" y1="3" x2="15" y2="3" />
+                      <path d="M10 3v6.5L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9.5V3" />
+                      <line x1="7" y1="14" x2="17" y2="14" />
+                    </svg>
+                    Test sandbox
+                  </button>
+                </>
+              )}
+              {actualLevel >= 2 && !isImpersonating && (
+                <>
+                  <div className="dg-menu-divider" />
+                  <button
+                    className="dg-menu-item"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setUserViewActive(!isUserViewActive);
+                    }}
+                  >
+                    <svg
+                      width="13"
+                      height="13"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    {isUserViewActive ? "Exit User View" : "View as User"}
+                  </button>
+                </>
+              )}
+              <div className="dg-menu-divider" />
+              <button
+                className="dg-menu-item dg-menu-item--danger"
+                onClick={() => {
+                  setMenuOpen(false);
+                  handleSignOut();
+                }}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Sign out
+              </button>
+            </div>
           )}
-          <NotificationBell />
         </div>
-      )}
-      {isGridmaster && canShowBillingNotice && orgId && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <HeaderBillingNotice orgId={orgId} />
-        </div>
-      )}
-      <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
-        <button
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-label="Account menu"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            background: menuOpen ? "var(--color-bg-secondary)" : "transparent",
-            border: "1px solid " + (menuOpen ? "var(--color-border)" : "transparent"),
-            borderRadius: "var(--dg-btn-radius)",
-            padding: "4px 8px 4px 4px",
-            minHeight: 44,
-            cursor: "pointer",
-            fontFamily: "inherit",
-            transition: "background 150ms ease, border-color 150ms ease",
-          }}
-          onMouseEnter={(e) => {
-            if (!menuOpen) {
-              e.currentTarget.style.background = "var(--color-bg-secondary)";
-              e.currentTarget.style.borderColor = "var(--color-border)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!menuOpen) {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.borderColor = "transparent";
-            }
-          }}
-        >
-          <div style={{
-            width: 28,
-            height: 28,
-            borderRadius: "50%",
-            background: "var(--color-brand)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "var(--dg-fs-footnote)",
-            fontWeight: 700,
-            color: "var(--color-text-inverse)",
-            flexShrink: 0,
-          }}>
-            {initials}
-          </div>
-          <div style={{ textAlign: "left" }}>
-            <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-primary)", lineHeight: 1.2, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {displayName}
-            </div>
-            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", lineHeight: 1.2 }}>
-              {roleLabel}
-            </div>
-          </div>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "transform 150ms ease", transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </button>
-
-        {menuOpen && (
-          <div
-            className="dg-menu dg-profile-menu"
-            style={{
-              position: "absolute",
-              top: "calc(100% + 6px)",
-              right: 0,
-              zIndex: 200,
-            }}
-          >
-            <button
-              className="dg-menu-item"
-              onClick={() => { setMenuOpen(false); router.push("/profile"); }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              Profile
-            </button>
-            {canOpenSandbox && (
-              <>
-                <div className="dg-menu-divider" />
-                <button
-                  type="button"
-                  className="dg-menu-item"
-                  onClick={() => { setMenuOpen(false); setSandboxDialogOpen(true); }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="9" y1="3" x2="15" y2="3" />
-                    <path d="M10 3v6.5L4.5 18a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9.5V3" />
-                    <line x1="7" y1="14" x2="17" y2="14" />
-                  </svg>
-                  Test sandbox
-                </button>
-              </>
-            )}
-            {actualLevel >= 2 && !isImpersonating && (
-              <>
-                <div className="dg-menu-divider" />
-                <button
-                  className="dg-menu-item"
-                  onClick={() => { setMenuOpen(false); setUserViewActive(!isUserViewActive); }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  {isUserViewActive ? "Exit User View" : "View as User"}
-                </button>
-              </>
-            )}
-            <div className="dg-menu-divider" />
-            <button
-              className="dg-menu-item dg-menu-item--danger"
-              onClick={() => { setMenuOpen(false); handleSignOut(); }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-              Sign out
-            </button>
-          </div>
-        )}
       </div>
-    </div>
     </>
   );
 }

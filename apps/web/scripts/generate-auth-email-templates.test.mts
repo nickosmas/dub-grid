@@ -24,12 +24,36 @@ import { EmailChangeEmail } from "../src/emails/auth/EmailChangeEmail";
 import { ReauthenticationEmail } from "../src/emails/auth/ReauthenticationEmail";
 
 const TEMPLATES = [
-  { file: "confirmation.html", Component: ConfirmationEmail, expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"] },
-  { file: "recovery.html", Component: RecoveryEmail, expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"] },
-  { file: "magic_link.html", Component: MagicLinkEmail, expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"] },
-  { file: "invite.html", Component: AuthInviteEmail, expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"] },
-  { file: "email_change.html", Component: EmailChangeEmail, expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"] },
-  { file: "reauthentication.html", Component: ReauthenticationEmail, expects: ["{{ .Token }}", "{{ .SiteURL }}"] },
+  {
+    file: "confirmation.html",
+    Component: ConfirmationEmail,
+    expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"],
+  },
+  {
+    file: "recovery.html",
+    Component: RecoveryEmail,
+    expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"],
+  },
+  {
+    file: "magic_link.html",
+    Component: MagicLinkEmail,
+    expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"],
+  },
+  {
+    file: "invite.html",
+    Component: AuthInviteEmail,
+    expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"],
+  },
+  {
+    file: "email_change.html",
+    Component: EmailChangeEmail,
+    expects: ["{{ .ConfirmationURL }}", "{{ .SiteURL }}"],
+  },
+  {
+    file: "reauthentication.html",
+    Component: ReauthenticationEmail,
+    expects: ["{{ .Token }}", "{{ .SiteURL }}"],
+  },
 ] as const;
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -41,9 +65,7 @@ describe("generate Supabase auth email templates", () => {
     async ({ file, Component, expects }) => {
       const html = await render(createElement(Component), { pretty: true });
       for (const placeholder of expects) {
-        expect(html, `${file} lost placeholder ${placeholder}`).toContain(
-          placeholder,
-        );
+        expect(html, `${file} lost placeholder ${placeholder}`).toContain(placeholder);
       }
       writeFileSync(join(TEMPLATES_DIR, file), html, "utf8");
       // eslint-disable-next-line no-console

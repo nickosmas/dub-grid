@@ -93,7 +93,6 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
           onExpand={() => onExpandPanel("staffHours")}
         />
       </div>
-
     </>
   );
 }

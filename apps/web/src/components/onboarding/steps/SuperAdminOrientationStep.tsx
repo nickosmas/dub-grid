@@ -1,13 +1,7 @@
 "use client";
 
 import StepLayout from "../StepLayout";
-import {
-  LayoutDashboard,
-  CalendarDays,
-  Users,
-  Settings,
-  Shield,
-} from "lucide-react";
+import { LayoutDashboard, CalendarDays, Users, Settings, Shield } from "lucide-react";
 
 interface SuperAdminOrientationStepProps {
   onNext: () => void;

@@ -1,11 +1,5 @@
-import type {
-  MobileAuthLoginBody,
-  MobileAuthLoginResponse,
-} from "@dubgrid/contracts";
-import {
-  buildPermissionContext,
-  type PermissionContext,
-} from "@dubgrid/authz";
+import type { MobileAuthLoginBody, MobileAuthLoginResponse } from "@dubgrid/contracts";
+import { buildPermissionContext, type PermissionContext } from "@dubgrid/authz";
 import type {
   BillingAccessResult,
   AdminPermissions,
@@ -18,16 +12,8 @@ import {
   evaluateOrganizationBillingAccess,
   isAccountDisabledMessage,
 } from "@dubgrid/domain";
-import {
-  createClient,
-  type Factor,
-  type SupabaseClient,
-  type User,
-} from "@supabase/supabase-js";
-import {
-  findMobileOrganizationBySlug,
-  type MobileOrganizationLookup,
-} from "./organization";
+import { createClient, type Factor, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { findMobileOrganizationBySlug, type MobileOrganizationLookup } from "./organization";
 import { isMobileOrgSetupComplete } from "./setup";
 
 type OrgMembership = {
@@ -109,17 +95,12 @@ function getMobileUserName(user: User): {
   lastName: string | null;
 } {
   return {
-    firstName:
-      (user.user_metadata?.first_name as string | undefined) ?? null,
-    lastName:
-      (user.user_metadata?.last_name as string | undefined) ?? null,
+    firstName: (user.user_metadata?.first_name as string | undefined) ?? null,
+    lastName: (user.user_metadata?.last_name as string | undefined) ?? null,
   };
 }
 
-function getLockedOrgMessage(
-  orgRole: string,
-  billingAccess: BillingAccessResult,
-): string {
+function getLockedOrgMessage(orgRole: string, billingAccess: BillingAccessResult): string {
   if (billingAccess.reason === "suspended") {
     return "Organization unavailable. Contact your organization administrator.";
   }
@@ -146,10 +127,7 @@ async function requireMobileOrganization(
   try {
     const organization = await findMobileOrganizationBySlug(serviceClient, slug);
     if (!organization) {
-      throw new MobileApiRequestError(
-        404,
-        "No organization matched that slug.",
-      );
+      throw new MobileApiRequestError(404, "No organization matched that slug.");
     }
 
     return organization;
@@ -158,10 +136,7 @@ async function requireMobileOrganization(
       throw error;
     }
 
-    throw new MobileApiRequestError(
-      503,
-      "We could not verify that organization right now.",
-    );
+    throw new MobileApiRequestError(503, "We could not verify that organization right now.");
   }
 }
 
@@ -179,11 +154,10 @@ async function signInMobileUser(
   // token. The service client is a process-wide singleton reused for
   // service-role reads/writes; signing in on it would silently downgrade every
   // later service-role query to the last-logged-in user's RLS scope.
-  const { data: authData, error: authError } =
-    await authClient.auth.signInWithPassword({
-      email: input.email,
-      password: input.password,
-    });
+  const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
+    email: input.email,
+    password: input.password,
+  });
 
   // The JWT hook refuses removed employees with a sentinel message. Surface
   // it as a structured ACCOUNT_DISABLED error so the mobile UI can render a
@@ -191,11 +165,7 @@ async function signInMobileUser(
   // toast. The hook returns http_code 403; Supabase surfaces it on
   // authError.status / authError.message.
   if (authError && isAccountDisabledMessage(authError.message)) {
-    throw new MobileApiRequestError(
-      403,
-      ACCOUNT_DISABLED_MESSAGE,
-      ACCOUNT_DISABLED_CODE,
-    );
+    throw new MobileApiRequestError(403, ACCOUNT_DISABLED_MESSAGE, ACCOUNT_DISABLED_CODE);
   }
 
   if (
@@ -209,10 +179,7 @@ async function signInMobileUser(
   }
 
   if (!authData.user.email_confirmed_at) {
-    throw new MobileApiRequestError(
-      403,
-      "Verify your email on the web before using mobile.",
-    );
+    throw new MobileApiRequestError(403, "Verify your email on the web before using mobile.");
   }
 
   const verifiedTotpFactors = (authData.user.factors ?? []).filter(
@@ -237,10 +204,7 @@ async function assertMobileProfileSupported(
     .maybeSingle();
 
   if (profileError) {
-    throw new MobileApiRequestError(
-      503,
-      "We could not finish signing you in right now.",
-    );
+    throw new MobileApiRequestError(503, "We could not finish signing you in right now.");
   }
 
   if ((profile?.platform_role as string | null) === "gridmaster") {
@@ -251,16 +215,11 @@ async function assertMobileProfileSupported(
   }
 }
 
-async function loadMobileMemberships(
-  sessionClient: SupabaseClient,
-): Promise<OrgMembership[]> {
+async function loadMobileMemberships(sessionClient: SupabaseClient): Promise<OrgMembership[]> {
   const membershipsResult = await sessionClient.rpc("get_my_organizations");
 
   if (membershipsResult.error) {
-    throw new MobileApiRequestError(
-      403,
-      "We could not verify your organization access.",
-    );
+    throw new MobileApiRequestError(403, "We could not verify your organization access.");
   }
 
   return (membershipsResult.data ?? []) as OrgMembership[];
@@ -280,10 +239,7 @@ async function switchMobileOrgIfNeeded(
   });
 
   if (switchResult.error) {
-    throw new MobileApiRequestError(
-      400,
-      "We could not switch your organization right now.",
-    );
+    throw new MobileApiRequestError(400, "We could not switch your organization right now.");
   }
 
   const refreshResult = await sessionClient.auth.refreshSession();
@@ -297,10 +253,7 @@ async function switchMobileOrgIfNeeded(
   return refreshResult.data.session as SignedInSession;
 }
 
-export function createMobileEphemeralAuthClient(
-  url: string,
-  anonKey: string,
-): SupabaseClient {
+export function createMobileEphemeralAuthClient(url: string, anonKey: string): SupabaseClient {
   return createClient(url, anonKey, {
     auth: {
       autoRefreshToken: false,
@@ -310,9 +263,7 @@ export function createMobileEphemeralAuthClient(
   });
 }
 
-export function extractMobileBearerToken(
-  authorizationHeader: string | null,
-): string | null {
+export function extractMobileBearerToken(authorizationHeader: string | null): string | null {
   if (!authorizationHeader?.startsWith("Bearer ")) {
     return null;
   }
@@ -360,31 +311,22 @@ export async function resolveMobileAuthContext<
     (factor) => factor.factor_type === "totp" && factor.status === "verified",
   );
   if (hasVerifiedTotpFactor && claims.aal !== "aal2") {
-    throw new MobileApiRequestError(
-      401,
-      "Two-factor authentication required",
-    );
+    throw new MobileApiRequestError(401, "Two-factor authentication required");
   }
 
   if (claims.platform_role === "gridmaster") {
-    throw new MobileApiRequestError(
-      403,
-      "Gridmaster mobile access is not supported",
-    );
+    throw new MobileApiRequestError(403, "Gridmaster mobile access is not supported");
   }
 
   const membershipRows = await input.fetchMemberships(input.serviceClient, user.id);
   if (membershipRows.length === 0) {
-    throw new MobileApiRequestError(
-      403,
-      "No active organization membership found",
-    );
+    throw new MobileApiRequestError(403, "No active organization membership found");
   }
 
   const currentOrgId =
     typeof claims.org_id === "string" && claims.org_id.length > 0
       ? claims.org_id
-      : membershipRows[0]?.organization.id ?? null;
+      : (membershipRows[0]?.organization.id ?? null);
 
   if (!currentOrgId) {
     throw new MobileApiRequestError(403, "Missing organization context");
@@ -394,22 +336,15 @@ export async function resolveMobileAuthContext<
     (membership) => membership.organization.id === currentOrgId,
   );
   if (!currentMembership) {
-    throw new MobileApiRequestError(
-      403,
-      "Organization context does not match this user",
-    );
+    throw new MobileApiRequestError(403, "Organization context does not match this user");
   }
 
-  const currentOrgRow = await input.fetchOrganization(
-    input.serviceClient,
-    currentOrgId,
-  );
+  const currentOrgRow = await input.fetchOrganization(input.serviceClient, currentOrgId);
   if (!currentOrgRow) {
     throw new MobileApiRequestError(404, "Organization not found");
   }
 
-  const platformRole =
-    (await input.fetchPlatformRole(input.serviceClient, user.id)) ?? "none";
+  const platformRole = (await input.fetchPlatformRole(input.serviceClient, user.id)) ?? "none";
   const adminPermissions = currentMembership.admin_permissions ?? null;
   const orgRole = currentMembership.org_role ?? "user";
   const currentOrg = input.mapOrganization(currentOrgRow);
@@ -420,21 +355,12 @@ export async function resolveMobileAuthContext<
   });
 
   if (billingAccess.isLocked) {
-    throw new MobileApiRequestError(
-      403,
-      getLockedOrgMessage(orgRole, billingAccess),
-    );
+    throw new MobileApiRequestError(403, getLockedOrgMessage(orgRole, billingAccess));
   }
 
-  const setupComplete = await isMobileOrgSetupComplete(
-    input.serviceClient,
-    currentOrgId,
-  );
+  const setupComplete = await isMobileOrgSetupComplete(input.serviceClient, currentOrgId);
   if (!setupComplete) {
-    throw new MobileApiRequestError(
-      403,
-      getIncompleteSetupMessage(orgRole),
-    );
+    throw new MobileApiRequestError(403, getIncompleteSetupMessage(orgRole));
   }
 
   // Inactive employees keep their session but lose every manage capability —
@@ -477,14 +403,8 @@ export async function loginMobileUser(
   sessionClient: SupabaseClient,
   input: MobileAuthLoginBody,
 ): Promise<MobileAuthLoginResponse> {
-  const organization = await requireMobileOrganization(
-    serviceClient,
-    input.orgSlug,
-  );
-  const { session, user, mfaFactor } = await signInMobileUser(
-    sessionClient,
-    input,
-  );
+  const organization = await requireMobileOrganization(serviceClient, input.orgSlug);
+  const { session, user, mfaFactor } = await signInMobileUser(sessionClient, input);
   await assertMobileProfileSupported(serviceClient, user.id);
 
   const memberships = await loadMobileMemberships(sessionClient);
@@ -493,10 +413,7 @@ export async function loginMobileUser(
   );
 
   if (!targetMembership) {
-    throw new MobileApiRequestError(
-      403,
-      "Your account is not associated with that organization.",
-    );
+    throw new MobileApiRequestError(403, "Your account is not associated with that organization.");
   }
 
   const loginBillingAccess = evaluateOrganizationBillingAccess({
@@ -508,18 +425,11 @@ export async function loginMobileUser(
   if (loginBillingAccess.isLocked) {
     throw new MobileApiRequestError(
       403,
-      getLockedOrgMessage(
-        targetMembership.org_role ?? "user",
-        loginBillingAccess,
-      ),
+      getLockedOrgMessage(targetMembership.org_role ?? "user", loginBillingAccess),
     );
   }
 
-  const currentSession = await switchMobileOrgIfNeeded(
-    sessionClient,
-    session,
-    targetMembership,
-  );
+  const currentSession = await switchMobileOrgIfNeeded(sessionClient, session, targetMembership);
 
   // First super_admin login starts the org's 14-day trial. This is a genuine
   // credential login (not automatic reconciliation like switchMobileOrgIfNeeded),

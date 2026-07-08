@@ -74,10 +74,7 @@ export type MobileMeScheduleContext = MobileServiceContext & {
 export type MobileOrgScheduleContext = MobileServiceContext & {
   permissions: Pick<
     MobilePermissionsLike,
-    | "canViewSchedule"
-    | "canEditShifts"
-    | "canApproveShiftRequests"
-    | "canManageEmployees"
+    "canViewSchedule" | "canEditShifts" | "canApproveShiftRequests" | "canManageEmployees"
   >;
 };
 
@@ -120,9 +117,7 @@ type FetchLinkedEmployeeForUser = (
   userId: string,
 ) => Promise<MobileLinkedEmployee | null>;
 
-type FetchMobileUnreadNotificationCount = (
-  userClient: SupabaseClient,
-) => Promise<number>;
+type FetchMobileUnreadNotificationCount = (userClient: SupabaseClient) => Promise<number>;
 
 type FetchMobileAbsenceTypes = (
   serviceClient: SupabaseClient,
@@ -182,9 +177,7 @@ type FetchMobileNotifications = (
   input: FetchMobileNotificationsInput,
 ) => Promise<FetchMobileNotificationsResult>;
 
-type MapOrganizationToMobileConfig = (
-  org: Organization,
-) => MobileBootstrapResponse["currentOrg"];
+type MapOrganizationToMobileConfig = (org: Organization) => MobileBootstrapResponse["currentOrg"];
 
 type MapEmployeeToMobilePerson = (person: MobilePersonSource) => MobilePerson;
 
@@ -244,29 +237,22 @@ export async function loadMobileBootstrapPayload(
     roles,
     certifications,
     departments,
-  ] =
-    await Promise.all([
-      deps.fetchLinkedEmployeeForUser(
-        auth.serviceClient,
-        auth.currentOrg.id,
-        auth.user.id,
-      ),
-      deps.fetchMobileUnreadNotificationCount(auth.userClient),
-      deps.fetchMobileAbsenceTypes(auth.serviceClient, auth.currentOrg.id),
-      deps.fetchMobileFocusAreas(auth.serviceClient, auth.currentOrg.id),
-      deps.fetchMobileRoles(auth.serviceClient, auth.currentOrg.id),
-      deps.fetchMobileCertifications(auth.serviceClient, auth.currentOrg.id),
-      deps.fetchMobileDepartments(auth.serviceClient, auth.currentOrg.id),
-    ]);
+  ] = await Promise.all([
+    deps.fetchLinkedEmployeeForUser(auth.serviceClient, auth.currentOrg.id, auth.user.id),
+    deps.fetchMobileUnreadNotificationCount(auth.userClient),
+    deps.fetchMobileAbsenceTypes(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchMobileFocusAreas(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchMobileRoles(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchMobileCertifications(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchMobileDepartments(auth.serviceClient, auth.currentOrg.id),
+  ]);
 
   return {
     user: {
       id: auth.user.id,
       email: auth.user.email ?? null,
-      firstName:
-        (auth.user.user_metadata?.first_name as string | undefined) ?? null,
-      lastName:
-        (auth.user.user_metadata?.last_name as string | undefined) ?? null,
+      firstName: (auth.user.user_metadata?.first_name as string | undefined) ?? null,
+      lastName: (auth.user.user_metadata?.last_name as string | undefined) ?? null,
     },
     currentOrg: deps.mapOrganizationToMobileConfig(auth.currentOrg),
     memberships: auth.memberships.map((membership) => ({
@@ -378,10 +364,7 @@ export async function loadMobilePeoplePayload(
     throw new MobileApiAuthorizationError();
   }
 
-  const people = await deps.fetchMobilePeople(
-    auth.serviceClient,
-    auth.currentOrg.id,
-  );
+  const people = await deps.fetchMobilePeople(auth.serviceClient, auth.currentOrg.id);
   const visiblePeople = auth.permissions.canManageEmployees
     ? people
     : people.filter((person) => person.status === "active");

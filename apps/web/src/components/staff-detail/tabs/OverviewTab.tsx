@@ -50,21 +50,32 @@ export function OverviewTab({
 }: OverviewTabProps) {
   const isNameMode = shiftDisplayMode === "name";
   const hoursHistory = useMemo(
-    () => computeEmployeeHoursHistory(employee.id, shifts, assignmentById, WEEK_COUNT, 40, categoryById),
-    [employee.id, shifts, assignmentById, categoryById]
+    () =>
+      computeEmployeeHoursHistory(
+        employee.id,
+        shifts,
+        assignmentById,
+        WEEK_COUNT,
+        40,
+        categoryById,
+      ),
+    [employee.id, shifts, assignmentById, categoryById],
   );
 
   const shiftDistribution = useMemo(
     () => computeShiftDistribution(employee.id, shifts, assignmentById),
-    [employee.id, shifts, assignmentById]
+    [employee.id, shifts, assignmentById],
   );
 
   const overtimeSummary = useMemo(() => computeOvertimeSummary(hoursHistory), [hoursHistory]);
 
   const totalShifts = hoursHistory.reduce((sum, week) => sum + week.shiftCount, 0);
-  const averageWeeklyHours = hoursHistory.length > 0
-    ? Math.round((hoursHistory.reduce((sum, week) => sum + week.totalHours, 0) / hoursHistory.length) * 10) / 10
-    : 0;
+  const averageWeeklyHours =
+    hoursHistory.length > 0
+      ? Math.round(
+          (hoursHistory.reduce((sum, week) => sum + week.totalHours, 0) / hoursHistory.length) * 10,
+        ) / 10
+      : 0;
 
   const topCode = shiftDistribution.length > 0 ? shiftDistribution[0] : null;
   const totalDistributionShifts = shiftDistribution.reduce((sum, item) => sum + item.count, 0);
@@ -72,8 +83,7 @@ export function OverviewTab({
   const certificationName = employee.certificationId
     ? certifications.find((item) => item.id === employee.certificationId)?.name
     : null;
-  const employmentLabel =
-    employee.employmentType === "part_time" ? "Part-time" : "Full-time";
+  const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
   const assignedFocusAreaNames = employee.focusAreaIds
     .map((id) => focusAreas.find((item) => item.id === id)?.name)
     .filter(Boolean) as string[];
@@ -88,9 +98,17 @@ export function OverviewTab({
     !!employee.contactNotes;
 
   const accountSummary = employee.userId
-    ? { label: "Linked account", detail: "Can sign in to DubGrid", dotColor: "var(--color-success)" }
+    ? {
+        label: "Linked account",
+        detail: "Can sign in to DubGrid",
+        dotColor: "var(--color-success)",
+      }
     : pendingInvite
-      ? { label: "Invitation pending", detail: `Sent to ${pendingInvite.email}`, dotColor: "var(--color-warning)" }
+      ? {
+          label: "Invitation pending",
+          detail: `Sent to ${pendingInvite.email}`,
+          dotColor: "var(--color-warning)",
+        }
       : { label: "No account", detail: "Not invited yet", dotColor: "var(--color-text-faint)" };
 
   const employmentSummary = {
@@ -117,7 +135,9 @@ export function OverviewTab({
               <BarChart3 className="h-4 w-4 text-[var(--color-text-muted)]" />
               Summary
             </div>
-            <div className="dg-card-subtitle">Hours, shift volume, and recent staffing patterns.</div>
+            <div className="dg-card-subtitle">
+              Hours, shift volume, and recent staffing patterns.
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-2 divide-y divide-[var(--color-border-light)] sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0 lg:divide-x lg:divide-[var(--color-border-light)]">
@@ -141,7 +161,7 @@ export function OverviewTab({
             danger={overtimeSummary.weeksWithOT > 0}
           />
           <MetricCell
-            value={topCode ? (isNameMode ? (topCode.name || topCode.label) : topCode.label) : "—"}
+            value={topCode ? (isNameMode ? topCode.name || topCode.label : topCode.label) : "—"}
             label={topCode ? `${topCode.percentage}% of shifts` : "Top Code"}
           />
         </div>
@@ -185,7 +205,9 @@ export function OverviewTab({
                   <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
                     Employment
                   </dt>
-                  <dd className="text-[13px] text-[var(--color-text-primary)]">{employmentLabel}</dd>
+                  <dd className="text-[13px] text-[var(--color-text-primary)]">
+                    {employmentLabel}
+                  </dd>
                 </div>
                 {assignedFocusAreaNames.length > 0 && (
                   <div>
@@ -202,7 +224,9 @@ export function OverviewTab({
                     <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
                       Certifications
                     </dt>
-                    <dd className="text-[13px] text-[var(--color-text-primary)]">{certificationName}</dd>
+                    <dd className="text-[13px] text-[var(--color-text-primary)]">
+                      {certificationName}
+                    </dd>
                   </div>
                 )}
                 {roleNames.length > 0 && (
@@ -210,7 +234,9 @@ export function OverviewTab({
                     <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
                       Roles
                     </dt>
-                    <dd className="text-[13px] text-[var(--color-text-primary)]">{roleNames.join(", ")}</dd>
+                    <dd className="text-[13px] text-[var(--color-text-primary)]">
+                      {roleNames.join(", ")}
+                    </dd>
                   </div>
                 )}
                 {employee.contactNotes && (
@@ -218,7 +244,9 @@ export function OverviewTab({
                     <dt className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.05em] text-[var(--color-text-subtle)]">
                       Notes
                     </dt>
-                    <dd className="text-[13px] leading-relaxed text-[var(--color-text-primary)]">{employee.contactNotes}</dd>
+                    <dd className="text-[13px] leading-relaxed text-[var(--color-text-primary)]">
+                      {employee.contactNotes}
+                    </dd>
                   </div>
                 )}
               </dl>
@@ -233,7 +261,9 @@ export function OverviewTab({
                 <Layers className="h-4 w-4 text-[var(--color-text-muted)]" />
                 {isNameMode ? "Assignments" : "Assignment Labels"}
               </div>
-              <div className="dg-card-subtitle">Most common shift and job patterns across recent schedule history.</div>
+              <div className="dg-card-subtitle">
+                Most common shift and job patterns across recent schedule history.
+              </div>
             </div>
           </div>
           <div className="dg-card-body">
@@ -277,7 +307,8 @@ export function OverviewTab({
                         </span>
                       </div>
                       <span className="text-[13px] text-[var(--color-text-muted)]">
-                        {item.count} <span className="text-[var(--color-text-faint)]">({item.percentage}%)</span>
+                        {item.count}{" "}
+                        <span className="text-[var(--color-text-faint)]">({item.percentage}%)</span>
                       </span>
                     </div>
                   ))}
@@ -347,10 +378,7 @@ function StatusCard({
       </div>
       <div className="dg-card-body">
         <div className="flex items-center gap-2">
-          <span
-            className="h-2.5 w-2.5 rounded-full"
-            style={{ background: dotColor }}
-          />
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: dotColor }} />
           <div className="text-[15px] font-semibold text-[var(--color-text-primary)]">{label}</div>
         </div>
         <div className="mt-1 text-[13px] text-[var(--color-text-muted)]">{detail}</div>

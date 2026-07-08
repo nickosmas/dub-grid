@@ -135,12 +135,18 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     const n = new URLSearchParams(window.location.search).get("name");
     if (n && n.trim()) {
       setOrgName(n);
-      try { window.localStorage.setItem(orgNameCacheKey(orgSlug), n); } catch { /* storage disabled */ }
+      try {
+        window.localStorage.setItem(orgNameCacheKey(orgSlug), n);
+      } catch {
+        /* storage disabled */
+      }
     } else {
       try {
         const cached = window.localStorage.getItem(orgNameCacheKey(orgSlug));
         if (cached && cached.trim()) setOrgName(cached);
-      } catch { /* storage disabled */ }
+      } catch {
+        /* storage disabled */
+      }
     }
 
     let cancelled = false;
@@ -154,11 +160,19 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
         }
         if (d.name) {
           setOrgName(d.name);
-          try { window.localStorage.setItem(orgNameCacheKey(orgSlug), d.name); } catch { /* storage disabled */ }
+          try {
+            window.localStorage.setItem(orgNameCacheKey(orgSlug), d.name);
+          } catch {
+            /* storage disabled */
+          }
         }
       })
-      .catch(() => { /* best-effort: don't block the form on a network blip */ });
-    return () => { cancelled = true; };
+      .catch(() => {
+        /* best-effort: don't block the form on a network blip */
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [orgSlug]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -182,7 +196,9 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
       if (!res.ok) {
         if (res.status === 429) {
-          toast.error(extractErrorMessage(result.error, "Too many login attempts. Please try again later."));
+          toast.error(
+            extractErrorMessage(result.error, "Too many login attempts. Please try again later."),
+          );
           setLoading(false);
           return;
         }
@@ -358,8 +374,8 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
                   margin: "0 0 4px",
                 }}
               >
-                We couldn&apos;t find an organization at this subdomain. Check the
-                address, or use a different one below.
+                We couldn&apos;t find an organization at this subdomain. Check the address, or use a
+                different one below.
               </p>
             </>
           ) : (
@@ -375,9 +391,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
               >
                 Sign in to
               </p>
-              <h1 className="dg-auth-heading">
-                {orgName ?? orgSlug}
-              </h1>
+              <h1 className="dg-auth-heading">{orgName ?? orgSlug}</h1>
 
               <EmailPasswordForm
                 email={email}
@@ -415,9 +429,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
             </button>
           </div>
         </Card>
-        {accountDisabled && (
-          <AccountDisabledModal onClose={() => setAccountDisabled(false)} />
-        )}
+        {accountDisabled && <AccountDisabledModal onClose={() => setAccountDisabled(false)} />}
       </PageShell>
     </PublicRoute>
   );

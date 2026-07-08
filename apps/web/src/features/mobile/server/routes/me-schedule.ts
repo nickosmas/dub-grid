@@ -1,8 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  mobileMeScheduleResponseSchema,
-  mobileScheduleQuerySchema,
-} from "@dubgrid/contracts";
+import { mobileMeScheduleResponseSchema, mobileScheduleQuerySchema } from "@dubgrid/contracts";
 import { loadMobileMeSchedulePayload } from "@dubgrid/mobile-api-core";
 import {
   fetchLinkedEmployeeForUser,

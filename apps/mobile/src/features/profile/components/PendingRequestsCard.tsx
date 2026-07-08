@@ -2,11 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 
 const TYPE_LABELS: Record<MobileProfileChangeRequest["type"], string> = {
   profile_update: "Name change",
@@ -14,10 +10,8 @@ const TYPE_LABELS: Record<MobileProfileChangeRequest["type"], string> = {
 };
 
 const TYPE_DESCRIPTIONS: Record<MobileProfileChangeRequest["type"], string> = {
-  profile_update:
-    "An admin will review and update your name once approved.",
-  account_deletion:
-    "An admin will review and remove your account once approved.",
+  profile_update: "An admin will review and update your name once approved.",
+  account_deletion: "An admin will review and remove your account once approved.",
 };
 
 function formatSubmittedAt(value: string): string {
@@ -44,19 +38,12 @@ export function PendingRequestsCard({
   if (requests.length === 0) return null;
 
   const countLabel =
-    requests.length === 1
-      ? "1 pending request"
-      : `${requests.length} pending requests`;
+    requests.length === 1 ? "1 pending request" : `${requests.length} pending requests`;
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Ionicons
-          color={mobileColors.warningText}
-          name="time"
-          size={24}
-          style={styles.icon}
-        />
+        <Ionicons color={mobileColors.warningText} name="time" size={24} style={styles.icon} />
         <View style={styles.headerCopy}>
           <Text style={styles.title}>{countLabel}</Text>
           <Text style={styles.subtitle}>
@@ -72,12 +59,8 @@ export function PendingRequestsCard({
             <View key={request.id} style={styles.row}>
               <View style={styles.rowCopy}>
                 <Text style={styles.rowTitle}>{TYPE_LABELS[request.type]}</Text>
-                <Text style={styles.rowDescription}>
-                  {TYPE_DESCRIPTIONS[request.type]}
-                </Text>
-                <Text style={styles.rowMeta}>
-                  Submitted {formatSubmittedAt(request.createdAt)}
-                </Text>
+                <Text style={styles.rowDescription}>{TYPE_DESCRIPTIONS[request.type]}</Text>
+                <Text style={styles.rowMeta}>Submitted {formatSubmittedAt(request.createdAt)}</Text>
               </View>
               <View style={styles.rowAction}>
                 <Button

@@ -30,9 +30,7 @@ function Field({ label, value }: { label: string; value?: string }) {
       >
         {label}
       </Column>
-      <Column
-        style={{ padding: "8px 12px", fontSize: "15px", color: emailTheme.textBody }}
-      >
+      <Column style={{ padding: "8px 12px", fontSize: "15px", color: emailTheme.textBody }}>
         {value}
       </Column>
     </Row>
@@ -54,8 +52,7 @@ export function DemoRequestEmail({
     <EmailLayout logoUrl={logoUrl} preview={`New demo request: ${orgName}`}>
       <Text style={styles.heading}>New demo request</Text>
       <Text style={styles.paragraph}>
-        <strong>{contactName}</strong> from <strong>{orgName}</strong> has
-        requested a demo.
+        <strong>{contactName}</strong> from <strong>{orgName}</strong> has requested a demo.
       </Text>
       <Section
         style={{
@@ -73,9 +70,7 @@ export function DemoRequestEmail({
       </Section>
       {notes ? (
         <Section style={{ marginTop: "24px" }}>
-          <Text
-            style={{ ...styles.fine, margin: "0 0 8px", fontWeight: 600 }}
-          >
+          <Text style={{ ...styles.fine, margin: "0 0 8px", fontWeight: 600 }}>
             Additional notes
           </Text>
           <Text
@@ -91,9 +86,7 @@ export function DemoRequestEmail({
         </Section>
       ) : null}
       <Hr style={styles.divider} />
-      <Text style={styles.fine}>
-        Reply directly to this email to respond to {contactName}.
-      </Text>
+      <Text style={styles.fine}>Reply directly to this email to respond to {contactName}.</Text>
     </EmailLayout>
   );
 }

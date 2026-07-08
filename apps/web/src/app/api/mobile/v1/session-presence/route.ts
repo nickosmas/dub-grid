@@ -1,6 +1,3 @@
 export const dynamic = "force-dynamic";
 
-export {
-  OPTIONS,
-  POST,
-} from "@/features/mobile/server/routes/session-presence";
+export { OPTIONS, POST } from "@/features/mobile/server/routes/session-presence";

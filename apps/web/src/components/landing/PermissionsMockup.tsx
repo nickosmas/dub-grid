@@ -6,17 +6,20 @@
    alongside the four trust-signal cards; the fade-out gradient suggests
    the list continues (Organization Settings + Dashboard live below). ── */
 
-type ModuleIcon =
-  | "calendar"
-  | "repeat"
-  | "users"
-  | "checkCircle"
-  | "barChart"
-  | "settings";
+type ModuleIcon = "calendar" | "repeat" | "users" | "checkCircle" | "barChart" | "settings";
 
 const ICONS: Record<ModuleIcon, React.ReactNode> = {
   calendar: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <rect width="18" height="18" x="3" y="4" rx="2" />
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
@@ -24,7 +27,16 @@ const ICONS: Record<ModuleIcon, React.ReactNode> = {
     </svg>
   ),
   repeat: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <polyline points="17 1 21 5 17 9" />
       <path d="M3 11V9a4 4 0 0 1 4-4h14" />
       <polyline points="7 23 3 19 7 15" />
@@ -32,7 +44,16 @@ const ICONS: Record<ModuleIcon, React.ReactNode> = {
     </svg>
   ),
   users: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -40,20 +61,47 @@ const ICONS: Record<ModuleIcon, React.ReactNode> = {
     </svg>
   ),
   checkCircle: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
       <polyline points="22 4 12 14.01 9 11.01" />
     </svg>
   ),
   barChart: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <line x1="12" y1="20" x2="12" y2="10" />
       <line x1="18" y1="20" x2="18" y2="4" />
       <line x1="6" y1="20" x2="6" y2="16" />
     </svg>
   ),
   settings: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
@@ -155,9 +203,7 @@ function Toggle({ on, disabled }: { on: boolean; disabled?: boolean }) {
 
 function ToggleCell({ value }: { value: boolean | "always" | null }) {
   if (value === null) {
-    return (
-      <span style={{ fontSize: 13, color: "var(--color-text-faint)" }}>—</span>
-    );
+    return <span style={{ fontSize: 13, color: "var(--color-text-faint)" }}>—</span>;
   }
   if (value === "always") {
     return <Toggle on disabled />;
@@ -349,7 +395,8 @@ export default function PermissionsMockup() {
           <div
             key={mod.title}
             style={{
-              borderBottom: idx < CORE_MODULES.length - 1 ? "1px solid var(--color-border-light)" : undefined,
+              borderBottom:
+                idx < CORE_MODULES.length - 1 ? "1px solid var(--color-border-light)" : undefined,
             }}
           >
             <ModuleRow mod={mod} />
@@ -361,7 +408,8 @@ export default function PermissionsMockup() {
           <div
             key={mod.title}
             style={{
-              borderBottom: idx < ADMIN_MODULES.length - 1 ? "1px solid var(--color-border-light)" : undefined,
+              borderBottom:
+                idx < ADMIN_MODULES.length - 1 ? "1px solid var(--color-border-light)" : undefined,
             }}
           >
             <ModuleRow mod={mod} />
@@ -377,7 +425,8 @@ export default function PermissionsMockup() {
           left: 0,
           right: 0,
           height: 80,
-          background: "linear-gradient(to bottom, rgba(255,255,255,0) 0%, var(--color-surface) 100%)",
+          background:
+            "linear-gradient(to bottom, rgba(255,255,255,0) 0%, var(--color-surface) 100%)",
           borderRadius: "0 0 12px 12px",
           pointerEvents: "none",
         }}

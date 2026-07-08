@@ -10,9 +10,7 @@ const querySchema = z.object({
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const parsed = querySchema.safeParse(
-    Object.fromEntries(req.nextUrl.searchParams.entries()),
-  );
+  const parsed = querySchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   }
@@ -21,18 +19,14 @@ export async function GET(req: NextRequest) {
     req,
     parsed.data.orgId,
     (permissions) =>
-      permissions.isGridmaster ||
-      permissions.isSuperAdmin ||
-      permissions.canViewSchedule,
+      permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
   );
   if ("response" in auth) {
     return auth.response;
   }
 
   try {
-    const cutoff =
-      parsed.data.since ??
-      new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const cutoff = parsed.data.since ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
     const { data: orgRow } = await auth.serviceClient
       .from("organizations")
@@ -49,9 +43,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await auth.serviceClient
       .from("publish_history")
-      .select(
-        "id, org_id, published_by, start_date, end_date, change_count, changes, published_at",
-      )
+      .select("id, org_id, published_by, start_date, end_date, change_count, changes, published_at")
       .eq("org_id", parsed.data.orgId)
       .gte("end_date", todayKey)
       .gte("published_at", cutoff)
@@ -73,9 +65,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to load recent publish history";
+      error instanceof Error ? error.message : "Failed to load recent publish history";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

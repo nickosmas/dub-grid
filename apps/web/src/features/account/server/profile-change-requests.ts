@@ -34,10 +34,7 @@ export const createProfileChangeRequestSchema = z
     requestNote: z.string().trim().max(1000).optional(),
   })
   .superRefine((value, ctx) => {
-    if (
-      value.type === "profile_update" &&
-      Object.keys(value.requestedChanges ?? {}).length === 0
-    ) {
+    if (value.type === "profile_update" && Object.keys(value.requestedChanges ?? {}).length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Profile update requests must include at least one change",
@@ -53,11 +50,7 @@ export const resolveProfileChangeRequestSchema = z.object({
 
 export type ProfileRequestedChanges = z.infer<typeof profileRequestedChangesSchema>;
 export type ProfileChangeRequestType = "profile_update" | "account_deletion";
-export type ProfileChangeRequestStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "cancelled";
+export type ProfileChangeRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
 
 export interface ProfileChangeRequestRecord {
   id: string;
@@ -90,8 +83,7 @@ function mapProfileChangeRequest(row: Record<string, unknown>): ProfileChangeReq
     orgId: row.org_id as string,
     requesterUserId: (row.requester_user_id as string | null) ?? null,
     requesterEmployeeId: (row.requester_employee_id as string | null) ?? null,
-    requesterEmployeeVersion:
-      (row.requester_employee_version as number | null | undefined) ?? null,
+    requesterEmployeeVersion: (row.requester_employee_version as number | null | undefined) ?? null,
     requesterName: (row.requester_name as string | null) ?? "",
     requesterEmail: (row.requester_email as string | null) ?? null,
     type: row.request_type as ProfileChangeRequestType,
@@ -215,11 +207,7 @@ async function fetchProfileChangeRequestReviewerIds(input: {
       continue;
     }
 
-    const permissions = buildPermissionContext(
-      row.org_role,
-      input.orgId,
-      row.admin_permissions,
-    );
+    const permissions = buildPermissionContext(row.org_role, input.orgId, row.admin_permissions);
     if (permissions.isSuperAdmin || permissions.canManageEmployees) {
       reviewerIds.add(row.user_id);
     }
@@ -246,10 +234,7 @@ function summarizeProfileChange(
   }
   const changes: Array<{ field: string; from?: string; to?: string }> = [];
 
-  if (
-    requestedChanges.firstName !== undefined ||
-    requestedChanges.lastName !== undefined
-  ) {
+  if (requestedChanges.firstName !== undefined || requestedChanges.lastName !== undefined) {
     const currentFirst = String(currentValues.firstName ?? "");
     const currentLast = String(currentValues.lastName ?? "");
     const nextFirst = requestedChanges.firstName ?? currentFirst;
@@ -265,9 +250,10 @@ function summarizeProfileChange(
       v === "full_time" ? "Full-time" : v === "part_time" ? "Part-time" : v;
     changes.push({
       field: "Employment type",
-      from: typeof currentValues.employmentType === "string"
-        ? friendly(currentValues.employmentType)
-        : undefined,
+      from:
+        typeof currentValues.employmentType === "string"
+          ? friendly(currentValues.employmentType)
+          : undefined,
       to: friendly(requestedChanges.employmentType),
     });
   }
@@ -297,9 +283,7 @@ function summarizeProfileChange(
 }
 
 function capitalizeFirst(value: string): string {
-  return value.length > 0
-    ? `${value.slice(0, 1).toUpperCase()}${value.slice(1)}`
-    : value;
+  return value.length > 0 ? `${value.slice(0, 1).toUpperCase()}${value.slice(1)}` : value;
 }
 
 async function notifyProfileChangeRequestReviewers(input: {
@@ -367,9 +351,7 @@ async function notifyProfileChangeRequestReviewers(input: {
         metadata: {
           requestedBy: requesterName,
           ...changeDetails,
-          ...(input.request.requestNote
-            ? { note: input.request.requestNote }
-            : {}),
+          ...(input.request.requestNote ? { note: input.request.requestNote } : {}),
           actionUrl: "/people?section=requests",
           actionLabel: "Review request",
         },
@@ -394,11 +376,7 @@ export async function createProfileChangeRequest(input: {
   requestedChanges?: ProfileRequestedChanges;
   requestNote?: string;
 }): Promise<ProfileChangeRequestRecord> {
-  const membership = await assertActiveMembership(
-    input.serviceClient,
-    input.user.id,
-    input.orgId,
-  );
+  const membership = await assertActiveMembership(input.serviceClient, input.user.id, input.orgId);
   if (!membership) {
     throw new Error("You are not an active member of this organization.");
   }
@@ -441,13 +419,10 @@ export async function createProfileChangeRequest(input: {
       requester_employee_id: linkedEmployee?.id ?? null,
       requester_employee_version: linkedEmployee?.version ?? null,
       requester_name:
-        getEmployeeDisplayName(linkedEmployee) ||
-        input.user.email?.split("@")[0] ||
-        "User",
+        getEmployeeDisplayName(linkedEmployee) || input.user.email?.split("@")[0] || "User",
       requester_email: input.user.email ?? null,
       request_type: input.type,
-      requested_changes:
-        input.type === "profile_update" ? (input.requestedChanges ?? {}) : {},
+      requested_changes: input.type === "profile_update" ? (input.requestedChanges ?? {}) : {},
       current_values: buildCurrentValues(linkedEmployee),
       request_note: input.requestNote?.trim() ?? "",
     })
@@ -667,10 +642,7 @@ export async function resolveProfileChangeRequest(input: {
       request.requestedChanges,
       request.currentValues,
     );
-    const resolverName = await fetchResolverDisplayName(
-      input.serviceClient,
-      input.actor.id,
-    );
+    const resolverName = await fetchResolverDisplayName(input.serviceClient, input.actor.id);
     const verb = input.action === "approve" ? "approved" : "declined";
 
     let message: string;
@@ -713,9 +685,7 @@ export async function resolveProfileChangeRequest(input: {
       metadata: {
         reviewedBy: resolverName,
         ...changeDetails,
-        ...(input.resolverNote?.trim()
-          ? { adminNote: input.resolverNote.trim() }
-          : {}),
+        ...(input.resolverNote?.trim() ? { adminNote: input.resolverNote.trim() } : {}),
       },
     });
   }
@@ -767,9 +737,5 @@ export async function canManageProfileChangeRequests(input: {
     (membership?.admin_permissions as AdminPermissions | null) ?? null,
   );
 
-  return (
-    permissions.isGridmaster ||
-    permissions.isSuperAdmin ||
-    permissions.canManageEmployees
-  );
+  return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees;
 }

@@ -117,8 +117,7 @@ describe("browser auth helpers", () => {
         data: { session: null },
         error: {
           name: "Error",
-          message:
-            "Lock 'lock:sb-127-auth-token' was released because another request stole it",
+          message: "Lock 'lock:sb-127-auth-token' was released because another request stole it",
         },
       })
       .mockResolvedValueOnce({
@@ -182,17 +181,11 @@ describe("browser auth helpers", () => {
     mockGetUser.mockImplementation(
       () =>
         new Promise((resolve) =>
-          setTimeout(
-            () => resolve({ data: { user: { id: "u-1" } }, error: null }),
-            10,
-          ),
+          setTimeout(() => resolve({ data: { user: { id: "u-1" } }, error: null }), 10),
         ),
     );
 
-    const [a, b] = await Promise.all([
-      getVerifiedBrowserUser(),
-      getVerifiedBrowserUser(),
-    ]);
+    const [a, b] = await Promise.all([getVerifiedBrowserUser(), getVerifiedBrowserUser()]);
 
     expect(a).toEqual({ id: "u-1" });
     expect(b).toEqual({ id: "u-1" });
@@ -228,12 +221,7 @@ describe("browser auth helpers", () => {
     await getVerifiedBrowserAuth();
 
     // Sequential — user does not start until session has fully resolved.
-    expect(order).toEqual([
-      "session:start",
-      "session:end",
-      "user:start",
-      "user:end",
-    ]);
+    expect(order).toEqual(["session:start", "session:end", "user:start", "user:end"]);
   });
 
   it("clearSupabaseBrowserAuthState releases the in-flight dedupe slots so a hung call can't deadlock future callers", async () => {

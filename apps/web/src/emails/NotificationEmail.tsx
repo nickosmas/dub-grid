@@ -10,19 +10,14 @@ export type NotificationEmailProps = {
 };
 
 /** Generic in-app notification delivered over email. */
-export function NotificationEmail({
-  title,
-  message,
-  logoUrl,
-}: NotificationEmailProps) {
+export function NotificationEmail({ title, message, logoUrl }: NotificationEmailProps) {
   return (
     <EmailLayout logoUrl={logoUrl} preview={title}>
       <Text style={styles.heading}>{title}</Text>
       <Text style={styles.paragraph}>{message}</Text>
       <Hr style={styles.divider} />
       <Text style={styles.fine}>
-        You can manage your notification preferences in your DubGrid profile
-        settings.
+        You can manage your notification preferences in your DubGrid profile settings.
       </Text>
     </EmailLayout>
   );

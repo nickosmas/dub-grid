@@ -16,9 +16,7 @@ const setQueryData = vi.fn();
 const push = vi.fn();
 const pushToast = vi.fn();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@tanstack/react-query", () => ({
   QueryClient: class QueryClient {},
@@ -39,9 +37,7 @@ vi.mock("expo-router", () => ({
   },
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("../../../shared/components/QueryStateCard", async () =>
   createQueryStateCardModule(await import("react")),
@@ -97,7 +93,7 @@ const SAMPLE_NOTIFICATION = {
 
 function buildInfiniteQueryResult(
   overrides: Partial<{
-    notifications: typeof SAMPLE_NOTIFICATION[];
+    notifications: (typeof SAMPLE_NOTIFICATION)[];
     unreadCount: number;
     isLoading: boolean;
     error: Error | null;
@@ -175,10 +171,7 @@ describe("NotificationsScreen", () => {
     fireEvent.click(screen.getByText("Pickup available"));
 
     await waitFor(() => {
-      expect(markNotificationRead).toHaveBeenCalledWith(
-        "token-123",
-        SAMPLE_NOTIFICATION.id,
-      );
+      expect(markNotificationRead).toHaveBeenCalledWith("token-123", SAMPLE_NOTIFICATION.id);
     });
     expect(push).toHaveBeenCalledWith({
       pathname: "/alerts/[id]",
@@ -210,9 +203,7 @@ describe("NotificationsScreen", () => {
     fireEvent.click(screen.getByText("Mark all read"));
 
     const confirmDialog = await screen.findByRole("alert");
-    fireEvent.click(
-      within(confirmDialog).getByRole("button", { name: "Mark all read" }),
-    );
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "Mark all read" }));
 
     await waitFor(() => {
       expect(markAllNotificationsRead).toHaveBeenCalledWith("token-123");

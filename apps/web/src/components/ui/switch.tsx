@@ -11,14 +11,7 @@ interface SwitchProps {
   style?: CSSProperties;
 }
 
-export function Switch({
-  checked,
-  onChange,
-  disabled,
-  ariaLabel,
-  id,
-  style,
-}: SwitchProps) {
+export function Switch({ checked, onChange, disabled, ariaLabel, id, style }: SwitchProps) {
   return (
     <button
       id={id}

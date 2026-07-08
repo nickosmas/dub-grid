@@ -21,11 +21,7 @@ export function OnboardingPagination({
   scrollX: SharedValue<number>;
 }) {
   return (
-    <View
-      accessible
-      accessibilityRole="tablist"
-      style={styles.row}
-    >
+    <View accessible accessibilityRole="tablist" style={styles.row}>
       {Array.from({ length: count }, (_, index) => (
         <Dot key={index} index={index} pageWidth={pageWidth} scrollX={scrollX} />
       ))}
@@ -47,11 +43,7 @@ function Dot({
     const distance = Math.abs(progress - index);
     const proximity = Math.min(distance, 1);
 
-    const width = interpolate(
-      proximity,
-      [0, 1],
-      [ACTIVE_DOT_WIDTH, DOT_SIZE],
-    );
+    const width = interpolate(proximity, [0, 1], [ACTIVE_DOT_WIDTH, DOT_SIZE]);
     const backgroundColor = interpolateColor(
       proximity,
       [0, 1],

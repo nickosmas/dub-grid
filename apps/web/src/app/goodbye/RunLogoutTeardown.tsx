@@ -50,8 +50,7 @@ interface RunLogoutTeardownProps {
  */
 export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownProps) {
   const queryClient = useQueryClient();
-  const signInHref =
-    reason === "inactivity" ? "/login?error=inactivity_timeout" : "/login";
+  const signInHref = reason === "inactivity" ? "/login?error=inactivity_timeout" : "/login";
   // StrictMode + Turbopack dev double-mount guard. Without this we call
   // signOutFromBrowser twice and recreate the lock contention the redesign
   // exists to avoid.

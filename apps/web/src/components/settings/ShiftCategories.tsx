@@ -80,15 +80,18 @@ function ShiftCategoriesSettings({
   const [catDepInfo, setCatDepInfo] = useState<DependencyInfo | null>(null);
 
   const handleDeleteClick = async (catId: number) => {
-    const cat = local.find(c => c.id === catId);
+    const cat = local.find((c) => c.id === catId);
     if (!cat) return;
-    if ((cat as { isNew?: boolean }).isNew) { handleDelete(cat, false); return; }
+    if ((cat as { isNew?: boolean }).isNew) {
+      handleDelete(cat, false);
+      return;
+    }
     const deps = await checkShiftCategoryDependencies(catId, orgId);
     setCatDepInfo(deps);
     setConfirmDeleteId(catId);
   };
   const originalRef = useRef<Map<number, ShiftCategory>>(
-    new Map(shiftCategories.map((c) => [c.id, c]))
+    new Map(shiftCategories.map((c) => [c.id, c])),
   );
   // Keep originalRef in sync when props update (e.g. concurrent edits)
   useEffect(() => {
@@ -97,15 +100,14 @@ function ShiftCategoriesSettings({
   const nextTmpId = useRef(-1);
   const newCategoryDefaultsRef = useRef<Map<number, ShiftCategory & { isNew: boolean }>>(new Map());
   const pendingExitRef = useRef<
-    | { type: "open"; categoryId: number }
-    | { type: "add"; focusAreaId: number | null }
-    | null
+    { type: "open"; categoryId: number } | { type: "add"; focusAreaId: number | null } | null
   >(null);
 
   const createDraftCategory = (focusAreaId: number | null) => {
     const tmpId = nextTmpId.current--;
     const siblingCount = local.filter((c) => c.focusAreaId === focusAreaId).length;
-    const defaultColor = PREDEFINED_COLORS[siblingCount % PREDEFINED_COLORS.length]?.bg ?? DEFAULT_PREDEFINED_COLOR_BG;
+    const defaultColor =
+      PREDEFINED_COLORS[siblingCount % PREDEFINED_COLORS.length]?.bg ?? DEFAULT_PREDEFINED_COLOR_BG;
     const tmp: ShiftCategory & { isNew: boolean } = {
       id: tmpId,
       orgId: orgId,
@@ -152,13 +154,17 @@ function ShiftCategoriesSettings({
 
   const isCategoryDirty = (cat: ShiftCategory & { isNew?: boolean }) => {
     const orig = originalRef.current.get(cat.id);
-    return cat.isNew || !orig ||
+    return (
+      cat.isNew ||
+      !orig ||
       cat.name !== orig.name ||
-      normalizeShiftAbbreviation(cat.abbr, cat.name) !== normalizeShiftAbbreviation(orig.abbr, orig.name) ||
+      normalizeShiftAbbreviation(cat.abbr, cat.name) !==
+        normalizeShiftAbbreviation(orig.abbr, orig.name) ||
       (cat.startTime ?? null) !== (orig.startTime ?? null) ||
       (cat.endTime ?? null) !== (orig.endTime ?? null) ||
       (cat.color ?? DEFAULT_PREDEFINED_COLOR_BG) !== (orig.color ?? DEFAULT_PREDEFINED_COLOR_BG) ||
-      (cat.breakMinutes ?? null) !== (orig.breakMinutes ?? null);
+      (cat.breakMinutes ?? null) !== (orig.breakMinutes ?? null)
+    );
   };
 
   const resetCategoryDraft = (cat: ShiftCategory & { isNew?: boolean }) => {
@@ -174,7 +180,10 @@ function ShiftCategoriesSettings({
     setLocal((prev) => prev.map((entry) => (entry.id === cat.id ? orig : entry)));
   };
 
-  const discardCategoryChanges = (cat: ShiftCategory & { isNew?: boolean }, closeAfter: boolean) => {
+  const discardCategoryChanges = (
+    cat: ShiftCategory & { isNew?: boolean },
+    closeAfter: boolean,
+  ) => {
     if (cat.isNew) {
       if (closeAfter) {
         newCategoryDefaultsRef.current.delete(cat.id);
@@ -202,10 +211,11 @@ function ShiftCategoriesSettings({
     createDraftCategory(pending.focusAreaId);
   };
 
-  const currentEditingCategory = editingId == null
-    ? null
-    : local.find((category) => category.id === editingId) ?? null;
-  const hasUnsavedEditingChanges = currentEditingCategory ? isCategoryDirty(currentEditingCategory) : false;
+  const currentEditingCategory =
+    editingId == null ? null : (local.find((category) => category.id === editingId) ?? null);
+  const hasUnsavedEditingChanges = currentEditingCategory
+    ? isCategoryDirty(currentEditingCategory)
+    : false;
 
   const { requestClose: requestEditorClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
     hasUnsavedChanges: hasUnsavedEditingChanges,
@@ -250,14 +260,13 @@ function ShiftCategoriesSettings({
       required: true,
       disallowUrl: true,
     });
-    const abbrError =
-      cat.abbr?.trim()
-        ? getCodeError(cat.abbr, {
-            label: "Shift code",
-            maxLength: SHIFT_ABBR_MAX_LENGTH,
-            uppercase: true,
-          })
-        : null;
+    const abbrError = cat.abbr?.trim()
+      ? getCodeError(cat.abbr, {
+          label: "Shift code",
+          maxLength: SHIFT_ABBR_MAX_LENGTH,
+          uppercase: true,
+        })
+      : null;
     if (nameError || abbrError) return;
     setSaving(cat.id);
     try {
@@ -270,14 +279,13 @@ function ShiftCategoriesSettings({
           required: true,
           disallowUrl: true,
         }),
-        abbr:
-          cat.abbr?.trim()
-            ? normalizeCode(cat.abbr, {
-                label: "Shift code",
-                maxLength: SHIFT_ABBR_MAX_LENGTH,
-                uppercase: true,
-              })
-            : normalizeShiftAbbreviation(cat.abbr, cat.name),
+        abbr: cat.abbr?.trim()
+          ? normalizeCode(cat.abbr, {
+              label: "Shift code",
+              maxLength: SHIFT_ABBR_MAX_LENGTH,
+              uppercase: true,
+            })
+          : normalizeShiftAbbreviation(cat.abbr, cat.name),
         startTime: cat.startTime || null,
         endTime: cat.endTime || null,
         color: cat.color ?? DEFAULT_PREDEFINED_COLOR_BG,
@@ -344,14 +352,13 @@ function ShiftCategoriesSettings({
             disallowUrl: true,
           })
         : null;
-    const abbrError =
-      cat.abbr?.trim()
-        ? getCodeError(cat.abbr, {
-            label: "Shift code",
-            maxLength: SHIFT_ABBR_MAX_LENGTH,
-            uppercase: true,
-          })
-        : null;
+    const abbrError = cat.abbr?.trim()
+      ? getCodeError(cat.abbr, {
+          label: "Shift code",
+          maxLength: SHIFT_ABBR_MAX_LENGTH,
+          uppercase: true,
+        })
+      : null;
     // Name uniqueness is scoped per focus area to match the DB's partial unique
     // indexes (shift_categories_area_name_unique / shift_categories_global_name_unique).
     // Archived shifts are excluded since the DB indexes filter on archived_at IS NULL.
@@ -423,14 +430,38 @@ function ShiftCategoriesSettings({
             </span>
             <div style={{ minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                  {cat.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}>Untitled</span>}
+                <span
+                  style={{
+                    fontSize: "var(--dg-fs-label)",
+                    fontWeight: 700,
+                    color: "var(--color-text-primary)",
+                  }}
+                >
+                  {cat.name || (
+                    <span
+                      style={{
+                        color: "var(--color-text-muted)",
+                        fontStyle: "italic",
+                        fontWeight: 400,
+                      }}
+                    >
+                      Untitled
+                    </span>
+                  )}
                 </span>
                 {(cat.startTime || cat.endTime) && (
-                  <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                  <span
+                    style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}
+                  >
                     {fmt12h(cat.startTime)} – {fmt12h(cat.endTime)}
                     {calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes) && (
-                      <span style={{ marginLeft: 8, fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                      <span
+                        style={{
+                          marginLeft: 8,
+                          fontWeight: 700,
+                          color: "var(--color-text-secondary)",
+                        }}
+                      >
                         ({calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes)})
                       </span>
                     )}
@@ -438,7 +469,13 @@ function ShiftCategoriesSettings({
                 )}
               </div>
               {resolveEffectiveBreak(cat.breakMinutes) > 0 && (
-                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-faint)", marginTop: 2 }}>
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--color-text-faint)",
+                    marginTop: 2,
+                  }}
+                >
                   incl. {resolveEffectiveBreak(cat.breakMinutes)}m break
                 </div>
               )}
@@ -487,17 +524,19 @@ function ShiftCategoriesSettings({
               maxLength={50}
               style={{
                 ...inputStyle,
-                ...(nameError || duplicateName
-                  ? { borderColor: "var(--color-danger)" }
-                  : {}),
+                ...(nameError || duplicateName ? { borderColor: "var(--color-danger)" } : {}),
               }}
               autoFocus
               disabled={!canManageScheduleDefinitions}
             />
-            {(nameError || duplicateName) ? (
+            {nameError || duplicateName ? (
               <p
                 role="alert"
-                style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+                style={{
+                  margin: "4px 0 0",
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-danger)",
+                }}
               >
                 {nameError ?? "Another shift in this focus area already uses that name."}
               </p>
@@ -513,16 +552,18 @@ function ShiftCategoriesSettings({
               style={{
                 ...inputStyle,
                 textTransform: "uppercase",
-                ...(abbrError || duplicateCode
-                  ? { borderColor: "var(--color-danger)" }
-                  : {}),
+                ...(abbrError || duplicateCode ? { borderColor: "var(--color-danger)" } : {}),
               }}
               disabled={!canManageScheduleDefinitions}
             />
-            {(abbrError || duplicateCode) ? (
+            {abbrError || duplicateCode ? (
               <p
                 role="alert"
-                style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)" }}
+                style={{
+                  margin: "4px 0 0",
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-danger)",
+                }}
               >
                 {abbrError ?? "Another shift in this focus area already uses that code."}
               </p>
@@ -592,7 +633,8 @@ function ShiftCategoriesSettings({
               max={480}
               value={cat.breakMinutes ?? ""}
               onChange={(e) => {
-                const val = e.target.value === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0);
+                const val =
+                  e.target.value === "" ? null : Math.max(0, parseInt(e.target.value, 10) || 0);
                 handleChange(cat.id, "breakMinutes", val);
               }}
               placeholder="None"
@@ -622,41 +664,71 @@ function ShiftCategoriesSettings({
               const gross = calcTimeDuration(cat.startTime, cat.endTime);
               const net = calcNetDuration(cat.startTime, cat.endTime, cat.breakMinutes);
               if (effectiveBreak > 0) {
-                return <>Gross: {gross} · Break: {effectiveBreak}m · Net: <span style={{ fontWeight: 700, color: "var(--color-text-secondary)" }}>{net}</span></>;
+                return (
+                  <>
+                    Gross: {gross} · Break: {effectiveBreak}m · Net:{" "}
+                    <span style={{ fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                      {net}
+                    </span>
+                  </>
+                );
               }
-              return <>Duration: <span style={{ fontWeight: 700, color: "var(--color-text-secondary)" }}>{gross}</span></>;
+              return (
+                <>
+                  Duration:{" "}
+                  <span style={{ fontWeight: 700, color: "var(--color-text-secondary)" }}>
+                    {gross}
+                  </span>
+                </>
+              );
             })()}
           </div>
         )}
         {/* Actions */}
         <EditorActionRow
-          destructiveAction={canManageScheduleDefinitions && !cat.isNew ? (
+          destructiveAction={
+            canManageScheduleDefinitions && !cat.isNew ? (
+              <button
+                onClick={() => handleDeleteClick(cat.id)}
+                disabled={isDeletingThis}
+                className="dg-btn dg-btn-danger dg-btn-sm"
+              >
+                {isDeletingThis ? "…" : "Delete"}
+              </button>
+            ) : undefined
+          }
+          secondaryAction={
             <button
-              onClick={() => handleDeleteClick(cat.id)}
-              disabled={isDeletingThis}
-              className="dg-btn dg-btn-danger dg-btn-sm"
-            >
-              {isDeletingThis ? "…" : "Delete"}
-            </button>
-          ) : undefined}
-          secondaryAction={(
-            <button
-              onClick={() => (cat.isNew || !isDirty ? handleClose(cat) : discardCategoryChanges(cat, false))}
+              onClick={() =>
+                cat.isNew || !isDirty ? handleClose(cat) : discardCategoryChanges(cat, false)
+              }
               disabled={isSavingThis}
               className="dg-btn dg-btn-secondary dg-btn-sm"
             >
-              {getEditorDismissLabel({ hasUnsavedChanges: isDirty, isCreating: Boolean(cat.isNew) })}
+              {getEditorDismissLabel({
+                hasUnsavedChanges: isDirty,
+                isCreating: Boolean(cat.isNew),
+              })}
             </button>
-          )}
-          primaryAction={(
+          }
+          primaryAction={
             <button
               onClick={() => handleSave(cat)}
-              disabled={isSavingThis || !cat.name.trim() || !isDirty || !canManageScheduleDefinitions || Boolean(nameError) || Boolean(abbrError) || duplicateName || duplicateCode}
+              disabled={
+                isSavingThis ||
+                !cat.name.trim() ||
+                !isDirty ||
+                !canManageScheduleDefinitions ||
+                Boolean(nameError) ||
+                Boolean(abbrError) ||
+                duplicateName ||
+                duplicateCode
+              }
               className="dg-btn dg-btn-primary dg-btn-sm"
             >
               {getEditorSaveLabel(isSavingThis)}
             </button>
-          )}
+          }
         />
       </div>
     );
@@ -717,17 +789,26 @@ function ShiftCategoriesSettings({
               <EmptyState
                 size="compact"
                 title="No shifts yet"
-                action={canManageScheduleDefinitions ? (
-                  <button onClick={() => handleAdd(focusArea.id)} className="dg-btn dg-btn-secondary dg-btn-sm">
-                    + Add Shift
-                  </button>
-                ) : undefined}
+                action={
+                  canManageScheduleDefinitions ? (
+                    <button
+                      onClick={() => handleAdd(focusArea.id)}
+                      className="dg-btn dg-btn-secondary dg-btn-sm"
+                    >
+                      + Add Shift
+                    </button>
+                  ) : undefined
+                }
                 style={{ margin: "12px 16px" }}
               />
             )}
             {areaCats.length > 0 && canManageScheduleDefinitions && (
               <div style={{ padding: "8px 16px 12px" }}>
-                <button onClick={() => handleAdd(focusArea.id)} className={addBtnClass} style={{ width: "100%" }}>
+                <button
+                  onClick={() => handleAdd(focusArea.id)}
+                  className={addBtnClass}
+                  style={{ width: "100%" }}
+                >
                   + Add Shift
                 </button>
               </div>
@@ -738,54 +819,68 @@ function ShiftCategoriesSettings({
 
       {unsavedChangesDialog}
 
-
-      {confirmDeleteId !== null && (() => {
-        const cat = local.find(c => c.id === confirmDeleteId);
-        if (!cat) return null;
-        const hasActive = catDepInfo?.hasDependencies ?? false;
-        const hasAny = catDepInfo?.hasAnyReferences ?? true;
-        if (hasActive) {
+      {confirmDeleteId !== null &&
+        (() => {
+          const cat = local.find((c) => c.id === confirmDeleteId);
+          if (!cat) return null;
+          const hasActive = catDepInfo?.hasDependencies ?? false;
+          const hasAny = catDepInfo?.hasAnyReferences ?? true;
+          if (hasActive) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${cat.name}"?`}
+                message={
+                  <>
+                    <strong>{cat.name}</strong> is currently {catDepInfo!.summary.toLowerCase()}.
+                    <br />
+                    <br />
+                    Archiving will preserve historical records. Any derived compatibility labels
+                    tied to this shift will become uncategorized.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                isLoading={deleting === confirmDeleteId}
+                onConfirm={() => handleDelete(cat, false)}
+                onCancel={() => setConfirmDeleteId(null)}
+              />
+            );
+          }
+          if (hasAny) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${cat.name}"?`}
+                message={
+                  <>
+                    This will archive <strong>{cat.name || "this category"}</strong>. Historical
+                    records will be preserved.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                isLoading={deleting === confirmDeleteId}
+                onConfirm={() => handleDelete(cat, false)}
+                onCancel={() => setConfirmDeleteId(null)}
+              />
+            );
+          }
           return (
             <ConfirmDialog
-              title={`Archive "${cat.name}"?`}
-              message={<>
-                <strong>{cat.name}</strong> is currently {catDepInfo!.summary.toLowerCase()}.
-                <br /><br />
-                Archiving will preserve historical records. Any derived compatibility labels tied to this shift will become uncategorized.
-              </>}
-              confirmLabel="Archive"
-              variant="warning"
+              title={`Delete "${cat.name}"?`}
+              message={
+                <>
+                  This will permanently delete <strong>{cat.name || "this category"}</strong>.
+                  Nothing references it.
+                </>
+              }
+              confirmLabel="Delete"
+              variant="danger"
               isLoading={deleting === confirmDeleteId}
-              onConfirm={() => handleDelete(cat, false)}
+              onConfirm={() => handleDelete(cat, true)}
               onCancel={() => setConfirmDeleteId(null)}
             />
           );
-        }
-        if (hasAny) {
-          return (
-            <ConfirmDialog
-              title={`Archive "${cat.name}"?`}
-              message={<>This will archive <strong>{cat.name || "this category"}</strong>. Historical records will be preserved.</>}
-              confirmLabel="Archive"
-              variant="warning"
-              isLoading={deleting === confirmDeleteId}
-              onConfirm={() => handleDelete(cat, false)}
-              onCancel={() => setConfirmDeleteId(null)}
-            />
-          );
-        }
-        return (
-          <ConfirmDialog
-            title={`Delete "${cat.name}"?`}
-            message={<>This will permanently delete <strong>{cat.name || "this category"}</strong>. Nothing references it.</>}
-            confirmLabel="Delete"
-            variant="danger"
-            isLoading={deleting === confirmDeleteId}
-            onConfirm={() => handleDelete(cat, true)}
-            onCancel={() => setConfirmDeleteId(null)}
-          />
-        );
-      })()}
+        })()}
     </div>
   );
 }

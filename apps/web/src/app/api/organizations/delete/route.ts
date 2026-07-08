@@ -82,7 +82,10 @@ export async function POST(req: NextRequest) {
   }
 
   if (org.archived_at) {
-    return NextResponse.json({ error: "This organization has already been deleted." }, { status: 409 });
+    return NextResponse.json(
+      { error: "This organization has already been deleted." },
+      { status: 409 },
+    );
   }
 
   if (confirmation !== `DELETE ${org.name}`) {
@@ -136,7 +139,10 @@ export async function POST(req: NextRequest) {
     Sentry.captureException(stripeError, {
       extra: { orgId: effectiveOrgId, context: "org-deletion-stripe" },
     });
-    logger.error({ error: stripeError, orgId: effectiveOrgId }, "Failed to cancel Stripe subscription on org deletion");
+    logger.error(
+      { error: stripeError, orgId: effectiveOrgId },
+      "Failed to cancel Stripe subscription on org deletion",
+    );
   }
 
   try {
@@ -150,7 +156,10 @@ export async function POST(req: NextRequest) {
       details: { name: org.name, stripeCanceled },
     });
   } catch (auditError) {
-    logger.error({ error: auditError, orgId: effectiveOrgId }, "Failed to write org deletion audit log");
+    logger.error(
+      { error: auditError, orgId: effectiveOrgId },
+      "Failed to write org deletion audit log",
+    );
   }
 
   logger.info({ orgId: effectiveOrgId, actorId: actor.id }, "Organization deleted");

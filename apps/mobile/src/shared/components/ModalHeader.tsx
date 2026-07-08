@@ -26,9 +26,7 @@ export function ModalHeader({
         accessibilityRole="button"
         accessibilityState={{ disabled: closeDisabled }}
         android_ripple={
-          closeDisabled
-            ? undefined
-            : { color: "rgba(15, 23, 42, 0.08)", borderless: true }
+          closeDisabled ? undefined : { color: "rgba(15, 23, 42, 0.08)", borderless: true }
         }
         disabled={closeDisabled}
         hitSlop={8}

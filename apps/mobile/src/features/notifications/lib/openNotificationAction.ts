@@ -18,10 +18,7 @@ function isExternalUrl(href: string): boolean {
  * decide whether to render an actionable CTA or a "complete on web" hint.
  */
 export function isNotificationActionSupportedOnMobile(href: string): boolean {
-  return (
-    isExternalUrl(href) ||
-    IN_APP_ROUTES.some(({ prefix }) => href.startsWith(prefix))
-  );
+  return isExternalUrl(href) || IN_APP_ROUTES.some(({ prefix }) => href.startsWith(prefix));
 }
 
 export function openNotificationAction(href: string) {

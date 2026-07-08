@@ -22,6 +22,9 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,7 +32,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
-      - run: npm run lint
+      - run: npx turbo run lint
+      - run: npx prettier --check .
 
   type-check:
     name: Type Check
@@ -60,6 +64,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test
+
+  mobile-verify:
+    name: Mobile Verify
+    runs-on: ubuntu-latest
+    env:
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx turbo run type-check --filter=@dubgrid/mobile
+      - run: npx turbo run test --filter=@dubgrid/mobile --filter=@dubgrid/schedule-core --filter=@dubgrid/contracts
 
   integration-test:
     name: Integration Tests (live DB)

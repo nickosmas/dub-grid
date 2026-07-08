@@ -39,9 +39,7 @@ function getCurrentPayPeriodOptionLabel(anchorDate: string): string {
   const anchor = new Date(`${anchorDate}T00:00:00.000Z`);
   const today = new Date();
   const todayUtc = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-  const periodIndex = Math.floor(
-    (todayUtc.getTime() - anchor.getTime()) / (14 * 86_400_000),
-  );
+  const periodIndex = Math.floor((todayUtc.getTime() - anchor.getTime()) / (14 * 86_400_000));
   const start = addDays(anchor, periodIndex * 14);
   return `Pay period (${formatRangeLabel(start, addDays(start, 13))})`;
 }
@@ -96,10 +94,8 @@ vi.mock("@/features/reports/client/api", () => ({
     { value: "shift-requests", label: "Shift requests" },
   ],
   fetchOperationsReport: (...args: unknown[]) => fetchOperationsReport(...args),
-  exportOperationsReportCsv: (...args: unknown[]) =>
-    exportOperationsReportCsv(...args),
-  exportOperationsReportPdf: (...args: unknown[]) =>
-    exportOperationsReportPdf(...args),
+  exportOperationsReportCsv: (...args: unknown[]) => exportOperationsReportCsv(...args),
+  exportOperationsReportPdf: (...args: unknown[]) => exportOperationsReportPdf(...args),
 }));
 
 const payload = {
@@ -285,24 +281,16 @@ describe("ReportsPageContent", () => {
       justifySelf: "start",
     });
     expect(
-      Array.from(runActions.querySelectorAll("button")).map((button) =>
-        button.textContent?.trim(),
-      ),
+      Array.from(runActions.querySelectorAll("button")).map((button) => button.textContent?.trim()),
     ).toEqual(["Refresh", "Generate report"]);
     expect(screen.getByLabelText("Report")).toBeInTheDocument();
     expect(screen.getByLabelText("Range")).toHaveTextContent(currentWeekOptionLabel);
     fireEvent.click(screen.getByLabelText("Range"));
-    expect(
-      await screen.findByRole("option", { name: currentWeekOptionLabel }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: currentWeekOptionLabel })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /Next week/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /Two weeks/ })).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("option", { name: payPeriodOptionLabel }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("option", { name: "Custom" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: payPeriodOptionLabel })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Custom" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("option", { name: currentWeekOptionLabel }));
     expect(screen.queryByText("Scheduled hours")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
@@ -409,9 +397,7 @@ describe("ReportsPageContent", () => {
       textOverflow: "ellipsis",
       whiteSpace: "nowrap",
     });
-    expect(screen.getByLabelText("Range")).toHaveTextContent(
-      "Custom (May 4 - May 8)",
-    );
+    expect(screen.getByLabelText("Range")).toHaveTextContent("Custom (May 4 - May 8)");
 
     fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
 
@@ -499,16 +485,12 @@ describe("ReportsPageContent", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "People" }));
     fireEvent.click(await screen.findByLabelText("Avery Ng"));
-    expect(screen.getByRole("button", { name: "People" })).toHaveTextContent(
-      "1 selected",
-    );
+    expect(screen.getByRole("button", { name: "People" })).toHaveTextContent("1 selected");
 
     fireEvent.click(screen.getByRole("button", { name: "Focus areas" }));
     fireEvent.click(await screen.findByLabelText("South"));
 
-    expect(screen.getByRole("button", { name: "People" })).toHaveTextContent(
-      "All people",
-    );
+    expect(screen.getByRole("button", { name: "People" })).toHaveTextContent("All people");
 
     fireEvent.click(screen.getByRole("button", { name: "People" }));
 
@@ -554,9 +536,7 @@ describe("ReportsPageContent", () => {
     renderReports();
 
     await waitFor(() => {
-      expect(toastInfo).toHaveBeenCalledWith(
-        "Reports are available to admins and super admins.",
-      );
+      expect(toastInfo).toHaveBeenCalledWith("Reports are available to admins and super admins.");
       expect(routerReplace).toHaveBeenCalledWith("/dashboard");
     });
     expect(fetchOperationsReport).not.toHaveBeenCalled();

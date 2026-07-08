@@ -27,10 +27,26 @@ function StatCard({ label, value }: { label: string; value: number }) {
         minWidth: 140,
       }}
     >
-      <div style={{ fontSize: "var(--dg-fs-page-title)", fontWeight: 700, fontFamily: "var(--font-dm-mono), 'DM Mono', monospace", color: "var(--color-text-primary)", marginBottom: 4 }}>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-page-title)",
+          fontWeight: 700,
+          fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+          color: "var(--color-text-primary)",
+          marginBottom: 4,
+        }}
+      >
         {value}
       </div>
-      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          fontWeight: 600,
+          color: "var(--color-text-muted)",
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+        }}
+      >
         {label}
       </div>
     </div>
@@ -58,13 +74,33 @@ function OversightCard({
           : "var(--color-text-primary)";
   return (
     <div style={{ ...sectionStyle, padding: "14px 16px", minWidth: 160, flex: "1 1 170px" }}>
-      <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 800, color, fontFamily: "var(--font-dm-mono), monospace" }}>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-card-title)",
+          fontWeight: 800,
+          color,
+          fontFamily: "var(--font-dm-mono), monospace",
+        }}
+      >
         {value}
       </div>
-      <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-primary)", marginTop: 2 }}>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-caption)",
+          fontWeight: 700,
+          color: "var(--color-text-primary)",
+          marginTop: 2,
+        }}
+      >
         {label}
       </div>
-      <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 2 }}>
+      <div
+        style={{
+          fontSize: "var(--dg-fs-footnote)",
+          color: "var(--color-text-muted)",
+          marginTop: 2,
+        }}
+      >
         {detail}
       </div>
     </div>
@@ -95,18 +131,29 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
           {formatOrganizationRoleLabel(entry.fromRole)}
         </span>
         {" → "}
-        <span style={{ fontWeight: 600 }}>
-          {formatOrganizationRoleLabel(entry.toRole)}
-        </span>
+        <span style={{ fontWeight: 600 }}>{formatOrganizationRoleLabel(entry.toRole)}</span>
       </div>
       {entry.orgName && (
-        <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)", flexShrink: 0 }}>
+        <span
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--color-text-subtle)",
+            flexShrink: 0,
+          }}
+        >
           {entry.orgName}
         </span>
       )}
-      <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)", flexShrink: 0, whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
-        {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-        {" "}
+      <span
+        style={{
+          fontSize: "var(--dg-fs-footnote)",
+          color: "var(--color-text-subtle)",
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+          fontFamily: "var(--font-dm-mono), monospace",
+        }}
+      >
+        {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
         {date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
       </span>
     </div>
@@ -149,8 +196,22 @@ export default function GridmasterDashboard({
 
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-        <h2 style={{ margin: 0, fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 20,
+        }}
+      >
+        <h2
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-fs-page-title)",
+            fontWeight: 700,
+            color: "var(--color-text-primary)",
+          }}
+        >
           Dashboard
         </h2>
         <button className="dg-btn dg-btn-brand" onClick={onCreateOrg}>
@@ -161,14 +222,25 @@ export default function GridmasterDashboard({
       {overview && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 28 }}>
           <div>
-            <h3 style={{ margin: "0 0 10px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+            <h3
+              style={{
+                margin: "0 0 10px",
+                fontSize: "var(--dg-fs-body-sm)",
+                fontWeight: 700,
+                color: "var(--color-text-secondary)",
+              }}
+            >
               Platform Oversight
             </h3>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               <OversightCard
                 label="DB / Redis"
                 value={overview.platformHealth.redis.productionReady ? "OK" : "Check"}
-                detail={overview.platformHealth.redis.configured ? "Rate limiting configured" : overview.platformHealth.redis.message ?? "Redis not configured"}
+                detail={
+                  overview.platformHealth.redis.configured
+                    ? "Rate limiting configured"
+                    : (overview.platformHealth.redis.message ?? "Redis not configured")
+                }
                 tone={overview.platformHealth.redis.productionReady ? "good" : "warning"}
               />
               <OversightCard
@@ -192,7 +264,12 @@ export default function GridmasterDashboard({
                 label="Billing Risk"
                 value={overview.businessHealth.billingRiskCount}
                 detail={`${overview.businessHealth.trialEndingCount} trials ending, ${overview.businessHealth.trialsNotStartedCount} not started, ${overview.businessHealth.seatMismatchCount} seat gaps`}
-                tone={overview.businessHealth.billingRiskCount > 0 || overview.businessHealth.seatMismatchCount > 0 ? "danger" : "good"}
+                tone={
+                  overview.businessHealth.billingRiskCount > 0 ||
+                  overview.businessHealth.seatMismatchCount > 0
+                    ? "danger"
+                    : "good"
+                }
               />
               <OversightCard
                 label="Compliance Alerts"
@@ -205,28 +282,108 @@ export default function GridmasterDashboard({
 
           {overview.orgRisk.riskiestOrganizations.length > 0 && (
             <div>
-              <h3 style={{ margin: "0 0 10px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+              <h3
+                style={{
+                  margin: "0 0 10px",
+                  fontSize: "var(--dg-fs-body-sm)",
+                  fontWeight: 700,
+                  color: "var(--color-text-secondary)",
+                }}
+              >
                 Highest Risk Organizations
               </h3>
               <div style={sectionStyle}>
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+                  <table
+                    style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}
+                  >
                     <thead>
                       <tr>
-                        {["Org", "Score", "Risk", "Active Users", "Open Requests", "Billing"].map((h) => (
-                          <th key={h} style={{ ...thStyle, borderBottom: "1px solid var(--color-border-light)" }}>{h}</th>
-                        ))}
+                        {["Org", "Score", "Risk", "Active Users", "Open Requests", "Billing"].map(
+                          (h) => (
+                            <th
+                              key={h}
+                              style={{
+                                ...thStyle,
+                                borderBottom: "1px solid var(--color-border-light)",
+                              }}
+                            >
+                              {h}
+                            </th>
+                          ),
+                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {overview.orgRisk.riskiestOrganizations.map((org) => (
-                        <tr key={org.orgId} style={{ cursor: "pointer" }} onClick={() => onSelectOrg(org.orgId)}>
-                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 700, borderBottom: "1px solid var(--color-border-light)" }}>{org.orgName}</td>
-                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 700, color: org.oversightScore < 60 ? "var(--color-danger)" : "var(--color-warning)", borderBottom: "1px solid var(--color-border-light)" }}>{org.oversightScore}</td>
-                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-light)" }}>{org.riskFlags.length ? org.riskFlags.map(formatClientLabel).join(", ") : "None"}</td>
-                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", borderBottom: "1px solid var(--color-border-light)" }}>{org.supportSnapshot.activeUsers30d}</td>
-                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", borderBottom: "1px solid var(--color-border-light)" }}>{org.supportSnapshot.openShiftRequests}</td>
-                          <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", borderBottom: "1px solid var(--color-border-light)" }}>{formatBillingStatusLabel(org.billing.subscriptionStatus)}</td>
+                        <tr
+                          key={org.orgId}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => onSelectOrg(org.orgId)}
+                        >
+                          <td
+                            style={{
+                              padding: "10px 14px",
+                              fontSize: "var(--dg-fs-label)",
+                              fontWeight: 700,
+                              borderBottom: "1px solid var(--color-border-light)",
+                            }}
+                          >
+                            {org.orgName}
+                          </td>
+                          <td
+                            style={{
+                              padding: "10px 14px",
+                              fontSize: "var(--dg-fs-label)",
+                              fontWeight: 700,
+                              color:
+                                org.oversightScore < 60
+                                  ? "var(--color-danger)"
+                                  : "var(--color-warning)",
+                              borderBottom: "1px solid var(--color-border-light)",
+                            }}
+                          >
+                            {org.oversightScore}
+                          </td>
+                          <td
+                            style={{
+                              padding: "10px 14px",
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-text-muted)",
+                              borderBottom: "1px solid var(--color-border-light)",
+                            }}
+                          >
+                            {org.riskFlags.length
+                              ? org.riskFlags.map(formatClientLabel).join(", ")
+                              : "None"}
+                          </td>
+                          <td
+                            style={{
+                              padding: "10px 14px",
+                              fontSize: "var(--dg-fs-label)",
+                              borderBottom: "1px solid var(--color-border-light)",
+                            }}
+                          >
+                            {org.supportSnapshot.activeUsers30d}
+                          </td>
+                          <td
+                            style={{
+                              padding: "10px 14px",
+                              fontSize: "var(--dg-fs-label)",
+                              borderBottom: "1px solid var(--color-border-light)",
+                            }}
+                          >
+                            {org.supportSnapshot.openShiftRequests}
+                          </td>
+                          <td
+                            style={{
+                              padding: "10px 14px",
+                              fontSize: "var(--dg-fs-caption)",
+                              borderBottom: "1px solid var(--color-border-light)",
+                            }}
+                          >
+                            {formatBillingStatusLabel(org.billing.subscriptionStatus)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -240,7 +397,10 @@ export default function GridmasterDashboard({
 
       {/* Stats row */}
       <div style={{ display: "flex", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
-        <StatCard label="Active Orgs" value={activeOrganizations.length - suspendedOrgs.filter((o) => !o.archivedAt).length} />
+        <StatCard
+          label="Active Orgs"
+          value={activeOrganizations.length - suspendedOrgs.filter((o) => !o.archivedAt).length}
+        />
         <StatCard label="Suspended" value={suspendedOrgs.length} />
         <StatCard label="Archived" value={archivedOrgs.length} />
         <StatCard label="Platform Users" value={totalUsers} />
@@ -261,13 +421,23 @@ export default function GridmasterDashboard({
             marginBottom: 20,
           }}
         >
-          {suspendedOrgs.length} organization{suspendedOrgs.length !== 1 ? "s" : ""} currently suspended:{" "}
+          {suspendedOrgs.length} organization{suspendedOrgs.length !== 1 ? "s" : ""} currently
+          suspended:{" "}
           {suspendedOrgs.map((o, i) => (
             <span key={o.id}>
               {i > 0 && ", "}
               <button
                 onClick={() => onSelectOrg(o.id)}
-                style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontWeight: 700, fontFamily: "inherit", padding: 0, textDecoration: "underline" }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "inherit",
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontFamily: "inherit",
+                  padding: 0,
+                  textDecoration: "underline",
+                }}
               >
                 {o.name}
               </button>
@@ -279,22 +449,72 @@ export default function GridmasterDashboard({
       {/* Platform Activity Trends */}
       {overview && overview.activitySummary.last7dCount > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <h3 style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+          <h3
+            style={{
+              margin: "0 0 12px",
+              fontSize: "var(--dg-fs-body-sm)",
+              fontWeight: 700,
+              color: "var(--color-text-secondary)",
+            }}
+          >
             Platform Activity
           </h3>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-            <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
-              <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{overview.activitySummary.last24hCount}</div>
-              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 24h</div>
+            <div
+              style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}
+            >
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-card-title)",
+                  fontWeight: 700,
+                  color: "var(--color-text-primary)",
+                }}
+              >
+                {overview.activitySummary.last24hCount}
+              </div>
+              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+                Last 24h
+              </div>
             </div>
-            <div style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
-              <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{overview.activitySummary.last7dCount}</div>
-              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>Last 7 days</div>
+            <div
+              style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}
+            >
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-card-title)",
+                  fontWeight: 700,
+                  color: "var(--color-text-primary)",
+                }}
+              >
+                {overview.activitySummary.last7dCount}
+              </div>
+              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+                Last 7 days
+              </div>
             </div>
             {overview.activitySummary.topCategories.map((category) => (
-              <div key={category.category} style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}>
-                <div style={{ fontSize: "var(--dg-fs-card-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>{category.count}</div>
-                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", textTransform: "capitalize" }}>{category.category}</div>
+              <div
+                key={category.category}
+                style={{ ...sectionStyle, padding: "12px 16px", flex: "1 1 120px", minWidth: 120 }}
+              >
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-card-title)",
+                    fontWeight: 700,
+                    color: "var(--color-text-primary)",
+                  }}
+                >
+                  {category.count}
+                </div>
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--color-text-muted)",
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {category.category}
+                </div>
               </div>
             ))}
           </div>
@@ -305,17 +525,67 @@ export default function GridmasterDashboard({
                   <thead>
                     <tr>
                       {["Org", "Activity", "Type", "Status"].map((h) => (
-                        <th key={h} style={{ ...thStyle, borderBottom: "1px solid var(--color-border-light)" }}>{h}</th>
+                        <th
+                          key={h}
+                          style={{
+                            ...thStyle,
+                            borderBottom: "1px solid var(--color-border-light)",
+                          }}
+                        >
+                          {h}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {overview.activitySummary.busiestOrganizations.map((signal) => (
-                      <tr key={signal.orgId} style={{ cursor: "pointer" }} onClick={() => onSelectOrg(signal.orgId)}>
-                        <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 700, borderBottom: "1px solid var(--color-border-light)" }}>{signal.orgName}</td>
-                        <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", borderBottom: "1px solid var(--color-border-light)" }}>{signal.actionCount} actions</td>
-                        <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", textTransform: "capitalize", borderBottom: "1px solid var(--color-border-light)" }}>{signal.dominantCategory ?? "Activity"}</td>
-                        <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", color: signal.classification === "review_recommended" ? "var(--color-warning)" : "var(--color-text-muted)", fontWeight: signal.classification === "review_recommended" ? 700 : 500, borderBottom: "1px solid var(--color-border-light)" }}>
+                      <tr
+                        key={signal.orgId}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => onSelectOrg(signal.orgId)}
+                      >
+                        <td
+                          style={{
+                            padding: "10px 14px",
+                            fontSize: "var(--dg-fs-label)",
+                            fontWeight: 700,
+                            borderBottom: "1px solid var(--color-border-light)",
+                          }}
+                        >
+                          {signal.orgName}
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 14px",
+                            fontSize: "var(--dg-fs-label)",
+                            borderBottom: "1px solid var(--color-border-light)",
+                          }}
+                        >
+                          {signal.actionCount} actions
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 14px",
+                            fontSize: "var(--dg-fs-caption)",
+                            color: "var(--color-text-muted)",
+                            textTransform: "capitalize",
+                            borderBottom: "1px solid var(--color-border-light)",
+                          }}
+                        >
+                          {signal.dominantCategory ?? "Activity"}
+                        </td>
+                        <td
+                          style={{
+                            padding: "10px 14px",
+                            fontSize: "var(--dg-fs-caption)",
+                            color:
+                              signal.classification === "review_recommended"
+                                ? "var(--color-warning)"
+                                : "var(--color-text-muted)",
+                            fontWeight: signal.classification === "review_recommended" ? 700 : 500,
+                            borderBottom: "1px solid var(--color-border-light)",
+                          }}
+                        >
                           {signal.reason}
                         </td>
                       </tr>
@@ -331,7 +601,14 @@ export default function GridmasterDashboard({
       {/* Recent Activity */}
       {recentActivity.length > 0 && (
         <div style={{ marginBottom: 28 }}>
-          <h3 style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+          <h3
+            style={{
+              margin: "0 0 12px",
+              fontSize: "var(--dg-fs-body-sm)",
+              fontWeight: 700,
+              color: "var(--color-text-secondary)",
+            }}
+          >
             Recent Activity
           </h3>
           <div
@@ -348,88 +625,201 @@ export default function GridmasterDashboard({
       )}
 
       {/* Organization list */}
-      <h3 style={{ margin: "0 0 12px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+      <h3
+        style={{
+          margin: "0 0 12px",
+          fontSize: "var(--dg-fs-body-sm)",
+          fontWeight: 700,
+          color: "var(--color-text-secondary)",
+        }}
+      >
         All Organizations
       </h3>
-      <div
-        style={sectionStyle}
-      >
+      <div style={sectionStyle}>
         <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
-          <thead>
-            <tr>
-              {["Name", "Slug", "Status", "Org Users", "Employees", "Focus Areas", "Certifications", "Roles", "Timezone"].map((h) => (
-                <th
-                  key={h}
-                  style={{
-                    ...thStyle,
-                    borderBottom: "1px solid var(--color-border-light)",
-                  }}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {organizations.filter((c) => !c.archivedAt).map((c) => {
-              const s = stats.get(c.id);
-              return (
-                <tr
-                  key={c.id}
-                  onClick={() => onSelectOrg(c.id)}
-                  style={{ cursor: "pointer", transition: "background 150ms ease" }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--color-bg-secondary)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
-                >
-                  <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", borderBottom: "1px solid var(--color-border-light)" }}>
-                    {c.name}
-                  </td>
-                  <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace", borderBottom: "1px solid var(--color-border-light)" }}>
-                    {c.slug ?? "—"}
-                  </td>
-                  <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-footnote)", borderBottom: "1px solid var(--color-border-light)" }}>
-                    {c.suspendedAt ? (
-                      <span style={{ fontWeight: 600, color: "var(--color-danger)", background: "var(--color-danger-bg)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>Suspended</span>
-                    ) : (
-                      <span style={{ fontWeight: 600, color: "var(--color-success)", background: "var(--color-success-bg)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>Active</span>
-                    )}
-                  </td>
-                  <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-secondary)", borderBottom: "1px solid var(--color-border-light)" }}>
-                    {s?.userCount ?? 0}
-                  </td>
-                  <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-secondary)", borderBottom: "1px solid var(--color-border-light)" }}>
-                    {s?.employeeCount ?? 0}
-                  </td>
-                  <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", borderBottom: "1px solid var(--color-border-light)" }}>
-                    {c.focusAreaLabel && c.focusAreaLabel !== "Focus Areas" ? (
-                      <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{c.focusAreaLabel}</span>
-                    ) : (
-                      <span style={{ color: "var(--color-text-subtle)" }}>—</span>
-                    )}
-                  </td>
-                  <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", borderBottom: "1px solid var(--color-border-light)" }}>
-                    {c.certificationLabel && c.certificationLabel !== "Certifications" ? (
-                      <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{c.certificationLabel}</span>
-                    ) : (
-                      <span style={{ color: "var(--color-text-subtle)" }}>—</span>
-                    )}
-                  </td>
-                  <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", borderBottom: "1px solid var(--color-border-light)" }}>
-                    {c.roleLabel && c.roleLabel !== "Roles" ? (
-                      <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{c.roleLabel}</span>
-                    ) : (
-                      <span style={{ color: "var(--color-text-subtle)" }}>—</span>
-                    )}
-                  </td>
-                  <td style={{ padding: "10px 14px", fontSize: "var(--dg-fs-caption)", color: "var(--color-text-subtle)", borderBottom: "1px solid var(--color-border-light)" }}>
-                    {c.timezone ?? "—"}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+          <table style={{ width: "100%", borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+            <thead>
+              <tr>
+                {[
+                  "Name",
+                  "Slug",
+                  "Status",
+                  "Org Users",
+                  "Employees",
+                  "Focus Areas",
+                  "Certifications",
+                  "Roles",
+                  "Timezone",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      ...thStyle,
+                      borderBottom: "1px solid var(--color-border-light)",
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {organizations
+                .filter((c) => !c.archivedAt)
+                .map((c) => {
+                  const s = stats.get(c.id);
+                  return (
+                    <tr
+                      key={c.id}
+                      onClick={() => onSelectOrg(c.id)}
+                      style={{ cursor: "pointer", transition: "background 150ms ease" }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.background =
+                          "var(--color-bg-secondary)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = "transparent";
+                      }}
+                    >
+                      <td
+                        style={{
+                          padding: "10px 14px",
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                          color: "var(--color-text-primary)",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        {c.name}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 14px",
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--color-text-muted)",
+                          fontFamily: "var(--font-dm-mono), monospace",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        {c.slug ?? "—"}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 14px",
+                          fontSize: "var(--dg-fs-footnote)",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        {c.suspendedAt ? (
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: "var(--color-danger)",
+                              background: "var(--color-danger-bg)",
+                              padding: "1px 6px",
+                              borderRadius: 4,
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            Suspended
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontWeight: 600,
+                              color: "var(--color-success)",
+                              background: "var(--color-success-bg)",
+                              padding: "1px 6px",
+                              borderRadius: 4,
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            Active
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 14px",
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                          color: "var(--color-text-secondary)",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        {s?.userCount ?? 0}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 14px",
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                          color: "var(--color-text-secondary)",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        {s?.employeeCount ?? 0}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 14px",
+                          fontSize: "var(--dg-fs-caption)",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        {c.focusAreaLabel && c.focusAreaLabel !== "Focus Areas" ? (
+                          <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+                            {c.focusAreaLabel}
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--color-text-subtle)" }}>—</span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 14px",
+                          fontSize: "var(--dg-fs-caption)",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        {c.certificationLabel && c.certificationLabel !== "Certifications" ? (
+                          <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+                            {c.certificationLabel}
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--color-text-subtle)" }}>—</span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 14px",
+                          fontSize: "var(--dg-fs-caption)",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        {c.roleLabel && c.roleLabel !== "Roles" ? (
+                          <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+                            {c.roleLabel}
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--color-text-subtle)" }}>—</span>
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          padding: "10px 14px",
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--color-text-subtle)",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        {c.timezone ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
         </div>
       </div>
     </>

@@ -19,15 +19,9 @@ import {
   resolveJobTimesForShift,
   shouldShowJobOnGrid,
 } from "@/lib/job-placement";
-import {
-  isDefaultShiftSystemJob,
-  isRegularStaffSystemJob,
-} from "@/lib/system-jobs";
+import { isDefaultShiftSystemJob, isRegularStaffSystemJob } from "@/lib/system-jobs";
 
-type EmployeeEligibilityInput = Pick<
-  Employee,
-  "certificationId" | "focusAreaIds" | "roleIds"
->;
+type EmployeeEligibilityInput = Pick<Employee, "certificationId" | "focusAreaIds" | "roleIds">;
 
 type BuildAssignableShiftOptionsInput = {
   assignments?: AssignmentDefinition[];
@@ -77,10 +71,7 @@ function resolvePlacementFocusAreaIds(
   const departmentFocusAreas = focusAreas
     .filter((focusArea) => {
       if (!includeArchived && focusArea.archivedAt) return false;
-      return (
-        focusArea.departmentId != null &&
-        departmentIds.has(focusArea.departmentId)
-      );
+      return focusArea.departmentId != null && departmentIds.has(focusArea.departmentId);
     })
     .map((focusArea) => focusArea.id);
 
@@ -138,25 +129,19 @@ export function buildScheduleAssignmentOptions(input: {
   includeArchived?: boolean;
 }): AssignmentDefinition[] {
   const includeArchived = input.includeArchived ?? false;
-  const focusAreaById = new Map(
-    input.focusAreas.map((focusArea) => [focusArea.id, focusArea]),
-  );
+  const focusAreaById = new Map(input.focusAreas.map((focusArea) => [focusArea.id, focusArea]));
   const shiftCategories = input.shiftCategories.filter(
     (shift) => includeArchived || !shift.archivedAt,
   );
   const jobs = input.jobs.filter(
-    (job) =>
-      !isRegularStaffSystemJob(job) && (includeArchived || !job.archivedAt),
+    (job) => !isRegularStaffSystemJob(job) && (includeArchived || !job.archivedAt),
   );
   const options: Array<{
     shiftId: number | null;
     jobId: number;
     sortOrder: number;
     archivedAt: string | null;
-    values: Omit<
-      AssignmentDefinition,
-      "id" | "orgId" | "sortOrder" | "archivedAt"
-    >;
+    values: Omit<AssignmentDefinition, "id" | "orgId" | "sortOrder" | "archivedAt">;
   }> = [];
 
   for (const job of jobs) {
@@ -164,21 +149,13 @@ export function buildScheduleAssignmentOptions(input: {
     const effectiveFocusAreaIdSet = new Set(
       resolvePlacementFocusAreaIds(job, input.focusAreas, includeArchived),
     );
-    const applicableShiftIdSet = new Set(
-      normalizePlacementIds(job.applicableShiftIds),
-    );
+    const applicableShiftIdSet = new Set(normalizePlacementIds(job.applicableShiftIds));
     const applicableShifts = shiftCategories.filter((shift) => {
-      if (
-        applicableShiftIdSet.size > 0 &&
-        !applicableShiftIdSet.has(shift.id)
-      ) {
+      if (applicableShiftIdSet.size > 0 && !applicableShiftIdSet.has(shift.id)) {
         return false;
       }
       if (effectiveFocusAreaIdSet.size > 0) {
-        return (
-          shift.focusAreaId != null &&
-          effectiveFocusAreaIdSet.has(shift.focusAreaId)
-        );
+        return shift.focusAreaId != null && effectiveFocusAreaIdSet.has(shift.focusAreaId);
       }
       return true;
     });
@@ -189,8 +166,7 @@ export function buildScheduleAssignmentOptions(input: {
           shift.focusAreaId != null
             ? (focusAreaById.get(shift.focusAreaId)?.archivedAt ?? null)
             : null;
-        const archivedAt =
-          job.archivedAt ?? shift.archivedAt ?? focusAreaArchivedAt ?? null;
+        const archivedAt = job.archivedAt ?? shift.archivedAt ?? focusAreaArchivedAt ?? null;
         if (!includeArchived && archivedAt) continue;
 
         options.push({
@@ -232,12 +208,7 @@ export function buildScheduleAssignmentOptions(input: {
       return left.jobId - right.jobId;
     })
     .map((row) => ({
-      id: createStableScheduleOptionId(
-        input.orgId,
-        row.shiftId,
-        row.jobId,
-        usedIds,
-      ),
+      id: createStableScheduleOptionId(input.orgId, row.shiftId, row.jobId, usedIds),
       orgId: input.orgId,
       sortOrder: row.sortOrder,
       archivedAt: row.archivedAt,
@@ -258,9 +229,7 @@ function getScheduleEligibleRoleIds(
   }
 
   const scheduleRoleIds = new Set(
-    orgRoles
-      .filter((role) => role.isScheduleRole !== false)
-      .map((role) => role.id),
+    orgRoles.filter((role) => role.isScheduleRole !== false).map((role) => role.id),
   );
 
   return job.eligibleRoleIds.filter((roleId) => scheduleRoleIds.has(roleId));
@@ -289,10 +258,7 @@ const QUALIFICATION_RANK_COMPONENT_FACTOR = 100_000;
 const MISSING_QUALIFICATION_COMPONENT_RANK = 99_999;
 
 export function getQualificationSeniorityRank(input: {
-  job: Pick<
-    JobDefinition,
-    "eligibleRoleIds" | "requiredCertificationIds"
-  > | null;
+  job: Pick<JobDefinition, "eligibleRoleIds" | "requiredCertificationIds"> | null;
   fallbackRequiredCertificationIds?: number[];
   orgRoles?: NamedItem[];
   certifications?: NamedItem[];
@@ -321,8 +287,7 @@ export function getQualificationSeniorityRank(input: {
   if (roleRank == null && certificationRank == null) return null;
 
   return (
-    (roleRank ?? MISSING_QUALIFICATION_COMPONENT_RANK) *
-      QUALIFICATION_RANK_COMPONENT_FACTOR +
+    (roleRank ?? MISSING_QUALIFICATION_COMPONENT_RANK) * QUALIFICATION_RANK_COMPONENT_FACTOR +
     (certificationRank ?? MISSING_QUALIFICATION_COMPONENT_RANK)
   );
 }
@@ -345,9 +310,7 @@ function getRequirementNames(
   ids: number[],
   nameMap: Map<number, string> | undefined,
 ): string[] | null {
-  const names = ids
-    .map((id) => nameMap?.get(id)?.trim() ?? "")
-    .filter((name) => name.length > 0);
+  const names = ids.map((id) => nameMap?.get(id)?.trim() ?? "").filter((name) => name.length > 0);
 
   if (names.length !== ids.length || names.length === 0) {
     return null;
@@ -368,9 +331,7 @@ export function formatShiftAssignmentDisqualificationMessage(input: {
   return `${base} because this assignment requires ${formatRequirementList(input.reasons)}.`;
 }
 
-export function getShiftAbbr(
-  shift: ShiftCategory | null | undefined,
-): string | null {
+export function getShiftAbbr(shift: ShiftCategory | null | undefined): string | null {
   if (!shift) return null;
   if (shift.abbr?.trim()) return shift.abbr.trim();
   const initials = shift.name
@@ -381,10 +342,7 @@ export function getShiftAbbr(
   return initials || null;
 }
 
-function getFallbackJobName(
-  assignment: AssignmentDefinition,
-  shift: ShiftCategory | null,
-): string {
+function getFallbackJobName(assignment: AssignmentDefinition, shift: ShiftCategory | null): string {
   const normalizedCodeName = assignment.name.trim();
   if (!shift) return normalizedCodeName || assignment.label;
 
@@ -401,15 +359,9 @@ function getFallbackJobName(
   return withoutShift || normalizedCodeName;
 }
 
-function getFallbackJobAbbr(
-  assignment: AssignmentDefinition,
-  shift: ShiftCategory | null,
-): string {
+function getFallbackJobAbbr(assignment: AssignmentDefinition, shift: ShiftCategory | null): string {
   const shiftAbbr = getShiftAbbr(shift);
-  if (
-    shiftAbbr &&
-    assignment.label.toUpperCase().startsWith(shiftAbbr.toUpperCase())
-  ) {
+  if (shiftAbbr && assignment.label.toUpperCase().startsWith(shiftAbbr.toUpperCase())) {
     const trimmed = assignment.label.slice(shiftAbbr.length).trim();
     if (trimmed.length > 0) {
       return trimmed.toUpperCase();
@@ -447,8 +399,7 @@ function isAssignmentDefinitionBackedByCurrentJobs(input: {
     return false;
   }
 
-  const assignmentMode =
-    job.assignmentMode ?? (shift == null ? "shiftless" : "with_shift");
+  const assignmentMode = job.assignmentMode ?? (shift == null ? "shiftless" : "with_shift");
   const hasPlacementConstraints =
     job.focusAreaId != null ||
     (job.focusAreaIds?.length ?? 0) > 0 ||
@@ -466,9 +417,7 @@ function isAssignmentDefinitionBackedByCurrentJobs(input: {
   }
 
   const allowedShiftIds = new Set(
-    getJobPlacementShiftPool(job, shiftCategories, focusAreas).map(
-      (candidate) => candidate.id,
-    ),
+    getJobPlacementShiftPool(job, shiftCategories, focusAreas).map((candidate) => candidate.id),
   );
 
   return allowedShiftIds.size > 0 && allowedShiftIds.has(shift.id);
@@ -503,20 +452,22 @@ export function buildShiftDisplayParts(input: {
   const { shift, job, assignment, shiftDisplayMode } = input;
   const resolvedAssignmentDefinition = assignment ?? null;
   const isShiftOnly = shift != null && isDefaultShiftSystemJob(job);
-  const showJobOnGrid = isShiftOnly ? false : deriveShowJobOnGrid(
-    job,
-    resolvedAssignmentDefinition ?? {
-      id: -1,
-      orgId: "derived",
-      label: "",
-      name: "",
-      color: "",
-      border: "",
-      text: "",
-      sortOrder: 0,
-    },
-    shift,
-  );
+  const showJobOnGrid = isShiftOnly
+    ? false
+    : deriveShowJobOnGrid(
+        job,
+        resolvedAssignmentDefinition ?? {
+          id: -1,
+          orgId: "derived",
+          label: "",
+          name: "",
+          color: "",
+          border: "",
+          text: "",
+          sortOrder: 0,
+        },
+        shift,
+      );
   const shiftAbbr = getShiftAbbr(shift);
   const jobName =
     job?.name ??
@@ -525,14 +476,11 @@ export function buildShiftDisplayParts(input: {
       : "Staff");
   const jobAbbr =
     job?.abbr ??
-    (resolvedAssignmentDefinition
-      ? getFallbackJobAbbr(resolvedAssignmentDefinition, shift)
-      : "");
+    (resolvedAssignmentDefinition ? getFallbackJobAbbr(resolvedAssignmentDefinition, shift) : "");
   const isShiftless =
     shift == null &&
     (resolvedAssignmentDefinition
-      ? resolvedAssignmentDefinition.isGeneral ||
-        resolvedAssignmentDefinition.focusAreaId == null
+      ? resolvedAssignmentDefinition.isGeneral || resolvedAssignmentDefinition.focusAreaId == null
       : job?.assignmentMode === "shiftless");
 
   return {
@@ -542,12 +490,8 @@ export function buildShiftDisplayParts(input: {
           (isShiftless
             ? job
               ? jobName
-              : resolvedAssignmentDefinition?.name ||
-                resolvedAssignmentDefinition?.label ||
-                ""
-            : resolvedAssignmentDefinition?.name ||
-              resolvedAssignmentDefinition?.label ||
-              jobName))
+              : resolvedAssignmentDefinition?.name || resolvedAssignmentDefinition?.label || ""
+            : resolvedAssignmentDefinition?.name || resolvedAssignmentDefinition?.label || jobName))
         : (shiftAbbr ??
           (isShiftless
             ? job
@@ -581,20 +525,14 @@ export function isEmployeeQualifiedForJob(
   const eligibleRoleIds = getScheduleEligibleRoleIds(job, orgRoles);
 
   const rolesOk =
-    eligibleRoleIds.length === 0 ||
-    eligibleRoleIds.some((roleId) => emp.roleIds.includes(roleId));
+    eligibleRoleIds.length === 0 || eligibleRoleIds.some((roleId) => emp.roleIds.includes(roleId));
   const certificationsOk =
     requiredCertificationIds.length === 0 ||
-    (emp.certificationId != null &&
-      requiredCertificationIds.includes(emp.certificationId));
+    (emp.certificationId != null && requiredCertificationIds.includes(emp.certificationId));
   const hasRoleGate = eligibleRoleIds.length > 0;
   const hasCertificationGate = requiredCertificationIds.length > 0;
 
-  if (
-    hasRoleGate &&
-    hasCertificationGate &&
-    getJobEligibilityMode(job) === "or"
-  ) {
+  if (hasRoleGate && hasCertificationGate && getJobEligibilityMode(job) === "or") {
     return rolesOk || certificationsOk;
   }
 
@@ -607,10 +545,7 @@ export function getAssignableShiftDisqualificationReasons(
     shift: Pick<ShiftCategory, "focusAreaId" | "name"> | null;
     job: Pick<
       JobDefinition,
-      | "name"
-      | "eligibleRoleIds"
-      | "requiredCertificationIds"
-      | "eligibilityMode"
+      "name" | "eligibleRoleIds" | "requiredCertificationIds" | "eligibilityMode"
     > | null;
     fallbackRequiredCertificationIds?: number[];
     focusAreaNames?: Map<number, string>;
@@ -621,16 +556,10 @@ export function getAssignableShiftDisqualificationReasons(
 ): string[] {
   const reasons: string[] = [];
 
-  if (
-    input.shift?.focusAreaId &&
-    !emp.focusAreaIds.includes(input.shift.focusAreaId)
-  ) {
-    const focusAreaName =
-      input.focusAreaNames?.get(input.shift.focusAreaId)?.trim() ?? "";
+  if (input.shift?.focusAreaId && !emp.focusAreaIds.includes(input.shift.focusAreaId)) {
+    const focusAreaName = input.focusAreaNames?.get(input.shift.focusAreaId)?.trim() ?? "";
     reasons.push(
-      focusAreaName.length > 0
-        ? `the ${focusAreaName} focus area`
-        : "the required focus area",
+      focusAreaName.length > 0 ? `the ${focusAreaName} focus area` : "the required focus area",
     );
   }
 
@@ -653,8 +582,7 @@ export function getAssignableShiftDisqualificationReasons(
     : (input.fallbackRequiredCertificationIds ?? []);
   const certificationReason =
     requiredCertificationIds.length > 0 &&
-    (emp.certificationId == null ||
-      !requiredCertificationIds.includes(emp.certificationId))
+    (emp.certificationId == null || !requiredCertificationIds.includes(emp.certificationId))
       ? (() => {
           const certificationNames = getRequirementNames(
             requiredCertificationIds,
@@ -693,9 +621,7 @@ export function isEmployeeQualifiedForAssignableShift(
     orgRoles?: NamedItem[];
   },
 ): boolean {
-  const areaOk =
-    !input.shift?.focusAreaId ||
-    emp.focusAreaIds.includes(input.shift.focusAreaId);
+  const areaOk = !input.shift?.focusAreaId || emp.focusAreaIds.includes(input.shift.focusAreaId);
 
   return (
     areaOk &&
@@ -721,9 +647,7 @@ export function buildAssignableShiftOptions({
   const resolvedAssignmentDefinitions = assignments ?? [];
   const shiftById = new Map(shiftCategories.map((shift) => [shift.id, shift]));
   const jobById = new Map(jobs.map((job) => [job.id, job]));
-  const focusAreaNameById = new Map(
-    focusAreas.map((focusArea) => [focusArea.id, focusArea.name]),
-  );
+  const focusAreaNameById = new Map(focusAreas.map((focusArea) => [focusArea.id, focusArea.name]));
 
   const options: AssignableShiftOption[] = [];
 
@@ -732,8 +656,7 @@ export function buildAssignableShiftOptions({
 
     const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
     const shift = shiftId != null ? (shiftById.get(shiftId) ?? null) : null;
-    const job =
-      assignment.jobId != null ? (jobById.get(assignment.jobId) ?? null) : null;
+    const job = assignment.jobId != null ? (jobById.get(assignment.jobId) ?? null) : null;
     const focusAreaId = shift?.focusAreaId ?? assignment.focusAreaId ?? null;
 
     if (
@@ -753,8 +676,7 @@ export function buildAssignableShiftOptions({
       !isEmployeeQualifiedForAssignableShift(employee, {
         shift,
         job,
-        fallbackRequiredCertificationIds:
-          assignment.requiredCertificationIds ?? [],
+        fallbackRequiredCertificationIds: assignment.requiredCertificationIds ?? [],
         orgRoles,
       })
     ) {
@@ -767,8 +689,7 @@ export function buildAssignableShiftOptions({
     const resolvedJobTimes = resolveJobTimesForShift(job, shift);
     const qualificationRank = getQualificationSeniorityRank({
       job,
-      fallbackRequiredCertificationIds:
-        assignment.requiredCertificationIds ?? [],
+      fallbackRequiredCertificationIds: assignment.requiredCertificationIds ?? [],
       orgRoles,
       certifications,
     });
@@ -781,9 +702,7 @@ export function buildAssignableShiftOptions({
     const groupLabel =
       shift?.name ??
       (!displayParts.isShiftless && focusAreaId != null
-        ? (focusAreaNameById.get(focusAreaId) ??
-          assignment.name ??
-          assignment.label)
+        ? (focusAreaNameById.get(focusAreaId) ?? assignment.name ?? assignment.label)
         : "General");
     const groupSortOrder = shift?.sortOrder ?? assignment.sortOrder;
 
@@ -793,10 +712,7 @@ export function buildAssignableShiftOptions({
       shiftId,
       jobId: job?.id ?? 0,
       focusAreaId,
-      focusAreaName:
-        focusAreaId != null
-          ? (focusAreaNameById.get(focusAreaId) ?? null)
-          : null,
+      focusAreaName: focusAreaId != null ? (focusAreaNameById.get(focusAreaId) ?? null) : null,
       shiftName: shift?.name ?? null,
       shiftAbbr,
       jobName,
@@ -813,12 +729,8 @@ export function buildAssignableShiftOptions({
       color: assignment.color,
       border: assignment.border,
       text: assignment.text,
-      startTime: toDisplayTime(
-        assignment.defaultStartTime ?? resolvedJobTimes.startTime,
-      ),
-      endTime: toDisplayTime(
-        assignment.defaultEndTime ?? resolvedJobTimes.endTime,
-      ),
+      startTime: toDisplayTime(assignment.defaultStartTime ?? resolvedJobTimes.startTime),
+      endTime: toDisplayTime(assignment.defaultEndTime ?? resolvedJobTimes.endTime),
     });
   }
 
@@ -852,11 +764,8 @@ export function formatAssignableShiftOptionLabel(
 export function buildAssignableShiftDisplayMap(
   input: Omit<BuildAssignableShiftOptionsInput, "employee">,
 ): Map<number, string> {
-  const resolvedAssignmentDefinitions =
-    input.assignments ?? input.assignments ?? [];
-  const shiftById = new Map(
-    input.shiftCategories.map((shift) => [shift.id, shift]),
-  );
+  const resolvedAssignmentDefinitions = input.assignments ?? input.assignments ?? [];
+  const shiftById = new Map(input.shiftCategories.map((shift) => [shift.id, shift]));
   const jobById = new Map(input.jobs.map((job) => [job.id, job]));
 
   return new Map(
@@ -865,10 +774,7 @@ export function buildAssignableShiftDisplayMap(
       .map((assignment) => {
         const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
         const shift = shiftId != null ? (shiftById.get(shiftId) ?? null) : null;
-        const job =
-          assignment.jobId != null
-            ? (jobById.get(assignment.jobId) ?? null)
-            : null;
+        const job = assignment.jobId != null ? (jobById.get(assignment.jobId) ?? null) : null;
         const displayParts = buildShiftDisplayParts({
           shift,
           job,
@@ -876,10 +782,7 @@ export function buildAssignableShiftDisplayMap(
           shiftDisplayMode: input.shiftDisplayMode ?? "code",
         });
 
-        return [
-          assignment.id,
-          formatAssignableShiftOptionLabel(displayParts),
-        ] as const;
+        return [assignment.id, formatAssignableShiftOptionLabel(displayParts)] as const;
       }),
   );
 }
@@ -893,25 +796,20 @@ export function isEmployeeQualifiedForAssignmentDefinition(
     orgRoles?: NamedItem[];
   },
 ): boolean {
-  const shiftId =
-    input.assignment.shiftId ?? input.assignment.categoryId ?? null;
+  const shiftId = input.assignment.shiftId ?? input.assignment.categoryId ?? null;
   const shift =
     shiftId != null
-      ? (input.shiftCategories.find((candidate) => candidate.id === shiftId) ??
-        null)
+      ? (input.shiftCategories.find((candidate) => candidate.id === shiftId) ?? null)
       : null;
   const job =
     input.assignment.jobId != null
-      ? (input.jobs.find(
-          (candidate) => candidate.id === input.assignment.jobId,
-        ) ?? null)
+      ? (input.jobs.find((candidate) => candidate.id === input.assignment.jobId) ?? null)
       : null;
 
   return isEmployeeQualifiedForAssignableShift(emp, {
     shift,
     job,
-    fallbackRequiredCertificationIds:
-      input.assignment.requiredCertificationIds ?? [],
+    fallbackRequiredCertificationIds: input.assignment.requiredCertificationIds ?? [],
     orgRoles: input.orgRoles,
   });
 }
@@ -928,25 +826,20 @@ export function getAssignmentDefinitionDisqualificationReasons(
     certificationNames?: Map<number, string>;
   },
 ): string[] {
-  const shiftId =
-    input.assignment.shiftId ?? input.assignment.categoryId ?? null;
+  const shiftId = input.assignment.shiftId ?? input.assignment.categoryId ?? null;
   const shift =
     shiftId != null
-      ? (input.shiftCategories.find((candidate) => candidate.id === shiftId) ??
-        null)
+      ? (input.shiftCategories.find((candidate) => candidate.id === shiftId) ?? null)
       : null;
   const job =
     input.assignment.jobId != null
-      ? (input.jobs.find(
-          (candidate) => candidate.id === input.assignment.jobId,
-        ) ?? null)
+      ? (input.jobs.find((candidate) => candidate.id === input.assignment.jobId) ?? null)
       : null;
 
   return getAssignableShiftDisqualificationReasons(emp, {
     shift,
     job,
-    fallbackRequiredCertificationIds:
-      input.assignment.requiredCertificationIds ?? [],
+    fallbackRequiredCertificationIds: input.assignment.requiredCertificationIds ?? [],
     focusAreaNames: input.focusAreaNames,
     orgRoles: input.orgRoles,
     roleNames: input.roleNames,

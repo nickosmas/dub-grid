@@ -89,15 +89,14 @@ function createSessionClientMock(input?: {
   const rpc = vi.fn(async (fn: string) => {
     if (fn === "get_my_organizations") {
       return {
-        data:
-          input?.memberships ?? [
-            {
-              org_id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
-              org_name: "DubGrid Health",
-              org_slug: "dubgrid-health",
-              is_active: true,
-            },
-          ],
+        data: input?.memberships ?? [
+          {
+            org_id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+            org_name: "DubGrid Health",
+            org_slug: "dubgrid-health",
+            is_active: true,
+          },
+        ],
         error: null,
       };
     }
@@ -143,13 +142,12 @@ function createSessionClientMock(input?: {
       }),
       refreshSession: vi.fn().mockResolvedValue({
         data: {
-          session:
-            input?.refreshSession ?? {
-              access_token: "switched-access-token",
-              refresh_token: "switched-refresh-token",
-              expires_in: 3600,
-              token_type: "bearer",
-            },
+          session: input?.refreshSession ?? {
+            access_token: "switched-access-token",
+            refresh_token: "switched-refresh-token",
+            expires_in: 3600,
+            token_type: "bearer",
+          },
         },
         error: null,
       }),
@@ -295,7 +293,8 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
+      error:
+        "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
     });
   });
 
@@ -449,8 +448,7 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
-      error:
-        "We couldn't find that organization. Check the subdomain and try again.",
+      error: "We couldn't find that organization. Check the subdomain and try again.",
     });
   });
 });

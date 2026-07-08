@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { DbOrganization } from "@dubgrid/db-types";
-import {
-  createRequestSupabaseClient,
-  requireGridmasterSession,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { rowToOrganization } from "@/lib/db/mappers";
@@ -307,14 +304,11 @@ export async function POST(req: NextRequest) {
           }
 
           const displayName = `${firstName} ${lastName}`.trim();
-          const assignResult = await requestClient.rpc(
-            "assign_org_role_by_email",
-            {
-              p_email: email,
-              p_org_id: org.id,
-              p_org_role: "super_admin",
-            },
-          );
+          const assignResult = await requestClient.rpc("assign_org_role_by_email", {
+            p_email: email,
+            p_org_id: org.id,
+            p_org_role: "super_admin",
+          });
 
           if (!assignResult.error) {
             superAdmin = {

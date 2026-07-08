@@ -70,7 +70,9 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
       // must allow the click even when departments.length === 0 at render
       // time and instead validate after the save runs.
       if (departmentsRef.current.length === 0) {
-        toast.error(`Add at least one ${(org?.departmentLabel || "department").toLowerCase().replace(/s$/, "")} to continue.`);
+        toast.error(
+          `Add at least one ${(org?.departmentLabel || "department").toLowerCase().replace(/s$/, "")} to continue.`,
+        );
         return;
       }
       onNext();

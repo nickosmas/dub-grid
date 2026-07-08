@@ -21,8 +21,6 @@ describe("Expo Router app tree", () => {
   it("does not include test files in the route directory", () => {
     const appFiles = collectFiles(appRoot);
 
-    expect(
-      appFiles.filter((file) => /\.(test|spec)\.[cm]?[jt]sx?$/.test(file)),
-    ).toEqual([]);
+    expect(appFiles.filter((file) => /\.(test|spec)\.[cm]?[jt]sx?$/.test(file))).toEqual([]);
   });
 });

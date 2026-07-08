@@ -14,7 +14,14 @@ interface StepperBarProps {
 
 export default function StepperBar({ steps, currentStepIndex }: StepperBarProps) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }} role="progressbar" aria-valuenow={currentStepIndex + 1} aria-valuemin={1} aria-valuemax={steps.length} aria-label={`Step ${currentStepIndex + 1} of ${steps.length}: ${steps[currentStepIndex]?.label ?? ""}`}>
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}
+      role="progressbar"
+      aria-valuenow={currentStepIndex + 1}
+      aria-valuemin={1}
+      aria-valuemax={steps.length}
+      aria-label={`Step ${currentStepIndex + 1} of ${steps.length}: ${steps[currentStepIndex]?.label ?? ""}`}
+    >
       {steps.map((step, i) => {
         const isCompleted = i < currentStepIndex;
         const isCurrent = i === currentStepIndex;
@@ -101,9 +108,7 @@ export default function StepperBar({ steps, currentStepIndex }: StepperBarProps)
                   marginLeft: 8,
                   marginRight: 8,
                   borderRadius: 1,
-                  background: isCompleted
-                    ? "var(--color-brand)"
-                    : "var(--color-border)",
+                  background: isCompleted ? "var(--color-brand)" : "var(--color-border)",
                   transition: "background 200ms ease",
                 }}
               />

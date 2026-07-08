@@ -4,11 +4,7 @@ import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { loadOperationsReport } from "@/features/reports/server/operations";
 import { apiErrorResponse } from "@/lib/error-handling";
-import {
-  operationsQuerySchema,
-  parseOperationsFilters,
-  parseOperationsRange,
-} from "./params";
+import { operationsQuerySchema, parseOperationsFilters, parseOperationsRange } from "./params";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +13,7 @@ export async function GET(req: NextRequest) {
     Object.fromEntries(req.nextUrl.searchParams.entries()),
   );
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Check the report filters and try again." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Check the report filters and try again." }, { status: 400 });
   }
 
   let range;
@@ -36,8 +29,7 @@ export async function GET(req: NextRequest) {
     const auth = await requireOrgPermissions(
       req,
       parsed.data.orgId,
-      (permissions) =>
-        permissions.role === "admin" || permissions.isSuperAdmin === true,
+      (permissions) => permissions.role === "admin" || permissions.isSuperAdmin === true,
     );
     if ("response" in auth) {
       return auth.response;

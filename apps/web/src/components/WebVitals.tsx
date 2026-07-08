@@ -3,8 +3,7 @@
 import { useReportWebVitals } from "next/web-vitals";
 
 const PERF_TIMING =
-  process.env.NEXT_PUBLIC_PERF_TIMING === "1" ||
-  process.env.NODE_ENV === "development";
+  process.env.NEXT_PUBLIC_PERF_TIMING === "1" || process.env.NODE_ENV === "development";
 
 /**
  * Perf-baseline Web Vitals capture (LCP / INP / TTFB / CLS / FCP).

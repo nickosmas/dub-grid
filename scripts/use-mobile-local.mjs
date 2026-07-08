@@ -73,11 +73,7 @@ export function getCandidateIpv4Addresses() {
 
   for (const [interfaceName, addresses] of Object.entries(interfaces)) {
     for (const address of addresses ?? []) {
-      if (
-        address.family === "IPv4" &&
-        !address.internal &&
-        isPrivateIpv4Address(address.address)
-      ) {
+      if (address.family === "IPv4" && !address.internal && isPrivateIpv4Address(address.address)) {
         candidates.push({ address: address.address, interface: interfaceName });
       }
     }
@@ -164,8 +160,7 @@ function main() {
 }
 
 const isDirectInvocation =
-  process.argv[1] != null &&
-  fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+  process.argv[1] != null && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 
 if (isDirectInvocation) {
   try {

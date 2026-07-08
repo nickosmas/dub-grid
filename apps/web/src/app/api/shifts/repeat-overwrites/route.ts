@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireAuthenticatedUser,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -61,9 +58,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ overwriteCount });
   } catch (error) {
     console.error("repeat overwrites POST failed", error);
-    return NextResponse.json(
-      { error: "Failed to load repeat overwrite count" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load repeat overwrite count" }, { status: 500 });
   }
 }

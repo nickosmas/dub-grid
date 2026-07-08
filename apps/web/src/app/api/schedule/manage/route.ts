@@ -8,27 +8,14 @@ import type {
 } from "@dubgrid/db-types";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
-import {
-  requireOrgPermissions,
-  resolveEffectiveOrgId,
-} from "@/app/api/shared/permissions";
+import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
-import {
-  fetchAssignmentIdByPairMap,
-  fetchAssignmentLabelMap,
-} from "@/app/api/shared/schedule";
-import {
-  rowToShiftRequest,
-} from "@/lib/db/mappers";
-import {
-  mapNormalizedScheduleCellRowToScheduleEntry,
-} from "@/lib/schedule-cells";
-import {
-  formatDateKey,
-  iterateDateRange,
-} from "@/lib/utils";
+import { fetchAssignmentIdByPairMap, fetchAssignmentLabelMap } from "@/app/api/shared/schedule";
+import { rowToShiftRequest } from "@/lib/db/mappers";
+import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
+import { formatDateKey, iterateDateRange } from "@/lib/utils";
 import { RECURRING_SHIFT_COLS, fetchAllRows } from "@/lib/db/shared";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import type {
@@ -346,14 +333,8 @@ async function writeShiftSnapshot(
   }
 
   const state = normalizeScheduleInput(input.state);
-  const {
-    shiftIds,
-    jobIds,
-    isMentoredFlags,
-    absenceTypeId,
-    customStartTime,
-    customEndTime,
-  } = getScheduleCellStorage(state);
+  const { shiftIds, jobIds, isMentoredFlags, absenceTypeId, customStartTime, customEndTime } =
+    getScheduleCellStorage(state);
 
   const { error } = await serviceClient.rpc("write_schedule_cell_snapshot", {
     p_org_id: input.orgId,
@@ -423,15 +404,12 @@ async function fetchScheduleCellSnapshotPayload(
   date: string,
   snapshotKind: "draft" | "published",
 ) {
-  const { data, error } = await serviceClient.rpc(
-    "get_schedule_cell_snapshot_payload",
-    {
-      p_org_id: orgId,
-      p_emp_id: employeeId,
-      p_date: date,
-      p_snapshot_kind: snapshotKind,
-    },
-  );
+  const { data, error } = await serviceClient.rpc("get_schedule_cell_snapshot_payload", {
+    p_org_id: orgId,
+    p_emp_id: employeeId,
+    p_date: date,
+    p_snapshot_kind: snapshotKind,
+  });
   if (error) {
     throw error;
   }
@@ -484,11 +462,7 @@ export async function POST(req: NextRequest) {
   {
     const auth = await requireAuthenticatedUser(req);
     if (!("response" in auth)) {
-      const effective = await resolveEffectiveOrgId(
-        req,
-        auth.user.id,
-        data.orgId,
-      );
+      const effective = await resolveEffectiveOrgId(req, auth.user.id, data.orgId);
       if (effective !== data.orgId) {
         (data as { orgId: string }).orgId = effective;
       }
@@ -502,9 +476,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canViewSchedule,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
         );
         if ("response" in auth) {
           return auth.response;
@@ -512,13 +484,8 @@ export async function POST(req: NextRequest) {
 
         assertDateRange(data.startDate, data.endDate);
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
-        const absenceTypeMap = new Map<number, string>(
-          data.absenceTypeLabels ?? [],
-        );
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(
-          auth.serviceClient,
-          data.orgId,
-        );
+        const absenceTypeMap = new Map<number, string>(data.absenceTypeLabels ?? []);
+        const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
 
         const buildPage = (from: number, to: number) => {
           let query = auth.serviceClient
@@ -564,9 +531,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canViewSchedule,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
         );
         if ("response" in auth) {
           return auth.response;
@@ -613,9 +578,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canViewSchedule,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
         );
         if ("response" in auth) {
           return auth.response;
@@ -637,10 +600,7 @@ export async function POST(req: NextRequest) {
         }
 
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(
-          auth.serviceClient,
-          data.orgId,
-        );
+        const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
 
         const openShifts = ((rows ?? []) as Record<string, unknown>[])
           .map((row): GridOpenShift | null => {
@@ -658,14 +618,10 @@ export async function POST(req: NextRequest) {
               requester_shift_date: row.requester_shift_date as string,
               requester_state: row.requester_state as ScheduleCellInput,
               target_emp_id: (row.target_emp_id as string | null) ?? null,
-              target_shift_date:
-                (row.target_shift_date as string | null) ?? null,
-              target_state:
-                (row.target_state as ScheduleCellInput | null | undefined) ??
-                null,
+              target_shift_date: (row.target_shift_date as string | null) ?? null,
+              target_state: (row.target_state as ScheduleCellInput | null | undefined) ?? null,
               absence_type_id: (row.absence_type_id as number | null) ?? null,
-              parent_request_id:
-                (row.parent_request_id as string | null) ?? null,
+              parent_request_id: (row.parent_request_id as string | null) ?? null,
               admin_user_id: (row.admin_user_id as string | null) ?? null,
               admin_note: (row.admin_note as string | null) ?? null,
               expires_at: row.expires_at as string,
@@ -714,18 +670,15 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canViewSchedule,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
         );
         if ("response" in auth) {
           return auth.response;
         }
 
-        const { data: value, error } = await auth.userClient.rpc(
-          "get_schedule_last_viewed",
-          { p_org_id: data.orgId },
-        );
+        const { data: value, error } = await auth.userClient.rpc("get_schedule_last_viewed", {
+          p_org_id: data.orgId,
+        });
         if (error) {
           throw error;
         }
@@ -738,18 +691,15 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canViewSchedule,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
         );
         if ("response" in auth) {
           return auth.response;
         }
 
-        const { error } = await auth.userClient.rpc(
-          "update_schedule_last_viewed",
-          { p_org_id: data.orgId },
-        );
+        const { error } = await auth.userClient.rpc("update_schedule_last_viewed", {
+          p_org_id: data.orgId,
+        });
         if (error) {
           throw error;
         }
@@ -761,9 +711,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canEditShifts,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
         );
         if ("response" in auth) {
           return auth.response;
@@ -784,9 +732,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canEditShifts,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
         );
         if ("response" in auth) {
           return auth.response;
@@ -795,28 +741,27 @@ export async function POST(req: NextRequest) {
         assertDateRange(data.sourceStartDate, data.sourceEndDate);
         assertDateRange(data.targetStartDate, data.targetEndDate);
 
-        const { data: rows, error } = await auth.userClient.rpc(
-          "import_previous_schedule",
-          {
-            p_org_id: data.orgId,
-            p_source_start: data.sourceStartDate,
-            p_source_end: data.sourceEndDate,
-            p_target_start: data.targetStartDate,
-            p_target_end: data.targetEndDate,
-            p_dry_run: data.dryRun,
-          },
-        );
+        const { data: rows, error } = await auth.userClient.rpc("import_previous_schedule", {
+          p_org_id: data.orgId,
+          p_source_start: data.sourceStartDate,
+          p_source_end: data.sourceEndDate,
+          p_target_start: data.targetStartDate,
+          p_target_end: data.targetEndDate,
+          p_dry_run: data.dryRun,
+        });
         if (error) {
           throw error;
         }
 
-        const outcomes = ((rows ?? []) as Array<{
-          emp_id: string;
-          source_date: string;
-          target_date: string;
-          outcome: string;
-          reason: string | null;
-        }>).map((row) => ({
+        const outcomes = (
+          (rows ?? []) as Array<{
+            emp_id: string;
+            source_date: string;
+            target_date: string;
+            outcome: string;
+            reason: string | null;
+          }>
+        ).map((row) => ({
           employeeId: row.emp_id,
           sourceDate: row.source_date,
           targetDate: row.target_date,
@@ -832,9 +777,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canEditShifts,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
         );
         if ("response" in auth) {
           return auth.response;
@@ -854,9 +797,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canEditShifts,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
         );
         if ("response" in auth) {
           return auth.response;
@@ -878,9 +819,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canEditShifts,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
         );
         if ("response" in auth) {
           return auth.response;
@@ -913,27 +852,23 @@ export async function POST(req: NextRequest) {
           );
         }
 
-        const { error } = await auth.userClient.rpc(
-          "write_schedule_cell_snapshot",
-          {
-            p_org_id: data.orgId,
-            p_emp_id: data.employeeId,
-            p_date: data.date,
-            p_snapshot_kind: "draft",
-            p_state_kind: "worked",
-            p_shift_ids: sourcePayload.shift_ids ?? [],
-            p_job_ids: sourcePayload.job_ids ?? [],
-            p_is_mentored_flags: sourcePayload.is_mentored_flags ?? [],
-            p_absence_type_id: null,
-            p_custom_start_time: data.customStartTime,
-            p_custom_end_time: data.customEndTime,
-            p_series_id: sourcePayload.series_id ?? null,
-            p_from_recurring: sourcePayload.from_recurring ?? false,
-            p_focus_area_id: sourcePayload.focus_area_id ?? null,
-            p_expected_version:
-              data.expectedVersion ?? sourcePayload.version ?? 0,
-          },
-        );
+        const { error } = await auth.userClient.rpc("write_schedule_cell_snapshot", {
+          p_org_id: data.orgId,
+          p_emp_id: data.employeeId,
+          p_date: data.date,
+          p_snapshot_kind: "draft",
+          p_state_kind: "worked",
+          p_shift_ids: sourcePayload.shift_ids ?? [],
+          p_job_ids: sourcePayload.job_ids ?? [],
+          p_is_mentored_flags: sourcePayload.is_mentored_flags ?? [],
+          p_absence_type_id: null,
+          p_custom_start_time: data.customStartTime,
+          p_custom_end_time: data.customEndTime,
+          p_series_id: sourcePayload.series_id ?? null,
+          p_from_recurring: sourcePayload.from_recurring ?? false,
+          p_focus_area_id: sourcePayload.focus_area_id ?? null,
+          p_expected_version: data.expectedVersion ?? sourcePayload.version ?? 0,
+        });
         if (error) {
           if (error.message?.includes("Optimistic lock failed")) {
             await raiseOptimisticConflict(
@@ -955,23 +890,15 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canEditShifts,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
         );
         if ("response" in auth) {
           return auth.response;
         }
 
         const state = normalizeScheduleInput(data.input);
-        const {
-          shiftIds,
-          jobIds,
-          isMentoredFlags,
-          absenceTypeId,
-          customStartTime,
-          customEndTime,
-        } = getScheduleCellStorage(state);
+        const { shiftIds, jobIds, isMentoredFlags, absenceTypeId, customStartTime, customEndTime } =
+          getScheduleCellStorage(state);
         const { error } = await auth.userClient.rpc("move_shift", {
           p_org_id: data.orgId,
           p_source_emp_id: data.sourceEmpId,
@@ -1023,45 +950,35 @@ export async function POST(req: NextRequest) {
           fromRecurring: false,
         });
 
-        if (
-          normalizedInput.kind === "absence" &&
-          (normalizedInput.absenceTypeId ?? null) == null
-        ) {
+        if (normalizedInput.kind === "absence" && (normalizedInput.absenceTypeId ?? null) == null) {
           return NextResponse.json(
             { error: "Shift series requires an absence type" },
             { status: 400 },
           );
         }
-        if (
-          normalizedInput.kind === "worked" &&
-          normalizedInput.segments.length === 0
-        ) {
+        if (normalizedInput.kind === "worked" && normalizedInput.segments.length === 0) {
           return NextResponse.json(
             { error: "Shift series requires at least one worked segment" },
             { status: 400 },
           );
         }
 
-        const { data: createdSeriesId, error } = await auth.userClient.rpc(
-          "create_shift_series",
-          {
-            p_series_id: requestedId,
-            p_emp_id: data.employeeId,
-            p_org_id: data.orgId,
-            p_state: normalizedInput,
-            p_frequency: data.frequency,
-            p_days_of_week: data.daysOfWeek,
-            p_start_date: data.startDate,
-            p_end_date: data.endDate,
-            p_max_occurrences: data.maxOccurrences,
-          },
-        );
+        const { data: createdSeriesId, error } = await auth.userClient.rpc("create_shift_series", {
+          p_series_id: requestedId,
+          p_emp_id: data.employeeId,
+          p_org_id: data.orgId,
+          p_state: normalizedInput,
+          p_frequency: data.frequency,
+          p_days_of_week: data.daysOfWeek,
+          p_start_date: data.startDate,
+          p_end_date: data.endDate,
+          p_max_occurrences: data.maxOccurrences,
+        });
         if (error) {
           throw error;
         }
 
-        const id =
-          typeof createdSeriesId === "string" ? createdSeriesId : requestedId;
+        const id = typeof createdSeriesId === "string" ? createdSeriesId : requestedId;
         const seriesInput = {
           ...normalizedInput,
           seriesId: id,
@@ -1075,9 +992,7 @@ export async function POST(req: NextRequest) {
           presentation: null,
           input: seriesInput,
           absenceTypeId:
-            seriesInput.kind === "absence"
-              ? (seriesInput.absenceTypeId ?? null)
-              : null,
+            seriesInput.kind === "absence" ? (seriesInput.absenceTypeId ?? null) : null,
           shiftLabel: data.shiftLabel,
           frequency: data.frequency as SeriesFrequency,
           daysOfWeek: data.daysOfWeek,
@@ -1116,10 +1031,7 @@ export async function POST(req: NextRequest) {
           seriesId: data.seriesId,
           fromRecurring: false,
         });
-        if (
-          normalizedInput.kind === "worked" &&
-          normalizedInput.segments.length === 0
-        ) {
+        if (normalizedInput.kind === "worked" && normalizedInput.segments.length === 0) {
           return NextResponse.json(
             { error: "Series updates require at least one worked segment" },
             { status: 400 },
@@ -1158,13 +1070,10 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const { data: deletedCount, error } = await auth.userClient.rpc(
-          "delete_shift_series",
-          {
-            p_series_id: data.seriesId,
-            p_org_id: data.orgId,
-          },
-        );
+        const { data: deletedCount, error } = await auth.userClient.rpc("delete_shift_series", {
+          p_series_id: data.seriesId,
+          p_org_id: data.orgId,
+        });
         if (error) {
           throw error;
         }
@@ -1208,20 +1117,19 @@ export async function POST(req: NextRequest) {
             .order("id", { ascending: true })
             .range(from, to);
 
-        const [{ data: recurringRows, error: recurringError }, cells] =
-          await Promise.all([
-            auth.serviceClient
-              .from("recurring_shifts")
-              .select(RECURRING_SHIFT_COLS)
-              .eq("org_id", data.orgId)
-              .is("archived_at", null)
-              .lte("effective_from", data.endDate)
-              .or(`effective_until.is.null,effective_until.gte.${data.startDate}`),
-            // A single unpaged query here would silently truncate at PostgREST's
-            // max_rows cap, causing already-scheduled cells to be treated as
-            // empty and overwritten by the recurring fill below.
-            fetchAllRows<DbScheduleCell>(buildExistingCellsPage),
-          ]);
+        const [{ data: recurringRows, error: recurringError }, cells] = await Promise.all([
+          auth.serviceClient
+            .from("recurring_shifts")
+            .select(RECURRING_SHIFT_COLS)
+            .eq("org_id", data.orgId)
+            .is("archived_at", null)
+            .lte("effective_from", data.endDate)
+            .or(`effective_until.is.null,effective_until.gte.${data.startDate}`),
+          // A single unpaged query here would silently truncate at PostgREST's
+          // max_rows cap, causing already-scheduled cells to be treated as
+          // empty and overwritten by the recurring fill below.
+          fetchAllRows<DbScheduleCell>(buildExistingCellsPage),
+        ]);
         if (recurringError) {
           throw recurringError;
         }
@@ -1244,9 +1152,7 @@ export async function POST(req: NextRequest) {
           new Set(
             ((recurringRows ?? []) as DbRecurringShift[])
               .map((row) =>
-                row.state.kind === "absence"
-                  ? (row.state.absenceTypeId ?? null)
-                  : null,
+                row.state.kind === "absence" ? (row.state.absenceTypeId ?? null) : null,
               )
               .filter((id): id is number => id != null),
           ),
@@ -1261,9 +1167,10 @@ export async function POST(req: NextRequest) {
           throw absenceError;
         }
         const absenceTypeLabelMap = new Map(
-          ((absenceRows ?? []) as Array<{ id: number; name: string }>).map(
-            (row) => [row.id, row.name],
-          ),
+          ((absenceRows ?? []) as Array<{ id: number; name: string }>).map((row) => [
+            row.id,
+            row.name,
+          ]),
         );
         const [assignmentIdByPair, assignmentLabelMap] = await Promise.all([
           fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId),
@@ -1325,25 +1232,19 @@ export async function POST(req: NextRequest) {
               const assignmentIds = normalizedInput.segments
                 .map(
                   (segment) =>
-                    assignmentIdByPair.get(
-                      `${segment.shiftId ?? "null"}:${segment.jobId}`,
-                    ) ?? null,
+                    assignmentIdByPair.get(`${segment.shiftId ?? "null"}:${segment.jobId}`) ?? null,
                 )
                 .filter((value): value is number => value != null);
               generated.push({
                 empId: template.emp_id,
                 date: dateKey,
-                label: assignmentIds
-                  .map((id) => assignmentLabelMap.get(id) ?? "?")
-                  .join("/"),
+                label: assignmentIds.map((id) => assignmentLabelMap.get(id) ?? "?").join("/"),
               });
             }
           }
         }
 
-        const affectedEmpIds = Array.from(
-          new Set(generated.map((entry) => entry.empId)),
-        );
+        const affectedEmpIds = Array.from(new Set(generated.map((entry) => entry.empId)));
         if (affectedEmpIds.length > 0) {
           void dispatchNotificationEvent(auth.actor.id, {
             action: "recurring_schedules_applied",
@@ -1362,9 +1263,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canEditNotes,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
         );
         if ("response" in auth) {
           return auth.response;
@@ -1403,9 +1302,7 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canEditNotes,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
         );
         if ("response" in auth) {
           return auth.response;

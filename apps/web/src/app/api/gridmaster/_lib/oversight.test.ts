@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildPlatformActivitySummary,
-  loadGridmasterOrgHealth,
-} from "./oversight";
+import { buildPlatformActivitySummary, loadGridmasterOrgHealth } from "./oversight";
 
 const orgId = "11111111-1111-4111-8111-111111111111";
 const now = new Date("2026-05-03T12:00:00.000Z");
@@ -45,10 +42,7 @@ describe("gridmaster platform activity summary", () => {
 
   it("reserves review signals for explicit high-risk audited actions", () => {
     const summary = buildPlatformActivitySummary({
-      auditRows: [
-        auditRow("employee.updated", 1),
-        auditRow("org.suspended", 2),
-      ],
+      auditRows: [auditRow("employee.updated", 1), auditRow("org.suspended", 2)],
       organizations: [{ id: orgId, name: "Arden Wood" }],
       now,
     });
@@ -82,8 +76,17 @@ class MockQuery {
     return this;
   }
 
-  then<TResult1 = { data: Record<string, unknown>[]; count: number; error: null }, TResult2 = never>(
-    onfulfilled?: ((value: { data: Record<string, unknown>[]; count: number; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
+  then<
+    TResult1 = { data: Record<string, unknown>[]; count: number; error: null },
+    TResult2 = never,
+  >(
+    onfulfilled?:
+      | ((value: {
+          data: Record<string, unknown>[];
+          count: number;
+          error: null;
+        }) => TResult1 | PromiseLike<TResult1>)
+      | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ) {
     return Promise.resolve({

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireGridmasterSession,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
@@ -75,10 +72,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("gridmaster impersonation GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load impersonation history" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load impersonation history" }, { status: 500 });
   }
 }
 
@@ -115,8 +109,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid input" }, { status: 400 });
       }
 
-      const ipAddress =
-        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+      const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
       const { data, error } = await requestClient.rpc("start_impersonation", {
         p_target_user_id: parsed.data.targetUserId,
         p_justification: parsed.data.justification,
@@ -182,9 +175,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
   } catch (error) {
     console.error("gridmaster impersonation POST failed", error);
-    return NextResponse.json(
-      { error: "Failed to update impersonation session" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update impersonation session" }, { status: 500 });
   }
 }

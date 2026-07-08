@@ -181,18 +181,18 @@ The mobile app communicates exclusively with `/api/mobile/v1/*` on the web app. 
 
 All 10 packages must remain platform-neutral: no Next.js, Expo, React Native, DOM, or Node.js-only imports. A change to any package affects both apps.
 
-| Package | Purpose |
-| ------- | ------- |
-| `@dubgrid/api-client` | Fetch/header utilities, query-param helpers |
-| `@dubgrid/authz` | Role level constants, permission builders (`buildPerms`, `buildPermissionContext`, `unionPermissions`), JWT claim extraction (`extractJwtClaims`), `READ_ONLY_PERMS` |
-| `@dubgrid/client-errors` | Platform-neutral error translation: `formatClientErrorMessage`, `isNetworkConnectionError`, canonical error copy constants |
-| `@dubgrid/contracts` | Zod schemas for all API contracts (main export + `./mobile` sub-export for mobile-specific schemas) |
-| `@dubgrid/data-access` | Supabase query helpers and mobile data queries |
-| `@dubgrid/db-types` | Generated DB type subsets (catalog, organization, requests, schedule, staff) |
-| `@dubgrid/design-tokens` | Color and spacing tokens shared by web and mobile |
-| `@dubgrid/domain` | Core domain types and helpers: `Organization`, `AdminPermissions`, `PlatformRole`, `OrganizationRole`, `WorkspaceKind`, `isSelfAction`, `assertNotSelf`, billing helpers, notification metadata, request types |
-| `@dubgrid/mobile-api-core` | Server-side orchestration logic for mobile API route handlers (auth, org, people-status, push tokens, shift requests, setup) |
-| `@dubgrid/schedule-core` | Schedule entry types, shift display logic |
+| Package                    | Purpose                                                                                                                                                                                                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@dubgrid/api-client`      | Fetch/header utilities, query-param helpers                                                                                                                                                                    |
+| `@dubgrid/authz`           | Role level constants, permission builders (`buildPerms`, `buildPermissionContext`, `unionPermissions`), JWT claim extraction (`extractJwtClaims`), `READ_ONLY_PERMS`                                           |
+| `@dubgrid/client-errors`   | Platform-neutral error translation: `formatClientErrorMessage`, `isNetworkConnectionError`, canonical error copy constants                                                                                     |
+| `@dubgrid/contracts`       | Zod schemas for all API contracts (main export + `./mobile` sub-export for mobile-specific schemas)                                                                                                            |
+| `@dubgrid/data-access`     | Supabase query helpers and mobile data queries                                                                                                                                                                 |
+| `@dubgrid/db-types`        | Generated DB type subsets (catalog, organization, requests, schedule, staff)                                                                                                                                   |
+| `@dubgrid/design-tokens`   | Color and spacing tokens shared by web and mobile                                                                                                                                                              |
+| `@dubgrid/domain`          | Core domain types and helpers: `Organization`, `AdminPermissions`, `PlatformRole`, `OrganizationRole`, `WorkspaceKind`, `isSelfAction`, `assertNotSelf`, billing helpers, notification metadata, request types |
+| `@dubgrid/mobile-api-core` | Server-side orchestration logic for mobile API route handlers (auth, org, people-status, push tokens, shift requests, setup)                                                                                   |
+| `@dubgrid/schedule-core`   | Schedule entry types, shift display logic                                                                                                                                                                      |
 
 Build all packages (except `@dubgrid/client-errors`): `npm run build:packages`
 
@@ -223,18 +223,18 @@ There are exactly 4 migration files. Never create a 005 or later. Add new tables
 
 Key commands defined in the root `package.json`:
 
-| Command | What it does |
-| ------- | ------------ |
-| `npm run dev` | Start the web app in development mode |
-| `npm run dev:mobile` | Start the Expo dev server |
-| `npm test` | Run all workspace tests (Vitest, via Turbo) |
-| `npm run test:web` | Run web app tests only |
-| `npm run test:mobile` | Run mobile + contracts tests |
-| `npm run test:e2e` | Run Playwright end-to-end tests |
-| `npm run build` | Production build (web app) |
-| `npm run type-check` | TypeScript check across all workspaces |
-| `npm run db:reset` | Reset local Supabase DB and re-seed |
-| `npm run db:reset:remote` | Drop/recreate remote DB, run migrations, re-seed |
-| `npm run gen:types` | Regenerate `apps/web/src/lib/database.types.ts` from Supabase |
-| `npm run build:packages` | Build all shared packages |
-| `npm run lint` | Run ESLint |
+| Command                   | What it does                                                  |
+| ------------------------- | ------------------------------------------------------------- |
+| `npm run dev`             | Start the web app in development mode                         |
+| `npm run dev:mobile`      | Start the Expo dev server                                     |
+| `npm test`                | Run all workspace tests (Vitest, via Turbo)                   |
+| `npm run test:web`        | Run web app tests only                                        |
+| `npm run test:mobile`     | Run mobile + contracts tests                                  |
+| `npm run test:e2e`        | Run Playwright end-to-end tests                               |
+| `npm run build`           | Production build (web app)                                    |
+| `npm run type-check`      | TypeScript check across all workspaces                        |
+| `npm run db:reset`        | Reset local Supabase DB and re-seed                           |
+| `npm run db:reset:remote` | Drop/recreate remote DB, run migrations, re-seed              |
+| `npm run gen:types`       | Regenerate `apps/web/src/lib/database.types.ts` from Supabase |
+| `npm run build:packages`  | Build all shared packages                                     |
+| `npm run lint`            | Run ESLint                                                    |

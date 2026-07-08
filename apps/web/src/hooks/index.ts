@@ -9,11 +9,7 @@ export { getPermissionsFromSession } from "@/features/permissions";
 export type { Permissions } from "@/features/permissions";
 
 export { useRoleChange, generateIdempotencyKey } from "./useRoleChange";
-export type {
-  RoleChangeParams,
-  RoleChangeResult,
-  OrgMember,
-} from "./useRoleChange";
+export type { RoleChangeParams, RoleChangeResult, OrgMember } from "./useRoleChange";
 
 export { useLogout } from "./useLogout";
 

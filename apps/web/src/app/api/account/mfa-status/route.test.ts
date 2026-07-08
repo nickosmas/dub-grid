@@ -17,8 +17,7 @@ vi.mock("@/features/account/server", () => ({
   updateSelfMfaStatus: (...args: unknown[]) => updateSelfMfaStatus(...args),
 }));
 vi.mock("@/features/notifications/server/events", () => ({
-  dispatchNotificationEvent: (...args: unknown[]) =>
-    dispatchNotificationEvent(...args),
+  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({

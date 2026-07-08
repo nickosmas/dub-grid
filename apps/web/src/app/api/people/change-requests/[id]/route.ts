@@ -10,10 +10,7 @@ import { apiErrorResponse } from "@/lib/error-handling";
 import { extractRawErrorMessage } from "@/lib/client-facing";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
 
@@ -26,9 +23,7 @@ export async function PATCH(
     req,
     orgId,
     (permissions) =>
-      permissions.isGridmaster ||
-      permissions.isSuperAdmin ||
-      permissions.canManageEmployees,
+      permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
   );
   if ("response" in auth) return auth.response;
 

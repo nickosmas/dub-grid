@@ -49,10 +49,7 @@ export function ProfilePage() {
   // areas — they're not on the schedule grid, so don't surface the
   // My work group (which is just "your schedule" + "your overview").
   const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
-  const navGroups = useMemo(
-    () => buildProfileNavGroups({ isOnSchedule }),
-    [isOnSchedule],
-  );
+  const navGroups = useMemo(() => buildProfileNavGroups({ isOnSchedule }), [isOnSchedule]);
   const allItems = useMemo(() => navGroups.flatMap((g) => g.items), [navGroups]);
   const defaultSection = getDefaultProfileSection();
   const sectionFromPath = resolveProfileSection(searchParams.get("section"));

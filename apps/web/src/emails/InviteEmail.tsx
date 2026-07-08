@@ -12,28 +12,19 @@ export type InviteEmailProps = {
 };
 
 /** Invitation to join an organization. Used by web + mobile invite flows. */
-export function InviteEmail({
-  orgName,
-  inviterName,
-  acceptUrl,
-  logoUrl,
-}: InviteEmailProps) {
+export function InviteEmail({ orgName, inviterName, acceptUrl, logoUrl }: InviteEmailProps) {
   return (
-    <EmailLayout
-      logoUrl={logoUrl}
-      preview={`You're invited to join ${orgName} on DubGrid`}
-    >
+    <EmailLayout logoUrl={logoUrl} preview={`You're invited to join ${orgName} on DubGrid`}>
       <Text style={styles.heading}>You&apos;re invited</Text>
       <Text style={styles.paragraph}>
         {inviterName ? (
           <>
-            <strong>{inviterName}</strong> has invited you to join{" "}
-            <strong>{orgName}</strong> on DubGrid.
+            <strong>{inviterName}</strong> has invited you to join <strong>{orgName}</strong> on
+            DubGrid.
           </>
         ) : (
           <>
-            You&apos;ve been invited to join <strong>{orgName}</strong> on
-            DubGrid.
+            You&apos;ve been invited to join <strong>{orgName}</strong> on DubGrid.
           </>
         )}
       </Text>
@@ -42,16 +33,13 @@ export function InviteEmail({
       </Text>
       <EmailButton href={acceptUrl}>Accept invitation</EmailButton>
       <Text style={{ ...styles.fine, margin: "0 0 8px" }}>
-        If the button doesn&apos;t work, copy and paste this link into your
-        browser:
+        If the button doesn&apos;t work, copy and paste this link into your browser:
       </Text>
-      <Text style={{ ...styles.fine, wordBreak: "break-all" }}>
-        {acceptUrl}
-      </Text>
+      <Text style={{ ...styles.fine, wordBreak: "break-all" }}>{acceptUrl}</Text>
       <Hr style={styles.divider} />
       <Text style={styles.fine}>
-        This invitation expires in 72 hours. If you didn&apos;t expect this
-        email, you can safely ignore it.
+        This invitation expires in 72 hours. If you didn&apos;t expect this email, you can safely
+        ignore it.
       </Text>
     </EmailLayout>
   );
@@ -60,8 +48,7 @@ export function InviteEmail({
 InviteEmail.PreviewProps = {
   orgName: "Acme Health",
   inviterName: "Jane Doe",
-  acceptUrl:
-    "https://app.dubgrid.com/accept-invite?token=demo-token&email=you%40example.com",
+  acceptUrl: "https://app.dubgrid.com/accept-invite?token=demo-token&email=you%40example.com",
   logoUrl: PREVIEW_LOGO_URL,
 } satisfies InviteEmailProps;
 

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireGridmasterSession,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 
 const querySchema = z.object({
   orgId: z.string().uuid().optional(),
@@ -28,14 +25,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid query" }, { status: 400 });
     }
 
-    const { data, error } = await createRequestSupabaseClient(req).rpc(
-      "get_audit_log",
-      {
-        p_org_id: parsed.data.orgId ?? null,
-        p_limit: parsed.data.limit ?? 50,
-        p_offset: parsed.data.offset ?? 0,
-      },
-    );
+    const { data, error } = await createRequestSupabaseClient(req).rpc("get_audit_log", {
+      p_org_id: parsed.data.orgId ?? null,
+      p_limit: parsed.data.limit ?? 50,
+      p_offset: parsed.data.offset ?? 0,
+    });
     if (error) {
       throw error;
     }
@@ -56,9 +50,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("gridmaster audit-log GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load audit log" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load audit log" }, { status: 500 });
   }
 }

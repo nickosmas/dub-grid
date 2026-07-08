@@ -88,9 +88,7 @@ const JOBS = [
 
 async function renderToPng(page: Page, html: string, outPath: string) {
   await page.setContent(html, { waitUntil: "networkidle" });
-  await page.evaluate(() =>
-    (document as Document & { fonts: FontFaceSet }).fonts.ready,
-  );
+  await page.evaluate(() => (document as Document & { fonts: FontFaceSet }).fonts.ready);
   const el = page.locator("#target");
   const box = await el.boundingBox();
   if (!box) throw new Error(`target not found for ${outPath}`);

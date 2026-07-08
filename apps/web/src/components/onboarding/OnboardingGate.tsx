@@ -37,23 +37,14 @@ const PUBLIC_ROUTES = [
 ];
 
 function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(route + "/"),
-  );
+  return PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(route + "/"));
 }
 
-function isBillingRecoveryRoute(
-  pathname: string,
-  section: string | null,
-): boolean {
+function isBillingRecoveryRoute(pathname: string, section: string | null): boolean {
   return pathname === "/settings" && section === "org-billing";
 }
 
-export default function OnboardingGate({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function OnboardingGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
   const perms = usePermissions();
   const pathname = usePathname();
@@ -100,7 +91,6 @@ export default function OnboardingGate({
 import OnboardingWizard from "./OnboardingWizard";
 import SetupPendingScreen from "./SetupPendingScreen";
 
-
 function BillingRedirect() {
   const router = useRouter();
 
@@ -146,7 +136,11 @@ function OnboardingCheck({
     staleTime: 30_000,
   });
 
-  const { org, setupStatus, loading: orgLoading } = useOrganizationData({
+  const {
+    org,
+    setupStatus,
+    loading: orgLoading,
+  } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
     enabled: shouldCheckOrganization && billing?.billingAccess.isLocked !== true,
   });
@@ -158,10 +152,7 @@ function OnboardingCheck({
   const onboardingComplete = isOnboardingComplete(userId, orgId);
   const reachedFinalDecision =
     onboardingComplete ||
-    (!billingLoading &&
-      billing?.billingAccess.isLocked !== true &&
-      !statusLoading &&
-      !orgLoading);
+    (!billingLoading && billing?.billingAccess.isLocked !== true && !statusLoading && !orgLoading);
   useEffect(() => {
     if (reachedFinalDecision) consumeAuthTransition();
   }, [reachedFinalDecision]);
@@ -228,15 +219,11 @@ function OnboardingCheck({
     // /setup as a standalone route was removed in the onboarding refactor
     // (commit d7e7b96). Render the wizard inline so users with incomplete
     // org setup see it on whatever route they landed on after login.
-    return (
-      <OnboardingWizard role={role} orgId={orgId} userId={userId} isOrgSetup={false} />
-    );
+    return <OnboardingWizard role={role} orgId={orgId} userId={userId} isOrgSetup={false} />;
   }
 
   // orientation
   if (onboardingStatus?.completed) return <>{children}</>;
 
-  return (
-    <OnboardingWizard role={role} orgId={orgId} userId={userId} isOrgSetup={true} />
-  );
+  return <OnboardingWizard role={role} orgId={orgId} userId={userId} isOrgSetup={true} />;
 }

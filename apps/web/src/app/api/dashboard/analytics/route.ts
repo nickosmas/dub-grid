@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
-import {
-  fetchEmployeeUtilization,
-  fetchWeeklyShiftHours,
-} from "@/lib/analytics";
+import { fetchEmployeeUtilization, fetchWeeklyShiftHours } from "@/lib/analytics";
 import * as Sentry from "@/lib/sentry";
 import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -49,9 +46,6 @@ export async function GET(req: NextRequest) {
       extra: { context: "dashboard/analytics", orgId, weeks },
     });
     logger.error({ error, orgId, weeks }, "Dashboard analytics failed");
-    return NextResponse.json(
-      { error: "Failed to load dashboard analytics" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load dashboard analytics" }, { status: 500 });
   }
 }

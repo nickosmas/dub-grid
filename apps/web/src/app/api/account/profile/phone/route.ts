@@ -31,17 +31,12 @@ export async function PATCH(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json(
-        { error: API_ERRORS.INVALID_BODY },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     const parsed = phoneUpdateSchema.safeParse(body);
     if (!parsed.success) {
-      return buildStaffValidationErrorResponse(
-        getStaffFieldErrorsFromZod(parsed.error),
-      );
+      return buildStaffValidationErrorResponse(getStaffFieldErrorsFromZod(parsed.error));
     }
 
     return NextResponse.json(

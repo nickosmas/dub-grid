@@ -4,7 +4,9 @@ import type { ImpersonationHistoryEntry } from "@/types";
 export async function fetchUserSessions() {
   const { data, error } = await supabase
     .from("user_sessions")
-    .select("id, user_id, org_id, supabase_session_id, platform, app_version, device_label, ip_address, last_active_at, created_at, refresh_token_hash")
+    .select(
+      "id, user_id, org_id, supabase_session_id, platform, app_version, device_label, ip_address, last_active_at, created_at, refresh_token_hash",
+    )
     .not("refresh_token_hash", "is", null)
     .order("last_active_at", { ascending: false });
 
@@ -54,17 +56,33 @@ export async function startImpersonation(
   });
   if (error) throw error;
   const result = data as { session_id: string; expires_at: string };
-  void logAudit("impersonation.started", "impersonation_session", result.session_id, { targetUserId, justification }, targetOrgId);
+  void logAudit(
+    "impersonation.started",
+    "impersonation_session",
+    result.session_id,
+    { targetUserId, justification },
+    targetOrgId,
+  );
   return result;
 }
 
-export async function endImpersonation(sessionId: string, reason: string = 'manual', targetOrgId?: string | null): Promise<void> {
+export async function endImpersonation(
+  sessionId: string,
+  reason: string = "manual",
+  targetOrgId?: string | null,
+): Promise<void> {
   const { error } = await supabase.rpc("end_impersonation", {
     p_session_id: sessionId,
     p_reason: reason,
   });
   if (error) throw error;
-  void logAudit("impersonation.ended", "impersonation_session", sessionId, { reason }, targetOrgId ?? null);
+  void logAudit(
+    "impersonation.ended",
+    "impersonation_session",
+    sessionId,
+    { reason },
+    targetOrgId ?? null,
+  );
 }
 
 export async function fetchImpersonationHistory(options?: {

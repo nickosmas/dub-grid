@@ -1,14 +1,5 @@
 import * as React from "react";
-import {
-  Body,
-  Container,
-  Font,
-  Head,
-  Html,
-  Img,
-  Preview,
-  Section,
-} from "@react-email/components";
+import { Body, Container, Font, Head, Html, Img, Preview, Section } from "@react-email/components";
 import { styles } from "./theme";
 
 export type EmailLayoutProps = {

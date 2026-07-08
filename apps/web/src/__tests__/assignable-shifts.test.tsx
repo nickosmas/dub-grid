@@ -316,9 +316,7 @@ describe("assignable shift resolution", () => {
           requiredCertificationIds: [2],
         },
         orgRoles: orgRoles.map((role) =>
-          role.id === 7
-            ? { ...role, archivedAt: "2026-04-01T00:00:00Z" }
-            : role,
+          role.id === 7 ? { ...role, archivedAt: "2026-04-01T00:00:00Z" } : role,
         ),
         certifications: certifications.map((certification) =>
           certification.id === 2
@@ -441,9 +439,7 @@ describe("assignable shift resolution", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: "Day Shift" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Day Shift" })).toBeInTheDocument();
     expect(screen.queryByText("Default shift job")).not.toBeInTheDocument();
   });
 
@@ -504,9 +500,7 @@ describe("assignable shift resolution", () => {
       shiftDisplayMode: "name",
     });
 
-    expect(options.map((option) => option.assignmentId).sort()).toEqual([
-      1, 2, 3,
-    ]);
+    expect(options.map((option) => option.assignmentId).sort()).toEqual([1, 2, 3]);
   });
 
   it("qualifies a mapped shift code against its resolved shift and job", () => {
@@ -541,11 +535,7 @@ describe("assignable shift resolution", () => {
           certificationNames: new Map([[2, "CSN II"]]),
         },
       ),
-    ).toEqual([
-      "the North focus area",
-      "the Supervisor role",
-      "CSN II certification",
-    ]);
+    ).toEqual(["the North focus area", "the Supervisor role", "CSN II certification"]);
   });
 
   it("ignores cosmetic roles when evaluating job eligibility", () => {
@@ -627,9 +617,7 @@ describe("ShiftPicker combined options", () => {
     });
     expect(within(dayStaff).getByText("Day Shift")).toBeInTheDocument();
     expect(within(dayStaff).getByText("Staff")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "D - ST" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "D - ST" })).not.toBeInTheDocument();
   });
 
   it("shows only eligible combined options and keeps shiftless jobs under General", () => {
@@ -648,9 +636,7 @@ describe("ShiftPicker combined options", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: "Day Shift - Staff" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Day Shift - Staff" })).toBeInTheDocument();
     expect(screen.queryByText("Supervisor")).not.toBeInTheDocument();
     expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByText("Office")).toBeInTheDocument();
@@ -702,9 +688,7 @@ describe("ShiftPicker combined options", () => {
 
     expect(screen.queryByText("Legacy General")).not.toBeInTheDocument();
     expect(screen.getByText("Off Days")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "VAC - Vacation" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "VAC - Vacation" })).toBeInTheDocument();
   });
 
   it("sorts pills by qualification seniority within each group without reordering the group", () => {
@@ -728,11 +712,7 @@ describe("ShiftPicker combined options", () => {
 
     render(
       <ShiftPicker
-        assignments={[
-          assignments[0]!,
-          assignments[1]!,
-          mentorAssignmentDefinition,
-        ]}
+        assignments={[assignments[0]!, assignments[1]!, mentorAssignmentDefinition]}
         shiftCategories={shiftCategories}
         jobs={[jobs[0]!, jobs[1]!, mentorJob]}
         orgRoles={orgRoles}
@@ -753,10 +733,6 @@ describe("ShiftPicker combined options", () => {
       within(group)
         .getAllByRole("button")
         .map((button) => button.getAttribute("aria-label")),
-    ).toEqual([
-      "Day Shift - Supervisor",
-      "Day Shift - Mentor",
-      "Day Shift - Staff",
-    ]);
+    ).toEqual(["Day Shift - Supervisor", "Day Shift - Mentor", "Day Shift - Staff"]);
   });
 });

@@ -15,15 +15,9 @@ import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
-import {
-  getMySchedule,
-  getShiftRequests,
-  updateShiftRequest,
-} from "../../../shared/lib/api";
+import { getMySchedule, getShiftRequests, updateShiftRequest } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import {
-  getMobileQueryContentState,
-} from "../../../shared/lib/query-state";
+import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
@@ -40,10 +34,7 @@ import {
   getMobileRequestActionKey,
   getMobileRequestActionSuccessToast,
 } from "../lib/request-action-feedback";
-import {
-  SplitShiftBadge,
-  SplitShiftSegmentList,
-} from "../../schedule/components/SplitShift";
+import { SplitShiftBadge, SplitShiftSegmentList } from "../../schedule/components/SplitShift";
 import {
   addDaysToIsoDate,
   buildAvailableOpenShiftFeed,
@@ -106,10 +97,7 @@ function hasMentoredSegments(
 
 function MentoredPill() {
   return (
-    <View
-      accessibilityLabel="Mentored assignment"
-      style={styles.mentoredPill}
-    >
+    <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
       <Text style={styles.mentoredPillText}>Mentored</Text>
     </View>
   );
@@ -159,24 +147,15 @@ function getRequestSegments(request: MobileShiftRequest) {
 
 function getRequestTimeRange(request: MobileShiftRequest): string | null {
   const segments = getRequestSegments(request);
-  const firstSegmentWithTime = segments.find(
-    (segment) => segment.startTime && segment.endTime,
-  );
+  const firstSegmentWithTime = segments.find((segment) => segment.startTime && segment.endTime);
   const lastSegmentWithTime =
-    [...segments].reverse().find((segment) => segment.startTime && segment.endTime) ??
-    null;
+    [...segments].reverse().find((segment) => segment.startTime && segment.endTime) ?? null;
 
   if (firstSegmentWithTime && lastSegmentWithTime) {
-    return formatScheduleTimeRange(
-      firstSegmentWithTime.startTime,
-      lastSegmentWithTime.endTime,
-    );
+    return formatScheduleTimeRange(firstSegmentWithTime.startTime, lastSegmentWithTime.endTime);
   }
 
-  if (
-    request.requesterPresentation?.startTime &&
-    request.requesterPresentation.endTime
-  ) {
+  if (request.requesterPresentation?.startTime && request.requesterPresentation.endTime) {
     return formatScheduleTimeRange(
       request.requesterPresentation.startTime,
       request.requesterPresentation.endTime,
@@ -193,9 +172,7 @@ function getOpenShiftLabel(openShift: MobileOpenShift): string {
   const primarySegment = openShift.presentation.segments[0] ?? null;
 
   return (
-    primarySegment?.shiftName ??
-    openShift.presentation.shiftName ??
-    openShift.presentation.label
+    primarySegment?.shiftName ?? openShift.presentation.shiftName ?? openShift.presentation.label
   );
 }
 
@@ -233,8 +210,7 @@ function buildJobChip(
           borderColor: "#FBCFE8",
           textColor: "#BE185D",
         }
-      : normalizedLabel.includes("mentor") ||
-          normalizedLabel.includes("trainer")
+      : normalizedLabel.includes("mentor") || normalizedLabel.includes("trainer")
         ? {
             backgroundColor: "#FFF7ED",
             borderColor: "#FED7AA",
@@ -279,9 +255,7 @@ function buildGeneralShiftChip(
   };
 }
 
-function isGeneralShiftSegment(
-  segment: { shiftId?: number | null } | null | undefined,
-): boolean {
+function isGeneralShiftSegment(segment: { shiftId?: number | null } | null | undefined): boolean {
   return (
     segment != null &&
     Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
@@ -296,8 +270,7 @@ function getOpenShiftJobChip(openShift: MobileOpenShift): JobChip | null {
     return buildGeneralShiftChip(getOpenShiftLabel(openShift), primarySegment);
   }
 
-  const segment =
-    openShift.presentation.segments.find((item) => item.jobName) ?? null;
+  const segment = openShift.presentation.segments.find((item) => item.jobName) ?? null;
 
   return buildJobChip(segment?.jobName ?? null, segment);
 }
@@ -312,18 +285,15 @@ function getSegmentJobChip(segment: MobileScheduleEntrySegment): JobChip | null 
 
 function getOpenShiftFocusAreaName(openShift: MobileOpenShift): string | null {
   return (
-    openShift.presentation.segments.find(
-      (segment) => segment.displayFocusAreaName,
-    )?.displayFocusAreaName ??
+    openShift.presentation.segments.find((segment) => segment.displayFocusAreaName)
+      ?.displayFocusAreaName ??
     openShift.presentation.displayFocusAreaName ??
     openShift.focusAreaName
   );
 }
 
 function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
-  const segment = openShift.presentation.segments.find(
-    (item) => item.startTime && item.endTime,
-  );
+  const segment = openShift.presentation.segments.find((item) => item.startTime && item.endTime);
 
   if (segment?.startTime && segment.endTime) {
     return formatScheduleTimeRange(segment.startTime, segment.endTime);
@@ -340,10 +310,7 @@ function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
     return null;
   }
 
-  return formatScheduleTimeRange(
-    openShift.state.customStartTime,
-    openShift.state.customEndTime,
-  );
+  return formatScheduleTimeRange(openShift.state.customStartTime, openShift.state.customEndTime);
 }
 
 function formatRequestStatus(status: MobileShiftRequest["status"]): string {
@@ -362,18 +329,13 @@ export default function RequestsScreen() {
   const { pushToast } = useToast();
   const now = useRealtimeNow();
   const [selectedTab, setSelectedTab] = useState<RequestTab | null>(null);
-  const [pendingAction, setPendingAction] =
-    useState<PendingRequestAction>(null);
+  const [pendingAction, setPendingAction] = useState<PendingRequestAction>(null);
   const [requestActionConfirmation, setRequestActionConfirmation] =
     useState<RequestActionConfirmation>(null);
   const linkedEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
-  const openShiftVisibility =
-    bootstrapQuery.data?.currentOrg.openShiftVisibility;
-  const todayDate = useMemo(
-    () => getIsoDateInTimeZone(now, timeZone),
-    [now, timeZone],
-  );
+  const openShiftVisibility = bootstrapQuery.data?.currentOrg.openShiftVisibility;
+  const todayDate = useMemo(() => getIsoDateInTimeZone(now, timeZone), [now, timeZone]);
   const requestRange = useMemo(
     () => ({
       startDate: todayDate,
@@ -381,24 +343,12 @@ export default function RequestsScreen() {
     }),
     [todayDate],
   );
-  const canApprove = Boolean(
-    bootstrapQuery.data?.permissions.canApproveShiftRequests,
-  );
-  const canEditShifts = Boolean(
-    bootstrapQuery.data?.permissions.canEditShifts,
-  );
-  const canManageEmployees = Boolean(
-    bootstrapQuery.data?.permissions.canManageEmployees,
-  );
+  const canApprove = Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests);
+  const canEditShifts = Boolean(bootstrapQuery.data?.permissions.canEditShifts);
+  const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const canViewAllRequests = canApprove || canEditShifts || canManageEmployees;
   const requestsQuery = useQuery({
-    queryKey: [
-      "mobile",
-      "requests",
-      accessToken,
-      requestRange.startDate,
-      requestRange.endDate,
-    ],
+    queryKey: ["mobile", "requests", accessToken, requestRange.startDate, requestRange.endDate],
     queryFn: () => getShiftRequests(accessToken!, requestRange),
     enabled: Boolean(accessToken),
   });
@@ -412,10 +362,7 @@ export default function RequestsScreen() {
       requestRange.endDate,
     ],
     queryFn: () => getMySchedule(accessToken!, requestRange),
-    enabled:
-      Boolean(accessToken) &&
-      Boolean(linkedEmployeeId) &&
-      !canViewAllRequests,
+    enabled: Boolean(accessToken) && Boolean(linkedEmployeeId) && !canViewAllRequests,
   });
   const manualRefresh = useManualRefresh(async () => {
     const refreshes: Array<Promise<unknown>> = [requestsQuery.refetch()];
@@ -483,8 +430,7 @@ export default function RequestsScreen() {
 
   const requests = requestsQuery.data?.requests ?? [];
   const openShifts = requestsQuery.data?.openShifts ?? [];
-  const availabilityScheduleEntries =
-    availabilityScheduleQuery.data?.entries ?? [];
+  const availabilityScheduleEntries = availabilityScheduleQuery.data?.entries ?? [];
   const availableOpenShiftFeed = useMemo(
     () =>
       buildAvailableOpenShiftFeed({
@@ -545,8 +491,7 @@ export default function RequestsScreen() {
     [canViewAllRequests, now, requests, timeZone],
   );
   const historyRequests = useMemo(
-    () =>
-      requests.filter((request) => !ACTIVE_REQUEST_STATUSES.has(request.status)),
+    () => requests.filter((request) => !ACTIVE_REQUEST_STATUSES.has(request.status)),
     [requests],
   );
   const contentState = getMobileQueryContentState({
@@ -557,13 +502,8 @@ export default function RequestsScreen() {
       approvalRequests.length > 0 ||
       historyRequests.length > 0,
     isLoading:
-      requestsQuery.isLoading ||
-      bootstrapQuery.isLoading ||
-      availabilityScheduleQuery.isLoading,
-    error:
-      requestsQuery.error ??
-      bootstrapQuery.error ??
-      availabilityScheduleQuery.error,
+      requestsQuery.isLoading || bootstrapQuery.isLoading || availabilityScheduleQuery.isLoading,
+    error: requestsQuery.error ?? bootstrapQuery.error ?? availabilityScheduleQuery.error,
   });
   const tabs = [
     {
@@ -614,24 +554,19 @@ export default function RequestsScreen() {
     return null;
   }, [params.tab]);
   const highlightedRequestId = useMemo(() => {
-    const rawRequestId = Array.isArray(params.requestId)
-      ? params.requestId[0]
-      : params.requestId;
+    const rawRequestId = Array.isArray(params.requestId) ? params.requestId[0] : params.requestId;
 
     return rawRequestId ?? null;
   }, [params.requestId]);
   const highlightedRequest = useMemo(
     () =>
       highlightedRequestId
-        ? requests.find((request) => request.id === highlightedRequestId) ?? null
+        ? (requests.find((request) => request.id === highlightedRequestId) ?? null)
         : null,
     [highlightedRequestId, requests],
   );
   const defaultTab = useMemo((): RequestTab => {
-    if (
-      routeTab &&
-      visibleTabs.some((tab) => tab.key === routeTab)
-    ) {
+    if (routeTab && visibleTabs.some((tab) => tab.key === routeTab)) {
       return routeTab;
     }
 
@@ -710,23 +645,11 @@ export default function RequestsScreen() {
               onPress={() => setSelectedTab(tab.key)}
               style={[styles.tabButton, isActive && styles.tabButtonActive]}
             >
-              <Text
-                style={[
-                  styles.tabButtonText,
-                  isActive && styles.tabButtonTextActive,
-                ]}
-              >
+              <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
                 {tab.label}
               </Text>
-              <View
-                style={[styles.tabBadge, isActive && styles.tabBadgeActive]}
-              >
-                <Text
-                  style={[
-                    styles.tabBadgeText,
-                    isActive && styles.tabBadgeTextActive,
-                  ]}
-                >
+              <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
+                <Text style={[styles.tabBadgeText, isActive && styles.tabBadgeTextActive]}>
                   {tab.count}
                 </Text>
               </View>
@@ -783,9 +706,7 @@ export default function RequestsScreen() {
                         key={item.key}
                         linkedEmployeeId={linkedEmployeeId}
                         pendingAction={pendingAction}
-                        onAction={(body) =>
-                          runRequestAction(item.openShift.id, body)
-                        }
+                        onAction={(body) => runRequestAction(item.openShift.id, body)}
                         openShift={item.openShift}
                         showDate={false}
                       />
@@ -795,9 +716,7 @@ export default function RequestsScreen() {
                         canApprove={false}
                         linkedEmployeeId={linkedEmployeeId}
                         pendingAction={pendingAction}
-                        onAction={(body) =>
-                          runRequestAction(item.request.id, body)
-                        }
+                        onAction={(body) => runRequestAction(item.request.id, body)}
                         highlighted={highlightedRequestId === item.request.id}
                         request={item.request}
                         showDate={false}
@@ -847,11 +766,11 @@ export default function RequestsScreen() {
                 key={request.id}
                 canApprove={false}
                 linkedEmployeeId={linkedEmployeeId}
-                  pendingAction={pendingAction}
-                  onAction={(body) => runRequestAction(request.id, body)}
-                  highlighted={highlightedRequestId === request.id}
-                  request={request}
-                />
+                pendingAction={pendingAction}
+                onAction={(body) => runRequestAction(request.id, body)}
+                highlighted={highlightedRequestId === request.id}
+                request={request}
+              />
             ))
           )}
         </View>
@@ -870,11 +789,11 @@ export default function RequestsScreen() {
                 key={request.id}
                 canApprove={canApprove}
                 linkedEmployeeId={linkedEmployeeId}
-                  pendingAction={pendingAction}
-                  onAction={(body) => runRequestAction(request.id, body)}
-                  highlighted={highlightedRequestId === request.id}
-                  request={request}
-                />
+                pendingAction={pendingAction}
+                onAction={(body) => runRequestAction(request.id, body)}
+                highlighted={highlightedRequestId === request.id}
+                request={request}
+              />
             ))
           )}
         </View>
@@ -893,20 +812,18 @@ export default function RequestsScreen() {
                 key={request.id}
                 canApprove={canApprove}
                 linkedEmployeeId={linkedEmployeeId}
-                  pendingAction={pendingAction}
-                  onAction={(body) => runRequestAction(request.id, body)}
-                  highlighted={highlightedRequestId === request.id}
-                  request={request}
-                />
+                pendingAction={pendingAction}
+                onAction={(body) => runRequestAction(request.id, body)}
+                highlighted={highlightedRequestId === request.id}
+                request={request}
+              />
             ))
           )}
         </View>
       )}
       <ConfirmationModal
         body={requestActionConfirmation?.feedback.message}
-        confirmLabel={
-          requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"
-        }
+        confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
         confirmTone={
           requestActionConfirmation?.feedback.confirmStyle === "destructive"
             ? "dangerFilled"
@@ -951,9 +868,7 @@ function RequestCard({
   );
 
   return (
-    <View
-      style={[styles.requestCard, highlighted && styles.requestCardHighlighted]}
-    >
+    <View style={[styles.requestCard, highlighted && styles.requestCardHighlighted]}>
       <View style={styles.requestHeaderRow}>
         <Text style={styles.requestTitle}>
           {showDate
@@ -961,9 +876,7 @@ function RequestCard({
             : request.requesterName}
         </Text>
         <View style={styles.statusChip}>
-          <Text style={styles.statusChipText}>
-            {formatRequestStatus(request.status)}
-          </Text>
+          <Text style={styles.statusChipText}>{formatRequestStatus(request.status)}</Text>
         </View>
       </View>
       <Text style={styles.metaText}>
@@ -994,9 +907,7 @@ function RequestCard({
             colors={getShiftPillColors(request.requesterPresentation)}
             label={shiftLabel}
           />
-          {timeRange ? (
-            <Text style={styles.shiftTitleTimeText}>{timeRange}</Text>
-          ) : null}
+          {timeRange ? <Text style={styles.shiftTitleTimeText}>{timeRange}</Text> : null}
           {isMentored ? <MentoredPill /> : null}
         </View>
       )}
@@ -1026,55 +937,53 @@ function RequestCard({
       <View style={styles.actions}>
         {linkedEmployeeId &&
         request.requesterEmpId === linkedEmployeeId &&
-        (request.status === "open" || request.status === "pending_approval") ? (
-          (() => {
-            const body: RequestActionBody = {
-              action: "cancel",
-              empId: linkedEmployeeId,
-            };
-            const isLoading =
-              pendingAction?.key === getMobileRequestActionKey(request.id, body);
+        (request.status === "open" || request.status === "pending_approval")
+          ? (() => {
+              const body: RequestActionBody = {
+                action: "cancel",
+                empId: linkedEmployeeId,
+              };
+              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
 
-            return (
-              <Button
-                compact
-                disabled={Boolean(pendingAction)}
-                label={isLoading ? pendingAction.label : "Cancel"}
-                loading={isLoading}
-                onPress={() => {
-                  onAction(body);
-                }}
-                tone="neutral"
-              />
-            );
-          })()
-        ) : null}
+              return (
+                <Button
+                  compact
+                  disabled={Boolean(pendingAction)}
+                  label={isLoading ? pendingAction.label : "Cancel"}
+                  loading={isLoading}
+                  onPress={() => {
+                    onAction(body);
+                  }}
+                  tone="neutral"
+                />
+              );
+            })()
+          : null}
         {linkedEmployeeId &&
         request.type === "pickup" &&
         request.status === "open" &&
         request.targetEmpId == null &&
-        request.requesterEmpId !== linkedEmployeeId ? (
-          (() => {
-            const body: RequestActionBody = {
-              action: "claim",
-              claimerEmpId: linkedEmployeeId,
-            };
-            const isLoading =
-              pendingAction?.key === getMobileRequestActionKey(request.id, body);
+        request.requesterEmpId !== linkedEmployeeId
+          ? (() => {
+              const body: RequestActionBody = {
+                action: "claim",
+                claimerEmpId: linkedEmployeeId,
+              };
+              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
 
-            return (
-              <Button
-                compact
-                disabled={Boolean(pendingAction)}
-                label={isLoading ? pendingAction.label : "Claim"}
-                loading={isLoading}
-                onPress={() => {
-                  onAction(body);
-                }}
-              />
-            );
-          })()
-        ) : null}
+              return (
+                <Button
+                  compact
+                  disabled={Boolean(pendingAction)}
+                  label={isLoading ? pendingAction.label : "Claim"}
+                  loading={isLoading}
+                  onPress={() => {
+                    onAction(body);
+                  }}
+                />
+              );
+            })()
+          : null}
         {linkedEmployeeId &&
         request.targetEmpId === linkedEmployeeId &&
         request.status === "open" ? (
@@ -1085,8 +994,7 @@ function RequestCard({
                 empId: linkedEmployeeId,
                 accept: true,
               };
-              const isLoading =
-                pendingAction?.key === getMobileRequestActionKey(request.id, body);
+              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
 
               return (
                 <Button
@@ -1106,8 +1014,7 @@ function RequestCard({
                 empId: linkedEmployeeId,
                 accept: false,
               };
-              const isLoading =
-                pendingAction?.key === getMobileRequestActionKey(request.id, body);
+              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
 
               return (
                 <Button
@@ -1131,8 +1038,7 @@ function RequestCard({
                 action: "resolve",
                 approved: true,
               };
-              const isLoading =
-                pendingAction?.key === getMobileRequestActionKey(request.id, body);
+              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
 
               return (
                 <Button
@@ -1151,8 +1057,7 @@ function RequestCard({
                 action: "resolve",
                 approved: false,
               };
-              const isLoading =
-                pendingAction?.key === getMobileRequestActionKey(request.id, body);
+              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
 
               return (
                 <Button
@@ -1198,8 +1103,7 @@ function OpenShiftCard({
   );
   const volunteerBlockReason =
     openShift.canVolunteer === false
-      ? (openShift.volunteerBlockReason ??
-        "You can't volunteer for this shift right now.")
+      ? (openShift.volunteerBlockReason ?? "You can't volunteer for this shift right now.")
       : null;
 
   return (
@@ -1233,9 +1137,7 @@ function OpenShiftCard({
         </View>
       ) : jobChip || focusAreaName || isMentored ? (
         <View style={styles.openShiftContextStack}>
-          {focusAreaName ? (
-            <Text style={styles.openShiftContextText}>{focusAreaName}</Text>
-          ) : null}
+          {focusAreaName ? <Text style={styles.openShiftContextText}>{focusAreaName}</Text> : null}
           {jobChip || isMentored ? (
             <View style={styles.shiftPillRow}>
               <JobPill chip={jobChip} compact isMentored={isMentored} />
@@ -1246,9 +1148,7 @@ function OpenShiftCard({
       <Text style={styles.metaText}>
         {openShift.needed} teammate{openShift.needed === 1 ? "" : "s"} needed
       </Text>
-      {volunteerBlockReason ? (
-        <Text style={styles.metaText}>{volunteerBlockReason}</Text>
-      ) : null}
+      {volunteerBlockReason ? <Text style={styles.metaText}>{volunteerBlockReason}</Text> : null}
       <View style={styles.actions}>
         {linkedEmployeeId
           ? (() => {
@@ -1260,15 +1160,12 @@ function OpenShiftCard({
                 state: openShift.state,
               };
               const isLoading =
-                pendingAction?.key ===
-                getMobileRequestActionKey(openShift.id, body);
+                pendingAction?.key === getMobileRequestActionKey(openShift.id, body);
 
               return (
                 <Button
                   compact
-                  disabled={
-                    Boolean(pendingAction) || openShift.canVolunteer === false
-                  }
+                  disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
                   label={isLoading ? pendingAction.label : "Volunteer"}
                   loading={isLoading}
                   onPress={() => {
@@ -1302,14 +1199,10 @@ function JobPill({
   }
 
   const accessibilityLabel = chip.eyebrowLabel
-    ? `${chip.eyebrowLabel} ${chip.label}${
-        isMentored ? " mentored assignment" : ""
-      }`
+    ? `${chip.eyebrowLabel} ${chip.label}${isMentored ? " mentored assignment" : ""}`
     : `Job ${chip.label}${isMentored ? " mentored assignment" : ""}`;
   const pillBorderColor =
-    chip.kind === "general"
-      ? mobileBorderColorFromText(chip.textColor)
-      : chip.borderColor;
+    chip.kind === "general" ? mobileBorderColorFromText(chip.textColor) : chip.borderColor;
 
   return (
     <View
@@ -1343,9 +1236,7 @@ function JobPill({
           >
             {chip.label}
             {isMentored ? (
-              <Text
-                style={[styles.jobPillMentoredText, { color: chip.textColor }]}
-              >
+              <Text style={[styles.jobPillMentoredText, { color: chip.textColor }]}>
                 {" "}
                 (Mentored)
               </Text>
@@ -1364,11 +1255,7 @@ function JobPill({
             {chip.label}
           </Text>
           {isMentored ? (
-            <Text
-              style={[styles.jobPillMentoredText, { color: chip.textColor }]}
-            >
-              (Mentored)
-            </Text>
+            <Text style={[styles.jobPillMentoredText, { color: chip.textColor }]}>(Mentored)</Text>
           ) : null}
         </View>
       )}
@@ -1376,13 +1263,7 @@ function JobPill({
   );
 }
 
-function ShiftPill({
-  colors,
-  label,
-}: {
-  colors: ShiftPillColors;
-  label: string;
-}) {
+function ShiftPill({ colors, label }: { colors: ShiftPillColors; label: string }) {
   return (
     <View
       accessibilityLabel={`Shift ${label}`}
@@ -1394,9 +1275,7 @@ function ShiftPill({
         },
       ]}
     >
-      <Text style={[styles.shiftPillText, { color: colors.textColor }]}>
-        {label}
-      </Text>
+      <Text style={[styles.shiftPillText, { color: colors.textColor }]}>{label}</Text>
     </View>
   );
 }

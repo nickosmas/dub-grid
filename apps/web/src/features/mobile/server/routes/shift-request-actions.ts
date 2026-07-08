@@ -17,10 +17,7 @@ function errorMessage(err: unknown): string {
   return "Unexpected error";
 }
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
 

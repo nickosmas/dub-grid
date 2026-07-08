@@ -94,16 +94,12 @@ function extractSupabaseSessionClaims(accessToken: string): {
     }
 
     const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
-    const padding =
-      normalized.length % 4 === 0
-        ? ""
-        : "=".repeat(4 - (normalized.length % 4));
+    const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
     const payload = JSON.parse(
       Buffer.from(`${normalized}${padding}`, "base64").toString("utf8"),
     ) as Record<string, unknown>;
     return {
-      supabaseSessionId:
-        typeof payload.session_id === "string" ? payload.session_id : null,
+      supabaseSessionId: typeof payload.session_id === "string" ? payload.session_id : null,
       orgId: typeof payload.org_id === "string" ? payload.org_id : null,
     };
   } catch {

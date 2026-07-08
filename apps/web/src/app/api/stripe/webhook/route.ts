@@ -19,10 +19,7 @@ function stripeObjectId(value: string | { id: string } | null | undefined) {
   return typeof value === "string" ? value : value.id;
 }
 
-async function upsertSubscription(
-  sub: Stripe.Subscription,
-  event: Stripe.Event,
-) {
+async function upsertSubscription(sub: Stripe.Subscription, event: Stripe.Event) {
   const supabase = getServiceClient();
   await upsertStripeSubscriptionToDb(supabase, sub, {
     audit: {
@@ -100,11 +97,10 @@ export async function POST(req: NextRequest) {
         // via the notify_gridmasters_of_org_event DB trigger, but only on the
         // *first* transition (past_due/unpaid guard), so the two paths don't
         // double up.
-        const result = await writeStripePaymentFailedAuditLog(
-          getServiceClient(),
-          invoice,
-          { stripeEventId: event.id, stripeEventType: event.type },
-        );
+        const result = await writeStripePaymentFailedAuditLog(getServiceClient(), invoice, {
+          stripeEventId: event.id,
+          stripeEventType: event.type,
+        });
         logger.warn(
           { customerId: invoice.customer, invoiceId: invoice.id },
           "Invoice payment failed",
@@ -144,11 +140,9 @@ export async function POST(req: NextRequest) {
       case "payment_method.updated": {
         const paymentMethod = event.data.object as Stripe.PaymentMethod;
         const previous = event.data.previous_attributes as
-          | Partial<Stripe.PaymentMethod>
-          | undefined;
+          Partial<Stripe.PaymentMethod> | undefined;
         const customerId =
-          stripeObjectId(paymentMethod.customer) ??
-          stripeObjectId(previous?.customer);
+          stripeObjectId(paymentMethod.customer) ?? stripeObjectId(previous?.customer);
         if (customerId) {
           await writeStripeCustomerBillingActivityLog(getServiceClient(), {
             customerId,

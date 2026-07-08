@@ -85,11 +85,7 @@ export function AuthStateCard({
             {primaryCta.label}
           </Link>
         ) : (
-          <button
-            type="button"
-            onClick={primaryCta.onClick}
-            className="dg-auth-submit"
-          >
+          <button type="button" onClick={primaryCta.onClick} className="dg-auth-submit">
             {primaryCta.label}
           </button>
         ))}

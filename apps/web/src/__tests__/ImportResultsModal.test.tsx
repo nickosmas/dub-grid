@@ -28,11 +28,36 @@ describe("ImportResultsModal", () => {
 
     const outcomes: ImportPreviousScheduleOutcome[] = [
       row({ outcome: "imported" }),
-      row({ employeeId: "emp-1", targetDate: "2026-08-11", outcome: "skipped", reason: "target_has_data" }),
-      row({ employeeId: "emp-2", targetDate: "2026-08-12", outcome: "skipped", reason: "target_has_data" }),
-      row({ employeeId: "emp-3", targetDate: "2026-08-13", outcome: "skipped", reason: "target_has_data" }),
-      row({ employeeId: "emp-4", targetDate: "2026-08-14", outcome: "skipped", reason: "target_has_data" }),
-      row({ employeeId: "emp-1", targetDate: "2026-08-15", outcome: "skipped", reason: "employee_inactive" }),
+      row({
+        employeeId: "emp-1",
+        targetDate: "2026-08-11",
+        outcome: "skipped",
+        reason: "target_has_data",
+      }),
+      row({
+        employeeId: "emp-2",
+        targetDate: "2026-08-12",
+        outcome: "skipped",
+        reason: "target_has_data",
+      }),
+      row({
+        employeeId: "emp-3",
+        targetDate: "2026-08-13",
+        outcome: "skipped",
+        reason: "target_has_data",
+      }),
+      row({
+        employeeId: "emp-4",
+        targetDate: "2026-08-14",
+        outcome: "skipped",
+        reason: "target_has_data",
+      }),
+      row({
+        employeeId: "emp-1",
+        targetDate: "2026-08-15",
+        outcome: "skipped",
+        reason: "employee_inactive",
+      }),
     ];
     const breakdown = summarizeImportPreviousOutcomes(outcomes);
 
@@ -47,9 +72,7 @@ describe("ImportResultsModal", () => {
       />,
     );
 
-    expect(
-      screen.getByText(/Imported 1 of 6 shifts/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Imported 1 of 6 shifts/)).toBeInTheDocument();
 
     // Group headers show the full count, not truncated to 3.
     expect(screen.getByText("Target already had data (4)")).toBeInTheDocument();

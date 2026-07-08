@@ -68,8 +68,20 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ href, children, className, ...rest }: { href: string; children: React.ReactNode; className?: string; [key: string]: unknown }) => (
-    <a href={href} className={className} {...rest}>{children}</a>
+  default: ({
+    href,
+    children,
+    className,
+    ...rest
+  }: {
+    href: string;
+    children: React.ReactNode;
+    className?: string;
+    [key: string]: unknown;
+  }) => (
+    <a href={href} className={className} {...rest}>
+      {children}
+    </a>
   ),
 }));
 
@@ -88,10 +100,7 @@ vi.mock("@/features/billing/client", () => ({
   fetchOrganizationBilling: vi.fn(),
 }));
 
-function renderHeader(
-  ui: React.ReactElement,
-  opts?: { inSandbox?: boolean },
-) {
+function renderHeader(ui: React.ReactElement, opts?: { inSandbox?: boolean }) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -105,9 +114,7 @@ function renderHeader(
     });
   }
 
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
 beforeEach(() => {
@@ -292,9 +299,10 @@ describe("Header permission-based tab visibility", () => {
 
     renderHeader(<Header />);
 
-    expect(
-      await screen.findByRole("link", { name: "Trial ends in 14 days" }),
-    ).toHaveAttribute("href", "/settings?section=org-billing");
+    expect(await screen.findByRole("link", { name: "Trial ends in 14 days" })).toHaveAttribute(
+      "href",
+      "/settings?section=org-billing",
+    );
   });
 
   it("does not load billing status for regular admins", () => {
@@ -320,9 +328,7 @@ describe("Header sign out in sandbox mode", () => {
 
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockSetUserViewActive).not.toHaveBeenCalled();
-    expect(
-      screen.queryByText(/exit sandbox to sign out/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/exit sandbox to sign out/i)).not.toBeInTheDocument();
   });
 
   it("signs out in one sweep from view-as-user, with no confirm prompt", async () => {
@@ -338,9 +344,7 @@ describe("Header sign out in sandbox mode", () => {
     // the admin context mid-logout and could leave the user still logged in.
     expect(mockSignOut).toHaveBeenCalledTimes(1);
     expect(mockSetUserViewActive).not.toHaveBeenCalled();
-    expect(
-      screen.queryByText(/exit sandbox to sign out/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/exit sandbox to sign out/i)).not.toBeInTheDocument();
   });
 
   it("prompts to exit the sandbox before signing out", async () => {
@@ -374,16 +378,12 @@ describe("Header Gridmaster button", () => {
   it('"Gridmaster" button is hidden for non-gridmaster users', () => {
     mockPermissions.isGridmaster = false;
     renderHeader(<Header />);
-    expect(
-      screen.queryByRole("button", { name: /Gridmaster/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Gridmaster/i })).not.toBeInTheDocument();
   });
 
   it('"Gridmaster" button is visible for gridmaster users', () => {
     mockPermissions.isGridmaster = true;
     renderHeader(<Header />);
-    expect(
-      screen.getByRole("button", { name: /Gridmaster/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Gridmaster/i })).toBeInTheDocument();
   });
 });

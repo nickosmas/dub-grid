@@ -35,8 +35,12 @@ describe("DomainSelector", () => {
         hostname: "localhost",
         protocol: "https:",
         port: "",
-        get href() { return ""; },
-        set href(v: string) { hrefSetter(v); },
+        get href() {
+          return "";
+        },
+        set href(v: string) {
+          hrefSetter(v);
+        },
       },
       writable: true,
       configurable: true,
@@ -48,7 +52,9 @@ describe("DomainSelector", () => {
     render(<DomainSelector />);
     submitSlug("gridmaster");
 
-    expect(screen.getByText("That subdomain isn't available. Check your organization's URL.")).toBeInTheDocument();
+    expect(
+      screen.getByText("That subdomain isn't available. Check your organization's URL."),
+    ).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(hrefSetter).not.toHaveBeenCalled();
   });

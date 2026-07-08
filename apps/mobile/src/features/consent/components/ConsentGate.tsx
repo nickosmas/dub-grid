@@ -1,20 +1,8 @@
 import { useEffect, useState, type PropsWithChildren } from "react";
-import {
-  Linking,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
-import {
-  LEGAL_URLS,
-  needsConsentDecision,
-  setStoredConsent,
-} from "../lib/consent";
+import { LEGAL_URLS, needsConsentDecision, setStoredConsent } from "../lib/consent";
 
 const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
 
@@ -64,10 +52,9 @@ export function ConsentGate({ children }: PropsWithChildren) {
             <View style={styles.copy}>
               <Text style={styles.title}>Your privacy</Text>
               <Text style={styles.body}>
-                We use essential data to keep DubGrid working, including error
-                monitoring. With your consent we also collect analytics to help
-                us improve the app. You can change this any time in Profile,
-                Privacy & data.
+                We use essential data to keep DubGrid working, including error monitoring. With your
+                consent we also collect analytics to help us improve the app. You can change this
+                any time in Profile, Privacy & data.
               </Text>
               <Pressable
                 accessibilityRole="link"

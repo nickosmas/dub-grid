@@ -10,9 +10,9 @@ const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /* ── Assignment colors from Calm Haven seed ── */
 const SHIFTS = [
-  { label: "D", color: "#FECACA", text: "#991B1B" },  // Day
+  { label: "D", color: "#FECACA", text: "#991B1B" }, // Day
   { label: "Ds", color: "#FED7AA", text: "#9A3412" }, // Day swing
-  { label: "E", color: "#FECACA", text: "#991B1B" },  // Evening
+  { label: "E", color: "#FECACA", text: "#991B1B" }, // Evening
 ];
 
 /* ── Designation colors — pulled from src/lib/colors.ts DESIGNATION_COLORS ── */
@@ -206,7 +206,15 @@ export default function RecurringShiftsMockup() {
           }}
         >
           <span>All Focus Areas</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--color-text-faint)" }}>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            style={{ color: "var(--color-text-faint)" }}
+          >
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </div>
@@ -306,9 +314,7 @@ export default function RecurringShiftsMockup() {
 
         {ENTRIES.map((entry, rowIdx) => {
           const designation = DESIGNATION_COLORS[entry.cert];
-          const rowBg = entry.isCurrentUser
-            ? "var(--color-today-bg)"
-            : "var(--color-surface)";
+          const rowBg = entry.isCurrentUser ? "var(--color-today-bg)" : "var(--color-surface)";
 
           return (
             <div

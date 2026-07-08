@@ -11,17 +11,11 @@ vi.mock("expo-router", async () => {
   const Tabs = ({ children }: { children: React.ReactNode }) =>
     React.createElement("div", {}, children);
 
-  Tabs.Screen = ({
-    name,
-    options,
-  }: {
-    name: string;
-    options?: { title?: string };
-  }) => React.createElement("span", {}, `${name}:${options?.title ?? name}`);
+  Tabs.Screen = ({ name, options }: { name: string; options?: { title?: string } }) =>
+    React.createElement("span", {}, `${name}:${options?.title ?? name}`);
 
   return {
-    Redirect: ({ href }: { href: string }) =>
-      React.createElement("div", {}, `redirect:${href}`),
+    Redirect: ({ href }: { href: string }) => React.createElement("div", {}, `redirect:${href}`),
     Tabs,
   };
 });
@@ -30,8 +24,7 @@ vi.mock("../shared/components/LoadingScreen", async () => {
   const React = await import("react");
 
   return {
-    LoadingScreen: ({ title }: { title: string }) =>
-      React.createElement("div", {}, title),
+    LoadingScreen: ({ title }: { title: string }) => React.createElement("div", {}, title),
   };
 });
 
@@ -53,16 +46,8 @@ vi.mock("../features/auth/screens/OrganizationLockedScreen", async () => {
         {},
         React.createElement("h1", {}, "Organization unavailable"),
         React.createElement("p", {}, message),
-        React.createElement(
-          "button",
-          { type: "button", onClick: onRetry },
-          "Try again",
-        ),
-        React.createElement(
-          "button",
-          { type: "button", onClick: onSignOut },
-          "Sign out",
-        ),
+        React.createElement("button", { type: "button", onClick: onRetry }, "Try again"),
+        React.createElement("button", { type: "button", onClick: onSignOut }, "Sign out"),
       ),
   };
 });
@@ -192,9 +177,7 @@ describe("TabsLayoutWeb", () => {
           canManageEmployees: true,
         },
       },
-      error: new Error(
-        "Organization unavailable. Sign in on the web to manage billing.",
-      ),
+      error: new Error("Organization unavailable. Sign in on the web to manage billing."),
       isFetching: false,
       refetch,
     });

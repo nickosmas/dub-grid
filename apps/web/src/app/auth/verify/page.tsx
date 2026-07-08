@@ -78,11 +78,7 @@ export default function AuthVerifyPage() {
                 : "Click the button below to verify your email address."
             }
           >
-            <button
-              onClick={handleVerify}
-              disabled={loading}
-              className="dg-auth-submit"
-            >
+            <button onClick={handleVerify} disabled={loading} className="dg-auth-submit">
               <ButtonLoading
                 loading={loading}
                 spinnerColor="var(--color-text-inverse)"

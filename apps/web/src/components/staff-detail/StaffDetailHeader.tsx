@@ -19,8 +19,7 @@ export function StaffDetailHeader({
   onToggleEditDetails,
 }: StaffDetailHeaderProps) {
   const displayName = getEmployeeDisplayName(employee);
-  const employmentLabel =
-    employee.employmentType === "part_time" ? "Part-time" : "Full-time";
+  const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
 
   const statusConfig = {
     active: {

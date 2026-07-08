@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createBillingPortalSession,
-  writeBillingPortalOpenedAuditLog,
-} from "@/lib/stripe";
+import { createBillingPortalSession, writeBillingPortalOpenedAuditLog } from "@/lib/stripe";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie } from "@/lib/api-auth";
@@ -59,10 +56,7 @@ export async function POST(req: NextRequest) {
       `billing-portal:${auth.actor.id}:${orgId}`,
     );
     if (misconfigured) {
-      return NextResponse.json(
-        { error: "Service temporarily unavailable" },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(

@@ -14,9 +14,7 @@ function createChannel() {
   };
 }
 
-function createChannelRef(
-  channel: RealtimeChannel,
-): MutableRefObject<RealtimeChannel | null> {
+function createChannelRef(channel: RealtimeChannel): MutableRefObject<RealtimeChannel | null> {
   return { current: channel };
 }
 
@@ -28,9 +26,7 @@ describe("useReliableRealtimeBroadcasts", () => {
   it("queues broadcasts until the channel is joined", async () => {
     const channel = createChannel();
     channel.state = "closed";
-    const { result } = renderHook(() =>
-      useReliableRealtimeBroadcasts(createChannelRef(channel)),
-    );
+    const { result } = renderHook(() => useReliableRealtimeBroadcasts(createChannelRef(channel)));
 
     act(() => {
       result.current.sendBroadcast(
@@ -57,9 +53,7 @@ describe("useReliableRealtimeBroadcasts", () => {
   it("merges keyed broadcasts before sending", async () => {
     const channel = createChannel();
     channel.state = "closed";
-    const { result } = renderHook(() =>
-      useReliableRealtimeBroadcasts(createChannelRef(channel)),
-    );
+    const { result } = renderHook(() => useReliableRealtimeBroadcasts(createChannelRef(channel)));
 
     act(() => {
       result.current.sendBroadcast(
@@ -111,20 +105,12 @@ describe("useReliableRealtimeBroadcasts", () => {
   it("retries failed sends until the broadcast goes through", async () => {
     vi.useFakeTimers();
     const channel = createChannel();
-    channel.send
-      .mockResolvedValueOnce("timed out")
-      .mockResolvedValueOnce("ok");
+    channel.send.mockResolvedValueOnce("timed out").mockResolvedValueOnce("ok");
 
-    const { result } = renderHook(() =>
-      useReliableRealtimeBroadcasts(createChannelRef(channel)),
-    );
+    const { result } = renderHook(() => useReliableRealtimeBroadcasts(createChannelRef(channel)));
 
     act(() => {
-      result.current.sendBroadcast(
-        "drafts_discarded",
-        {},
-        { key: "drafts_discarded" },
-      );
+      result.current.sendBroadcast("drafts_discarded", {}, { key: "drafts_discarded" });
     });
 
     expect(channel.send).toHaveBeenCalledTimes(1);

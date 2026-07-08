@@ -102,13 +102,7 @@ describe("Toolbar — Tools dropdown", () => {
 
   it("uses an import arrow for Import Previous Schedule", async () => {
     const user = userEvent.setup();
-    render(
-      <Toolbar
-        {...defaultProps}
-        canImportPrevious
-        onImportPrevious={vi.fn()}
-      />,
-    );
+    render(<Toolbar {...defaultProps} canImportPrevious onImportPrevious={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: /Tools/i }));
     const importItem = screen.getByRole("menuitem", {
       name: /Import Previous Schedule/i,
@@ -139,12 +133,30 @@ describe("Toolbar — Tools dropdown", () => {
     await user.click(screen.getByRole("button", { name: /Tools/i }));
 
     expect(screen.getByRole("menuitem", { name: /Requests/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /Print/i })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Export CSV/i })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Publish History/i })).not.toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Auto Fill/i })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Import Previous Schedule/i })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Bulk Delete Entries/i })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: /Print/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Export CSV/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Publish History/i })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Auto Fill/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Import Previous Schedule/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Bulk Delete Entries/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("disables schedule-entry tools when visible staff rows have no schedule entries", async () => {
@@ -171,13 +183,34 @@ describe("Toolbar — Tools dropdown", () => {
     await user.click(screen.getByRole("button", { name: /Tools/i }));
 
     expect(screen.getByRole("menuitem", { name: /Requests/i })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /Authors/i })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Print/i })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Export CSV/i })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Publish History/i })).not.toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Auto Fill/i })).not.toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Import Previous Schedule/i })).not.toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("menuitem", { name: /Bulk Delete Entries/i })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("menuitem", { name: /Authors/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Print/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Export CSV/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Publish History/i })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Auto Fill/i })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Import Previous Schedule/i })).not.toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByRole("menuitem", { name: /Bulk Delete Entries/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("keeps bulk delete exit available even when no removable entries remain", async () => {
@@ -210,23 +243,13 @@ describe("Toolbar — Tools dropdown", () => {
       />,
     );
     await user.click(screen.getByRole("button", { name: /Tools/i }));
-    expect(
-      screen.getByRole("menuitem", { name: /Import Previous Schedule/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("menuitem", { name: /Auto Fill/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Import Previous Schedule/i })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Auto Fill/i })).not.toBeInTheDocument();
   });
 
   it("shows Auto Fill only when recurring apply permission is granted", async () => {
     const user = userEvent.setup();
-    render(
-      <Toolbar
-        {...defaultProps}
-        canApplyRecurringSchedule
-        onApplyRecurring={vi.fn()}
-      />,
-    );
+    render(<Toolbar {...defaultProps} canApplyRecurringSchedule onApplyRecurring={vi.fn()} />);
     await user.click(screen.getByRole("button", { name: /Tools/i }));
     expect(screen.getByRole("menuitem", { name: /Auto Fill/i })).toBeInTheDocument();
   });
@@ -343,13 +366,9 @@ describe("Toolbar — property tests", () => {
 
     fc.assert(
       fc.property(arbDate, arbNumericSpan, (date, span) => {
-        const { unmount } = render(
-          <Toolbar {...defaultProps} weekStart={date} spanWeeks={span} />,
-        );
+        const { unmount } = render(<Toolbar {...defaultProps} weekStart={date} spanWeeks={span} />);
         const label = screen.getByText(/\d{1,2}\/\d{1,2}/);
-        const result = /^\d{1,2}\/\d{1,2} – \d{1,2}\/\d{1,2}$/.test(
-          label.textContent ?? "",
-        );
+        const result = /^\d{1,2}\/\d{1,2} – \d{1,2}\/\d{1,2}$/.test(label.textContent ?? "");
         unmount();
         return result;
       }),

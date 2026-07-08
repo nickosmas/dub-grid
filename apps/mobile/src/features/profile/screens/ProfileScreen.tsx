@@ -35,19 +35,10 @@ import {
   getInlineErrorMessageOrToast,
   pushClientFriendlyErrorToast,
 } from "../../../shared/lib/errors";
-import {
-  getMobileQueryContentState,
-  getQueryErrorMessage,
-} from "../../../shared/lib/query-state";
-import {
-  loadStoredPushDevice,
-  saveLastOrgSlug,
-} from "../../../shared/lib/session";
+import { getMobileQueryContentState, getQueryErrorMessage } from "../../../shared/lib/query-state";
+import { loadStoredPushDevice, saveLastOrgSlug } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
-import {
-  mobileColors,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileText } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { queryClient } from "../../../shared/lib/query-client";
@@ -99,11 +90,8 @@ export default function ProfileScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isSwitchModalVisible, setIsSwitchModalVisible] = useState(false);
-  const [switchingOrgId, setSwitchingOrgId] = useState<
-    string | null
-  >(null);
-  const [pendingConfirmation, setPendingConfirmation] =
-    useState<ProfileConfirmation | null>(null);
+  const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<ProfileConfirmation | null>(null);
   const [showCollapsedHeader, setShowCollapsedHeader] = useState(false);
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
@@ -117,16 +105,10 @@ export default function ProfileScreen() {
   });
   const bootstrapQuery = useBootstrap(accessToken);
   const manualRefresh = useManualRefresh(() =>
-    Promise.all([
-      profileQuery.refetch(),
-      changeRequestsQuery.refetch(),
-      bootstrapQuery.refetch(),
-    ]),
+    Promise.all([profileQuery.refetch(), changeRequestsQuery.refetch(), bootstrapQuery.refetch()]),
   );
   const pendingChangeRequests: MobileProfileChangeRequest[] =
-    changeRequestsQuery.data?.requests.filter(
-      (request) => request.status === "pending",
-    ) ?? [];
+    changeRequestsQuery.data?.requests.filter((request) => request.status === "pending") ?? [];
   const cancelChangeRequestMutation = useMutation({
     mutationFn: (request: MobileProfileChangeRequest) =>
       updateProfileChangeRequest(accessToken!, request.id, { action: "cancel" }),
@@ -138,10 +120,7 @@ export default function ProfileScreen() {
             ? "Account deletion request cancelled."
             : "Name change request cancelled.",
       });
-      await Promise.all([
-        changeRequestsQuery.refetch(),
-        profileQuery.refetch(),
-      ]);
+      await Promise.all([changeRequestsQuery.refetch(), profileQuery.refetch()]);
     },
     onError: (error) => {
       pushClientFriendlyErrorToast(pushToast, {
@@ -158,10 +137,7 @@ export default function ProfileScreen() {
     error: profileQuery.error,
   });
   const displayName =
-    [profile?.user.firstName, profile?.user.lastName]
-      .filter(Boolean)
-      .join(" ")
-      .trim() ||
+    [profile?.user.firstName, profile?.user.lastName].filter(Boolean).join(" ").trim() ||
     profile?.user.email ||
     "DubGrid user";
   const focusAreaNames =
@@ -171,8 +147,7 @@ export default function ProfileScreen() {
   const memberships = bootstrapQuery.data?.memberships ?? [];
   const canSwitchOrganizations = memberships.length > 1;
   const orgRoleBadge = getMobileOrgRoleBadge(profile?.effectiveRole);
-  const roleLabel =
-    orgRoleBadge?.label ?? ROLE_LABELS[profile?.effectiveRole ?? ""] ?? "User";
+  const roleLabel = orgRoleBadge?.label ?? ROLE_LABELS[profile?.effectiveRole ?? ""] ?? "User";
   const avatarSeed = profile?.linkedEmployee?.id ?? profile?.user.id ?? "";
   const avatarTone = avatarSeed ? getAvatarTone(avatarSeed) : null;
   const staffStatusLabel = formatProfileStatus(profile?.linkedEmployee?.status);
@@ -201,8 +176,7 @@ export default function ProfileScreen() {
         setLogoutError(
           getInlineErrorMessageOrToast(pushToast, {
             error,
-            fallbackMessage:
-              "We couldn't sign you out right now. Try again in a moment.",
+            fallbackMessage: "We couldn't sign you out right now. Try again in a moment.",
           }),
         );
         return;
@@ -213,8 +187,7 @@ export default function ProfileScreen() {
       setLogoutError(
         getInlineErrorMessageOrToast(pushToast, {
           error,
-          fallbackMessage:
-            "We couldn't sign you out right now. Try again in a moment.",
+          fallbackMessage: "We couldn't sign you out right now. Try again in a moment.",
         }),
       );
     } finally {
@@ -253,8 +226,7 @@ export default function ProfileScreen() {
       if (refreshResult.error || !refreshResult.data.session) {
         pushClientFriendlyErrorToast(pushToast, {
           error: refreshResult.error,
-          fallbackMessage:
-            "We couldn't refresh your session after switching organizations.",
+          fallbackMessage: "We couldn't refresh your session after switching organizations.",
           title: "Could not switch organization",
         });
         return;
@@ -281,9 +253,7 @@ export default function ProfileScreen() {
     void handleLogout();
   }
 
-  const confirmationTitle = pendingConfirmation?.force
-    ? "Force sign out?"
-    : "Sign out?";
+  const confirmationTitle = pendingConfirmation?.force ? "Force sign out?" : "Sign out?";
   const confirmationBody = pendingConfirmation?.force
     ? "You'll be signed out immediately, even if data hasn't synced."
     : "You'll be signed out on this device.";
@@ -306,9 +276,7 @@ export default function ProfileScreen() {
       onScroll={handleScroll}
       scrollEventThrottle={16}
     >
-      <Stack.Screen
-        options={createDetailStackOptions(showCollapsedHeader ? displayName : "")}
-      />
+      <Stack.Screen options={createDetailStackOptions(showCollapsedHeader ? displayName : "")} />
       {contentState.kind === "loading" ? (
         <View style={styles.loadingState}>
           <Text style={styles.loadingTitle}>Loading profile</Text>
@@ -362,9 +330,7 @@ export default function ProfileScreen() {
                   }
                 : undefined
             }
-            avatarTextStyle={
-              avatarTone ? { color: avatarTone.color } : undefined
-            }
+            avatarTextStyle={avatarTone ? { color: avatarTone.color } : undefined}
             badge={roleLabel}
             badgeTone={orgRoleBadge?.tone}
             initials={getProfileInitials(displayName)}
@@ -377,10 +343,7 @@ export default function ProfileScreen() {
               label="Phone"
               value={formatProfileValue(profile.linkedEmployee?.phone)}
             />
-            <ProfileHeroMeta
-              label="Date joined"
-              value={formatDate(profile.user.createdAt)}
-            />
+            <ProfileHeroMeta label="Date joined" value={formatDate(profile.user.createdAt)} />
           </ProfileHero>
 
           <PendingRequestsCard
@@ -390,9 +353,7 @@ export default function ProfileScreen() {
                 ? (cancelChangeRequestMutation.variables?.id ?? null)
                 : null
             }
-            onCancel={(request) =>
-              cancelChangeRequestMutation.mutate(request)
-            }
+            onCancel={(request) => cancelChangeRequestMutation.mutate(request)}
           />
 
           <ProfileSection title="Organization details">
@@ -407,11 +368,7 @@ export default function ProfileScreen() {
                 label="Organization"
                 value={formatProfileValue(profile.currentOrg.slug)}
               />
-              <ProfileInfoRow
-                iconName="shield-checkmark-outline"
-                label="Role"
-                value={roleLabel}
-              />
+              <ProfileInfoRow iconName="shield-checkmark-outline" label="Role" value={roleLabel} />
               {profile.linkedEmployee ? (
                 <>
                   <ProfileInfoRow
@@ -423,11 +380,7 @@ export default function ProfileScreen() {
                     iconName="albums-outline"
                     isLast
                     label={profile.currentOrg.labels.focusArea}
-                    value={
-                      focusAreaNames.length > 0
-                        ? focusAreaNames.join(", ")
-                        : "Not set"
-                    }
+                    value={focusAreaNames.length > 0 ? focusAreaNames.join(", ") : "Not set"}
                   />
                 </>
               ) : (
@@ -499,9 +452,7 @@ export default function ProfileScreen() {
             animationType="slide"
             allowSwipeDismissal
             onRequestClose={() => setIsSwitchModalVisible(false)}
-            presentationStyle={
-              Platform.OS === "ios" ? "pageSheet" : "fullScreen"
-            }
+            presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
             visible={isSwitchModalVisible}
           >
             <Screen
@@ -532,9 +483,7 @@ export default function ProfileScreen() {
                         // down a still-mounted native modal.
                         Alert.alert(
                           "Switch organization?",
-                          `You'll switch to ${
-                            membership.name ?? "this organization"
-                          }.`,
+                          `You'll switch to ${membership.name ?? "this organization"}.`,
                           [
                             { text: "Cancel", style: "cancel" },
                             {
@@ -613,17 +562,13 @@ function OrganizationOptionRow({
     >
       <View style={styles.orgOptionIcon}>
         <Ionicons
-          color={
-            membership.isCurrent ? mobileColors.brand : mobileColors.textSecondary
-          }
+          color={membership.isCurrent ? mobileColors.brand : mobileColors.textSecondary}
           name={membership.isCurrent ? "checkmark" : "business-outline"}
           size={18}
         />
       </View>
       <View style={styles.orgOptionCopy}>
-        <Text style={styles.orgOptionName}>
-          {membership.name ?? "Organization"}
-        </Text>
+        <Text style={styles.orgOptionName}>{membership.name ?? "Organization"}</Text>
         <Text style={styles.orgOptionMeta}>
           {membership.slug ?? "organization"} - {membership.orgRole ?? "user"}
         </Text>

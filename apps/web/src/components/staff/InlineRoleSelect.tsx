@@ -41,12 +41,7 @@ export function InlineRoleSelect({
         style={{ minWidth: 132, maxWidth: 168 }}
         title={SELF_ACTION_FORBIDDEN_MESSAGE}
       >
-        <CustomSelect
-          value={orgRole}
-          disabled
-          onChange={() => undefined}
-          options={ROLE_OPTIONS}
-        />
+        <CustomSelect value={orgRole} disabled onChange={() => undefined} options={ROLE_OPTIONS} />
       </div>
     );
   }
@@ -66,10 +61,7 @@ export function InlineRoleSelect({
   }
 
   return (
-    <div
-      onClick={(event) => event.stopPropagation()}
-      style={{ minWidth: 132, maxWidth: 168 }}
-    >
+    <div onClick={(event) => event.stopPropagation()} style={{ minWidth: 132, maxWidth: 168 }}>
       <CustomSelect
         value={orgRole}
         disabled={saving}
@@ -98,11 +90,7 @@ export function InlineRoleSelect({
                 toast.success(`Role updated to ${ORG_ROLE_LABELS[next]}.`);
                 setPending(null);
               } catch (error) {
-                toast.error(
-                  error instanceof Error
-                    ? error.message
-                    : "Could not change the role.",
-                );
+                toast.error(error instanceof Error ? error.message : "Could not change the role.");
               } finally {
                 setSaving(false);
               }

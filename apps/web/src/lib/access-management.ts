@@ -121,9 +121,7 @@ export function buildMembershipAccessChanges(
   return changes;
 }
 
-export function buildMembershipRemovalChanges(
-  user: OrganizationUser,
-): AccessReviewChange[] {
+export function buildMembershipRemovalChanges(user: OrganizationUser): AccessReviewChange[] {
   return [
     {
       key: "organizationAccess",

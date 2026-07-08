@@ -51,10 +51,7 @@ export async function POST(req: NextRequest) {
 
   // ── Authorization — only gridmaster can trigger impersonation notifications ──
   if (claims.platform_role !== "gridmaster") {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.FORBIDDEN },
-      { status: 403 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
   }
 
   // ── Config check ──────────────────────────────────────────────────
@@ -72,18 +69,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.INVALID_BODY },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.INVALID_INPUT },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { targetEmail, targetOrgName, type, justification } = parsed.data;
@@ -119,10 +110,7 @@ export async function POST(req: NextRequest) {
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (ip && serviceRoleKey) {
         try {
-          const supabaseAdmin = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            serviceRoleKey,
-          );
+          const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
           await supabaseAdmin
             .from("impersonation_sessions")
             .update({ ip_address: ip })
@@ -136,10 +124,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "notify-impersonation" } });
-    logger.error({ err, path: "/api/notify-impersonation" }, "Failed to send impersonation notification email");
-    return NextResponse.json(
-      { success: false, error: "Failed to send email" },
-      { status: 500 },
+    logger.error(
+      { err, path: "/api/notify-impersonation" },
+      "Failed to send impersonation notification email",
     );
+    return NextResponse.json({ success: false, error: "Failed to send email" }, { status: 500 });
   }
 }

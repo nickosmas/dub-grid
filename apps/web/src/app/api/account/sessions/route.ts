@@ -26,10 +26,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("account sessions GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load sessions" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load sessions" }, { status: 500 });
   }
 }
 
@@ -80,9 +77,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("account sessions DELETE failed", error);
-    return NextResponse.json(
-      { error: "Failed to revoke session" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to revoke session" }, { status: 500 });
   }
 }

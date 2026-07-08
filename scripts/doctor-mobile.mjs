@@ -68,14 +68,11 @@ function classifyHost(host) {
     };
   }
   if (isPrivateIpv4Address(host)) {
-    const active = new Set(
-      getCandidateIpv4Addresses().map((c) => c.address),
-    );
+    const active = new Set(getCandidateIpv4Addresses().map((c) => c.address));
     if (!active.has(host)) {
       return {
         tone: "warn",
-        note:
-          "Private IP is not currently bound to any active interface on this Mac. Re-run `npm run use:mobile:local`.",
+        note: "Private IP is not currently bound to any active interface on this Mac. Re-run `npm run use:mobile:local`.",
       };
     }
     return {
@@ -109,7 +106,9 @@ async function main() {
   console.log("");
 
   if (!supabaseUrl || !apiBaseUrl || !anonKey) {
-    console.log("! One or more required env vars are missing. Re-run `use:mobile:local` or `use:mobile:remote`.");
+    console.log(
+      "! One or more required env vars are missing. Re-run `use:mobile:local` or `use:mobile:remote`.",
+    );
     process.exit(1);
   }
 
@@ -148,7 +147,9 @@ async function main() {
   if (supabaseProbe.ok) {
     console.log(`  ok (${supabaseProbe.status}, ${supabaseProbe.latencyMs}ms)`);
   } else if (supabaseProbe.status) {
-    console.log(`  reached host but got HTTP ${supabaseProbe.status} (${supabaseProbe.latencyMs}ms)`);
+    console.log(
+      `  reached host but got HTTP ${supabaseProbe.status} (${supabaseProbe.latencyMs}ms)`,
+    );
   } else {
     console.log(`  unreachable: ${supabaseProbe.error}`);
     console.log("  -> Is local Supabase running? (`npx supabase start`)");
@@ -156,10 +157,7 @@ async function main() {
 
   console.log("");
   const anyFail =
-    apiClass.tone === "fail" ||
-    supabaseClass.tone === "fail" ||
-    !apiProbe.ok ||
-    !supabaseProbe.ok;
+    apiClass.tone === "fail" || supabaseClass.tone === "fail" || !apiProbe.ok || !supabaseProbe.ok;
   if (anyFail) {
     console.log("Doctor: issues detected — see notes above.");
     process.exit(1);

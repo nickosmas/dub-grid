@@ -42,10 +42,7 @@ function formatList(ids: number[], map: Map<number, string>): string {
   return names.length > 0 ? names.join(", ") : "—";
 }
 
-function deriveScheduledDepartmentIds(
-  focusAreaIds: number[],
-  focusAreas: FocusArea[],
-): number[] {
+function deriveScheduledDepartmentIds(focusAreaIds: number[], focusAreas: FocusArea[]): number[] {
   const selected = new Set(focusAreaIds);
   const seen = new Set<number>();
   const out: number[] = [];
@@ -74,7 +71,9 @@ export function StaffReadOnlyDetailPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
   const onCloseRef = useRef(onClose);
-  useEffect(() => { onCloseRef.current = onClose; });
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   const closePanel = useCallback(() => {
     setClosing(true);
@@ -107,20 +106,14 @@ export function StaffReadOnlyDetailPanel({
   const departmentIds = deriveScheduledDepartmentIds(employee.focusAreaIds, focusAreas);
   const departmentNames = formatList(departmentIds, deptMap);
   const certificationName =
-    employee.certificationId != null
-      ? (certMap.get(employee.certificationId) ?? "Unknown")
-      : "—";
-  const employmentLabel =
-    employee.employmentType === "part_time" ? "Part-time" : "Full-time";
+    employee.certificationId != null ? (certMap.get(employee.certificationId) ?? "Unknown") : "—";
+  const employmentLabel = employee.employmentType === "part_time" ? "Part-time" : "Full-time";
   const displayName = getEmployeeDisplayName(employee);
   const initials = getInitials(displayName);
 
   return createPortal(
     <>
-      <div
-        className={`staff-detail-overlay${closing ? " closing" : ""}`}
-        onClick={closePanel}
-      />
+      <div className={`staff-detail-overlay${closing ? " closing" : ""}`} onClick={closePanel} />
       <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
         {/* Header */}
         <div
@@ -150,7 +143,9 @@ export function StaffReadOnlyDetailPanel({
             </svg>
           </button>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", paddingTop: 8 }}>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", paddingTop: 8 }}
+          >
             <div
               style={{
                 width: 56,
@@ -331,7 +326,12 @@ export function StaffReadOnlyDetailPanel({
             >
               <Calendar size={12} strokeWidth={2} />
               <span>
-                On staff since {new Date(employee.statusChangedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                On staff since{" "}
+                {new Date(employee.statusChangedAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
               </span>
             </div>
           )}
@@ -342,13 +342,7 @@ export function StaffReadOnlyDetailPanel({
   );
 }
 
-function ReadOnlySection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function ReadOnlySection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section style={{ marginBottom: 22 }}>
       <h3

@@ -21,12 +21,8 @@ export type MobilePushTokenContext = {
   };
 };
 
-async function readUnreadNotificationCount(
-  userClient: SupabaseClient,
-): Promise<number> {
-  const unreadCountResult = await userClient.rpc(
-    "get_unread_notification_count",
-  );
+async function readUnreadNotificationCount(userClient: SupabaseClient): Promise<number> {
+  const unreadCountResult = await userClient.rpc("get_unread_notification_count");
   if (unreadCountResult.error) {
     throw unreadCountResult.error;
   }
@@ -54,9 +50,7 @@ export async function markMobileNotificationRead(
       unreadCount,
     };
   } catch (error) {
-    throw new MobileApiRefreshError(
-      error instanceof Error ? error.message : undefined,
-    );
+    throw new MobileApiRefreshError(error instanceof Error ? error.message : undefined);
   }
 }
 
@@ -76,9 +70,7 @@ export async function markAllMobileNotificationsRead(
       unreadCount,
     };
   } catch (error) {
-    throw new MobileApiRefreshError(
-      error instanceof Error ? error.message : undefined,
-    );
+    throw new MobileApiRefreshError(error instanceof Error ? error.message : undefined);
   }
 }
 
@@ -117,9 +109,7 @@ export async function bulkMutateMobileNotifications(
       updatedCount,
     };
   } catch (error) {
-    throw new MobileApiRefreshError(
-      error instanceof Error ? error.message : undefined,
-    );
+    throw new MobileApiRefreshError(error instanceof Error ? error.message : undefined);
   }
 }
 

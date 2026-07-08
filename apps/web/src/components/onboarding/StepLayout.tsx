@@ -113,19 +113,13 @@ export default function StepLayout({
               padding: "10px 24px",
               borderRadius: 10,
               border: "none",
-              background: nextDisabled
-                ? "var(--color-bg-secondary)"
-                : "var(--color-brand)",
-              color: nextDisabled
-                ? "var(--color-text-faint)"
-                : "var(--color-text-inverse)",
+              background: nextDisabled ? "var(--color-bg-secondary)" : "var(--color-brand)",
+              color: nextDisabled ? "var(--color-text-faint)" : "var(--color-text-inverse)",
               fontSize: 14,
               fontWeight: 700,
               cursor: nextDisabled ? "not-allowed" : "pointer",
               transition: "background 150ms ease, transform 150ms ease",
-              boxShadow: nextDisabled
-                ? "none"
-                : "0 2px 8px rgba(37, 99, 235, 0.2)",
+              boxShadow: nextDisabled ? "none" : "0 2px 8px rgba(37, 99, 235, 0.2)",
             }}
           >
             <ButtonLoading

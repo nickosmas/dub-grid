@@ -37,9 +37,7 @@ function renderWithClient(ui: React.ReactElement) {
     defaultOptions: { queries: { retry: false } },
   });
   const queryClientClear = vi.spyOn(queryClient, "clear");
-  const utils = render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
-  );
+  const utils = render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
   return { ...utils, queryClientClear };
 }
 
@@ -55,9 +53,7 @@ describe("RunLogoutTeardown", () => {
     localStorage.clear();
     // Spy on history.replaceState so we can assert the ?scope= cleanup
     // without actually mutating jsdom's URL across tests.
-    vi.spyOn(window.history, "replaceState").mockImplementation(
-      mockHistoryReplaceState,
-    );
+    vi.spyOn(window.history, "replaceState").mockImplementation(mockHistoryReplaceState);
   });
 
   afterEach(() => {
@@ -73,9 +69,7 @@ describe("RunLogoutTeardown", () => {
     localStorage.setItem("dg-sidebar-manual-collapse", "1");
     localStorage.setItem("dubgrid-cookie-consent", "x");
 
-    const { queryClientClear } = renderWithClient(
-      <RunLogoutTeardown scope="local" />,
-    );
+    const { queryClientClear } = renderWithClient(<RunLogoutTeardown scope="local" />);
 
     // Pre-teardown: the primary CTA renders as a disabled <button> with the
     // same "Sign back in" label as the post-teardown <Link>. No text swap
@@ -91,9 +85,9 @@ describe("RunLogoutTeardown", () => {
     });
 
     // Auth-required cleanup MUST run before signOut clears the session.
-    expect(
-      mockClearLogoutCleanup.mock.invocationCallOrder[0],
-    ).toBeLessThan(mockSignOutFromBrowser.mock.invocationCallOrder[0]);
+    expect(mockClearLogoutCleanup.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSignOutFromBrowser.mock.invocationCallOrder[0],
+    );
 
     // Cache + perms + impersonation cookie all cleared exactly once.
     expect(queryClientClear).toHaveBeenCalledTimes(1);
@@ -118,9 +112,7 @@ describe("RunLogoutTeardown", () => {
 
     // CTA flips to an enabled link once done.
     await waitFor(() => {
-      expect(
-        screen.getByRole("link", { name: /sign back in/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /sign back in/i })).toBeInTheDocument();
     });
   });
 
@@ -136,12 +128,8 @@ describe("RunLogoutTeardown", () => {
     renderWithClient(<RunLogoutTeardown scope={null} />);
 
     // CTAs are enabled immediately — no disabled button placeholder.
-    expect(
-      screen.queryByRole("button", { name: /sign back in/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /sign back in/i }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sign back in/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /sign back in/i })).toBeInTheDocument();
 
     // None of the teardown side-effects ran.
     expect(mockSignOutFromBrowser).not.toHaveBeenCalled();
@@ -167,9 +155,9 @@ describe("RunLogoutTeardown", () => {
     expect(mockRemoveChannel).toHaveBeenCalledTimes(2);
     // Realtime cleanup before Supabase signOut, otherwise channel teardown
     // requests would fly with no auth.
-    expect(
-      mockRemoveChannel.mock.invocationCallOrder[0],
-    ).toBeLessThan(mockSignOutFromBrowser.mock.invocationCallOrder[0]);
+    expect(mockRemoveChannel.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSignOutFromBrowser.mock.invocationCallOrder[0],
+    );
   });
 
   it("guards against React StrictMode + Turbopack dev double-mount", async () => {

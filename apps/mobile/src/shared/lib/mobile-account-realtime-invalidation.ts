@@ -1,10 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 export type MobileAccountRealtimeTable =
-  | "profiles"
-  | "user_sessions"
-  | "notification_preferences"
-  | "notifications";
+  "profiles" | "user_sessions" | "notification_preferences" | "notifications";
 
 export function getMobileAccountRealtimeInvalidationKeys(
   accessToken: string,
@@ -16,11 +13,7 @@ export function getMobileAccountRealtimeInvalidationKeys(
   // (sessions, notification-preferences, etc.).
   const profileAll = ["mobile", "profile"] as const;
   const notifications = ["mobile", "notifications-infinite"] as const;
-  const notificationFacets = [
-    "mobile",
-    "notification-facets",
-    accessToken,
-  ] as const;
+  const notificationFacets = ["mobile", "notification-facets", accessToken] as const;
 
   switch (table) {
     case "profiles":
@@ -39,10 +32,7 @@ export function invalidateMobileAccountRealtimeQueries(
   accessToken: string,
   table: MobileAccountRealtimeTable,
 ): void {
-  for (const queryKey of getMobileAccountRealtimeInvalidationKeys(
-    accessToken,
-    table,
-  )) {
+  for (const queryKey of getMobileAccountRealtimeInvalidationKeys(accessToken, table)) {
     void queryClient.invalidateQueries({ queryKey });
   }
 }

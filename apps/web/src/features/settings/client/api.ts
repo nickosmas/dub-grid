@@ -38,10 +38,7 @@ function resolveClientUrl(path: string): string {
   return path;
 }
 
-async function requestSettingsJson<T>(
-  input: string,
-  options: RequestOptions,
-): Promise<T> {
+async function requestSettingsJson<T>(input: string, options: RequestOptions): Promise<T> {
   const response = await fetch(resolveClientUrl(input), options);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -49,9 +46,7 @@ async function requestSettingsJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, options.errorMessage),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, options.errorMessage));
   }
 
   return body as T;
@@ -114,10 +109,7 @@ export function checkCertificationDependencies(
   );
 }
 
-export function restoreCertification(
-  certId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreCertification(certId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreCertification", orgId, itemId: certId },
     "Failed to restore certification.",
@@ -151,10 +143,7 @@ export async function saveOrganizationRoles(
   return body.items;
 }
 
-export function checkRoleDependencies(
-  roleId: number,
-  orgId: string,
-): Promise<DependencyInfo> {
+export function checkRoleDependencies(roleId: number, orgId: string): Promise<DependencyInfo> {
   return requestSettingsJson<DependencyInfo>(
     buildQuery("checkRoleDependencies", {
       orgId,
@@ -164,10 +153,7 @@ export function checkRoleDependencies(
   );
 }
 
-export function restoreOrganizationRole(
-  roleId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreOrganizationRole(roleId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreOrganizationRole", orgId, itemId: roleId },
     "Failed to restore role.",
@@ -214,10 +200,7 @@ export function checkDepartmentDependencies(
   );
 }
 
-export function restoreDepartment(
-  deptId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreDepartment(deptId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreDepartment", orgId, itemId: deptId },
     "Failed to restore department.",
@@ -272,10 +255,7 @@ export function deleteFocusArea(
   );
 }
 
-export function restoreFocusArea(
-  focusAreaId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreFocusArea(focusAreaId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreFocusArea", orgId, itemId: focusAreaId },
     "Failed to restore focus area.",
@@ -330,10 +310,7 @@ export function deleteShiftCategory(
   );
 }
 
-export function restoreShiftCategory(
-  categoryId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreShiftCategory(categoryId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreShiftCategory", orgId, itemId: categoryId },
     "Failed to restore shift.",
@@ -354,10 +331,7 @@ export async function fetchJobDefinitions(
   return body.items;
 }
 
-export function checkJobDependencies(
-  jobId: number,
-  orgId: string,
-): Promise<DependencyInfo> {
+export function checkJobDependencies(jobId: number, orgId: string): Promise<DependencyInfo> {
   return requestSettingsJson<DependencyInfo>(
     buildQuery("checkJobDependencies", {
       orgId,
@@ -388,19 +362,14 @@ export function deleteJobDefinition(
   );
 }
 
-export function restoreJobDefinition(
-  jobId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreJobDefinition(jobId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreJobDefinition", orgId, itemId: jobId },
     "Failed to restore job.",
   ).then(() => undefined);
 }
 
-export async function fetchCoverageRequirements(
-  orgId: string,
-): Promise<CoverageRequirement[]> {
+export async function fetchCoverageRequirements(orgId: string): Promise<CoverageRequirement[]> {
   const body = await requestSettingsJson<{ items: CoverageRequirement[] }>(
     buildQuery("fetchCoverageRequirements", { orgId }),
     { errorMessage: "Failed to fetch coverage requirements." },
@@ -477,10 +446,7 @@ export function deleteAbsenceType(
   );
 }
 
-export function restoreAbsenceType(
-  absenceTypeId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreAbsenceType(absenceTypeId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreAbsenceType", orgId, itemId: absenceTypeId },
     "Failed to restore absence type.",
@@ -535,10 +501,7 @@ export function deleteIndicatorType(
   );
 }
 
-export function restoreIndicatorType(
-  indicatorTypeId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreIndicatorType(indicatorTypeId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreIndicatorType", orgId, itemId: indicatorTypeId },
     "Failed to restore indicator type.",

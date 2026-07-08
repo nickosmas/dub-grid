@@ -8,14 +8,8 @@ import {
   removeBrowserRealtimeChannel,
   type BrowserRealtimeChannel,
 } from "@/features/account/client";
-import {
-  READ_ONLY_PERMS,
-  ROLE_LEVEL,
-} from "./core";
-import {
-  buildPerms,
-  extractJwtClaims,
-} from "./shared";
+import { READ_ONLY_PERMS, ROLE_LEVEL } from "./core";
+import { buildPerms, extractJwtClaims } from "./shared";
 import type { Permissions } from "./shared";
 
 const LOADING_PERMS: Permissions = buildPerms("user", null, true);
@@ -55,7 +49,9 @@ function readUserView(): boolean {
 
 function subscribeUserView(callback: () => void): () => void {
   userViewListeners.add(callback);
-  return () => { userViewListeners.delete(callback); };
+  return () => {
+    userViewListeners.delete(callback);
+  };
 }
 
 const SERVER_SNAPSHOT = false;

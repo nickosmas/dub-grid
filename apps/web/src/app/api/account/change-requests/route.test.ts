@@ -6,9 +6,8 @@ const validateCsrfOrigin = vi.fn();
 const getServiceClient = vi.fn();
 const listOwnProfileChangeRequests = vi.fn();
 const createProfileChangeRequest = vi.fn();
-const apiErrorResponse = vi.fn(
-  (_err: unknown, fallback: string, status: number) =>
-    NextResponse.json({ error: fallback }, { status }),
+const apiErrorResponse = vi.fn((_err: unknown, fallback: string, status: number) =>
+  NextResponse.json({ error: fallback }, { status }),
 );
 
 vi.mock("@/lib/api-auth", () => ({
@@ -25,10 +24,8 @@ vi.mock("@/lib/error-handling", () => ({
     apiErrorResponse(...(args as [unknown, string, number])),
 }));
 vi.mock("@/features/account/server", () => ({
-  listOwnProfileChangeRequests: (...args: unknown[]) =>
-    listOwnProfileChangeRequests(...args),
-  createProfileChangeRequest: (...args: unknown[]) =>
-    createProfileChangeRequest(...args),
+  listOwnProfileChangeRequests: (...args: unknown[]) => listOwnProfileChangeRequests(...args),
+  createProfileChangeRequest: (...args: unknown[]) => createProfileChangeRequest(...args),
   createProfileChangeRequestSchema: {
     safeParse: (input: unknown) => {
       // Minimal stub: accept objects with the expected shape, reject others.
@@ -84,9 +81,7 @@ beforeEach(() => {
 
 describe("GET /api/account/change-requests", () => {
   it("returns 400 when orgId is missing", async () => {
-    const res = await GET(
-      new NextRequest("http://localhost/api/account/change-requests"),
-    );
+    const res = await GET(new NextRequest("http://localhost/api/account/change-requests"));
     expect(res.status).toBe(400);
     expect(listOwnProfileChangeRequests).not.toHaveBeenCalled();
   });
@@ -94,9 +89,7 @@ describe("GET /api/account/change-requests", () => {
   it("returns 403 when caller is not a member of orgId", async () => {
     getServiceClient.mockReturnValue(buildServiceClient(null));
     const res = await GET(
-      new NextRequest(
-        `http://localhost/api/account/change-requests?orgId=${ORG_ID}`,
-      ),
+      new NextRequest(`http://localhost/api/account/change-requests?orgId=${ORG_ID}`),
     );
     expect(res.status).toBe(403);
     expect(listOwnProfileChangeRequests).not.toHaveBeenCalled();
@@ -105,13 +98,9 @@ describe("GET /api/account/change-requests", () => {
   it("returns requests when caller is a member of orgId", async () => {
     const sc = buildServiceClient({ user_id: "user-1" });
     getServiceClient.mockReturnValue(sc);
-    listOwnProfileChangeRequests.mockResolvedValueOnce([
-      { id: "req-1", type: "name" },
-    ]);
+    listOwnProfileChangeRequests.mockResolvedValueOnce([{ id: "req-1", type: "name" }]);
     const res = await GET(
-      new NextRequest(
-        `http://localhost/api/account/change-requests?orgId=${ORG_ID}`,
-      ),
+      new NextRequest(`http://localhost/api/account/change-requests?orgId=${ORG_ID}`),
     );
     expect(res.status).toBe(200);
     expect(listOwnProfileChangeRequests).toHaveBeenCalledWith({
@@ -129,9 +118,7 @@ describe("GET /api/account/change-requests", () => {
       response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
     });
     const res = await GET(
-      new NextRequest(
-        `http://localhost/api/account/change-requests?orgId=${ORG_ID}`,
-      ),
+      new NextRequest(`http://localhost/api/account/change-requests?orgId=${ORG_ID}`),
     );
     expect(res.status).toBe(401);
     expect(getServiceClient).not.toHaveBeenCalled();

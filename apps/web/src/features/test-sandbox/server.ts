@@ -38,10 +38,7 @@ async function cloneOrgTable(
   remappings: Remapping[] = [],
   extraStripFields: string[] = [],
 ): Promise<Map<number, number>> {
-  const { data: rows, error } = await svc
-    .from(table)
-    .select("*")
-    .eq("org_id", sourceOrgId);
+  const { data: rows, error } = await svc.from(table).select("*").eq("org_id", sourceOrgId);
   if (error) throw error;
   if (!rows || rows.length === 0) return new Map();
 
@@ -73,10 +70,7 @@ async function cloneOrgTable(
     return out;
   });
 
-  const { data: inserted, error: insErr } = await svc
-    .from(table)
-    .insert(newRows)
-    .select("id");
+  const { data: inserted, error: insErr } = await svc.from(table).insert(newRows).select("id");
   if (insErr) throw insErr;
 
   const map = new Map<number, number>();
@@ -123,13 +117,9 @@ async function cloneOrgIntoSandbox(
   ]);
 
   // Phase 3 — shift categories depend on focus areas
-  const shiftCategoryMap = await cloneOrgTable(
-    svc,
-    "shift_categories",
-    sourceOrgId,
-    sandboxOrgId,
-    [{ col: "focus_area_id", map: focusAreaMap }],
-  );
+  const shiftCategoryMap = await cloneOrgTable(svc, "shift_categories", sourceOrgId, sandboxOrgId, [
+    { col: "focus_area_id", map: focusAreaMap },
+  ]);
 
   // Phase 4 — jobs depend on focus areas, shift categories, departments,
   // roles, and certifications.
@@ -219,9 +209,7 @@ export async function createSandboxForUser(input: {
     const { data: orgRow, error: insertErr } = await serviceClient
       .from("organizations")
       .insert({
-        name: sourceOrg?.name
-          ? `${sourceOrg.name} — Sandbox`
-          : "Sandbox organization",
+        name: sourceOrg?.name ? `${sourceOrg.name} — Sandbox` : "Sandbox organization",
         slug,
         workspace_kind: "sandbox",
         sandbox_owner_user_id: actor.id,
@@ -252,8 +240,7 @@ export async function createSandboxForUser(input: {
         landing_page_config: sourceOrg?.landing_page_config ?? {},
         // Operational config
         data_retention_days: sourceOrg?.data_retention_days ?? 365,
-        enforce_conflict_prevention:
-          sourceOrg?.enforce_conflict_prevention ?? false,
+        enforce_conflict_prevention: sourceOrg?.enforce_conflict_prevention ?? false,
         coverage_rule_config: sourceOrg?.coverage_rule_config ?? {
           mentoredCoverageCreditPercent: 100,
         },
@@ -282,14 +269,12 @@ export async function createSandboxForUser(input: {
   try {
     // Add the actor as super_admin so RLS lets them touch the sandbox
     // like any organization they belong to.
-    const { error: membershipErr } = await serviceClient
-      .from("organization_memberships")
-      .insert({
-        user_id: actor.id,
-        org_id: createdOrgId,
-        org_role: "super_admin",
-        onboarding_completed_at: new Date().toISOString(),
-      });
+    const { error: membershipErr } = await serviceClient.from("organization_memberships").insert({
+      user_id: actor.id,
+      org_id: createdOrgId,
+      org_role: "super_admin",
+      onboarding_completed_at: new Date().toISOString(),
+    });
     if (membershipErr) throw membershipErr;
 
     // Clone the source org's structural config and people.
@@ -297,10 +282,7 @@ export async function createSandboxForUser(input: {
   } catch (err) {
     // Best-effort cleanup — if any step after the org insert fails, drop
     // the half-built sandbox so the user isn't left with a broken row.
-    await serviceClient
-      .from("organizations")
-      .delete()
-      .eq("id", createdOrgId);
+    await serviceClient.from("organizations").delete().eq("id", createdOrgId);
     throw err;
   }
 

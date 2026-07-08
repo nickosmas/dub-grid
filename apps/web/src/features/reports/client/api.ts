@@ -59,10 +59,7 @@ function buildReportParams(input: {
 async function parseReportError(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { error?: unknown };
-    return formatClientErrorMessage(
-      body.error,
-      "We couldn't complete the report request.",
-    );
+    return formatClientErrorMessage(body.error, "We couldn't complete the report request.");
   } catch {
     return "We couldn't complete the report request.";
   }
@@ -73,10 +70,9 @@ export async function fetchOperationsReport(input: {
   range: OperationsReportRange;
   filters?: OperationsReportFilters;
 }): Promise<OperationsReportPayload> {
-  const response = await fetch(
-    `/api/reports/operations?${buildReportParams(input)}`,
-    { cache: "no-store" },
-  );
+  const response = await fetch(`/api/reports/operations?${buildReportParams(input)}`, {
+    cache: "no-store",
+  });
   if (!response.ok) {
     throw new Error(await parseReportError(response));
   }
@@ -96,10 +92,9 @@ async function exportOperationsReportFile(input: {
   format: OperationsReportExportFormat;
   filters?: OperationsReportFilters;
 }): Promise<void> {
-  const response = await fetch(
-    `/api/reports/operations/export?${buildReportParams(input)}`,
-    { cache: "no-store" },
-  );
+  const response = await fetch(`/api/reports/operations/export?${buildReportParams(input)}`, {
+    cache: "no-store",
+  });
   if (!response.ok) {
     throw new Error(await parseReportError(response));
   }

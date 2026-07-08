@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { passwordResetLimiter, emailTargetLimiter, checkRateLimit, hashEmail } from "@/lib/rate-limit";
+import {
+  passwordResetLimiter,
+  emailTargetLimiter,
+  checkRateLimit,
+  hashEmail,
+} from "@/lib/rate-limit";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -21,10 +26,7 @@ export async function POST(req: NextRequest) {
   const { user } = auth;
 
   // ── Rate limit by user ID ────────────────────────────────────────────
-  const { limited, reset, misconfigured } = await checkRateLimit(
-    passwordResetLimiter,
-    user.id,
-  );
+  const { limited, reset, misconfigured } = await checkRateLimit(passwordResetLimiter, user.id);
   if (misconfigured) {
     return NextResponse.json(
       { success: false, error: "Service temporarily unavailable" },
@@ -47,18 +49,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid request body" },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: "Invalid request body" }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: "Invalid input" },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: "Invalid input" }, { status: 400 });
   }
 
   const { email } = parsed.data;
@@ -77,7 +73,10 @@ export async function POST(req: NextRequest) {
   if (target.limited) {
     const retryAfter = target.reset ? Math.ceil((target.reset - Date.now()) / 1000) : 60;
     return NextResponse.json(
-      { success: false, error: "Too many reset emails sent to this address. Please try again later." },
+      {
+        success: false,
+        error: "Too many reset emails sent to this address. Please try again later.",
+      },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
     );
   }
@@ -123,10 +122,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "gridmaster-password-reset" } });
-    logger.error(
-      { err, path: "/api/gridmaster/password-reset" },
-      "Password reset failed",
-    );
+    logger.error({ err, path: "/api/gridmaster/password-reset" }, "Password reset failed");
     return NextResponse.json(
       { success: false, error: "Failed to send password reset" },
       { status: 500 },

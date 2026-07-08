@@ -18,11 +18,15 @@ import { fmt12h } from "@/lib/utils";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { DAY_LABELS } from "@/lib/constants";
+import { formatShiftRequestStatusLabel, formatShiftRequestTypeLabel } from "@/lib/client-facing";
 import {
-  formatShiftRequestStatusLabel,
-  formatShiftRequestTypeLabel,
-} from "@/lib/client-facing";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CalendarClock, History, Clock } from "lucide-react";
@@ -68,7 +72,10 @@ export function ScheduleTab({
   const shiftEntries = useMemo(() => {
     return Object.entries(shifts)
       .filter(([key]) => key.startsWith(`${employee.id}_`))
-      .filter(([, entry]) => !entry.isDelete && (entry.assignmentIds.length > 0 || entry.absenceTypeId != null))
+      .filter(
+        ([, entry]) =>
+          !entry.isDelete && (entry.assignmentIds.length > 0 || entry.absenceTypeId != null),
+      )
       .map(([key, entry]) => ({
         dateKey: key.substring(key.indexOf("_") + 1),
         ...entry,
@@ -114,7 +121,9 @@ export function ScheduleTab({
             {recurringShifts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <CalendarClock className="mb-3 h-7 w-7 text-[var(--color-text-faint)]" />
-                <p className="text-[13px] text-[var(--color-text-muted)]">No recurring shifts configured</p>
+                <p className="text-[13px] text-[var(--color-text-muted)]">
+                  No recurring shifts configured
+                </p>
               </div>
             ) : (
               <div>
@@ -150,7 +159,9 @@ export function ScheduleTab({
                   <p className="mt-3 text-center text-[10px] text-[var(--color-text-muted)]">
                     {recurringShifts
                       .filter((shift) => shift.effectiveUntil)
-                      .map((shift) => `${DAY_LABELS[shift.dayOfWeek]}: until ${shift.effectiveUntil}`)
+                      .map(
+                        (shift) => `${DAY_LABELS[shift.dayOfWeek]}: until ${shift.effectiveUntil}`,
+                      )
                       .join(" · ")}
                   </p>
                 )}
@@ -170,7 +181,9 @@ export function ScheduleTab({
                 {shiftEntries.length}
               </Badge>
             </div>
-            <div className="dg-card-subtitle">Published and draft assignment history for this person.</div>
+            <div className="dg-card-subtitle">
+              Published and draft assignment history for this person.
+            </div>
           </div>
         </div>
         <div className="p-0">
@@ -206,12 +219,15 @@ export function ScheduleTab({
                         </TableRow>
                         {group.entries.map((entry) => {
                           const isAbsence = entry.absenceTypeId != null;
-                          const absenceType = isAbsence ? absenceTypeById.get(entry.absenceTypeId!) ?? null : null;
-                          const publishedSet = new Set(entry.publishedAssignmentDefinitionIds ?? []);
+                          const absenceType = isAbsence
+                            ? (absenceTypeById.get(entry.absenceTypeId!) ?? null)
+                            : null;
+                          const publishedSet = new Set(
+                            entry.publishedAssignmentDefinitionIds ?? [],
+                          );
                           const codes = !isAbsence
                             ? entry.assignmentIds.map((id) => {
-                                const assignment =
-                                  assignmentById.get(id);
+                                const assignment = assignmentById.get(id);
                                 const focusArea =
                                   assignment?.focusAreaId != null
                                     ? focusAreaById.get(assignment.focusAreaId)
@@ -235,14 +251,20 @@ export function ScheduleTab({
                                 categoryById,
                               );
                           const date = new Date(`${entry.dateKey}T00:00:00`);
-                          const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()];
+                          const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][
+                            date.getDay()
+                          ];
                           const isSplit = codes.length > 1;
 
                           return (
                             <TableRow key={entry.dateKey}>
                               <TableCell>
-                                <span className="mr-1.5 font-semibold text-[var(--color-text-primary)]">{dayName}</span>
-                                <span className="text-[var(--color-text-muted)]">{entry.dateKey}</span>
+                                <span className="mr-1.5 font-semibold text-[var(--color-text-primary)]">
+                                  {dayName}
+                                </span>
+                                <span className="text-[var(--color-text-muted)]">
+                                  {entry.dateKey}
+                                </span>
                               </TableCell>
                               <TableCell>
                                 <div className={`flex gap-1 ${isSplit ? "flex-col" : "flex-wrap"}`}>
@@ -257,17 +279,25 @@ export function ScheduleTab({
                                         }}
                                         className="h-5 w-fit px-1.5 py-0 text-[10px]"
                                       >
-                                        {isNameMode ? (absenceType.name || absenceType.label) : absenceType.label}
+                                        {isNameMode
+                                          ? absenceType.name || absenceType.label
+                                          : absenceType.label}
                                       </Badge>
                                     ) : (
-                                      <Badge variant="outline" className="h-5 w-fit px-1.5 py-0 text-[10px] text-muted-foreground">
+                                      <Badge
+                                        variant="outline"
+                                        className="h-5 w-fit px-1.5 py-0 text-[10px] text-muted-foreground"
+                                      >
                                         {entry.label || "?"}
                                       </Badge>
                                     )
                                   ) : (
                                     codes.map(({ assignment, isCodeDraft }, idx) =>
                                       assignment ? (
-                                        <div key={assignment.id} className="flex items-center gap-1.5">
+                                        <div
+                                          key={assignment.id}
+                                          className="flex items-center gap-1.5"
+                                        >
                                           <Badge
                                             variant="outline"
                                             style={{
@@ -278,13 +308,10 @@ export function ScheduleTab({
                                             className="h-5 px-1.5 py-0 text-[10px]"
                                           >
                                             {isNameMode
-                                              ? (assignment.name ||
-                                                  assignment.label)
+                                              ? assignment.name || assignment.label
                                               : assignment.label}
                                           </Badge>
-                                          {!isNameMode &&
-                                            isSplit &&
-                                            assignment.name && (
+                                          {!isNameMode && isSplit && assignment.name && (
                                             <span className="text-[11px] text-[var(--color-text-muted)]">
                                               {assignment.name}
                                             </span>
@@ -293,7 +320,9 @@ export function ScheduleTab({
                                             <span
                                               className="text-[10px] font-semibold"
                                               style={{
-                                                color: isCodeDraft ? "var(--color-warning)" : "var(--color-success)",
+                                                color: isCodeDraft
+                                                  ? "var(--color-warning)"
+                                                  : "var(--color-success)",
                                               }}
                                             >
                                               {isCodeDraft ? "Draft" : "Live"}
@@ -301,7 +330,11 @@ export function ScheduleTab({
                                           )}
                                         </div>
                                       ) : (
-                                        <Badge key={`unknown-${idx}`} variant="outline" className="h-5 px-1.5 py-0 text-[10px] text-muted-foreground">
+                                        <Badge
+                                          key={`unknown-${idx}`}
+                                          variant="outline"
+                                          className="h-5 px-1.5 py-0 text-[10px] text-muted-foreground"
+                                        >
                                           ?
                                         </Badge>
                                       ),
@@ -309,34 +342,37 @@ export function ScheduleTab({
                                   )}
                                   {entry.fromRecurring && (
                                     <Hint content={hint("From recurring schedule")} side="top">
-                                      <span className="text-[11px] text-[var(--color-text-muted)]">↻</span>
+                                      <span className="text-[11px] text-[var(--color-text-muted)]">
+                                        ↻
+                                      </span>
                                     </Hint>
                                   )}
                                 </div>
                               </TableCell>
                               <TableCell className="text-[13px] text-[var(--color-text-muted)]">
-                                {isAbsence ? "—" : isSplit ? (
+                                {isAbsence ? (
+                                  "—"
+                                ) : isSplit ? (
                                   <div className="flex flex-col gap-0.5">
                                     {codes.map(({ focusArea }, idx) => (
                                       <span key={idx}>{focusArea ? focusArea.name : "—"}</span>
                                     ))}
                                   </div>
                                 ) : (
-                                  codes[0]?.focusArea?.name ?? "—"
+                                  (codes[0]?.focusArea?.name ?? "—")
                                 )}
                               </TableCell>
                               <TableCell className="text-[13px] text-[var(--color-text-muted)]">
-                                {isAbsence ? "—" : isSplit ? (
+                                {isAbsence ? (
+                                  "—"
+                                ) : isSplit ? (
                                   <div className="flex flex-col gap-0.5">
                                     {codes.map(({ assignment }, idx) => {
                                       const customStarts = entry.customStartTime?.split("|") ?? [];
                                       const customEnds = entry.customEndTime?.split("|") ?? [];
                                       const start =
-                                        customStarts[idx] ||
-                                        assignment?.defaultStartTime;
-                                      const end =
-                                        customEnds[idx] ||
-                                        assignment?.defaultEndTime;
+                                        customStarts[idx] || assignment?.defaultStartTime;
+                                      const end = customEnds[idx] || assignment?.defaultEndTime;
                                       return (
                                         <span key={idx}>
                                           {start && end ? `${fmt12h(start)} – ${fmt12h(end)}` : "—"}
@@ -344,29 +380,34 @@ export function ScheduleTab({
                                       );
                                     })}
                                   </div>
-                                ) : (() => {
-                                  const assignment =
-                                    codes[0]?.assignment;
-                                  const start =
-                                    entry.customStartTime ??
-                                    assignment?.defaultStartTime;
-                                  const end =
-                                    entry.customEndTime ??
-                                    assignment?.defaultEndTime;
-                                  return start && end ? `${fmt12h(start)} – ${fmt12h(end)}` : "—";
-                                })()}
+                                ) : (
+                                  (() => {
+                                    const assignment = codes[0]?.assignment;
+                                    const start =
+                                      entry.customStartTime ?? assignment?.defaultStartTime;
+                                    const end = entry.customEndTime ?? assignment?.defaultEndTime;
+                                    return start && end ? `${fmt12h(start)} – ${fmt12h(end)}` : "—";
+                                  })()
+                                )}
                               </TableCell>
                               <TableCell className="text-[13px] font-semibold text-[var(--color-text-primary)]">
                                 {hours > 0 ? `${Math.round(hours * 10) / 10}h` : "—"}
                               </TableCell>
                               <TableCell>
-                                {isSplit && entry.isDraft && codes.some((code) => code.isCodeDraft) && codes.some((code) => !code.isCodeDraft) ? (
+                                {isSplit &&
+                                entry.isDraft &&
+                                codes.some((code) => code.isCodeDraft) &&
+                                codes.some((code) => !code.isCodeDraft) ? (
                                   <div className="flex flex-col gap-0.5">
                                     {codes.map(({ isCodeDraft }, idx) => (
                                       <span
                                         key={idx}
                                         className="text-[12px] font-semibold"
-                                        style={{ color: isCodeDraft ? "var(--color-warning)" : "var(--color-success)" }}
+                                        style={{
+                                          color: isCodeDraft
+                                            ? "var(--color-warning)"
+                                            : "var(--color-success)",
+                                        }}
                                       >
                                         {isCodeDraft ? "Draft" : "Published"}
                                       </span>
@@ -375,7 +416,11 @@ export function ScheduleTab({
                                 ) : (
                                   <span
                                     className="text-[12px] font-semibold"
-                                    style={{ color: entry.isDraft ? "var(--color-warning)" : "var(--color-success)" }}
+                                    style={{
+                                      color: entry.isDraft
+                                        ? "var(--color-warning)"
+                                        : "var(--color-success)",
+                                    }}
                                   >
                                     {entry.isDraft ? "Draft" : "Published"}
                                   </span>
@@ -391,7 +436,10 @@ export function ScheduleTab({
                                   const label = <span>{compactName(name)}</span>;
                                   if (!timestamp) return label;
                                   return (
-                                    <Hint content={hint(new Date(timestamp).toLocaleString())} side="bottom">
+                                    <Hint
+                                      content={hint(new Date(timestamp).toLocaleString())}
+                                      side="bottom"
+                                    >
                                       {label}
                                     </Hint>
                                   );
@@ -423,7 +471,9 @@ export function ScheduleTab({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setPage((currentPage) => Math.min(totalPages - 1, currentPage + 1))}
+                      onClick={() =>
+                        setPage((currentPage) => Math.min(totalPages - 1, currentPage + 1))
+                      }
                       disabled={page >= totalPages - 1}
                     >
                       Next
@@ -465,7 +515,9 @@ export function ScheduleTab({
                 <TableBody>
                   {shiftRequests.map((request) => (
                     <TableRow key={request.id}>
-                      <TableCell className="text-[13px] font-medium">{formatShiftRequestTypeLabel(request.type)}</TableCell>
+                      <TableCell className="text-[13px] font-medium">
+                        {formatShiftRequestTypeLabel(request.type)}
+                      </TableCell>
                       <TableCell className="text-[13px]">{request.requesterShiftDate}</TableCell>
                       <TableCell className="text-[13px] font-semibold">
                         {request.requesterSegments?.length

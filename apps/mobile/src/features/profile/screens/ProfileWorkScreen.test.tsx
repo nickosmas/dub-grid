@@ -1,15 +1,6 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createReactNativeModule,
-  createScreenModule,
-} from "../../../test/native";
+import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
 const useMutation = vi.fn();
 const useQuery = vi.fn();
@@ -19,17 +10,13 @@ const updateMobilePerson = vi.fn();
 const updateProfileAccount = vi.fn();
 const pushToast = vi.fn();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-query")>();
@@ -202,16 +189,12 @@ describe("ProfileWorkScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "RN" }));
 
-    expect(
-      screen.getByRole("button", { name: "Save changes" }),
-    ).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
     expect(screen.getByRole("button", { name: "Discard" })).not.toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     expect(screen.getByText("Save these changes?")).toBeInTheDocument();
-    fireEvent.click(
-      within(screen.getByRole("alert")).getByRole("button", { name: "Save" }),
-    );
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
       expect(updateMobilePerson).toHaveBeenCalledWith(

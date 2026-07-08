@@ -1,21 +1,14 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createReactNativeModule,
-  createScreenModule,
-} from "../../../test/native";
+import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 const routerPush = vi.fn();
 const useQuery = vi.fn();
@@ -283,9 +276,7 @@ describe("ProfileScreen", () => {
 
     render(<ProfileScreen />);
 
-    expect(
-      screen.queryByRole("button", { name: "Switch organization" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Switch organization" })).not.toBeInTheDocument();
   });
 
   it("shows pending profile change request review state", () => {
@@ -391,14 +382,10 @@ describe("ProfileScreen", () => {
   it("opens organization switching in a modal from the bottom button", () => {
     render(<ProfileScreen />);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Switch organization" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Switch organization" }));
 
     expect(screen.getByText("Hidden Clinic")).toBeInTheDocument();
-    expect(routerPush).not.toHaveBeenCalledWith(
-      "/(tabs)/profile/switch-organization",
-    );
+    expect(routerPush).not.toHaveBeenCalledWith("/(tabs)/profile/switch-organization");
   });
 
   it("resets the mobile session after a successful sign-out", async () => {

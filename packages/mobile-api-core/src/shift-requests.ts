@@ -1,7 +1,4 @@
-import {
-  normalizeMobileScheduleRange,
-  type MobileScheduleQuery,
-} from "@dubgrid/contracts";
+import { normalizeMobileScheduleRange, type MobileScheduleQuery } from "@dubgrid/contracts";
 import type {
   MobileBootstrapResponse,
   MobileCreateShiftRequestBody,
@@ -10,16 +7,10 @@ import type {
   MobileShiftRequest,
   MobileUpdateShiftRequestBody,
 } from "@dubgrid/contracts";
-import {
-  hasShiftRequestStarted,
-  timesOverlap,
-  type TimeRange,
-} from "@dubgrid/schedule-core";
+import { hasShiftRequestStarted, timesOverlap, type TimeRange } from "@dubgrid/schedule-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-type MobileShiftRequestEmployee = NonNullable<
-  MobileBootstrapResponse["linkedEmployee"]
->;
+type MobileShiftRequestEmployee = NonNullable<MobileBootstrapResponse["linkedEmployee"]>;
 
 export type MobileShiftRequestsContext = {
   currentOrg: {
@@ -164,10 +155,7 @@ function getScheduleEntryTimeRanges(entry: MobileScheduleEntry): TimeRange[] {
     return segmentRanges;
   }
 
-  const presentationRange = toTimeRange(
-    entry.presentation.startTime,
-    entry.presentation.endTime,
-  );
+  const presentationRange = toTimeRange(entry.presentation.startTime, entry.presentation.endTime);
 
   return presentationRange ? [presentationRange] : [];
 }
@@ -203,9 +191,7 @@ function getRequestTimeRanges(request: MobileShiftRequest): TimeRange[] {
   return stateRange ? [stateRange] : [];
 }
 
-function buildScheduleRangesByDate(
-  entries: MobileScheduleEntry[],
-): Map<string, TimeRange[]> {
+function buildScheduleRangesByDate(entries: MobileScheduleEntry[]): Map<string, TimeRange[]> {
   const rangesByDate = new Map<string, TimeRange[]>();
 
   for (const entry of entries) {
@@ -241,10 +227,7 @@ function filterAvailableOpenPickupRequests(input: {
       return true;
     }
 
-    if (
-      request.targetEmpId != null &&
-      request.targetEmpId !== input.linkedEmployeeId
-    ) {
+    if (request.targetEmpId != null && request.targetEmpId !== input.linkedEmployeeId) {
       return false;
     }
 
@@ -259,9 +242,7 @@ function filterAvailableOpenPickupRequests(input: {
   });
 }
 
-export async function loadMobileShiftRequestsPayload<
-  TEmployee extends MobileShiftRequestEmployee,
->(
+export async function loadMobileShiftRequestsPayload<TEmployee extends MobileShiftRequestEmployee>(
   auth: MobileShiftRequestsContext,
   input: { startDate?: string; endDate?: string },
   deps: {
@@ -287,10 +268,7 @@ export async function loadMobileShiftRequestsPayload<
   }
 
   const employeeId = canViewAllRequests ? undefined : linkedEmployee?.id;
-  const requestRange = resolveMobileShiftRequestRange(
-    input.startDate,
-    input.endDate,
-  );
+  const requestRange = resolveMobileShiftRequestRange(input.startDate, input.endDate);
 
   const [requests, openShifts, availabilityEntries] = await Promise.all([
     deps.fetchMobileShiftRequests(auth.serviceClient, {
@@ -321,14 +299,15 @@ export async function loadMobileShiftRequestsPayload<
   ]);
 
   return {
-    requests: employeeId && !canViewAllRequests
-      ? filterAvailableOpenPickupRequests({
-          linkedEmployeeId: employeeId,
-          requests,
-          scheduleEntries: availabilityEntries,
-          timeZone: auth.currentOrg.timezone ?? null,
-        })
-      : requests,
+    requests:
+      employeeId && !canViewAllRequests
+        ? filterAvailableOpenPickupRequests({
+            linkedEmployeeId: employeeId,
+            requests,
+            scheduleEntries: availabilityEntries,
+            timeZone: auth.currentOrg.timezone ?? null,
+          })
+        : requests,
     openShifts,
   };
 }
@@ -340,20 +319,17 @@ export async function createMobileShiftRequest(
     dispatchNotificationEvent: DispatchShiftRequestNotificationEvent;
   },
 ): Promise<{ requestId: string }> {
-  const { data: requestId, error } = await auth.userClient.rpc(
-    "create_shift_request",
-    {
-      p_org_id: auth.currentOrg.id,
-      p_type: data.type,
-      p_requester_emp_id: data.requesterEmpId,
-      p_requester_shift_date: data.requesterShiftDate,
-      p_target_emp_id: data.targetEmpId ?? null,
-      p_target_shift_date: data.targetShiftDate ?? null,
-      p_absence_type_id: data.absenceTypeId ?? null,
-      p_requester_segment_index: data.requesterSegmentIndex ?? null,
-      p_target_segment_index: data.targetSegmentIndex ?? null,
-    },
-  );
+  const { data: requestId, error } = await auth.userClient.rpc("create_shift_request", {
+    p_org_id: auth.currentOrg.id,
+    p_type: data.type,
+    p_requester_emp_id: data.requesterEmpId,
+    p_requester_shift_date: data.requesterShiftDate,
+    p_target_emp_id: data.targetEmpId ?? null,
+    p_target_shift_date: data.targetShiftDate ?? null,
+    p_absence_type_id: data.absenceTypeId ?? null,
+    p_requester_segment_index: data.requesterSegmentIndex ?? null,
+    p_target_segment_index: data.targetSegmentIndex ?? null,
+  });
 
   if (error || !requestId) {
     throw error ?? new Error("Unable to create shift request");
@@ -418,9 +394,7 @@ export async function updateMobileShiftRequest(
         action: "shift_request_responded",
         orgId: auth.currentOrg.id,
         requestId,
-        requestType:
-          (requestRow?.type as "pickup" | "swap" | "calloff" | undefined) ??
-          "swap",
+        requestType: (requestRow?.type as "pickup" | "swap" | "calloff" | undefined) ?? "swap",
         accepted: data.accept,
       });
       return;
@@ -446,9 +420,7 @@ export async function updateMobileShiftRequest(
         action: "shift_request_resolved",
         orgId: auth.currentOrg.id,
         requestId,
-        requestType:
-          (requestRow?.type as "pickup" | "swap" | "calloff" | undefined) ??
-          "pickup",
+        requestType: (requestRow?.type as "pickup" | "swap" | "calloff" | undefined) ?? "pickup",
         approved: data.approved,
         ...(data.note !== undefined ? { adminNote: data.note } : {}),
       });
@@ -468,9 +440,7 @@ export async function updateMobileShiftRequest(
 
     case "volunteer_open_shift": {
       if (data.state.kind !== "worked" || data.state.segments.length === 0) {
-        throw new Error(
-          "Open-shift volunteering requires a worked assignment",
-        );
+        throw new Error("Open-shift volunteering requires a worked assignment");
       }
 
       const { data: createdRequestId, error } = await auth.userClient.rpc(
@@ -481,9 +451,7 @@ export async function updateMobileShiftRequest(
           p_shift_date: data.shiftDate,
           p_shift_ids: data.state.segments.map((segment) => segment.shiftId),
           p_job_ids: data.state.segments.map((segment) => segment.jobId),
-          p_is_mentored_flags: data.state.segments.map(
-            (segment) => segment.isMentored ?? false,
-          ),
+          p_is_mentored_flags: data.state.segments.map((segment) => segment.isMentored ?? false),
           p_focus_area_id: data.focusAreaId,
           p_custom_start_time: data.state.customStartTime ?? null,
           p_custom_end_time: data.state.customEndTime ?? null,

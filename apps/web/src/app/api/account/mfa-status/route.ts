@@ -56,9 +56,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ profile });
   } catch (error) {
     console.error("account mfa status POST failed", error);
-    return NextResponse.json(
-      { error: "Failed to update MFA status" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update MFA status" }, { status: 500 });
   }
 }

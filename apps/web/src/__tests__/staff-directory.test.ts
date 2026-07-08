@@ -81,13 +81,15 @@ describe("staff directory cache helpers", () => {
   });
 
   it("applies management-panel edits and keeps alias/admin department fields aligned", () => {
-    expect(applyManagementDirectoryUpdate(baseDirectoryPerson, {
-      firstName: "Allie",
-      lastName: "Stone",
-      email: "alice@example.com",
-      phone: "555-0199",
-      managementDepartmentIds: [10],
-    })).toEqual({
+    expect(
+      applyManagementDirectoryUpdate(baseDirectoryPerson, {
+        firstName: "Allie",
+        lastName: "Stone",
+        email: "alice@example.com",
+        phone: "555-0199",
+        managementDepartmentIds: [10],
+      }),
+    ).toEqual({
       ...baseDirectoryPerson,
       firstName: "Allie",
       lastName: "Stone",
@@ -110,10 +112,15 @@ describe("staff directory cache helpers", () => {
       userId: null,
     };
 
-    expect(upsertEmployeeInList([otherEmployee], baseEmployee)).toEqual([otherEmployee, baseEmployee]);
-    expect(upsertEmployeeInList([otherEmployee, baseEmployee], {
-      ...baseEmployee,
-      firstName: "Alice",
-    })[1].firstName).toBe("Alice");
+    expect(upsertEmployeeInList([otherEmployee], baseEmployee)).toEqual([
+      otherEmployee,
+      baseEmployee,
+    ]);
+    expect(
+      upsertEmployeeInList([otherEmployee, baseEmployee], {
+        ...baseEmployee,
+        firstName: "Alice",
+      })[1].firstName,
+    ).toBe("Alice");
   });
 });

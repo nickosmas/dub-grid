@@ -49,7 +49,9 @@ function buildServiceClient(opts: {
   orgUpdateError?: unknown;
   subscription?: { stripe_subscription_id: string | null } | null;
 }) {
-  const orgUpdate = vi.fn(() => ({ eq: vi.fn(async () => ({ error: opts.orgUpdateError ?? null })) }));
+  const orgUpdate = vi.fn(() => ({
+    eq: vi.fn(async () => ({ error: opts.orgUpdateError ?? null })),
+  }));
   const subUpdate = vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) }));
   const auditInsert = vi.fn(async () => ({ error: null }));
 
@@ -58,7 +60,9 @@ function buildServiceClient(opts: {
       if (table === "organizations") {
         return {
           select: vi.fn(() => ({
-            eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: opts.org, error: null })) })),
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: opts.org, error: null })),
+            })),
           })),
           update: orgUpdate,
         };
@@ -66,7 +70,9 @@ function buildServiceClient(opts: {
       if (table === "subscriptions") {
         return {
           select: vi.fn(() => ({
-            eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: opts.subscription ?? null, error: null })) })),
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: opts.subscription ?? null, error: null })),
+            })),
           })),
           update: subUpdate,
         };
@@ -176,7 +182,9 @@ describe("POST /api/organizations/delete", () => {
     expect(res.status).toBe(200);
     expect(orgUpdate).toHaveBeenCalled();
     expect(cancelSubscription).not.toHaveBeenCalled();
-    const auditPayload = (auditInsert.mock.calls[0] as unknown[])[0] as { details: { stripeCanceled: boolean } };
+    const auditPayload = (auditInsert.mock.calls[0] as unknown[])[0] as {
+      details: { stripeCanceled: boolean };
+    };
     expect(auditPayload.details.stripeCanceled).toBe(false);
   });
 });

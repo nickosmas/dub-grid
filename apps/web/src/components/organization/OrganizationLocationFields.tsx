@@ -28,8 +28,7 @@ import { getTimezoneForCoords } from "@/lib/timezone-from-coords";
 import { getTimezoneForUsState } from "@/lib/us-state-timezones";
 import TimezoneSelect from "./TimezoneSelect";
 
-export interface OrganizationLocationFormValue
-  extends StructuredOrganizationAddress {
+export interface OrganizationLocationFormValue extends StructuredOrganizationAddress {
   phone: string;
   timezone: string;
 }
@@ -44,11 +43,7 @@ interface OrganizationLocationFieldsProps {
   gridTemplateColumns?: string;
 }
 
-function HighlightedGoogleText({
-  value,
-}: {
-  value: GoogleFormattableText | undefined;
-}) {
+function HighlightedGoogleText({ value }: { value: GoogleFormattableText | undefined }) {
   const text = getGoogleText(value);
   const matches = value?.matches ?? [];
 
@@ -65,9 +60,7 @@ function HighlightedGoogleText({
 
     if (start > cursor) {
       segments.push(
-        <span key={`plain-${index}-${cursor}`}>
-          {chars.slice(cursor, start).join("")}
-        </span>,
+        <span key={`plain-${index}-${cursor}`}>{chars.slice(cursor, start).join("")}</span>,
       );
     }
 
@@ -83,9 +76,7 @@ function HighlightedGoogleText({
   });
 
   if (cursor < chars.length) {
-    segments.push(
-      <span key={`tail-${cursor}`}>{chars.slice(cursor).join("")}</span>,
-    );
+    segments.push(<span key={`tail-${cursor}`}>{chars.slice(cursor).join("")}</span>);
   }
 
   return <>{segments}</>;
@@ -114,21 +105,16 @@ function AddressLine1Input({
   const skipNextPanelOpenRef = useRef(false);
   const sessionTokenRef = useRef<object | null>(null);
 
-  const [placesLibrary, setPlacesLibrary] = useState<GooglePlacesLibrary | null>(
-    null,
-  );
+  const [placesLibrary, setPlacesLibrary] = useState<GooglePlacesLibrary | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
-  const [suggestions, setSuggestions] = useState<GoogleAutocompleteSuggestion[]>(
-    [],
-  );
+  const [suggestions, setSuggestions] = useState<GoogleAutocompleteSuggestion[]>([]);
 
   const query = value.trim();
   const hasAutocomplete = Boolean(apiKey && placesLibrary);
-  const showPanel =
-    hasAutocomplete && panelOpen && (query.length >= 2 || loading);
+  const showPanel = hasAutocomplete && panelOpen && (query.length >= 2 || loading);
 
   const updatePanelPosition = useCallback(() => {
     if (!inputRef.current || typeof window === "undefined") return;
@@ -139,10 +125,7 @@ function AddressLine1Input({
     const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
     const spaceAbove = rect.top - viewportPadding;
     const openAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
-    const maxHeight = Math.max(
-      160,
-      Math.min(preferredHeight, openAbove ? spaceAbove : spaceBelow),
-    );
+    const maxHeight = Math.max(160, Math.min(preferredHeight, openAbove ? spaceAbove : spaceBelow));
 
     setPanelStyle({
       position: "fixed",
@@ -188,11 +171,7 @@ function AddressLine1Input({
       return;
     }
 
-    if (
-      hasAutocomplete &&
-      query.length >= 2 &&
-      inputRef.current === document.activeElement
-    ) {
+    if (hasAutocomplete && query.length >= 2 && inputRef.current === document.activeElement) {
       const frame = window.requestAnimationFrame(() => {
         updatePanelPosition();
         setPanelOpen(true);
@@ -224,8 +203,7 @@ function AddressLine1Input({
 
       void autocompleteLibrary.AutocompleteSuggestion.fetchAutocompleteSuggestions({
         input: query,
-        language:
-          typeof navigator !== "undefined" ? navigator.language : undefined,
+        language: typeof navigator !== "undefined" ? navigator.language : undefined,
         sessionToken: sessionTokenRef.current,
       })
         .then(({ suggestions: nextSuggestions }) => {
@@ -373,9 +351,7 @@ function AddressLine1Input({
 
           if (event.key === "ArrowDown") {
             event.preventDefault();
-            setActiveIndex((prev) =>
-              Math.min(prev + 1, Math.max(suggestions.length - 1, 0)),
-            );
+            setActiveIndex((prev) => Math.min(prev + 1, Math.max(suggestions.length - 1, 0)));
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
             setActiveIndex((prev) => Math.max(prev - 1, 0));
@@ -397,74 +373,72 @@ function AddressLine1Input({
         aria-autocomplete="list"
         aria-controls={showPanel ? `${id}-suggestions` : undefined}
         aria-activedescendant={
-          showPanel && suggestions[activeIndex]
-            ? `${id}-option-${activeIndex}`
-            : undefined
+          showPanel && suggestions[activeIndex] ? `${id}-option-${activeIndex}` : undefined
         }
       />
 
       {showPanel && typeof document !== "undefined"
         ? createPortal(
-        <div className="dg-address-panel" style={panelStyle}>
-          <div
-            id={`${id}-suggestions`}
-            className="dg-address-panel-list"
-            role="listbox"
-            aria-label="Address suggestions"
-          >
-            {loading ? (
-              <div className="dg-address-state">Looking up places…</div>
-            ) : suggestions.length === 0 ? (
-              <div className="dg-address-state">
-                No matching places yet. Keep typing for a more exact address.
-              </div>
-            ) : (
-              suggestions.map((suggestion, index) => {
-                const prediction = suggestion.placePrediction;
-                if (!prediction) return null;
+            <div className="dg-address-panel" style={panelStyle}>
+              <div
+                id={`${id}-suggestions`}
+                className="dg-address-panel-list"
+                role="listbox"
+                aria-label="Address suggestions"
+              >
+                {loading ? (
+                  <div className="dg-address-state">Looking up places…</div>
+                ) : suggestions.length === 0 ? (
+                  <div className="dg-address-state">
+                    No matching places yet. Keep typing for a more exact address.
+                  </div>
+                ) : (
+                  suggestions.map((suggestion, index) => {
+                    const prediction = suggestion.placePrediction;
+                    if (!prediction) return null;
 
-                const title = prediction.mainText ?? prediction.text;
-                const subtitle = prediction.secondaryText;
-                const isActive = activeIndex === index;
+                    const title = prediction.mainText ?? prediction.text;
+                    const subtitle = prediction.secondaryText;
+                    const isActive = activeIndex === index;
 
-                return (
-                  <button
-                    key={`${getGoogleText(prediction.text)}-${index}`}
-                    id={`${id}-option-${index}`}
-                    type="button"
-                    role="option"
-                    aria-selected={isActive}
-                    className="dg-address-item"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => {
-                      void handleSelectPrediction(prediction);
-                    }}
-                  >
-                    <span className="dg-address-item-icon" aria-hidden="true">
-                      <MapPin size={14} strokeWidth={2.2} />
-                    </span>
-                    <span className="dg-address-item-copy">
-                      <span className="dg-address-item-title">
-                        <HighlightedGoogleText value={title} />
-                      </span>
-                      {subtitle && getGoogleText(subtitle) ? (
-                        <span className="dg-address-item-subtitle">
-                          <HighlightedGoogleText value={subtitle} />
+                    return (
+                      <button
+                        key={`${getGoogleText(prediction.text)}-${index}`}
+                        id={`${id}-option-${index}`}
+                        type="button"
+                        role="option"
+                        aria-selected={isActive}
+                        className="dg-address-item"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseEnter={() => setActiveIndex(index)}
+                        onClick={() => {
+                          void handleSelectPrediction(prediction);
+                        }}
+                      >
+                        <span className="dg-address-item-icon" aria-hidden="true">
+                          <MapPin size={14} strokeWidth={2.2} />
                         </span>
-                      ) : null}
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-          <div className="dg-address-panel-foot">
-            <span className="dg-address-panel-attribution">Powered by Google</span>
-          </div>
-        </div>,
-        document.body,
-      )
+                        <span className="dg-address-item-copy">
+                          <span className="dg-address-item-title">
+                            <HighlightedGoogleText value={title} />
+                          </span>
+                          {subtitle && getGoogleText(subtitle) ? (
+                            <span className="dg-address-item-subtitle">
+                              <HighlightedGoogleText value={subtitle} />
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              <div className="dg-address-panel-foot">
+                <span className="dg-address-panel-attribution">Powered by Google</span>
+              </div>
+            </div>,
+            document.body,
+          )
         : null}
     </div>
   );
@@ -582,9 +556,7 @@ export default function OrganizationLocationFields({
           id={`${idBase}-postal-code`}
           className="dg-input"
           value={value.addressPostalCode}
-          onChange={(event) =>
-            onChange({ addressPostalCode: event.target.value })
-          }
+          onChange={(event) => onChange({ addressPostalCode: event.target.value })}
           autoComplete="postal-code"
           maxLength={20}
         />

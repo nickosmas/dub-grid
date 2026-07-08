@@ -65,9 +65,7 @@ describe("mobile people status route", () => {
   });
 
   it("updates employee status for authorized mobile managers", async () => {
-    const selectSingle = vi
-      .fn()
-      .mockResolvedValueOnce({ data: createEmployeeRow(), error: null });
+    const selectSingle = vi.fn().mockResolvedValueOnce({ data: createEmployeeRow(), error: null });
     const updateMaybeSingle = vi.fn().mockResolvedValue({
       data: createEmployeeRow({
         status: "inactive",

@@ -4,10 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MobileNotification } from "@dubgrid/contracts";
-import {
-  extractNotificationAction,
-  formatNotificationMetadata,
-} from "@dubgrid/domain";
+import { extractNotificationAction, formatNotificationMetadata } from "@dubgrid/domain";
 import { Button } from "../../../shared/components/Button";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
@@ -19,11 +16,7 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import {
   isNotificationActionSupportedOnMobile,
@@ -167,9 +160,7 @@ export default function NotificationDetailScreen() {
     () => extractNotificationAction(notification?.metadata ?? null),
     [notification?.metadata],
   );
-  const actionSupported = action
-    ? isNotificationActionSupportedOnMobile(action.href)
-    : false;
+  const actionSupported = action ? isNotificationActionSupportedOnMobile(action.href) : false;
 
   const handleOpenAction = useCallback(() => {
     if (!action) return;
@@ -223,8 +214,7 @@ export default function NotificationDetailScreen() {
               color={mobileColors.brand}
             />
           </View>
-          {(notification.priority === "critical" ||
-            notification.priority === "high") && (
+          {(notification.priority === "critical" || notification.priority === "high") && (
             <Text
               style={[
                 styles.priorityChip,
@@ -239,23 +229,16 @@ export default function NotificationDetailScreen() {
         </View>
 
         <Text style={styles.title}>{notification.title}</Text>
-        <Text style={styles.timestamp}>
-          {formatFullTimestamp(notification.createdAt)}
-        </Text>
+        <Text style={styles.timestamp}>{formatFullTimestamp(notification.createdAt)}</Text>
         <Text style={styles.message}>{notification.message}</Text>
 
         {action && actionSupported ? (
           <Button tone="primary" label={action.label} onPress={handleOpenAction} />
         ) : action ? (
           <View style={styles.webOnlyHint}>
-            <Ionicons
-              name="globe-outline"
-              size={16}
-              color={mobileColors.textMuted}
-            />
+            <Ionicons name="globe-outline" size={16} color={mobileColors.textMuted} />
             <Text style={styles.webOnlyHintLabel}>
-              This action isn't available in the mobile app. Sign in on the web
-              to complete it.
+              This action isn't available in the mobile app. Sign in on the web to complete it.
             </Text>
           </View>
         ) : null}
@@ -272,11 +255,7 @@ export default function NotificationDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Mark unread"
           >
-            <Ionicons
-              name="mail-unread-outline"
-              size={18}
-              color={mobileColors.textPrimary}
-            />
+            <Ionicons name="mail-unread-outline" size={18} color={mobileColors.textPrimary} />
             <Text style={styles.actionLabel}>Mark unread</Text>
           </Pressable>
           <Pressable
@@ -293,9 +272,7 @@ export default function NotificationDetailScreen() {
               size={18}
               color={mobileColors.textPrimary}
             />
-            <Text style={styles.actionLabel}>
-              {isArchived ? "Restore" : "Archive"}
-            </Text>
+            <Text style={styles.actionLabel}>{isArchived ? "Restore" : "Archive"}</Text>
           </Pressable>
         </View>
       </ScrollView>

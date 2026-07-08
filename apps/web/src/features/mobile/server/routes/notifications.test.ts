@@ -158,9 +158,7 @@ describe("mobile notifications route", () => {
 
     expect(response.status).toBe(200);
     expect(payload.notifications).toHaveLength(1);
-    expect(payload.notifications[0].id).toBe(
-      "00000000-0000-0000-0000-000000000002",
-    );
+    expect(payload.notifications[0].id).toBe("00000000-0000-0000-0000-000000000002");
     expect(loggerWarn).toHaveBeenCalledWith(
       expect.objectContaining({
         notificationId: "00000000-0000-0000-0000-000000000003",

@@ -3,10 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  fetchAccountIdentity,
-  getVerifiedBrowserAuthUser,
-} from "@/features/account/client";
+import { fetchAccountIdentity, getVerifiedBrowserAuthUser } from "@/features/account/client";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { openConsentPreferences } from "@/components/CookieConsent";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
@@ -83,8 +80,7 @@ const FEATURES: Feature[] = [
   {
     icon: Settings,
     title: "Speaks your language",
-    description:
-      "Call focus areas, certifications, and roles whatever your facility calls them.",
+    description: "Call focus areas, certifications, and roles whatever your facility calls them.",
   },
   {
     icon: Mail,
@@ -194,9 +190,7 @@ export default function RootPage() {
             const slug = identity.orgSlug;
             if (slug) {
               const host = buildSubdomainHost(slug, parsed);
-              window.location.replace(
-                `${window.location.protocol}//${host}/schedule`,
-              );
+              window.location.replace(`${window.location.protocol}//${host}/schedule`);
               return;
             }
           }
@@ -332,22 +326,19 @@ export default function RootPage() {
           <div
             className="absolute top-1/4 left-1/4 w-[600px] h-[600px] rounded-full opacity-[0.04]"
             style={{
-              background:
-                "radial-gradient(circle, var(--color-brand) 0%, transparent 70%)",
+              background: "radial-gradient(circle, var(--color-brand) 0%, transparent 70%)",
             }}
           />
           <div
             className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] rounded-full opacity-[0.03]"
             style={{
-              background:
-                "radial-gradient(circle, var(--color-brand) 0%, transparent 70%)",
+              background: "radial-gradient(circle, var(--color-brand) 0%, transparent 70%)",
             }}
           />
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-[0.02]"
             style={{
-              background:
-                "radial-gradient(circle, var(--color-brand) 0%, transparent 60%)",
+              background: "radial-gradient(circle, var(--color-brand) 0%, transparent 60%)",
             }}
           />
         </div>
@@ -362,9 +353,8 @@ export default function RootPage() {
 
           {/* Subtitle */}
           <p className="mt-6 text-lg md:text-xl text-[var(--color-text-muted)] max-w-2xl mx-auto leading-relaxed">
-            Built for the way care teams actually work. Quick to build the
-            schedule, easy to fill a gap, and right in your pocket on iOS and
-            Android.
+            Built for the way care teams actually work. Quick to build the schedule, easy to fill a
+            gap, and right in your pocket on iOS and Android.
           </p>
 
           {/* CTAs */}
@@ -433,7 +423,6 @@ export default function RootPage() {
                 </div>
               );
             })}
-
           </div>
         </div>
       </RevealSection>
@@ -461,7 +450,8 @@ export default function RootPage() {
               Make it your own
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Rename focus areas, certifications, and roles so the app speaks the same language as your team.
+              Rename focus areas, certifications, and roles so the app speaks the same language as
+              your team.
             </p>
           </div>
           <SettingsMockup />
@@ -476,7 +466,8 @@ export default function RootPage() {
               Set it once.
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Set each person's usual weekly shifts, then apply the template across any date range in a click.
+              Set each person's usual weekly shifts, then apply the template across any date range
+              in a click.
             </p>
           </div>
           <RecurringShiftsMockup />
@@ -491,7 +482,8 @@ export default function RootPage() {
               Your whole team, one screen
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Certifications, focus areas, and account status. Filter to whoever you need, sorted by name or seniority.
+              Certifications, focus areas, and account status. Filter to whoever you need, sorted by
+              name or seniority.
             </p>
           </div>
           <div className="max-w-4xl mx-auto">
@@ -501,10 +493,7 @@ export default function RootPage() {
       </RevealSection>
 
       {/* ── Security & Trust ── */}
-      <RevealSection
-        id="security"
-        className="py-16 sm:py-20 lg:py-24"
-      >
+      <RevealSection id="security" className="py-16 sm:py-20 lg:py-24">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-10">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
@@ -557,7 +546,8 @@ export default function RootPage() {
               Your schedule, in your pocket
             </h2>
             <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Check the week, swap a shift, or grab an open shift right from your phone. Native iOS and Android.
+              Check the week, swap a shift, or grab an open shift right from your phone. Native iOS
+              and Android.
             </p>
           </div>
           <div className="flex justify-center">
@@ -601,7 +591,11 @@ export default function RootPage() {
       <footer className="border-t border-[var(--color-border-light)]">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <a
-            href={typeof window !== "undefined" ? `${window.location.protocol}//${buildSubdomainHost("gridmaster", parseHost(window.location.host))}/login` : "/login"}
+            href={
+              typeof window !== "undefined"
+                ? `${window.location.protocol}//${buildSubdomainHost("gridmaster", parseHost(window.location.host))}/login`
+                : "/login"
+            }
             className="flex items-center gap-2.5"
           >
             <DubGridLogo size={20} color="var(--color-text-faint)" />

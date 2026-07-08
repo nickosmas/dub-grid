@@ -140,18 +140,8 @@ describe("queryKeys factory", () => {
 
     it("org.bootstrap produces correct keys", () => {
       expect(queryKeys.org.bootstrapAll()).toEqual(["org", "bootstrap"]);
-      expect(queryKeys.org.bootstrap("org-1", true)).toEqual([
-        "org",
-        "bootstrap",
-        "org-1",
-        true,
-      ]);
-      expect(queryKeys.org.bootstrap(null, false)).toEqual([
-        "org",
-        "bootstrap",
-        "auto",
-        false,
-      ]);
+      expect(queryKeys.org.bootstrap("org-1", true)).toEqual(["org", "bootstrap", "org-1", true]);
+      expect(queryKeys.org.bootstrap(null, false)).toEqual(["org", "bootstrap", "auto", false]);
     });
 
     it("org.assignments produces correct key", () => {
@@ -183,11 +173,7 @@ describe("queryKeys factory", () => {
     });
 
     it("employees.detail produces correct key with empId", () => {
-      expect(queryKeys.employees.detail("emp-42")).toEqual([
-        "employees",
-        "detail",
-        "emp-42",
-      ]);
+      expect(queryKeys.employees.detail("emp-42")).toEqual(["employees", "detail", "emp-42"]);
     });
 
     it("gridmaster.allOrganizations produces correct key", () => {

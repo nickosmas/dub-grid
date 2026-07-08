@@ -2,10 +2,7 @@
 
 import { Copy, ClipboardPaste, Trash2, UserPlus, ArrowLeftRight } from "lucide-react";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
-import {
-  useCloseOnWindowResize,
-  usePopupCornerAlign,
-} from "@/hooks/useAnchoredPopup";
+import { useCloseOnWindowResize, usePopupCornerAlign } from "@/hooks/useAnchoredPopup";
 
 interface ShiftContextMenuProps {
   anchorEl: HTMLElement;
@@ -40,10 +37,7 @@ export default function ShiftContextMenu({
 }: ShiftContextMenuProps) {
   useCloseOnWindowResize(onClose);
 
-  const { align, alignOffset, sideOffset, popupRef } = usePopupCornerAlign(
-    anchorEl,
-    192,
-  );
+  const { align, alignOffset, sideOffset, popupRef } = usePopupCornerAlign(anchorEl, 192);
 
   return (
     <Menu
@@ -68,84 +62,84 @@ export default function ShiftContextMenu({
         }}
         finalFocus={() => anchorEl}
       >
-      {canEdit && (
-        <>
-          <MenuItem
-            disabled={!hasShift}
-            onClick={() => {
-              onCopy();
-            }}
-          >
-            <Copy size={14} />
-            Copy Entry
-          </MenuItem>
-          <MenuItem
-            disabled={!hasClipboard}
-            onClick={() => {
-              onPaste();
-            }}
-          >
-            <ClipboardPaste size={14} />
-            Paste Entry
-          </MenuItem>
-          {hasShift && (
-            <>
-              <div className="dg-menu-divider" />
+        {canEdit && (
+          <>
+            <MenuItem
+              disabled={!hasShift}
+              onClick={() => {
+                onCopy();
+              }}
+            >
+              <Copy size={14} />
+              Copy Entry
+            </MenuItem>
+            <MenuItem
+              disabled={!hasClipboard}
+              onClick={() => {
+                onPaste();
+              }}
+            >
+              <ClipboardPaste size={14} />
+              Paste Entry
+            </MenuItem>
+            {hasShift && (
+              <>
+                <div className="dg-menu-divider" />
+                <MenuItem
+                  className="dg-menu-item--danger"
+                  onClick={() => {
+                    onClear();
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Remove Entry
+                </MenuItem>
+              </>
+            )}
+          </>
+        )}
+        {canRequest && hasShift && !hasActiveRequest && (
+          <>
+            {canEdit && <div className="dg-menu-divider" />}
+            {onNeedCoverage && (
               <MenuItem
-                className="dg-menu-item--danger"
+                className="dg-menu-item--accent"
                 onClick={() => {
-                  onClear();
+                  onNeedCoverage();
                 }}
               >
-                <Trash2 size={14} />
-                Remove Entry
+                <UserPlus size={14} />
+                Drop shift
               </MenuItem>
-            </>
-          )}
-        </>
-      )}
-      {canRequest && hasShift && !hasActiveRequest && (
-        <>
-          {canEdit && <div className="dg-menu-divider" />}
-          {onNeedCoverage && (
-            <MenuItem
-              className="dg-menu-item--accent"
-              onClick={() => {
-                onNeedCoverage();
+            )}
+            {onProposeSwap && (
+              <MenuItem
+                className="dg-menu-item--accent"
+                onClick={() => {
+                  onProposeSwap();
+                }}
+              >
+                <ArrowLeftRight size={14} />
+                Swap
+              </MenuItem>
+            )}
+          </>
+        )}
+        {canRequest && hasShift && hasActiveRequest && (
+          <>
+            {canEdit && <div className="dg-menu-divider" />}
+            <div
+              style={{
+                padding: "8px 14px",
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-warning-text)",
+                fontStyle: "italic",
               }}
             >
-              <UserPlus size={14} />
-              Drop shift
-            </MenuItem>
-          )}
-          {onProposeSwap && (
-            <MenuItem
-              className="dg-menu-item--accent"
-              onClick={() => {
-                onProposeSwap();
-              }}
-            >
-              <ArrowLeftRight size={14} />
-              Swap
-            </MenuItem>
-          )}
-        </>
-      )}
-      {canRequest && hasShift && hasActiveRequest && (
-        <>
-          {canEdit && <div className="dg-menu-divider" />}
-          <div
-            style={{
-              padding: "8px 14px",
-              fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-warning-text)",
-              fontStyle: "italic",
-            }}
-          >
-            Request already active
-          </div>
-        </>
-      )}
+              Request already active
+            </div>
+          </>
+        )}
       </MenuContent>
     </Menu>
   );

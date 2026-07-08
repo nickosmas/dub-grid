@@ -1,21 +1,49 @@
 import {
-  supabase, cacheThrough, cacheDel, CacheKey, TTL,
-  FOCUS_AREA_COLS, SHIFT_CATEGORY_COLS, JOB_COLS, NAMED_ITEM_COLS, ORG_ROLE_COLS,
+  supabase,
+  cacheThrough,
+  cacheDel,
+  CacheKey,
+  TTL,
+  FOCUS_AREA_COLS,
+  SHIFT_CATEGORY_COLS,
+  JOB_COLS,
+  NAMED_ITEM_COLS,
+  ORG_ROLE_COLS,
   COVERAGE_REQ_COLS,
-  ABSENCE_TYPE_COLS, INDICATOR_TYPE_COLS,
-  logAudit, saveNamedEntities,
+  ABSENCE_TYPE_COLS,
+  INDICATOR_TYPE_COLS,
+  logAudit,
+  saveNamedEntities,
 } from "./shared";
 import type {
-  DbFocusArea, DbShiftCategory, DbJobDefinition, DbNamedItem,
-  DbCoverageRequirement, DbAbsenceType, DbIndicatorType, DbScheduleCell,
+  DbFocusArea,
+  DbShiftCategory,
+  DbJobDefinition,
+  DbNamedItem,
+  DbCoverageRequirement,
+  DbAbsenceType,
+  DbIndicatorType,
+  DbScheduleCell,
 } from "./types";
 import {
-  rowToFocusArea, rowToShiftCategory, rowToJobDefinition, rowToNamedItem,
-  rowToCoverageRequirement, rowToAbsenceType, rowToIndicatorType,
+  rowToFocusArea,
+  rowToShiftCategory,
+  rowToJobDefinition,
+  rowToNamedItem,
+  rowToCoverageRequirement,
+  rowToAbsenceType,
+  rowToIndicatorType,
 } from "./mappers";
 import type {
-  FocusArea, AssignmentDefinition, ShiftCategory, JobDefinition, NamedItem,
-  CoverageRequirement, AbsenceType, IndicatorType, ScheduleCellState,
+  FocusArea,
+  AssignmentDefinition,
+  ShiftCategory,
+  JobDefinition,
+  NamedItem,
+  CoverageRequirement,
+  AbsenceType,
+  IndicatorType,
+  ScheduleCellState,
 } from "@/types";
 import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
 import {
@@ -73,7 +101,8 @@ async function loadActiveScheduleCellDependencies(
 ): Promise<ScheduleCellDependencyRow[]> {
   const { data, error } = await supabase
     .from("schedule_cells")
-    .select(`
+    .select(
+      `
       id,
       employees!inner(archived_at),
       snapshots:schedule_cell_snapshots(
@@ -83,7 +112,8 @@ async function loadActiveScheduleCellDependencies(
           job_id
         )
       )
-    `)
+    `,
+    )
     .eq("org_id", orgId)
     .is("employees.archived_at", null);
 
@@ -116,7 +146,10 @@ function recurringStateUsesAbsenceType(state: ScheduleCellState, absenceTypeId: 
   return state.kind === "absence" && state.absenceTypeId === absenceTypeId;
 }
 
-export async function checkRoleDependencies(roleId: number, orgId: string): Promise<DependencyInfo> {
+export async function checkRoleDependencies(
+  roleId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
   const [employeeRes, jobRes] = await Promise.all([
     supabase
       .from("employees")
@@ -137,16 +170,28 @@ export async function checkRoleDependencies(roleId: number, orgId: string): Prom
   ]);
 }
 
-export async function checkCertificationDependencies(certId: number, orgId: string): Promise<DependencyInfo> {
+export async function checkCertificationDependencies(
+  certId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
   const [empRes, assignments, jobRes] = await Promise.all([
-    supabase.from("employees").select("id", { count: "exact", head: true }).eq("org_id", orgId).is("archived_at", null).eq("certification_id", certId),
+    supabase
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .eq("certification_id", certId),
     fetchAssignmentDefinitions(orgId, true),
-    supabase.from("jobs").select("id", { count: "exact", head: true }).eq("org_id", orgId).is("archived_at", null).contains("required_certification_ids", [certId]),
+    supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .contains("required_certification_ids", [certId]),
   ]);
   const codeCount = assignments.filter(
     (assignment) =>
-      !assignment.archivedAt &&
-      (assignment.requiredCertificationIds ?? []).includes(certId),
+      !assignment.archivedAt && (assignment.requiredCertificationIds ?? []).includes(certId),
   ).length;
   return buildSummary([
     empRes.count ? `${empRes.count} employee${empRes.count !== 1 ? "s" : ""}` : "",
@@ -155,12 +200,29 @@ export async function checkCertificationDependencies(certId: number, orgId: stri
   ]);
 }
 
-export async function checkFocusAreaDependencies(faId: number, orgId: string): Promise<DependencyInfo> {
+export async function checkFocusAreaDependencies(
+  faId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
   const [empRes, assignments, covRes, jobRes] = await Promise.all([
-    supabase.from("employees").select("id", { count: "exact", head: true }).eq("org_id", orgId).is("archived_at", null).contains("focus_area_ids", [faId]),
+    supabase
+      .from("employees")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .contains("focus_area_ids", [faId]),
     fetchAssignmentDefinitions(orgId, true),
-    supabase.from("coverage_requirements").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("focus_area_id", faId),
-    supabase.from("jobs").select("id", { count: "exact", head: true }).eq("org_id", orgId).is("archived_at", null).contains("focus_area_ids", [faId]),
+    supabase
+      .from("coverage_requirements")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("focus_area_id", faId),
+    supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .contains("focus_area_ids", [faId]),
   ]);
   const codeCount = assignments.filter(
     (assignment) => !assignment.archivedAt && assignment.focusAreaId === faId,
@@ -173,7 +235,10 @@ export async function checkFocusAreaDependencies(faId: number, orgId: string): P
   ]);
 }
 
-export async function checkShiftCategoryDependencies(catId: number, orgId: string): Promise<DependencyInfo> {
+export async function checkShiftCategoryDependencies(
+  catId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
   const [assignments, recurringStates, coverageRes] = await Promise.all([
     fetchAssignmentDefinitions(orgId, true),
     loadActiveRecurringStateDependencies(orgId),
@@ -185,8 +250,7 @@ export async function checkShiftCategoryDependencies(catId: number, orgId: strin
   ]);
   const codeCount = assignments.filter(
     (assignment) =>
-      !assignment.archivedAt &&
-      (assignment.shiftId === catId || assignment.categoryId === catId),
+      !assignment.archivedAt && (assignment.shiftId === catId || assignment.categoryId === catId),
   ).length;
   const recurringCount = recurringStates.filter((row) =>
     recurringStateUsesShift(row.state, catId),
@@ -194,7 +258,9 @@ export async function checkShiftCategoryDependencies(catId: number, orgId: strin
   return buildSummary([
     codeCount ? `${codeCount} assignment${codeCount !== 1 ? "s" : ""}` : "",
     recurringCount ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}` : "",
-    coverageRes.count ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}` : "",
+    coverageRes.count
+      ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
+      : "",
   ]);
 }
 
@@ -208,31 +274,34 @@ export async function checkJobDependencies(jobId: number, orgId: string): Promis
       .eq("org_id", orgId)
       .eq("job_id", jobId),
   ]);
-  const shiftCount =
-    scheduleCells.filter((cell) =>
-      (cell.snapshots ?? []).some((snapshot) =>
-        (snapshot.segments ?? []).some((segment) => segment.job_id === jobId),
-      ),
-    ).length;
+  const shiftCount = scheduleCells.filter((cell) =>
+    (cell.snapshots ?? []).some((snapshot) =>
+      (snapshot.segments ?? []).some((segment) => segment.job_id === jobId),
+    ),
+  ).length;
   const recurringCount = recurringStates.filter((row) =>
     recurringStateUsesJob(row.state, jobId),
   ).length;
   return buildSummary([
     shiftCount ? `${shiftCount} shift${shiftCount !== 1 ? "s" : ""}` : "",
     recurringCount ? `${recurringCount} recurring template${recurringCount !== 1 ? "s" : ""}` : "",
-    coverageRes.count ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}` : "",
+    coverageRes.count
+      ? `${coverageRes.count} coverage requirement${coverageRes.count !== 1 ? "s" : ""}`
+      : "",
   ]);
 }
 
-export async function checkAbsenceTypeDependencies(atId: number, orgId: string): Promise<DependencyInfo> {
+export async function checkAbsenceTypeDependencies(
+  atId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
   const [scheduleCells, recurringStates] = await Promise.all([
     loadActiveScheduleCellDependencies(orgId),
     loadActiveRecurringStateDependencies(orgId),
   ]);
-  const shiftCount =
-    scheduleCells.filter((cell) =>
-      (cell.snapshots ?? []).some((snapshot) => snapshot.absence_type_id === atId),
-    ).length;
+  const shiftCount = scheduleCells.filter((cell) =>
+    (cell.snapshots ?? []).some((snapshot) => snapshot.absence_type_id === atId),
+  ).length;
   const recurringCount = recurringStates.filter((row) =>
     recurringStateUsesAbsenceType(row.state, atId),
   ).length;
@@ -242,7 +311,10 @@ export async function checkAbsenceTypeDependencies(atId: number, orgId: string):
   ]);
 }
 
-export async function checkIndicatorTypeDependencies(itId: number, orgId: string): Promise<DependencyInfo> {
+export async function checkIndicatorTypeDependencies(
+  itId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
   const { count } = await supabase
     .from("schedule_notes")
     .select("id", { count: "exact", head: true })
@@ -253,7 +325,10 @@ export async function checkIndicatorTypeDependencies(itId: number, orgId: string
 
 // ── Certifications ───────────────────────────────────────────────────────────
 
-export async function fetchCertifications(orgId: string, includeArchived = false): Promise<NamedItem[]> {
+export async function fetchCertifications(
+  orgId: string,
+  includeArchived = false,
+): Promise<NamedItem[]> {
   if (!includeArchived) {
     return cacheThrough(CacheKey.certifications(orgId), TTL.STABLE, async () => {
       const { data, error } = await supabase
@@ -266,10 +341,7 @@ export async function fetchCertifications(orgId: string, includeArchived = false
       return (data as DbNamedItem[]).map(rowToNamedItem);
     });
   }
-  const query = supabase
-    .from("certifications")
-    .select(NAMED_ITEM_COLS)
-    .eq("org_id", orgId);
+  const query = supabase.from("certifications").select(NAMED_ITEM_COLS).eq("org_id", orgId);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
   return (data as DbNamedItem[]).map(rowToNamedItem);
@@ -293,8 +365,18 @@ export async function saveCertifications(
     }),
   });
 
-  await cacheDel(CacheKey.certifications(orgId), CacheKey.assignments(orgId), CacheKey.assignments(orgId, true));
-  void logAudit("certifications.saved", "certification", null, { created, updated, archived }, orgId);
+  await cacheDel(
+    CacheKey.certifications(orgId),
+    CacheKey.assignments(orgId),
+    CacheKey.assignments(orgId, true),
+  );
+  void logAudit(
+    "certifications.saved",
+    "certification",
+    null,
+    { created, updated, archived },
+    orgId,
+  );
   return fetchCertifications(orgId);
 }
 
@@ -311,7 +393,10 @@ export async function restoreCertification(certId: number, orgId: string): Promi
 
 // ── Organization Roles ───────────────────────────────────────────────────────
 
-export async function fetchOrganizationRoles(orgId: string, includeArchived = false): Promise<NamedItem[]> {
+export async function fetchOrganizationRoles(
+  orgId: string,
+  includeArchived = false,
+): Promise<NamedItem[]> {
   if (!includeArchived) {
     return cacheThrough(CacheKey.orgRoles(orgId), TTL.STABLE, async () => {
       const { data, error } = await supabase
@@ -324,10 +409,7 @@ export async function fetchOrganizationRoles(orgId: string, includeArchived = fa
       return (data as DbNamedItem[]).map(rowToNamedItem);
     });
   }
-  const query = supabase
-    .from("organization_roles")
-    .select(ORG_ROLE_COLS)
-    .eq("org_id", orgId);
+  const query = supabase.from("organization_roles").select(ORG_ROLE_COLS).eq("org_id", orgId);
   const { data, error } = await query.order("sort_order");
   if (error) throw error;
   return (data as DbNamedItem[]).map(rowToNamedItem);
@@ -370,7 +452,10 @@ export async function restoreOrganizationRole(roleId: number, orgId: string): Pr
 
 // ── Focus Areas ──────────────────────────────────────────────────────────────
 
-export async function fetchFocusAreas(orgId: string, includeArchived = false): Promise<FocusArea[]> {
+export async function fetchFocusAreas(
+  orgId: string,
+  includeArchived = false,
+): Promise<FocusArea[]> {
   if (!includeArchived) {
     return cacheThrough(CacheKey.focusAreas(orgId), TTL.STABLE, async () => {
       const { data, error } = await supabase
@@ -404,13 +489,10 @@ export async function autoMigrateOrphanedFocusAreas(orgId: string): Promise<bool
   // Late import to avoid circular dependency — fetchDepartments lives in a sibling module
   const { fetchDepartments } = await import("./employees");
 
-  const [depts, fas] = await Promise.all([
-    fetchDepartments(orgId),
-    fetchFocusAreas(orgId),
-  ]);
+  const [depts, fas] = await Promise.all([fetchDepartments(orgId), fetchFocusAreas(orgId)]);
 
-  const scheduledDepts = depts.filter((d: { type: string }) => d.type === 'scheduled');
-  const orphanedFAs = fas.filter(fa => fa.departmentId === null);
+  const scheduledDepts = depts.filter((d: { type: string }) => d.type === "scheduled");
+  const orphanedFAs = fas.filter((fa) => fa.departmentId === null);
 
   // Nothing to migrate if there are scheduled depts or no orphaned FAs
   if (scheduledDepts.length > 0 || orphanedFAs.length === 0) return false;
@@ -427,7 +509,7 @@ export async function autoMigrateOrphanedFocusAreas(orgId: string): Promise<bool
   const newDeptId = inserted.id as number;
 
   // Assign all orphaned FAs to this department
-  const faIds = orphanedFAs.map(fa => fa.id);
+  const faIds = orphanedFAs.map((fa) => fa.id);
   const { error: updateErr } = await supabase
     .from("focus_areas")
     .update({ department_id: newDeptId })
@@ -439,7 +521,9 @@ export async function autoMigrateOrphanedFocusAreas(orgId: string): Promise<bool
   return true;
 }
 
-export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: number }): Promise<FocusArea> {
+export async function upsertFocusArea(
+  focusArea: Omit<FocusArea, "id"> & { id?: number },
+): Promise<FocusArea> {
   const row = {
     org_id: focusArea.orgId,
     department_id: focusArea.departmentId ?? null,
@@ -456,18 +540,26 @@ export async function upsertFocusArea(focusArea: Omit<FocusArea, "id"> & { id?: 
       .single();
     if (error) throw error;
     await cacheDel(CacheKey.focusAreas(focusArea.orgId));
-    void logAudit("focus_area.upserted", "focus_area", String(focusArea.id), { name: focusArea.name }, focusArea.orgId);
+    void logAudit(
+      "focus_area.upserted",
+      "focus_area",
+      String(focusArea.id),
+      { name: focusArea.name },
+      focusArea.orgId,
+    );
     return rowToFocusArea(data as DbFocusArea);
   }
-  const { data, error } = await supabase
-    .from("focus_areas")
-    .insert(row)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("focus_areas").insert(row).select().single();
   if (error) throw error;
   await cacheDel(CacheKey.focusAreas(focusArea.orgId));
   const result = rowToFocusArea(data as DbFocusArea);
-  void logAudit("focus_area.upserted", "focus_area", String(result.id), { name: focusArea.name }, focusArea.orgId);
+  void logAudit(
+    "focus_area.upserted",
+    "focus_area",
+    String(result.id),
+    { name: focusArea.name },
+    focusArea.orgId,
+  );
   return result;
 }
 
@@ -498,7 +590,8 @@ export async function deleteFocusArea(focusAreaId: number, orgId: string): Promi
   if (error) throw error;
   await cacheDel(
     CacheKey.focusAreas(orgId),
-    CacheKey.assignments(orgId), CacheKey.assignments(orgId, true),
+    CacheKey.assignments(orgId),
+    CacheKey.assignments(orgId, true),
     CacheKey.shiftCategories(orgId),
     CacheKey.employees(orgId),
     CacheKey.coverageReqs(orgId),
@@ -519,7 +612,10 @@ export async function restoreFocusArea(focusAreaId: number, orgId: string): Prom
 
 // ── Schedule Assignment Options ───────────────────────────────────────────────
 
-export async function fetchAssignmentDefinitions(orgId: string, includeArchived = false): Promise<AssignmentDefinition[]> {
+export async function fetchAssignmentDefinitions(
+  orgId: string,
+  includeArchived = false,
+): Promise<AssignmentDefinition[]> {
   return cacheThrough(CacheKey.assignments(orgId, includeArchived), TTL.STABLE, async () => {
     const [focusAreas, shiftCategories, jobs] = await Promise.all([
       fetchFocusAreas(orgId, includeArchived),
@@ -536,7 +632,10 @@ export async function fetchAssignmentDefinitions(orgId: string, includeArchived 
   });
 }
 
-export async function fetchShiftCategories(orgId: string, includeArchived = false): Promise<ShiftCategory[]> {
+export async function fetchShiftCategories(
+  orgId: string,
+  includeArchived = false,
+): Promise<ShiftCategory[]> {
   if (!includeArchived) {
     return cacheThrough(CacheKey.shiftCategories(orgId), TTL.STABLE, async () => {
       const { data, error } = await supabase
@@ -558,12 +657,12 @@ export async function fetchShiftCategories(orgId: string, includeArchived = fals
   return (data as DbShiftCategory[]).map(rowToShiftCategory);
 }
 
-export async function fetchJobDefinitions(orgId: string, includeArchived = false): Promise<JobDefinition[]> {
+export async function fetchJobDefinitions(
+  orgId: string,
+  includeArchived = false,
+): Promise<JobDefinition[]> {
   return cacheThrough(CacheKey.jobs(orgId, includeArchived), TTL.STABLE, async () => {
-    let query = supabase
-      .from("jobs")
-      .select(JOB_COLS)
-      .eq("org_id", orgId);
+    let query = supabase.from("jobs").select(JOB_COLS).eq("org_id", orgId);
     if (!includeArchived) query = query.is("archived_at", null);
     const { data, error } = await query.order("sort_order");
     if (error) throw error;
@@ -571,9 +670,7 @@ export async function fetchJobDefinitions(orgId: string, includeArchived = false
   });
 }
 
-async function refreshDerivedScheduleCaches(
-  orgId: string,
-): Promise<void> {
+async function refreshDerivedScheduleCaches(orgId: string): Promise<void> {
   await cacheDel(
     CacheKey.assignments(orgId),
     CacheKey.assignments(orgId, true),
@@ -633,11 +730,7 @@ export async function upsertJobDefinition(
     if (error) throw error;
     saved = data as DbJobDefinition;
   } else {
-    const { data, error } = await supabase
-      .from("jobs")
-      .insert(row)
-      .select(JOB_COLS)
-      .single();
+    const { data, error } = await supabase.from("jobs").insert(row).select(JOB_COLS).single();
     if (error) throw error;
     saved = data as DbJobDefinition;
   }
@@ -670,7 +763,7 @@ export async function restoreJobDefinition(id: number, orgId: string): Promise<v
 }
 
 export async function upsertShiftCategory(
-  cat: Omit<ShiftCategory, "id"> & { id?: number }
+  cat: Omit<ShiftCategory, "id"> & { id?: number },
 ): Promise<ShiftCategory> {
   const row = {
     org_id: cat.orgId,
@@ -693,18 +786,26 @@ export async function upsertShiftCategory(
     if (error) throw error;
     await cacheDel(CacheKey.shiftCategories(cat.orgId));
     await refreshDerivedScheduleCaches(cat.orgId);
-    void logAudit("shift_category.upserted", "shift_category", String(cat.id), { name: cat.name }, cat.orgId);
+    void logAudit(
+      "shift_category.upserted",
+      "shift_category",
+      String(cat.id),
+      { name: cat.name },
+      cat.orgId,
+    );
     return rowToShiftCategory(data as DbShiftCategory);
   }
-  const { data, error } = await supabase
-    .from("shift_categories")
-    .insert(row)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("shift_categories").insert(row).select().single();
   if (error) throw error;
   await cacheDel(CacheKey.shiftCategories(cat.orgId));
   await refreshDerivedScheduleCaches(cat.orgId);
-  void logAudit("shift_category.upserted", "shift_category", String((data as DbShiftCategory).id), { name: cat.name }, cat.orgId);
+  void logAudit(
+    "shift_category.upserted",
+    "shift_category",
+    String((data as DbShiftCategory).id),
+    { name: cat.name },
+    cat.orgId,
+  );
   return rowToShiftCategory(data as DbShiftCategory);
 }
 
@@ -737,10 +838,7 @@ export async function restoreShiftCategory(id: number, orgId: string): Promise<v
 export async function fetchCoverageRequirements(orgId: string): Promise<CoverageRequirement[]> {
   return cacheThrough(CacheKey.coverageReqs(orgId), TTL.STABLE, async () => {
     const [{ data, error }, jobs] = await Promise.all([
-      supabase
-        .from("coverage_requirements")
-        .select(COVERAGE_REQ_COLS)
-        .eq("org_id", orgId),
+      supabase.from("coverage_requirements").select(COVERAGE_REQ_COLS).eq("org_id", orgId),
       fetchJobDefinitions(orgId, true),
     ]);
     if (error) throw error;
@@ -758,9 +856,8 @@ export async function fetchCoverageRequirements(orgId: string): Promise<Coverage
     );
     return rows
       .map(rowToCoverageRequirement)
-      .filter((requirement) =>
-        (requirement.jobId ?? 0) > 0 &&
-        visibleJobIds.has(requirement.jobId ?? 0),
+      .filter(
+        (requirement) => (requirement.jobId ?? 0) > 0 && visibleJobIds.has(requirement.jobId ?? 0),
       );
   });
 }
@@ -782,9 +879,10 @@ export async function saveCoverageRequirements(
     .eq("org_id", orgId)
     .eq("focus_area_id", focusAreaId)
     .eq("job_id", jobId);
-  deleteQuery = preferredShiftId == null
-    ? deleteQuery.is("preferred_shift_id", null)
-    : deleteQuery.eq("preferred_shift_id", preferredShiftId);
+  deleteQuery =
+    preferredShiftId == null
+      ? deleteQuery.is("preferred_shift_id", null)
+      : deleteQuery.eq("preferred_shift_id", preferredShiftId);
   const { error: delError } = await deleteQuery;
   if (delError) throw delError;
 
@@ -802,31 +900,39 @@ export async function saveCoverageRequirements(
 
   if (rows.length === 0) {
     await cacheDel(CacheKey.coverageReqs(orgId));
-    void logAudit("coverage_requirements.saved", "coverage_requirement", `${focusAreaId}_${jobId}_${preferredShiftId ?? "null"}`, { count: 0 }, orgId);
+    void logAudit(
+      "coverage_requirements.saved",
+      "coverage_requirement",
+      `${focusAreaId}_${jobId}_${preferredShiftId ?? "null"}`,
+      { count: 0 },
+      orgId,
+    );
     return [];
   }
 
-  const { data, error } = await supabase
-    .from("coverage_requirements")
-    .insert(rows)
-    .select();
+  const { data, error } = await supabase.from("coverage_requirements").insert(rows).select();
   if (error) throw error;
   await cacheDel(CacheKey.coverageReqs(orgId));
-  void logAudit("coverage_requirements.saved", "coverage_requirement", `${focusAreaId}_${jobId}_${preferredShiftId ?? "null"}`, { count: rows.length }, orgId);
+  void logAudit(
+    "coverage_requirements.saved",
+    "coverage_requirement",
+    `${focusAreaId}_${jobId}_${preferredShiftId ?? "null"}`,
+    { count: rows.length },
+    orgId,
+  );
   return (data as DbCoverageRequirement[])
     .map(rowToCoverageRequirement)
     .filter((requirement) => (requirement.jobId ?? 0) > 0);
 }
 
-
 // ── Absence Types ────────────────────────────────────────────────────────────
 
-export async function fetchAbsenceTypes(orgId: string, includeArchived = false): Promise<AbsenceType[]> {
+export async function fetchAbsenceTypes(
+  orgId: string,
+  includeArchived = false,
+): Promise<AbsenceType[]> {
   return cacheThrough(CacheKey.absenceTypes(orgId, includeArchived), TTL.STABLE, async () => {
-    let query = supabase
-      .from("absence_types")
-      .select(ABSENCE_TYPE_COLS)
-      .eq("org_id", orgId);
+    let query = supabase.from("absence_types").select(ABSENCE_TYPE_COLS).eq("org_id", orgId);
     if (!includeArchived) query = query.is("archived_at", null);
     const { data, error } = await query.order("sort_order");
     if (error) throw error;
@@ -835,7 +941,7 @@ export async function fetchAbsenceTypes(orgId: string, includeArchived = false):
 }
 
 export async function upsertAbsenceType(
-  at: Omit<AbsenceType, "id"> & { id?: number }
+  at: Omit<AbsenceType, "id"> & { id?: number },
 ): Promise<AbsenceType> {
   const row = {
     org_id: at.orgId,
@@ -858,17 +964,19 @@ export async function upsertAbsenceType(
     if (error) throw error;
     saved = data as DbAbsenceType;
   } else {
-    const { data, error } = await supabase
-      .from("absence_types")
-      .insert(row)
-      .select()
-      .single();
+    const { data, error } = await supabase.from("absence_types").insert(row).select().single();
     if (error) throw error;
     saved = data as DbAbsenceType;
   }
 
   await cacheDel(CacheKey.absenceTypes(at.orgId), CacheKey.absenceTypes(at.orgId, true));
-  void logAudit("absence_type.upserted", "absence_type", String(saved.id), { label: at.label, name: at.name }, at.orgId);
+  void logAudit(
+    "absence_type.upserted",
+    "absence_type",
+    String(saved.id),
+    { label: at.label, name: at.name },
+    at.orgId,
+  );
   return rowToAbsenceType(saved);
 }
 
@@ -896,7 +1004,10 @@ export async function restoreAbsenceType(id: number, orgId: string): Promise<voi
 
 // ── Indicator Types ──────────────────────────────────────────────────────────
 
-export async function fetchIndicatorTypes(orgId: string, includeArchived = false): Promise<IndicatorType[]> {
+export async function fetchIndicatorTypes(
+  orgId: string,
+  includeArchived = false,
+): Promise<IndicatorType[]> {
   if (!includeArchived) {
     return cacheThrough(CacheKey.indicatorTypes(orgId), TTL.STABLE, async () => {
       const { data, error } = await supabase
@@ -919,7 +1030,7 @@ export async function fetchIndicatorTypes(orgId: string, includeArchived = false
 }
 
 export async function upsertIndicatorType(
-  indicator: Omit<IndicatorType, "id"> & { id?: number }
+  indicator: Omit<IndicatorType, "id"> & { id?: number },
 ): Promise<IndicatorType> {
   const row = {
     org_id: indicator.orgId,
@@ -936,17 +1047,25 @@ export async function upsertIndicatorType(
       .single();
     if (error) throw error;
     await cacheDel(CacheKey.indicatorTypes(indicator.orgId));
-    void logAudit("indicator_type.upserted", "indicator_type", String(indicator.id), { name: indicator.name }, indicator.orgId);
+    void logAudit(
+      "indicator_type.upserted",
+      "indicator_type",
+      String(indicator.id),
+      { name: indicator.name },
+      indicator.orgId,
+    );
     return rowToIndicatorType(data as DbIndicatorType);
   }
-  const { data, error } = await supabase
-    .from("indicator_types")
-    .insert(row)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("indicator_types").insert(row).select().single();
   if (error) throw error;
   await cacheDel(CacheKey.indicatorTypes(indicator.orgId));
-  void logAudit("indicator_type.upserted", "indicator_type", String((data as DbIndicatorType).id), { name: indicator.name }, indicator.orgId);
+  void logAudit(
+    "indicator_type.upserted",
+    "indicator_type",
+    String((data as DbIndicatorType).id),
+    { name: indicator.name },
+    indicator.orgId,
+  );
   return rowToIndicatorType(data as DbIndicatorType);
 }
 

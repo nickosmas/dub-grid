@@ -3,9 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../test/native";
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
@@ -67,21 +65,14 @@ describe("SearchBar", () => {
     fireEvent.click(screen.getByLabelText("Clear search"));
 
     expect(screen.queryByLabelText("Clear search")).toBeNull();
-    expect(
-      (screen.getByPlaceholderText("Search") as HTMLInputElement).value,
-    ).toBe("");
+    expect((screen.getByPlaceholderText("Search") as HTMLInputElement).value).toBe("");
   });
 
   it("debounces onDebouncedChange and only fires the final value", () => {
     vi.useFakeTimers();
     try {
       const onDebouncedChange = vi.fn();
-      render(
-        <ControlledSearchBar
-          debounceMs={300}
-          onDebouncedChange={onDebouncedChange}
-        />,
-      );
+      render(<ControlledSearchBar debounceMs={300} onDebouncedChange={onDebouncedChange} />);
 
       const input = screen.getByPlaceholderText("Search");
       fireEvent.change(input, { target: { value: "a" } });

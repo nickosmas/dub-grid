@@ -16,11 +16,7 @@ function readConsent(): ConsentState {
 }
 
 export default function CookiePreferencesManager() {
-  const consent = useSyncExternalStore(
-    subscribeToConsentChanges,
-    readConsent,
-    () => "none",
-  );
+  const consent = useSyncExternalStore(subscribeToConsentChanges, readConsent, () => "none");
   const [saving, setSaving] = useState(false);
 
   function updateConsent(analytics: boolean) {
@@ -48,10 +44,23 @@ export default function CookiePreferencesManager() {
       }}
     >
       <div>
-        <p style={{ margin: 0, fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: "var(--dg-fs-body)",
+            fontWeight: 600,
+            color: "var(--color-text-primary)",
+          }}
+        >
           Your current preference
         </p>
-        <p style={{ margin: "4px 0 0", fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-secondary)" }}>
+        <p
+          style={{
+            margin: "4px 0 0",
+            fontSize: "var(--dg-fs-body-sm)",
+            color: "var(--color-text-secondary)",
+          }}
+        >
           {consent !== "none"
             ? analyticsEnabled
               ? "All cookies accepted (essential + analytics)"

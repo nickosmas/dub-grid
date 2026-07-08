@@ -29,7 +29,9 @@ vi.mock("@/features/employees/client", () => ({
 }));
 
 vi.mock("@/components/staff-detail/StaffDetailPage", () => ({
-  StaffDetailPage: ({ employeeId }: { employeeId: string }) => <div data-testid="staff-detail-page">{employeeId}</div>,
+  StaffDetailPage: ({ employeeId }: { employeeId: string }) => (
+    <div data-testid="staff-detail-page">{employeeId}</div>
+  ),
 }));
 
 describe("PersonDetailRouteContent", () => {

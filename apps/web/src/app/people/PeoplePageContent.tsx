@@ -23,14 +23,30 @@ function PeopleContent() {
     orgId,
   } = usePermissions();
   const {
-    org, focusAreas, assignments, shiftCategories, jobs, certifications, orgRoles, departments, assignmentLabelMap, absenceTypes,
-    loading: refLoading, loadError, setupStatus,
+    org,
+    focusAreas,
+    assignments,
+    shiftCategories,
+    jobs,
+    certifications,
+    orgRoles,
+    departments,
+    assignmentLabelMap,
+    absenceTypes,
+    loading: refLoading,
+    loadError,
+    setupStatus,
   } = useOrganizationData();
   const {
-    employees, inactiveEmployees, removedEmployees,
+    employees,
+    inactiveEmployees,
+    removedEmployees,
     loading: empLoading,
-    handleAddEmployee, handleSaveEmployee, handleRemoveEmployee,
-    handleDeactivateEmployee, handleActivateEmployee,
+    handleAddEmployee,
+    handleSaveEmployee,
+    handleRemoveEmployee,
+    handleDeactivateEmployee,
+    handleActivateEmployee,
   } = useEmployees(orgId ?? org?.id ?? null);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -45,9 +61,7 @@ function PeopleContent() {
 
   const staffEmployees = useMemo(
     () =>
-      employees
-        .filter((e) => e.focusAreaIds.length > 0)
-        .sort((a, b) => a.seniority - b.seniority),
+      employees.filter((e) => e.focusAreaIds.length > 0).sort((a, b) => a.seniority - b.seniority),
     [employees],
   );
 
@@ -64,7 +78,14 @@ function PeopleContent() {
 
   if (loadError && !org) {
     return (
-      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        }}
+      >
         <p style={{ color: "var(--color-text-muted)" }}>{loadError}</p>
       </div>
     );

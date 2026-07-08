@@ -9,10 +9,7 @@ import {
   type NativeSyntheticEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, {
-  useAnimatedScrollHandler,
-  useSharedValue,
-} from "react-native-reanimated";
+import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { Button } from "../../../shared/components/Button";
 import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
 import { hapticSelection } from "../../../shared/lib/haptics";
@@ -45,9 +42,7 @@ const SLIDES: Array<{ visual: ReactNode; title: string; body: string }> = [
 const AnimatedScrollView = Animated.ScrollView;
 
 export default function OnboardingScreen() {
-  const [pageWidth, setPageWidth] = useState(
-    Dimensions.get("window").width,
-  );
+  const [pageWidth, setPageWidth] = useState(Dimensions.get("window").width);
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollX = useSharedValue(0);
   const scrollRef = useRef<Animated.ScrollView>(null);
@@ -144,15 +139,8 @@ export default function OnboardingScreen() {
       </View>
 
       <View style={styles.footer}>
-        <OnboardingPagination
-          count={SLIDES.length}
-          pageWidth={pageWidth}
-          scrollX={scrollX}
-        />
-        <Button
-          label={isLast ? "Get Started" : "Continue"}
-          onPress={handlePrimary}
-        />
+        <OnboardingPagination count={SLIDES.length} pageWidth={pageWidth} scrollX={scrollX} />
+        <Button label={isLast ? "Get Started" : "Continue"} onPress={handlePrimary} />
       </View>
     </SafeAreaView>
   );

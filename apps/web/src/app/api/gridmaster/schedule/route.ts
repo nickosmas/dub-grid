@@ -31,8 +31,7 @@ const readOnlyScheduleSchema = z.object({
   endDate: dateKeySchema,
 });
 
-const FOCUS_AREA_COLS =
-  "id, org_id, department_id, name, color, sort_order, archived_at";
+const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, archived_at";
 const SHIFT_CATEGORY_COLS =
   "id, org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes, archived_at";
 const JOB_COLS =
@@ -208,18 +207,14 @@ export async function GET(req: NextRequest) {
     if (scheduleCellResult.error) throw scheduleCellResult.error;
     if (organizationResult.error) throw organizationResult.error;
 
-    const focusAreas = ((focusAreaResult.data ?? []) as DbFocusArea[]).map(
-      rowToFocusArea,
-    );
+    const focusAreas = ((focusAreaResult.data ?? []) as DbFocusArea[]).map(rowToFocusArea);
     const shiftCategories = ((shiftCategoryResult.data ?? []) as DbShiftCategory[]).map(
       rowToShiftCategory,
     );
-    const jobs = ((jobResult.data ?? []) as DbJobDefinition[]).map(
-      rowToJobDefinition,
-    );
+    const jobs = ((jobResult.data ?? []) as DbJobDefinition[]).map(rowToJobDefinition);
     const shiftDisplayMode: ShiftDisplayMode =
-      (organizationResult.data as { shift_display_mode?: unknown } | null)
-        ?.shift_display_mode === "name"
+      (organizationResult.data as { shift_display_mode?: unknown } | null)?.shift_display_mode ===
+      "name"
         ? "name"
         : "code";
     const focusAreaNameById = new Map(
@@ -239,9 +234,7 @@ export async function GET(req: NextRequest) {
     const assignmentLabelMap = new Map(
       assignments.map((assignment) => [assignment.id, assignment.label]),
     );
-    const assignmentById = new Map(
-      assignments.map((assignment) => [assignment.id, assignment]),
-    );
+    const assignmentById = new Map(assignments.map((assignment) => [assignment.id, assignment]));
     const assignmentIdByPair = createAssignmentDefinitionIdByPairMap(assignments);
     const absenceTypeMap = new Map(
       ((absenceTypeResult.data ?? []) as DbAbsenceType[]).map((row) => {
@@ -252,10 +245,7 @@ export async function GET(req: NextRequest) {
     const coverageRequirements = (
       (coverageRequirementResult.data ?? []) as DbCoverageRequirement[]
     ).map(rowToCoverageRequirement);
-    const requestsByEmployeeDate = new Map<
-      string,
-      ShiftRow["requestIndicators"]
-    >();
+    const requestsByEmployeeDate = new Map<string, ShiftRow["requestIndicators"]>();
     const addRequestIndicator = (
       row: Record<string, unknown>,
       relation: "requester" | "target",
@@ -287,9 +277,9 @@ export async function GET(req: NextRequest) {
       addRequestIndicator(row, "target");
     }
 
-    const shifts: ShiftRow[] = ((scheduleCellResult.data ?? []) as Array<
-      DbScheduleCell & Record<string, unknown>
-    >)
+    const shifts: ShiftRow[] = (
+      (scheduleCellResult.data ?? []) as Array<DbScheduleCell & Record<string, unknown>>
+    )
       .map<ShiftRow | null>((row) => {
         const entry = mapNormalizedScheduleCellRowToScheduleEntry(row, {
           isScheduler: true,
@@ -299,8 +289,7 @@ export async function GET(req: NextRequest) {
         });
         if (!entry) return null;
 
-        const assignmentDetails: ShiftRow["assignmentDetails"] =
-          entry.assignmentIds.map((id) => {
+        const assignmentDetails: ShiftRow["assignmentDetails"] = entry.assignmentIds.map((id) => {
           const assignment = assignmentById.get(id) as AssignmentDefinition | undefined;
           if (!assignment) {
             return {
@@ -323,11 +312,8 @@ export async function GET(req: NextRequest) {
           }
 
           const shift =
-            assignment.shiftId != null
-              ? (shiftById.get(assignment.shiftId) ?? null)
-              : null;
-          const job =
-            assignment.jobId != null ? (jobById.get(assignment.jobId) ?? null) : null;
+            assignment.shiftId != null ? (shiftById.get(assignment.shiftId) ?? null) : null;
+          const job = assignment.jobId != null ? (jobById.get(assignment.jobId) ?? null) : null;
           const displayParts = buildShiftDisplayParts({
             shift,
             job,
@@ -362,12 +348,8 @@ export async function GET(req: NextRequest) {
         const employee =
           (row.employees as { first_name?: string | null; last_name?: string | null } | null) ??
           null;
-        const focusArea =
-          (row.focus_areas as { name?: unknown } | null) ?? null;
-        const employeeName = [
-          employee?.first_name?.trim(),
-          employee?.last_name?.trim(),
-        ]
+        const focusArea = (row.focus_areas as { name?: unknown } | null) ?? null;
+        const employeeName = [employee?.first_name?.trim(), employee?.last_name?.trim()]
           .filter(Boolean)
           .join(" ");
 
@@ -377,14 +359,10 @@ export async function GET(req: NextRequest) {
           date: row.date,
           assignments: assignmentDetails.map((assignment) => assignment.label),
           assignmentDetails,
-          requestIndicators:
-            requestsByEmployeeDate.get(`${row.emp_id}:${row.date}`) ?? [],
+          requestIndicators: requestsByEmployeeDate.get(`${row.emp_id}:${row.date}`) ?? [],
           absenceLabel:
-            entry.absenceTypeId != null
-              ? (absenceTypeMap.get(entry.absenceTypeId) ?? null)
-              : null,
-          focusAreaName:
-            typeof focusArea?.name === "string" ? focusArea.name : null,
+            entry.absenceTypeId != null ? (absenceTypeMap.get(entry.absenceTypeId) ?? null) : null,
+          focusAreaName: typeof focusArea?.name === "string" ? focusArea.name : null,
           isDraft: entry.draftKind != null,
           draftKind: entry.draftKind,
         } satisfies ShiftRow;
@@ -442,9 +420,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ shifts });
   } catch (error) {
     console.error("gridmaster schedule GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load read-only schedule" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load read-only schedule" }, { status: 500 });
   }
 }

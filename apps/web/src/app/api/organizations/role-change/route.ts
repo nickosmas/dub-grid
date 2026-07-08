@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireAuthenticatedUser,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import { isOrgSuperAdminOrGridmaster } from "@/app/api/employees/shared";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { apiErrorResponse } from "@/lib/error-handling";
-import {
-  SELF_ACTION_FORBIDDEN_CODE,
-  SELF_ACTION_FORBIDDEN_MESSAGE,
-} from "@dubgrid/domain";
+import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const roleChangeSchema = z.object({
@@ -33,15 +27,9 @@ export async function POST(req: NextRequest) {
       return auth.response;
     }
 
-    const { limited, reset, misconfigured } = await checkRateLimit(
-      apiLimiter,
-      auth.user.id,
-    );
+    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, auth.user.id);
     if (misconfigured) {
-      return NextResponse.json(
-        { error: "Service temporarily unavailable" },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -118,9 +106,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("organization role change POST failed", error);
-    return NextResponse.json(
-      { error: "Failed to change role" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to change role" }, { status: 500 });
   }
 }

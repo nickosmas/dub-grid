@@ -33,9 +33,7 @@ export function AuthActionEmail({
   return (
     <EmailLayout logoUrl={logoUrl} preview={heading}>
       <Text style={{ ...styles.heading, textAlign: "center" }}>{heading}</Text>
-      <Text style={{ ...styles.paragraph, textAlign: "center", fontSize: "15px" }}>
-        {intro}
-      </Text>
+      <Text style={{ ...styles.paragraph, textAlign: "center", fontSize: "15px" }}>{intro}</Text>
       <EmailButton href={SUPABASE.confirmationUrl}>{ctaLabel}</EmailButton>
       <Hr style={styles.divider} />
       <Text style={{ ...styles.fine, textAlign: "center" }}>{footer}</Text>

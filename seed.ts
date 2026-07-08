@@ -176,20 +176,52 @@ const TENANTS = [
       { name: "Nursing", type: "scheduled" as const },
       { name: "Residential", type: "scheduled" as const },
       // Management departments (with permission templates)
-      { name: "Administration", type: "management" as const, permissions: {
-        canViewSchedule: true, canEditShifts: true, canPublishSchedule: true, canApplyRecurringSchedule: true,
-        canEditNotes: true, canEditScheduleIndicators: true, canManageRecurringShifts: true, canManageShiftSeries: true,
-        canViewStaff: true, canManageEmployees: true, canManageFocusAreas: true,
-        canManageScheduleDefinitions: true, canManageIndicatorTypes: true, canManageOrgSettings: false,
-        canManageOrgLabels: true, canManageCoverageRequirements: true, canApproveShiftRequests: true,
-      }},
-      { name: "Human Resources", type: "management" as const, permissions: {
-        canViewSchedule: true, canEditShifts: false, canPublishSchedule: false, canApplyRecurringSchedule: false,
-        canEditNotes: false, canEditScheduleIndicators: false, canManageRecurringShifts: false, canManageShiftSeries: false,
-        canViewStaff: true, canManageEmployees: true, canManageFocusAreas: false,
-        canManageScheduleDefinitions: false, canManageIndicatorTypes: false, canManageOrgSettings: false,
-        canManageOrgLabels: false, canManageCoverageRequirements: false, canApproveShiftRequests: false,
-      }},
+      {
+        name: "Administration",
+        type: "management" as const,
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: true,
+          canPublishSchedule: true,
+          canApplyRecurringSchedule: true,
+          canEditNotes: true,
+          canEditScheduleIndicators: true,
+          canManageRecurringShifts: true,
+          canManageShiftSeries: true,
+          canViewStaff: true,
+          canManageEmployees: true,
+          canManageFocusAreas: true,
+          canManageScheduleDefinitions: true,
+          canManageIndicatorTypes: true,
+          canManageOrgSettings: false,
+          canManageOrgLabels: true,
+          canManageCoverageRequirements: true,
+          canApproveShiftRequests: true,
+        },
+      },
+      {
+        name: "Human Resources",
+        type: "management" as const,
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: false,
+          canPublishSchedule: false,
+          canApplyRecurringSchedule: false,
+          canEditNotes: false,
+          canEditScheduleIndicators: false,
+          canManageRecurringShifts: false,
+          canManageShiftSeries: false,
+          canViewStaff: true,
+          canManageEmployees: true,
+          canManageFocusAreas: false,
+          canManageScheduleDefinitions: false,
+          canManageIndicatorTypes: false,
+          canManageOrgSettings: false,
+          canManageOrgLabels: false,
+          canManageCoverageRequirements: false,
+          canApproveShiftRequests: false,
+        },
+      },
       { name: "Maintenance", type: "management" as const },
     ],
     // Memory Care → Nursing (0), Assisted Living → Residential (1),
@@ -205,28 +237,189 @@ const TENANTS = [
       { name: "Day Shift", start_time: "08:00", end_time: "16:00", faIndex: 3 },
     ],
     absenceTypes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
-      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
-      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
-      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
-      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
-      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
-      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
-      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
-      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
-      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
-      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+      {
+        label: "X",
+        name: "Off",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+      },
+      {
+        label: "V",
+        name: "Vacation",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+      },
+      {
+        label: "S",
+        name: "Sick",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+      },
+      {
+        label: "PTO",
+        name: "Paid Time Off",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+      },
+      {
+        label: "P",
+        name: "Personal",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+      },
+      {
+        label: "B",
+        name: "Bereavement",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+      },
+      {
+        label: "J",
+        name: "Jury Duty",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+      },
+      {
+        label: "H",
+        name: "Holiday",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+      },
+      {
+        label: "CME",
+        name: "Education / Training",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+      },
+      {
+        label: "FMLA",
+        name: "Family / Medical Leave",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+      },
+      {
+        label: "UX",
+        name: "Unpaid Leave",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+      },
     ] as AbsenceTypeDef[],
     assignments: [
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "D", name: "Day", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
-      { label: "E", name: "Evening", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
-      { label: "N", name: "Night", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239", is_general: false, faIndex: 0, catIndex: 2, start: "23:00", end: "07:00" },
-      { label: "D", name: "Day", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3", is_general: false, faIndex: 1, catIndex: 3, start: "07:00", end: "15:00" },
-      { label: "E", name: "Evening", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 1, catIndex: 4, start: "15:00", end: "23:00" },
-      { label: "D", name: "Day", color: "#A7F3D0", border_color: "transparent", text_color: "#065F46", is_general: false, faIndex: 2, catIndex: 5, start: "08:00", end: "16:00" },
-      { label: "D", name: "Day", color: "#BFDBFE", border_color: "transparent", text_color: "#1E40AF", is_general: false, faIndex: 3, catIndex: 6, start: "08:00", end: "16:00" },
+      {
+        label: "Ofc",
+        name: "Office",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "0.3",
+        name: "Partial",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 0,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "E",
+        name: "Evening",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 1,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "N",
+        name: "Night",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 2,
+        start: "23:00",
+        end: "07:00",
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 3,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "E",
+        name: "Evening",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 4,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#A7F3D0",
+        border_color: "transparent",
+        text_color: "#065F46",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 5,
+        start: "08:00",
+        end: "16:00",
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#BFDBFE",
+        border_color: "transparent",
+        text_color: "#1E40AF",
+        is_general: false,
+        faIndex: 3,
+        catIndex: 6,
+        start: "08:00",
+        end: "16:00",
+      },
     ] as AssignmentDef[],
     employeeCount: 35,
     indicatorTypes: [
@@ -283,27 +476,177 @@ const TENANTS = [
       { name: "Clinic Hours", start_time: "09:00", end_time: "17:00", faIndex: 3 },
     ],
     absenceTypes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
-      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
-      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
-      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
-      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
-      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
-      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
-      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
-      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
-      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
-      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+      {
+        label: "X",
+        name: "Off",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+      },
+      {
+        label: "V",
+        name: "Vacation",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+      },
+      {
+        label: "S",
+        name: "Sick",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+      },
+      {
+        label: "PTO",
+        name: "Paid Time Off",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+      },
+      {
+        label: "P",
+        name: "Personal",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+      },
+      {
+        label: "B",
+        name: "Bereavement",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+      },
+      {
+        label: "J",
+        name: "Jury Duty",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+      },
+      {
+        label: "H",
+        name: "Holiday",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+      },
+      {
+        label: "CME",
+        name: "Education / Training",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+      },
+      {
+        label: "FMLA",
+        name: "Family / Medical Leave",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+      },
+      {
+        label: "UX",
+        name: "Unpaid Leave",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+      },
     ] as AbsenceTypeDef[],
     assignments: [
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "D", name: "Day", color: "#99F6E4", border_color: "transparent", text_color: "#115E59", is_general: false, faIndex: 0, catIndex: 0, start: "06:00", end: "14:00" },
-      { label: "Sw", name: "Swing", color: "#E9D5FF", border_color: "transparent", text_color: "#6B21A8", is_general: false, faIndex: 0, catIndex: 1, start: "14:00", end: "22:00" },
-      { label: "N", name: "Night", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_general: false, faIndex: 0, catIndex: 2, start: "22:00", end: "06:00" },
-      { label: "R", name: "Rehab", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3", is_general: false, faIndex: 1, catIndex: 3, start: "08:00", end: "16:30" },
-      { label: "H", name: "Hospice", color: "#F5D0FE", border_color: "transparent", text_color: "#86198F", is_general: false, faIndex: 2, catIndex: 4, start: "08:00", end: "16:00" },
-      { label: "C", name: "Clinic", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 3, catIndex: 5, start: "09:00", end: "17:00" },
+      {
+        label: "Ofc",
+        name: "Office",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "0.3",
+        name: "Partial",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#99F6E4",
+        border_color: "transparent",
+        text_color: "#115E59",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 0,
+        start: "06:00",
+        end: "14:00",
+      },
+      {
+        label: "Sw",
+        name: "Swing",
+        color: "#E9D5FF",
+        border_color: "transparent",
+        text_color: "#6B21A8",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 1,
+        start: "14:00",
+        end: "22:00",
+      },
+      {
+        label: "N",
+        name: "Night",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 2,
+        start: "22:00",
+        end: "06:00",
+      },
+      {
+        label: "R",
+        name: "Rehab",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 3,
+        start: "08:00",
+        end: "16:30",
+      },
+      {
+        label: "H",
+        name: "Hospice",
+        color: "#F5D0FE",
+        border_color: "transparent",
+        text_color: "#86198F",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 4,
+        start: "08:00",
+        end: "16:00",
+      },
+      {
+        label: "C",
+        name: "Clinic",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+        is_general: false,
+        faIndex: 3,
+        catIndex: 5,
+        start: "09:00",
+        end: "17:00",
+      },
     ] as AssignmentDef[],
     employeeCount: 40,
     indicatorTypes: [
@@ -359,29 +702,201 @@ const TENANTS = [
       { name: "Afternoon", start_time: "15:00", end_time: "23:00", faIndex: 3 },
     ],
     absenceTypes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
-      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
-      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
-      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
-      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
-      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
-      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
-      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
-      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
-      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
-      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+      {
+        label: "X",
+        name: "Off",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+      },
+      {
+        label: "V",
+        name: "Vacation",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+      },
+      {
+        label: "S",
+        name: "Sick",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+      },
+      {
+        label: "PTO",
+        name: "Paid Time Off",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+      },
+      {
+        label: "P",
+        name: "Personal",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+      },
+      {
+        label: "B",
+        name: "Bereavement",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+      },
+      {
+        label: "J",
+        name: "Jury Duty",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+      },
+      {
+        label: "H",
+        name: "Holiday",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+      },
+      {
+        label: "CME",
+        name: "Education / Training",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+      },
+      {
+        label: "FMLA",
+        name: "Family / Medical Leave",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+      },
+      {
+        label: "UX",
+        name: "Unpaid Leave",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+      },
     ] as AbsenceTypeDef[],
     assignments: [
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "M", name: "Morning", color: "#BBF7D0", border_color: "transparent", text_color: "#166534", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
-      { label: "M", name: "Morning", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 1, catIndex: 2, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D", is_general: false, faIndex: 1, catIndex: 3, start: "15:00", end: "23:00" },
-      { label: "M", name: "Morning", color: "#BAE6FD", border_color: "transparent", text_color: "#075985", is_general: false, faIndex: 2, catIndex: 4, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 2, catIndex: 5, start: "15:00", end: "23:00" },
-      { label: "M", name: "Morning", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 3, catIndex: 6, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#99F6E4", border_color: "transparent", text_color: "#115E59", is_general: false, faIndex: 3, catIndex: 7, start: "15:00", end: "23:00" },
+      {
+        label: "Ofc",
+        name: "Office",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "0.3",
+        name: "Partial",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "M",
+        name: "Morning",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 0,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "A",
+        name: "Afternoon",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 1,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "M",
+        name: "Morning",
+        color: "#FECACA",
+        border_color: "transparent",
+        text_color: "#991B1B",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 2,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "A",
+        name: "Afternoon",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 3,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "M",
+        name: "Morning",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 4,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "A",
+        name: "Afternoon",
+        color: "#FECACA",
+        border_color: "transparent",
+        text_color: "#991B1B",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 5,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "M",
+        name: "Morning",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+        is_general: false,
+        faIndex: 3,
+        catIndex: 6,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "A",
+        name: "Afternoon",
+        color: "#99F6E4",
+        border_color: "transparent",
+        text_color: "#115E59",
+        is_general: false,
+        faIndex: 3,
+        catIndex: 7,
+        start: "15:00",
+        end: "23:00",
+      },
     ] as AssignmentDef[],
     employeeCount: 32,
     indicatorTypes: [
@@ -444,28 +959,189 @@ const TENANTS = [
       { name: "Day Shift", start_time: "08:00", end_time: "16:00", faIndex: 4 },
     ],
     absenceTypes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
-      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
-      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
-      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
-      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
-      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
-      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
-      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
-      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
-      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
-      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+      {
+        label: "X",
+        name: "Off",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+      },
+      {
+        label: "V",
+        name: "Vacation",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+      },
+      {
+        label: "S",
+        name: "Sick",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+      },
+      {
+        label: "PTO",
+        name: "Paid Time Off",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+      },
+      {
+        label: "P",
+        name: "Personal",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+      },
+      {
+        label: "B",
+        name: "Bereavement",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+      },
+      {
+        label: "J",
+        name: "Jury Duty",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+      },
+      {
+        label: "H",
+        name: "Holiday",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+      },
+      {
+        label: "CME",
+        name: "Education / Training",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+      },
+      {
+        label: "FMLA",
+        name: "Family / Medical Leave",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+      },
+      {
+        label: "UX",
+        name: "Unpaid Leave",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+      },
     ] as AbsenceTypeDef[],
     assignments: [
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "12D", name: "12hr Day", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "19:00" },
-      { label: "12N", name: "12hr Night", color: "#F5D0FE", border_color: "transparent", text_color: "#86198F", is_general: false, faIndex: 0, catIndex: 1, start: "19:00", end: "07:00" },
-      { label: "D", name: "Day", color: "#FDE047", border_color: "transparent", text_color: "#854D0E", is_general: false, faIndex: 1, catIndex: 2, start: "07:00", end: "15:30" },
-      { label: "E", name: "Evening", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 1, catIndex: 3, start: "15:30", end: "23:30" },
-      { label: "C", name: "Clinic", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 2, catIndex: 4, start: "08:00", end: "17:00" },
-      { label: "ER", name: "ER Shift", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 3, catIndex: 5, start: "07:00", end: "19:00" },
-      { label: "BH", name: "Behavioral", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 4, catIndex: 6, start: "08:00", end: "16:00" },
+      {
+        label: "Ofc",
+        name: "Office",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "0.3",
+        name: "Partial",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "12D",
+        name: "12hr Day",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 0,
+        start: "07:00",
+        end: "19:00",
+      },
+      {
+        label: "12N",
+        name: "12hr Night",
+        color: "#F5D0FE",
+        border_color: "transparent",
+        text_color: "#86198F",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 1,
+        start: "19:00",
+        end: "07:00",
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#FDE047",
+        border_color: "transparent",
+        text_color: "#854D0E",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 2,
+        start: "07:00",
+        end: "15:30",
+      },
+      {
+        label: "E",
+        name: "Evening",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 3,
+        start: "15:30",
+        end: "23:30",
+      },
+      {
+        label: "C",
+        name: "Clinic",
+        color: "#FECACA",
+        border_color: "transparent",
+        text_color: "#991B1B",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 4,
+        start: "08:00",
+        end: "17:00",
+      },
+      {
+        label: "ER",
+        name: "ER Shift",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+        is_general: false,
+        faIndex: 3,
+        catIndex: 5,
+        start: "07:00",
+        end: "19:00",
+      },
+      {
+        label: "BH",
+        name: "Behavioral",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+        is_general: false,
+        faIndex: 4,
+        catIndex: 6,
+        start: "08:00",
+        end: "16:00",
+      },
     ] as AssignmentDef[],
     employeeCount: 45,
     indicatorTypes: [
@@ -484,11 +1160,7 @@ const TENANTS = [
     focus_area_label: "Programs",
     certification_label: "Certifications",
     role_label: "Disciplines",
-    focusAreas: [
-      { name: "Inpatient Hospice" },
-      { name: "Home Care" },
-      { name: "Bereavement" },
-    ],
+    focusAreas: [{ name: "Inpatient Hospice" }, { name: "Home Care" }, { name: "Bereavement" }],
     certifications: [
       { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
       { name: "Licensed Practical Nurse", abbr: "LPN", deptIndex: 0 },
@@ -519,26 +1191,165 @@ const TENANTS = [
       { name: "Support Group", start_time: "10:00", end_time: "16:00", faIndex: 2 },
     ],
     absenceTypes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
-      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
-      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
-      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
-      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
-      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
-      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
-      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
-      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
-      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
-      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+      {
+        label: "X",
+        name: "Off",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+      },
+      {
+        label: "V",
+        name: "Vacation",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+      },
+      {
+        label: "S",
+        name: "Sick",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+      },
+      {
+        label: "PTO",
+        name: "Paid Time Off",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+      },
+      {
+        label: "P",
+        name: "Personal",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+      },
+      {
+        label: "B",
+        name: "Bereavement",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+      },
+      {
+        label: "J",
+        name: "Jury Duty",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+      },
+      {
+        label: "H",
+        name: "Holiday",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+      },
+      {
+        label: "CME",
+        name: "Education / Training",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+      },
+      {
+        label: "FMLA",
+        name: "Family / Medical Leave",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+      },
+      {
+        label: "UX",
+        name: "Unpaid Leave",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+      },
     ] as AbsenceTypeDef[],
     assignments: [
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "D", name: "Day", color: "#BAE6FD", border_color: "transparent", text_color: "#075985", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
-      { label: "E", name: "Evening", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6", is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
-      { label: "N", name: "Night", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_general: false, faIndex: 0, catIndex: 2, start: "23:00", end: "07:00" },
-      { label: "FV", name: "Field Visit", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 1, catIndex: 3, start: "08:00", end: "17:00" },
-      { label: "SG", name: "Support Group", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 2, catIndex: 4, start: "10:00", end: "16:00" },
+      {
+        label: "Ofc",
+        name: "Office",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "0.3",
+        name: "Partial",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 0,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "E",
+        name: "Evening",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 1,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "N",
+        name: "Night",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 2,
+        start: "23:00",
+        end: "07:00",
+      },
+      {
+        label: "FV",
+        name: "Field Visit",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 3,
+        start: "08:00",
+        end: "17:00",
+      },
+      {
+        label: "SG",
+        name: "Support Group",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 4,
+        start: "10:00",
+        end: "16:00",
+      },
     ] as AssignmentDef[],
     employeeCount: 30,
     indicatorTypes: [
@@ -550,25 +1361,101 @@ const TENANTS = [
 ];
 
 const EMPLOYEE_NAMES = [
-  "Maria Garcia", "James Johnson", "Sarah Williams", "Robert Brown", "Jennifer Davis",
-  "Michael Miller", "Lisa Wilson", "David Moore", "Jessica Taylor", "Thomas Anderson",
-  "Amanda Martinez", "Christopher Robinson", "Ashley Clark", "Daniel Rodriguez", "Emily Lewis",
-  "Matthew Lee", "Stephanie Walker", "Andrew Hall", "Nicole Allen", "Joshua Young",
-  "Megan Hernandez", "Kevin King", "Rachel Wright", "Brian Lopez", "Lauren Hill",
-  "Ryan Scott", "Samantha Green", "Justin Adams", "Heather Baker", "Brandon Nelson",
-  "Amber Carter", "Tyler Mitchell", "Kayla Perez", "Jason Roberts", "Christina Turner",
-  "Nathan Phillips", "Tiffany Campbell", "Eric Parker", "Melissa Evans", "Aaron Edwards",
-  "Rebecca Collins", "Patrick Stewart", "Victoria Morgan", "Sean Murphy", "Hannah Cook",
-  "Cody Rogers", "Catherine Reed", "Derek Bailey", "Danielle Rivera", "Travis Cooper",
-  "Michelle Thomas", "Gregory Jackson", "Brittany White", "Keith Harris", "Diana Martin",
-  "Frank Thompson", "Janet Robinson", "Gary Clark", "Susan Lewis", "Peter Lee",
-  "Carol Walker", "George Young", "Donna Allen", "Timothy King", "Sandra Wright",
-  "Kenneth Scott", "Dorothy Hill", "Steven Green", "Nancy Adams", "Edward Baker",
-  "Carolyn Nelson", "Larry Carter", "Virginia Mitchell", "Raymond Perez", "Debra Roberts",
-  "Jeffrey Turner", "Laura Phillips", "Raymond Campbell", "Judith Parker", "Albert Evans",
-  "Helen Edwards", "Ralph Collins", "Gloria Stewart", "Louis Morgan", "Marie Murphy",
-  "Russell Cook", "Beverly Rogers", "Wayne Reed", "Frances Bailey", "Adam Rivera",
-  "Rose Cooper", "Eugene Thomas", "Patricia Jackson", "Henry White", "Martha Harris",
+  "Maria Garcia",
+  "James Johnson",
+  "Sarah Williams",
+  "Robert Brown",
+  "Jennifer Davis",
+  "Michael Miller",
+  "Lisa Wilson",
+  "David Moore",
+  "Jessica Taylor",
+  "Thomas Anderson",
+  "Amanda Martinez",
+  "Christopher Robinson",
+  "Ashley Clark",
+  "Daniel Rodriguez",
+  "Emily Lewis",
+  "Matthew Lee",
+  "Stephanie Walker",
+  "Andrew Hall",
+  "Nicole Allen",
+  "Joshua Young",
+  "Megan Hernandez",
+  "Kevin King",
+  "Rachel Wright",
+  "Brian Lopez",
+  "Lauren Hill",
+  "Ryan Scott",
+  "Samantha Green",
+  "Justin Adams",
+  "Heather Baker",
+  "Brandon Nelson",
+  "Amber Carter",
+  "Tyler Mitchell",
+  "Kayla Perez",
+  "Jason Roberts",
+  "Christina Turner",
+  "Nathan Phillips",
+  "Tiffany Campbell",
+  "Eric Parker",
+  "Melissa Evans",
+  "Aaron Edwards",
+  "Rebecca Collins",
+  "Patrick Stewart",
+  "Victoria Morgan",
+  "Sean Murphy",
+  "Hannah Cook",
+  "Cody Rogers",
+  "Catherine Reed",
+  "Derek Bailey",
+  "Danielle Rivera",
+  "Travis Cooper",
+  "Michelle Thomas",
+  "Gregory Jackson",
+  "Brittany White",
+  "Keith Harris",
+  "Diana Martin",
+  "Frank Thompson",
+  "Janet Robinson",
+  "Gary Clark",
+  "Susan Lewis",
+  "Peter Lee",
+  "Carol Walker",
+  "George Young",
+  "Donna Allen",
+  "Timothy King",
+  "Sandra Wright",
+  "Kenneth Scott",
+  "Dorothy Hill",
+  "Steven Green",
+  "Nancy Adams",
+  "Edward Baker",
+  "Carolyn Nelson",
+  "Larry Carter",
+  "Virginia Mitchell",
+  "Raymond Perez",
+  "Debra Roberts",
+  "Jeffrey Turner",
+  "Laura Phillips",
+  "Raymond Campbell",
+  "Judith Parker",
+  "Albert Evans",
+  "Helen Edwards",
+  "Ralph Collins",
+  "Gloria Stewart",
+  "Louis Morgan",
+  "Marie Murphy",
+  "Russell Cook",
+  "Beverly Rogers",
+  "Wayne Reed",
+  "Frances Bailey",
+  "Adam Rivera",
+  "Rose Cooper",
+  "Eugene Thomas",
+  "Patricia Jackson",
+  "Henry White",
+  "Martha Harris",
 ];
 
 function dateStr(y: number, m: number, d: number): string {
@@ -592,9 +1479,7 @@ interface ParsedSeedAddress {
 
 function parseUsSeedAddress(address: string): ParsedSeedAddress {
   const normalized = address.replace(/\s*\n\s*/g, ", ").trim();
-  const match = normalized.match(
-    /^(.*?),\s*([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/,
-  );
+  const match = normalized.match(/^(.*?),\s*([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
 
   if (!match) {
     throw new Error(`Unable to parse seed address: ${address}`);
@@ -619,9 +1504,7 @@ function toNumberArray(value: unknown): number[] {
     return [];
   }
 
-  return value
-    .map((entry) => Number(entry))
-    .filter((entry) => Number.isFinite(entry));
+  return value.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry));
 }
 
 function normalizeSeedLookup(value: string | null | undefined): string {
@@ -633,9 +1516,9 @@ function normalizeSeedLookup(value: string | null | undefined): string {
 }
 
 function uniqueNumbers(values: number[]): number[] {
-  return Array.from(
-    new Set(values.filter((value) => Number.isFinite(value))),
-  ).sort((left, right) => left - right);
+  return Array.from(new Set(values.filter((value) => Number.isFinite(value)))).sort(
+    (left, right) => left - right,
+  );
 }
 
 function toTitleCase(value: string): string {
@@ -650,10 +1533,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function getPreferredJobAbbr(
-  role: SeedRoleRow | null,
-  fallback: string,
-): string {
+function getPreferredJobAbbr(role: SeedRoleRow | null, fallback: string): string {
   const abbr = role?.abbr?.trim() ?? "";
   if (abbr.length > 0 && abbr.length <= 4) {
     return abbr;
@@ -682,10 +1562,7 @@ function buildFallbackAbbr(value: string): string {
     .toUpperCase();
 }
 
-function findMatchingRoles(
-  roles: SeedRoleRow[],
-  aliases: string[],
-): SeedRoleRow[] {
+function findMatchingRoles(roles: SeedRoleRow[], aliases: string[]): SeedRoleRow[] {
   const normalizedAliases = uniqueNormalizedAliases(aliases);
   if (normalizedAliases.length === 0) {
     return [];
@@ -712,9 +1589,7 @@ function findMatchingRoles(
 }
 
 function uniqueNormalizedAliases(values: string[]): string[] {
-  return Array.from(
-    new Set(values.map((value) => normalizeSeedLookup(value)).filter(Boolean)),
-  );
+  return Array.from(new Set(values.map((value) => normalizeSeedLookup(value)).filter(Boolean)));
 }
 
 function resolveJobIdentity(
@@ -728,9 +1603,7 @@ function resolveJobIdentity(
   const raw = rawDescriptor.trim();
   const normalized = normalizeSeedLookup(raw);
 
-  const exactAbbrMatches = roles.filter(
-    (role) => normalizeSeedLookup(role.abbr) === normalized,
-  );
+  const exactAbbrMatches = roles.filter((role) => normalizeSeedLookup(role.abbr) === normalized);
   if (exactAbbrMatches.length > 0) {
     const primary = exactAbbrMatches[0];
     return {
@@ -797,9 +1670,7 @@ function resolveJobIdentity(
     return { name: "Partial", abbr: "0.3", eligibleRoleIds: [] };
   }
 
-  const exactNameMatches = roles.filter(
-    (role) => normalizeSeedLookup(role.name) === normalized,
-  );
+  const exactNameMatches = roles.filter((role) => normalizeSeedLookup(role.name) === normalized);
   if (exactNameMatches.length > 0) {
     const primary = exactNameMatches[0];
     return {
@@ -835,26 +1706,16 @@ function deriveJobDescriptor(
     .replace(/\s+/g, " ")
     .trim();
 
-  const removablePhrases = Array.from(
-    new Set([shiftName, shiftNameWithoutShift].filter(Boolean)),
-  );
+  const removablePhrases = Array.from(new Set([shiftName, shiftNameWithoutShift].filter(Boolean)));
   for (const phrase of removablePhrases) {
     working = working.replace(new RegExp(escapeRegExp(phrase), "ig"), " ");
   }
 
   const removableTokens = Array.from(
-    new Set(
-      shiftNameWithoutShift
-        .split(/\s+/)
-        .filter(Boolean)
-        .concat("shift"),
-    ),
+    new Set(shiftNameWithoutShift.split(/\s+/).filter(Boolean).concat("shift")),
   );
   for (const token of removableTokens) {
-    working = working.replace(
-      new RegExp(`\\b${escapeRegExp(token)}\\b`, "ig"),
-      " ",
-    );
+    working = working.replace(new RegExp(`\\b${escapeRegExp(token)}\\b`, "ig"), " ");
   }
 
   working = working
@@ -869,10 +1730,7 @@ function deriveJobDescriptor(
 
   const normalizedShiftName = normalizeSeedLookup(shiftName);
   const normalizedShiftBase = normalizeSeedLookup(shiftNameWithoutShift);
-  if (
-    normalizedWorking === normalizedShiftName ||
-    normalizedWorking === normalizedShiftBase
-  ) {
+  if (normalizedWorking === normalizedShiftName || normalizedWorking === normalizedShiftBase) {
     return null;
   }
 
@@ -883,21 +1741,17 @@ function selectBaseAssignment(
   codes: SeedAssignmentRow[],
   shift: SeedShiftCategoryRow,
 ): SeedAssignmentRow {
-  const baseCandidates = codes.filter(
-    (code) => deriveJobDescriptor(code, shift) == null,
-  );
+  const baseCandidates = codes.filter((code) => deriveJobDescriptor(code, shift) == null);
 
-  return [...(baseCandidates.length > 0 ? baseCandidates : codes)].sort(
-    (left, right) => {
-      if (left.sort_order !== right.sort_order) {
-        return left.sort_order - right.sort_order;
-      }
-      if (left.label.length !== right.label.length) {
-        return left.label.length - right.label.length;
-      }
-      return left.id - right.id;
-    },
-  )[0];
+  return [...(baseCandidates.length > 0 ? baseCandidates : codes)].sort((left, right) => {
+    if (left.sort_order !== right.sort_order) {
+      return left.sort_order - right.sort_order;
+    }
+    if (left.label.length !== right.label.length) {
+      return left.label.length - right.label.length;
+    }
+    return left.id - right.id;
+  })[0];
 }
 
 async function writePublishedWorkScheduleCellsBatch(
@@ -976,9 +1830,7 @@ function splitSqlBeforeFinalScheduleBlock(sql: string): {
   const scheduleSql = sql.slice(lastDoIndex).trim();
 
   if (!scheduleSql.includes("write_schedule_cell_snapshot_internal")) {
-    throw new Error(
-      "Expected final DO block in tenant SQL seed file to seed schedule cells",
-    );
+    throw new Error("Expected final DO block in tenant SQL seed file to seed schedule cells");
   }
 
   return { prefixSql, scheduleSql };
@@ -1004,7 +1856,9 @@ async function seedTenantSqlBeforeSchedule(
     await db.query(scheduleSql);
   }
 
-  const { rows: [counts] } = await db.query(
+  const {
+    rows: [counts],
+  } = await db.query(
     `SELECT
        COUNT(*)::int AS total_job_count,
        COUNT(*) FILTER (WHERE assignment_mode = 'with_shift')::int AS scheduled_job_count,
@@ -1137,19 +1991,15 @@ async function seedJobsForOrg(
       const existing = scheduledJobMap.get(key);
       const shiftDepartmentId =
         shift.focus_area_id != null
-          ? focusAreaDepartmentById.get(shift.focus_area_id) ?? null
+          ? (focusAreaDepartmentById.get(shift.focus_area_id) ?? null)
           : null;
       const nextTimeOverride = deriveShiftTimeOverride(code, shift);
       if (existing) {
         existing.focus_area_ids = uniqueNumbers(
-          existing.focus_area_ids.concat(
-            shift.focus_area_id != null ? [shift.focus_area_id] : [],
-          ),
+          existing.focus_area_ids.concat(shift.focus_area_id != null ? [shift.focus_area_id] : []),
         );
         existing.department_ids = uniqueNumbers(
-          existing.department_ids.concat(
-            shiftDepartmentId != null ? [shiftDepartmentId] : [],
-          ),
+          existing.department_ids.concat(shiftDepartmentId != null ? [shiftDepartmentId] : []),
         );
         existing.applicable_shift_ids = uniqueNumbers(
           existing.applicable_shift_ids.concat(shift.id),
@@ -1158,9 +2008,7 @@ async function seedJobsForOrg(
           existing.eligible_role_ids.concat(identity.eligibleRoleIds),
         );
         existing.required_certification_ids = uniqueNumbers(
-          existing.required_certification_ids.concat(
-            code.required_certification_ids,
-          ),
+          existing.required_certification_ids.concat(code.required_certification_ids),
         );
         if (nextTimeOverride) {
           existing.shift_time_overrides[String(shift.id)] = nextTimeOverride;
@@ -1178,9 +2026,7 @@ async function seedJobsForOrg(
           department_ids: shiftDepartmentId != null ? [shiftDepartmentId] : [],
           applicable_shift_ids: [shift.id],
           eligible_role_ids: identity.eligibleRoleIds,
-          required_certification_ids: uniqueNumbers(
-            code.required_certification_ids,
-          ),
+          required_certification_ids: uniqueNumbers(code.required_certification_ids),
           color: "#E2E8F0",
           border_color: "transparent",
           text_color: "#1E293B",
@@ -1213,15 +2059,11 @@ async function seedJobsForOrg(
         existing.eligible_role_ids.concat(identity.eligibleRoleIds),
       );
       existing.required_certification_ids = uniqueNumbers(
-        existing.required_certification_ids.concat(
-          code.required_certification_ids,
-        ),
+        existing.required_certification_ids.concat(code.required_certification_ids),
       );
       existing.sort_order = Math.min(existing.sort_order, code.sort_order);
-      existing.default_start_time =
-        existing.default_start_time ?? code.default_start_time;
-      existing.default_end_time =
-        existing.default_end_time ?? code.default_end_time;
+      existing.default_start_time = existing.default_start_time ?? code.default_start_time;
+      existing.default_end_time = existing.default_end_time ?? code.default_end_time;
       existing.default_duration_hours =
         existing.default_duration_hours ?? code.default_duration_hours;
       existing.default_duration_minutes =
@@ -1238,9 +2080,7 @@ async function seedJobsForOrg(
         department_ids: [],
         applicable_shift_ids: [],
         eligible_role_ids: identity.eligibleRoleIds,
-        required_certification_ids: uniqueNumbers(
-          code.required_certification_ids,
-        ),
+        required_certification_ids: uniqueNumbers(code.required_certification_ids),
         color: code.color,
         border_color: code.border_color,
         text_color: code.text_color,
@@ -1288,11 +2128,8 @@ async function seedJobsForOrg(
             ),
           );
     const placementShiftIds = uniqueNumbers(
-      placementFocusAreaIds.flatMap(
-        (focusAreaId) => shiftIdsByFocusAreaId.get(focusAreaId) ?? [],
-      ),
+      placementFocusAreaIds.flatMap((focusAreaId) => shiftIdsByFocusAreaId.get(focusAreaId) ?? []),
     );
-
   }
   const shiftlessJobs = [...shiftlessJobMap.values()].sort((left, right) => {
     if (left.sort_order !== right.sort_order) {
@@ -1438,7 +2275,9 @@ async function main() {
     const password = process.env.SUPABASE_DB_PASSWORD;
     if (!password) {
       console.error("ERROR: SUPABASE_DB_PASSWORD not found for remote DB.");
-      console.error("Ensure it's set in Vercel env vars, or use `npm run db:reset:remote` which handles this automatically.");
+      console.error(
+        "Ensure it's set in Vercel env vars, or use `npm run db:reset:remote` which handles this automatically.",
+      );
       process.exit(1);
     }
     connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
@@ -1492,7 +2331,9 @@ async function main() {
 
     // 1. Organization
     const addressFields = parseUsSeedAddress(tenant.address);
-    const { rows: [org] } = await db.query(
+    const {
+      rows: [org],
+    } = await db.query(
       `INSERT INTO public.organizations (
          name,
          slug,
@@ -1530,7 +2371,7 @@ async function main() {
         tenant.role_label,
         "Scheduled Departments",
         tenant.employeeCount,
-      ]
+      ],
     );
     const orgId: string = org.id;
 
@@ -1563,9 +2404,8 @@ async function main() {
     const focusAreaIds: number[] = [];
     if (tenant.focusAreas.length > 0) {
       const faSeeds = tenant.focusAreas.map((fa, i) => ({
-        department_id: tenant.focusAreaDeptIndex?.[i] != null
-          ? deptIds[tenant.focusAreaDeptIndex[i]]
-          : null,
+        department_id:
+          tenant.focusAreaDeptIndex?.[i] != null ? deptIds[tenant.focusAreaDeptIndex[i]] : null,
         name: fa.name,
         color: FOCUS_AREA_PRESET_COLORS[i % FOCUS_AREA_PRESET_COLORS.length],
         sort_order: i,
@@ -1644,8 +2484,7 @@ async function main() {
       const catSeeds = tenant.shiftCategories.map((cat, i) => {
         const faId = cat.faIndex !== null ? focusAreaIds[cat.faIndex] : null;
         const baseAbbr = (
-          ((cat as { abbr?: string }).abbr ?? "").trim() ||
-          deriveSeedAbbr(cat.name, "SHF")
+          ((cat as { abbr?: string }).abbr ?? "").trim() || deriveSeedAbbr(cat.name, "SHF")
         ).toUpperCase();
         const areaKey: number | null = faId ?? null;
         let usedInArea = usedAbbrsByArea.get(areaKey);
@@ -1662,8 +2501,9 @@ async function main() {
         usedInArea.add(catAbbr);
         const catBreakMinutes = (cat as { break_minutes?: number | null }).break_minutes ?? null;
         const catColor =
-          tenant.assignments.find((assignment) => assignment.catIndex === i && !assignment.is_general)?.color ??
-          DEFAULT_JOB_PRESET.bg;
+          tenant.assignments.find(
+            (assignment) => assignment.catIndex === i && !assignment.is_general,
+          )?.color ?? DEFAULT_JOB_PRESET.bg;
         return {
           name: cat.name,
           abbr: catAbbr,
@@ -1693,7 +2533,10 @@ async function main() {
     }
 
     // 7a. Absence Types
-    interface AbsenceTypeRow { id: number; label: string }
+    interface AbsenceTypeRow {
+      id: number;
+      label: string;
+    }
     const absenceTypeRows: AbsenceTypeRow[] = [];
     if (tenant.absenceTypes.length > 0) {
       const absenceSeeds = tenant.absenceTypes.map((at, i) => ({
@@ -1730,10 +2573,8 @@ async function main() {
       border_color: assignment.border_color,
       text_color: assignment.text_color,
       is_general: assignment.is_general,
-      focus_area_id:
-        assignment.faIndex !== null ? focusAreaIds[assignment.faIndex] : null,
-      category_id:
-        assignment.catIndex !== null ? catIds[assignment.catIndex] : null,
+      focus_area_id: assignment.faIndex !== null ? focusAreaIds[assignment.faIndex] : null,
+      category_id: assignment.catIndex !== null ? catIds[assignment.catIndex] : null,
       sort_order: index,
       default_start_time: assignment.start ?? null,
       default_end_time: assignment.end ?? null,
@@ -1764,7 +2605,11 @@ async function main() {
       globalNameIdx++;
     }
 
-    interface EmpRow { id: string; focus_area_ids: number[]; status: string }
+    interface EmpRow {
+      id: string;
+      focus_area_ids: number[];
+      status: string;
+    }
     interface EmpSeed {
       first_name: string;
       last_name: string;
@@ -1787,7 +2632,8 @@ async function main() {
         empFaIds.push(focusAreaIds[(primaryFaIdx + 1) % focusAreaIds.length]);
       }
       const empRoleIds = i % 4 === 0 ? [roleIds[i % roleIds.length]] : [];
-      const status = i < empNames.length - 2 ? "active" : i === empNames.length - 2 ? "inactive" : "removed";
+      const status =
+        i < empNames.length - 2 ? "active" : i === empNames.length - 2 ? "inactive" : "removed";
       return {
         first_name: firstName,
         last_name: lastName,
@@ -1841,7 +2687,9 @@ async function main() {
 
     // 9b. Assign ~20% of employees to management departments
     // Every 5th employee gets a mgmt dept. First of each pair is a dept admin, rest are users.
-    const mgmtDeptIds = deptIds.filter((_, idx) => tenant.departments?.[idx]?.type === 'management');
+    const mgmtDeptIds = deptIds.filter(
+      (_, idx) => tenant.departments?.[idx]?.type === "management",
+    );
     if (mgmtDeptIds.length > 0) {
       const mgmtUpdates: Array<{ emp_id: string; dept_ids: number[]; admin_ids: number[] }> = [];
       let adminToggle = true;
@@ -1892,8 +2740,7 @@ async function main() {
       const primaryFaId = emp.focus_area_ids[0] ?? null;
       const empWorkAssignments = seededJobs.resolvedAssignments.filter(
         (assignment) =>
-          assignment.focus_area_id === primaryFaId ||
-          assignment.focus_area_id === null,
+          assignment.focus_area_id === primaryFaId || assignment.focus_area_id === null,
       );
       if (empWorkAssignments.length === 0) continue;
 
@@ -1916,8 +2763,7 @@ async function main() {
             });
           }
         } else {
-          const assignment =
-            empWorkAssignments[i % empWorkAssignments.length];
+          const assignment = empWorkAssignments[i % empWorkAssignments.length];
           const faId = assignment.focus_area_id ?? primaryFaId;
           workShiftValues.push({
             empId: emp.id,
@@ -1934,7 +2780,9 @@ async function main() {
     await writePublishedWorkScheduleCellsBatch(db, orgId, workShiftValues);
     await writePublishedAbsenceScheduleCellsBatch(db, orgId, absenceValues);
 
-    console.log(`    ✓ ${deptIds.length} depts, ${tenant.focusAreas.length} focus areas, ${tenant.certifications.length} certs, ${tenant.assignments.length} schedule labels, ${seededJobs.totalJobCount} jobs, ${employees.length} employees, ${shiftCount} shifts`);
+    console.log(
+      `    ✓ ${deptIds.length} depts, ${tenant.focusAreas.length} focus areas, ${tenant.certifications.length} certs, ${tenant.assignments.length} schedule labels, ${seededJobs.totalJobCount} jobs, ${employees.length} employees, ${shiftCount} shifts`,
+    );
   }
 
   // ── Calm Haven (6th tenant) — from SQL seed file ────────────────────
@@ -1942,25 +2790,29 @@ async function main() {
 
   const calmHavenJobs = await seedTenantSqlBeforeSchedule(
     db,
-    'supabase/seed_calm_haven.sql',
+    "supabase/seed_calm_haven.sql",
     "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
   );
 
-  console.log(`    ✓ 4 focus areas, 6 certs, 8 roles, 17 schedule labels, ${calmHavenJobs.totalJobCount} jobs, 28 employees, shifts seeded`);
+  console.log(
+    `    ✓ 4 focus areas, 6 certs, 8 roles, 17 schedule labels, ${calmHavenJobs.totalJobCount} jobs, 28 employees, shifts seeded`,
+  );
 
   // ── Arden Wood (7th tenant) — Calm Haven config + PDF-derived roster ──────
   console.log(`\n  [7/7] Arden Wood...`);
 
   const ardenWoodJobs = await seedTenantSqlBeforeSchedule(
     db,
-    'supabase/seed_arden_wood.sql',
+    "supabase/seed_arden_wood.sql",
     "964c29d1-dc1e-4cd6-861c-8b8ab00d20c0",
   );
 
-  const gridmasterSql = readFileSync('supabase/seed_gridmaster.sql', 'utf8');
+  const gridmasterSql = readFileSync("supabase/seed_gridmaster.sql", "utf8");
   await db.query(gridmasterSql);
 
-  console.log(`    ✓ Calm Haven configuration mirrored with 26 Arden Wood employees, ${ardenWoodJobs.totalJobCount} jobs, and seeded shifts`);
+  console.log(
+    `    ✓ Calm Haven configuration mirrored with 26 Arden Wood employees, ${ardenWoodJobs.totalJobCount} jobs, and seeded shifts`,
+  );
 
   // ── Auth Users & Profiles ──────────────────────────────────────────────
   // Create 3 test users, all assigned to a seeded organization.
@@ -1971,46 +2823,107 @@ async function main() {
 
   // Get organization IDs for user assignment
   const { rows: orgs } = await db.query(
-    `SELECT id, slug FROM public.organizations WHERE slug IN ('sunrise-senior', 'calmhaven', 'ardenwood')`
+    `SELECT id, slug FROM public.organizations WHERE slug IN ('sunrise-senior', 'calmhaven', 'ardenwood')`,
   );
-  const defaultOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'sunrise-senior')?.id;
-  const calmhavenOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'calmhaven')?.id;
-  const ardenwoodOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'ardenwood')?.id;
+  const defaultOrgId = orgs.find((o: Record<string, unknown>) => o.slug === "sunrise-senior")?.id;
+  const calmhavenOrgId = orgs.find((o: Record<string, unknown>) => o.slug === "calmhaven")?.id;
+  const ardenwoodOrgId = orgs.find((o: Record<string, unknown>) => o.slug === "ardenwood")?.id;
 
   const TEST_USERS = [
-    { email: "nicokosmas.dev@gmail.com",     platform_role: "gridmaster", org_role: "user",        label: "gridmaster",  first_name: "Nicodamus", last_name: "Kosmas", preferred_org: "sunrise-senior" },
-    { email: "nicokosmas@outlook.com",        platform_role: "none",       org_role: "super_admin", label: "super_admin", first_name: "Nic",       last_name: "Kosmas", preferred_org: "ardenwood" },
-    { email: "nicodamusalois@gmail.com",       platform_role: "none",       org_role: "user",        label: "user",        first_name: "Nick",      last_name: "Kosmas", preferred_org: "calmhaven" },
+    {
+      email: "nicokosmas.dev@gmail.com",
+      platform_role: "gridmaster",
+      org_role: "user",
+      label: "gridmaster",
+      first_name: "Nicodamus",
+      last_name: "Kosmas",
+      preferred_org: "sunrise-senior",
+    },
+    {
+      email: "nicokosmas@outlook.com",
+      platform_role: "none",
+      org_role: "super_admin",
+      label: "super_admin",
+      first_name: "Nic",
+      last_name: "Kosmas",
+      preferred_org: "ardenwood",
+    },
+    {
+      email: "nicodamusalois@gmail.com",
+      platform_role: "none",
+      org_role: "user",
+      label: "user",
+      first_name: "Nick",
+      last_name: "Kosmas",
+      preferred_org: "calmhaven",
+    },
   ];
 
   // All admin permissions (full edit access — for admin-role users)
   const allAdminPermsObj = {
-    canViewSchedule: true, canEditShifts: true, canPublishSchedule: true, canApplyRecurringSchedule: true,
-    canEditNotes: true, canEditScheduleIndicators: true, canViewRecurringShifts: true, canManageRecurringShifts: true, canManageShiftSeries: true,
-    canViewStaff: true, canViewEmployeeDetails: true, canManageEmployees: true,
-    canViewFocusAreas: true, canManageFocusAreas: true, canViewScheduleDefinitions: true, canManageScheduleDefinitions: true,
-    canViewIndicatorTypes: true, canManageIndicatorTypes: true, canManageOrgSettings: true,
-    canViewOrgLabels: true, canManageOrgLabels: true, canViewCoverageRequirements: true, canManageCoverageRequirements: true,
-    canApproveShiftRequests: true, canViewDashboardAnalytics: true,
+    canViewSchedule: true,
+    canEditShifts: true,
+    canPublishSchedule: true,
+    canApplyRecurringSchedule: true,
+    canEditNotes: true,
+    canEditScheduleIndicators: true,
+    canViewRecurringShifts: true,
+    canManageRecurringShifts: true,
+    canManageShiftSeries: true,
+    canViewStaff: true,
+    canViewEmployeeDetails: true,
+    canManageEmployees: true,
+    canViewFocusAreas: true,
+    canManageFocusAreas: true,
+    canViewScheduleDefinitions: true,
+    canManageScheduleDefinitions: true,
+    canViewIndicatorTypes: true,
+    canManageIndicatorTypes: true,
+    canManageOrgSettings: true,
+    canViewOrgLabels: true,
+    canManageOrgLabels: true,
+    canViewCoverageRequirements: true,
+    canManageCoverageRequirements: true,
+    canApproveShiftRequests: true,
+    canViewDashboardAnalytics: true,
   };
 
   // View-only permissions for user-role members (no edit access, can see everything)
   const userViewPermsObj = {
-    canViewSchedule: true, canEditShifts: false, canPublishSchedule: false, canApplyRecurringSchedule: false,
-    canEditNotes: false, canEditScheduleIndicators: false, canViewRecurringShifts: true, canManageRecurringShifts: false, canManageShiftSeries: false,
-    canViewStaff: true, canViewEmployeeDetails: true, canManageEmployees: false,
-    canViewFocusAreas: true, canManageFocusAreas: false, canViewScheduleDefinitions: true, canManageScheduleDefinitions: false,
-    canViewIndicatorTypes: true, canManageIndicatorTypes: false, canManageOrgSettings: false,
-    canViewOrgLabels: true, canManageOrgLabels: false, canViewCoverageRequirements: true, canManageCoverageRequirements: false,
-    canApproveShiftRequests: false, canViewDashboardAnalytics: true,
+    canViewSchedule: true,
+    canEditShifts: false,
+    canPublishSchedule: false,
+    canApplyRecurringSchedule: false,
+    canEditNotes: false,
+    canEditScheduleIndicators: false,
+    canViewRecurringShifts: true,
+    canManageRecurringShifts: false,
+    canManageShiftSeries: false,
+    canViewStaff: true,
+    canViewEmployeeDetails: true,
+    canManageEmployees: false,
+    canViewFocusAreas: true,
+    canManageFocusAreas: false,
+    canViewScheduleDefinitions: true,
+    canManageScheduleDefinitions: false,
+    canViewIndicatorTypes: true,
+    canManageIndicatorTypes: false,
+    canManageOrgSettings: false,
+    canViewOrgLabels: true,
+    canManageOrgLabels: false,
+    canViewCoverageRequirements: true,
+    canManageCoverageRequirements: false,
+    canApproveShiftRequests: false,
+    canViewDashboardAnalytics: true,
   };
 
   for (const user of TEST_USERS) {
-    const orgIdStr = user.preferred_org === 'ardenwood'
-      ? ardenwoodOrgId
-      : user.preferred_org === 'calmhaven'
-        ? calmhavenOrgId
-        : defaultOrgId;
+    const orgIdStr =
+      user.preferred_org === "ardenwood"
+        ? ardenwoodOrgId
+        : user.preferred_org === "calmhaven"
+          ? calmhavenOrgId
+          : defaultOrgId;
     const orgIdSql = user.platform_role === "gridmaster" ? "NULL" : `'${orgIdStr}'`;
 
     await db.query(`
@@ -2071,9 +2984,7 @@ async function main() {
 
   console.log("\n  Creating organization memberships...");
 
-  const { rows: allOrgs } = await db.query(
-    `SELECT id FROM public.organizations ORDER BY name`
-  );
+  const { rows: allOrgs } = await db.query(`SELECT id FROM public.organizations ORDER BY name`);
 
   // Ensure a "Tech" management department exists in every org, then assign the
   // seeded logins to it below. Members surface as management users in the People
@@ -2107,9 +3018,11 @@ async function main() {
   }> = [];
   for (const user of memberUsers) {
     const adminPermissions =
-      user.org_role === "admin" ? allAdminPermsObj
-      : user.org_role === "user" ? userViewPermsObj
-      : null;
+      user.org_role === "admin"
+        ? allAdminPermsObj
+        : user.org_role === "user"
+          ? userViewPermsObj
+          : null;
     for (const org of allOrgs) {
       membershipSeeds.push({
         email: user.email,

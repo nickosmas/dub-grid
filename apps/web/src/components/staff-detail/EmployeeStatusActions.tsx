@@ -42,8 +42,9 @@ export function EmployeeStatusActions({
   const [note, setNote] = useState(employee.statusNote || "");
   const [alsoRevokeAccess, setAlsoRevokeAccess] = useState(false);
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
-  const [pendingInvitationAction, setPendingInvitationAction] =
-    useState<"reinvite" | "revoke" | null>(null);
+  const [pendingInvitationAction, setPendingInvitationAction] = useState<
+    "reinvite" | "revoke" | null
+  >(null);
   const [revoking, setRevoking] = useState(false);
 
   const isActive = employee.status === "active";
@@ -86,33 +87,46 @@ export function EmployeeStatusActions({
   }
 
   // ── Invitation section (panel variant only) ──
-  const invitationSection = variant === "panel" && pendingInvitation && onInvite ? (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", flexWrap: "wrap" }}>
-      <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
-        Invitation pending
-      </span>
-      <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-        <button
-          disabled={revoking}
-          onClick={() => setPendingInvitationAction("reinvite")}
-          className="dg-btn dg-btn-ghost dg-btn-xs"
-          style={{ color: "var(--color-link)" }}
-        >
-          <ButtonLoading loading={revoking} spinnerSize={12}>Reinvite</ButtonLoading>
-        </button>
-        {onRevoke && (
+  const invitationSection =
+    variant === "panel" && pendingInvitation && onInvite ? (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 0",
+          flexWrap: "wrap",
+        }}
+      >
+        <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+          Invitation pending
+        </span>
+        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
           <button
             disabled={revoking}
-            onClick={() => setPendingInvitationAction("revoke")}
+            onClick={() => setPendingInvitationAction("reinvite")}
             className="dg-btn dg-btn-ghost dg-btn-xs"
-            style={{ color: "var(--color-danger)" }}
+            style={{ color: "var(--color-link)" }}
           >
-            <ButtonLoading loading={revoking} spinnerSize={12}>Revoke</ButtonLoading>
+            <ButtonLoading loading={revoking} spinnerSize={12}>
+              Reinvite
+            </ButtonLoading>
           </button>
-        )}
+          {onRevoke && (
+            <button
+              disabled={revoking}
+              onClick={() => setPendingInvitationAction("revoke")}
+              className="dg-btn dg-btn-ghost dg-btn-xs"
+              style={{ color: "var(--color-danger)" }}
+            >
+              <ButtonLoading loading={revoking} spinnerSize={12}>
+                Revoke
+              </ButtonLoading>
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  ) : null;
+    ) : null;
 
   // ── Unified Deactivate confirmation ──
   // One modal asks Temporary vs Permanent. The primary button's verb + variant
@@ -142,7 +156,13 @@ export function EmployeeStatusActions({
               />
               <span>
                 <span style={{ display: "block", fontWeight: 600 }}>Mark inactive</span>
-                <span style={{ display: "block", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "var(--dg-fs-label)",
+                    color: "var(--color-text-muted)",
+                  }}
+                >
                   They&apos;re temporarily off the schedule. You can reactivate them anytime.
                 </span>
               </span>
@@ -165,7 +185,13 @@ export function EmployeeStatusActions({
               />
               <span>
                 <span style={{ display: "block", fontWeight: 600 }}>Remove from staff</span>
-                <span style={{ display: "block", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "var(--dg-fs-label)",
+                    color: "var(--color-text-muted)",
+                  }}
+                >
                   They lose access and won&apos;t appear in active staff. This can&apos;t be undone.
                 </span>
               </span>
@@ -182,7 +208,16 @@ export function EmployeeStatusActions({
               style={{ fontSize: "var(--dg-fs-label)" }}
             />
             {isRemove && employee.userId && onRevokeAccess && (
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--dg-fs-label)", fontWeight: 500, cursor: "pointer" }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: "var(--dg-fs-label)",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
                 <input
                   type="checkbox"
                   checked={alsoRevokeAccess}
@@ -216,27 +251,50 @@ export function EmployeeStatusActions({
   // ── Default state: action buttons ──
   const showDeactivate = isActive;
   const showActivate = employee.status === "inactive" || employee.status === "removed";
-  const actionGroupStyle = variant === "page"
-    ? { display: "flex", gap: 8, flexWrap: "wrap" as const }
-    : { display: "flex", gap: 8 };
+  const actionGroupStyle =
+    variant === "page"
+      ? { display: "flex", gap: 8, flexWrap: "wrap" as const }
+      : { display: "flex", gap: 8 };
 
   return (
     <>
       {invitationSection}
       {showActivate && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: showDeactivate ? 8 : 0 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            flexWrap: "wrap",
+            marginBottom: showDeactivate ? 8 : 0,
+          }}
+        >
           <button
             onClick={() => setShowActivateConfirm(true)}
-            className={variant === "page" ? "dg-btn dg-btn-secondary dg-btn-sm" : "dg-btn dg-btn-ghost dg-btn-xs"}
-            style={variant === "page"
-              ? {
-                  color: "var(--color-success)",
-                  borderColor: "var(--color-success-border)",
-                  background: "var(--color-success-bg)",
-                }
-              : { color: "var(--color-success)" }}
+            className={
+              variant === "page"
+                ? "dg-btn dg-btn-secondary dg-btn-sm"
+                : "dg-btn dg-btn-ghost dg-btn-xs"
+            }
+            style={
+              variant === "page"
+                ? {
+                    color: "var(--color-success)",
+                    borderColor: "var(--color-success-border)",
+                    background: "var(--color-success-bg)",
+                  }
+                : { color: "var(--color-success)" }
+            }
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="20 6 9 17 4 12" />
             </svg>
             Activate
@@ -259,9 +317,7 @@ export function EmployeeStatusActions({
       {pendingInvitationAction && pendingInvitation && (
         <ConfirmDialog
           title={
-            pendingInvitationAction === "reinvite"
-              ? "Reissue Invitation?"
-              : "Revoke Invitation?"
+            pendingInvitationAction === "reinvite" ? "Reissue Invitation?" : "Revoke Invitation?"
           }
           message={
             pendingInvitationAction === "reinvite"
@@ -269,9 +325,7 @@ export function EmployeeStatusActions({
               : `Revoke the pending invitation for ${pendingInvitation.email}? The current invite link will stop working.`
           }
           confirmLabel={
-            pendingInvitationAction === "reinvite"
-              ? "Reissue Invitation"
-              : "Revoke Invitation"
+            pendingInvitationAction === "reinvite" ? "Reissue Invitation" : "Revoke Invitation"
           }
           variant={pendingInvitationAction === "reinvite" ? "warning" : "danger"}
           isLoading={revoking}
@@ -293,7 +347,16 @@ export function EmployeeStatusActions({
               minWidth: variant === "page" ? 160 : undefined,
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />

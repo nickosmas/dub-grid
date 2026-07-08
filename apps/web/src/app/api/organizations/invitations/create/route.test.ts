@@ -21,16 +21,14 @@ vi.mock("@/lib/supabase-service", () => ({
 }));
 vi.mock("@/app/api/employees/shared", () => ({
   canManageEmployees: (...args: unknown[]) => canManageEmployees(...args),
-  isOrgSuperAdminOrGridmaster: (...args: unknown[]) =>
-    isOrgSuperAdminOrGridmaster(...args),
+  isOrgSuperAdminOrGridmaster: (...args: unknown[]) => isOrgSuperAdminOrGridmaster(...args),
 }));
 vi.mock("@/features/notifications/server/events", () => ({
   dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 vi.mock("@/lib/staff-validation", () => ({
   getStaffFieldErrors: () => ({}),
-  buildStaffValidationErrorResponse: () =>
-    NextResponse.json({ error: "invalid" }, { status: 422 }),
+  buildStaffValidationErrorResponse: () => NextResponse.json({ error: "invalid" }, { status: 422 }),
 }));
 vi.mock("@dubgrid/contracts", () => ({
   normalizeRequiredStaffEmail: (v: string) => v,
@@ -62,14 +60,10 @@ beforeEach(() => {
 
 describe("POST /api/organizations/invitations/create", () => {
   it("blocks invitation creation while in sandbox mode and never hits the RPC", async () => {
-    forbidIfSandboxCookie.mockReturnValue(
-      NextResponse.json({ error: "sandbox" }, { status: 403 }),
-    );
+    forbidIfSandboxCookie.mockReturnValue(NextResponse.json({ error: "sandbox" }, { status: 403 }));
 
     const { POST } = await importRoute();
-    const res = await POST(
-      makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }),
-    );
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
 
     expect(res.status).toBe(403);
     // Hard 403 before auth/service-client: no invitation is ever created.
@@ -89,9 +83,7 @@ describe("POST /api/organizations/invitations/create", () => {
     getServiceClient.mockReturnValue({ rpc });
 
     const { POST } = await importRoute();
-    const res = await POST(
-      makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }),
-    );
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "new@test.com", role: "admin" }));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({

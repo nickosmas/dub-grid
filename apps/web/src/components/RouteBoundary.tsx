@@ -75,9 +75,7 @@ export function NotFoundBoundary({
     <div style={shellStyle}>
       <DubGridLogo size={48} />
       <p style={titleStyle}>{title}</p>
-      <p style={bodyStyle}>
-        {message ?? "The page you're looking for doesn't exist."}
-      </p>
+      <p style={bodyStyle}>{message ?? "The page you're looking for doesn't exist."}</p>
       <Link href={backHref} className="dg-btn dg-btn-primary" style={{ marginTop: 8 }}>
         {backLabel}
       </Link>

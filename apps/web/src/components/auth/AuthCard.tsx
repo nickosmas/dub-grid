@@ -3,11 +3,7 @@
 import Link from "next/link";
 import { openConsentPreferences } from "@/components/CookieConsent";
 
-export function PageShell({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="dg-auth-shell">
       {children}

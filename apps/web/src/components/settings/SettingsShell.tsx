@@ -284,9 +284,7 @@ export function SettingsShell<TId extends string = string>({
             </div>
           )}
 
-          {banner && (
-            <div style={{ width: "100%", maxWidth, marginBottom: 16 }}>{banner}</div>
-          )}
+          {banner && <div style={{ width: "100%", maxWidth, marginBottom: 16 }}>{banner}</div>}
 
           {allItems.length === 0 ? (
             <div
@@ -312,8 +310,8 @@ export function SettingsShell<TId extends string = string>({
                 No access
               </span>
               <span>
-                You don&apos;t have permission to view this page. Contact your
-                organization admin for access.
+                You don&apos;t have permission to view this page. Contact your organization admin
+                for access.
               </span>
             </div>
           ) : (

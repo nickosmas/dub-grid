@@ -151,13 +151,13 @@ const STAFF: {
    ShiftJobSegment). Most open shifts have no job override (default job is
    hidden on grid), so they render as just the shift abbr. */
 const OPEN_SHIFTS: ShiftAssignment[][] = [
-  [sh("D")],                  // Sun
-  [],                          // Mon — fully staffed
-  [sh("D")],                   // Tue — Barbara sick
-  [],                          // Wed
-  [],                          // Thu
-  [sh("E")],                   // Fri — Kevin PTO
-  [sh("D"), sh("E")],          // Sat — short on weekend
+  [sh("D")], // Sun
+  [], // Mon — fully staffed
+  [sh("D")], // Tue — Barbara sick
+  [], // Wed
+  [], // Thu
+  [sh("E")], // Fri — Kevin PTO
+  [sh("D"), sh("E")], // Sat — short on weekend
 ];
 
 const OPEN_TOTAL = OPEN_SHIFTS.reduce((acc, day) => acc + day.length, 0);
@@ -238,9 +238,7 @@ function SinglePill({
     >
       <span style={{ fontSize: 13, fontWeight: 800 }}>{primary}</span>
       {secondary && (
-        <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.78 }}>
-          {secondary}
-        </span>
+        <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.78 }}>{secondary}</span>
       )}
     </span>
   );
@@ -248,11 +246,7 @@ function SinglePill({
 
 /* Split-shift row — pills side-by-side horizontally (data-shift-pill="multi"
    uses flexDirection: "row" + gap: 1 at line 2778 of ScheduleGrid.tsx). */
-function SplitShiftRow({
-  pair,
-}: {
-  pair: [ShiftAssignment, ShiftAssignment];
-}) {
+function SplitShiftRow({ pair }: { pair: [ShiftAssignment, ShiftAssignment] }) {
   return (
     <div
       style={{
@@ -288,9 +282,7 @@ function SplitShiftRow({
           >
             <span style={{ fontSize: 11, fontWeight: 800 }}>{seg.shift}</span>
             {seg.job && (
-              <span style={{ fontSize: 9, fontWeight: 600, opacity: 0.78 }}>
-                {seg.job}
-              </span>
+              <span style={{ fontSize: 9, fontWeight: 600, opacity: 0.78 }}>{seg.job}</span>
             )}
           </span>
         );
@@ -322,11 +314,7 @@ function OpenShiftPill({ seg }: { seg: ShiftAssignment }) {
       }}
     >
       <span style={{ fontSize: 12, fontWeight: 800 }}>{seg.shift}</span>
-      {seg.job && (
-        <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.78 }}>
-          {seg.job}
-        </span>
-      )}
+      {seg.job && <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.78 }}>{seg.job}</span>}
     </span>
   );
 }
@@ -348,33 +336,17 @@ function CellContent({ cell }: { cell: Cell }) {
   }
   if ("shiftless" in cell) {
     const j = SHIFTLESS[cell.shiftless];
-    return (
-      <SinglePill
-        primary={cell.shiftless}
-        bg={j.bg}
-        text={j.text}
-        border={j.border}
-      />
-    );
+    return <SinglePill primary={cell.shiftless} bg={j.bg} text={j.text} border={j.border} />;
   }
   // Absence — secondaryLabel is always null for absences (line 2347)
   const a = ABSENCES[cell.absence];
-  return (
-    <SinglePill primary={a.label} bg={a.bg} text={a.text} border={a.border} />
-  );
+  return <SinglePill primary={a.label} bg={a.bg} text={a.text} border={a.border} />;
 }
 
-function TallyCell({
-  required,
-  scheduled,
-}: {
-  required: number;
-  scheduled: number;
-}) {
+function TallyCell({ required, scheduled }: { required: number; scheduled: number }) {
   const hasRequirement = required > 0;
   const met = scheduled >= required;
-  const displayValue =
-    scheduled > 0 || hasRequirement ? String(scheduled) : "-";
+  const displayValue = scheduled > 0 || hasRequirement ? String(scheduled) : "-";
   return (
     <div
       style={{
@@ -476,7 +448,16 @@ export default function ScheduleGridMockup() {
               cursor: "default",
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
@@ -510,7 +491,16 @@ export default function ScheduleGridMockup() {
               cursor: "default",
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
@@ -727,13 +717,7 @@ export default function ScheduleGridMockup() {
   );
 }
 
-function EmployeeRow({
-  emp,
-  todayIndex,
-}: {
-  emp: (typeof STAFF)[number];
-  todayIndex: number;
-}) {
+function EmployeeRow({ emp, todayIndex }: { emp: (typeof STAFF)[number]; todayIndex: number }) {
   return (
     <>
       <div
@@ -754,7 +738,14 @@ function EmployeeRow({
           borderRight: "1px solid var(--color-border-light)",
         }}
       >
-        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+        <div
+          style={{
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
           <span
             style={{
               fontSize: 13,

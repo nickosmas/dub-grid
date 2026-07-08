@@ -7,11 +7,7 @@ import {
   getSplitShiftBadgeLabel,
   getSplitShiftSegmentLabel,
 } from "../lib/schedule";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 
 type SplitShiftVariant = "compact" | "hero" | "detail" | "supporting";
 const SPLIT_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
@@ -37,11 +33,7 @@ export function SplitShiftBadge({
   return (
     <View
       accessibilityLabel={customLabel ? label : `Multiple Shifts, ${label}`}
-      style={[
-        styles.badge,
-        compact && styles.badgeCompact,
-        inverse && styles.badgeInverse,
-      ]}
+      style={[styles.badge, compact && styles.badgeCompact, inverse && styles.badgeInverse]}
     >
       <Ionicons color={contentColor} name="layers-outline" size={compact ? 13 : 15} />
       <Text
@@ -73,16 +65,10 @@ export function SplitShiftSegmentList({
   variant,
 }: {
   dashedDividers?: boolean;
-  getSegmentTimingLabel?: (
-    segment: MobileScheduleEntrySegment,
-    index: number,
-  ) => string | null;
+  getSegmentTimingLabel?: (segment: MobileScheduleEntrySegment, index: number) => string | null;
   inverse?: boolean;
   leadingDivider?: boolean;
-  renderSegmentChip?: (
-    segment: MobileScheduleEntrySegment,
-    index: number,
-  ) => ReactNode;
+  renderSegmentChip?: (segment: MobileScheduleEntrySegment, index: number) => ReactNode;
   segmentLabelIndices?: ReadonlyArray<number>;
   segmentLabelStartIndex?: number;
   segmentLabelTotalCount?: number;
@@ -115,12 +101,9 @@ export function SplitShiftSegmentList({
         isDetail && styles.segmentListDetail,
       ]}
     >
-      {leadingDivider && dashedDividers ? (
-        <SplitShiftDashedDivider inverse={inverse} />
-      ) : null}
+      {leadingDivider && dashedDividers ? <SplitShiftDashedDivider inverse={inverse} /> : null}
       {segments.map((segment, index) => {
-        const title =
-          segment.shiftName?.trim() || segment.label?.trim() || "Shift";
+        const title = segment.shiftName?.trim() || segment.label?.trim() || "Shift";
         const timeRange = getScheduleEntrySegmentTimeRange(segment);
         const timingLabel = getSegmentTimingLabel?.(segment, index) ?? null;
         const chip = isHero ? null : (renderSegmentChip?.(segment, index) ?? null);
@@ -135,9 +118,7 @@ export function SplitShiftSegmentList({
           <Fragment
             key={`${title}-${segment.startTime ?? "none"}-${segment.endTime ?? "none"}-${index}`}
           >
-            {hasDivider && dashedDividers ? (
-              <SplitShiftDashedDivider inverse={inverse} />
-            ) : null}
+            {hasDivider && dashedDividers ? <SplitShiftDashedDivider inverse={inverse} /> : null}
             <View
               style={[
                 styles.segmentBlock,
@@ -228,38 +209,21 @@ export function SplitShiftSegmentList({
                     {title}
                   </Text>
                   {timeRange ? (
-                    <Text
-                      style={[
-                        styles.segmentMeta,
-                        inverse && styles.segmentMetaInverse,
-                      ]}
-                    >
+                    <Text style={[styles.segmentMeta, inverse && styles.segmentMetaInverse]}>
                       {timeRange}
                     </Text>
                   ) : null}
                   {timingLabel ? (
-                    <Text
-                      style={[
-                        styles.segmentTiming,
-                        inverse && styles.segmentTimingInverse,
-                      ]}
-                    >
+                    <Text style={[styles.segmentTiming, inverse && styles.segmentTimingInverse]}>
                       {timingLabel}
                     </Text>
                   ) : null}
                   {segment.displayFocusAreaName ? (
-                    <Text
-                      style={[
-                        styles.segmentMeta,
-                        inverse && styles.segmentMetaInverse,
-                      ]}
-                    >
+                    <Text style={[styles.segmentMeta, inverse && styles.segmentMetaInverse]}>
                       {segment.displayFocusAreaName}
                     </Text>
                   ) : null}
-                  {chip ? (
-                    <View style={styles.segmentChipRow}>{chip}</View>
-                  ) : null}
+                  {chip ? <View style={styles.segmentChipRow}>{chip}</View> : null}
                 </>
               )}
             </View>

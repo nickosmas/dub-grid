@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
@@ -16,10 +10,7 @@ import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import ShiftPicker from "@/components/ShiftPicker";
-import {
-  BOX_SHADOW_CARD,
-  DAY_LABELS,
-} from "@/lib/constants";
+import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
 import {
@@ -34,10 +25,7 @@ import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
 import { useMediaQuery, MOBILE } from "@/hooks";
-import {
-  useCloseOnWindowResize,
-  usePopupCornerAlign,
-} from "@/hooks/useAnchoredPopup";
+import { useCloseOnWindowResize, usePopupCornerAlign } from "@/hooks/useAnchoredPopup";
 import type {
   AbsenceType,
   Employee,
@@ -317,9 +305,7 @@ function migrateLegacyDraftValue(
 
   if (value.startsWith("abs:")) {
     const absenceLabel = value.slice(4);
-    const absenceType = absenceTypes.find(
-      (candidate) => candidate.label === absenceLabel,
-    );
+    const absenceType = absenceTypes.find((candidate) => candidate.label === absenceLabel);
     return absenceType
       ? {
           kind: "absence",
@@ -410,9 +396,7 @@ function RecurringShiftPill({
         shiftDisplayMode,
       })
     : {
-        primaryLabel: isNameMode
-          ? absenceType!.name || absenceType!.label
-          : absenceType!.label,
+        primaryLabel: isNameMode ? absenceType!.name || absenceType!.label : absenceType!.label,
         secondaryLabel: null,
       };
 
@@ -560,15 +544,11 @@ export function RecurringScheduleSection({
       ),
     [assignments],
   );
-  const jobById = useMemo(
-    () => new Map(jobs.map((job) => [job.id, job])),
-    [jobs],
-  );
+  const jobById = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
   const queryClient = useQueryClient();
   const recurringShiftsQuery = useQuery({
     queryKey: queryKeys.recurringShifts.all(orgId),
-    queryFn: () =>
-      fetchRecurringShifts(orgId, undefined, assignmentMap, false, absenceTypeMap),
+    queryFn: () => fetchRecurringShifts(orgId, undefined, assignmentMap, false, absenceTypeMap),
   });
   const allSchedules = useMemo<RecurringScheduleDraft>(() => {
     const schedules: RecurringScheduleDraft = {};
@@ -577,8 +557,7 @@ export function RecurringScheduleSection({
         schedules[recurringShift.empId] = {};
       }
       if (!(recurringShift.dayOfWeek in schedules[recurringShift.empId])) {
-        schedules[recurringShift.empId][recurringShift.dayOfWeek] =
-          recurringShift.input;
+        schedules[recurringShift.empId][recurringShift.dayOfWeek] = recurringShift.input;
       }
     }
     return schedules;
@@ -592,12 +571,10 @@ export function RecurringScheduleSection({
   const [activeCellEl, setActiveCellEl] = useState<HTMLElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savedDraftTimestamp, setSavedDraftTimestamp] = useState<string | null>(
+  const [savedDraftTimestamp, setSavedDraftTimestamp] = useState<string | null>(null);
+  const [pendingRecurringAction, setPendingRecurringAction] = useState<"save" | "discard" | null>(
     null,
   );
-  const [pendingRecurringAction, setPendingRecurringAction] = useState<
-    "save" | "discard" | null
-  >(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterFocusArea, setFilterFocusArea] = useState<number | "">("");
 
@@ -625,21 +602,11 @@ export function RecurringScheduleSection({
     void (async () => {
       try {
         const draft = await getRecurringDraft(orgId, currentUserId);
-        if (
-          !cancelled &&
-          draft?.draftData &&
-          Object.keys(draft.draftData).length > 0
-        ) {
+        if (!cancelled && draft?.draftData && Object.keys(draft.draftData).length > 0) {
           const migrated: RecurringScheduleDraft = {};
-          for (const [employeeId, employeeDirty] of Object.entries(
-            draft.draftData,
-          )) {
+          for (const [employeeId, employeeDirty] of Object.entries(draft.draftData)) {
             for (const [dayKey, value] of Object.entries(employeeDirty)) {
-              const migratedValue = migrateLegacyDraftValue(
-                value,
-                assignments,
-                absenceTypes,
-              );
+              const migratedValue = migrateLegacyDraftValue(value, assignments, absenceTypes);
               if (migratedValue !== null) {
                 if (!migrated[employeeId]) {
                   migrated[employeeId] = {};
@@ -660,14 +627,7 @@ export function RecurringScheduleSection({
     return () => {
       cancelled = true;
     };
-  }, [
-    absenceTypes,
-    assignments,
-    canManage,
-    currentUserId,
-    orgId,
-    recurringShiftsQuery.isPending,
-  ]);
+  }, [absenceTypes, assignments, canManage, currentUserId, orgId, recurringShiftsQuery.isPending]);
 
   const hasDirtyChanges = Object.keys(dirtySchedules).length > 0;
   const dirtyCount = Object.values(dirtySchedules).reduce(
@@ -675,10 +635,7 @@ export function RecurringScheduleSection({
     0,
   );
 
-  function getEffectiveInput(
-    empId: string,
-    dayIndex: number,
-  ): ScheduleCellInput | null {
+  function getEffectiveInput(empId: string, dayIndex: number): ScheduleCellInput | null {
     if (dirtySchedules[empId] && dayIndex in dirtySchedules[empId]) {
       return dirtySchedules[empId][dayIndex];
     }
@@ -706,16 +663,16 @@ export function RecurringScheduleSection({
 
     if (input.kind === "absence") {
       const absenceType =
-        input.absenceTypeId != null
-          ? (absenceTypeIdMap.get(input.absenceTypeId) ?? null)
-          : null;
+        input.absenceTypeId != null ? (absenceTypeIdMap.get(input.absenceTypeId) ?? null) : null;
       return {
         assignment: null,
         shiftCategory: null,
         job: null,
         absenceType,
         label: absenceType
-          ? (isNameMode ? absenceType.name || absenceType.label : absenceType.label)
+          ? isNameMode
+            ? absenceType.name || absenceType.label
+            : absenceType.label
           : null,
         segments: [],
       };
@@ -734,18 +691,11 @@ export function RecurringScheduleSection({
     }
 
     const assignment =
-      assignmentBySegmentKey.get(
-        `${segment.shiftId ?? "null"}:${segment.jobId}`,
-      ) ?? null;
+      assignmentBySegmentKey.get(`${segment.shiftId ?? "null"}:${segment.jobId}`) ?? null;
     const shiftCategoryId =
-      segment.shiftId ??
-      assignment?.shiftId ??
-      assignment?.categoryId ??
-      null;
+      segment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
     const shiftCategory =
-      shiftCategoryId != null
-        ? (shiftCategoryById.get(shiftCategoryId) ?? null)
-        : null;
+      shiftCategoryId != null ? (shiftCategoryById.get(shiftCategoryId) ?? null) : null;
     const job = jobById.get(segment.jobId) ?? null;
     const displayParts = assignment
       ? buildShiftDisplayParts({
@@ -788,11 +738,7 @@ export function RecurringScheduleSection({
     };
   }
 
-  function handleCellChange(
-    empId: string,
-    dayIndex: number,
-    newValue: ScheduleCellInput | null,
-  ) {
+  function handleCellChange(empId: string, dayIndex: number, newValue: ScheduleCellInput | null) {
     const original = allSchedules[empId]?.[dayIndex] ?? null;
     setDirtySchedules((current) => {
       const employeeDirty = { ...(current[empId] ?? {}) };
@@ -814,11 +760,7 @@ export function RecurringScheduleSection({
     setActiveCellEl(null);
   }
 
-  function handleCellClick(
-    empId: string,
-    dayIndex: number,
-    element: HTMLElement,
-  ) {
+  function handleCellClick(empId: string, dayIndex: number, element: HTMLElement) {
     if (!canManage) return;
     if (activeCell?.empId === empId && activeCell?.dayIndex === dayIndex) {
       setActiveCell(null);
@@ -896,9 +838,7 @@ export function RecurringScheduleSection({
       toast.success("Draft saved");
     } catch (err: unknown) {
       Sentry.captureException(err);
-      toast.error(
-        formatClientErrorMessage(err, "We couldn't save that draft."),
-      );
+      toast.error(formatClientErrorMessage(err, "We couldn't save that draft."));
     }
   }
 
@@ -915,9 +855,7 @@ export function RecurringScheduleSection({
       employees.filter((employee) => {
         const matchesSearch =
           !searchQuery ||
-          getEmployeeDisplayName(employee)
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase());
+          getEmployeeDisplayName(employee).toLowerCase().includes(searchQuery.toLowerCase());
         const matchesFocusArea =
           !filterFocusArea || employee.focusAreaIds.includes(filterFocusArea);
         return matchesSearch && matchesFocusArea;
@@ -926,10 +864,7 @@ export function RecurringScheduleSection({
   );
 
   useEffect(() => {
-    if (
-      activeCell &&
-      !filteredEmployees.some((employee) => employee.id === activeCell.empId)
-    ) {
+    if (activeCell && !filteredEmployees.some((employee) => employee.id === activeCell.empId)) {
       setActiveCell(null);
       setActiveCellEl(null);
     }
@@ -938,8 +873,7 @@ export function RecurringScheduleSection({
   const sortedEmployees = useMemo(
     () =>
       [...filteredEmployees].sort(
-        (firstEmployee, secondEmployee) =>
-          firstEmployee.seniority - secondEmployee.seniority,
+        (firstEmployee, secondEmployee) => firstEmployee.seniority - secondEmployee.seniority,
       ),
     [filteredEmployees],
   );
@@ -956,7 +890,7 @@ export function RecurringScheduleSection({
   );
 
   const activeCellEmp = activeCell
-    ? employees.find((employee) => employee.id === activeCell.empId) ?? null
+    ? (employees.find((employee) => employee.id === activeCell.empId) ?? null)
     : null;
 
   return (
@@ -1219,17 +1153,18 @@ export function RecurringScheduleSection({
           </div>
 
           {sortedEmployees.map((employee, index) => {
-            const isCurrentUser =
-              !!(employee.userId && currentUserId && employee.userId === currentUserId);
-            const rowBg = isCurrentUser
-              ? "var(--color-today-bg)"
-              : "var(--color-surface)";
+            const isCurrentUser = !!(
+              employee.userId &&
+              currentUserId &&
+              employee.userId === currentUserId
+            );
+            const rowBg = isCurrentUser ? "var(--color-today-bg)" : "var(--color-surface)";
             const certAbbr =
               employee.certificationId != null
                 ? getCertAbbr(employee.certificationId, certifications)
                 : null;
             const designationColors = certAbbr
-              ? DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR
+              ? (DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR)
               : null;
 
             return (
@@ -1240,8 +1175,7 @@ export function RecurringScheduleSection({
                   display: "grid",
                   gridTemplateColumns: `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr))`,
                   minWidth: isMobile ? 448 : undefined,
-                  borderTop:
-                    index === 0 ? "none" : "1px solid var(--color-border-light)",
+                  borderTop: index === 0 ? "none" : "1px solid var(--color-border-light)",
                   background: rowBg,
                   transition: "background 150ms ease",
                 }}
@@ -1322,8 +1256,9 @@ export function RecurringScheduleSection({
                     absenceType,
                     label: cellLabel,
                   } = resolveRecurringDisplay(cellInput);
-                  const isDirty =
-                    !!(dirtySchedules[employee.id] && dayIdx in dirtySchedules[employee.id]);
+                  const isDirty = !!(
+                    dirtySchedules[employee.id] && dayIdx in dirtySchedules[employee.id]
+                  );
 
                   return (
                     <div
@@ -1337,20 +1272,11 @@ export function RecurringScheduleSection({
                           ? `${getEmployeeDisplayName(employee)}, ${DAY_LABELS[dayIdx]}: ${cellLabel}`
                           : `${getEmployeeDisplayName(employee)}, ${DAY_LABELS[dayIdx]}: empty`
                       }
-                      onClick={(event) =>
-                        handleCellClick(employee.id, dayIdx, event.currentTarget)
-                      }
+                      onClick={(event) => handleCellClick(employee.id, dayIdx, event.currentTarget)}
                       onKeyDown={(event) => {
-                        if (
-                          canManage &&
-                          (event.key === "Enter" || event.key === " ")
-                        ) {
+                        if (canManage && (event.key === "Enter" || event.key === " ")) {
                           event.preventDefault();
-                          handleCellClick(
-                            employee.id,
-                            dayIdx,
-                            event.currentTarget as HTMLElement,
-                          );
+                          handleCellClick(employee.id, dayIdx, event.currentTarget as HTMLElement);
                         }
                       }}
                       style={{
@@ -1391,32 +1317,29 @@ export function RecurringScheduleSection({
         </div>
       )}
 
-      {activeCell && activeCellEmp && (() => {
-        const activeInput = getEffectiveInput(activeCell.empId, activeCell.dayIndex);
-        const activeDisplay = resolveRecurringDisplay(activeInput);
-        const currentAbsenceTypeId =
-          activeInput?.kind === "absence" ? (activeInput.absenceTypeId ?? null) : null;
+      {activeCell &&
+        activeCellEmp &&
+        (() => {
+          const activeInput = getEffectiveInput(activeCell.empId, activeCell.dayIndex);
+          const activeDisplay = resolveRecurringDisplay(activeInput);
+          const currentAbsenceTypeId =
+            activeInput?.kind === "absence" ? (activeInput.absenceTypeId ?? null) : null;
 
-        return (
-          <ShiftCellPopover
-            anchorRef={activeCellEl}
-            assignments={assignments}
-            shiftCategories={shiftCategories}
-            jobs={jobs}
-            orgRoles={orgRoles}
-            certifications={certifications}
-            focusAreas={focusAreas}
-            absenceTypes={absenceTypes}
-            currentSegments={activeDisplay.segments}
-            currentAbsenceTypeId={currentAbsenceTypeId}
-            onSelect={(input) =>
-              handleCellChange(activeCell.empId, activeCell.dayIndex, input)
-            }
-            onAbsenceSelect={(absenceType) =>
-              handleCellChange(
-                activeCell.empId,
-                activeCell.dayIndex,
-                {
+          return (
+            <ShiftCellPopover
+              anchorRef={activeCellEl}
+              assignments={assignments}
+              shiftCategories={shiftCategories}
+              jobs={jobs}
+              orgRoles={orgRoles}
+              certifications={certifications}
+              focusAreas={focusAreas}
+              absenceTypes={absenceTypes}
+              currentSegments={activeDisplay.segments}
+              currentAbsenceTypeId={currentAbsenceTypeId}
+              onSelect={(input) => handleCellChange(activeCell.empId, activeCell.dayIndex, input)}
+              onAbsenceSelect={(absenceType) =>
+                handleCellChange(activeCell.empId, activeCell.dayIndex, {
                   kind: "absence",
                   segments: [],
                   absenceTypeId: absenceType.id,
@@ -1424,20 +1347,19 @@ export function RecurringScheduleSection({
                   customEndTime: null,
                   seriesId: null,
                   fromRecurring: true,
-                },
-              )
-            }
-            onClose={() => {
-              setActiveCell(null);
-              setActiveCellEl(null);
-            }}
-            empFocusAreaIds={activeCellEmp.focusAreaIds}
-            empCertificationId={activeCellEmp.certificationId}
-            empRoleIds={activeCellEmp.roleIds}
-            shiftDisplayMode={shiftDisplayMode}
-          />
-        );
-      })()}
+                })
+              }
+              onClose={() => {
+                setActiveCell(null);
+                setActiveCellEl(null);
+              }}
+              empFocusAreaIds={activeCellEmp.focusAreaIds}
+              empCertificationId={activeCellEmp.certificationId}
+              empRoleIds={activeCellEmp.roleIds}
+              shiftDisplayMode={shiftDisplayMode}
+            />
+          );
+        })()}
 
       {pendingRecurringAction ? (
         <ConfirmDialog

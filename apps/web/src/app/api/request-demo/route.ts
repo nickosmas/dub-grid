@@ -38,12 +38,8 @@ export async function POST(req: NextRequest) {
   if (csrfError) return csrfError;
 
   // ── Rate limit by IP ──────────────────────────────────────────────────
-  const ip =
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
-  const { limited, reset, misconfigured } = await checkRateLimit(
-    demoLimiter,
-    ip,
-  );
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
+  const { limited, reset, misconfigured } = await checkRateLimit(demoLimiter, ip);
   if (misconfigured) {
     return NextResponse.json(
       { success: false, error: "Service temporarily unavailable" },
@@ -63,22 +59,15 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.INVALID_BODY },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.INVALID_INPUT },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { contactName, email, phone, orgName, orgSize, industry, message } =
-    parsed.data;
+  const { contactName, email, phone, orgName, orgSize, industry, message } = parsed.data;
   const fieldErrors = {
     contactName: getStaffNameError(contactName, "Contact name"),
     email: getRequiredStaffEmailError(email),
@@ -128,8 +117,7 @@ export async function POST(req: NextRequest) {
 
   // ── Build email ───────────────────────────────────────────────────────
   const apiKey = process.env.RESEND_API_KEY;
-  const fromEmail =
-    process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+  const fromEmail = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
 
   const recipientEmail = process.env.DEMO_RECIPIENT_EMAIL;
 
@@ -160,18 +148,13 @@ export async function POST(req: NextRequest) {
       from: fromEmail,
       to: recipientEmail,
       replyTo: sanitizeHeaderValue(normalizedEmail),
-      subject: sanitizeHeaderValue(
-        `DubGrid Demo Request: ${normalizedOrgName}`,
-      ),
+      subject: sanitizeHeaderValue(`DubGrid Demo Request: ${normalizedOrgName}`),
       html,
     });
     return NextResponse.json({ success: true });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "request-demo" } });
     logger.error({ err, path: "/api/request-demo" }, "Failed to send demo request email");
-    return NextResponse.json(
-      { success: false, error: "Failed to send email" },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: "Failed to send email" }, { status: 500 });
   }
 }

@@ -7,13 +7,11 @@ const extractJwtClaims = vi.fn();
 const serviceFrom = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
-    requireAuthenticatedUserWithClaims(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
 }));
 
 vi.mock("@/lib/impersonation", () => ({
-  getImpersonationFromCookie: (cookie: string) =>
-    getImpersonationFromCookie(cookie),
+  getImpersonationFromCookie: (cookie: string) => getImpersonationFromCookie(cookie),
 }));
 
 vi.mock("@/lib/supabase-service", () => ({

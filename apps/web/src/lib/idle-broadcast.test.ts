@@ -25,9 +25,7 @@ describe("idle-broadcast", () => {
 
       const received: number[] = [];
       const unlisten = listenForIdleActivity((at) => received.push(at));
-      window.dispatchEvent(
-        new StorageEvent("storage", { key: STORAGE_KEY, newValue: "555" }),
-      );
+      window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY, newValue: "555" }));
 
       expect(received).toEqual([555]);
       unlisten();
@@ -44,9 +42,7 @@ describe("idle-broadcast", () => {
     try {
       const received: number[] = [];
       const unlisten = listenForIdleActivity((at) => received.push(at));
-      window.dispatchEvent(
-        new StorageEvent("storage", { key: "some-other-key", newValue: "555" }),
-      );
+      window.dispatchEvent(new StorageEvent("storage", { key: "some-other-key", newValue: "555" }));
 
       expect(received).toEqual([]);
       unlisten();

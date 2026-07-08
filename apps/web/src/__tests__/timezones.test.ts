@@ -1,9 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  buildTimezoneOptions,
-  formatTimezoneLabel,
-  getSupportedTimezones,
-} from "@/lib/timezones";
+import { buildTimezoneOptions, formatTimezoneLabel, getSupportedTimezones } from "@/lib/timezones";
 
 const originalSupportedValuesOf = Intl.supportedValuesOf;
 
@@ -36,10 +32,7 @@ describe("timezones", () => {
   });
 
   it("builds rich labels with UTC offsets and human-friendly place names", () => {
-    const label = formatTimezoneLabel(
-      "America/Los_Angeles",
-      new Date("2026-01-15T12:00:00Z"),
-    );
+    const label = formatTimezoneLabel("America/Los_Angeles", new Date("2026-01-15T12:00:00Z"));
 
     expect(label).toContain("UTC");
     expect(label).toContain("Los Angeles");

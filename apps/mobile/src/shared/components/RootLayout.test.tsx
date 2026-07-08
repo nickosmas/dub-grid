@@ -7,9 +7,7 @@ import {
 } from "../../test/native";
 import * as envModule from "../lib/env";
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),
@@ -41,11 +39,7 @@ vi.mock("../../features/consent/components/ConsentGate", async () => {
 
   return {
     ConsentGate: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(
-        "div",
-        { "data-testid": "consent-gate" },
-        children,
-      ),
+      React.createElement("div", { "data-testid": "consent-gate" }, children),
   };
 });
 
@@ -103,11 +97,7 @@ vi.mock("../../features/auth/providers/MobileRealtimeProvider", async () => {
 
   return {
     MobileRealtimeProvider: ({ children }: { children: React.ReactNode }) =>
-      React.createElement(
-        "div",
-        { "data-testid": "mobile-realtime-provider" },
-        children,
-      ),
+      React.createElement("div", { "data-testid": "mobile-realtime-provider" }, children),
   };
 });
 
@@ -159,9 +149,7 @@ describe("RootLayout", () => {
 
     render(<RootLayout />);
 
-    expect(
-      screen.getByText("Mobile configuration needs attention"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Mobile configuration needs attention")).toBeInTheDocument();
     expect(screen.getByText("Mobile connection")).toBeInTheDocument();
     expect(
       screen.getByText("This build is missing a reachable DubGrid web connection."),

@@ -12,8 +12,7 @@ const mockUpdateGridmasterSubscription = vi.fn();
 vi.mock("@/features/gridmaster/client", () => ({
   fetchGridmasterBilling: () => mockFetchGridmasterBilling(),
   syncGridmasterBilling: (orgId: string) => mockSyncGridmasterBilling(orgId),
-  updateGridmasterSubscription: (input: unknown) =>
-    mockUpdateGridmasterSubscription(input),
+  updateGridmasterSubscription: (input: unknown) => mockUpdateGridmasterSubscription(input),
 }));
 
 vi.mock("sonner", () => ({
@@ -112,10 +111,7 @@ describe("GridmasterBillingView", () => {
 
     await user.click(await screen.findByText("Acme Health"));
 
-    expect(onSelectOrg).toHaveBeenCalledWith(
-      "11111111-1111-4111-8111-111111111111",
-      "billing",
-    );
+    expect(onSelectOrg).toHaveBeenCalledWith("11111111-1111-4111-8111-111111111111", "billing");
   });
 
   it("extends a trial from the row action", async () => {
@@ -195,9 +191,7 @@ describe("GridmasterBillingView", () => {
     renderView();
 
     await screen.findByText("Acme Health");
-    await user.click(
-      screen.getByRole("button", { name: "Billing status for Acme Health" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Billing status for Acme Health" }));
     await user.click(await screen.findByRole("option", { name: "Active" }));
     await user.click(screen.getByRole("button", { name: "Override" }));
     await user.click(screen.getByRole("button", { name: "Override Status" }));

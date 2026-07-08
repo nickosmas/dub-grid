@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { DbRecurringShift } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
-import {
-  requireOrgPermissions,
-  resolveEffectiveOrgId,
-} from "@/app/api/shared/permissions";
+import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
@@ -71,9 +68,7 @@ function canManageRecurring(
   permissions: ReturnType<typeof import("@dubgrid/authz").buildPermissionContext>,
 ) {
   return (
-    permissions.isGridmaster ||
-    permissions.isSuperAdmin ||
-    permissions.canManageRecurringShifts
+    permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageRecurringShifts
   );
 }
 
@@ -99,11 +94,7 @@ export async function POST(req: NextRequest) {
   {
     const auth = await requireAuthenticatedUser(req);
     if (!("response" in auth)) {
-      const effective = await resolveEffectiveOrgId(
-        req,
-        auth.user.id,
-        data.orgId,
-      );
+      const effective = await resolveEffectiveOrgId(req, auth.user.id, data.orgId);
       if (effective !== data.orgId) {
         (data as { orgId: string }).orgId = effective;
       }
@@ -113,11 +104,7 @@ export async function POST(req: NextRequest) {
   try {
     switch (data.action) {
       case "fetchRecurringShifts": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canReadRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canReadRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -140,16 +127,9 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        const assignmentLabelMap = new Map<number, string>(
-          data.assignmentLabels ?? [],
-        );
-        const absenceTypeMap = new Map<number, string>(
-          data.absenceTypeLabels ?? [],
-        );
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(
-          auth.serviceClient,
-          data.orgId,
-        );
+        const assignmentLabelMap = new Map<number, string>(data.assignmentLabels ?? []);
+        const absenceTypeMap = new Map<number, string>(data.absenceTypeLabels ?? []);
+        const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
 
         return NextResponse.json({
           rows: ((rows ?? []) as DbRecurringShift[]).map((row) =>
@@ -165,11 +145,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "getRecurringDraft": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canManageRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -198,11 +174,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "saveRecurringDraft": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canManageRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -247,11 +219,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "deleteRecurringDraft": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canManageRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -269,11 +237,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "upsertRecurringShift": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canManageRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -307,11 +271,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "deleteRecurringShift": {
-        const auth = await requireOrgPermissions(
-          req,
-          data.orgId,
-          canManageRecurring,
-        );
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
         if ("response" in auth) {
           return auth.response;
         }
@@ -338,10 +298,7 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Recurring schedule operation failed";
+    const message = error instanceof Error ? error.message : "Recurring schedule operation failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

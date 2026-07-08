@@ -1,9 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
-import {
-  mobileColors,
-  mobileRadii,
-} from "../../../../shared/theme/tokens";
+import { mobileColors, mobileRadii } from "../../../../shared/theme/tokens";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -47,11 +44,7 @@ export function IllustrationNotifications() {
   return (
     <View accessible={false} style={styles.stack}>
       <View style={styles.headerChip}>
-        <Ionicons
-          color={mobileColors.brand}
-          name="notifications"
-          size={14}
-        />
+        <Ionicons color={mobileColors.brand} name="notifications" size={14} />
         <Text style={styles.headerLabel}>Alerts</Text>
         <View style={styles.unreadBadge}>
           <Text style={styles.unreadBadgeText}>3</Text>
@@ -59,16 +52,8 @@ export function IllustrationNotifications() {
       </View>
 
       {NOTES.map((note, index) => (
-        <View
-          key={note.title}
-          style={[
-            styles.card,
-            index === 0 ? styles.cardLead : null,
-          ]}
-        >
-          <View
-            style={[styles.iconCircle, { backgroundColor: note.iconBg }]}
-          >
+        <View key={note.title} style={[styles.card, index === 0 ? styles.cardLead : null]}>
+          <View style={[styles.iconCircle, { backgroundColor: note.iconBg }]}>
             <Ionicons color={note.iconColor} name={note.iconName} size={16} />
           </View>
           <View style={styles.copy}>

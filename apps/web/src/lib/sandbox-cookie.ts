@@ -18,19 +18,15 @@ export interface SandboxCookieData {
  * shape validation. Ownership is *not* checked here — that's done in
  * middleware against the DB.
  */
-export function getSandboxFromCookie(
-  cookieString: string,
-): SandboxCookieData | null {
+export function getSandboxFromCookie(cookieString: string): SandboxCookieData | null {
   const prefix = `${SANDBOX_COOKIE_NAME}=`;
-  const cookie = cookieString
-    .split(/;\s*/)
-    .find((c) => c.startsWith(prefix));
+  const cookie = cookieString.split(/;\s*/).find((c) => c.startsWith(prefix));
   if (!cookie) return null;
 
   try {
-    const data = JSON.parse(decodeURIComponent(cookie.slice(prefix.length))) as
-      | Partial<SandboxCookieData>
-      | null;
+    const data = JSON.parse(
+      decodeURIComponent(cookie.slice(prefix.length)),
+    ) as Partial<SandboxCookieData> | null;
     if (
       !data ||
       typeof data.sandboxOrgId !== "string" ||

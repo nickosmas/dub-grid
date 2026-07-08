@@ -30,10 +30,7 @@ export interface SignOutOptions {
  * signed in) — no navigation.
  */
 export function useLogout() {
-  function signOut({
-    scope = "local",
-    redirectTo = "/goodbye",
-  }: SignOutOptions = {}): void {
+  function signOut({ scope = "local", redirectTo = "/goodbye" }: SignOutOptions = {}): void {
     beginLogout();
     const url = new URL(redirectTo, window.location.origin);
     url.searchParams.set("scope", scope);

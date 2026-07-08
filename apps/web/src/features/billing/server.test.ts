@@ -70,10 +70,7 @@ function createQueryClient() {
           select: () => ({
             eq: () => ({
               is: async () => ({
-                data: [
-                  { user_id: "linked-user" },
-                  { user_id: "manager-user" },
-                ],
+                data: [{ user_id: "linked-user" }, { user_id: "manager-user" }],
                 error: null,
               }),
             }),
@@ -88,9 +85,17 @@ function createQueryClient() {
                 order: () => ({
                   limit: async () => ({
                     data: [
-                      { id: 1, action: "billing.subscription_created", created_at: "2026-05-03T00:00:00Z" },
+                      {
+                        id: 1,
+                        action: "billing.subscription_created",
+                        created_at: "2026-05-03T00:00:00Z",
+                      },
                       { id: 2, action: "billing.seats_synced", created_at: "2026-05-02T00:00:00Z" },
-                      { id: 3, action: "billing.portal_opened", created_at: "2026-05-01T00:00:00Z" },
+                      {
+                        id: 3,
+                        action: "billing.portal_opened",
+                        created_at: "2026-05-01T00:00:00Z",
+                      },
                     ],
                     error: null,
                   }),
@@ -108,9 +113,7 @@ function createQueryClient() {
 describe("loadOrganizationBillingSummary", () => {
   it("maps the org, subscription, app-user count, and recent operations", async () => {
     const summary = await loadOrganizationBillingSummary(
-      createQueryClient() as unknown as Parameters<
-        typeof loadOrganizationBillingSummary
-      >[0],
+      createQueryClient() as unknown as Parameters<typeof loadOrganizationBillingSummary>[0],
       "org-1",
       {
         canManageBilling: true,

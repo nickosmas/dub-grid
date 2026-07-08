@@ -64,24 +64,17 @@ export const READ_ONLY_PERMS: AdminPermissions = {
   canViewDashboardAnalytics: false,
 };
 
-export function applyViewImplications(
-  permissions: AdminPermissions,
-): AdminPermissions {
+export function applyViewImplications(permissions: AdminPermissions): AdminPermissions {
   const result = { ...permissions };
-  result.canViewEmployeeDetails =
-    result.canViewEmployeeDetails || result.canManageEmployees;
-  result.canViewFocusAreas =
-    result.canViewFocusAreas || result.canManageFocusAreas;
+  result.canViewEmployeeDetails = result.canViewEmployeeDetails || result.canManageEmployees;
+  result.canViewFocusAreas = result.canViewFocusAreas || result.canManageFocusAreas;
   result.canViewScheduleDefinitions =
     result.canViewScheduleDefinitions || result.canManageScheduleDefinitions;
-  result.canViewIndicatorTypes =
-    result.canViewIndicatorTypes || result.canManageIndicatorTypes;
+  result.canViewIndicatorTypes = result.canViewIndicatorTypes || result.canManageIndicatorTypes;
   result.canViewCoverageRequirements =
     result.canViewCoverageRequirements || result.canManageCoverageRequirements;
-  result.canViewRecurringShifts =
-    result.canViewRecurringShifts || result.canManageRecurringShifts;
-  result.canViewOrgLabels =
-    result.canViewOrgLabels || result.canManageOrgLabels;
+  result.canViewRecurringShifts = result.canViewRecurringShifts || result.canManageRecurringShifts;
+  result.canViewOrgLabels = result.canViewOrgLabels || result.canManageOrgLabels;
   result.canViewDashboardAnalytics =
     result.canViewDashboardAnalytics ||
     result.canEditShifts ||
@@ -91,9 +84,7 @@ export function applyViewImplications(
   return result;
 }
 
-export function unionPermissions(
-  permissionSets: AdminPermissions[],
-): AdminPermissions {
+export function unionPermissions(permissionSets: AdminPermissions[]): AdminPermissions {
   const result: AdminPermissions = { ...READ_ONLY_PERMS };
   for (const permissions of permissionSets) {
     for (const key of Object.keys(result) as (keyof AdminPermissions)[]) {
@@ -173,9 +164,7 @@ export function buildPermissionContext(
   if (isGridmaster || isSuperAdmin) {
     permissions = ALL_PERMS;
   } else if (role === "admin") {
-    permissions = adminPerms
-      ? { ...adminPerms, canViewSchedule: true }
-      : READ_ONLY_PERMS;
+    permissions = adminPerms ? { ...adminPerms, canViewSchedule: true } : READ_ONLY_PERMS;
   } else if (role === "user") {
     permissions = adminPerms
       ? {
@@ -239,8 +228,7 @@ export function buildPermissionContext(
     canManageOrg,
     canAccessSettings,
     canManageUsers: isImpersonating ? false : isSuperAdmin || isGridmaster,
-    canConfigureAdminPermissions:
-      isImpersonating ? false : isSuperAdmin || isGridmaster,
+    canConfigureAdminPermissions: isImpersonating ? false : isSuperAdmin || isGridmaster,
   };
 }
 
@@ -265,8 +253,7 @@ export function buildPerms(
 
 function decodeBase64UrlSegment(segment: string): string {
   const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
-  const padding =
-    normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
   const padded = `${normalized}${padding}`;
 
   if (typeof atob === "function") {
@@ -276,7 +263,10 @@ function decodeBase64UrlSegment(segment: string): string {
   const bufferCtor = (
     globalThis as {
       Buffer?: {
-        from: (value: string, encoding: string) => {
+        from: (
+          value: string,
+          encoding: string,
+        ) => {
           toString: (encoding: string) => string;
         };
       };
@@ -301,9 +291,7 @@ export function extractJwtClaims(accessToken: string): {
       throw new Error("Missing JWT payload segment");
     }
 
-    payload = JSON.parse(
-      decodeBase64UrlSegment(encodedPayload),
-    ) as Record<string, unknown>;
+    payload = JSON.parse(decodeBase64UrlSegment(encodedPayload)) as Record<string, unknown>;
   } catch {
     return { effectiveRole: "user", orgId: null };
   }

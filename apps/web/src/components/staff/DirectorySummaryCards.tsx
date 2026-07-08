@@ -18,11 +18,23 @@ export function DirectorySummaryCards({
       >
         <CardContent className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">On schedule</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">
+              On schedule
+            </p>
             <p className="text-2xl font-bold tracking-tight mt-0.5">{onScheduleCount}</p>
           </div>
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-brand-bg)]">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-brand)]">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-[var(--color-brand)]"
+            >
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
               <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -39,11 +51,23 @@ export function DirectorySummaryCards({
       >
         <CardContent className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">Full-time</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">
+              Full-time
+            </p>
             <p className="text-2xl font-bold tracking-tight mt-0.5">{fullTimeCount}</p>
           </div>
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-bg-secondary)]">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-text-subtle)]">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-[var(--color-text-subtle)]"
+            >
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <path d="M16 2v4" />
               <path d="M8 2v4" />
@@ -65,11 +89,23 @@ export function DirectorySummaryCards({
       >
         <CardContent className="flex items-center justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">Part-time</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-text-subtle)]">
+              Part-time
+            </p>
             <p className="text-2xl font-bold tracking-tight mt-0.5">{partTimeCount}</p>
           </div>
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[var(--color-warning-bg,#FEF3C7)]">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--color-warning-text,#92400E)]">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-[var(--color-warning-text,#92400E)]"
+            >
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <path d="M16 2v4" />
               <path d="M8 2v4" />

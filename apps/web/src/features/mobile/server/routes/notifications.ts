@@ -5,10 +5,7 @@ import {
   mobileNotificationsResponseSchema,
 } from "@dubgrid/contracts";
 import { loadMobileNotificationsPayload } from "@dubgrid/mobile-api-core";
-import {
-  fetchMobileNotifications,
-  requireMobileAuth,
-} from "@/features/mobile/server";
+import { fetchMobileNotifications, requireMobileAuth } from "@/features/mobile/server";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";

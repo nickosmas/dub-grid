@@ -2,13 +2,14 @@ import * as React from "react";
 import { ScrollView, View, Text } from "react-native";
 
 const passthroughComponent = (Component: React.ComponentType<any>) => {
-  return React.forwardRef<unknown, Record<string, unknown>>(
-    function PassthroughComponent({ entering, exiting, ...rest }, ref) {
-      void entering;
-      void exiting;
-      return React.createElement(Component as never, { ref, ...rest });
-    },
-  );
+  return React.forwardRef<unknown, Record<string, unknown>>(function PassthroughComponent(
+    { entering, exiting, ...rest },
+    ref,
+  ) {
+    void entering;
+    void exiting;
+    return React.createElement(Component as never, { ref, ...rest });
+  });
 };
 
 const AnimatedView = passthroughComponent(View);
@@ -50,11 +51,7 @@ export function withSequence<T>(...values: readonly T[]) {
   return values[values.length - 1] as T;
 }
 
-export function withRepeat<T>(
-  value: T,
-  _numberOfReps?: number,
-  _reverse?: boolean,
-) {
+export function withRepeat<T>(value: T, _numberOfReps?: number, _reverse?: boolean) {
   return value;
 }
 
@@ -81,9 +78,7 @@ export function cancelAnimation(_sharedValue: unknown) {
   return undefined;
 }
 
-export function runOnJS<Args extends unknown[], Return>(
-  fn: (...args: Args) => Return,
-) {
+export function runOnJS<Args extends unknown[], Return>(fn: (...args: Args) => Return) {
   return fn;
 }
 
@@ -95,11 +90,7 @@ export function useAnimatedStyle<T>(factory: () => T) {
   return factory();
 }
 
-export function interpolate(
-  _value: number,
-  _input: readonly number[],
-  output: readonly number[],
-) {
+export function interpolate(_value: number, _input: readonly number[], output: readonly number[]) {
   return output[0];
 }
 

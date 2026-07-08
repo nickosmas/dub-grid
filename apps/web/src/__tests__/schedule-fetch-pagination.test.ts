@@ -18,8 +18,7 @@ function chainableQuery(result: { data: unknown; error: unknown }) {
   for (const method of ["select", "eq", "gte", "lte", "order", "range"]) {
     query[method] = vi.fn(() => query);
   }
-  (query as unknown as { then: unknown }).then = (resolve: (v: unknown) => void) =>
-    resolve(result);
+  (query as unknown as { then: unknown }).then = (resolve: (v: unknown) => void) => resolve(result);
   return query;
 }
 
@@ -30,13 +29,48 @@ describe("fetchShifts (via fetchNormalizedShifts) pagination wiring", () => {
 
   it("applies org/date filters, orders and ranges the query, and maps a short page into a ShiftMap", async () => {
     const shiftCategories: ShiftCategory[] = [
-      { id: 10, orgId: "org-1", name: "Day Shift", abbr: "D", startTime: "07:00", endTime: "15:00", sortOrder: 0, focusAreaId: 1 },
+      {
+        id: 10,
+        orgId: "org-1",
+        name: "Day Shift",
+        abbr: "D",
+        startTime: "07:00",
+        endTime: "15:00",
+        sortOrder: 0,
+        focusAreaId: 1,
+      },
     ];
     const jobs: JobDefinition[] = [
-      { id: 100, orgId: "org-1", name: "Staff", abbr: "ST", showOnGrid: true, eligibleRoleIds: [], requiredCertificationIds: [], color: "#DBEAFE", border: "#93C5FD", text: "#1E40AF", sortOrder: 0, systemKey: null },
+      {
+        id: 100,
+        orgId: "org-1",
+        name: "Staff",
+        abbr: "ST",
+        showOnGrid: true,
+        eligibleRoleIds: [],
+        requiredCertificationIds: [],
+        color: "#DBEAFE",
+        border: "#93C5FD",
+        text: "#1E40AF",
+        sortOrder: 0,
+        systemKey: null,
+      },
     ];
     const assignments: AssignmentDefinition[] = [
-      { id: 1, orgId: "org-1", label: "DST", name: "Day Staff", color: "#DBEAFE", border: "#93C5FD", text: "#1E40AF", categoryId: 10, shiftId: 10, jobId: 100, focusAreaId: 1, sortOrder: 0 },
+      {
+        id: 1,
+        orgId: "org-1",
+        label: "DST",
+        name: "Day Staff",
+        color: "#DBEAFE",
+        border: "#93C5FD",
+        text: "#1E40AF",
+        categoryId: 10,
+        shiftId: 10,
+        jobId: 100,
+        focusAreaId: 1,
+        sortOrder: 0,
+      },
     ];
     const segmentCompatibility = createShiftJobCompatibilityMaps({
       assignments,
@@ -68,16 +102,21 @@ describe("fetchShifts (via fetchNormalizedShifts) pagination wiring", () => {
           custom_start_time: null,
           custom_end_time: null,
           segments: [
-            { id: "seg-1", snapshot_id: "snap-1", org_id: "org-1", position: 0, shift_id: 10, job_id: 100 },
+            {
+              id: "seg-1",
+              snapshot_id: "snap-1",
+              org_id: "org-1",
+              position: 0,
+              shift_id: 10,
+              job_id: 100,
+            },
           ],
         },
       ],
     };
 
     const query = chainableQuery({ data: [row], error: null });
-    vi.mocked(supabase.from).mockReturnValue(
-      query as unknown as ReturnType<typeof supabase.from>,
-    );
+    vi.mocked(supabase.from).mockReturnValue(query as unknown as ReturnType<typeof supabase.from>);
 
     const map = await fetchShifts(
       "org-1",
@@ -119,9 +158,7 @@ describe("fetchScheduleNotes pagination wiring", () => {
     };
 
     const query = chainableQuery({ data: [row], error: null });
-    vi.mocked(supabase.from).mockReturnValue(
-      query as unknown as ReturnType<typeof supabase.from>,
-    );
+    vi.mocked(supabase.from).mockReturnValue(query as unknown as ReturnType<typeof supabase.from>);
 
     const notes = await fetchScheduleNotes("org-1", "2026-08-02", "2026-08-15");
 

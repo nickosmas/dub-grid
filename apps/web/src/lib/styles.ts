@@ -65,10 +65,7 @@ const NEUTRAL_ROLE_BADGE = {
   border: "var(--color-border-light)",
 } as const;
 
-export const ROLE_BADGE_COLORS: Record<
-  string,
-  { bg: string; text: string; border: string }
-> = {
+export const ROLE_BADGE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   gridmaster: {
     bg: "#DBEAFE",
     text: "#1D4ED8",

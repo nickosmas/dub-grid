@@ -7,7 +7,10 @@ export type SortKey = "seniority" | "name";
 export type EmploymentTypeFilter = "all" | Employee["employmentType"];
 export type AccountLinkFilter = "all" | "linked" | "unlinked";
 export type ContactPresenceFilter = "all" | "present" | "missing";
-export interface SortConfig { key: SortKey; dir: "asc" | "desc" }
+export interface SortConfig {
+  key: SortKey;
+  dir: "asc" | "desc";
+}
 
 const PAGE_SIZE = 15;
 
@@ -62,7 +65,7 @@ export function useStaffFilters({
 
   const handleSort = useCallback((key: SortKey) => {
     setSortConfig((prev) =>
-      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
     );
   }, []);
 
@@ -114,15 +117,15 @@ export function useStaffFilters({
 
       const matchesEmploymentType =
         filterEmploymentType === "all" || emp.employmentType === filterEmploymentType;
-      const matchesDepartment =
-        !filterDepartment || emp.departmentIds.includes(filterDepartment);
+      const matchesDepartment = !filterDepartment || emp.departmentIds.includes(filterDepartment);
       const matchesDepartmentAdmin =
         !filterDepartmentAdminOnly ||
         (filterDepartment
           ? emp.deptAdminIds.includes(filterDepartment)
           : emp.deptAdminIds.length > 0);
       const matchesFocusArea = !filterFocusArea || emp.focusAreaIds.includes(filterFocusArea);
-      const matchesCertification = !filterCertification || emp.certificationId === filterCertification;
+      const matchesCertification =
+        !filterCertification || emp.certificationId === filterCertification;
       const matchesRole = !filterRole || emp.roleIds.includes(filterRole);
       const matchesAccountLink =
         filterAccountLink === "all" ||
@@ -164,18 +167,17 @@ export function useStaffFilters({
     filterPhonePresence,
   ]);
 
-  const sorted = useMemo(
-    () => {
-      const mul = sortConfig.dir === "asc" ? 1 : -1;
-      return [...rawList].sort((a, b) => {
-        if (sortConfig.key === "name") {
-          return (a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName)) * mul;
-        }
-        return (a.seniority - b.seniority) * mul;
-      });
-    },
-    [rawList, sortConfig],
-  );
+  const sorted = useMemo(() => {
+    const mul = sortConfig.dir === "asc" ? 1 : -1;
+    return [...rawList].sort((a, b) => {
+      if (sortConfig.key === "name") {
+        return (
+          (a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName)) * mul
+        );
+      }
+      return (a.seniority - b.seniority) * mul;
+    });
+  }, [rawList, sortConfig]);
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
 

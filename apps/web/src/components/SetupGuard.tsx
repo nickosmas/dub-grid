@@ -14,7 +14,11 @@ import { useLogout } from "@/hooks";
  */
 export default function SetupGuard({ children }: { children: React.ReactNode }) {
   const perms = usePermissions();
-  const { setupStatus, loading: orgLoading, org } = useOrganizationData({ includeAssignmentDefinitionCompatibility: false });
+  const {
+    setupStatus,
+    loading: orgLoading,
+    org,
+  } = useOrganizationData({ includeAssignmentDefinitionCompatibility: false });
   const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
   const { signOut } = useLogout();
 
@@ -60,7 +64,16 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
             justifyContent: "center",
           }}
         >
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
         </div>

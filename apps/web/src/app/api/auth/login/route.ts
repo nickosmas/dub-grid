@@ -147,18 +147,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.INVALID_BODY },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.INVALID_INPUT },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { email, password } = parsed.data;
@@ -202,10 +196,7 @@ export async function POST(req: NextRequest) {
   if (!supabaseUrl || !anonKey) {
     logger.error("Supabase env vars not configured for login route");
     Sentry.captureMessage("Supabase env vars not configured for login route", "error");
-    return NextResponse.json(
-      { success: false, error: "Server misconfigured" },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: "Server misconfigured" }, { status: 500 });
   }
 
   const supabase = createAnonClient();

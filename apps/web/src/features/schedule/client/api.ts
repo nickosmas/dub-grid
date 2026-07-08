@@ -37,10 +37,7 @@ export class OptimisticLockError extends Error {
   }
 }
 
-async function requestScheduleJson<T>(
-  input: string,
-  init?: RequestInit,
-): Promise<T> {
+async function requestScheduleJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -48,9 +45,7 @@ async function requestScheduleJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "Schedule request failed."),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, "Schedule request failed."));
   }
 
   return body as T;
@@ -188,11 +183,7 @@ export function resolveShiftRequest(
   }).then(() => undefined);
 }
 
-export function cancelShiftRequest(
-  requestId: string,
-  empId: string,
-  orgId: string,
-): Promise<void> {
+export function cancelShiftRequest(requestId: string, empId: string, orgId: string): Promise<void> {
   return requestScheduleAction<{ success: true }>({
     action: "cancelShiftRequest",
     orgId,
@@ -259,12 +250,8 @@ export function fetchRecurringShifts(
     action: "fetchRecurringShifts",
     orgId,
     employeeId,
-    assignmentLabels: assignmentLabelMap
-      ? [...assignmentLabelMap.entries()]
-      : undefined,
-    absenceTypeLabels: absenceTypeMap
-      ? [...absenceTypeMap.entries()]
-      : undefined,
+    assignmentLabels: assignmentLabelMap ? [...assignmentLabelMap.entries()] : undefined,
+    absenceTypeLabels: absenceTypeMap ? [...absenceTypeMap.entries()] : undefined,
     includeArchived,
   }).then((data) => data.rows);
 }
@@ -305,10 +292,7 @@ export function saveRecurringDraft(
   }).then(() => undefined);
 }
 
-export function deleteRecurringDraft(
-  orgId: string,
-  _userId: string,
-): Promise<void> {
+export function deleteRecurringDraft(orgId: string, _userId: string): Promise<void> {
   return requestRecurringAction<{ success: true }>({
     action: "deleteRecurringDraft",
     orgId,
@@ -447,9 +431,7 @@ async function requestManageWithLockTyped<T extends Record<string, unknown>>(
   return (payload ?? ({} as T)) as T;
 }
 
-async function requestManageWithLock(
-  body: Record<string, unknown>,
-): Promise<void> {
+async function requestManageWithLock(body: Record<string, unknown>): Promise<void> {
   await requestManageWithLockTyped(body);
 }
 
@@ -520,10 +502,7 @@ export type DeleteShiftBatchItem = {
   expectedVersion?: number;
 };
 
-export function deleteShiftBatch(
-  orgId: string,
-  shifts: DeleteShiftBatchItem[],
-): Promise<void> {
+export function deleteShiftBatch(orgId: string, shifts: DeleteShiftBatchItem[]): Promise<void> {
   return requestManageWithLock({
     action: "deleteShifts",
     orgId,
@@ -616,10 +595,7 @@ export function updateSeriesAllShifts(
   });
 }
 
-export function deleteShiftSeries(
-  seriesId: string,
-  orgId: string,
-): Promise<number> {
+export function deleteShiftSeries(seriesId: string, orgId: string): Promise<number> {
   return requestScheduleManage<{ deletedCount: number }>({
     action: "deleteShiftSeries",
     orgId,
@@ -631,9 +607,7 @@ export function applyRecurringSchedules(
   orgId: string,
   startDate: Date,
   endDate: Date,
-): Promise<
-  Array<{ empId: string; date: string; label: string; absenceTypeId?: number }>
-> {
+): Promise<Array<{ empId: string; date: string; label: string; absenceTypeId?: number }>> {
   return requestScheduleManage<{
     generated: Array<{
       empId: string;
@@ -666,9 +640,10 @@ export async function publishSchedule(
       endDate: formatDateKey(endDate),
     }),
   });
-  const body = (await response.json().catch(() => null)) as
-    | { summary?: DraftBreakdown; error?: string }
-    | null;
+  const body = (await response.json().catch(() => null)) as {
+    summary?: DraftBreakdown;
+    error?: string;
+  } | null;
   if (!response.ok || !body?.summary) {
     throw new Error(formatClientErrorMessage(body?.error, "Failed to publish schedule"));
   }
@@ -687,9 +662,10 @@ export async function discardScheduleDrafts(
       scope: userId ? "mine" : "all",
     }),
   });
-  const body = (await response.json().catch(() => null)) as
-    | { summary?: DraftBreakdown; error?: string }
-    | null;
+  const body = (await response.json().catch(() => null)) as {
+    summary?: DraftBreakdown;
+    error?: string;
+  } | null;
   if (!response.ok || !body?.summary) {
     throw new Error(formatClientErrorMessage(body?.error, "Failed to discard schedule drafts"));
   }

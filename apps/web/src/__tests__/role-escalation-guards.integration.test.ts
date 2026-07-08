@@ -29,8 +29,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
 const DB_URL =
-  process.env.LOCAL_SUPABASE_DB_URL ??
-  "postgres://postgres:postgres@127.0.0.1:54322/postgres";
+  process.env.LOCAL_SUPABASE_DB_URL ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
 
 // Supabase's hosted pooler requires SSL; the local CLI Postgres does not.
 // Match what scripts/reset-remote-db.ts uses so the same DB_URL works
@@ -74,9 +73,7 @@ let fx: Fixture;
  * we want to prove the *tier* guard fires, not the last-of-kind guard.
  */
 async function seedFixture(): Promise<Fixture> {
-  const { rows } = await db.query<{ id: string }>(
-    `SELECT id FROM public.organizations LIMIT 1`,
-  );
+  const { rows } = await db.query<{ id: string }>(`SELECT id FROM public.organizations LIMIT 1`);
   if (rows.length === 0) {
     throw new Error("No organizations in seed — run npm run db:reset first");
   }
@@ -177,10 +174,11 @@ afterAll(async () => {
        WHERE user_id IN ($1, $2, $3)`,
       [fx.adminUserId, fx.superAdminUserId, fx.secondSuperAdminUserId],
     );
-    await db.query(
-      `DELETE FROM auth.users WHERE id IN ($1, $2, $3)`,
-      [fx.adminUserId, fx.superAdminUserId, fx.secondSuperAdminUserId],
-    );
+    await db.query(`DELETE FROM auth.users WHERE id IN ($1, $2, $3)`, [
+      fx.adminUserId,
+      fx.superAdminUserId,
+      fx.secondSuperAdminUserId,
+    ]);
   } finally {
     await db.end();
   }
@@ -265,9 +263,7 @@ describe.runIf(reachable)("role-escalation guards (live DB)", () => {
              )`,
             [fx.superAdminUserId, fx.adminUserId, fx.orgId],
           ),
-        ).rejects.toThrow(
-          /admin cannot change the role of an admin, super_admin, or gridmaster/i,
-        );
+        ).rejects.toThrow(/admin cannot change the role of an admin, super_admin, or gridmaster/i);
       } finally {
         await db.query("ROLLBACK");
         await resetSession();
@@ -279,9 +275,7 @@ describe.runIf(reachable)("role-escalation guards (live DB)", () => {
       // to test against; rollback will restore.
       await db.query("BEGIN");
       try {
-        await db.query(
-          `SELECT set_config('app.allow_role_change', 'true', true)`,
-        );
+        await db.query(`SELECT set_config('app.allow_role_change', 'true', true)`);
         await db.query(
           `UPDATE public.organization_memberships
              SET org_role = 'admin'
@@ -296,9 +290,7 @@ describe.runIf(reachable)("role-escalation guards (live DB)", () => {
              )`,
             [fx.secondSuperAdminUserId, fx.adminUserId, fx.orgId],
           ),
-        ).rejects.toThrow(
-          /admin cannot change the role of an admin, super_admin, or gridmaster/i,
-        );
+        ).rejects.toThrow(/admin cannot change the role of an admin, super_admin, or gridmaster/i);
       } finally {
         await db.query("ROLLBACK");
         await resetSession();
@@ -363,9 +355,7 @@ describe.runIf(reachable)("role-escalation guards (live DB)", () => {
       await db.query("BEGIN");
       try {
         // Make a user-tier member first
-        await db.query(
-          `SELECT set_config('app.allow_role_change', 'true', true)`,
-        );
+        await db.query(`SELECT set_config('app.allow_role_change', 'true', true)`);
         await db.query(
           `UPDATE public.organization_memberships
              SET org_role = 'user'

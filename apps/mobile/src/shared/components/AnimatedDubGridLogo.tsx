@@ -11,27 +11,15 @@ import Animated, {
 } from "react-native-reanimated";
 import { useEffect, useMemo } from "react";
 import {
-  ANIMATED_LOGO_DELAY_MAX_S,
-  ANIMATED_LOGO_DURATION_MAX_S,
-  ANIMATED_LOGO_DURATION_MIN_S,
   ANIMATED_LOGO_OPACITY_MAX,
   ANIMATED_LOGO_OPACITY_MIN,
   BRAND_ANIMATED_LOGO_SIZE,
+  generateAnimatedLogoTimings,
 } from "@dubgrid/design-tokens";
 import { mobileColors } from "../theme/tokens";
 
 const ROWS = [0, 1, 2, 3] as const;
 const COLS = [0, 1, 2, 3] as const;
-
-type Timing = readonly [number, number];
-
-function generateRandomTimings(): readonly Timing[] {
-  const durationSpan = ANIMATED_LOGO_DURATION_MAX_S - ANIMATED_LOGO_DURATION_MIN_S;
-  return Array.from({ length: 16 }, () => [
-    ANIMATED_LOGO_DURATION_MIN_S + Math.random() * durationSpan,
-    Math.random() * ANIMATED_LOGO_DELAY_MAX_S,
-  ] as const);
-}
 
 /**
  * Mobile twin of the web AnimatedDubGridLogo. Cells render as native
@@ -52,11 +40,11 @@ export function AnimatedDubGridLogo({
   color?: string;
 }) {
   const reducedMotion = useReducedMotion();
-  const timings = useMemo(() => generateRandomTimings(), []);
+  const timings = useMemo(() => generateAnimatedLogoTimings(), []);
   const cell = size / 4;
-  const gap = cell * 0.10;
+  const gap = cell * 0.1;
   const inner = cell - gap * 2;
-  const radius = cell * 0.20;
+  const radius = cell * 0.2;
 
   return (
     <View
@@ -80,10 +68,7 @@ export function AnimatedDubGridLogo({
 
           if (reducedMotion) {
             return (
-              <View
-                key={`${row}-${col}`}
-                style={[style, { opacity: staticOpacity(row, col) }]}
-              />
+              <View key={`${row}-${col}`} style={[style, { opacity: staticOpacity(row, col) }]} />
             );
           }
 

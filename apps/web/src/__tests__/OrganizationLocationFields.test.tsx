@@ -4,11 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
 
-function LocationFieldsHarness({
-  addressLine2 = "",
-}: {
-  addressLine2?: string;
-}) {
+function LocationFieldsHarness({ addressLine2 = "" }: { addressLine2?: string }) {
   const [value, setValue] = useState({
     phone: "",
     timezone: "",
@@ -33,127 +29,123 @@ function LocationFieldsHarness({
 }
 
 function createGooglePlacesMock() {
-  const fetchAutocompleteSuggestions = vi.fn(
-    async ({ input }: { input: string }) => {
-      const query = input.toLowerCase();
+  const fetchAutocompleteSuggestions = vi.fn(async ({ input }: { input: string }) => {
+    const query = input.toLowerCase();
 
-      if (query.includes("goog")) {
-        return {
-          suggestions: [
-            {
-              placePrediction: {
-                text: { text: "Googleplex, Mountain View, CA, USA" },
-                mainText: {
-                  text: "Googleplex",
-                  matches: [{ startOffset: 0, endOffset: 4 }],
-                },
-                secondaryText: {
-                  text: "1600 Amphitheatre Pkwy, Mountain View, CA, USA",
-                },
-                toPlace: () => ({
-                  fetchFields: vi.fn(async () => undefined),
-                  formattedAddress:
-                    "1600 Amphitheatre Pkwy, Mountain View, CA 94043, United States",
-                  addressComponents: [
-                    {
-                      longText: "1600",
-                      shortText: "1600",
-                      types: ["street_number"],
-                    },
-                    {
-                      longText: "Amphitheatre Pkwy",
-                      shortText: "Amphitheatre Pkwy",
-                      types: ["route"],
-                    },
-                    {
-                      longText: "Mountain View",
-                      shortText: "Mountain View",
-                      types: ["locality"],
-                    },
-                    {
-                      longText: "California",
-                      shortText: "CA",
-                      types: ["administrative_area_level_1"],
-                    },
-                    {
-                      longText: "94043",
-                      shortText: "94043",
-                      types: ["postal_code"],
-                    },
-                    {
-                      longText: "United States",
-                      shortText: "US",
-                      types: ["country"],
-                    },
-                  ],
-                }),
+    if (query.includes("goog")) {
+      return {
+        suggestions: [
+          {
+            placePrediction: {
+              text: { text: "Googleplex, Mountain View, CA, USA" },
+              mainText: {
+                text: "Googleplex",
+                matches: [{ startOffset: 0, endOffset: 4 }],
               },
-            },
-          ],
-        };
-      }
-
-      if (query.includes("1600")) {
-        return {
-          suggestions: [
-            {
-              placePrediction: {
-                text: {
-                  text: "1600 Amphitheatre Pkwy, Mountain View, CA, USA",
-                },
-                mainText: {
-                  text: "1600 Amphitheatre Pkwy",
-                  matches: [{ startOffset: 0, endOffset: 4 }],
-                },
-                secondaryText: {
-                  text: "Mountain View, CA, USA",
-                },
-                toPlace: () => ({
-                  fetchFields: vi.fn(async () => undefined),
-                  formattedAddress:
-                    "1600 Amphitheatre Pkwy, Mountain View, CA 94043, United States",
-                  addressComponents: [
-                    {
-                      longText: "1600",
-                      shortText: "1600",
-                      types: ["street_number"],
-                    },
-                    {
-                      longText: "Amphitheatre Pkwy",
-                      shortText: "Amphitheatre Pkwy",
-                      types: ["route"],
-                    },
-                    {
-                      longText: "Mountain View",
-                      shortText: "Mountain View",
-                      types: ["locality"],
-                    },
-                    {
-                      longText: "California",
-                      shortText: "CA",
-                      types: ["administrative_area_level_1"],
-                    },
-                    {
-                      longText: "94043",
-                      shortText: "94043",
-                      types: ["postal_code"],
-                    },
-                    {
-                      longText: "United States",
-                      shortText: "US",
-                      types: ["country"],
-                    },
-                  ],
-                }),
+              secondaryText: {
+                text: "1600 Amphitheatre Pkwy, Mountain View, CA, USA",
               },
+              toPlace: () => ({
+                fetchFields: vi.fn(async () => undefined),
+                formattedAddress: "1600 Amphitheatre Pkwy, Mountain View, CA 94043, United States",
+                addressComponents: [
+                  {
+                    longText: "1600",
+                    shortText: "1600",
+                    types: ["street_number"],
+                  },
+                  {
+                    longText: "Amphitheatre Pkwy",
+                    shortText: "Amphitheatre Pkwy",
+                    types: ["route"],
+                  },
+                  {
+                    longText: "Mountain View",
+                    shortText: "Mountain View",
+                    types: ["locality"],
+                  },
+                  {
+                    longText: "California",
+                    shortText: "CA",
+                    types: ["administrative_area_level_1"],
+                  },
+                  {
+                    longText: "94043",
+                    shortText: "94043",
+                    types: ["postal_code"],
+                  },
+                  {
+                    longText: "United States",
+                    shortText: "US",
+                    types: ["country"],
+                  },
+                ],
+              }),
             },
-          ],
-        };
-      }
+          },
+        ],
+      };
+    }
 
-      return { suggestions: [] };
-    },
-  );
+    if (query.includes("1600")) {
+      return {
+        suggestions: [
+          {
+            placePrediction: {
+              text: {
+                text: "1600 Amphitheatre Pkwy, Mountain View, CA, USA",
+              },
+              mainText: {
+                text: "1600 Amphitheatre Pkwy",
+                matches: [{ startOffset: 0, endOffset: 4 }],
+              },
+              secondaryText: {
+                text: "Mountain View, CA, USA",
+              },
+              toPlace: () => ({
+                fetchFields: vi.fn(async () => undefined),
+                formattedAddress: "1600 Amphitheatre Pkwy, Mountain View, CA 94043, United States",
+                addressComponents: [
+                  {
+                    longText: "1600",
+                    shortText: "1600",
+                    types: ["street_number"],
+                  },
+                  {
+                    longText: "Amphitheatre Pkwy",
+                    shortText: "Amphitheatre Pkwy",
+                    types: ["route"],
+                  },
+                  {
+                    longText: "Mountain View",
+                    shortText: "Mountain View",
+                    types: ["locality"],
+                  },
+                  {
+                    longText: "California",
+                    shortText: "CA",
+                    types: ["administrative_area_level_1"],
+                  },
+                  {
+                    longText: "94043",
+                    shortText: "94043",
+                    types: ["postal_code"],
+                  },
+                  {
+                    longText: "United States",
+                    shortText: "US",
+                    types: ["country"],
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      };
+    }
+
+    return { suggestions: [] };
+  });
 
   const importLibrary = vi.fn(async () => ({
     AutocompleteSuggestion: {
@@ -182,8 +174,7 @@ describe("OrganizationLocationFields", () => {
 
   afterEach(() => {
     if (originalGoogleMapsKey) {
-      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY =
-        originalGoogleMapsKey;
+      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = originalGoogleMapsKey;
     } else {
       delete process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     }
@@ -204,8 +195,7 @@ describe("OrganizationLocationFields", () => {
 
   it("shows custom place-name recommendations and autofills structured fields on selection", async () => {
     process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = "test-key";
-    const { fetchAutocompleteSuggestions, importLibrary } =
-      createGooglePlacesMock();
+    const { fetchAutocompleteSuggestions, importLibrary } = createGooglePlacesMock();
     const user = userEvent.setup();
 
     render(<LocationFieldsHarness addressLine2="Suite 12" />);
@@ -213,13 +203,9 @@ describe("OrganizationLocationFields", () => {
     const line1Input = screen.getByLabelText(/address line 1/i);
     await user.type(line1Input, "Goog");
 
+    await waitFor(() => expect(fetchAutocompleteSuggestions).toHaveBeenCalled());
     await waitFor(() =>
-      expect(fetchAutocompleteSuggestions).toHaveBeenCalled(),
-    );
-    await waitFor(() =>
-      expect(
-        screen.getByRole("listbox", { name: /address suggestions/i }),
-      ).toBeInTheDocument(),
+      expect(screen.getByRole("listbox", { name: /address suggestions/i })).toBeInTheDocument(),
     );
 
     expect(screen.getByText(/powered by google/i)).toBeInTheDocument();
@@ -228,9 +214,7 @@ describe("OrganizationLocationFields", () => {
     await user.click(screen.getByRole("option", { name: /googleplex/i }));
 
     await waitFor(() =>
-      expect(screen.getByLabelText(/address line 1/i)).toHaveValue(
-        "1600 Amphitheatre Pkwy",
-      ),
+      expect(screen.getByLabelText(/address line 1/i)).toHaveValue("1600 Amphitheatre Pkwy"),
     );
     await waitFor(() =>
       expect(
@@ -242,9 +226,7 @@ describe("OrganizationLocationFields", () => {
     expect(screen.getByLabelText(/state \/ province/i)).toHaveValue("CA");
     expect(screen.getByLabelText(/postal code/i)).toHaveValue("94043");
     expect(screen.getByLabelText(/country/i)).toHaveValue("United States");
-    expect(screen.getByTestId("tz-value")).toHaveTextContent(
-      "America/Los_Angeles",
-    );
+    expect(screen.getByTestId("tz-value")).toHaveTextContent("America/Los_Angeles");
   });
 
   it("fills the right address fields after confirming an address recommendation", async () => {
@@ -257,20 +239,14 @@ describe("OrganizationLocationFields", () => {
     const line1Input = screen.getByLabelText(/address line 1/i);
     await user.type(line1Input, "1600");
 
-    await waitFor(() =>
-      expect(screen.getAllByRole("option")).toHaveLength(1),
-    );
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
 
-    expect(screen.getAllByRole("option")[0]).toHaveTextContent(
-      "1600 Amphitheatre Pkwy",
-    );
+    expect(screen.getAllByRole("option")[0]).toHaveTextContent("1600 Amphitheatre Pkwy");
 
     await user.click(screen.getAllByRole("option")[0]);
 
     await waitFor(() =>
-      expect(screen.getByLabelText(/address line 1/i)).toHaveValue(
-        "1600 Amphitheatre Pkwy",
-      ),
+      expect(screen.getByLabelText(/address line 1/i)).toHaveValue("1600 Amphitheatre Pkwy"),
     );
     await waitFor(() =>
       expect(

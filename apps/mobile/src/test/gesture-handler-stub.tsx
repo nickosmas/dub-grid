@@ -11,13 +11,7 @@ type ChainableGesture = {
 // Methods that register a callback vitest can invoke directly to drive a
 // gesture without simulating real touch/pan input (react-native-gesture-handler
 // gestures aren't otherwise testable under jsdom).
-const GESTURE_HANDLER_METHODS = [
-  "onStart",
-  "onUpdate",
-  "onChange",
-  "onEnd",
-  "onFinalize",
-];
+const GESTURE_HANDLER_METHODS = ["onStart", "onUpdate", "onChange", "onEnd", "onFinalize"];
 
 // Pure config methods — no callback to capture, just chainable no-ops.
 const GESTURE_CONFIG_METHODS = [

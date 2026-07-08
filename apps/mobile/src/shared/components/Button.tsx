@@ -1,11 +1,5 @@
 import type { PropsWithChildren, ReactNode } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { hapticSelection } from "../lib/haptics";
 import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
 

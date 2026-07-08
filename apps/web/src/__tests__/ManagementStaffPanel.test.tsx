@@ -177,9 +177,7 @@ describe("ManagementStaffPanel", () => {
       ],
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /remove from management/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /remove from management/i }));
     expect(screen.getByText(/stay on the schedule/i)).toBeInTheDocument();
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
@@ -218,9 +216,7 @@ describe("ManagementStaffPanel", () => {
     await user.click(screen.getByRole("button", { name: "Leadership" }));
 
     expect(
-      screen.getByText(
-        /must stay assigned to at least one management department/i,
-      ),
+      screen.getByText(/must stay assigned to at least one management department/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
   });
@@ -239,9 +235,7 @@ describe("ManagementStaffPanel", () => {
     // through the confirm-before-closing flow.
     await user.click(screen.getByRole("button", { name: /^close$/i }));
 
-    expect(
-      screen.getByRole("dialog", { name: /unsaved changes/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: /discard changes/i }));

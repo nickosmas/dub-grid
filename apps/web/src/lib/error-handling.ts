@@ -11,21 +11,14 @@ import { isLoggingOut } from "@/lib/logout-state";
  * internals) and replaces it with the caller's user-facing fallback. The raw
  * error is logged server-side so observability isn't lost.
  */
-export function apiErrorResponse(
-  error: unknown,
-  fallback: string,
-  status = 500,
-): NextResponse {
+export function apiErrorResponse(error: unknown, fallback: string, status = 500): NextResponse {
   console.error("[api]", fallback, error);
-  return NextResponse.json(
-    { error: formatClientErrorMessage(error, fallback) },
-    { status },
-  );
+  return NextResponse.json({ error: formatClientErrorMessage(error, fallback) }, { status });
 }
 
 /** Extract a human-readable message from an unknown error value. */
 export function extractErrorMessage(err: unknown, fallback: string): string {
-    return formatClientErrorMessage(err, fallback);
+  return formatClientErrorMessage(err, fallback);
 }
 
 /**
@@ -34,36 +27,46 @@ export function extractErrorMessage(err: unknown, fallback: string): string {
  * @param action  Optional verb phrase describing what failed (e.g. "delete shift", "save profile")
  */
 export async function handleApiError(error: unknown, action?: string) {
-    // During logout the cache is cleared and the session torn down while the app
-    // is still mounted, so in-flight queries fail with 401/expired. Stay silent —
-    // signOutLocal already owns the redirect; a toast here would just flash.
-    if (isLoggingOut()) return;
+  // During logout the cache is cleared and the session torn down while the app
+  // is still mounted, so in-flight queries fail with 401/expired. Stay silent —
+  // signOutLocal already owns the redirect; a toast here would just flash.
+  if (isLoggingOut()) return;
 
-    const rawMessage = extractRawErrorMessage(error) ?? "";
-    const message = formatClientErrorMessage(error, "");
+  const rawMessage = extractRawErrorMessage(error) ?? "";
+  const message = formatClientErrorMessage(error, "");
 
-    if (rawMessage.includes("jwt expired") || rawMessage.includes("Refresh Token Not Found") || rawMessage.includes("Invalid Refresh Token")) {
-        toast.error("Your session has expired. Please log in again.", { id: "session-expired", duration: Infinity });
-        await signOutFromBrowser("local");
-        window.location.replace("/");
-        return;
-    }
+  if (
+    rawMessage.includes("jwt expired") ||
+    rawMessage.includes("Refresh Token Not Found") ||
+    rawMessage.includes("Invalid Refresh Token")
+  ) {
+    toast.error("Your session has expired. Please log in again.", {
+      id: "session-expired",
+      duration: Infinity,
+    });
+    await signOutFromBrowser("local");
+    window.location.replace("/");
+    return;
+  }
 
-    if (rawMessage.includes("Failed to fetch") || (error instanceof Error && error.name === "TypeError")) {
-        toast.error(
-            "We're having trouble connecting. If you are using an adblocker or privacy shield, please try pausing it.",
-            { id: "network-error", duration: 8000 }
-        );
-        return;
-    }
+  if (
+    rawMessage.includes("Failed to fetch") ||
+    (error instanceof Error && error.name === "TypeError")
+  ) {
+    toast.error(
+      "We're having trouble connecting. If you are using an adblocker or privacy shield, please try pausing it.",
+      { id: "network-error", duration: 8000 },
+    );
+    return;
+  }
 
-    if (rawMessage) {
-        console.error("handleApiError:", rawMessage);
-    }
+  if (rawMessage) {
+    console.error("handleApiError:", rawMessage);
+  }
 
-    const prefix = action ? `Failed to ${action}` : "Something went wrong";
-    const detail = message && message.length < 120
-        ? `: ${message}`
-        : ". Please try again.";
-    toast.error(`${prefix}${detail}`, { id: action ? `error-${action.replace(/\s+/g, "-")}` : "generic-error" });
+  const prefix = action ? `Failed to ${action}` : "Something went wrong";
+  const detail = message && message.length < 120 ? `: ${message}` : ". Please try again.";
+  toast.error(`${prefix}${detail}`, {
+    id: action ? `error-${action.replace(/\s+/g, "-")}` : "generic-error",
+  });
 }

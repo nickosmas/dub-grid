@@ -9,8 +9,7 @@ vi.mock("@/lib/csrf", () => ({
 }));
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
-    requireAuthenticatedUserWithClaims(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
 }));
 
 vi.mock("@/lib/supabase-service", () => ({
@@ -82,9 +81,7 @@ describe("POST /api/schedule/actor-names", () => {
     // The unresolved (cross-org) id is not found among the org's employees.
     enqueue("employees", { data: [] });
 
-    const response = await POST(
-      makeRequest([SAME_ORG_USER_ID, OTHER_ORG_USER_ID]),
-    );
+    const response = await POST(makeRequest([SAME_ORG_USER_ID, OTHER_ORG_USER_ID]));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({

@@ -11,8 +11,7 @@ import type {
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { OrganizationSettingsEditable } from "@/lib/organization-settings";
 
-export interface UpdateOrganizationSettingsInput
-  extends Partial<OrganizationSettingsEditable> {
+export interface UpdateOrganizationSettingsInput extends Partial<OrganizationSettingsEditable> {
   orgId: string;
   expectedUpdatedAt: string;
 }
@@ -69,10 +68,7 @@ function getErrorMessage(body: ErrorBody | null, fallback: string): string {
   return formatClientErrorMessage(body?.error, fallback);
 }
 
-async function requestOrganizationJson<T>(
-  input: string,
-  init?: RequestInit,
-): Promise<T> {
+async function requestOrganizationJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(resolveClientUrl(input), init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -80,9 +76,7 @@ async function requestOrganizationJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "Organization request failed."),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, "Organization request failed."));
   }
 
   return body as T;
@@ -104,14 +98,11 @@ export async function checkUserExistsByEmail(
   email: string,
   orgId: string,
 ): Promise<UserExistsByEmailResult> {
-  return requestOrganizationJson<UserExistsByEmailResult>(
-    "/api/users/check-email",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, orgId }),
-    },
-  );
+  return requestOrganizationJson<UserExistsByEmailResult>("/api/users/check-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, orgId }),
+  });
 }
 
 export function fetchOrganizationUsers(orgId: string): Promise<OrganizationUser[]> {
@@ -189,10 +180,7 @@ export async function updateOrganizationSettings(
 
   if (!response.ok) {
     const message =
-      body &&
-      typeof body === "object" &&
-      "error" in body &&
-      typeof body.error === "string"
+      body && typeof body === "object" && "error" in body && typeof body.error === "string"
         ? body.error
         : "Failed to update organization settings";
     throw new Error(message);
@@ -345,10 +333,7 @@ export async function resendOrganizationInvitationGuarded(input: {
   };
 }
 
-export async function revokeInvitation(
-  invitationId: string,
-  orgId: string,
-): Promise<void> {
+export async function revokeInvitation(invitationId: string, orgId: string): Promise<void> {
   const invitations = await fetchOrganizationInvitations(orgId);
   const invitation = invitations.find((item) => item.id === invitationId);
   if (!invitation?.updatedAt) {
@@ -381,10 +366,7 @@ export async function resendInvitation(
   };
 }
 
-export async function removeUserFromOrganization(
-  userId: string,
-  orgId: string,
-): Promise<void> {
+export async function removeUserFromOrganization(userId: string, orgId: string): Promise<void> {
   const users = await fetchOrganizationUsers(orgId);
   const organizationUser = users.find((item) => item.id === userId);
   if (!organizationUser?.updatedAt) {

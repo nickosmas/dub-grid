@@ -17,15 +17,10 @@ export const OPTIONS = createMobileOptionsHandler(CORS_METHODS);
 export async function GET(req: NextRequest) {
   const json = (body: unknown, init?: ResponseInit) =>
     withMobileCors(req, NextResponse.json(body, init), CORS_METHODS);
-  const slug = normalizeMobileOrgSlug(
-    req.nextUrl.searchParams.get("slug"),
-  );
+  const slug = normalizeMobileOrgSlug(req.nextUrl.searchParams.get("slug"));
 
   if (!isValidMobileOrgSlug(slug, RESERVED_SUBDOMAINS)) {
-    return json(
-      { error: "Enter a valid organization slug." },
-      { status: 400 },
-    );
+    return json({ error: "Enter a valid organization slug." }, { status: 400 });
   }
 
   const serviceClient = getServiceClient();
@@ -33,10 +28,7 @@ export async function GET(req: NextRequest) {
     const organization = await findMobileOrganizationBySlug(serviceClient, slug);
 
     if (!organization) {
-      return json(
-        { error: "No organization matched that slug." },
-        { status: 404 },
-      );
+      return json({ error: "No organization matched that slug." }, { status: 404 });
     }
 
     return json(
@@ -45,9 +37,6 @@ export async function GET(req: NextRequest) {
       }),
     );
   } catch {
-    return json(
-      { error: "We could not verify that organization right now." },
-      { status: 503 },
-    );
+    return json({ error: "We could not verify that organization right now." }, { status: 503 });
   }
 }

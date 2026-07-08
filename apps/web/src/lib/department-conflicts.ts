@@ -15,9 +15,7 @@ export interface DepartmentConflict {
  *
  * Returns null when the error isn't a known duplicate-name case.
  */
-export function getDepartmentConflict(
-  error: unknown,
-): DepartmentConflict | null {
+export function getDepartmentConflict(error: unknown): DepartmentConflict | null {
   if (!error || typeof error !== "object") return null;
 
   const record = error as {

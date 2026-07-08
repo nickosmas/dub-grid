@@ -7,14 +7,8 @@ import {
 export default function PeopleLayout() {
   return (
     <Stack>
-      <Stack.Screen
-        name="index"
-        options={createTopLevelStackOptions("People")}
-      />
-      <Stack.Screen
-        name="[id]"
-        options={createDetailStackOptions("Person")}
-      />
+      <Stack.Screen name="index" options={createTopLevelStackOptions("People")} />
+      <Stack.Screen name="[id]" options={createDetailStackOptions("Person")} />
     </Stack>
   );
 }

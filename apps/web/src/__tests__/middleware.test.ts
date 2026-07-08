@@ -14,7 +14,9 @@ function makeResponseObject(init?: { headers?: Headers }) {
       set(name: string, value: string, options?: Record<string, unknown>) {
         cookieJar[name] = { value, options };
       },
-      get(name: string) { return cookieJar[name]; },
+      get(name: string) {
+        return cookieJar[name];
+      },
       _jar: cookieJar,
     },
     _type: "next" as const,
@@ -28,8 +30,7 @@ function makeRedirectResponse(url: string | URL) {
 
 vi.mock("next/server", () => ({
   NextResponse: {
-    next: (opts?: { request?: { headers?: Headers } }) =>
-      makeResponseObject(opts?.request),
+    next: (opts?: { request?: { headers?: Headers } }) => makeResponseObject(opts?.request),
     redirect: (url: string | URL) => makeRedirectResponse(url),
   },
 }));
@@ -151,7 +152,9 @@ describe("calculateEffectiveRole", () => {
   });
 
   it("returns org_role when platform_role is not gridmaster", () => {
-    expect(calculateEffectiveRole({ platform_role: "none", org_role: "super_admin" })).toBe("super_admin");
+    expect(calculateEffectiveRole({ platform_role: "none", org_role: "super_admin" })).toBe(
+      "super_admin",
+    );
   });
 
   it("returns 'user' when no org_role is set", () => {
@@ -164,11 +167,21 @@ describe("calculateEffectiveRole", () => {
 });
 
 describe("getRoleLevel", () => {
-  it("returns 4 for gridmaster", () => { expect(getRoleLevel("gridmaster")).toBe(4); });
-  it("returns 3 for super_admin", () => { expect(getRoleLevel("super_admin")).toBe(3); });
-  it("returns 2 for admin", () => { expect(getRoleLevel("admin")).toBe(2); });
-  it("returns 0 for user", () => { expect(getRoleLevel("user")).toBe(0); });
-  it("returns 0 for unknown role", () => { expect(getRoleLevel("unknown")).toBe(0); });
+  it("returns 4 for gridmaster", () => {
+    expect(getRoleLevel("gridmaster")).toBe(4);
+  });
+  it("returns 3 for super_admin", () => {
+    expect(getRoleLevel("super_admin")).toBe(3);
+  });
+  it("returns 2 for admin", () => {
+    expect(getRoleLevel("admin")).toBe(2);
+  });
+  it("returns 0 for user", () => {
+    expect(getRoleLevel("user")).toBe(0);
+  });
+  it("returns 0 for unknown role", () => {
+    expect(getRoleLevel("unknown")).toBe(0);
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -229,13 +242,17 @@ describe("middleware: marketing page redirects", () => {
   });
 
   it("redirects /privacy on org subdomain to apex", async () => {
-    const req = makeNextRequest("http://acme.localhost:3000/privacy", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/privacy", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("redirect");
   });
 
   it("does NOT redirect / on gridmaster subdomain", async () => {
-    const req = makeNextRequest("http://gridmaster.localhost:3000/", { host: "gridmaster.localhost:3000" });
+    const req = makeNextRequest("http://gridmaster.localhost:3000/", {
+      host: "gridmaster.localhost:3000",
+    });
     const res = await runMiddleware(req);
     // / is a public route, so it passes through (not redirected to apex)
     expect((res as { _type: string })._type).toBe("next");
@@ -261,7 +278,9 @@ describe("middleware: JWT verification", () => {
       org_slug: "acme",
       sub: "user-1",
     });
-    const req = makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("next");
     expect(mockJwtVerify).toHaveBeenCalled();
@@ -277,7 +296,9 @@ describe("middleware: JWT verification", () => {
       org_id: "org-1",
       org_slug: "acme",
     });
-    const req = makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("next");
     expect(mockDecodeJwt).toHaveBeenCalled();
@@ -301,7 +322,9 @@ describe("middleware: JWT verification", () => {
     const session = { access_token: "fake-jwt", user: { id: "user-1" } };
     mockGetSession.mockResolvedValue({ data: { session } });
     mockJwtVerify.mockRejectedValue(new Error("expired"));
-    mockDecodeJwt.mockImplementation(() => { throw new Error("bad token"); });
+    mockDecodeJwt.mockImplementation(() => {
+      throw new Error("bad token");
+    });
     const req = makeNextRequest("http://localhost:3000/schedule");
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("redirect");
@@ -311,8 +334,7 @@ describe("middleware: JWT verification", () => {
 
 describe("middleware: Content-Security-Policy", () => {
   function scriptSrcOf(res: unknown): string {
-    const csp =
-      (res as { headers: Headers }).headers.get("Content-Security-Policy") ?? "";
+    const csp = (res as { headers: Headers }).headers.get("Content-Security-Policy") ?? "";
     return (
       csp
         .split(";")
@@ -361,7 +383,9 @@ describe("middleware: route guards", () => {
       org_slug: "acme",
       sub: "user-1",
     });
-    const req = makeNextRequest("http://acme.localhost:3000/people", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/people", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("next");
   });
@@ -374,7 +398,9 @@ describe("middleware: route guards", () => {
       org_slug: "acme",
       sub: "user-1",
     });
-    const req = makeNextRequest("http://acme.localhost:3000/people", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/people", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("next");
   });
@@ -387,10 +413,14 @@ describe("middleware: route guards", () => {
       org_slug: "acme",
       sub: "user-1",
     });
-    const req = makeNextRequest("http://acme.localhost:3000/settings", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/settings", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { _type: string; _redirectUrl: string })._type).toBe("redirect");
-    expect((res as { _redirectUrl: string })._redirectUrl).toBe("http://acme.localhost:3000/schedule");
+    expect((res as { _redirectUrl: string })._redirectUrl).toBe(
+      "http://acme.localhost:3000/schedule",
+    );
   });
 
   it("allows admin role on /settings", async () => {
@@ -401,7 +431,9 @@ describe("middleware: route guards", () => {
       org_slug: "acme",
       sub: "user-1",
     });
-    const req = makeNextRequest("http://acme.localhost:3000/settings", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/settings", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("next");
   });
@@ -517,10 +549,9 @@ describe("middleware: route guards", () => {
       }),
     );
     const billingRes = await runMiddleware(
-      makeNextRequest(
-        "http://acme.localhost:3000/settings?section=org-billing",
-        { host: "acme.localhost:3000" },
-      ),
+      makeNextRequest("http://acme.localhost:3000/settings?section=org-billing", {
+        host: "acme.localhost:3000",
+      }),
     );
 
     expect((profileRes as { _type: string })._type).toBe("redirect");
@@ -542,7 +573,9 @@ describe("middleware: route guards", () => {
       org_slug: "acme",
       sub: "user-1",
     });
-    const req = makeNextRequest("http://acme.localhost:3000/gridmaster", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/gridmaster", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { _type: string })._type).toBe("redirect");
     expect((res as { _redirectUrl: string })._redirectUrl).toContain("/schedule");
@@ -571,7 +604,9 @@ describe("middleware: header injection", () => {
       org_slug: "acme",
       sub: "user-1",
     });
-    const req = makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { headers: Headers }).headers.get("x-dubgrid-role")).toBe("admin");
   });
@@ -584,7 +619,9 @@ describe("middleware: header injection", () => {
       org_slug: "acme",
       sub: "user-1",
     });
-    const req = makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { headers: Headers }).headers.get("x-dubgrid-org-id")).toBe("org-1");
   });
@@ -597,7 +634,9 @@ describe("middleware: header injection", () => {
       org_slug: "acme",
       sub: "user-1",
     });
-    const req = makeNextRequest("http://acme.localhost:3000/schedule", { host: "acme.localhost:3000" });
+    const req = makeNextRequest("http://acme.localhost:3000/schedule", {
+      host: "acme.localhost:3000",
+    });
     const res = await runMiddleware(req);
     expect((res as { headers: Headers }).headers.get("x-dubgrid-org-slug")).toBe("acme");
   });

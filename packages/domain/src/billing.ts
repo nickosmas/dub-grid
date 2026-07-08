@@ -40,17 +40,9 @@ export interface BillingAccessResult {
   trialGraceEndsAt: string | null;
 }
 
-const LOCKED_STATUSES = new Set([
-  "canceled",
-  "incomplete_expired",
-  "unpaid",
-]);
+const LOCKED_STATUSES = new Set(["canceled", "incomplete_expired", "unpaid"]);
 
-const PAYMENT_ATTENTION_STATUSES = new Set([
-  "incomplete",
-  "past_due",
-  "paused",
-]);
+const PAYMENT_ATTENTION_STATUSES = new Set(["incomplete", "past_due", "paused"]);
 
 function parseDate(value: string | null | undefined): Date | null {
   if (!value) return null;
@@ -66,9 +58,7 @@ function daysUntil(from: Date, to: Date): number {
   return Math.ceil((to.getTime() - from.getTime()) / 86_400_000);
 }
 
-export function evaluateOrganizationBillingAccess(
-  input: BillingAccessInput,
-): BillingAccessResult {
+export function evaluateOrganizationBillingAccess(input: BillingAccessInput): BillingAccessResult {
   const now = input.now ?? new Date();
   const status = input.subscriptionStatus ?? null;
   const trialEndsAt = parseDate(input.trialEndsAt);

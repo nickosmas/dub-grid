@@ -127,7 +127,9 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       const { data: factorsData, error: listError } = await listBrowserMfaFactors();
       if (listError) throw listError;
 
-      const totpFactors = factorsData.totp.filter((f: { status: string }) => f.status === "verified");
+      const totpFactors = factorsData.totp.filter(
+        (f: { status: string }) => f.status === "verified",
+      );
       for (const factor of totpFactors) {
         const { error } = await disableBrowserMfaFactor(factor.id);
         if (error) throw error;
@@ -176,13 +178,21 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           ) : (
             <ShieldOff size={18} style={{ color: "var(--color-text-muted)" }} />
           )}
-          <span style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-primary)", fontWeight: 500 }}>
+          <span
+            style={{
+              fontSize: "var(--dg-fs-body-sm)",
+              color: "var(--color-text-primary)",
+              fontWeight: 500,
+            }}
+          >
             {mfaEnabled
               ? "Two-factor authentication is enabled."
               : "Two-factor authentication is not enabled."}
           </span>
         </div>
-        <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
+        <p
+          style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}
+        >
           {mfaEnabled
             ? "Your account is protected with an authenticator app. You can disable it below."
             : "Add an extra layer of security by requiring a verification code from an authenticator app."}
@@ -202,7 +212,11 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
             className="dg-btn dg-btn-primary"
             style={{ alignSelf: "flex-start" }}
           >
-            <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={14}>
+            <ButtonLoading
+              loading={loading}
+              spinnerColor="var(--color-text-inverse)"
+              spinnerSize={14}
+            >
               Enable 2FA
             </ButtonLoading>
           </button>
@@ -215,24 +229,24 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   if (step === "disabling") {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-danger-dark)", margin: 0, fontWeight: 500 }}>
-          Are you sure you want to disable two-factor authentication? This will make your account less secure.
+        <p
+          style={{
+            fontSize: "var(--dg-fs-body-sm)",
+            color: "var(--color-danger-dark)",
+            margin: 0,
+            fontWeight: 500,
+          }}
+        >
+          Are you sure you want to disable two-factor authentication? This will make your account
+          less secure.
         </p>
         <div style={{ display: "flex", gap: 10 }}>
-          <button
-            onClick={disableMFA}
-            disabled={loading}
-            className="dg-btn dg-btn-danger"
-          >
+          <button onClick={disableMFA} disabled={loading} className="dg-btn dg-btn-danger">
             <ButtonLoading loading={loading} spinnerSize={14}>
               Confirm Disable
             </ButtonLoading>
           </button>
-          <button
-            onClick={resetState}
-            disabled={loading}
-            className="dg-btn dg-btn-secondary"
-          >
+          <button onClick={resetState} disabled={loading} className="dg-btn dg-btn-secondary">
             Cancel
           </button>
         </div>
@@ -243,7 +257,14 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
   // ── Enrollment: QR code + verification ──
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-primary)", margin: 0, fontWeight: 500 }}>
+      <p
+        style={{
+          fontSize: "var(--dg-fs-body-sm)",
+          color: "var(--color-text-primary)",
+          margin: 0,
+          fontWeight: 500,
+        }}
+      >
         Scan this QR code with your authenticator app
       </p>
       <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
@@ -251,16 +272,18 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       </p>
 
       {qrCode && (
-        <div style={{
-          display: "flex",
-          justifyContent: "center",
-          padding: 16,
-          background: "white",
-          borderRadius: "var(--dg-radius-md)",
-          border: "1px solid var(--color-border)",
-          width: "fit-content",
-          alignSelf: "center",
-        }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            padding: 16,
+            background: "white",
+            borderRadius: "var(--dg-radius-md)",
+            border: "1px solid var(--color-border)",
+            width: "fit-content",
+            alignSelf: "center",
+          }}
+        >
           <img
             src={qrCode.trimEnd()}
             alt="Scan this QR code with your authenticator app"
@@ -274,18 +297,20 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       {secret && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <label style={labelStyle}>Or enter this code manually</label>
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 12px",
-            background: "var(--color-bg-secondary)",
-            borderRadius: "var(--dg-radius-md)",
-            border: "1px solid var(--color-border)",
-            fontFamily: "monospace",
-            fontSize: "var(--dg-fs-body-sm)",
-            wordBreak: "break-all",
-          }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 12px",
+              background: "var(--color-bg-secondary)",
+              borderRadius: "var(--dg-radius-md)",
+              border: "1px solid var(--color-border)",
+              fontFamily: "monospace",
+              fontSize: "var(--dg-fs-body-sm)",
+              wordBreak: "break-all",
+            }}
+          >
             <span style={{ flex: 1, color: "var(--color-text-primary)" }}>{secret}</span>
             <MaybeHint content="Copy secret" side="top">
               <button
@@ -337,7 +362,13 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           }}
         />
         {verifyError && (
-          <p style={{ color: "var(--color-danger-dark)", fontSize: "var(--dg-fs-body-sm)", margin: 0 }}>
+          <p
+            style={{
+              color: "var(--color-danger-dark)",
+              fontSize: "var(--dg-fs-body-sm)",
+              margin: 0,
+            }}
+          >
             {verifyError}
           </p>
         )}
@@ -349,7 +380,11 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           disabled={loading || verifyCode.length !== 6}
           className="dg-btn dg-btn-primary"
         >
-          <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={14}>
+          <ButtonLoading
+            loading={loading}
+            spinnerColor="var(--color-text-inverse)"
+            spinnerSize={14}
+          >
             Verify &amp; Enable
           </ButtonLoading>
         </button>

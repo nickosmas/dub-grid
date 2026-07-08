@@ -12,8 +12,7 @@ vi.mock("@/lib/csrf", () => ({
 }));
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
-    requireAuthenticatedUserWithClaims(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
 }));
 
 vi.mock("@/app/api/shared/permissions", () => ({
@@ -26,8 +25,7 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 
 vi.mock("@/features/notifications/server", () => ({
-  dispatchNotificationEvent: (...args: unknown[]) =>
-    dispatchNotificationEvent(...args),
+  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
 vi.mock("@/lib/logger", () => ({

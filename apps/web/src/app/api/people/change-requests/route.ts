@@ -15,9 +15,7 @@ export async function GET(req: NextRequest) {
     req,
     orgId,
     (permissions) =>
-      permissions.isGridmaster ||
-      permissions.isSuperAdmin ||
-      permissions.canManageEmployees,
+      permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
   );
   if ("response" in auth) return auth.response;
 

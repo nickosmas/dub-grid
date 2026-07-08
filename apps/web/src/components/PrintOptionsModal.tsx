@@ -38,16 +38,15 @@ export default function PrintOptionsModal({
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<string[]>(
     focusAreas.map((w) => w.name),
   );
-  const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(
-    currentSpanWeeks,
-  );
+  const [spanWeeks, setSpanWeeks] = useState<1 | 2 | "month">(currentSpanWeeks);
   const [fontSizeKey, setFontSizeKey] = useState<FontSizeKey>("medium");
 
   const allSelected = selectedFocusAreas.length === focusAreas.length;
   const hasUnsavedChanges =
-    spanWeeks !== currentSpanWeeks
-    || fontSizeKey !== "medium"
-    || JSON.stringify([...selectedFocusAreas].sort()) !== JSON.stringify([...focusAreas.map((focusArea) => focusArea.name)].sort());
+    spanWeeks !== currentSpanWeeks ||
+    fontSizeKey !== "medium" ||
+    JSON.stringify([...selectedFocusAreas].sort()) !==
+      JSON.stringify([...focusAreas.map((focusArea) => focusArea.name)].sort());
   const { requestClose, unsavedChangesDialog } = useUnsavedChangesPrompt({
     hasUnsavedChanges,
     onDiscard: onClose,
@@ -130,9 +129,7 @@ export default function PrintOptionsModal({
           {/* Focus Areas */}
           {focusAreas.length > 0 && (
             <div style={{ marginBottom: 24 }}>
-              <div className="dg-modal-section-label">
-                {focusAreaLabel.toUpperCase()}
-              </div>
+              <div className="dg-modal-section-label">{focusAreaLabel.toUpperCase()}</div>
               <div className="dg-checklist">
                 {/* All toggle */}
                 <label className="dg-checkbox-row dg-checkbox-row--header">

@@ -14,7 +14,9 @@ describe("gridmaster account SQL boundaries", () => {
 
   it("keeps gridmaster accounts out of org-user RPCs and tenant counts", () => {
     expect(sql).toContain("CREATE OR REPLACE FUNCTION public.get_all_users_with_profiles()");
-    expect(sql).toContain("COALESCE(p.platform_role, 'none'::public.platform_role) <> 'gridmaster'::public.platform_role");
+    expect(sql).toContain(
+      "COALESCE(p.platform_role, 'none'::public.platform_role) <> 'gridmaster'::public.platform_role",
+    );
     expect(sql).toContain("AND p.platform_role <> 'gridmaster'");
     expect(sql).toContain("JOIN public.profiles p ON p.id = om.user_id");
   });

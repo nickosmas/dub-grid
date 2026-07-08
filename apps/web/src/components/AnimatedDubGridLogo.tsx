@@ -2,24 +2,13 @@
 
 import { useEffect, useState } from "react";
 import {
-  ANIMATED_LOGO_DELAY_MAX_S,
-  ANIMATED_LOGO_DURATION_MAX_S,
-  ANIMATED_LOGO_DURATION_MIN_S,
   ANIMATED_LOGO_OPACITY_MAX,
   ANIMATED_LOGO_OPACITY_MIN,
   BRAND_ANIMATED_LOGO_SIZE,
+  generateAnimatedLogoTimings,
+  type AnimatedLogoTiming,
 } from "@dubgrid/design-tokens";
 import { DubGridLogo } from "./Logo";
-
-type Timing = readonly [number, number];
-
-function generateRandomTimings(): readonly Timing[] {
-  const durationSpan = ANIMATED_LOGO_DURATION_MAX_S - ANIMATED_LOGO_DURATION_MIN_S;
-  return Array.from({ length: 16 }, () => [
-    ANIMATED_LOGO_DURATION_MIN_S + Math.random() * durationSpan,
-    Math.random() * ANIMATED_LOGO_DELAY_MAX_S,
-  ] as const);
-}
 
 /**
  * Animated dubgrid mark — every cell pulses on its own random [duration,
@@ -37,10 +26,10 @@ export function AnimatedDubGridLogo({
   size?: number;
   color?: string;
 }) {
-  const [timings, setTimings] = useState<readonly Timing[] | null>(null);
+  const [timings, setTimings] = useState<readonly AnimatedLogoTiming[] | null>(null);
 
   useEffect(() => {
-    setTimings(generateRandomTimings());
+    setTimings(generateAnimatedLogoTimings());
   }, []);
 
   if (!timings) {
@@ -48,8 +37,8 @@ export function AnimatedDubGridLogo({
   }
 
   const cell = size / 4;
-  const gap = cell * 0.10;
-  const r = cell * 0.20;
+  const gap = cell * 0.1;
+  const r = cell * 0.2;
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">

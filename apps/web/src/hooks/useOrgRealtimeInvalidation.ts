@@ -142,28 +142,17 @@ export function getOrgRealtimeInvalidationKeys(
         queryKeys.shiftRequests.all(orgId),
       ]);
     case "organization_memberships":
-      return uniqueKeys([
-        queryKeys.org.users(orgId),
-        queryKeys.org.directory(orgId),
-      ]);
+      return uniqueKeys([queryKeys.org.users(orgId), queryKeys.org.directory(orgId)]);
     case "shift_requests":
-      return uniqueKeys([
-        queryKeys.shiftRequests.all(orgId),
-        queryKeys.shifts.all(orgId),
-      ]);
+      return uniqueKeys([queryKeys.shiftRequests.all(orgId), queryKeys.shifts.all(orgId)]);
     case "schedule_cells":
     case "schedule_cell_snapshots":
     case "schedule_cell_segments":
-      return uniqueKeys([
-        queryKeys.shifts.all(orgId),
-        queryKeys.shiftRequests.all(orgId),
-      ]);
+      return uniqueKeys([queryKeys.shifts.all(orgId), queryKeys.shiftRequests.all(orgId)]);
     case "schedule_notes":
       return uniqueKeys([queryKeys.shifts.all(orgId)]);
     case "profile_change_requests":
-      return uniqueKeys([
-        queryKeys.org.peopleChangeRequests(orgId, "pending"),
-      ]);
+      return uniqueKeys([queryKeys.org.peopleChangeRequests(orgId, "pending")]);
     case "invitations":
       return uniqueKeys([
         queryKeys.org.invitations(orgId),
@@ -172,15 +161,9 @@ export function getOrgRealtimeInvalidationKeys(
         queryKeys.org.employeeCount(orgId),
       ]);
     case "recurring_shifts":
-      return uniqueKeys([
-        queryKeys.recurringShifts.all(orgId),
-        queryKeys.shifts.all(orgId),
-      ]);
+      return uniqueKeys([queryKeys.recurringShifts.all(orgId), queryKeys.shifts.all(orgId)]);
     case "publish_history":
-      return uniqueKeys([
-        queryKeys.org.publishHistory(orgId),
-        queryKeys.shifts.all(orgId),
-      ]);
+      return uniqueKeys([queryKeys.org.publishHistory(orgId), queryKeys.shifts.all(orgId)]);
     case "audit_log":
       return uniqueKeys([queryKeys.org.auditLog(orgId)]);
   }

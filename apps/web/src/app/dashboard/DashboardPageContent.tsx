@@ -29,10 +29,7 @@ function DashboardContent() {
     loading: refLoading,
     loadError,
   } = useOrganizationData();
-  const {
-    employees,
-    loading: empLoading,
-  } = useEmployees(perms.orgId ?? org?.id ?? null);
+  const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
 
   const isLoading = refLoading || empLoading || perms.isLoading;
 

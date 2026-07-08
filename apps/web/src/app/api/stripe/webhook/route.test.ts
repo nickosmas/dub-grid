@@ -151,10 +151,7 @@ describe("POST /api/stripe/webhook", () => {
       subscription_seats: 9,
       trial_ends_at: "2026-05-03T00:00:00.000Z",
     });
-    expect(organizationEq).toHaveBeenCalledWith(
-      "id",
-      "11111111-1111-4111-8111-111111111111",
-    );
+    expect(organizationEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         org_id: "11111111-1111-4111-8111-111111111111",

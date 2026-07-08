@@ -60,11 +60,8 @@ function SettingsPageContent() {
     canViewCoverageRequirements,
   } = usePermissions();
   const canViewSettingsPage =
-    isGridmaster ||
-    isSuperAdmin ||
-    (role === "admin" && canAccessSettings);
-  const isBillingRecoverySection =
-    searchParams.get("section") === "org-billing";
+    isGridmaster || isSuperAdmin || (role === "admin" && canAccessSettings);
+  const isBillingRecoverySection = searchParams.get("section") === "org-billing";
   const shouldCheckBillingRecovery =
     !permissionsLoading &&
     isBillingRecoverySection &&
@@ -77,26 +74,37 @@ function SettingsPageContent() {
     enabled: shouldCheckBillingRecovery,
     staleTime: 30_000,
   });
-  const isCheckingBillingRecovery =
-    shouldCheckBillingRecovery && billingRecoveryQuery.isLoading;
+  const isCheckingBillingRecovery = shouldCheckBillingRecovery && billingRecoveryQuery.isLoading;
   const billingRecoveryOrgId =
-    billingRecoveryQuery.data?.billingAccess.isLocked === true
-      ? orgId
-      : null;
+    billingRecoveryQuery.data?.billingAccess.isLocked === true ? orgId : null;
   const {
-    org, focusAreas, absenceTypes, shiftCategories, jobs, indicatorTypes,
-    certifications, orgRoles, departments, coverageRequirements, loading, loadError,
-    setOrg, setFocusAreas, handleAbsenceTypesChange, setShiftCategories,
-    setJobs, setIndicatorTypes, handleCertificationsChange, setOrgRoles, setDepartments, setCoverageRequirements,
+    org,
+    focusAreas,
+    absenceTypes,
+    shiftCategories,
+    jobs,
+    indicatorTypes,
+    certifications,
+    orgRoles,
+    departments,
+    coverageRequirements,
+    loading,
+    loadError,
+    setOrg,
+    setFocusAreas,
+    handleAbsenceTypesChange,
+    setShiftCategories,
+    setJobs,
+    setIndicatorTypes,
+    handleCertificationsChange,
+    setOrgRoles,
+    setDepartments,
+    setCoverageRequirements,
   } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
-    enabled:
-      canViewSettingsPage &&
-      !isCheckingBillingRecovery &&
-      !billingRecoveryOrgId,
+    enabled: canViewSettingsPage && !isCheckingBillingRecovery && !billingRecoveryOrgId,
   });
-  const isLoading =
-    permissionsLoading || isCheckingBillingRecovery || loading || !org;
+  const isLoading = permissionsLoading || isCheckingBillingRecovery || loading || !org;
 
   useEffect(() => {
     if (!permissionsLoading && !canViewSettingsPage) {
@@ -116,7 +124,14 @@ function SettingsPageContent() {
 
   if (loadError && !org) {
     return (
-      <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif" }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
+        }}
+      >
         <p style={{ color: "var(--color-text-muted)" }}>{loadError}</p>
       </div>
     );

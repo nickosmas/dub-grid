@@ -1,13 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createReactNativeModule,
-  createSafeAreaContextModule,
-} from "../../../test/native";
+import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),
@@ -32,8 +27,7 @@ vi.mock("expo-router", async () => {
   const React = await import("react");
 
   return {
-    Redirect: ({ href }: { href: string }) =>
-      React.createElement("div", {}, `redirect:${href}`),
+    Redirect: ({ href }: { href: string }) => React.createElement("div", {}, `redirect:${href}`),
     router: {
       replace: routerReplace,
     },
@@ -289,9 +283,7 @@ describe("LoginScreen", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
 
-    expect(
-      await screen.findByText("Two-factor authentication"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Two-factor authentication")).toBeInTheDocument();
     expect(setSession).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText("Verification code"), {

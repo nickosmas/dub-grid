@@ -4,7 +4,13 @@ import { useCallback, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation, OrganizationRole } from "@/types";
 import { getEmployeeProfileHref } from "@/lib/profile-links";
-import { getInitials, getCertAbbr, getCertName, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
+import {
+  getInitials,
+  getCertAbbr,
+  getCertName,
+  getRoleAbbrs,
+  getEmployeeDisplayName,
+} from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -116,11 +122,7 @@ function StaffRowCells({
   const employmentAbbr = emp.employmentType === "part_time" ? "PT" : "FT";
   const employmentLabel = emp.employmentType === "part_time" ? "Part-time" : "Full-time";
   const statusLabel =
-    emp.status === "inactive"
-      ? "Inactive"
-      : emp.status === "removed"
-        ? "Removed"
-        : "Active";
+    emp.status === "inactive" ? "Inactive" : emp.status === "removed" ? "Removed" : "Active";
   const joinedLabel = emp.createdAt
     ? new Date(emp.createdAt).toLocaleDateString(undefined, {
         year: "numeric",
@@ -140,7 +142,13 @@ function StaffRowCells({
         >
           <div className="flex items-center gap-1" style={{ color: "var(--color-text-faint)" }}>
             {isReordering && (
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor" className="shrink-0">
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 14 14"
+                fill="currentColor"
+                className="shrink-0"
+              >
                 <rect x="3" y="2" width="2" height="2" rx="1" />
                 <rect x="9" y="2" width="2" height="2" rx="1" />
                 <rect x="3" y="6" width="2" height="2" rx="1" />
@@ -205,7 +213,9 @@ function StaffRowCells({
                 </span>
               )}
               {isYou && (
-                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">You</span>
+                <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">
+                  You
+                </span>
               )}
             </div>
             {(emp.email || emp.phone) && (
@@ -372,7 +382,16 @@ function StaffRowCells({
             visibility: isReordering ? "hidden" : "visible",
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="9 6 15 12 9 18" />
           </svg>
         </div>
@@ -382,13 +401,7 @@ function StaffRowCells({
 }
 
 export function StaffTableRow(props: StaffTableRowProps) {
-  const {
-    emp,
-    isExpanded,
-    isReordering,
-    isDragging,
-    onRowClick,
-  } = props;
+  const { emp, isExpanded, isReordering, isDragging, onRowClick } = props;
 
   return (
     <TableRow
@@ -398,7 +411,9 @@ export function StaffTableRow(props: StaffTableRowProps) {
       onClick={!isReordering ? () => onRowClick(emp.id) : undefined}
       style={{
         borderLeft: isExpanded ? "3px solid var(--color-control-primary)" : "3px solid transparent",
-        boxShadow: isExpanded ? "inset 0 1px 0 var(--color-control-active-border), inset 0 -1px 0 var(--color-control-active-border)" : undefined,
+        boxShadow: isExpanded
+          ? "inset 0 1px 0 var(--color-control-active-border), inset 0 -1px 0 var(--color-control-active-border)"
+          : undefined,
       }}
     >
       <StaffRowCells {...props} variant="table" />
@@ -440,7 +455,9 @@ export function StaffReorderListRow({
       data-drag-phase={isDragging ? dragPhase : undefined}
       data-moving={!isDragging && dragOffsetY !== 0 ? "true" : undefined}
       draggable={false}
-      onPointerDown={onReorderPointerDown ? (event) => onReorderPointerDown(event, globalIndex) : undefined}
+      onPointerDown={
+        onReorderPointerDown ? (event) => onReorderPointerDown(event, globalIndex) : undefined
+      }
       onPointerMove={onReorderPointerMove}
       onPointerUp={onReorderPointerEnd}
       onPointerCancel={onReorderPointerCancel}

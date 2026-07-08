@@ -6,9 +6,8 @@ const requireAuthenticatedUser = vi.fn();
 const checkRateLimit = vi.fn();
 const resolveEffectiveOrgId = vi.fn();
 const createRequestSupabaseClient = vi.fn();
-const apiErrorResponse = vi.fn(
-  (_err: unknown, fallback: string, status: number) =>
-    NextResponse.json({ error: fallback }, { status }),
+const apiErrorResponse = vi.fn((_err: unknown, fallback: string, status: number) =>
+  NextResponse.json({ error: fallback }, { status }),
 );
 
 vi.mock("@/lib/csrf", () => ({
@@ -16,8 +15,7 @@ vi.mock("@/lib/csrf", () => ({
 }));
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
-  createRequestSupabaseClient: (req: NextRequest) =>
-    createRequestSupabaseClient(req),
+  createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
 }));
 vi.mock("@/lib/rate-limit", () => ({
   apiLimiter: {},
@@ -97,11 +95,7 @@ describe("POST /api/organizations/role-change", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(resolveEffectiveOrgId).toHaveBeenCalledWith(
-      expect.anything(),
-      USER_ID,
-      ORG_ID,
-    );
+    expect(resolveEffectiveOrgId).toHaveBeenCalledWith(expect.anything(), USER_ID, ORG_ID);
     expect(rpc).toHaveBeenCalledWith(
       "change_user_role",
       expect.objectContaining({

@@ -1,12 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef } from "react";
-import {
-  Pressable,
-  StyleSheet,
-  TextInput,
-  type TextInputProps,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, TextInput, type TextInputProps, View } from "react-native";
 import { mobileColors, mobileRadii } from "../theme/tokens";
 
 const DEFAULT_DEBOUNCE_MS = 300;
@@ -72,11 +66,7 @@ export function SearchBar({
           hitSlop={10}
           onPress={() => onChangeText("")}
         >
-          <Ionicons
-            color={mobileColors.textMuted}
-            name="close-circle"
-            size={18}
-          />
+          <Ionicons color={mobileColors.textMuted} name="close-circle" size={18} />
         </Pressable>
       ) : null}
     </View>

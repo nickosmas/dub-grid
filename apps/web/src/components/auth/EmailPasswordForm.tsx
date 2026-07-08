@@ -31,10 +31,7 @@ export function EmailPasswordForm({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <form
-      onSubmit={onSubmit}
-      style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-    >
+    <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div>
         <label htmlFor="auth-email" className="dg-auth-field-label">
           Email
@@ -85,11 +82,7 @@ export function EmailPasswordForm({
         className="dg-auth-submit"
         style={{ marginTop: "4px" }}
       >
-        <ButtonLoading
-          loading={loading}
-          spinnerColor="var(--color-text-inverse)"
-          spinnerSize={28}
-        >
+        <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>
           {submitLabel}
         </ButtonLoading>
       </button>

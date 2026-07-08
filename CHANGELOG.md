@@ -9,6 +9,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+
 - **Trial activation + welcome flow** — 14-day trial clock starts on the first super_admin login via the idempotent `start_trial_for_org` RPC; `/api/auth/start-trial` calls it after a successful login; `/api/trial-welcome` sends a welcome email via Resend and controls whether the welcome modal is shown; `trial_started_at` records the activation timestamp; `trial_pending` billing state gates non-super-admins from accessing the app before the trial is active.
 - **Org soft-delete (Danger Zone) and archived_at access revocation** — super_admins can delete their own organization from Settings → Danger Zone; `/api/organizations/delete` marks the org archived, cancels the Stripe subscription, and writes an audit entry; `archived_at` now revokes access in middleware, `get_my_organizations`, the JWT hook, and `switch_org`; deletions are reversible by a gridmaster.
 - **Post-login soft nav, AuthSplash, and resilient logout** — login redirects via soft `router.replace("/dashboard")` rather than `window.location`; `markAuthTransition()` flag plus the `<AuthSplash>` bridge prevent `ProtectedRoute` from bouncing to `/login` during the auth-settle gap; logout always redirects to `/login` in a `finally` block with no splash.
@@ -44,6 +45,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Org-scoped constraint on the `notifications` table.
 
 ### Changed
+
 - **Supabase auth rate limits raised** — `sign_in_sign_ups` 30 to 200 per 5min per IP, `token_refresh` 150 to 1000 per 5min per IP (required because login/refresh runs server-side through shared Vercel egress IPs); updated in `supabase/config.toml` for local dev. **Production deploy requires manually updating Supabase Dashboard → Authentication → Rate Limits to match.**
 - Admin permissions expanded to **25** (from 24): added `canEditScheduleIndicators`, `canViewScheduleDefinitions`, `canManageScheduleDefinitions`; `schedule_notes` RLS now gates on `canEditScheduleIndicators`.
 - `complete_onboarding` is now idempotent; `change_user_role` hard-blocks self-role-change (raises `P0001`); `get_my_organizations` returns `workspace_kind` and filters archived memberships.
@@ -55,6 +57,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Per-person permissions model confirmed: a member's permissions are stored as `admin_permissions` JSONB on `organization_memberships` (set per-person on the People page); departments do not grant permissions.
 
 ### Security
+
 - `org_id` safety clauses on all UPDATE queries prevent cross-org mutations.
 - Self-role-change is hard-blocked at the database (`change_user_role` raises `P0001`).
 - Custom time format validation prevents malformed schedule data.
@@ -67,6 +70,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.1.0] — 2026-04-05
 
 ### Added
+
 - Department hierarchy: two-type model (scheduled + management)
   - Scheduled departments contain focus areas as children
   - Management departments for non-schedule staff (HR, admin)
@@ -86,6 +90,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Publish history with JSONB change tracking
 
 ### Security
+
 - org_id safety clauses on all UPDATE queries prevent cross-org mutations
 - Schedule-cell `org_id` changed from nullable to NOT NULL
 - Custom time format validation prevents malformed schedule data
@@ -95,6 +100,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.0.1] — 2026-03-01
 
 ### Added
+
 - Initial release: multi-tenant scheduling platform
 - Four-tier RBAC (Gridmaster > Super Admin > Admin > User)
 - Schedule grid with 1-week, 2-week, and month views

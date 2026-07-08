@@ -3,7 +3,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Employee, FocusArea, NamedItem, Invitation, OrganizationRole, AdminPermissions } from "@/types";
+import {
+  Employee,
+  FocusArea,
+  NamedItem,
+  Invitation,
+  OrganizationRole,
+  AdminPermissions,
+} from "@/types";
 import { isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
@@ -104,8 +111,12 @@ export function StaffDetailPanel({
     "reinvite" | "revoke" | null
   >(null);
   const onCloseRef = useRef(onClose);
-  useEffect(() => { onCloseRef.current = onClose; });
-  const pendingInvitation = canManageEmployees ? pendingInviteByEmployeeId.get(employee.id) : undefined;
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+  const pendingInvitation = canManageEmployees
+    ? pendingInviteByEmployeeId.get(employee.id)
+    : undefined;
   const canEditEmployee = employee.status === "active" || employee.status === "inactive";
   const showInviteActions =
     canEditEmployee &&
@@ -113,8 +124,9 @@ export function StaffDetailPanel({
     !employee.userId &&
     Boolean(employee.email) &&
     Boolean(pendingInvitation || (orgId && onInvite));
-  const showManagementAccessAction =
-    Boolean(canManageManagementAccess && onManageManagementAccess && employee.status !== "removed");
+  const showManagementAccessAction = Boolean(
+    canManageManagementAccess && onManageManagementAccess && employee.status !== "removed",
+  );
   const showAccountAccessActions = showInviteActions || showManagementAccessAction;
   const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
 
@@ -179,11 +191,18 @@ export function StaffDetailPanel({
 
   return createPortal(
     <>
-      <div className={`staff-detail-overlay${closing ? " closing" : ""}`} onClick={handleRequestClose} />
+      <div
+        className={`staff-detail-overlay${closing ? " closing" : ""}`}
+        onClick={handleRequestClose}
+      />
       <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
         {/* Panel header */}
         <div className="staff-detail-header">
-          <button className="staff-detail-close" onClick={handleRequestClose} aria-label="Close detail panel">
+          <button
+            className="staff-detail-close"
+            onClick={handleRequestClose}
+            aria-label="Close detail panel"
+          >
             <svg
               width="15"
               height="15"
@@ -200,7 +219,9 @@ export function StaffDetailPanel({
           </button>
 
           {/* Profile card area */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", paddingTop: 4 }}>
+          <div
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", paddingTop: 4 }}
+          >
             <div
               style={{
                 width: 44,
@@ -221,7 +242,17 @@ export function StaffDetailPanel({
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: "var(--dg-fs-body)", color: "var(--color-text-primary)", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span
+                  style={{
+                    fontWeight: 700,
+                    fontSize: "var(--dg-fs-body)",
+                    color: "var(--color-text-primary)",
+                    letterSpacing: "-0.01em",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {getEmployeeDisplayName(employee)}
                 </span>
                 <StatusPill
@@ -234,12 +265,26 @@ export function StaffDetailPanel({
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 2 }}>
                 {employee.email && (
-                  <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <span
+                    style={{
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-text-muted)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {employee.email}
                   </span>
                 )}
                 {employee.phone && (
-                  <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-faint)", flexShrink: 0 }}>
+                  <span
+                    style={{
+                      fontSize: "var(--dg-fs-footnote)",
+                      color: "var(--color-text-faint)",
+                      flexShrink: 0,
+                    }}
+                  >
                     {employee.phone}
                   </span>
                 )}
@@ -258,7 +303,16 @@ export function StaffDetailPanel({
                 }}
               >
                 View full profile
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="9 6 15 12 9 18" />
                 </svg>
               </Link>
@@ -392,7 +446,8 @@ export function StaffDetailPanel({
                   </div>
                 </div>
               ) : (
-                showInviteActions && onInvite && (
+                showInviteActions &&
+                onInvite && (
                   <button
                     onClick={() => onInvite(employee)}
                     className="dg-btn dg-btn-secondary"
@@ -424,7 +479,9 @@ export function StaffDetailPanel({
                   className="dg-btn dg-btn-secondary"
                   style={{ width: "100%" }}
                 >
-                  {hasManagementAccess || hasPendingManagementInvite ? "Edit Management Access" : "Add to Management"}
+                  {hasManagementAccess || hasPendingManagementInvite
+                    ? "Edit Management Access"
+                    : "Add to Management"}
                 </button>
               )}
               <MemberAccessControls
@@ -439,7 +496,13 @@ export function StaffDetailPanel({
         </div>
 
         {/* Sticky bottom actions */}
-        <div style={{ flexShrink: 0, padding: "16px 24px", borderTop: "1px solid var(--color-border-light)" }}>
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "16px 24px",
+            borderTop: "1px solid var(--color-border-light)",
+          }}
+        >
           {canEditEmployee ? (
             <EditorActionRow
               secondaryAction={
@@ -470,15 +533,12 @@ export function StaffDetailPanel({
             />
           )}
         </div>
-
       </div>
       {unsavedChangesDialog}
       {pendingInvitationAction && pendingInvitation && (
         <ConfirmDialog
           title={
-            pendingInvitationAction === "reinvite"
-              ? "Reissue Invitation?"
-              : "Revoke Invitation?"
+            pendingInvitationAction === "reinvite" ? "Reissue Invitation?" : "Revoke Invitation?"
           }
           message={
             pendingInvitationAction === "reinvite"
@@ -486,9 +546,7 @@ export function StaffDetailPanel({
               : `Revoke the pending invitation for ${pendingInvitation.email}? The current invite link will stop working.`
           }
           confirmLabel={
-            pendingInvitationAction === "reinvite"
-              ? "Reissue Invitation"
-              : "Revoke Invitation"
+            pendingInvitationAction === "reinvite" ? "Reissue Invitation" : "Revoke Invitation"
           }
           variant={pendingInvitationAction === "reinvite" ? "warning" : "danger"}
           isLoading={revokingInvite}
@@ -501,6 +559,6 @@ export function StaffDetailPanel({
         />
       )}
     </>,
-    document.body
+    document.body,
   );
 }

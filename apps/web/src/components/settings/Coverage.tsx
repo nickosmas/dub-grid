@@ -12,7 +12,11 @@ import type {
 } from "@/types";
 import { saveCoverageRequirements } from "@/features/settings/client";
 import { buildShiftDisplayParts, getQualificationSeniorityRank } from "@/lib/assignable-shifts";
-import { getJobPlacementShiftPool, resolveJobColorsForShift, resolveJobTimesForShift } from "@/lib/job-placement";
+import {
+  getJobPlacementShiftPool,
+  resolveJobColorsForShift,
+  resolveJobTimesForShift,
+} from "@/lib/job-placement";
 import { isRegularStaffSystemJob } from "@/lib/system-jobs";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -35,7 +39,10 @@ type CoverageOptionSection = {
   isShiftless: boolean;
 };
 
-function requirementKey(focusAreaId: number, option: Pick<AssignableShiftOption, "jobId" | "shiftId">): string {
+function requirementKey(
+  focusAreaId: number,
+  option: Pick<AssignableShiftOption, "jobId" | "shiftId">,
+): string {
   return `${focusAreaId}:${option.jobId}:${option.shiftId ?? "null"}`;
 }
 
@@ -56,8 +63,7 @@ function buildDraft(
 ): CoverageDraft {
   const matching = requirements.filter(
     (requirement) =>
-      requirement.focusAreaId === focusAreaId &&
-      requirementMatchesOption(requirement, option),
+      requirement.focusAreaId === focusAreaId && requirementMatchesOption(requirement, option),
   );
 
   if (matching.length === 0) {
@@ -77,9 +83,10 @@ function buildDraft(
 
   return {
     everyDay: false,
-    values: Array.from({ length: 7 }, (_, index) => (
-      matching.find((requirement) => requirement.dayOfWeek === index)?.minStaff ?? 0
-    )),
+    values: Array.from(
+      { length: 7 },
+      (_, index) => matching.find((requirement) => requirement.dayOfWeek === index)?.minStaff ?? 0,
+    ),
   };
 }
 
@@ -136,7 +143,9 @@ function CoveragePreview({ draft }: { draft: CoverageDraft }) {
   if (activeDays.length === 0) return <span style={emptyStyle}>No requirement</span>;
 
   return (
-    <span style={{ display: "inline-flex", flexWrap: "wrap", gap: "4px 12px", alignItems: "baseline" }}>
+    <span
+      style={{ display: "inline-flex", flexWrap: "wrap", gap: "4px 12px", alignItems: "baseline" }}
+    >
       {activeDays.map((entry) => (
         <span key={entry.index} style={{ display: "inline-flex", alignItems: "baseline", gap: 4 }}>
           <span style={labelStyle}>{DAY_NAMES[entry.index]}</span>
@@ -183,7 +192,9 @@ function buildCoverageOptions(args: {
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
   const activeShifts = shiftCategories.filter((shift) => !shift.archivedAt);
   const activeJobs = jobs.filter((job) => !job.archivedAt && !isRegularStaffSystemJob(job));
-  const focusAreaNameById = new Map(activeFocusAreas.map((focusArea) => [focusArea.id, focusArea.name]));
+  const focusAreaNameById = new Map(
+    activeFocusAreas.map((focusArea) => [focusArea.id, focusArea.name]),
+  );
   const options: AssignableShiftOption[] = [];
 
   for (const job of activeJobs) {
@@ -205,7 +216,8 @@ function buildCoverageOptions(args: {
           shiftId: shift.id,
           jobId: job.id,
           focusAreaId: shift.focusAreaId ?? null,
-          focusAreaName: shift.focusAreaId != null ? (focusAreaNameById.get(shift.focusAreaId) ?? null) : null,
+          focusAreaName:
+            shift.focusAreaId != null ? (focusAreaNameById.get(shift.focusAreaId) ?? null) : null,
           shiftName: shift.name,
           shiftAbbr: shift.abbr ?? null,
           jobName: job.name,
@@ -325,7 +337,10 @@ function CoverageOptionRow({
   const panelId = React.useId();
 
   return (
-    <div className="dg-list-row" style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}>
+    <div
+      className="dg-list-row"
+      style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}
+    >
       <button
         type="button"
         className="dg-hover-row"
@@ -347,14 +362,27 @@ function CoverageOptionRow({
         onClick={() => setExpanded((previous) => !previous)}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+            }}
+          >
             {getCoverageRowTitle(option)}
           </div>
           <div style={{ marginTop: 4 }}>
             <CoveragePreview draft={draft} />
           </div>
         </div>
-        <span style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-faint)", transform: expanded ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
+        <span
+          style={{
+            fontSize: "var(--dg-fs-body-sm)",
+            color: "var(--color-text-faint)",
+            transform: expanded ? "rotate(180deg)" : "none",
+            transition: "transform 150ms ease",
+          }}
+        >
           ▾
         </span>
       </button>
@@ -375,7 +403,15 @@ function CoverageOptionRow({
           onClick={(event) => event.stopPropagation()}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
               <input
                 type="checkbox"
                 checked={draft.everyDay}
@@ -383,7 +419,11 @@ function CoverageOptionRow({
                   if (event.target.checked) {
                     onDraftChange({
                       everyDay: true,
-                      values: [draft.everyDay ? draft.values[0] ?? 0 : draft.values[1] ?? draft.values[0] ?? 0],
+                      values: [
+                        draft.everyDay
+                          ? (draft.values[0] ?? 0)
+                          : (draft.values[1] ?? draft.values[0] ?? 0),
+                      ],
                     });
                     return;
                   }
@@ -400,7 +440,15 @@ function CoverageOptionRow({
 
           {draft.everyDay ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <label style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              <label
+                style={{
+                  fontSize: "var(--dg-fs-caption)",
+                  fontWeight: 700,
+                  color: "var(--color-text-muted)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                }}
+              >
                 Minimum Staff
               </label>
               <input
@@ -408,16 +456,40 @@ function CoverageOptionRow({
                 min={0}
                 max={999}
                 value={draft.values[0] ?? 0}
-                onChange={(event) => onDraftChange({ everyDay: true, values: [Math.max(0, Math.min(999, Number(event.target.value) || 0))] })}
-                style={{ width: 72, padding: "6px 8px", borderRadius: 8, border: "1px solid var(--color-border)", textAlign: "center" }}
+                onChange={(event) =>
+                  onDraftChange({
+                    everyDay: true,
+                    values: [Math.max(0, Math.min(999, Number(event.target.value) || 0))],
+                  })
+                }
+                style={{
+                  width: 72,
+                  padding: "6px 8px",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-border)",
+                  textAlign: "center",
+                }}
                 disabled={!canEdit}
               />
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
+            <div
+              style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}
+            >
               {DAY_NAMES.map((day, index) => (
-                <label key={`${option.id}-${day}`} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <span style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                <label
+                  key={`${option.id}-${day}`}
+                  style={{ display: "flex", flexDirection: "column", gap: 6 }}
+                >
+                  <span
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      fontWeight: 700,
+                      color: "var(--color-text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
                     {day}
                   </span>
                   <input
@@ -427,10 +499,19 @@ function CoverageOptionRow({
                     value={draft.values[index] ?? 0}
                     onChange={(event) => {
                       const nextValues = [...draft.values];
-                      nextValues[index] = Math.max(0, Math.min(999, Number(event.target.value) || 0));
+                      nextValues[index] = Math.max(
+                        0,
+                        Math.min(999, Number(event.target.value) || 0),
+                      );
                       onDraftChange({ everyDay: false, values: nextValues });
                     }}
-                    style={{ width: "100%", padding: "6px 8px", borderRadius: 8, border: "1px solid var(--color-border)", textAlign: "center" }}
+                    style={{
+                      width: "100%",
+                      padding: "6px 8px",
+                      borderRadius: 8,
+                      border: "1px solid var(--color-border)",
+                      textAlign: "center",
+                    }}
                     disabled={!canEdit}
                   />
                 </label>
@@ -487,7 +568,8 @@ function FocusAreaCoverageCard({
   const isDirty = serializeDrafts(drafts) !== initialKey;
 
   const draftFor = (option: AssignableShiftOption): CoverageDraft =>
-    drafts[requirementKey(focusArea.id, option)] ?? initialDrafts[requirementKey(focusArea.id, option)];
+    drafts[requirementKey(focusArea.id, option)] ??
+    initialDrafts[requirementKey(focusArea.id, option)];
 
   const handleDiscard = () => setDrafts(initialDrafts);
 
@@ -518,7 +600,9 @@ function FocusAreaCoverageCard({
       );
 
       onBatchSaved(focusArea.id, results);
-      toast.success(results.length > 1 ? "Coverage requirements saved" : "Coverage requirement saved");
+      toast.success(
+        results.length > 1 ? "Coverage requirements saved" : "Coverage requirement saved",
+      );
     } catch (error) {
       Sentry.captureException(error);
       toast.error("Failed to save coverage requirements");
@@ -528,8 +612,23 @@ function FocusAreaCoverageCard({
   };
 
   return (
-    <div style={{ background: "var(--color-surface)", borderRadius: "var(--dg-radius-md)", border: "1px solid var(--color-border)", overflow: "hidden" }}>
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", fontWeight: 700, fontSize: "var(--dg-fs-label)", color: "var(--color-text-secondary)" }}>
+    <div
+      style={{
+        background: "var(--color-surface)",
+        borderRadius: "var(--dg-radius-md)",
+        border: "1px solid var(--color-border)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "12px 16px",
+          borderBottom: "1px solid var(--color-border-light)",
+          fontWeight: 700,
+          fontSize: "var(--dg-fs-label)",
+          color: "var(--color-text-secondary)",
+        }}
+      >
         {focusArea.name}
       </div>
 
@@ -544,9 +643,29 @@ function FocusAreaCoverageCard({
         <>
           <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
             {sections.map((section) => (
-              <div key={`${focusArea.id}-${section.key}`} style={{ border: "1px solid var(--color-border-light)", borderRadius: "var(--dg-radius-lg)", overflow: "hidden" }}>
-                <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--color-border-light)" }}>
-                  <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+              <div
+                key={`${focusArea.id}-${section.key}`}
+                style={{
+                  border: "1px solid var(--color-border-light)",
+                  borderRadius: "var(--dg-radius-lg)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderBottom: "1px solid var(--color-border-light)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      fontWeight: 700,
+                      color: "var(--color-text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                    }}
+                  >
                     {section.title}
                   </div>
                 </div>
@@ -573,16 +692,26 @@ function FocusAreaCoverageCard({
 
           <div style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}>
             <EditorActionRow
-              secondaryAction={isDirty ? (
-                <button onClick={handleDiscard} disabled={saving} className="dg-btn dg-btn-secondary dg-btn-sm">
-                  {EDITOR_ACTION_LABELS.discard}
-                </button>
-              ) : null}
-              primaryAction={(
-                <button onClick={handleSave} disabled={saving || !canEdit || !isDirty} className="dg-btn dg-btn-primary dg-btn-sm">
+              secondaryAction={
+                isDirty ? (
+                  <button
+                    onClick={handleDiscard}
+                    disabled={saving}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                  >
+                    {EDITOR_ACTION_LABELS.discard}
+                  </button>
+                ) : null
+              }
+              primaryAction={
+                <button
+                  onClick={handleSave}
+                  disabled={saving || !canEdit || !isDirty}
+                  className="dg-btn dg-btn-primary dg-btn-sm"
+                >
                   {getEditorSaveLabel(saving)}
                 </button>
-              )}
+              }
             />
           </div>
         </>
@@ -616,14 +745,15 @@ export default function CoverageRequirementsSettings({
 }) {
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
   const assignableOptions = useMemo(
-    () => buildCoverageOptions({
-      shiftCategories,
-      jobs,
-      focusAreas,
-      orgRoles,
-      certifications,
-      shiftDisplayMode,
-    }),
+    () =>
+      buildCoverageOptions({
+        shiftCategories,
+        jobs,
+        focusAreas,
+        orgRoles,
+        certifications,
+        shiftDisplayMode,
+      }),
     [certifications, focusAreas, jobs, orgRoles, shiftCategories, shiftDisplayMode],
   );
   const coverageOptions = useMemo(
@@ -637,23 +767,26 @@ export default function CoverageRequirementsSettings({
         const localOptions = coverageOptions.filter(
           (option) => option.focusAreaId === focusArea.id,
         );
-        const sections = localOptions.reduce<Map<string, CoverageOptionSection>>((accumulator, option) => {
-          const key = getCoverageSectionKey(option);
-          const existing = accumulator.get(key);
-          if (existing) {
-            existing.options.push(option);
-            return accumulator;
-          }
+        const sections = localOptions.reduce<Map<string, CoverageOptionSection>>(
+          (accumulator, option) => {
+            const key = getCoverageSectionKey(option);
+            const existing = accumulator.get(key);
+            if (existing) {
+              existing.options.push(option);
+              return accumulator;
+            }
 
-          accumulator.set(key, {
-            key,
-            title: getCoverageSectionTitle(option),
-            options: [option],
-            sortOrder: option.groupSortOrder,
-            isShiftless: option.isShiftless,
-          });
-          return accumulator;
-        }, new Map());
+            accumulator.set(key, {
+              key,
+              title: getCoverageSectionTitle(option),
+              options: [option],
+              sortOrder: option.groupSortOrder,
+              isShiftless: option.isShiftless,
+            });
+            return accumulator;
+          },
+          new Map(),
+        );
 
         return [
           focusArea.id,
@@ -683,8 +816,7 @@ export default function CoverageRequirementsSettings({
       updated = updated.filter(
         (requirement) =>
           !(
-            requirement.focusAreaId === focusAreaId &&
-            requirementMatchesOption(requirement, option)
+            requirement.focusAreaId === focusAreaId && requirementMatchesOption(requirement, option)
           ),
       );
     }
@@ -697,9 +829,11 @@ export default function CoverageRequirementsSettings({
       <EmptyState
         size="compact"
         title={activeFocusAreas.length === 0 ? "No focus areas yet" : "No coverage targets yet"}
-        description={activeFocusAreas.length === 0
-          ? "Create focus areas first to configure coverage."
-          : "Create shifts or scheduled jobs first so coverage can target the staffing demand you want to track."}
+        description={
+          activeFocusAreas.length === 0
+            ? "Create focus areas first to configure coverage."
+            : "Create shifts or scheduled jobs first so coverage can target the staffing demand you want to track."
+        }
       />
     );
   }

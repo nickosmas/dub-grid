@@ -78,8 +78,8 @@ export default function DangerZone({ organization }: DangerZoneProps) {
               lineHeight: 1.5,
             }}
           >
-            Closing {organization.name} cancels its subscription and removes access for
-            every member. Reach out to support if you need it restored.
+            Closing {organization.name} cancels its subscription and removes access for every
+            member. Reach out to support if you need it restored.
           </p>
         </div>
         <div
@@ -95,9 +95,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
             onClick={() => setConfirmOpen(true)}
             disabled={isInSandbox}
             title={
-              isInSandbox
-                ? "Deleting the organization isn't available in sandbox mode."
-                : undefined
+              isInSandbox ? "Deleting the organization isn't available in sandbox mode." : undefined
             }
           >
             Delete organization
@@ -117,8 +115,8 @@ export default function DangerZone({ organization }: DangerZoneProps) {
           message={
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <span>
-                This cancels billing and removes access for everyone in {organization.name}.
-                This cannot be undone from here.
+                This cancels billing and removes access for everyone in {organization.name}. This
+                cannot be undone from here.
               </span>
               <label className="dg-label" htmlFor="danger-confirm-input">
                 Type <strong>{confirmPhrase}</strong> to confirm

@@ -9,10 +9,7 @@ vi.mock("./supabase", () => ({
 describe("mobileApiRequest", () => {
   beforeEach(() => {
     createEphemeralSupabaseClient.mockReset();
-    vi.stubEnv(
-      "EXPO_PUBLIC_SUPABASE_URL",
-      "https://example-project.supabase.co",
-    );
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://example-project.supabase.co");
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "https://app.dubgrid.com");
   });
@@ -224,12 +221,7 @@ describe("mobileApiRequest", () => {
     const { mobileApiRequest } = await import("./api");
 
     await expect(
-      mobileApiRequest(
-        "/api/mobile/v1/ping",
-        "token-123",
-        { method: "GET" },
-        (value) => value,
-      ),
+      mobileApiRequest("/api/mobile/v1/ping", "token-123", { method: "GET" }, (value) => value),
     ).rejects.toThrow("Forbidden");
   });
 
@@ -283,8 +275,7 @@ describe("mobileApiRequest", () => {
         throw new Error("Unexpected token <");
       },
       headers: {
-        get: (name: string) =>
-          name === "content-type" ? "text/html; charset=utf-8" : null,
+        get: (name: string) => (name === "content-type" ? "text/html; charset=utf-8" : null),
       },
     });
 
@@ -510,15 +501,11 @@ describe("mobileApiRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { updateMobilePersonStatus } = await import("./api");
 
-    await updateMobilePersonStatus(
-      "token-123",
-      "00000000-0000-0000-0000-000000000001",
-      {
-        action: "deactivate",
-        expectedVersion: 7,
-        note: "Coverage hold",
-      },
-    );
+    await updateMobilePersonStatus("token-123", "00000000-0000-0000-0000-000000000001", {
+      action: "deactivate",
+      expectedVersion: 7,
+      note: "Coverage hold",
+    });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://app.dubgrid.com/api/mobile/v1/people/00000000-0000-0000-0000-000000000001/status",
@@ -560,10 +547,7 @@ describe("mobileApiRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { getMobilePerson } = await import("./api");
 
-    const result = await getMobilePerson(
-      "token-123",
-      "00000000-0000-0000-0000-000000000001",
-    );
+    const result = await getMobilePerson("token-123", "00000000-0000-0000-0000-000000000001");
 
     expect(result.person.id).toBe("00000000-0000-0000-0000-000000000001");
     expect(fetchMock).toHaveBeenCalledWith(
@@ -627,27 +611,17 @@ describe("mobileApiRequest", () => {
       revokeMobilePersonInvitation,
     } = await import("./api");
 
-    await createMobilePersonInvitation(
-      "token-123",
-      "00000000-0000-0000-0000-000000000001",
-      { email: "mina@dubgrid.com" },
-    );
-    await resendMobilePersonInvitation(
-      "token-123",
-      "00000000-0000-0000-0000-000000000001",
-      {
-        invitationId: "11111111-1111-4111-8111-111111111111",
-        expectedUpdatedAt: "2026-04-28T00:00:00.000Z",
-      },
-    );
-    await revokeMobilePersonInvitation(
-      "token-123",
-      "00000000-0000-0000-0000-000000000001",
-      {
-        invitationId: "11111111-1111-4111-8111-111111111111",
-        expectedUpdatedAt: "2026-04-28T01:00:00.000Z",
-      },
-    );
+    await createMobilePersonInvitation("token-123", "00000000-0000-0000-0000-000000000001", {
+      email: "mina@dubgrid.com",
+    });
+    await resendMobilePersonInvitation("token-123", "00000000-0000-0000-0000-000000000001", {
+      invitationId: "11111111-1111-4111-8111-111111111111",
+      expectedUpdatedAt: "2026-04-28T00:00:00.000Z",
+    });
+    await revokeMobilePersonInvitation("token-123", "00000000-0000-0000-0000-000000000001", {
+      invitationId: "11111111-1111-4111-8111-111111111111",
+      expectedUpdatedAt: "2026-04-28T01:00:00.000Z",
+    });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -689,24 +663,19 @@ describe("mobileApiRequest", () => {
     });
 
     vi.stubGlobal("fetch", fetchMock);
-    const { createMobilePersonInvitation, parseMobileNameMismatchError } =
-      await import("./api");
+    const { createMobilePersonInvitation, parseMobileNameMismatchError } = await import("./api");
 
     let thrownError: unknown;
     try {
-      await createMobilePersonInvitation(
-        "token-123",
-        "00000000-0000-0000-0000-000000000001",
-        { email: "mina@dubgrid.com" },
-      );
+      await createMobilePersonInvitation("token-123", "00000000-0000-0000-0000-000000000001", {
+        email: "mina@dubgrid.com",
+      });
     } catch (error) {
       thrownError = error;
     }
 
     expect(thrownError).toBeInstanceOf(Error);
-    expect((thrownError as Error).message).toContain(
-      "The user account name does not match",
-    );
+    expect((thrownError as Error).message).toContain("The user account name does not match");
     expect(parseMobileNameMismatchError(thrownError)?.details).toMatchObject({
       accountFirstName: "Minnie",
       employeeFirstName: "Mina",
@@ -718,21 +687,17 @@ describe("mobileApiRequest", () => {
     const { parseMobileAccountLinkChallenge } = await import("./api");
 
     const challenge = parseMobileAccountLinkChallenge(
-      new ApiResponseError(
-        "An existing account was found for this email.",
-        409,
-        {
-          code: "ACCOUNT_FOUND",
-          details: {
-            employeeId: "00000000-0000-0000-0000-000000000001",
-            userId: "22222222-2222-4222-8222-222222222222",
-            employeeFirstName: "Mina",
-            employeeLastName: "Diaz",
-            accountFirstName: "Mina",
-            accountLastName: "Diaz",
-          },
+      new ApiResponseError("An existing account was found for this email.", 409, {
+        code: "ACCOUNT_FOUND",
+        details: {
+          employeeId: "00000000-0000-0000-0000-000000000001",
+          userId: "22222222-2222-4222-8222-222222222222",
+          employeeFirstName: "Mina",
+          employeeLastName: "Diaz",
+          accountFirstName: "Mina",
+          accountLastName: "Diaz",
         },
-      ),
+      }),
     );
 
     expect(challenge).toEqual({

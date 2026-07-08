@@ -26,11 +26,7 @@ import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
@@ -51,7 +47,6 @@ function formatStatusLabel(status: MobilePerson["status"]): string {
   return status === "active" ? "Active" : "Inactive";
 }
 
-
 export default function PeopleScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
@@ -60,14 +55,13 @@ export default function PeopleScreen() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const [sortMode, setSortMode] = useState<SortMode>("seniority");
   const [focusFilterId, setFocusFilterId] = useState<number | "all">("all");
-  const [managementDepartmentFilterId, setManagementDepartmentFilterId] =
-    useState<number | "all">("all");
+  const [managementDepartmentFilterId, setManagementDepartmentFilterId] = useState<number | "all">(
+    "all",
+  );
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [profileRequestConfirmation, setProfileRequestConfirmation] =
     useState<ProfileRequestConfirmation>(null);
-  const canManageEmployees = Boolean(
-    bootstrapQuery.data?.permissions.canManageEmployees,
-  );
+  const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const peopleQuery = useQuery({
     queryKey: ["mobile", "people", accessToken],
     queryFn: () => getPeople(accessToken!),
@@ -79,19 +73,13 @@ export default function PeopleScreen() {
     enabled: Boolean(accessToken) && canManageEmployees,
   });
   const resolveRequestMutation = useMutation({
-    mutationFn: ({
-      requestId,
-      action,
-    }: {
-      requestId: string;
-      action: "approve" | "reject";
-    }) => updateProfileChangeRequest(accessToken!, requestId, { action }),
+    mutationFn: ({ requestId, action }: { requestId: string; action: "approve" | "reject" }) =>
+      updateProfileChangeRequest(accessToken!, requestId, { action }),
     onSuccess: async (_, variables) => {
       await Promise.all([profileRequestsQuery.refetch(), peopleQuery.refetch()]);
       pushToast({
         tone: "success",
-        title:
-          variables.action === "approve" ? "Request approved" : "Request rejected",
+        title: variables.action === "approve" ? "Request approved" : "Request rejected",
         message: "The profile request was updated.",
       });
     },
@@ -104,11 +92,7 @@ export default function PeopleScreen() {
     },
   });
   const manualRefresh = useManualRefresh(() =>
-    Promise.all([
-      peopleQuery.refetch(),
-      bootstrapQuery.refetch(),
-      profileRequestsQuery.refetch(),
-    ]),
+    Promise.all([peopleQuery.refetch(), bootstrapQuery.refetch(), profileRequestsQuery.refetch()]),
   );
   function clearFilters() {
     setFocusFilterId("all");
@@ -130,10 +114,7 @@ export default function PeopleScreen() {
   const focusAreaMap = useMemo(
     () =>
       new Map(
-        (bootstrapQuery.data?.focusAreas ?? []).map((focusArea) => [
-          focusArea.id,
-          focusArea.name,
-        ]),
+        (bootstrapQuery.data?.focusAreas ?? []).map((focusArea) => [focusArea.id, focusArea.name]),
       ),
     [bootstrapQuery.data?.focusAreas],
   );
@@ -163,28 +144,20 @@ export default function PeopleScreen() {
           person.email.toLowerCase().includes(normalizedSearch) ||
           person.phone.toLowerCase().includes(normalizedSearch);
 
-        const matchesStatus =
-          !canManageEmployees
-            ? true
-            : statusFilter === "active"
-              ? person.status === "active"
-              : person.status !== "active";
+        const matchesStatus = !canManageEmployees
+          ? true
+          : statusFilter === "active"
+            ? person.status === "active"
+            : person.status !== "active";
 
         const matchesFocus =
           focusFilterId === "all" ? true : person.focusAreaIds.includes(focusFilterId);
         const matchesManagementDepartment =
           managementDepartmentFilterId === "all"
             ? true
-            : getPersonManagementDepartmentIds(person).includes(
-                managementDepartmentFilterId,
-              );
+            : getPersonManagementDepartmentIds(person).includes(managementDepartmentFilterId);
 
-        return (
-          matchesSearch &&
-          matchesStatus &&
-          matchesFocus &&
-          matchesManagementDepartment
-        );
+        return matchesSearch && matchesStatus && matchesFocus && matchesManagementDepartment;
       })
       .sort((left, right) => {
         if (sortMode === "alphabetical") {
@@ -208,10 +181,7 @@ export default function PeopleScreen() {
     statusFilter,
   ]);
   const visiblePeople = useMemo(
-    () =>
-      canManageEmployees
-        ? people
-        : people.filter((person) => person.status === "active"),
+    () => (canManageEmployees ? people : people.filter((person) => person.status === "active")),
     [canManageEmployees, people],
   );
   const activeCount = visiblePeople.filter((person) => person.status === "active").length;
@@ -289,10 +259,7 @@ export default function PeopleScreen() {
             {managementDepartments.map((department) => (
               <SelectionRow
                 key={department.id}
-                detail={`${countPeopleInManagementDepartment(
-                  visiblePeople,
-                  department.id,
-                )} people`}
+                detail={`${countPeopleInManagementDepartment(visiblePeople, department.id)} people`}
                 label={department.name}
                 onPress={() => setManagementDepartmentFilterId(department.id)}
                 selected={managementDepartmentFilterId === department.id}
@@ -346,17 +313,10 @@ export default function PeopleScreen() {
             accessibilityState={{ expanded: isFilterModalVisible }}
             android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
             onPress={() => setIsFilterModalVisible(true)}
-            style={[
-              styles.filterButton,
-              activeFilterCount > 0 && styles.filterButtonActive,
-            ]}
+            style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]}
           >
             <Ionicons
-              color={
-                activeFilterCount > 0
-                  ? mobileColors.textInverse
-                  : mobileColors.textSecondary
-              }
+              color={activeFilterCount > 0 ? mobileColors.textInverse : mobileColors.textSecondary}
               name="options-outline"
               size={16}
             />
@@ -380,17 +340,12 @@ export default function PeopleScreen() {
             {profileRequests.map((request: MobileProfileChangeRequest, index: number) => (
               <View
                 key={request.id}
-                style={[
-                  styles.requestRow,
-                  index < profileRequests.length - 1 && styles.rowDivider,
-                ]}
+                style={[styles.requestRow, index < profileRequests.length - 1 && styles.rowDivider]}
               >
                 <View style={styles.requestCopy}>
                   <Text style={styles.personName}>{request.requesterName}</Text>
                   <Text style={styles.personSubtitle}>
-                    {request.type === "account_deletion"
-                      ? "Account deletion"
-                      : "Profile update"}
+                    {request.type === "account_deletion" ? "Account deletion" : "Profile update"}
                   </Text>
                 </View>
                 <View style={styles.requestActions}>
@@ -429,8 +384,7 @@ export default function PeopleScreen() {
           <Text style={styles.loadingTitle}>Loading directory</Text>
           <ListSkeleton rows={4} showSectionHeader={false} />
         </View>
-      ) : contentState.kind === "error" &&
-        contentState.reason === "unauthorized" ? (
+      ) : contentState.kind === "error" && contentState.reason === "unauthorized" ? (
         <StatusBanner
           body="Your current role does not include mobile staff visibility for this organization."
           fillScreen
@@ -491,8 +445,7 @@ export default function PeopleScreen() {
                   orgRole={person.orgRole}
                   onPress={() => {
                     const isSelf =
-                      (currentEmployeeId !== null &&
-                        person.id === currentEmployeeId) ||
+                      (currentEmployeeId !== null && person.id === currentEmployeeId) ||
                       (currentUserId !== null &&
                         person.userId !== null &&
                         person.userId === currentUserId);
@@ -523,9 +476,7 @@ export default function PeopleScreen() {
               ? "The change will be applied to this teammate's profile."
               : "The teammate's profile will stay as it is."
         }
-        confirmLabel={
-          profileRequestConfirmation?.action === "approve" ? "Approve" : "Reject"
-        }
+        confirmLabel={profileRequestConfirmation?.action === "approve" ? "Approve" : "Reject"}
         confirmTone={
           profileRequestConfirmation?.request.type === "account_deletion" &&
           profileRequestConfirmation.action === "approve"
@@ -538,9 +489,7 @@ export default function PeopleScreen() {
         onCancel={() => setProfileRequestConfirmation(null)}
         onConfirm={confirmProfileRequestAction}
         title={
-          profileRequestConfirmation?.action === "approve"
-            ? "Approve request?"
-            : "Reject request?"
+          profileRequestConfirmation?.action === "approve" ? "Approve request?" : "Reject request?"
         }
         visible={profileRequestConfirmation != null}
       />
@@ -556,18 +505,11 @@ function countPeopleInManagementDepartment(
   people: MobilePerson[],
   departmentId: MobileDepartment["id"],
 ): number {
-  return people.filter((person) =>
-    getPersonManagementDepartmentIds(person).includes(departmentId),
-  ).length;
+  return people.filter((person) => getPersonManagementDepartmentIds(person).includes(departmentId))
+    .length;
 }
 
-function SelectionSection({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function SelectionSection({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{label}</Text>
@@ -593,18 +535,13 @@ function SelectionRow({
       accessibilityState={{ selected }}
       android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.selectionRow,
-        pressed && styles.selectionRowPressed,
-      ]}
+      style={({ pressed }) => [styles.selectionRow, pressed && styles.selectionRowPressed]}
     >
       <View style={styles.selectionRowCopy}>
         <Text style={styles.selectionRowTitle}>{label}</Text>
         {detail ? <Text style={styles.selectionRowDetail}>{detail}</Text> : null}
       </View>
-      {selected ? (
-        <Ionicons color={mobileColors.brand} name="checkmark" size={20} />
-      ) : null}
+      {selected ? <Ionicons color={mobileColors.brand} name="checkmark" size={20} /> : null}
     </Pressable>
   );
 }
@@ -670,9 +607,7 @@ function PersonRow({
           },
         ]}
       >
-        <Text style={[styles.personAvatarText, { color: avatarTone.color }]}>
-          {initials}
-        </Text>
+        <Text style={[styles.personAvatarText, { color: avatarTone.color }]}>{initials}</Text>
       </View>
       <View style={styles.personCopy}>
         <View style={styles.personNameRow}>

@@ -50,18 +50,10 @@ export default function InactivityGuard() {
         You&rsquo;ll be signed out in {secondsRemaining} seconds due to inactivity.
       </p>
       <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          className="dg-btn dg-btn-secondary"
-          onClick={handleExpire}
-        >
+        <button type="button" className="dg-btn dg-btn-secondary" onClick={handleExpire}>
           Sign out now
         </button>
-        <button
-          type="button"
-          className="dg-btn dg-btn-primary"
-          onClick={handleStay}
-        >
+        <button type="button" className="dg-btn dg-btn-primary" onClick={handleStay}>
           Stay signed in
         </button>
       </div>

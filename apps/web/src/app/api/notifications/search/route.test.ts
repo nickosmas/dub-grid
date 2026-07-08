@@ -10,10 +10,8 @@ vi.mock("@/lib/csrf", () => ({
 }));
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
-    requireAuthenticatedUserWithClaims(req),
-  createRequestSupabaseClient: (req: NextRequest) =>
-    createRequestSupabaseClient(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
+  createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
 }));
 
 vi.mock("../route", () => ({
@@ -87,9 +85,7 @@ describe("POST /api/notifications/search org-scoping", () => {
 
     expect(builder.eq).toHaveBeenCalledWith("user_id", USER_ID);
     expect(builder.eq).toHaveBeenCalledWith("channel", "in_app");
-    expect(builder.or).toHaveBeenCalledWith(
-      `org_id.eq.${ORG_ID},org_id.is.null`,
-    );
+    expect(builder.or).toHaveBeenCalledWith(`org_id.eq.${ORG_ID},org_id.is.null`);
   });
 
   it("restricts to platform-only when the caller has no current org", async () => {
@@ -103,8 +99,6 @@ describe("POST /api/notifications/search org-scoping", () => {
     expect(response.status).toBe(200);
 
     expect(builder.is).toHaveBeenCalledWith("org_id", null);
-    expect(builder.or).not.toHaveBeenCalledWith(
-      expect.stringContaining("org_id.eq."),
-    );
+    expect(builder.or).not.toHaveBeenCalledWith(expect.stringContaining("org_id.eq."));
   });
 });

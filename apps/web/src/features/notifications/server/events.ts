@@ -192,10 +192,7 @@ export type NotificationEvent =
       removedDepartmentNames: string[];
     };
 
-async function getAdminsWithPermission(
-  orgId: string,
-  permission: string,
-): Promise<string[]> {
+async function getAdminsWithPermission(orgId: string, permission: string): Promise<string[]> {
   const db = getServiceClient();
 
   const { data: superAdmins } = await db
@@ -247,14 +244,10 @@ async function getAffectedEmployeeUserIds(
     .in("id", empIds)
     .not("user_id", "is", null);
 
-  return (employees ?? [])
-    .map((employee) => employee.user_id as string)
-    .filter(Boolean);
+  return (employees ?? []).map((employee) => employee.user_id as string).filter(Boolean);
 }
 
-async function getRequestInfo(
-  requestId: string,
-): Promise<{
+async function getRequestInfo(requestId: string): Promise<{
   requesterUserId: string | null;
   requesterName: string;
   targetUserId: string | null;
@@ -279,9 +272,7 @@ async function getRequestInfo(
 
   return {
     requesterUserId: requester?.user_id ?? null,
-    requesterName: requester
-      ? `${requester.first_name} ${requester.last_name}`
-      : "An employee",
+    requesterName: requester ? `${requester.first_name} ${requester.last_name}` : "An employee",
     targetUserId: target?.user_id ?? null,
     targetName: target ? `${target.first_name} ${target.last_name}` : "An employee",
     requestType:
@@ -340,11 +331,7 @@ async function getOrgSuperAdmins(orgId: string): Promise<string[]> {
 
 async function getEmployeeUserId(empId: string): Promise<string | null> {
   const db = getServiceClient();
-  const { data } = await db
-    .from("employees")
-    .select("user_id")
-    .eq("id", empId)
-    .maybeSingle();
+  const { data } = await db.from("employees").select("user_id").eq("id", empId).maybeSingle();
   return (data?.user_id as string | null) ?? null;
 }
 
@@ -377,14 +364,10 @@ async function getSeriesAffectedUserIds(seriesId: string): Promise<string[]> {
     .select("user_id")
     .in("id", [...empIds])
     .not("user_id", "is", null);
-  return (emps ?? [])
-    .map((emp) => emp.user_id as string)
-    .filter(Boolean);
+  return (emps ?? []).map((emp) => emp.user_id as string).filter(Boolean);
 }
 
-async function getAffectedUserIdsForEmpIds(
-  empIds: string[],
-): Promise<string[]> {
+async function getAffectedUserIdsForEmpIds(empIds: string[]): Promise<string[]> {
   if (empIds.length === 0) return [];
   const db = getServiceClient();
   const { data } = await db
@@ -395,9 +378,7 @@ async function getAffectedUserIdsForEmpIds(
   return (data ?? []).map((row) => row.user_id as string).filter(Boolean);
 }
 
-async function getInvitation(
-  invitationId: string,
-): Promise<{
+async function getInvitation(invitationId: string): Promise<{
   invitedBy: string | null;
   email: string | null;
   orgId: string | null;
@@ -418,11 +399,7 @@ async function getInvitation(
 
 async function getOrgName(orgId: string): Promise<string> {
   const db = getServiceClient();
-  const { data } = await db
-    .from("organizations")
-    .select("name")
-    .eq("id", orgId)
-    .maybeSingle();
+  const { data } = await db.from("organizations").select("name").eq("id", orgId).maybeSingle();
   return (data?.name as string | null) ?? "your organization";
 }
 
@@ -441,8 +418,7 @@ async function getOrgCopyLabels(orgId: string): Promise<OrgCopyLabels> {
     .maybeSingle();
   return {
     focusAreaLabel: (data?.focus_area_label as string | null) ?? "Focus Areas",
-    certificationLabel:
-      (data?.certification_label as string | null) ?? "Certifications",
+    certificationLabel: (data?.certification_label as string | null) ?? "Certifications",
     roleLabel: (data?.role_label as string | null) ?? "Roles",
   };
 }
@@ -456,10 +432,7 @@ function titleCaseWords(value: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function friendlyProfileFieldLabel(
-  key: string,
-  labels: OrgCopyLabels,
-): string {
+function friendlyProfileFieldLabel(key: string, labels: OrgCopyLabels): string {
   switch (key) {
     case "firstName":
       return "first name";
@@ -498,9 +471,7 @@ function joinWithAnd(items: string[]): string {
 }
 
 function capitalizeFirst(value: string): string {
-  return value.length > 0
-    ? `${value.charAt(0).toUpperCase()}${value.slice(1)}`
-    : value;
+  return value.length > 0 ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : value;
 }
 
 async function notifyShiftRequestApprovers(input: {
@@ -511,10 +482,7 @@ async function notifyShiftRequestApprovers(input: {
   title: string;
   message: string;
 }) {
-  const adminIds = await getAdminsWithPermission(
-    input.orgId,
-    "canApproveShiftRequests",
-  );
+  const adminIds = await getAdminsWithPermission(input.orgId, "canApproveShiftRequests");
 
   await Promise.all(
     adminIds
@@ -537,9 +505,7 @@ async function notifyShiftRequestApprovers(input: {
   );
 }
 
-export type NotificationDispatchResult =
-  | { success: true }
-  | { success: false; error: string };
+export type NotificationDispatchResult = { success: true } | { success: false; error: string };
 
 /**
  * Dispatches a notification event and returns a structured result. Errors
@@ -690,11 +656,7 @@ async function dispatchNotificationEventInternal(
     }
 
     case "schedule_published": {
-      const userIds = await getAffectedEmployeeUserIds(
-        event.orgId,
-        event.startDate,
-        event.endDate,
-      );
+      const userIds = await getAffectedEmployeeUserIds(event.orgId, event.startDate, event.endDate);
 
       await Promise.all(
         userIds
@@ -787,10 +749,7 @@ async function dispatchNotificationEventInternal(
       if (event.status !== "published") return;
       const userId = await getEmployeeUserId(event.empId);
       if (!userId || userId === actorUserId) return;
-      const title =
-        event.mode === "delete"
-          ? "Schedule note removed"
-          : "Schedule note added";
+      const title = event.mode === "delete" ? "Schedule note removed" : "Schedule note added";
       const message = `Schedule note ${event.mode === "delete" ? "removed" : "added"} for ${event.date}.`;
       await sendNotification(
         userId,
@@ -839,7 +798,7 @@ async function dispatchNotificationEventInternal(
       const orgName = await getOrgName(event.orgId);
       const superAdmins = await getOrgSuperAdmins(event.orgId);
       const inviter = event.invitationId
-        ? (await getInvitation(event.invitationId))?.invitedBy ?? null
+        ? ((await getInvitation(event.invitationId))?.invitedBy ?? null)
         : null;
       const recipients = new Set<string>(superAdmins);
       if (inviter) recipients.add(inviter);
@@ -951,9 +910,7 @@ async function dispatchNotificationEventInternal(
             userId,
             event.orgId,
             "employee_created" as NotificationType,
-            userId === empUserId
-              ? "You were added to an organization"
-              : "Employee added",
+            userId === empUserId ? "You were added to an organization" : "Employee added",
             userId === empUserId
               ? `Your employee record was created in ${orgName}.`
               : `${empName} was added to ${orgName}.`,
@@ -977,9 +934,7 @@ async function dispatchNotificationEventInternal(
             userId,
             event.orgId,
             "employee_status_changed" as NotificationType,
-            userId === empUserId
-              ? "Your employment status changed"
-              : "Employee status changed",
+            userId === empUserId ? "Your employment status changed" : "Employee status changed",
             userId === empUserId
               ? `Your status was changed (${transition}).`
               : `An employee's status changed (${transition}).`,
@@ -1005,9 +960,7 @@ async function dispatchNotificationEventInternal(
         body = "Several details on your profile were updated.";
       } else {
         const labels = await getOrgCopyLabels(event.orgId);
-        const friendly = event.fields.map((f) =>
-          friendlyProfileFieldLabel(f, labels),
-        );
+        const friendly = event.fields.map((f) => friendlyProfileFieldLabel(f, labels));
         const verb = friendly.length === 1 ? "was" : "were";
         body = `${capitalizeFirst(joinWithAnd(friendly))} ${verb} updated.`;
       }
@@ -1052,9 +1005,7 @@ async function dispatchNotificationEventInternal(
         event.targetUserId,
         event.orgId,
         "security_mfa_changed" as NotificationType,
-        event.enabled
-          ? "Two-factor authentication enabled"
-          : "Two-factor authentication disabled",
+        event.enabled ? "Two-factor authentication enabled" : "Two-factor authentication disabled",
         event.enabled
           ? "Two-factor authentication was turned on for your account."
           : "Two-factor authentication was turned off for your account. If this wasn't you, re-enable it and change your password.",
@@ -1148,9 +1099,7 @@ async function dispatchNotificationEventInternal(
     // ── Expiry sweepers (cron-driven) ──────────────────────────────────
 
     case "shift_request_expired": {
-      const { requesterUserId, requesterName } = await getRequestInfo(
-        event.requestId,
-      );
+      const { requesterUserId, requesterName } = await getRequestInfo(event.requestId);
       // Dedupe — the cron may re-run; once a row exists for this request the
       // sweeper won't re-fire because it filters on status='expired' already,
       // but keep this guard so a transient SQL error mid-run can't double-fire.

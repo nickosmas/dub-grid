@@ -25,27 +25,27 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 
 ## Tech Stack
 
-| Layer         | Technology                                            |
-| ------------- | ----------------------------------------------------- |
-| Framework     | [Next.js 16](https://nextjs.org) + React 19           |
-| Monorepo      | npm workspaces + TurboRepo                            |
-| Language      | TypeScript                                            |
-| Styling       | [Tailwind CSS v4](https://tailwindcss.com)            |
-| Database      | [Supabase](https://supabase.com) (PostgreSQL + Auth + Realtime + RLS) |
-| SSR           | @supabase/ssr v0.9                                    |
-| State         | [TanStack React Query v5](https://tanstack.com/query) |
-| Drag & Drop   | @dnd-kit/core                                         |
-| Mobile        | [Expo](https://expo.dev) SDK 54 + React Native (Expo Router) |
-| Email         | [Resend](https://resend.com)                          |
-| Billing       | [Stripe](https://stripe.com) (subscriptions + webhooks) |
-| Rate Limiting | [@upstash/ratelimit](https://upstash.com) + Redis     |
-| Validation    | [Zod](https://zod.dev)                                |
-| JWT           | [jose](https://github.com/panva/jose)                 |
-| Notifications | [Sonner](https://sonner.emilkowal.dev) v2             |
-| Analytics     | [@vercel/analytics](https://vercel.com/analytics) + [PostHog](https://posthog.com) |
-| Error Tracking| [Sentry](https://sentry.io)                           |
-| Testing       | [Vitest](https://vitest.dev) + Testing Library        |
-| Deployment    | [Vercel](https://vercel.com)                          |
+| Layer          | Technology                                                                         |
+| -------------- | ---------------------------------------------------------------------------------- |
+| Framework      | [Next.js 16](https://nextjs.org) + React 19                                        |
+| Monorepo       | npm workspaces + TurboRepo                                                         |
+| Language       | TypeScript                                                                         |
+| Styling        | [Tailwind CSS v4](https://tailwindcss.com)                                         |
+| Database       | [Supabase](https://supabase.com) (PostgreSQL + Auth + Realtime + RLS)              |
+| SSR            | @supabase/ssr v0.9                                                                 |
+| State          | [TanStack React Query v5](https://tanstack.com/query)                              |
+| Drag & Drop    | @dnd-kit/core                                                                      |
+| Mobile         | [Expo](https://expo.dev) SDK 54 + React Native (Expo Router)                       |
+| Email          | [Resend](https://resend.com)                                                       |
+| Billing        | [Stripe](https://stripe.com) (subscriptions + webhooks)                            |
+| Rate Limiting  | [@upstash/ratelimit](https://upstash.com) + Redis                                  |
+| Validation     | [Zod](https://zod.dev)                                                             |
+| JWT            | [jose](https://github.com/panva/jose)                                              |
+| Notifications  | [Sonner](https://sonner.emilkowal.dev) v2                                          |
+| Analytics      | [@vercel/analytics](https://vercel.com/analytics) + [PostHog](https://posthog.com) |
+| Error Tracking | [Sentry](https://sentry.io)                                                        |
+| Testing        | [Vitest](https://vitest.dev) + Testing Library                                     |
+| Deployment     | [Vercel](https://vercel.com)                                                       |
 
 ## Prerequisites
 
@@ -149,38 +149,38 @@ seed.ts                             # Root seed runner (executes the SQL seed fi
 
 ## Available Scripts
 
-| Script                    | Description                                              |
-| ------------------------- | -------------------------------------------------------- |
-| `npm run dev`             | Start the web app through TurboRepo                      |
-| `npm run dev:web`         | Start the Next.js web app through TurboRepo              |
-| `npm run dev:web:lan`     | Start the Next.js web app on `0.0.0.0` for phone access  |
-| `npm run dev:webpack`     | Start the web app with the Webpack dev server            |
-| `npm run dev:mobile`      | Start the Expo mobile app in tunnel mode for Expo Go     |
-| `npm run dev:mobile:phone`| Start the Expo mobile app in tunnel mode for Expo Go     |
-| `npm run dev:mobile:lan`  | Start the Expo mobile app in LAN mode                    |
-| `npm run build`           | Dependency-aware production build for the web app        |
-| `npm run build:packages`  | Build all `packages/*` workspaces (tsc → `dist/`)        |
-| `npm run start`           | Start the web production server                          |
-| `npm run lint`            | Run ESLint                                               |
-| `npm run type-check`      | Run workspace type-checks through TurboRepo              |
-| `npm test`                | Run workspace tests through TurboRepo                    |
-| `npm run test:web`        | Run web workspace tests                                  |
-| `npm run test:mobile`     | Run mobile + contracts workspace tests                   |
-| `npm run test:e2e`        | Run Playwright end-to-end tests                          |
-| `npm run test:e2e:ui`     | Run Playwright tests with interactive UI                 |
-| `npm run test:load`       | Run the k6 schedule load test                            |
-| `npm run test:load:auth`  | Run the k6 auth-flow load test                           |
-| `npm run test:load:stress`| Run the k6 schedule load test in stress mode             |
-| `npm run analyze`         | Build the web app with bundle analysis                   |
-| `npm run gen:types`       | Generate Supabase TypeScript types from the local DB     |
-| `npm run seed`            | Seed the local database (runs `seed.ts` → SQL seed files)|
-| `npm run db:reset`        | Reset local Supabase DB (runs migrations + seed)         |
-| `npm run db:reset:remote` | Reset remote Supabase DB (for staging environments)      |
-| `node scripts/doctor-mobile.mjs` | Diagnose the mobile app's local environment setup |
-| `npm run use:local`       | Switch .env.local to local Supabase credentials          |
-| `npm run use:mobile:local`| Generate `apps/mobile/.env.local` for local phone testing|
-| `npm run use:mobile:remote`| Copy remote mobile envs into `apps/mobile/.env.local`   |
-| `npm run use:remote`      | Switch .env.local to remote Supabase credentials         |
+| Script                           | Description                                               |
+| -------------------------------- | --------------------------------------------------------- |
+| `npm run dev`                    | Start the web app through TurboRepo                       |
+| `npm run dev:web`                | Start the Next.js web app through TurboRepo               |
+| `npm run dev:web:lan`            | Start the Next.js web app on `0.0.0.0` for phone access   |
+| `npm run dev:webpack`            | Start the web app with the Webpack dev server             |
+| `npm run dev:mobile`             | Start the Expo mobile app in tunnel mode for Expo Go      |
+| `npm run dev:mobile:phone`       | Start the Expo mobile app in tunnel mode for Expo Go      |
+| `npm run dev:mobile:lan`         | Start the Expo mobile app in LAN mode                     |
+| `npm run build`                  | Dependency-aware production build for the web app         |
+| `npm run build:packages`         | Build all `packages/*` workspaces (tsc → `dist/`)         |
+| `npm run start`                  | Start the web production server                           |
+| `npm run lint`                   | Run ESLint                                                |
+| `npm run type-check`             | Run workspace type-checks through TurboRepo               |
+| `npm test`                       | Run workspace tests through TurboRepo                     |
+| `npm run test:web`               | Run web workspace tests                                   |
+| `npm run test:mobile`            | Run mobile + contracts workspace tests                    |
+| `npm run test:e2e`               | Run Playwright end-to-end tests                           |
+| `npm run test:e2e:ui`            | Run Playwright tests with interactive UI                  |
+| `npm run test:load`              | Run the k6 schedule load test                             |
+| `npm run test:load:auth`         | Run the k6 auth-flow load test                            |
+| `npm run test:load:stress`       | Run the k6 schedule load test in stress mode              |
+| `npm run analyze`                | Build the web app with bundle analysis                    |
+| `npm run gen:types`              | Generate Supabase TypeScript types from the local DB      |
+| `npm run seed`                   | Seed the local database (runs `seed.ts` → SQL seed files) |
+| `npm run db:reset`               | Reset local Supabase DB (runs migrations + seed)          |
+| `npm run db:reset:remote`        | Reset remote Supabase DB (for staging environments)       |
+| `node scripts/doctor-mobile.mjs` | Diagnose the mobile app's local environment setup         |
+| `npm run use:local`              | Switch .env.local to local Supabase credentials           |
+| `npm run use:mobile:local`       | Generate `apps/mobile/.env.local` for local phone testing |
+| `npm run use:mobile:remote`      | Copy remote mobile envs into `apps/mobile/.env.local`     |
+| `npm run use:remote`             | Switch .env.local to remote Supabase credentials          |
 
 ## Emails
 
@@ -226,20 +226,20 @@ empty string for any secret that isn't set (it does not fail the step), so a mis
 secret here shows up as a confusing runtime/build failure rather than a clear error —
 double-check all of these are set before relying on the `build` job passing.
 
-| Secret | Source |
-| --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project API settings (same value as `apps/web/.env.example`) |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project API settings |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase project API settings (server-only, never expose to the client) |
-| `NEXT_PUBLIC_SITE_URL` | The deployed site origin (e.g. `https://app.example.com`) |
-| `NEXT_PUBLIC_BASE_DOMAIN` | The base domain used for subdomain routing |
-| `NEXT_PUBLIC_SENTRY_DSN` | Sentry project settings |
-| `SENTRY_AUTH_TOKEN` | Sentry account → Auth Tokens (used for release/source-map upload) |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe dashboard → API keys |
-| `NEXT_PUBLIC_POSTHOG_KEY` | PostHog project settings |
-| `NEXT_PUBLIC_POSTHOG_HOST` | PostHog project settings |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Cloud Console → APIs & Services → Credentials |
-| `NEXT_PUBLIC_VERCEL_URL` | Vercel project settings |
+| Secret                               | Source                                                                  |
+| ------------------------------------ | ----------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`           | Supabase project API settings (same value as `apps/web/.env.example`)   |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`      | Supabase project API settings                                           |
+| `SUPABASE_SERVICE_ROLE_KEY`          | Supabase project API settings (server-only, never expose to the client) |
+| `NEXT_PUBLIC_SITE_URL`               | The deployed site origin (e.g. `https://app.example.com`)               |
+| `NEXT_PUBLIC_BASE_DOMAIN`            | The base domain used for subdomain routing                              |
+| `NEXT_PUBLIC_SENTRY_DSN`             | Sentry project settings                                                 |
+| `SENTRY_AUTH_TOKEN`                  | Sentry account → Auth Tokens (used for release/source-map upload)       |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe dashboard → API keys                                             |
+| `NEXT_PUBLIC_POSTHOG_KEY`            | PostHog project settings                                                |
+| `NEXT_PUBLIC_POSTHOG_HOST`           | PostHog project settings                                                |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`    | Google Cloud Console → APIs & Services → Credentials                    |
+| `NEXT_PUBLIC_VERCEL_URL`             | Vercel project settings                                                 |
 
 `TURBO_TEAM`/`TURBO_TOKEN` (documented above) are also read by the `type-check`,
 `test`, and `build` jobs, but are optional — CI still passes without them, just without
@@ -259,6 +259,7 @@ All schema lives in exactly **4 migration files** — never create additional fi
 Deployed on **Vercel** with a hosted **Supabase** backend. Edge middleware runs at the CDN layer for low-latency RBAC checks and subdomain routing.
 
 Key configuration:
+
 - All routes are simple pages (no catch-all routes) to enable static prerendering
 - Static security headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) live in `apps/web/next.config.ts`; the per-request Content-Security-Policy (nonce-based on authenticated pages) is built in `apps/web/middleware.ts`
 - Custom access token hook must be enabled in the Supabase dashboard
@@ -281,22 +282,22 @@ Important:
 
 ## Documentation
 
-| Document | Description |
-| -------- | ----------- |
-| [PRD.md](PRD.md) | Product requirements, feature specs, and implementation status |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System design, layered architecture, and technical decisions |
-| [RBAC_SYSTEM_DESIGN.md](RBAC_SYSTEM_DESIGN.md) | Four-tier role hierarchy, 25 admin permissions, race condition mitigations |
-| [SYSTEM_FLOWCHARTS.md](SYSTEM_FLOWCHARTS.md) | Mermaid-based diagrams for auth, JWT hook, org validation, and request flows |
-| [CLAUDE.md](CLAUDE.md) | Development workflow rules, React/Next.js/security best practices |
-| [AGENTS.md](AGENTS.md) | Repo conventions and guidance for AI coding agents |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Branching, commit, PR, testing, and monorepo contribution conventions |
-| [SECURITY.md](SECURITY.md) | Security policy and vulnerability disclosure process |
-| [CHANGELOG.md](CHANGELOG.md) | Release history (Keep a Changelog format) |
-| [docs/api-reference.md](docs/api-reference.md) | API surface — Route Handlers and the `/api/mobile/v1` mobile API |
-| [docs/authentication.md](docs/authentication.md) | Auth flows — login, JWT hook, invitations, verification |
-| [docs/cookies-and-gdpr.md](docs/cookies-and-gdpr.md) | Cookie consent, GDPR data export, and account deletion |
-| [docs/secrets-rotation.md](docs/secrets-rotation.md) | Secret rotation procedures per environment |
-| [docs/architecture/folder-structure.md](docs/architecture/folder-structure.md) | Monorepo + `apps/web` feature-module folder layout |
+| Document                                                                       | Description                                                                  |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| [PRD.md](PRD.md)                                                               | Product requirements, feature specs, and implementation status               |
+| [ARCHITECTURE.md](ARCHITECTURE.md)                                             | System design, layered architecture, and technical decisions                 |
+| [RBAC_SYSTEM_DESIGN.md](RBAC_SYSTEM_DESIGN.md)                                 | Four-tier role hierarchy, 25 admin permissions, race condition mitigations   |
+| [SYSTEM_FLOWCHARTS.md](SYSTEM_FLOWCHARTS.md)                                   | Mermaid-based diagrams for auth, JWT hook, org validation, and request flows |
+| [CLAUDE.md](CLAUDE.md)                                                         | Development workflow rules, React/Next.js/security best practices            |
+| [AGENTS.md](AGENTS.md)                                                         | Repo conventions and guidance for AI coding agents                           |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                                             | Branching, commit, PR, testing, and monorepo contribution conventions        |
+| [SECURITY.md](SECURITY.md)                                                     | Security policy and vulnerability disclosure process                         |
+| [CHANGELOG.md](CHANGELOG.md)                                                   | Release history (Keep a Changelog format)                                    |
+| [docs/api-reference.md](docs/api-reference.md)                                 | API surface — Route Handlers and the `/api/mobile/v1` mobile API             |
+| [docs/authentication.md](docs/authentication.md)                               | Auth flows — login, JWT hook, invitations, verification                      |
+| [docs/cookies-and-gdpr.md](docs/cookies-and-gdpr.md)                           | Cookie consent, GDPR data export, and account deletion                       |
+| [docs/secrets-rotation.md](docs/secrets-rotation.md)                           | Secret rotation procedures per environment                                   |
+| [docs/architecture/folder-structure.md](docs/architecture/folder-structure.md) | Monorepo + `apps/web` feature-module folder layout                           |
 
 ## License
 

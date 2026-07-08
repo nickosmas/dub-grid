@@ -2,11 +2,7 @@ import { useEffect, useState } from "react";
 import { Linking, StyleSheet, Switch, Text, View } from "react-native";
 import { Screen } from "../../../shared/components/Screen";
 import { mobileColors, mobileText } from "../../../shared/theme/tokens";
-import {
-  getStoredConsent,
-  LEGAL_URLS,
-  setStoredConsent,
-} from "../../consent/lib/consent";
+import { getStoredConsent, LEGAL_URLS, setStoredConsent } from "../../consent/lib/consent";
 import {
   ProfileList,
   ProfileNavRow,

@@ -5,6 +5,8 @@ export {
   ANIMATED_LOGO_DURATION_MIN_S,
   ANIMATED_LOGO_DURATION_MAX_S,
   ANIMATED_LOGO_DELAY_MAX_S,
+  generateAnimatedLogoTimings,
+  type AnimatedLogoTiming,
 } from "./animated-logo";
 
 export const colorTokens = {

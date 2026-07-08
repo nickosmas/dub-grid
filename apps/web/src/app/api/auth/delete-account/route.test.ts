@@ -13,8 +13,7 @@ const loggerError = vi.fn();
 const loggerInfo = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
-    requireAuthenticatedUserWithClaims(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
   forbidIfSandboxCookie: (req: NextRequest) => forbidIfSandboxCookie(req),
 }));
 vi.mock("@/lib/csrf", () => ({
@@ -28,8 +27,7 @@ vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => getServiceClient(),
 }));
 vi.mock("@/features/account/server", () => ({
-  canManageProfileChangeRequests: (...args: unknown[]) =>
-    canManageProfileChangeRequests(...args),
+  canManageProfileChangeRequests: (...args: unknown[]) => canManageProfileChangeRequests(...args),
 }));
 vi.mock("@/features/permissions/shared", () => ({
   extractJwtClaims: (...args: unknown[]) => extractJwtClaims(...args),
@@ -100,9 +98,7 @@ function buildServiceClient(opts: ServiceOpts) {
           };
         });
         const deleteEq = vi.fn(async () => ({
-          error: cleanup.has("organization_memberships")
-            ? { message: "fail" }
-            : null,
+          error: cleanup.has("organization_memberships") ? { message: "fail" } : null,
         }));
         return {
           select: listSelect,

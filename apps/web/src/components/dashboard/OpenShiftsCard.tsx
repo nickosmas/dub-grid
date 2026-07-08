@@ -48,10 +48,7 @@ export default function OpenShiftsCard({
 }: OpenShiftsCardProps) {
   const visible = openShifts.slice(0, maxVisible);
   const remainingCount = Math.max(0, openShifts.length - visible.length);
-  const openSlotCount = openShifts.reduce(
-    (total, shift) => total + shift.needed,
-    0,
-  );
+  const openSlotCount = openShifts.reduce((total, shift) => total + shift.needed, 0);
   const isUnpublished = publishedWindowState === "unpublished";
   const isPartial = publishedWindowState === "partial";
   const subtitle = isUnpublished
@@ -68,9 +65,7 @@ export default function OpenShiftsCard({
           <div className="dg-card-title">Open shifts</div>
           <div className="dg-card-subtitle">{subtitle}</div>
         </div>
-        {onExpand && (
-          <ExpandButton onClick={onExpand} label="Expand open shifts" />
-        )}
+        {onExpand && <ExpandButton onClick={onExpand} label="Expand open shifts" />}
       </div>
 
       <div
@@ -117,9 +112,7 @@ export default function OpenShiftsCard({
                 border: "1px solid var(--color-border)",
               };
               const rowContent = (
-                <div
-                  style={rowStyle}
-                >
+                <div style={rowStyle}>
                   {/* Date block */}
                   <div style={{ textAlign: "center", minWidth: 34 }}>
                     <div

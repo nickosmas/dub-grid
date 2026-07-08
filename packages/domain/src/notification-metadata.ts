@@ -76,9 +76,7 @@ function humanizeKey(key: string): string {
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .toLowerCase()
     .trim();
-  return withSpaces.length > 0
-    ? withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1)
-    : key;
+  return withSpaces.length > 0 ? withSpaces.charAt(0).toUpperCase() + withSpaces.slice(1) : key;
 }
 
 /** Format a metadata value for display. Returns null when the value is empty. */

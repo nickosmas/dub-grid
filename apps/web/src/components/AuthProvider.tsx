@@ -63,8 +63,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       try {
         const params = new URLSearchParams(window.location.search);
         const isVerifiedLoginHandoff =
-          window.location.pathname === "/login" &&
-          params.get("verified") === "1";
+          window.location.pathname === "/login" && params.get("verified") === "1";
         if (isVerifiedLoginHandoff) {
           clearBrowserAuthState();
         }
@@ -79,13 +78,12 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         );
         const initialSession = await Promise.race([sessionPromise, timeoutPromise]);
 
-        const verifiedUser =
-          initialSession?.access_token ? await getVerifiedBrowserAuthUser() : null;
+        const verifiedUser = initialSession?.access_token
+          ? await getVerifiedBrowserAuthUser()
+          : null;
         setSession(verifiedUser ? initialSession : null);
         setUser(verifiedUser);
-        setSentryUser(
-          verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null,
-        );
+        setSentryUser(verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null);
 
         // Track existing session on page load (session restored from cookies)
         if (initialSession?.refresh_token && verifiedUser) {
@@ -127,9 +125,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         setSession(verifiedUser ? nextSession : null);
         setUser(verifiedUser);
         setIsLoading(false);
-        setSentryUser(
-          verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null,
-        );
+        setSentryUser(verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null);
 
         // No redirect on SIGNED_OUT — signOutLocal() handles the apex redirect,
         // and ProtectedRoute handles session-expiry redirects to /login.
@@ -157,9 +153,5 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     [user, session, signOut, isLoading],
   );
 
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }

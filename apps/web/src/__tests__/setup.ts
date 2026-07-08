@@ -25,5 +25,4 @@ vi.mock("@/lib/supabase", () => ({
       maybeSingle: vi.fn().mockResolvedValue({ data: null }),
     }),
   },
-  validateConfig: vi.fn(),
 }));

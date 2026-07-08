@@ -23,11 +23,7 @@ import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
@@ -39,8 +35,7 @@ import {
   profilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
 
-const PENDING_ACCOUNT_DELETION_MESSAGE =
-  "An account deletion request is pending admin review.";
+const PENDING_ACCOUNT_DELETION_MESSAGE = "An account deletion request is pending admin review.";
 
 const PASSWORD_STRENGTH_RULES = [
   {
@@ -121,10 +116,7 @@ function PasswordStrengthHints({ password }: { password: string }) {
         : styles.passwordStrengthLevelMedium;
 
   return (
-    <View
-      accessibilityLabel="Password strength hints"
-      style={styles.passwordStrength}
-    >
+    <View accessibilityLabel="Password strength hints" style={styles.passwordStrength}>
       <View style={styles.passwordStrengthHeader}>
         <Text style={styles.passwordStrengthTitle}>Password strength</Text>
         {hasStartedTyping ? (
@@ -136,18 +128,8 @@ function PasswordStrengthHints({ password }: { password: string }) {
       <View style={styles.passwordHintList}>
         {hints.map((hint) => (
           <View key={hint.id} style={styles.passwordHintRow}>
-            <View
-              style={[
-                styles.passwordHintDot,
-                hint.met && styles.passwordHintDotMet,
-              ]}
-            />
-            <Text
-              style={[
-                styles.passwordHintText,
-                hint.met && styles.passwordHintTextMet,
-              ]}
-            >
+            <View style={[styles.passwordHintDot, hint.met && styles.passwordHintDotMet]} />
+            <Text style={[styles.passwordHintText, hint.met && styles.passwordHintTextMet]}>
               {hint.label}
             </Text>
           </View>
@@ -186,18 +168,14 @@ function PasswordVisibilityToggle({
 export default function ProfileSecurityScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
-  const [sessionScopeLoading, setSessionScopeLoading] = useState<
-    "others" | "global" | null
-  >(null);
+  const [sessionScopeLoading, setSessionScopeLoading] = useState<"others" | "global" | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isPasswordEditorOpen, setPasswordEditorOpen] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
-  const [focusedPasswordField, setFocusedPasswordField] = useState<
-    PasswordField | null
-  >(null);
+  const [focusedPasswordField, setFocusedPasswordField] = useState<PasswordField | null>(null);
   const [visiblePasswordFields, setVisiblePasswordFields] = useState<
     Record<PasswordField, boolean>
   >({
@@ -205,25 +183,21 @@ export default function ProfileSecurityScreen() {
     newPassword: false,
     confirmPassword: false,
   });
-  const [pendingConfirmation, setPendingConfirmation] =
-    useState<SecurityConfirmation | null>(null);
+  const [pendingConfirmation, setPendingConfirmation] = useState<SecurityConfirmation | null>(null);
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
     queryFn: () => getProfile(accessToken!),
     enabled: Boolean(accessToken),
   });
   const bootstrapQuery = useBootstrap(accessToken);
-  const canEditProfileDirectly = Boolean(
-    bootstrapQuery.data?.permissions.canManageEmployees,
-  );
+  const canEditProfileDirectly = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const sessionsQuery = useQuery({
     queryKey: ["mobile", "profile", "sessions", accessToken],
     queryFn: () => getProfileSessions(accessToken!),
     enabled: Boolean(accessToken),
   });
   const revokeMutation = useMutation({
-    mutationFn: (refreshTokenHash: string) =>
-      revokeProfileSession(accessToken!, refreshTokenHash),
+    mutationFn: (refreshTokenHash: string) => revokeProfileSession(accessToken!, refreshTokenHash),
     onSuccess: async () => {
       await sessionsQuery.refetch();
       pushToast({
@@ -276,9 +250,7 @@ export default function ProfileSecurityScreen() {
       ? "Passwords do not match."
       : null;
   const passwordLooksReady =
-    currentPassword.length > 0 &&
-    newPassword.length >= 10 &&
-    newPassword === confirmPassword;
+    currentPassword.length > 0 && newPassword.length >= 10 && newPassword === confirmPassword;
 
   function resetPasswordEditor() {
     setPasswordError(null);
@@ -359,9 +331,7 @@ export default function ProfileSecurityScreen() {
       return;
     }
     if (newPassword === currentPassword) {
-      setPasswordError(
-        "New password must be different from your current password.",
-      );
+      setPasswordError("New password must be different from your current password.");
       return;
     }
 
@@ -415,8 +385,7 @@ export default function ProfileSecurityScreen() {
         setPasswordError(
           getInlineErrorMessageOrToast(pushToast, {
             error: signOutResult.error,
-            fallbackMessage:
-              "Your password changed, but we couldn't sign out every session.",
+            fallbackMessage: "Your password changed, but we couldn't sign out every session.",
           }),
         );
         return;
@@ -471,40 +440,34 @@ export default function ProfileSecurityScreen() {
       ? "Request account deletion?"
       : pendingConfirmation?.kind === "password"
         ? "Update password?"
-      : pendingConfirmation?.kind === "sessionScope" &&
-          pendingConfirmation.scope === "global"
-        ? "Sign out all devices?"
-        : pendingConfirmation?.kind === "sessionScope"
-          ? "Sign out other sessions?"
-          : "Revoke session?";
+        : pendingConfirmation?.kind === "sessionScope" && pendingConfirmation.scope === "global"
+          ? "Sign out all devices?"
+          : pendingConfirmation?.kind === "sessionScope"
+            ? "Sign out other sessions?"
+            : "Revoke session?";
   const confirmationBody =
     pendingConfirmation?.kind === "deletion"
       ? "Your admin will be notified to start the deletion process."
       : pendingConfirmation?.kind === "password"
         ? "You'll be signed out of every device after the password is updated."
-      : pendingConfirmation?.kind === "sessionScope" &&
-          pendingConfirmation.scope === "global"
-        ? "Every device, including this one, will be signed out."
-        : pendingConfirmation?.kind === "sessionScope"
-          ? "Every device except this one will be signed out."
-          : `${pendingConfirmation?.label ?? "This device"} will lose access immediately.`;
+        : pendingConfirmation?.kind === "sessionScope" && pendingConfirmation.scope === "global"
+          ? "Every device, including this one, will be signed out."
+          : pendingConfirmation?.kind === "sessionScope"
+            ? "Every device except this one will be signed out."
+            : `${pendingConfirmation?.label ?? "This device"} will lose access immediately.`;
   const confirmationLabel =
     pendingConfirmation?.kind === "deletion"
       ? "Request"
       : pendingConfirmation?.kind === "password"
         ? "Update and sign out"
-      : pendingConfirmation?.kind === "sessionScope" &&
-          pendingConfirmation.scope === "global"
-        ? "Sign Out"
-        : pendingConfirmation?.kind === "sessionScope"
+        : pendingConfirmation?.kind === "sessionScope" && pendingConfirmation.scope === "global"
           ? "Sign Out"
-          : "Revoke";
+          : pendingConfirmation?.kind === "sessionScope"
+            ? "Sign Out"
+            : "Revoke";
 
   return (
-    <Screen
-      refreshing={manualRefresh.isRefreshing}
-      onRefresh={manualRefresh.refresh}
-    >
+    <Screen refreshing={manualRefresh.isRefreshing} onRefresh={manualRefresh.refresh}>
       {contentState.kind === "loading" ? (
         <DetailSkeleton sections={3} />
       ) : contentState.kind === "error" ? (
@@ -519,18 +482,12 @@ export default function ProfileSecurityScreen() {
       ) : profileQuery.data ? (
         <>
           {profileQuery.data.pendingAccountDeletionRequest ? (
-            <StatusBanner
-              body={PENDING_ACCOUNT_DELETION_MESSAGE}
-              title="Request pending"
-            />
+            <StatusBanner body={PENDING_ACCOUNT_DELETION_MESSAGE} title="Request pending" />
           ) : null}
 
           <ProfileSection title="Password">
             {passwordError ? (
-              <StatusBanner
-                body={passwordError}
-                title="Could not change password"
-              />
+              <StatusBanner body={passwordError} title="Could not change password" />
             ) : null}
             {isPasswordEditorOpen ? (
               <>
@@ -545,9 +502,7 @@ export default function ProfileSecurityScreen() {
                       <PasswordVisibilityToggle
                         isVisible={visiblePasswordFields.currentPassword}
                         label="current password"
-                        onPress={() =>
-                          togglePasswordVisibility("currentPassword")
-                        }
+                        onPress={() => togglePasswordVisibility("currentPassword")}
                       />
                     }
                     value={currentPassword}
@@ -585,9 +540,7 @@ export default function ProfileSecurityScreen() {
                       <PasswordVisibilityToggle
                         isVisible={visiblePasswordFields.confirmPassword}
                         label="confirm password"
-                        onPress={() =>
-                          togglePasswordVisibility("confirmPassword")
-                        }
+                        onPress={() => togglePasswordVisibility("confirmPassword")}
                       />
                     }
                     value={confirmPassword}
@@ -596,8 +549,7 @@ export default function ProfileSecurityScreen() {
                     onFocus={() => setFocusedPasswordField("confirmPassword")}
                   />
                   <Text style={styles.signOutNotice}>
-                    You will be logged out of all sessions after changing your
-                    password.
+                    You will be logged out of all sessions after changing your password.
                   </Text>
                 </ProfilePanel>
                 <View style={styles.actionsRow}>
@@ -634,17 +586,10 @@ export default function ProfileSecurityScreen() {
                 iconName="shield-outline"
                 isLast
                 label="Status"
-                value={
-                  profileQuery.data.user.mfaEnabled ? "Enabled" : "Not enabled"
-                }
+                value={profileQuery.data.user.mfaEnabled ? "Enabled" : "Not enabled"}
               />
             </ProfileList>
-            <Button
-              compact
-              label="Open web profile"
-              onPress={openWebProfile}
-              tone="secondary"
-            />
+            <Button compact label="Open web profile" onPress={openWebProfile} tone="secondary" />
           </ProfileSection>
 
           {!canEditProfileDirectly ? (
@@ -656,9 +601,7 @@ export default function ProfileSecurityScreen() {
                   Boolean(profileQuery.data.pendingAccountDeletionRequest)
                 }
                 label={
-                  deletionRequestMutation.isPending
-                    ? "Requesting..."
-                    : "Request account deletion"
+                  deletionRequestMutation.isPending ? "Requesting..." : "Request account deletion"
                 }
                 onPress={confirmDeletionRequest}
                 tone="danger"
@@ -673,9 +616,7 @@ export default function ProfileSecurityScreen() {
                   compact
                   disabled={sessionScopeLoading != null}
                   label={
-                    sessionScopeLoading === "others"
-                      ? "Updating..."
-                      : "Sign out other sessions"
+                    sessionScopeLoading === "others" ? "Updating..." : "Sign out other sessions"
                   }
                   onPress={() => {
                     setPendingConfirmation({
@@ -690,11 +631,7 @@ export default function ProfileSecurityScreen() {
                 <Button
                   compact
                   disabled={sessionScopeLoading != null}
-                  label={
-                    sessionScopeLoading === "global"
-                      ? "Updating..."
-                      : "Sign out all devices"
-                  }
+                  label={sessionScopeLoading === "global" ? "Updating..." : "Sign out all devices"}
                   onPress={() => {
                     setPendingConfirmation({
                       kind: "sessionScope",
@@ -706,9 +643,7 @@ export default function ProfileSecurityScreen() {
               </View>
             </View>
             {sessionsQuery.isLoading ? (
-              <Text style={profilePrimitiveStyles.subtleText}>
-                Loading sessions...
-              </Text>
+              <Text style={profilePrimitiveStyles.subtleText}>Loading sessions...</Text>
             ) : sessionsQuery.error ? (
               <StatusBanner
                 actionLabel="Try Again"
@@ -720,60 +655,49 @@ export default function ProfileSecurityScreen() {
               />
             ) : (
               <View style={styles.sessionList}>
-                {(sessionsQuery.data?.sessions ?? []).map(
-                  (session, index, sessions) => (
-                    <View
-                      key={session.id}
-                      style={[
-                        styles.sessionItem,
-                        index < sessions.length - 1 &&
-                          styles.sessionItemDivider,
-                      ]}
-                    >
-                      <View style={styles.sessionRow}>
-                        <View style={styles.sessionIcon}>
-                          <Text style={styles.sessionIconText}>
-                            {formatSessionPlatform(session.platform)}
-                          </Text>
-                        </View>
-                        <View style={styles.sessionCopy}>
-                          <Text style={styles.sessionTitle}>
-                            {session.deviceLabel ||
-                              session.platform ||
-                              "Unknown device"}
-                          </Text>
-                          <Text style={styles.sessionBody}>
-                            Last active{" "}
-                            {new Date(session.lastActiveAt).toLocaleString()}
-                          </Text>
-                          {session.appVersion || session.ipAddress ? (
-                            <Text style={styles.sessionMeta}>
-                              {[session.appVersion, session.ipAddress]
-                                .filter(Boolean)
-                                .join(" - ")}
-                            </Text>
-                          ) : null}
-                        </View>
+                {(sessionsQuery.data?.sessions ?? []).map((session, index, sessions) => (
+                  <View
+                    key={session.id}
+                    style={[
+                      styles.sessionItem,
+                      index < sessions.length - 1 && styles.sessionItemDivider,
+                    ]}
+                  >
+                    <View style={styles.sessionRow}>
+                      <View style={styles.sessionIcon}>
+                        <Text style={styles.sessionIconText}>
+                          {formatSessionPlatform(session.platform)}
+                        </Text>
                       </View>
-                      <Button
-                        compact
-                        disabled={revokeMutation.isPending}
-                        label="Revoke"
-                        onPress={() => {
-                          setPendingConfirmation({
-                            kind: "revokeSession",
-                            refreshTokenHash: session.refreshTokenHash,
-                            label:
-                              session.deviceLabel ||
-                              session.platform ||
-                              "this device",
-                          });
-                        }}
-                        tone="neutral"
-                      />
+                      <View style={styles.sessionCopy}>
+                        <Text style={styles.sessionTitle}>
+                          {session.deviceLabel || session.platform || "Unknown device"}
+                        </Text>
+                        <Text style={styles.sessionBody}>
+                          Last active {new Date(session.lastActiveAt).toLocaleString()}
+                        </Text>
+                        {session.appVersion || session.ipAddress ? (
+                          <Text style={styles.sessionMeta}>
+                            {[session.appVersion, session.ipAddress].filter(Boolean).join(" - ")}
+                          </Text>
+                        ) : null}
+                      </View>
                     </View>
-                  ),
-                )}
+                    <Button
+                      compact
+                      disabled={revokeMutation.isPending}
+                      label="Revoke"
+                      onPress={() => {
+                        setPendingConfirmation({
+                          kind: "revokeSession",
+                          refreshTokenHash: session.refreshTokenHash,
+                          label: session.deviceLabel || session.platform || "this device",
+                        });
+                      }}
+                      tone="neutral"
+                    />
+                  </View>
+                ))}
               </View>
             )}
           </ProfileSection>
@@ -786,8 +710,7 @@ export default function ProfileSecurityScreen() {
           pendingConfirmation?.kind === "deletion" ||
           pendingConfirmation?.kind === "password" ||
           pendingConfirmation?.kind === "revokeSession" ||
-          (pendingConfirmation?.kind === "sessionScope" &&
-            pendingConfirmation.scope === "global")
+          (pendingConfirmation?.kind === "sessionScope" && pendingConfirmation.scope === "global")
             ? "dangerFilled"
             : "primary"
         }

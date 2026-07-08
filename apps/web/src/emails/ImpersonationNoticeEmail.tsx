@@ -24,9 +24,7 @@ export function ImpersonationNoticeEmail({
       logoUrl={logoUrl}
       preview={ended ? "Account access ended" : "Account access notice"}
     >
-      <Text style={styles.heading}>
-        {ended ? "Account access ended" : "Account access notice"}
-      </Text>
+      <Text style={styles.heading}>{ended ? "Account access ended" : "Account access notice"}</Text>
       <Text style={styles.paragraph}>
         {ended ? (
           <>
@@ -36,8 +34,7 @@ export function ImpersonationNoticeEmail({
         ) : (
           <>
             A platform administrator is currently reviewing your account on{" "}
-            <strong>{orgDisplay}</strong> for support purposes. This is a
-            routine support action.
+            <strong>{orgDisplay}</strong> for support purposes. This is a routine support action.
             {reason ? (
               <>
                 <br />
@@ -50,8 +47,8 @@ export function ImpersonationNoticeEmail({
       </Text>
       <Hr style={styles.divider} />
       <Text style={styles.fine}>
-        This is an automated notification from DubGrid. If you have questions
-        about this access, please contact your organization administrator.
+        This is an automated notification from DubGrid. If you have questions about this access,
+        please contact your organization administrator.
       </Text>
     </EmailLayout>
   );

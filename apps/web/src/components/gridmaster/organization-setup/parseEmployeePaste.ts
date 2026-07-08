@@ -5,12 +5,21 @@ const PHONE_RE = /(?:\+?1[\s.\-)]*)?\(?\d{3}\)?[\s.\-]*\d{3}[\s.\-]*\d{4}/;
 
 function splitFields(line: string): string[] {
   if (line.includes("\t")) {
-    return line.split("\t").map((f) => f.trim()).filter(Boolean);
+    return line
+      .split("\t")
+      .map((f) => f.trim())
+      .filter(Boolean);
   }
   if (line.includes(",")) {
-    return line.split(",").map((f) => f.trim()).filter(Boolean);
+    return line
+      .split(",")
+      .map((f) => f.trim())
+      .filter(Boolean);
   }
-  return line.split(/\s{2,}/).map((f) => f.trim()).filter(Boolean);
+  return line
+    .split(/\s{2,}/)
+    .map((f) => f.trim())
+    .filter(Boolean);
 }
 
 function extractAndStrip(fields: string[], pattern: RegExp): { match: string; rest: string[] } {

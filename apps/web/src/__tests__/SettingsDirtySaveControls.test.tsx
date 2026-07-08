@@ -130,16 +130,12 @@ describe("settings dirty save controls", () => {
   it("organization settings only show Discard while the draft is dirty", async () => {
     const user = userEvent.setup();
 
-    render(
-      <OrganizationGeneral organization={baseOrganization} onSave={vi.fn()} />,
-    );
+    render(<OrganizationGeneral organization={baseOrganization} onSave={vi.fn()} />);
 
     const nameInput = screen.getByDisplayValue("Acme Health");
     const saveButton = screen.getByRole("button", { name: /review & save/i });
     expect(saveButton).toBeDisabled();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
 
     await user.clear(nameInput);
     await user.type(nameInput, "Acme North");
@@ -152,9 +148,7 @@ describe("settings dirty save controls", () => {
 
     expect(screen.getByDisplayValue("Acme Health")).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
   it("organization settings require review before the guarded save runs", async () => {
@@ -166,13 +160,9 @@ describe("settings dirty save controls", () => {
       updatedAt: "2026-04-15T18:05:00.000000+00:00",
     };
 
-    vi.mocked(updateOrganizationSettings).mockResolvedValue(
-      updatedOrganization,
-    );
+    vi.mocked(updateOrganizationSettings).mockResolvedValue(updatedOrganization);
 
-    render(
-      <OrganizationGeneral organization={baseOrganization} onSave={onSave} />,
-    );
+    render(<OrganizationGeneral organization={baseOrganization} onSave={onSave} />);
 
     const nameInput = screen.getByDisplayValue("Acme Health");
     await user.clear(nameInput);
@@ -180,9 +170,7 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByRole("button", { name: /review & save/i }));
 
-    expect(
-      screen.getByText(/review organization changes/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/review organization changes/i)).toBeInTheDocument();
     expect(screen.getByText("Organization Name")).toBeInTheDocument();
     expect(updateOrganizationSettings).not.toHaveBeenCalled();
 
@@ -203,34 +191,24 @@ describe("settings dirty save controls", () => {
   it("organization settings block review when the phone number is invalid", async () => {
     const user = userEvent.setup();
 
-    render(
-      <OrganizationGeneral organization={baseOrganization} onSave={vi.fn()} />,
-    );
+    render(<OrganizationGeneral organization={baseOrganization} onSave={vi.fn()} />);
 
     const phoneInput = screen.getByLabelText("Phone");
     await user.clear(phoneInput);
     await user.type(phoneInput, "123");
 
-    expect(
-      screen.getByText("Enter a 10-digit US phone number"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /review & save/i }),
-    ).toBeDisabled();
+    expect(screen.getByText("Enter a 10-digit US phone number")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /review & save/i })).toBeDisabled();
   });
 
   it("organization labels only show Discard while the labels are dirty", async () => {
     const user = userEvent.setup();
 
-    render(
-      <OrganizationLabels organization={baseOrganization} onSave={vi.fn()} />,
-    );
+    render(<OrganizationLabels organization={baseOrganization} onSave={vi.fn()} />);
 
     const labelInput = screen.getByDisplayValue("Focus Areas");
     const saveButton = screen.getByRole("button", { name: /^save$/i });
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
 
     await user.clear(labelInput);
     await user.type(labelInput, "Units");
@@ -243,15 +221,11 @@ describe("settings dirty save controls", () => {
 
     expect(screen.getByDisplayValue("Focus Areas")).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
   it("custom labels does not expose a Scheduled Departments field — that label is fixed", () => {
-    render(
-      <OrganizationLabels organization={baseOrganization} onSave={vi.fn()} />,
-    );
+    render(<OrganizationLabels organization={baseOrganization} onSave={vi.fn()} />);
 
     expect(screen.queryByText("SCHEDULED DEPARTMENTS LABEL")).not.toBeInTheDocument();
     expect(
@@ -269,9 +243,7 @@ describe("settings dirty save controls", () => {
     render(<DisplayMode organization={baseOrganization} onSave={vi.fn()} />);
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
-    const codeSample = document.querySelector(
-      '[data-display-mode-sample="code"]',
-    );
+    const codeSample = document.querySelector('[data-display-mode-sample="code"]');
     const codeSampleStaffHeader = document.querySelector(
       '[data-display-mode-sample-staff-header="true"]',
     );
@@ -282,15 +254,9 @@ describe("settings dirty save controls", () => {
       position: "relative",
       zIndex: "2",
     });
-    expect(
-      codeSample?.querySelector('.dg-grid-slot[data-leading-divider="split"]'),
-    ).not.toBeNull();
-    expect(
-      codeSample?.querySelector('.dg-grid-cell[data-top-divider="dark"]'),
-    ).not.toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /^cancel$/i }),
-    ).not.toBeInTheDocument();
+    expect(codeSample?.querySelector('.dg-grid-slot[data-leading-divider="split"]')).not.toBeNull();
+    expect(codeSample?.querySelector('.dg-grid-cell[data-top-divider="dark"]')).not.toBeNull();
+    expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /full names/i }));
 
@@ -303,20 +269,13 @@ describe("settings dirty save controls", () => {
 
     expect(screen.getByText(/choose a display mode/i)).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
-    expect(
-      screen.queryByRole("button", { name: /^cancel$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
   });
 
   it("schedule rules only expose Save for a modified toggle", async () => {
     const user = userEvent.setup();
 
-    render(
-      <ScheduleRules
-        organization={baseOrganization}
-        onOrganizationSave={vi.fn()}
-      />,
-    );
+    render(<ScheduleRules organization={baseOrganization} onOrganizationSave={vi.fn()} />);
 
     const toggle = screen.getByRole("switch", {
       name: /enforce shift conflict prevention/i,
@@ -324,22 +283,14 @@ describe("settings dirty save controls", () => {
     const saveButton = screen.getByRole("button", { name: /^save$/i });
 
     expect(saveButton).toBeDisabled();
-    expect(
-      screen.queryByRole("button", { name: /^cancel$/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^close$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
 
     await user.click(toggle);
 
     expect(saveButton).toBeEnabled();
-    expect(
-      screen.queryByRole("button", { name: /^cancel$/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^close$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^cancel$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
   });
 
   it("schedule rules save a biweekly pay-period anchor date", async () => {
@@ -356,10 +307,7 @@ describe("settings dirty save controls", () => {
     });
 
     const { container } = render(
-      <ScheduleRules
-        organization={organization}
-        onOrganizationSave={onOrganizationSave}
-      />,
+      <ScheduleRules organization={organization} onOrganizationSave={onOrganizationSave} />,
     );
 
     expect(container.querySelector('input[type="date"]')).toBeNull();
@@ -369,9 +317,7 @@ describe("settings dirty save controls", () => {
         name: /biweekly pay period start date/i,
       }),
     );
-    expect(
-      screen.getByLabelText("Biweekly pay period start date calendar"),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Biweekly pay period start date calendar")).toBeInTheDocument();
     await user.click(
       screen.getByRole("button", {
         name: /choose monday, april 20, 2026/i,
@@ -421,17 +367,13 @@ describe("settings dirty save controls", () => {
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(saveButton).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: /^close$/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
 
     const input = screen.getByDisplayValue("Readings");
     await user.clear(input);
     await user.type(input, "Daily Readings");
     expect(saveButton).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: /^discard$/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^discard$/i })).toBeInTheDocument();
 
     vi.mocked(upsertIndicatorType).mockResolvedValue({
       ...indicator,
@@ -443,16 +385,10 @@ describe("settings dirty save controls", () => {
     // A successful save collapses the editor shut, so its Save / Close /
     // Discard controls are no longer present.
     await waitFor(() => {
-      expect(
-        screen.queryByRole("button", { name: /^save$/i }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^save$/i })).not.toBeInTheDocument();
     });
-    expect(
-      screen.queryByRole("button", { name: /^close$/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
   it("indicator rows swap Close for Discard and keep the editor open after discard", async () => {
@@ -478,13 +414,9 @@ describe("settings dirty save controls", () => {
 
     const input = screen.getByDisplayValue("Readings");
     const saveButton = screen.getByRole("button", { name: /^save$/i });
-    expect(
-      screen.getByRole("button", { name: /^close$/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
 
     await user.clear(input);
     await user.type(input, "Daily Readings");
@@ -497,34 +429,21 @@ describe("settings dirty save controls", () => {
 
     expect(screen.getByDisplayValue("Readings")).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: /^close$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
   it("Add Indicator shows Cancel on a pristine new row, and Cancel removes the draft", async () => {
     const user = userEvent.setup();
 
     render(
-      <Indicators
-        indicatorTypes={[]}
-        orgId="org-1"
-        onChange={vi.fn()}
-        canManageIndicatorTypes
-      />,
+      <Indicators indicatorTypes={[]} orgId="org-1" onChange={vi.fn()} canManageIndicatorTypes />,
     );
 
     await user.click(screen.getByRole("button", { name: /\+ add indicator/i }));
 
-    expect(
-      screen.getByRole("button", { name: /^cancel$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^cancel$/i }));
 
@@ -559,15 +478,11 @@ describe("settings dirty save controls", () => {
     // Clicking the row header again while dirty should prompt before closing.
     await user.click(screen.getByText("Daily Readings"));
 
-    expect(
-      await screen.findByRole("dialog", { name: /unsaved changes/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
-    expect(
-      screen.queryByRole("dialog", { name: /unsaved changes/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /unsaved changes/i })).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Daily Readings")).toBeInTheDocument();
   });
 
@@ -589,9 +504,7 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await userEvent
-      .setup()
-      .click(screen.getByText("Readings"));
+    await userEvent.setup().click(screen.getByText("Readings"));
 
     const input = screen.getByDisplayValue("Readings");
     const saveButton = screen.getByRole("button", { name: /^save$/i });
@@ -611,30 +524,22 @@ describe("settings dirty save controls", () => {
     render(
       <StringListSettings
         label="Certifications"
-        items={[
-          { id: 1, orgId: "org-1", name: "RN", abbr: "RN", sortOrder: 0 },
-        ]}
+        items={[{ id: 1, orgId: "org-1", name: "RN", abbr: "RN", sortOrder: 0 }]}
         onSave={vi.fn().mockResolvedValue(undefined)}
         placeholder="Certification"
         initialEditing
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: /^close$/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
 
     const input = screen.getByPlaceholderText("Full name");
     await user.clear(input);
     await user.type(input, "Charge Nurse");
 
-    expect(
-      screen.getByRole("button", { name: /^discard$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^close$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^discard$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
   });
 
   it("coverage edit mode reveals Discard alongside Save once a draft is dirty", async () => {
@@ -709,28 +614,22 @@ describe("settings dirty save controls", () => {
     const saveButton = screen.getByRole("button", { name: /^save$/i });
 
     expect(
-      staffInput.compareDocumentPosition(saveButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      staffInput.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
 
     await user.clear(staffInput);
     await user.type(staffInput, "3");
     const discardButton = screen.getByRole("button", { name: /^discard$/i });
     expect(discardButton).toBeInTheDocument();
     expect(
-      discardButton.compareDocumentPosition(saveButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      discardButton.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
     await user.click(discardButton);
 
     expect(screen.getByRole("spinbutton")).toHaveValue(2);
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
   it("coverage defaults new requirements to same every day", async () => {
@@ -801,13 +700,9 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
-      expect(saveCoverageRequirements).toHaveBeenCalledWith(
-        "org-1",
-        1,
-        200,
-        10,
-        [{ dayOfWeek: null, minStaff: 2 }],
-      );
+      expect(saveCoverageRequirements).toHaveBeenCalledWith("org-1", 1, 200, 10, [
+        { dayOfWeek: null, minStaff: 2 },
+      ]);
     });
   });
 
@@ -949,13 +844,9 @@ describe("settings dirty save controls", () => {
     expect(screen.queryByText("Regular Staff")).not.toBeInTheDocument();
     expect(screen.queryByText("Default shift job")).not.toBeInTheDocument();
     expect(screen.queryAllByText("Supervisor").length).toBeGreaterThan(0);
-    expect(
-      screen.queryByText("General shiftless jobs"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("General shiftless jobs")).not.toBeInTheDocument();
     expect(screen.queryByText("Office")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/^Day Shift · Supervisor$/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Day Shift · Supervisor$/)).not.toBeInTheDocument();
   });
 
   it("coverage saves shift-only demand against the default shift job", async () => {
@@ -1031,13 +922,9 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
     await waitFor(() => {
-      expect(saveCoverageRequirements).toHaveBeenCalledWith(
-        "org-1",
-        1,
-        203,
-        10,
-        [{ dayOfWeek: null, minStaff: 4 }],
-      );
+      expect(saveCoverageRequirements).toHaveBeenCalledWith("org-1", 1, 203, 10, [
+        { dayOfWeek: null, minStaff: 4 },
+      ]);
     });
   });
 
@@ -1191,12 +1078,10 @@ describe("settings dirty save controls", () => {
     const staffRow = screen.getByText("Staff");
 
     expect(
-      supervisorRow.compareDocumentPosition(mentorRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      supervisorRow.compareDocumentPosition(mentorRow) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      mentorRow.compareDocumentPosition(staffRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      mentorRow.compareDocumentPosition(staffRow) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -1228,35 +1113,25 @@ describe("settings dirty save controls", () => {
     const cancelButton = screen.getByRole("button", { name: /^close$/i });
     const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(
-      input.compareDocumentPosition(cancelButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      input.compareDocumentPosition(cancelButton) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      cancelButton.compareDocumentPosition(saveButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      cancelButton.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(saveButton).toBeDisabled();
 
     await user.clear(input);
     await user.type(input, "Lead");
-    expect(
-      screen.getByRole("button", { name: /^discard$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^close$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^discard$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
     expect(saveButton).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: /^discard$/i }));
 
     expect(screen.getByDisplayValue("Charge")).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: /^close$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
   it("allows dense string list tables to use a wider section card", () => {
@@ -1323,35 +1198,25 @@ describe("settings dirty save controls", () => {
     const cancelButton = screen.getByRole("button", { name: /^close$/i });
     const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(
-      input.compareDocumentPosition(cancelButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      input.compareDocumentPosition(cancelButton) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      cancelButton.compareDocumentPosition(saveButton) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      cancelButton.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(saveButton).toBeDisabled();
 
     await user.clear(input);
     await user.type(input, "South");
-    expect(
-      screen.getByRole("button", { name: /^discard$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^close$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^discard$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
     expect(saveButton).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: /^discard$/i }));
 
     expect(screen.getByDisplayValue("North")).toBeInTheDocument();
     expect(saveButton).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: /^close$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
   });
 
   it("shows scheduled focus areas without requiring expansion in read mode", () => {
@@ -1455,9 +1320,7 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByRole("button", { name: /^edit$/i }));
 
-    expect(
-      screen.queryByRole("button", { name: /color preset/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /color preset/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/^Color$/i)).not.toBeInTheDocument();
   });
 
@@ -1493,28 +1356,20 @@ describe("settings dirty save controls", () => {
     await user.click(screen.getAllByRole("button", { name: /^edit$/i })[0]);
 
     const nameInput = screen.getByDisplayValue("Days");
-    expect(
-      screen.getByRole("button", { name: /^close$/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
 
     await user.clear(nameInput);
     await user.type(nameInput, "Days Updated");
 
-    expect(
-      screen.getByRole("button", { name: /^discard$/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^discard$/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^edit$/i }));
 
-    expect(
-      await screen.findByRole("dialog", { name: /unsaved changes/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
-    expect(
-      screen.queryByRole("dialog", { name: /unsaved changes/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /unsaved changes/i })).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Days Updated")).toBeInTheDocument();
   });
 
@@ -1620,18 +1475,12 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByRole("button", { name: /\+ add shift/i }));
 
-    expect(
-      screen.getByRole("button", { name: /^cancel$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^cancel$/i }));
 
-    expect(
-      screen.queryByPlaceholderText("e.g. Day Shift"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("e.g. Day Shift")).not.toBeInTheDocument();
     expect(upsertShiftCategory).not.toHaveBeenCalled();
   });
 
@@ -1800,32 +1649,22 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByText("Mentor"));
 
-    expect(
-      screen.getByRole("button", { name: /^close$/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
 
     const nameInput = screen.getByDisplayValue("Mentor");
     await user.clear(nameInput);
     await user.type(nameInput, "Mentor Updated");
 
-    expect(
-      screen.getByRole("button", { name: /^discard$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^close$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^discard$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByText("Mentor Updated"));
 
-    expect(
-      await screen.findByRole("dialog", { name: /unsaved changes/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: /unsaved changes/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /keep editing/i }));
 
-    expect(
-      screen.queryByRole("dialog", { name: /unsaved changes/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /unsaved changes/i })).not.toBeInTheDocument();
     expect(screen.getByDisplayValue("Mentor Updated")).toBeInTheDocument();
   });
 
@@ -1868,36 +1707,21 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /add scheduled job/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
 
     // Pristine new draft must offer Cancel, not Discard or Close.
-    expect(
-      screen.getByRole("button", { name: /^cancel$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^close$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^close$/i })).not.toBeInTheDocument();
 
     // Type something so the draft is "dirty" — Cancel must still be shown.
-    await user.type(
-      screen.getByPlaceholderText("e.g. Supervisor"),
-      "Supervisor",
-    );
-    expect(
-      screen.getByRole("button", { name: /^cancel$/i }),
-    ).toBeInTheDocument();
+    await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Supervisor");
+    expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^cancel$/i }));
 
     // Editor closes, no draft row remains, and no save fired.
-    expect(
-      screen.queryByPlaceholderText("e.g. Supervisor"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("e.g. Supervisor")).not.toBeInTheDocument();
     expect(upsertJobDefinition).not.toHaveBeenCalled();
   });
 
@@ -2021,9 +1845,7 @@ describe("settings dirty save controls", () => {
       ),
     ).toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole("button", { name: /use duration instead/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /use duration instead/i }));
 
     const [hoursInput] = screen.getAllByRole("spinbutton");
     await user.clear(hoursInput!);
@@ -2211,31 +2033,22 @@ describe("settings dirty save controls", () => {
     const officeRow = screen.getByText("Office");
 
     expect(
-      supervisorRow.compareDocumentPosition(mentorRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      supervisorRow.compareDocumentPosition(mentorRow) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      mentorRow.compareDocumentPosition(chargeNurseRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      mentorRow.compareDocumentPosition(chargeNurseRow) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      chargeNurseRow.compareDocumentPosition(officeRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      chargeNurseRow.compareDocumentPosition(officeRow) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
-    await user.click(
-      screen.getByRole("button", { name: /add scheduled job/i }),
-    );
-    await user.type(
-      screen.getByPlaceholderText("e.g. Supervisor"),
-      "Draft Lead",
-    );
+    await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
+    await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Draft Lead");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "DRF");
 
     const draftRow = screen.getByText("Draft Lead");
     expect(
-      mentorRow.compareDocumentPosition(draftRow) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      mentorRow.compareDocumentPosition(draftRow) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -2278,9 +2091,7 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /add scheduled job/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
     expect(saveButton).toBeDisabled();
@@ -2288,10 +2099,7 @@ describe("settings dirty save controls", () => {
     expect(screen.getByLabelText(/^North$/i)).toBeChecked();
     expect(screen.getByLabelText(/^Day Shift$/i)).toBeChecked();
 
-    await user.type(
-      screen.getByPlaceholderText("e.g. Supervisor"),
-      "Supervisor",
-    );
+    await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Supervisor");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "SUP");
 
     expect(saveButton).toBeEnabled();
@@ -2382,13 +2190,8 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /add scheduled job/i }),
-    );
-    await user.type(
-      screen.getByPlaceholderText("e.g. Supervisor"),
-      "Supervisor",
-    );
+    await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
+    await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Supervisor");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "SUP");
 
     const saveButton = screen.getByRole("button", { name: /^save$/i });
@@ -2492,13 +2295,8 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /add scheduled job/i }),
-    );
-    await user.type(
-      screen.getByPlaceholderText("e.g. Supervisor"),
-      "Supervisor",
-    );
+    await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
+    await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Supervisor");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "SUP");
 
     const [departmentSelectAll, focusAreaSelectAll, shiftSelectAll] =
@@ -2559,18 +2357,11 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /add scheduled job/i }),
-    );
-    await user.type(
-      screen.getByPlaceholderText("e.g. Supervisor"),
-      "Supervisor",
-    );
+    await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
+    await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Supervisor");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "SUP");
 
-    expect(
-      screen.getByText(/using 07:00-15:00 from the shift/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/using 07:00-15:00 from the shift/i)).toBeInTheDocument();
 
     await user.click(screen.getByLabelText(/override time/i));
 
@@ -2649,9 +2440,7 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByText(/1 department.*1 focus area.*1 shift/i));
 
-    const codePreview = document.querySelector<HTMLElement>(
-      '[data-job-shift-preview="10"]',
-    );
+    const codePreview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
     expect(codePreview).not.toBeNull();
     expect(within(codePreview!).getByText(/^D$/)).toBeInTheDocument();
     expect(within(codePreview!).getByText(/^SUP$/)).toBeInTheDocument();
@@ -2677,9 +2466,7 @@ describe("settings dirty save controls", () => {
 
     await user.click(screen.getByText(/1 department.*1 focus area.*1 shift/i));
 
-    const namePreview = document.querySelector<HTMLElement>(
-      '[data-job-shift-preview="10"]',
-    );
+    const namePreview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
     expect(namePreview).not.toBeNull();
     expect(within(namePreview!).getByText(/^Day Shift$/)).toBeInTheDocument();
     expect(within(namePreview!).getByText(/^Supervisor$/)).toBeInTheDocument();
@@ -2758,9 +2545,7 @@ describe("settings dirty save controls", () => {
     expect(screen.queryByText("Default Shift Job")).not.toBeInTheDocument();
     await user.click(screen.getByText("Default shift job"));
 
-    const codePreview = document.querySelector<HTMLElement>(
-      '[data-job-shift-preview="10"]',
-    );
+    const codePreview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
     expect(codePreview).not.toBeNull();
     expect(within(codePreview!).getByText(/^D$/)).toBeInTheDocument();
     expect(within(codePreview!).queryByText(/^SHIFT$/)).not.toBeInTheDocument();
@@ -2788,9 +2573,7 @@ describe("settings dirty save controls", () => {
     expect(screen.queryByText("Default Shift Job")).not.toBeInTheDocument();
     await user.click(screen.getByText("Default shift job"));
 
-    const namePreview = document.querySelector<HTMLElement>(
-      '[data-job-shift-preview="10"]',
-    );
+    const namePreview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
     expect(namePreview).not.toBeNull();
     expect(within(namePreview!).getByText(/^Day Shift$/)).toBeInTheDocument();
     expect(within(namePreview!).queryByText(/^SHIFT$/)).not.toBeInTheDocument();
@@ -2885,19 +2668,12 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /add scheduled job/i }),
-    );
-    await user.type(
-      screen.getByPlaceholderText("e.g. Supervisor"),
-      "Supervisor",
-    );
+    await user.click(screen.getByRole("button", { name: /add scheduled job/i }));
+    await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Supervisor");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "SUP");
 
     await user.click(screen.getAllByLabelText(/override time/i)[1]!);
-    await user.click(
-      screen.getAllByRole("button", { name: /color preset:/i })[1]!,
-    );
+    await user.click(screen.getAllByRole("button", { name: /color preset:/i })[1]!);
     await user.click(await screen.findByRole("button", { name: /^slate$/i }));
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
@@ -2934,22 +2710,14 @@ describe("settings dirty save controls", () => {
       />,
     );
 
-    await user.click(
-      screen.getByRole("button", { name: /\+ add absence type/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /\+ add absence type/i }));
 
-    expect(
-      screen.getByRole("button", { name: /^cancel$/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^discard$/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^cancel$/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^discard$/i })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^cancel$/i }));
 
-    expect(
-      screen.queryByPlaceholderText("e.g. Vacation"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("e.g. Vacation")).not.toBeInTheDocument();
   });
 
   it("absence type editors disable Save until there is a real persisted-value change", async () => {
@@ -2995,9 +2763,7 @@ describe("settings dirty save controls", () => {
   it("custom labels block invalid text before save", async () => {
     const user = userEvent.setup();
 
-    render(
-      <OrganizationLabels organization={baseOrganization} onSave={vi.fn()} />,
-    );
+    render(<OrganizationLabels organization={baseOrganization} onSave={vi.fn()} />);
 
     const input = screen.getByDisplayValue("Focus Areas");
     await user.clear(input);
@@ -3015,9 +2781,7 @@ describe("settings dirty save controls", () => {
     render(
       <StringListSettings
         label="Roles"
-        items={[
-          { id: 1, orgId: "org-1", name: "Charge Nurse", abbr: "CN", sortOrder: 0 },
-        ]}
+        items={[{ id: 1, orgId: "org-1", name: "Charge Nurse", abbr: "CN", sortOrder: 0 }]}
         onSave={onSave}
         placeholder="Role"
         initialEditing

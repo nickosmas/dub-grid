@@ -36,11 +36,9 @@ function createMockChannel() {
 const mockCreateBrowserRealtimeChannel = vi.fn((_name: string) => createMockChannel());
 
 vi.mock("@/features/account/client", () => ({
-  createBrowserRealtimeChannel: (name: string) =>
-    mockCreateBrowserRealtimeChannel(name),
+  createBrowserRealtimeChannel: (name: string) => mockCreateBrowserRealtimeChannel(name),
   fetchAccountPermissions: () => mockFetchAccountPermissions(),
-  removeBrowserRealtimeChannel: (channel: unknown) =>
-    mockRemoveBrowserRealtimeChannel(channel),
+  removeBrowserRealtimeChannel: (channel: unknown) => mockRemoveBrowserRealtimeChannel(channel),
 }));
 
 // ── Import after mocks ──────────────────────────────────────────────────────
@@ -52,10 +50,7 @@ import {
   applyViewImplications,
   READ_ONLY_PERMS,
 } from "@/features/permissions";
-import {
-  clearPermsCache,
-  usePermissions,
-} from "@/features/permissions/client";
+import { clearPermsCache, usePermissions } from "@/features/permissions/client";
 import { ALL_FALSE_PERMS } from "./factories";
 
 type TestJwtClaims = {
@@ -133,7 +128,9 @@ describe("getPermissionsFromSession", () => {
   });
 
   it("returns NO_PERMS for session with no access_token", () => {
-    const perms = getPermissionsFromSession({ access_token: "" } as Parameters<typeof getPermissionsFromSession>[0]);
+    const perms = getPermissionsFromSession({ access_token: "" } as Parameters<
+      typeof getPermissionsFromSession
+    >[0]);
     expect(perms.role).toBe("user");
   });
 
@@ -194,7 +191,9 @@ describe("getPermissionsFromSession", () => {
   });
 
   it("returns user perms when JWT decode fails", () => {
-    const session = { access_token: "bad-jwt", user: { id: "u-1" } } as Parameters<typeof getPermissionsFromSession>[0];
+    const session = { access_token: "bad-jwt", user: { id: "u-1" } } as Parameters<
+      typeof getPermissionsFromSession
+    >[0];
     const perms = getPermissionsFromSession(session);
     expect(perms.role).toBe("user");
     expect(perms.orgId).toBeNull();
@@ -647,7 +646,11 @@ describe("canAccessSettings", () => {
 
 describe("buildPerms — user role per-user permissions", () => {
   it("user with admin_permissions set", () => {
-    const perms = { ...ALL_FALSE_PERMS, canViewDashboardAnalytics: true, canViewEmployeeDetails: true };
+    const perms = {
+      ...ALL_FALSE_PERMS,
+      canViewDashboardAnalytics: true,
+      canViewEmployeeDetails: true,
+    };
     const result = buildPerms("user", "org-1", false, perms);
     expect(result.canViewDashboardAnalytics).toBe(true);
     expect(result.canViewEmployeeDetails).toBe(true);

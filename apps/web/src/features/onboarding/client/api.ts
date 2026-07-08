@@ -18,10 +18,7 @@ function resolveClientUrl(path: string): string {
   return path;
 }
 
-async function requestOnboardingJson<T>(
-  input: string,
-  init?: RequestInit,
-): Promise<T> {
+async function requestOnboardingJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(resolveClientUrl(input), init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -29,9 +26,7 @@ async function requestOnboardingJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "Onboarding request failed."),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, "Onboarding request failed."));
   }
 
   return body as T;
@@ -91,10 +86,7 @@ function onboardingPhaseKey(userId: string, orgId: string): string {
   return `dg_onboarding_phase:${userId}:${orgId}`;
 }
 
-export function getOnboardingPhase(
-  userId: string,
-  orgId: string,
-): OnboardingPhase | null {
+export function getOnboardingPhase(userId: string, orgId: string): OnboardingPhase | null {
   try {
     const v = sessionStorage.getItem(onboardingPhaseKey(userId, orgId));
     return v === "config" || v === "orientation" ? v : null;
@@ -104,11 +96,7 @@ export function getOnboardingPhase(
 }
 
 /** Freeze the phase only if not already frozen (sticky for the session). */
-export function freezeOnboardingPhase(
-  userId: string,
-  orgId: string,
-  phase: OnboardingPhase,
-): void {
+export function freezeOnboardingPhase(userId: string, orgId: string, phase: OnboardingPhase): void {
   try {
     const key = onboardingPhaseKey(userId, orgId);
     if (!sessionStorage.getItem(key)) sessionStorage.setItem(key, phase);

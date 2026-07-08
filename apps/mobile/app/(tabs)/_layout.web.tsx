@@ -11,9 +11,8 @@ export default function TabsLayoutWeb() {
   const { accessToken, isLoading } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
   const lockedMessage = getOrgUnavailableMessage(bootstrapQuery.error);
-  const canViewTeamSchedule = bootstrapQuery.data && !lockedMessage
-    ? bootstrapQuery.data.permissions.canViewSchedule
-    : false;
+  const canViewTeamSchedule =
+    bootstrapQuery.data && !lockedMessage ? bootstrapQuery.data.permissions.canViewSchedule : false;
 
   if (isLoading) {
     return (
@@ -60,9 +59,7 @@ export default function TabsLayoutWeb() {
       }}
     >
       <Tabs.Screen name="home" options={{ title: "Home" }} />
-      {canViewTeamSchedule ? (
-        <Tabs.Screen name="team" options={{ title: "Schedule" }} />
-      ) : null}
+      {canViewTeamSchedule ? <Tabs.Screen name="team" options={{ title: "Schedule" }} /> : null}
       <Tabs.Screen name="requests" options={{ title: "Requests" }} />
       <Tabs.Screen name="people" options={{ title: "People" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />

@@ -53,27 +53,27 @@ DubGrid uses **npm workspaces** (`apps/*`, `packages/*`) orchestrated by **Turbo
 
 ### Apps
 
-| Workspace | Package name | Stack | Path |
-| --------- | ------------ | ----- | ---- |
-| Web | `@dubgrid/web` | Next.js 16 App Router, React 19, Tailwind v4 | `apps/web` |
-| Mobile | `@dubgrid/mobile` | Expo SDK 54, React Native, Expo Router | `apps/mobile` |
+| Workspace | Package name      | Stack                                        | Path          |
+| --------- | ----------------- | -------------------------------------------- | ------------- |
+| Web       | `@dubgrid/web`    | Next.js 16 App Router, React 19, Tailwind v4 | `apps/web`    |
+| Mobile    | `@dubgrid/mobile` | Expo SDK 54, React Native, Expo Router       | `apps/mobile` |
 
 ### Shared Packages
 
 All ten packages are private, versioned `0.1.0`, ESM, and build with `tsc` to `dist/`.
 
-| Package | Purpose | Depends on |
-| ------- | ------- | ---------- |
-| `@dubgrid/domain` | Platform-neutral domain types/enums + pure logic. `Organization` (incl. `workspaceKind` / `sandbox*`), `AdminPermissions` (25 perms), role enums, billing types, `requests`, `staff`, `self-guard.ts` (`SelfActionForbiddenError`, `assertNotSelf`, `isSelfAction`). | none |
-| `@dubgrid/contracts` | Zod schemas + inferred types for cross-app API contracts. Re-exports `schedule`, `mobile`, `staff`; exposes a `./mobile` subpath. | `zod` |
-| `@dubgrid/db-types` | DB-row TS types (`DbOrganization`, etc.): `catalog`, `organization`, `requests`, `schedule`, `staff`. | `contracts`, `domain` |
-| `@dubgrid/authz` | Permission logic: `ROLE_LEVEL`, `ALL_PERMS` / `READ_ONLY_PERMS`, `applyViewImplications`, `unionPermissions`, `buildPermissionContext` / `buildPerms`, `extractJwtClaims`, `getPermissionsFromSession`. | `domain`, `@supabase/supabase-js` |
-| `@dubgrid/schedule-core` | Schedule transformation / calculation logic. | `contracts` |
-| `@dubgrid/data-access` | Supabase query + data-mapping layer; currently powers the shared mobile data layer. | `contracts`, `db-types`, `domain`, `@supabase/supabase-js` |
-| `@dubgrid/mobile-api-core` | Framework-neutral mobile backend orchestration consumed by web's `/api/mobile/v1` routes. Modules: `auth`, `people-status`, `push`, `read`, `shift-requests`, `setup`, `organization`, `write`. Rejects sandbox organizations for mobile login. | `authz`, `contracts`, `domain`, `schedule-core`, `@supabase/supabase-js` |
-| `@dubgrid/api-client` | Platform-neutral HTTP client primitives: `createHeaders`, `appendQueryParams`, `createJsonApiRequest`, `ApiResponseError`. | none |
-| `@dubgrid/client-errors` | Shared client-facing error translation: friendly-copy pattern tables, network-error detection, and `formatClientErrorMessage`. Both apps delegate to it so a single source of truth governs which raw errors are rewritten and which are hidden behind a fallback. | none |
-| `@dubgrid/design-tokens` | Shared design values. | none |
+| Package                    | Purpose                                                                                                                                                                                                                                                              | Depends on                                                               |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `@dubgrid/domain`          | Platform-neutral domain types/enums + pure logic. `Organization` (incl. `workspaceKind` / `sandbox*`), `AdminPermissions` (25 perms), role enums, billing types, `requests`, `staff`, `self-guard.ts` (`SelfActionForbiddenError`, `assertNotSelf`, `isSelfAction`). | none                                                                     |
+| `@dubgrid/contracts`       | Zod schemas + inferred types for cross-app API contracts. Re-exports `schedule`, `mobile`, `staff`; exposes a `./mobile` subpath.                                                                                                                                    | `zod`                                                                    |
+| `@dubgrid/db-types`        | DB-row TS types (`DbOrganization`, etc.): `catalog`, `organization`, `requests`, `schedule`, `staff`.                                                                                                                                                                | `contracts`, `domain`                                                    |
+| `@dubgrid/authz`           | Permission logic: `ROLE_LEVEL`, `ALL_PERMS` / `READ_ONLY_PERMS`, `applyViewImplications`, `unionPermissions`, `buildPermissionContext` / `buildPerms`, `extractJwtClaims`, `getPermissionsFromSession`.                                                              | `domain`, `@supabase/supabase-js`                                        |
+| `@dubgrid/schedule-core`   | Schedule transformation / calculation logic.                                                                                                                                                                                                                         | `contracts`                                                              |
+| `@dubgrid/data-access`     | Supabase query + data-mapping layer; currently powers the shared mobile data layer.                                                                                                                                                                                  | `contracts`, `db-types`, `domain`, `@supabase/supabase-js`               |
+| `@dubgrid/mobile-api-core` | Framework-neutral mobile backend orchestration consumed by web's `/api/mobile/v1` routes. Modules: `auth`, `people-status`, `push`, `read`, `shift-requests`, `setup`, `organization`, `write`. Rejects sandbox organizations for mobile login.                      | `authz`, `contracts`, `domain`, `schedule-core`, `@supabase/supabase-js` |
+| `@dubgrid/api-client`      | Platform-neutral HTTP client primitives: `createHeaders`, `appendQueryParams`, `createJsonApiRequest`, `ApiResponseError`.                                                                                                                                           | none                                                                     |
+| `@dubgrid/client-errors`   | Shared client-facing error translation: friendly-copy pattern tables, network-error detection, and `formatClientErrorMessage`. Both apps delegate to it so a single source of truth governs which raw errors are rewritten and which are hidden behind a fallback.   | none                                                                     |
+| `@dubgrid/design-tokens`   | Shared design values.                                                                                                                                                                                                                                                | none                                                                     |
 
 ### Dependency Boundaries
 
@@ -94,12 +94,12 @@ The mobile app intentionally has **no** dependency on Supabase packages or serve
 
 Every organization gets a unique subdomain. The middleware resolves the subdomain to an org context before any page renders.
 
-| URL Pattern                      | Resolution                       |
-| -------------------------------- | -------------------------------- |
-| `acme.dubgrid.com/schedule`      | Org "Acme", schedule page        |
-| `gridmaster.dubgrid.com`         | Gridmaster command center        |
-| `dubgrid.com`                    | Landing page (public)            |
-| `dubgrid.local:3000` (dev)       | Local development (no subdomain) |
+| URL Pattern                 | Resolution                       |
+| --------------------------- | -------------------------------- |
+| `acme.dubgrid.com/schedule` | Org "Acme", schedule page        |
+| `gridmaster.dubgrid.com`    | Gridmaster command center        |
+| `dubgrid.com`               | Landing page (public)            |
+| `dubgrid.local:3000` (dev)  | Local development (no subdomain) |
 
 ### Org Isolation
 
@@ -119,11 +119,11 @@ Subdomains are simulated using `dubgrid.local` entries in `/etc/hosts`. The `par
 
 ### Three Security Layers
 
-| Layer | Where | What It Does | Failure Mode |
-| ----- | ----- | ------------ | ------------ |
-| **Edge Middleware** (`apps/web/middleware.ts`) | Vercel CDN edge | JWT verification, role-based route blocking, subdomain enforcement, org-suspension check | Redirects to `/login` |
-| **Custom JWT Claims** | Supabase auth hook | Injects `platform_role`, `org_role`, `org_id`, `org_slug` into JWT at sign-in | User gets default `user` role |
-| **Row-Level Security** | PostgreSQL | Every query filtered by `caller_org_id()` and role checks | Query returns empty / blocked |
+| Layer                                          | Where              | What It Does                                                                             | Failure Mode                  |
+| ---------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------- | ----------------------------- |
+| **Edge Middleware** (`apps/web/middleware.ts`) | Vercel CDN edge    | JWT verification, role-based route blocking, subdomain enforcement, org-suspension check | Redirects to `/login`         |
+| **Custom JWT Claims**                          | Supabase auth hook | Injects `platform_role`, `org_role`, `org_id`, `org_slug` into JWT at sign-in            | User gets default `user` role |
+| **Row-Level Security**                         | PostgreSQL         | Every query filtered by `caller_org_id()` and role checks                                | Query returns empty / blocked |
 
 > **Middleware JWT fallback:** the `jwtVerify` catch block falls back to `decodeJwt` (unverified) for non-gridmaster users — `jwtVerify` can fail in production, and RLS is the real boundary. Gridmaster is always blocked from unverified tokens. This fallback must never be removed.
 
@@ -221,12 +221,12 @@ A new organization's 14-day trial clock starts on the **first super admin login*
 
 All schema lives in exactly **4 files** under `supabase/migrations/`. New tables, columns, or constraints are added to the appropriate file — never create additional migration files.
 
-| File | Contents |
-| ---- | -------- |
-| `001_schema.sql` | Enums, tables, foreign keys, indexes, realtime subscriptions |
-| `002_functions_triggers.sql` | Functions, triggers, auth hooks, RPCs |
-| `003_rls_policies.sql` | RLS enable statements + all policies |
-| `004_grants.sql` | Grants for anon, authenticated, service_role, supabase_auth_admin |
+| File                         | Contents                                                          |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `001_schema.sql`             | Enums, tables, foreign keys, indexes, realtime subscriptions      |
+| `002_functions_triggers.sql` | Functions, triggers, auth hooks, RPCs                             |
+| `003_rls_policies.sql`       | RLS enable statements + all policies                              |
+| `004_grants.sql`             | Grants for anon, authenticated, service_role, supabase_auth_admin |
 
 **Rationale:** Consolidating migrations into 4 files eliminates ordering issues, makes the full schema readable in one pass, and simplifies the `db:reset` workflow. Supabase runs these in alphabetical order.
 
@@ -330,13 +330,13 @@ This pattern provides type safety via row mappers (snake_case → camelCase), ce
 
 ### State Management
 
-| State Type | Managed By | Example |
-| ---------- | ---------- | ------- |
-| Server data | React Query | Employees, schedule cells, org config, coverage requirements |
-| Auth/session | Supabase Auth + `usePermissions` hook | JWT claims, admin permissions |
-| UI state | React `useState` | Modal open/close, selected date, active tab |
-| Real-time | Supabase Realtime | Schedule changes, cell locks, presence |
-| URL state | Next.js router | Active route, query params |
+| State Type   | Managed By                            | Example                                                      |
+| ------------ | ------------------------------------- | ------------------------------------------------------------ |
+| Server data  | React Query                           | Employees, schedule cells, org config, coverage requirements |
+| Auth/session | Supabase Auth + `usePermissions` hook | JWT claims, admin permissions                                |
+| UI state     | React `useState`                      | Modal open/close, selected date, active tab                  |
+| Real-time    | Supabase Realtime                     | Schedule changes, cell locks, presence                       |
+| URL state    | Next.js router                        | Active route, query params                                   |
 
 **No global state store** (no Redux, Zustand). React Query handles server-state caching and synchronization; component-local state handles UI concerns.
 
@@ -377,13 +377,13 @@ The `force-dynamic` POST is guarded by a CSRF origin check, and its actions are 
 
 Tailwind v4 is the foundation, layered with shared style modules and `@dubgrid/design-tokens`:
 
-| File | Purpose |
-| ---- | ------- |
-| `apps/web/src/lib/palette.ts` | Static hex values matching CSS custom properties, for JS inline styles. |
-| `apps/web/src/lib/colors.ts` | Color presets for jobs, shifts, focus areas; draft border + designation badge colors. |
-| `apps/web/src/lib/styles.ts` | Shared CSS-in-JS style objects for consistent layouts. |
-| `apps/web/src/emails/` | react-email components for transactional + Supabase auth emails (`email:dev` previews, `email:build` regenerates `supabase/templates/*.html`). |
-| `apps/web/src/lib/email.ts` | Small email helpers (`sanitizeHeaderValue`, `emailBaseUrl`) — the HTML now lives in `src/emails/`. |
+| File                          | Purpose                                                                                                                                        |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/lib/palette.ts` | Static hex values matching CSS custom properties, for JS inline styles.                                                                        |
+| `apps/web/src/lib/colors.ts`  | Color presets for jobs, shifts, focus areas; draft border + designation badge colors.                                                          |
+| `apps/web/src/lib/styles.ts`  | Shared CSS-in-JS style objects for consistent layouts.                                                                                         |
+| `apps/web/src/emails/`        | react-email components for transactional + Supabase auth emails (`email:dev` previews, `email:build` regenerates `supabase/templates/*.html`). |
+| `apps/web/src/lib/email.ts`   | Small email helpers (`sanitizeHeaderValue`, `emailBaseUrl`) — the HTML now lives in `src/emails/`.                                             |
 
 Two parallel button/input vocabularies coexist by design: `dg-btn-*` / `dg-input` inside the authenticated app, and `dg-auth-*` for public auth flows. See `CLAUDE.md` for the full design-system conventions.
 
@@ -472,49 +472,49 @@ DubGrid uses Supabase Realtime for three purposes:
 
 ### Third-Party Integrations
 
-| Service | Use |
-| ------- | --- |
-| **Stripe** | Billing, subscriptions, checkout, webhooks |
-| **Resend** | Transactional email (invites, demo requests, notifications) |
-| **PostHog** | Product analytics, onboarding telemetry |
-| **Sentry** | Error monitoring |
-| **Upstash Redis** | Caching (org-suspension lookups) + rate limiting |
-| **Vercel Analytics** | Web performance / traffic analytics |
-| **Expo** | Mobile builds + push notifications |
+| Service              | Use                                                         |
+| -------------------- | ----------------------------------------------------------- |
+| **Stripe**           | Billing, subscriptions, checkout, webhooks                  |
+| **Resend**           | Transactional email (invites, demo requests, notifications) |
+| **PostHog**          | Product analytics, onboarding telemetry                     |
+| **Sentry**           | Error monitoring                                            |
+| **Upstash Redis**    | Caching (org-suspension lookups) + rate limiting            |
+| **Vercel Analytics** | Web performance / traffic analytics                         |
+| **Expo**             | Mobile builds + push notifications                          |
 
 ### Environment Configuration
 
-| Variable | Purpose | Scope |
-| -------- | ------- | ----- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase API URL | web: client + server |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | web: client + server |
-| `NEXT_PUBLIC_SITE_URL` | Public site URL (CSRF origin check) | web: client + server |
-| ~~`SUPABASE_JWT_SECRET`~~ | _Removed_ — JWT verification uses JWKS (ES256) via Supabase's `.well-known/jwks.json` | — |
-| `RESEND_API_KEY` | Email sending via Resend | web: server only |
-| `UPSTASH_REDIS_REST_URL` | Redis backend (cache + rate limiting) | web: server only |
-| `UPSTASH_REDIS_REST_TOKEN` | Redis auth token | web: server only |
-| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe billing + webhook verification | web: server only |
-| PostHog / Sentry keys | Analytics + error monitoring | web: per provider config |
-| `EXPO_PUBLIC_API_BASE_URL` | Base URL the mobile app calls for `/api/mobile/v1/*` | mobile: client |
+| Variable                                      | Purpose                                                                               | Scope                    |
+| --------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------ |
+| `NEXT_PUBLIC_SUPABASE_URL`                    | Supabase API URL                                                                      | web: client + server     |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`               | Supabase anon key                                                                     | web: client + server     |
+| `NEXT_PUBLIC_SITE_URL`                        | Public site URL (CSRF origin check)                                                   | web: client + server     |
+| ~~`SUPABASE_JWT_SECRET`~~                     | _Removed_ — JWT verification uses JWKS (ES256) via Supabase's `.well-known/jwks.json` | —                        |
+| `RESEND_API_KEY`                              | Email sending via Resend                                                              | web: server only         |
+| `UPSTASH_REDIS_REST_URL`                      | Redis backend (cache + rate limiting)                                                 | web: server only         |
+| `UPSTASH_REDIS_REST_TOKEN`                    | Redis auth token                                                                      | web: server only         |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe billing + webhook verification                                                 | web: server only         |
+| PostHog / Sentry keys                         | Analytics + error monitoring                                                          | web: per provider config |
+| `EXPO_PUBLIC_API_BASE_URL`                    | Base URL the mobile app calls for `/api/mobile/v1/*`                                  | mobile: client           |
 
 ---
 
 ## 10. Key Design Decisions
 
-| Decision | Rationale |
-| -------- | --------- |
-| **Monorepo (npm workspaces + Turborepo)** | Web and mobile share domain types, contracts, and permission logic via versioned packages. One source of truth for business rules; the mobile app stays a thin client with no DB access. |
-| **4-file migration strategy** | Eliminates migration ordering issues, makes the full schema readable, simplifies resets. Trade-off: merge conflicts on a team, but acceptable at current size. |
-| **Subdomain-based multi-tenancy** | Strongest tenant isolation — org context is in the URL, not a query parameter. Prevents accidental cross-tenant data access. |
-| **JWT claims at top level** | Middleware reads `payload.platform_role` directly. Avoids the `app_metadata` nesting Supabase defaults to, which is harder to parse at the edge. |
-| **RLS as the real security boundary** | Middleware is a fast first filter that can fail; RLS at the database is the authoritative gate. Middleware keeps a `decodeJwt` fallback for non-gridmaster users so a `jwtVerify` failure never locks legitimate users out. |
-| **Per-person admin permissions (JSONB)** | More flexible than fixed roles. 25 individually-toggled flags set per person on the People page, with `canManage*` implying `canView*`. Departments do not grant permissions. Organizations build custom permission profiles without schema changes. |
-| **Browser never touches data tables** | All app data flows browser → `features/*/client/api.ts` → Route Handler → `lib/db/*`. Centralizes authorization and keeps Supabase access server-side; mobile follows the same shape via `/api/mobile/v1/*` → `mobile-api-core`. |
-| **No global state store** | React Query handles server state; local state handles UI. Avoids Redux/Zustand boilerplate for a primarily server-data-driven app. |
-| **Optimistic locking over pessimistic** | Allows concurrent editing without blocking. Lock violations are rare (cell locks reduce conflicts further) and the UX beats waiting for locks. |
-| **Simple routes (no catch-all)** | Vercel statically prerenders simple routes at build time. Catch-all routes (`[[...slug]]`) force dynamic serverless rendering. |
-| **Invite-only registration** | Care facilities control who has access. No public sign-up; invitations link to existing employee records. |
-| **Three security layers** | Defense in depth: middleware for speed, JWT claims for identity, RLS for correctness. Any single layer can fail without compromising security. |
+| Decision                                  | Rationale                                                                                                                                                                                                                                            |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Monorepo (npm workspaces + Turborepo)** | Web and mobile share domain types, contracts, and permission logic via versioned packages. One source of truth for business rules; the mobile app stays a thin client with no DB access.                                                             |
+| **4-file migration strategy**             | Eliminates migration ordering issues, makes the full schema readable, simplifies resets. Trade-off: merge conflicts on a team, but acceptable at current size.                                                                                       |
+| **Subdomain-based multi-tenancy**         | Strongest tenant isolation — org context is in the URL, not a query parameter. Prevents accidental cross-tenant data access.                                                                                                                         |
+| **JWT claims at top level**               | Middleware reads `payload.platform_role` directly. Avoids the `app_metadata` nesting Supabase defaults to, which is harder to parse at the edge.                                                                                                     |
+| **RLS as the real security boundary**     | Middleware is a fast first filter that can fail; RLS at the database is the authoritative gate. Middleware keeps a `decodeJwt` fallback for non-gridmaster users so a `jwtVerify` failure never locks legitimate users out.                          |
+| **Per-person admin permissions (JSONB)**  | More flexible than fixed roles. 25 individually-toggled flags set per person on the People page, with `canManage*` implying `canView*`. Departments do not grant permissions. Organizations build custom permission profiles without schema changes. |
+| **Browser never touches data tables**     | All app data flows browser → `features/*/client/api.ts` → Route Handler → `lib/db/*`. Centralizes authorization and keeps Supabase access server-side; mobile follows the same shape via `/api/mobile/v1/*` → `mobile-api-core`.                     |
+| **No global state store**                 | React Query handles server state; local state handles UI. Avoids Redux/Zustand boilerplate for a primarily server-data-driven app.                                                                                                                   |
+| **Optimistic locking over pessimistic**   | Allows concurrent editing without blocking. Lock violations are rare (cell locks reduce conflicts further) and the UX beats waiting for locks.                                                                                                       |
+| **Simple routes (no catch-all)**          | Vercel statically prerenders simple routes at build time. Catch-all routes (`[[...slug]]`) force dynamic serverless rendering.                                                                                                                       |
+| **Invite-only registration**              | Care facilities control who has access. No public sign-up; invitations link to existing employee records.                                                                                                                                            |
+| **Three security layers**                 | Defense in depth: middleware for speed, JWT claims for identity, RLS for correctness. Any single layer can fail without compromising security.                                                                                                       |
 
 ---
 

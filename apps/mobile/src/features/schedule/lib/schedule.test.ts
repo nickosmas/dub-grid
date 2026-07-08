@@ -56,11 +56,7 @@ describe("mobile schedule helpers", () => {
 
   it("anchors the visible range to the organization timezone instead of the device timezone", () => {
     expect(
-      getScheduleRange(
-        0,
-        "America/Los_Angeles",
-        new Date("2026-04-16T06:30:00.000Z"),
-      ),
+      getScheduleRange(0, "America/Los_Angeles", new Date("2026-04-16T06:30:00.000Z")),
     ).toEqual({
       startDate: "2026-04-12",
       endDate: "2026-04-18",
@@ -84,9 +80,7 @@ describe("mobile schedule helpers", () => {
   });
 
   it("formats optional custom shift times", () => {
-    expect(formatScheduleTimeRange("07:00:00", "19:30:00")).toBe(
-      "7:00 AM - 7:30 PM",
-    );
+    expect(formatScheduleTimeRange("07:00:00", "19:30:00")).toBe("7:00 AM - 7:30 PM");
     expect(formatScheduleTimeRange(null, "19:30:00")).toBeNull();
     expect(
       getScheduleEntryTimeRange({
@@ -291,15 +285,13 @@ describe("mobile schedule helpers", () => {
   it("uses the organization timezone for Today and Tomorrow labels", () => {
     const now = new Date("2026-04-16T06:30:00.000Z");
 
-    expect(
-      formatScheduleDayLabel("2026-04-14", now, "America/Los_Angeles"),
-    ).toBe("Yesterday, Apr 14");
-    expect(
-      formatScheduleDayLabel("2026-04-15", now, "America/Los_Angeles"),
-    ).toBe("Today, Apr 15");
-    expect(
-      formatScheduleDayLabel("2026-04-16", now, "America/Los_Angeles"),
-    ).toBe("Tomorrow, Apr 16");
+    expect(formatScheduleDayLabel("2026-04-14", now, "America/Los_Angeles")).toBe(
+      "Yesterday, Apr 14",
+    );
+    expect(formatScheduleDayLabel("2026-04-15", now, "America/Los_Angeles")).toBe("Today, Apr 15");
+    expect(formatScheduleDayLabel("2026-04-16", now, "America/Los_Angeles")).toBe(
+      "Tomorrow, Apr 16",
+    );
   });
 
   it("groups entries into ordered daily sections", () => {
@@ -545,12 +537,7 @@ describe("mobile schedule helpers", () => {
       },
     ];
 
-    expect(sortScheduleEntries(entries)).toEqual([
-      entries[3],
-      entries[1],
-      entries[2],
-      entries[0],
-    ]);
+    expect(sortScheduleEntries(entries)).toEqual([entries[3], entries[1], entries[2], entries[0]]);
     expect(buildScheduleShiftGroups(entries)).toEqual([
       {
         key: "shift:1",
@@ -601,9 +588,7 @@ describe("mobile schedule helpers", () => {
     } as const;
 
     expect(getScheduleEntrySegments(entry)).toEqual(entry.segments);
-    expect(getScheduleEntrySegmentTimeRange(entry.segments[0]!)).toBe(
-      "7:00 AM - 3:00 PM",
-    );
+    expect(getScheduleEntrySegmentTimeRange(entry.segments[0]!)).toBe("7:00 AM - 3:00 PM");
     expect(
       getScheduleEntrySegments({
         shiftName: "Night Shift",
@@ -697,9 +682,7 @@ describe("mobile schedule helpers", () => {
       ],
     };
 
-    const sortedSplitSegments = getSplitShiftSegmentsForEntry(
-      splitEntry as never,
-    );
+    const sortedSplitSegments = getSplitShiftSegmentsForEntry(splitEntry as never);
 
     expect(sortedSplitSegments).toHaveLength(2);
     expect(sortedSplitSegments[0]?.shiftName).toBe("Day Shift");
@@ -918,17 +901,10 @@ describe("mobile schedule helpers", () => {
     ]);
 
     expect(
-      filterTeamScheduleEntriesByFocusArea(
-        entries,
-        TEAM_SCHEDULE_ALL_FOCUS_AREAS_KEY,
-      ),
+      filterTeamScheduleEntriesByFocusArea(entries, TEAM_SCHEDULE_ALL_FOCUS_AREAS_KEY),
     ).toHaveLength(3);
-    expect(
-      filterTeamScheduleEntriesByFocusArea(entries, "focus-area:2"),
-    ).toEqual([entries[0]]);
-    expect(
-      filterTeamScheduleEntriesByFocusArea(entries, "focus-area:3"),
-    ).toEqual([]);
+    expect(filterTeamScheduleEntriesByFocusArea(entries, "focus-area:2")).toEqual([entries[0]]);
+    expect(filterTeamScheduleEntriesByFocusArea(entries, "focus-area:3")).toEqual([]);
   });
 
   it("builds team focus area tabs from entries when bootstrap focus areas are missing", () => {
@@ -1293,9 +1269,7 @@ describe("mobile schedule helpers", () => {
     ]);
 
     expect(items).toHaveLength(1);
-    expect(
-      getScheduleEntrySegmentFocusAreaName(items[0]!.entry, items[0]!.segment),
-    ).toBeNull();
+    expect(getScheduleEntrySegmentFocusAreaName(items[0]!.entry, items[0]!.segment)).toBeNull();
   });
 
   it("splits open shift claims from targeted cover requests", () => {
@@ -1375,12 +1349,8 @@ describe("mobile schedule helpers", () => {
       timeZone: "America/Los_Angeles",
     });
 
-    expect(sections.openShiftRequests.map((request) => request.id)).toEqual([
-      "pickup-open",
-    ]);
-    expect(sections.coverRequests.map((request) => request.id)).toEqual([
-      "cover-open",
-    ]);
+    expect(sections.openShiftRequests.map((request) => request.id)).toEqual(["pickup-open"]);
+    expect(sections.coverRequests.map((request) => request.id)).toEqual(["cover-open"]);
   });
 
   it("groups available open shifts and pickup requests by date before rendering", () => {
@@ -1600,8 +1570,7 @@ describe("mobile schedule helpers", () => {
           focusAreaName: "ICU",
           needed: 1,
           canVolunteer: false,
-          volunteerBlockReason:
-            "You do not meet the eligibility requirements for this shift.",
+          volunteerBlockReason: "You do not meet the eligibility requirements for this shift.",
           state: {
             kind: "worked",
             segments: [{ shiftId: 6, jobId: 15, position: 0 }],
@@ -1792,9 +1761,7 @@ describe("mobile schedule helpers", () => {
 
     expect(feed.totalCount).toBe(4);
     expect(feed.openShifts.map((shift) => shift.id)).toEqual(["open-clear"]);
-    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
-      "request-clear",
-    ]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual(["request-clear"]);
     expect(feed.groups).toMatchObject([
       {
         date: "2026-04-18",
@@ -2012,9 +1979,7 @@ describe("mobile schedule helpers", () => {
     // The conflicting open shift and pickup overlap emp-1's own 07:00-15:00
     // shift, so only the clear (non-overlapping) items survive.
     expect(feed.openShifts.map((shift) => shift.id)).toEqual(["open-clear"]);
-    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
-      "request-clear",
-    ]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual(["request-clear"]);
   });
 
   it("shows every eligible open shift regardless of availability when visibility is 'always'", () => {
@@ -2027,10 +1992,7 @@ describe("mobile schedule helpers", () => {
     // Availability filtering is bypassed, so the conflicting items reappear.
     // Hard eligibility (canVolunteer) and own-request exclusion still apply,
     // but neither is present in this fixture.
-    expect(feed.openShifts.map((shift) => shift.id)).toEqual([
-      "open-conflict",
-      "open-clear",
-    ]);
+    expect(feed.openShifts.map((shift) => shift.id)).toEqual(["open-conflict", "open-clear"]);
     expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
       "request-conflict",
       "request-clear",
@@ -2142,12 +2104,8 @@ describe("mobile schedule helpers", () => {
     });
 
     expect(feed.openShifts).toEqual([]);
-    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
-      "pending-volunteer",
-    ]);
-    expect(feed.groups[0]?.items).toMatchObject([
-      { kind: "request", key: "pending-volunteer" },
-    ]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual(["pending-volunteer"]);
+    expect(feed.groups[0]?.items).toMatchObject([{ kind: "request", key: "pending-volunteer" }]);
   });
 
   it("keeps partially filled open shifts visible to other mobile users", () => {
@@ -2317,9 +2275,7 @@ describe("mobile schedule helpers", () => {
     });
 
     expect(feed.openShifts).toMatchObject([{ id: "open-icu" }]);
-    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
-      "pending-other-focus",
-    ]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual(["pending-other-focus"]);
   });
 
   it("filters started open requests and open shifts using org-local time", () => {
@@ -2529,13 +2485,9 @@ describe("mobile schedule helpers", () => {
       timeZone: "America/Los_Angeles",
     });
 
-    expect(sections.coverRequests.map((request) => request.id)).toEqual([
-      "future-cover",
-    ]);
+    expect(sections.coverRequests.map((request) => request.id)).toEqual(["future-cover"]);
     expect(feed.openShifts.map((shift) => shift.id)).toEqual(["future-open"]);
-    expect(feed.openShiftRequests.map((request) => request.id)).toEqual([
-      "future-request",
-    ]);
+    expect(feed.openShiftRequests.map((request) => request.id)).toEqual(["future-request"]);
   });
 
   it("keeps org-wide open shifts visible for editor-style show-all feeds", () => {

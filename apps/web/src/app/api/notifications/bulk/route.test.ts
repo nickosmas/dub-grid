@@ -10,10 +10,8 @@ vi.mock("@/lib/csrf", () => ({
 }));
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
-    requireAuthenticatedUserWithClaims(req),
-  createRequestSupabaseClient: (req: NextRequest) =>
-    createRequestSupabaseClient(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
+  createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
 }));
 
 import { POST } from "./route";
@@ -74,16 +72,12 @@ describe("POST /api/notifications/bulk org-scoping", () => {
     // no user_id or org_id filter — a user in org A who knew an org-B
     // notification's UUID could mark it read. RLS already prevents this,
     // but this is the route-layer defense.
-    const response = await POST(
-      makeRequest({ action: "read", ids: [FOREIGN_NOTIFICATION_ID] }),
-    );
+    const response = await POST(makeRequest({ action: "read", ids: [FOREIGN_NOTIFICATION_ID] }));
     expect(response.status).toBe(200);
 
     expect(builder.in).toHaveBeenCalledWith("id", [FOREIGN_NOTIFICATION_ID]);
     expect(builder.eq).toHaveBeenCalledWith("user_id", USER_ID);
-    expect(builder.or).toHaveBeenCalledWith(
-      `org_id.eq.${ORG_ID},org_id.is.null`,
-    );
+    expect(builder.or).toHaveBeenCalledWith(`org_id.eq.${ORG_ID},org_id.is.null`);
   });
 
   it("restricts to platform-only when the caller has no current org", async () => {
@@ -93,14 +87,10 @@ describe("POST /api/notifications/bulk org-scoping", () => {
       claims: { sub: USER_ID, org_id: null },
     });
 
-    const response = await POST(
-      makeRequest({ action: "archive", ids: [FOREIGN_NOTIFICATION_ID] }),
-    );
+    const response = await POST(makeRequest({ action: "archive", ids: [FOREIGN_NOTIFICATION_ID] }));
     expect(response.status).toBe(200);
 
     expect(builder.is).toHaveBeenCalledWith("org_id", null);
-    expect(builder.or).not.toHaveBeenCalledWith(
-      expect.stringContaining("org_id.eq."),
-    );
+    expect(builder.or).not.toHaveBeenCalledWith(expect.stringContaining("org_id.eq."));
   });
 });

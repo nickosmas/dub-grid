@@ -48,7 +48,7 @@ export const scenarios = {
 };
 
 export const thresholds = {
-  http_req_duration: ["p(95)<500"],      // 95% of reads < 500ms
-  http_req_failed: ["rate<0.01"],        // <1% error rate
+  http_req_duration: ["p(95)<500"], // 95% of reads < 500ms
+  http_req_failed: ["rate<0.01"], // <1% error rate
   "http_req_duration{type:write}": ["p(95)<1000"], // writes < 1s
 };

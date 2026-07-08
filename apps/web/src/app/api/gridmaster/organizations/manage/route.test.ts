@@ -112,9 +112,7 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         return {
           insert: vi.fn(() => ({
             select: vi.fn(() => ({
-              single: vi.fn(() =>
-                Promise.resolve({ data: { id: "employee-id" }, error: null }),
-              ),
+              single: vi.fn(() => Promise.resolve({ data: { id: "employee-id" }, error: null })),
             })),
           })),
         };
@@ -131,9 +129,7 @@ describe("POST /api/gridmaster/organizations/manage", () => {
       NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     );
 
-    const response = await POST(
-      makeRequest({ action: "archiveOrganization", orgId: ORG_ID }),
-    );
+    const response = await POST(makeRequest({ action: "archiveOrganization", orgId: ORG_ID }));
 
     expect(response.status).toBe(403);
     expect(requireGridmasterSession).not.toHaveBeenCalled();
@@ -164,9 +160,7 @@ describe("POST /api/gridmaster/organizations/manage", () => {
   });
 
   it("archives an organization and writes an audit event", async () => {
-    const response = await POST(
-      makeRequest({ action: "archiveOrganization", orgId: ORG_ID }),
-    );
+    const response = await POST(makeRequest({ action: "archiveOrganization", orgId: ORG_ID }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
@@ -264,8 +258,6 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         subscription_status: "trialing",
       }),
     );
-    expect(organizationInsert.mock.calls[0][0]).not.toHaveProperty(
-      "trial_ends_at",
-    );
+    expect(organizationInsert.mock.calls[0][0]).not.toHaveProperty("trial_ends_at");
   });
 });

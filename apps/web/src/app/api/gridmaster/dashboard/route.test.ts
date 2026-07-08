@@ -43,12 +43,11 @@ function makeRequest() {
 function makeOrganizationsQuery(rows: Record<string, unknown>[]) {
   const query = {
     select: vi.fn(() => query),
-    order: vi.fn(
-      () =>
-        Promise.resolve({
-          data: rows,
-          error: null,
-        }),
+    order: vi.fn(() =>
+      Promise.resolve({
+        data: rows,
+        error: null,
+      }),
     ),
   };
   return query;
@@ -143,10 +142,7 @@ describe("GET /api/gridmaster/dashboard", () => {
       count: "exact",
       head: true,
     });
-    expect(profilesCountQuery.neq).toHaveBeenCalledWith(
-      "platform_role",
-      "gridmaster",
-    );
+    expect(profilesCountQuery.neq).toHaveBeenCalledWith("platform_role", "gridmaster");
     expect(serviceRpc).not.toHaveBeenCalled();
   });
 });

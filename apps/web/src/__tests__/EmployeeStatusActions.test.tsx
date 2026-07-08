@@ -50,12 +50,8 @@ describe("EmployeeStatusActions", () => {
     // Modal opens with "Mark inactive" selected by default → primary button
     // reads "Mark Inactive" (not "Remove").
     const dialog = screen.getByRole("dialog", { name: /Deactivate Alice Smith/i });
-    expect(
-      within(dialog).getByRole("radio", { name: /Mark inactive/i }),
-    ).toBeChecked();
-    expect(
-      within(dialog).getByRole("radio", { name: /Remove from staff/i }),
-    ).not.toBeChecked();
+    expect(within(dialog).getByRole("radio", { name: /Mark inactive/i })).toBeChecked();
+    expect(within(dialog).getByRole("radio", { name: /Remove from staff/i })).not.toBeChecked();
 
     await user.type(
       within(dialog).getByPlaceholderText(/Reason \(optional\)/),
@@ -94,9 +90,7 @@ describe("EmployeeStatusActions", () => {
     const noteInput = within(dialog).getByPlaceholderText(/Reason \(optional\)/);
     await user.type(noteInput, "  Left the company  ");
 
-    await user.click(
-      within(dialog).getByRole("checkbox", { name: /also revoke app access/i }),
-    );
+    await user.click(within(dialog).getByRole("checkbox", { name: /also revoke app access/i }));
     await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
     expect(onRemove).toHaveBeenCalledWith("emp-1", "Left the company");

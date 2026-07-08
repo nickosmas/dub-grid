@@ -6,8 +6,7 @@ const endingSoonQuery = vi.fn();
 const expiredQuery = vi.fn();
 
 vi.mock("@/features/notifications/server/events", () => ({
-  dispatchNotificationEvent: (...args: unknown[]) =>
-    dispatchNotificationEvent(...args),
+  dispatchNotificationEvent: (...args: unknown[]) => dispatchNotificationEvent(...args),
 }));
 
 // Track which query is being built across .from() calls. The route's first
@@ -26,9 +25,7 @@ vi.mock("@/lib/supabase-service", () => ({
       builder.in = vi.fn(() => builder);
       builder.is = vi.fn(() => {
         const inner: Record<string, unknown> = {};
-        inner.is = vi.fn(() =>
-          myIndex === 0 ? endingSoonQuery() : expiredQuery(),
-        );
+        inner.is = vi.fn(() => (myIndex === 0 ? endingSoonQuery() : expiredQuery()));
         return inner;
       });
       return builder;

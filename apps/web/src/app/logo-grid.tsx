@@ -53,8 +53,8 @@ export function LogoGrid({ size, color = COLORS.light }: GridProps) {
   }
 
   const cell = size / 4;
-  const gap = cell * 0.10;
-  const r = cell * 0.20;
+  const gap = cell * 0.1;
+  const r = cell * 0.2;
 
   return (
     <div

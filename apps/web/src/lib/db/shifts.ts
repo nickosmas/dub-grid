@@ -1,6 +1,4 @@
-import {
-  supabase, OptimisticLockError, logAudit, fetchAllRows,
-} from "./shared";
+import { supabase, OptimisticLockError, logAudit, fetchAllRows } from "./shared";
 import { fetchAssignmentDefinitions } from "./config";
 import type { DbScheduleCell } from "./types";
 import type { ScheduleCellInput, ScheduleCellSegmentInput, ShiftMap } from "@/types";
@@ -96,9 +94,7 @@ async function fetchNormalizedShifts(
   return map;
 }
 
-function sortSegments(
-  segments: ScheduleCellSegmentInput[],
-): ScheduleCellSegmentInput[] {
+function sortSegments(segments: ScheduleCellSegmentInput[]): ScheduleCellSegmentInput[] {
   return [...segments].sort((left, right) => left.position - right.position);
 }
 
@@ -114,9 +110,7 @@ async function resolveAssignmentDefinitionIdsForSegments(
   );
 
   return orderedSegments
-    .map((segment) =>
-      codeByPair.get(buildShiftJobPairKey(segment.shiftId, segment.jobId)) ?? null,
-    )
+    .map((segment) => codeByPair.get(buildShiftJobPairKey(segment.shiftId, segment.jobId)) ?? null)
     .filter((assignmentId): assignmentId is number => assignmentId != null);
 }
 
@@ -268,7 +262,9 @@ export async function checkAssignmentDefinitionOverlap(
       start: toMinutes(assignment.defaultStartTime ?? null),
       end: toMinutes(assignment.defaultEndTime ?? null),
     }))
-    .filter((c: { start: number | null; end: number | null }) => c.start !== null && c.end !== null);
+    .filter(
+      (c: { start: number | null; end: number | null }) => c.start !== null && c.end !== null,
+    );
 
   for (let i = 0; i < parsed.length; i++) {
     for (let j = i + 1; j < parsed.length; j++) {
@@ -356,18 +352,8 @@ export async function upsertShiftTimes(
   orgId: string,
   expectedVersion?: number,
 ): Promise<void> {
-  const draftPayload = await fetchScheduleCellSnapshotPayload(
-    orgId,
-    empId,
-    date,
-    "draft",
-  );
-  const publishedPayload = await fetchScheduleCellSnapshotPayload(
-    orgId,
-    empId,
-    date,
-    "published",
-  );
+  const draftPayload = await fetchScheduleCellSnapshotPayload(orgId, empId, date, "draft");
+  const publishedPayload = await fetchScheduleCellSnapshotPayload(orgId, empId, date, "published");
   const sourcePayload =
     draftPayload?.state_kind === "worked"
       ? draftPayload
@@ -399,18 +385,18 @@ export async function upsertShiftTimes(
 
   if (error) {
     if (error.message?.includes("Optimistic lock failed")) {
-      await throwOptimisticLock(
-        empId,
-        date,
-        orgId,
-        expectedVersion ?? sourcePayload.version ?? 0,
-      );
+      await throwOptimisticLock(empId, date, orgId, expectedVersion ?? sourcePayload.version ?? 0);
     }
     throw error;
   }
 }
 
-export async function deleteShift(empId: string, date: string, orgId: string, expectedVersion?: number): Promise<void> {
+export async function deleteShift(
+  empId: string,
+  date: string,
+  orgId: string,
+  expectedVersion?: number,
+): Promise<void> {
   const { error } = await supabase.rpc("delete_schedule_cell_draft", {
     p_org_id: orgId,
     p_emp_id: empId,
@@ -471,19 +457,22 @@ export async function moveShift(
   });
   if (error) {
     if (error.message?.includes("Optimistic lock failed")) {
-      throw new OptimisticLockError(
-        `${sourceEmpId}:${sourceDate}`,
-        expectedVersion ?? 0,
-      );
+      throw new OptimisticLockError(`${sourceEmpId}:${sourceDate}`, expectedVersion ?? 0);
     }
     throw error;
   }
-  void logAudit("shift.moved", "shift", `${sourceEmpId}:${sourceDate}`, {
-    targetEmpId,
-    targetDate,
-    input,
-    assignmentIds,
-    absenceTypeId: absenceTypeId ?? null,
-    dragMode,
-  }, orgId);
+  void logAudit(
+    "shift.moved",
+    "shift",
+    `${sourceEmpId}:${sourceDate}`,
+    {
+      targetEmpId,
+      targetDate,
+      input,
+      assignmentIds,
+      absenceTypeId: absenceTypeId ?? null,
+      dragMode,
+    },
+    orgId,
+  );
 }

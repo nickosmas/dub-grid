@@ -41,9 +41,7 @@ describe("extractDateKeyFromCellKey", () => {
     expect(extractDateKeyFromCellKey("emp-abc_2026-05-17")).toBe("2026-05-17");
   });
   it("parses a note key with a focus area suffix", () => {
-    expect(extractDateKeyFromCellKey("emp-abc_2026-05-17_42")).toBe(
-      "2026-05-17",
-    );
+    expect(extractDateKeyFromCellKey("emp-abc_2026-05-17_42")).toBe("2026-05-17");
   });
   it("returns null when no recognizable date is present", () => {
     expect(extractDateKeyFromCellKey("emp-abc")).toBeNull();
@@ -64,9 +62,7 @@ describe("computeDraftBreakdown", () => {
       { indicatorTypeId: 1, status: "draft" as const },
       { indicatorTypeId: 2, status: "published" as const },
     ],
-    "e1_2026-06-05_3": [
-      { indicatorTypeId: 1, status: "draft" as const },
-    ],
+    "e1_2026-06-05_3": [{ indicatorTypeId: 1, status: "draft" as const }],
   };
 
   it("counts all drafts when no date range is provided", () => {
@@ -127,10 +123,7 @@ describe("computeOutOfWindowDraftGroups", () => {
       weekOf,
       parseWeekKey,
     );
-    expect(result.map((g) => g.periodKey)).toEqual([
-      "2026-05-03",
-      "2026-05-31",
-    ]);
+    expect(result.map((g) => g.periodKey)).toEqual(["2026-05-03", "2026-05-31"]);
     // Week of 5/3: 2 shifts + 1 note = 3 drafts
     expect(result[0]?.count).toBe(3);
     // Week of 5/31: 1 shift
@@ -170,23 +163,26 @@ describe("computeOutOfWindowDraftGroups", () => {
     const postPublishShifts: ShiftMap = {};
     // 12 drafts in week of 2026-05-03
     for (let i = 3; i <= 9; i++) {
-      postPublishShifts[`e1_2026-05-${String(i).padStart(2, "0")}`] =
-        shiftEntry(i % 2 === 0 ? "new" : "modified");
+      postPublishShifts[`e1_2026-05-${String(i).padStart(2, "0")}`] = shiftEntry(
+        i % 2 === 0 ? "new" : "modified",
+      );
     }
     // 15 drafts in week of 2026-05-31
     for (let i = 31; i <= 31; i++) {
-      postPublishShifts[`e1_2026-05-${String(i).padStart(2, "0")}`] =
-        shiftEntry("new");
+      postPublishShifts[`e1_2026-05-${String(i).padStart(2, "0")}`] = shiftEntry("new");
     }
     for (let i = 1; i <= 6; i++) {
-      postPublishShifts[`e2_2026-06-${String(i).padStart(2, "0")}`] =
-        shiftEntry("new");
+      postPublishShifts[`e2_2026-06-${String(i).padStart(2, "0")}`] = shiftEntry("new");
     }
 
-    const inWindow = computeDraftBreakdown(postPublishShifts, {}, {
-      startDateKey: "2026-05-17",
-      endDateKey: "2026-05-30",
-    });
+    const inWindow = computeDraftBreakdown(
+      postPublishShifts,
+      {},
+      {
+        startDateKey: "2026-05-17",
+        endDateKey: "2026-05-30",
+      },
+    );
     expect(inWindow.totalChanges).toBe(0); // banner correctly empty post-publish
 
     const groups = computeOutOfWindowDraftGroups(

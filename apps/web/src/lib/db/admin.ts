@@ -1,4 +1,12 @@
-import { supabase, cacheThrough, cacheDel, CacheKey, TTL, logAudit, ORGANIZATION_WITH_BILLING_COLS } from "./shared";
+import {
+  supabase,
+  cacheThrough,
+  cacheDel,
+  CacheKey,
+  TTL,
+  logAudit,
+  ORGANIZATION_WITH_BILLING_COLS,
+} from "./shared";
 import type { DbInvitation, DbOrganization, TenantStats } from "./types";
 import { rowToInvitation, rowToOrganization } from "./mappers";
 import { removeOrganizationMembershipGuarded, revokeOrganizationInvitationGuarded } from "./access";
@@ -16,10 +24,7 @@ import type {
   PlatformUser,
 } from "@/types";
 
-async function countScheduleCellsCreatedSince(
-  orgId: string,
-  since: string,
-): Promise<number> {
+async function countScheduleCellsCreatedSince(orgId: string, since: string): Promise<number> {
   const { count, error } = await supabase
     .from("schedule_cells")
     .select("id", { count: "exact", head: true })
@@ -29,47 +34,44 @@ async function countScheduleCellsCreatedSince(
   return count ?? 0;
 }
 
-export async function fetchAllOrganizations(
-  options?: { limit?: number; offset?: number },
-): Promise<Organization[]> {
+export async function fetchAllOrganizations(options?: {
+  limit?: number;
+  offset?: number;
+}): Promise<Organization[]> {
   const limit = options?.limit ?? 500;
   const offset = options?.offset ?? 0;
-  return cacheThrough(
-    `${CacheKey.allOrganizations()}:${offset}:${limit}`,
-    TTL.STABLE,
-    async () => {
-      const { data, error } = await supabase
-        .from("organizations")
-        .select(ORGANIZATION_WITH_BILLING_COLS)
-        .order("name")
-        .range(offset, offset + limit - 1);
-      if (error) throw error;
-      return (data ?? []).map((row: unknown) => rowToOrganization(row as DbOrganization));
-    },
-  );
+  return cacheThrough(`${CacheKey.allOrganizations()}:${offset}:${limit}`, TTL.STABLE, async () => {
+    const { data, error } = await supabase
+      .from("organizations")
+      .select(ORGANIZATION_WITH_BILLING_COLS)
+      .order("name")
+      .range(offset, offset + limit - 1);
+    if (error) throw error;
+    return (data ?? []).map((row: unknown) => rowToOrganization(row as DbOrganization));
+  });
 }
 
-export async function createOrganization(data: Omit<Organization, 'id'>): Promise<Organization> {
+export async function createOrganization(data: Omit<Organization, "id">): Promise<Organization> {
   const address = composeOrganizationAddress(data);
   const { data: row, error } = await supabase
     .from("organizations")
     .insert({
       name: data.name,
       slug: data.slug || null,
-      address: address || '',
-      address_line_1: data.addressLine1 || '',
-      address_line_2: data.addressLine2 || '',
-      address_city: data.addressCity || '',
-      address_state: data.addressState || '',
-      address_postal_code: data.addressPostalCode || '',
-      address_country: data.addressCountry || '',
-      phone: data.phone || '',
+      address: address || "",
+      address_line_1: data.addressLine1 || "",
+      address_line_2: data.addressLine2 || "",
+      address_city: data.addressCity || "",
+      address_state: data.addressState || "",
+      address_postal_code: data.addressPostalCode || "",
+      address_country: data.addressCountry || "",
+      phone: data.phone || "",
       employee_count: data.employeeCount ?? null,
       focus_area_label: data.focusAreaLabel || null,
       certification_label: data.certificationLabel || null,
       role_label: data.roleLabel || null,
       department_label: data.departmentLabel || null,
-      shift_display_mode: data.shiftDisplayMode || 'code',
+      shift_display_mode: data.shiftDisplayMode || "code",
       timezone: data.timezone || null,
       pay_period_start_date: data.payPeriodStartDate || null,
       subscription_status: "trialing",
@@ -111,7 +113,9 @@ export async function restoreOrganization(orgId: string): Promise<void> {
 }
 
 export async function deactivateUser(userId: string, orgId: string): Promise<void> {
-  const { data: { user: actor } } = await supabase.auth.getUser();
+  const {
+    data: { user: actor },
+  } = await supabase.auth.getUser();
   const { error } = await supabase
     .from("profiles")
     .update({ deactivated_at: new Date().toISOString(), deactivated_by: actor?.id ?? null })
@@ -160,8 +164,8 @@ export async function fetchAllUsers(): Promise<PlatformUser[]> {
       email: (row.email as string | null) ?? null,
       firstName: null,
       lastName: null,
-      platformRole: (row.platform_role as string ?? 'none') as PlatformRole,
-      orgRole: (row.org_role as string | null) as OrganizationRole | null,
+      platformRole: ((row.platform_role as string) ?? "none") as PlatformRole,
+      orgRole: row.org_role as string | null as OrganizationRole | null,
       orgId: (row.org_id as string | null) ?? null,
       orgName: (row.org_name as string | null) ?? null,
       orgSlug: (row.org_slug as string | null) ?? null,
@@ -207,12 +211,11 @@ export async function fetchFullAuditLog(options?: {
 }): Promise<FullAuditLogEntry[]> {
   let query = supabase
     .from("audit_log")
-    .select("id, org_id, actor_id, actor_email, action, resource_type, resource_id, details, created_at")
+    .select(
+      "id, org_id, actor_id, actor_email, action, resource_type, resource_id, details, created_at",
+    )
     .order("created_at", { ascending: false })
-    .range(
-      options?.offset ?? 0,
-      (options?.offset ?? 0) + (options?.limit ?? 50) - 1,
-    );
+    .range(options?.offset ?? 0, (options?.offset ?? 0) + (options?.limit ?? 50) - 1);
   if (options?.orgId) query = query.eq("org_id", options.orgId);
   if (options?.action) query = query.eq("action", options.action);
   if (options?.actionPrefix) query = query.like("action", `${options.actionPrefix}%`);
@@ -235,10 +238,7 @@ export async function fetchFullAuditLog(options?: {
   }));
 }
 
-export async function removeUserFromOrganization(
-  userId: string,
-  orgId: string,
-): Promise<void> {
+export async function removeUserFromOrganization(userId: string, orgId: string): Promise<void> {
   const { data: membershipRow, error } = await supabase
     .from("organization_memberships")
     .select("updated_at")
@@ -257,32 +257,45 @@ export async function removeUserFromOrganization(
     userId,
     expectedUpdatedAt: membershipRow.updated_at,
   });
-  await cacheDel(CacheKey.orgUsers(orgId), CacheKey.orgDirectory(orgId), CacheKey.employees(orgId), CacheKey.allUsers(), CacheKey.tenantStats());
+  await cacheDel(
+    CacheKey.orgUsers(orgId),
+    CacheKey.orgDirectory(orgId),
+    CacheKey.employees(orgId),
+    CacheKey.allUsers(),
+    CacheKey.tenantStats(),
+  );
 }
 
 export async function fetchTenantStats(): Promise<TenantStats[]> {
   return cacheThrough(CacheKey.tenantStats(), TTL.MODERATE, async () => {
     const { data, error } = await supabase.rpc("get_tenant_stats");
     if (error) throw error;
-    return (data ?? []).map((row: { org_id: string; user_count: number; employee_count: number }) => ({
-      orgId: row.org_id,
-      userCount: Number(row.user_count),
-      employeeCount: Number(row.employee_count),
-    }));
+    return (data ?? []).map(
+      (row: { org_id: string; user_count: number; employee_count: number }) => ({
+        orgId: row.org_id,
+        userCount: Number(row.user_count),
+        employeeCount: Number(row.employee_count),
+      }),
+    );
   });
 }
 
 export async function fetchInvitationsForOrg(orgId: string): Promise<Invitation[]> {
   const { data, error } = await supabase
     .from("invitations")
-    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+    .select(
+      "id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids",
+    )
     .eq("org_id", orgId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((row: DbInvitation) => rowToInvitation(row));
 }
 
-export async function revokeInvitationAsGridmaster(invitationId: string, orgId: string): Promise<void> {
+export async function revokeInvitationAsGridmaster(
+  invitationId: string,
+  orgId: string,
+): Promise<void> {
   const { data: invitationRow, error } = await supabase
     .from("invitations")
     .select("updated_at")
@@ -450,7 +463,9 @@ export async function deleteOrganizationPermanently(orgId: string): Promise<void
 export async function fetchOrgSubscription(orgId: string): Promise<Subscription | null> {
   const { data, error } = await supabase
     .from("subscriptions")
-    .select("id, org_id, stripe_subscription_id, stripe_customer_id, status, price_id, quantity, current_period_start, current_period_end, cancel_at, canceled_at, trial_end, created_at, updated_at")
+    .select(
+      "id, org_id, stripe_subscription_id, stripe_customer_id, status, price_id, quantity, current_period_start, current_period_end, cancel_at, canceled_at, trial_end, created_at, updated_at",
+    )
     .eq("org_id", orgId)
     .maybeSingle();
   if (error) throw error;

@@ -12,7 +12,10 @@ interface ICalEvent {
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  return d
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}/, "");
 }
 
 function escapeText(s: string): string {
@@ -22,10 +25,7 @@ function escapeText(s: string): string {
 /**
  * Generate an ICS calendar string from a list of events.
  */
-export function generateICS(
-  events: ICalEvent[],
-  calendarName = "DubGrid Schedule",
-): string {
+export function generateICS(events: ICalEvent[], calendarName = "DubGrid Schedule"): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -49,10 +49,7 @@ export function generateICS(
     if (event.location) {
       lines.push(`LOCATION:${escapeText(event.location)}`);
     }
-    lines.push(
-      `DTSTAMP:${formatDate(new Date())}`,
-      "END:VEVENT",
-    );
+    lines.push(`DTSTAMP:${formatDate(new Date())}`, "END:VEVENT");
   }
 
   lines.push("END:VCALENDAR");

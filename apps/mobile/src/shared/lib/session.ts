@@ -112,9 +112,7 @@ export async function loadLastOrgSlug(): Promise<string | null> {
   return getStoredValue(LAST_ORG_KEY);
 }
 
-export async function saveStoredPushDevice(
-  device: StoredPushDevice | null,
-): Promise<void> {
+export async function saveStoredPushDevice(device: StoredPushDevice | null): Promise<void> {
   await saveJsonValue(PUSH_DEVICE_KEY, device);
 }
 

@@ -32,8 +32,7 @@ export async function GET(req: NextRequest) {
     }
 
     const organization =
-      (data?.organizations as { name?: string | null; slug?: string | null } | null) ??
-      null;
+      (data?.organizations as { name?: string | null; slug?: string | null } | null) ?? null;
 
     if (!organization) {
       // Unknown / expired / accepted / revoked — same 404 for all so a caller
@@ -56,9 +55,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("invitation lookup GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to look up invitation" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to look up invitation" }, { status: 500 });
   }
 }

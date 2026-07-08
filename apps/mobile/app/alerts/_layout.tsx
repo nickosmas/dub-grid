@@ -7,14 +7,8 @@ import {
 export default function AlertsLayout() {
   return (
     <Stack>
-      <Stack.Screen
-        name="index"
-        options={createTopLevelStackOptions("Alerts")}
-      />
-      <Stack.Screen
-        name="[id]"
-        options={createDetailStackOptions("Alert")}
-      />
+      <Stack.Screen name="index" options={createTopLevelStackOptions("Alerts")} />
+      <Stack.Screen name="[id]" options={createDetailStackOptions("Alert")} />
     </Stack>
   );
 }

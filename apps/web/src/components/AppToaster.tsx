@@ -4,14 +4,7 @@ import { Toaster, toast, type ExternalToast } from "sonner";
 
 type ToastMethod = "success" | "error" | "info" | "warning" | "message" | "loading";
 
-const TONES: ToastMethod[] = [
-  "success",
-  "error",
-  "info",
-  "warning",
-  "message",
-  "loading",
-];
+const TONES: ToastMethod[] = ["success", "error", "info", "warning", "message", "loading"];
 
 declare global {
   // eslint-disable-next-line no-var
@@ -26,14 +19,9 @@ if (typeof window !== "undefined" && !globalThis.__dubgridToastPatched) {
   // with a fresh React key (= entrance animation).
   const activeByKey = new Map<string, string | number>();
 
-  const deriveKey = (
-    tone: string,
-    title: unknown,
-    options?: ExternalToast,
-  ): string | undefined => {
+  const deriveKey = (tone: string, title: unknown, options?: ExternalToast): string | undefined => {
     if (typeof title !== "string") return undefined;
-    const description =
-      typeof options?.description === "string" ? options.description : "";
+    const description = typeof options?.description === "string" ? options.description : "";
     return `${tone}:${title}:${description}`;
   };
 

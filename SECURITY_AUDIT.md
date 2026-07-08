@@ -34,15 +34,15 @@ implemented; the rest are fixed). `npm audit` is 0 critical / 0 high / 0 low.
 
 ### Findings
 
-| ID | Severity | Title | Status |
-|----|----------|-------|--------|
-| F-1 | **High** | `next@16.2.4` has known middleware-bypass + SSRF + DoS advisories | ✅ Fixed — upgraded to `16.2.6` |
-| F-2 | Low | `/api/organizations/role-change` lacks rate limiting (siblings have it) | ✅ Fixed — `apiLimiter` added |
-| F-3 | Low | CSRF Origin validation applied inconsistently across mutating routes | ✅ Fixed — `validateCsrfOrigin` applied to all state-changing routes |
-| F-4 | Low | CSP `script-src` relies on `'unsafe-inline'` (no nonce) | ✅ Fixed — authed pages forced dynamic + nonce/strict-dynamic CSP |
-| F-5 | ~~Info~~ | ~~Gridmaster demotion stale-token window~~ | ❌ Withdrawn — already implemented (see appendix) |
-| F-6 | Informational | Sandbox cookie is not `HttpOnly` | ✅ Fixed — cookie now `HttpOnly` |
-| F-7 | Informational | Transitive dependency advisories (not production-reachable) | ✅ Fixed — `protobufjs`/`fast-uri` patched via overrides |
+| ID  | Severity      | Title                                                                   | Status                                                               |
+| --- | ------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| F-1 | **High**      | `next@16.2.4` has known middleware-bypass + SSRF + DoS advisories       | ✅ Fixed — upgraded to `16.2.6`                                      |
+| F-2 | Low           | `/api/organizations/role-change` lacks rate limiting (siblings have it) | ✅ Fixed — `apiLimiter` added                                        |
+| F-3 | Low           | CSRF Origin validation applied inconsistently across mutating routes    | ✅ Fixed — `validateCsrfOrigin` applied to all state-changing routes |
+| F-4 | Low           | CSP `script-src` relies on `'unsafe-inline'` (no nonce)                 | ✅ Fixed — authed pages forced dynamic + nonce/strict-dynamic CSP    |
+| F-5 | ~~Info~~      | ~~Gridmaster demotion stale-token window~~                              | ❌ Withdrawn — already implemented (see appendix)                    |
+| F-6 | Informational | Sandbox cookie is not `HttpOnly`                                        | ✅ Fixed — cookie now `HttpOnly`                                     |
+| F-7 | Informational | Transitive dependency advisories (not production-reachable)             | ✅ Fixed — `protobufjs`/`fast-uri` patched via overrides             |
 
 ---
 
@@ -53,6 +53,7 @@ implemented; the rest are fixed). `npm audit` is 0 critical / 0 high / 0 low.
 **Location (original):** `next@16.2.4`. Vulnerable range: `16.0.0 – 16.2.5`.
 
 **Evidence:** `npm audit` reported `next` as high, including:
+
 - Middleware / Proxy bypass through dynamic route parameter injection — CVSS 8.1 (GHSA-492v-c6pp-mqqv)
 - Middleware / Proxy bypass via segment-prefetch routes — CVSS 7.5 (GHSA-267c-6grr-h53f, GHSA-26hh-7cqf-hhc6)
 - SSRF via WebSocket upgrades — CVSS 8.6 (GHSA-c4j6-fc7j-m34r)
@@ -106,14 +107,14 @@ providing defense-in-depth against cross-site cookie replay.
 
 **Fix history and current state (verified in code):**
 
-*First attempt (reverted):* A split nonce CSP assumed authed pages were
+_First attempt (reverted):_ A split nonce CSP assumed authed pages were
 dynamically rendered. A production-build smoke test disproved that: the build
 showed `/dashboard`, `/people`, `/settings`, `/profile`, `/notifications`,
 `/reports`, `/gridmaster`, and `/onboarding` were statically prerendered. A
 static page's baked `<script>` tags cannot carry a per-request nonce, so the
 nonce + `strict-dynamic` policy broke hydration. That attempt was reverted.
 
-*True fix (verified in source):* The authed routes were made genuinely dynamic,
+_True fix (verified in source):_ The authed routes were made genuinely dynamic,
 then the split CSP was re-applied:
 
 1. `export const dynamic = "force-dynamic"` added to the layouts/pages for all
@@ -174,11 +175,13 @@ worked for an `HttpOnly` cookie) was removed.
 ### F-7 — Transitive dependency advisories (not production-reachable) — **Informational** — ✅ Fixed
 
 **Evidence and triage:**
+
 - **`protobufjs` (high)** — reached only via `posthog-js → @opentelemetry/exporter-logs-otlp-http`. The advisories require attacker-controlled protobuf descriptors; the OTLP exporter only emits telemetry and never parses untrusted protobuf. Not reachable in production.
 - **`fast-uri` (high, path traversal)** — reached only via `@sentry/nextjs → webpack → schema-utils → ajv`. Build-time toolchain dependency; absent from the production runtime. Not reachable.
 - Remaining moderates (`hono` / `@hono/node-server` via `@modelcontextprotocol/sdk`) are in the `shadcn` dev CLI only — not in the deployed runtime.
 
 **Fix confirmed in `package.json` overrides:**
+
 - `@opentelemetry/otlp-transformer` scoped: `protobufjs → 7.5.9`
 - `ajv` scoped: `fast-uri → ^3.1.2`
 - Bare `protobufjs: 7.5.9` override also present (previously pinned to the vulnerable `7.5.5`)
@@ -208,7 +211,7 @@ candidate leads that were disproven:
   users; honors `jwt_refresh_locks`; `SECURITY DEFINER`, owner `postgres`,
   `EXECUTE` granted only to `supabase_auth_admin` and `service_role`.
 - **Role-change / assign-role RPCs** — caller-identity check (`p_changed_by_id =
-  auth.uid()`), self-action guard, admin-tier guard (admins cannot touch
+auth.uid()`), self-action guard, admin-tier guard (admins cannot touch
   admin/super_admin/gridmaster or assign privileged roles), last-super_admin
   guard, advisory lock, idempotency, audit log, JWT refresh lock. Direct
   `org_role` UPDATEs blocked by `guard_org_role_change` trigger.
@@ -250,12 +253,12 @@ candidate leads that were disproven:
 
 ## Dependency audit summary
 
-| Package | Severity | Production-reachable? | Action |
-|---------|----------|----------------------|--------|
-| `next` | ~~high~~ | Yes (framework + middleware auth) | ✅ Upgraded to `16.2.6` |
-| `protobufjs` | ~~high~~ | No (posthog-js OTLP emit path) | ✅ Override → `7.5.9` |
-| `fast-uri` | ~~high~~ | No (build-time webpack/ajv) | ✅ Override → `3.1.2` |
-| `hono` / `@hono/node-server` | moderate | No (`shadcn` dev CLI only) | Left — dev tooling, not deployed |
+| Package                      | Severity | Production-reachable?             | Action                           |
+| ---------------------------- | -------- | --------------------------------- | -------------------------------- |
+| `next`                       | ~~high~~ | Yes (framework + middleware auth) | ✅ Upgraded to `16.2.6`          |
+| `protobufjs`                 | ~~high~~ | No (posthog-js OTLP emit path)    | ✅ Override → `7.5.9`            |
+| `fast-uri`                   | ~~high~~ | No (build-time webpack/ajv)       | ✅ Override → `3.1.2`            |
+| `hono` / `@hono/node-server` | moderate | No (`shadcn` dev CLI only)        | Left — dev tooling, not deployed |
 
 **Before fixes:** 0 critical, 3 high, 14 moderate, 1 low.
 **After all fixes:** 0 critical, 0 high, 3 moderate, 0 low.

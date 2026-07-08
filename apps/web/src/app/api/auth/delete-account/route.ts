@@ -33,15 +33,9 @@ export async function DELETE(req: NextRequest) {
     const { orgId } = extractJwtClaims(auth.session.access_token);
 
     // Rate-limit: this is a destructive, irreversible endpoint.
-    const { limited, reset, misconfigured } = await checkRateLimit(
-      apiLimiter,
-      user.id,
-    );
+    const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
     if (misconfigured) {
-      return NextResponse.json(
-        { error: "Service temporarily unavailable" },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -80,7 +74,10 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (body.confirmation !== "DELETE MY ACCOUNT") {
-      return NextResponse.json({ error: "Confirmation text must be exactly: DELETE MY ACCOUNT" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Confirmation text must be exactly: DELETE MY ACCOUNT" },
+        { status: 400 },
+      );
     }
 
     const userId = user.id;
@@ -136,12 +133,7 @@ export async function DELETE(req: NextRequest) {
       operation: () => Promise<{ error?: unknown } | void>,
     ) {
       const result = await operation();
-      if (
-        result &&
-        typeof result === "object" &&
-        "error" in result &&
-        result.error
-      ) {
+      if (result && typeof result === "object" && "error" in result && result.error) {
         throw result.error;
       }
     }
@@ -149,59 +141,30 @@ export async function DELETE(req: NextRequest) {
     try {
       await runCleanupStep("organization_memberships", () =>
         Promise.resolve(
-          serviceClient
-            .from("organization_memberships")
-            .delete()
-            .eq("user_id", userId),
+          serviceClient.from("organization_memberships").delete().eq("user_id", userId),
         ),
       );
       await runCleanupStep("employees", () =>
         Promise.resolve(
-          serviceClient
-            .from("employees")
-            .update({ user_id: null })
-            .eq("user_id", userId),
+          serviceClient.from("employees").update({ user_id: null }).eq("user_id", userId),
         ),
       );
       await runCleanupStep("profiles", () =>
-        Promise.resolve(
-          serviceClient
-            .from("profiles")
-            .delete()
-            .eq("id", userId),
-        ),
+        Promise.resolve(serviceClient.from("profiles").delete().eq("id", userId)),
       );
       await runCleanupStep("notification_preferences", () =>
         Promise.resolve(
-          serviceClient
-            .from("notification_preferences")
-            .delete()
-            .eq("user_id", userId),
+          serviceClient.from("notification_preferences").delete().eq("user_id", userId),
         ),
       );
       await runCleanupStep("user_sessions", () =>
-        Promise.resolve(
-          serviceClient
-            .from("user_sessions")
-            .delete()
-            .eq("user_id", userId),
-        ),
+        Promise.resolve(serviceClient.from("user_sessions").delete().eq("user_id", userId)),
       );
       await runCleanupStep("cookie_consents", () =>
-        Promise.resolve(
-          serviceClient
-            .from("cookie_consents")
-            .delete()
-            .eq("user_id", userId),
-        ),
+        Promise.resolve(serviceClient.from("cookie_consents").delete().eq("user_id", userId)),
       );
       await runCleanupStep("terms_acceptances", () =>
-        Promise.resolve(
-          serviceClient
-            .from("terms_acceptances")
-            .delete()
-            .eq("user_id", userId),
-        ),
+        Promise.resolve(serviceClient.from("terms_acceptances").delete().eq("user_id", userId)),
       );
     } catch (cleanupError) {
       Sentry.captureException(cleanupError, {
@@ -211,10 +174,7 @@ export async function DELETE(req: NextRequest) {
         { error: cleanupError, userId },
         "Account deletion cleanup failed; auth user preserved",
       );
-      return NextResponse.json(
-        { error: "Failed to delete account" },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
     }
 
     const { error: deleteError } = await serviceClient.auth.admin.deleteUser(userId);

@@ -55,9 +55,7 @@ async function resolveOrganizationId(
 }> {
   const impersonationCookie = req.cookies.get(IMPERSONATION_COOKIE_NAME)?.value;
   const impersonation = impersonationCookie
-    ? getImpersonationFromCookie(
-        `${IMPERSONATION_COOKIE_NAME}=${impersonationCookie}`,
-      )
+    ? getImpersonationFromCookie(`${IMPERSONATION_COOKIE_NAME}=${impersonationCookie}`)
     : null;
 
   if (impersonation?.targetOrgId) {
@@ -160,11 +158,7 @@ export async function GET(req: NextRequest) {
       coverageReqResult,
       absenceTypeResult,
     ] = await Promise.all([
-      serviceClient
-        .from("organizations")
-        .select(ORGANIZATION_COLS)
-        .eq("id", orgId)
-        .single(),
+      serviceClient.from("organizations").select(ORGANIZATION_COLS).eq("id", orgId).single(),
       serviceClient
         .from("focus_areas")
         .select(FOCUS_AREA_COLS)
@@ -204,10 +198,7 @@ export async function GET(req: NextRequest) {
         .eq("org_id", orgId)
         .is("archived_at", null)
         .order("sort_order", { ascending: true }),
-      serviceClient
-        .from("coverage_requirements")
-        .select(COVERAGE_REQ_COLS)
-        .eq("org_id", orgId),
+      serviceClient.from("coverage_requirements").select(COVERAGE_REQ_COLS).eq("org_id", orgId),
       serviceClient
         .from("absence_types")
         .select(ABSENCE_TYPE_COLS)
@@ -228,14 +219,22 @@ export async function GET(req: NextRequest) {
 
     const org = rowToOrganization(orgResult.data as DbOrganization);
     const focusAreas = ((focusAreaResult.data ?? []) as DbFocusArea[]).map(rowToFocusArea);
-    const shiftCategories = ((shiftCategoryResult.data ?? []) as DbShiftCategory[]).map(rowToShiftCategory);
+    const shiftCategories = ((shiftCategoryResult.data ?? []) as DbShiftCategory[]).map(
+      rowToShiftCategory,
+    );
     const jobs = ((jobResult.data ?? []) as DbJobDefinition[]).map(rowToJobDefinition);
-    const indicatorTypes = ((indicatorTypeResult.data ?? []) as DbIndicatorType[]).map(rowToIndicatorType);
+    const indicatorTypes = ((indicatorTypeResult.data ?? []) as DbIndicatorType[]).map(
+      rowToIndicatorType,
+    );
     const certifications = ((certificationResult.data ?? []) as DbNamedItem[]).map(rowToNamedItem);
     const orgRoles = ((orgRoleResult.data ?? []) as DbNamedItem[]).map(rowToNamedItem);
     const departments = ((departmentResult.data ?? []) as DbDepartment[]).map(rowToDepartment);
-    const coverageRequirements = ((coverageReqResult.data ?? []) as DbCoverageRequirement[]).map(rowToCoverageRequirement);
-    const allAbsenceTypes = ((absenceTypeResult.data ?? []) as DbAbsenceType[]).map(rowToAbsenceType);
+    const coverageRequirements = ((coverageReqResult.data ?? []) as DbCoverageRequirement[]).map(
+      rowToCoverageRequirement,
+    );
+    const allAbsenceTypes = ((absenceTypeResult.data ?? []) as DbAbsenceType[]).map(
+      rowToAbsenceType,
+    );
     const allAssignmentDefinitions = includeAssignments
       ? buildScheduleAssignmentOptions({
           orgId,
@@ -262,9 +261,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("organization bootstrap GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load organization bootstrap" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load organization bootstrap" }, { status: 500 });
   }
 }

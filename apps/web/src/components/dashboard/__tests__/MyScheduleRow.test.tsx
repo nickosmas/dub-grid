@@ -224,9 +224,7 @@ describe("MyScheduleRow", () => {
       />,
     );
 
-    expect(
-      screen.queryByRole("button", { name: "Scroll later days" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Scroll later days" })).not.toBeInTheDocument();
 
     const scrollContainer = screen
       .getByTestId("my-schedule-row")

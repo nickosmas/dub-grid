@@ -83,7 +83,9 @@ describe("recurring schedule database contract", () => {
   it("updates series templates from canonical state only", () => {
     const sql = readFileSync(resolveMigrationPath(), "utf8");
 
-    expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.update_series_all_shifts\s*\(\s*p_series_id UUID,\s*p_org_id UUID,\s*p_state JSONB/);
+    expect(sql).toMatch(
+      /CREATE OR REPLACE FUNCTION public\.update_series_all_shifts\s*\(\s*p_series_id UUID,\s*p_org_id UUID,\s*p_state JSONB/,
+    );
     expect(sql).toContain("UPDATE public.shift_series");
     expect(sql).toContain("state = p_state");
     expect(sql).toContain("public.resolve_schedule_state_storage(p_org_id, p_state)");

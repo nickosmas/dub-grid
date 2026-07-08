@@ -196,12 +196,7 @@ export function buildOperationsReportPreviewTable(
           ["Active staff", summary.activeStaffCount],
           ["Absences", summary.totalAbsences],
           ["Open slots", summary.openSlotCount],
-          [
-            "Coverage",
-            summary.coveragePct == null
-              ? "Not available"
-              : `${summary.coveragePct}%`,
-          ],
+          ["Coverage", summary.coveragePct == null ? "Not available" : `${summary.coveragePct}%`],
           ["Requests", summary.requestCount],
         ],
         emptyText: "No period data for this range.",
@@ -326,14 +321,10 @@ export function buildOperationsReportPreviewTable(
           })),
         ],
         rows: payload.reports.scheduleMatrix.rows
-          .filter((row) =>
-            payload.reports.scheduleMatrix.dates.some((date) => row.cells[date]),
-          )
+          .filter((row) => payload.reports.scheduleMatrix.dates.some((date) => row.cells[date]))
           .map((row) => [
             row.employeeName,
-            ...payload.reports.scheduleMatrix.dates.map(
-              (date) => row.cells[date] ?? "",
-            ),
+            ...payload.reports.scheduleMatrix.dates.map((date) => row.cells[date] ?? ""),
           ]),
         emptyText: "No published schedule for this range.",
       };

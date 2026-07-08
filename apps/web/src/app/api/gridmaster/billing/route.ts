@@ -13,9 +13,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await loadGridmasterBilling(getServiceClient()));
   } catch (error) {
     console.error("gridmaster billing GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load billing oversight" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load billing oversight" }, { status: 500 });
   }
 }

@@ -1,27 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type {
-  DbEmployee,
-  DbInvitation,
-  DbScheduleCell,
-} from "@dubgrid/db-types";
+import type { DbEmployee, DbInvitation, DbScheduleCell } from "@dubgrid/db-types";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import type { Employee } from "@/types";
-import {
-  requireOrgPermissions,
-  resolveEffectiveOrgId,
-} from "@/app/api/shared/permissions";
+import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
-import {
-  employeeToRow,
-  rowToEmployee,
-  rowToInvitation,
-} from "@/lib/db/mappers";
+import { employeeToRow, rowToEmployee, rowToInvitation } from "@/lib/db/mappers";
 import { EMPLOYEE_COLS } from "@/lib/db/shared";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import { apiErrorResponse } from "@/lib/error-handling";
@@ -148,10 +137,7 @@ function isEmployeeDetailViewer(permissions: {
   );
 }
 
-function maskEmployeeForViewer(
-  employee: Employee,
-  callerUserId: string,
-): Employee {
+function maskEmployeeForViewer(employee: Employee, callerUserId: string): Employee {
   // Preserve userId on the caller's own row so the dashboard / schedule can
   // still locate it (the caller already knows their own auth id; suppressing
   // it here just breaks self-lookup). Other rows get the link nulled so
@@ -206,10 +192,7 @@ function diffEmployeeProfileFields(
   if (before.employmentType !== after.employmentType) fields.push("employmentType");
   if (before.certificationId !== after.certificationId) fields.push("certification");
   if (before.seniority !== after.seniority) fields.push("seniority");
-  if (
-    JSON.stringify([...before.roleIds].sort()) !==
-    JSON.stringify([...after.roleIds].sort())
-  )
+  if (JSON.stringify([...before.roleIds].sort()) !== JSON.stringify([...after.roleIds].sort()))
     fields.push("roles");
   if (
     JSON.stringify([...before.focusAreaIds].sort()) !==
@@ -280,17 +263,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { error: API_ERRORS.INVALID_BODY },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
-    return buildStaffValidationErrorResponse(
-      getStaffFieldErrorsFromZod(parsed.error),
-    );
+    return buildStaffValidationErrorResponse(getStaffFieldErrorsFromZod(parsed.error));
   }
 
   const data = parsed.data;
@@ -303,11 +281,7 @@ export async function POST(req: NextRequest) {
   {
     const auth = await requireAuthenticatedUser(req);
     if (!("response" in auth)) {
-      const effective = await resolveEffectiveOrgId(
-        req,
-        auth.user.id,
-        data.orgId,
-      );
+      const effective = await resolveEffectiveOrgId(req, auth.user.id, data.orgId);
       if (effective !== data.orgId) {
         (data as { orgId: string }).orgId = effective;
       }
@@ -367,26 +341,20 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canManageEmployees,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
         );
         if ("response" in auth) {
           return auth.response;
         }
 
-        const referenceErrors = await validateStaffOrgReferences(
-          auth.serviceClient,
-          data.orgId,
-          {
-            certificationId: data.employee.certificationId,
-            departmentIds: data.employee.departmentIds,
-            deptAdminIds: data.employee.deptAdminIds,
-            focusAreaIds: data.employee.focusAreaIds,
-            requireFocusArea: true,
-            roleIds: data.employee.roleIds,
-          },
-        );
+        const referenceErrors = await validateStaffOrgReferences(auth.serviceClient, data.orgId, {
+          certificationId: data.employee.certificationId,
+          departmentIds: data.employee.departmentIds,
+          deptAdminIds: data.employee.deptAdminIds,
+          focusAreaIds: data.employee.focusAreaIds,
+          requireFocusArea: true,
+          roleIds: data.employee.roleIds,
+        });
         if (Object.keys(referenceErrors).length > 0) {
           return buildStaffValidationErrorResponse(referenceErrors);
         }
@@ -417,26 +385,20 @@ export async function POST(req: NextRequest) {
           req,
           data.orgId,
           (permissions) =>
-            permissions.isGridmaster ||
-            permissions.isSuperAdmin ||
-            permissions.canManageEmployees,
+            permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
         );
         if ("response" in auth) {
           return auth.response;
         }
 
-        const referenceErrors = await validateStaffOrgReferences(
-          auth.serviceClient,
-          data.orgId,
-          {
-            certificationId: data.employee.certificationId,
-            departmentIds: data.employee.departmentIds,
-            deptAdminIds: data.employee.deptAdminIds,
-            focusAreaIds: data.employee.focusAreaIds,
-            requireFocusArea: true,
-            roleIds: data.employee.roleIds,
-          },
-        );
+        const referenceErrors = await validateStaffOrgReferences(auth.serviceClient, data.orgId, {
+          certificationId: data.employee.certificationId,
+          departmentIds: data.employee.departmentIds,
+          deptAdminIds: data.employee.deptAdminIds,
+          focusAreaIds: data.employee.focusAreaIds,
+          requireFocusArea: true,
+          roleIds: data.employee.roleIds,
+        });
         if (Object.keys(referenceErrors).length > 0) {
           return buildStaffValidationErrorResponse(referenceErrors);
         }
@@ -455,8 +417,7 @@ export async function POST(req: NextRequest) {
           lastName: normalizedFields.lastName ?? data.employee.lastName,
           phone: normalizedFields.phone ?? data.employee.phone,
           email: normalizedFields.optionalEmail ?? data.employee.email,
-          contactNotes:
-            normalizedFields.contactNotes ?? data.employee.contactNotes,
+          contactNotes: normalizedFields.contactNotes ?? data.employee.contactNotes,
         };
 
         // Snapshot the prior row so we can diff status vs profile fields
@@ -476,9 +437,7 @@ export async function POST(req: NextRequest) {
           query = query.eq("version", data.expectedVersion);
         }
 
-        const { data: updatedRow, error } = await query
-          .select(EMPLOYEE_COLS)
-          .maybeSingle();
+        const { data: updatedRow, error } = await query.select(EMPLOYEE_COLS).maybeSingle();
         if (error) {
           throw error;
         }
@@ -491,8 +450,7 @@ export async function POST(req: NextRequest) {
           );
           return NextResponse.json(
             {
-              error:
-                "Employee details changed elsewhere. Refresh and try again.",
+              error: "Employee details changed elsewhere. Refresh and try again.",
               code: "EMPLOYEE_CONFLICT",
               employee: latestEmployee,
             },
@@ -517,10 +475,7 @@ export async function POST(req: NextRequest) {
               toStatus: nextEmployee.status,
             });
           }
-          const changedProfileFields = diffEmployeeProfileFields(
-            previousRow,
-            nextEmployee,
-          );
+          const changedProfileFields = diffEmployeeProfileFields(previousRow, nextEmployee);
           if (changedProfileFields.length > 0) {
             void dispatchNotificationEvent(auth.actor.id, {
               action: "employee_profile_changed",
@@ -551,11 +506,7 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const employee = await fetchLatestEmployee(
-          auth.serviceClient,
-          data.orgId,
-          data.employeeId,
-        );
+        const employee = await fetchLatestEmployee(auth.serviceClient, data.orgId, data.employeeId);
 
         if (!isEmployeeDetailViewer(auth.permissions)) {
           // Mirror the mobile person endpoint: view-only callers only see
@@ -583,10 +534,7 @@ export async function POST(req: NextRequest) {
           auth.permissions.canViewEmployeeDetails ||
           auth.permissions.canManageEmployees;
         if (!canReadOtherEmployees && auth.actor.id !== data.userId) {
-          return NextResponse.json(
-            { error: API_ERRORS.FORBIDDEN },
-            { status: 403 },
-          );
+          return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
         }
 
         const { data: row, error } = await auth.serviceClient
@@ -619,16 +567,9 @@ export async function POST(req: NextRequest) {
         }
 
         assertDateRange(data.startDate, data.endDate);
-        const assignmentLabelMap = new Map<number, string>(
-          data.assignmentLabels,
-        );
-        const absenceTypeMap = new Map<number, string>(
-          data.absenceTypeLabels ?? [],
-        );
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(
-          auth.serviceClient,
-          data.orgId,
-        );
+        const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
+        const absenceTypeMap = new Map<number, string>(data.absenceTypeLabels ?? []);
+        const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
 
         let query = auth.serviceClient
           .from("schedule_cells")
@@ -707,15 +648,12 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const { data: rows, error } = await auth.serviceClient.rpc(
-          "get_audit_log",
-          {
-            p_org_id: null,
-            p_limit: 50,
-            p_offset: 0,
-            p_target_user_id: data.userId,
-          },
-        );
+        const { data: rows, error } = await auth.serviceClient.rpc("get_audit_log", {
+          p_org_id: null,
+          p_limit: 50,
+          p_offset: 0,
+          p_target_user_id: data.userId,
+        });
         if (error) {
           throw error;
         }

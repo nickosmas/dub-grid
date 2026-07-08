@@ -36,15 +36,9 @@ export async function POST(req: NextRequest) {
   if ("response" in auth) return auth.response;
   const { user } = auth;
 
-  const { limited, reset, misconfigured } = await checkRateLimit(
-    apiLimiter,
-    user.id,
-  );
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json(
-      { error: "Service temporarily unavailable" },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -73,10 +67,7 @@ export async function POST(req: NextRequest) {
 
   const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
   if (!hasPermission) {
-    return NextResponse.json(
-      { error: API_ERRORS.FORBIDDEN },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
   }
 
   // Match by lowercased email against auth.users. Service-role required.
@@ -88,10 +79,7 @@ export async function POST(req: NextRequest) {
     .limit(1);
   if (authLookupErr) {
     console.error("check-email auth lookup failed", authLookupErr);
-    return NextResponse.json(
-      { error: "Failed to look up user" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to look up user" }, { status: 500 });
   }
   const matchedUserId = matchedUsers?.[0]?.id ?? null;
   if (!matchedUserId) {

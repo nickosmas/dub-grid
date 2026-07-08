@@ -9,8 +9,7 @@ import {
   type StoredPushDevice,
 } from "../../../shared/lib/session";
 
-const isExpoGo =
-  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 const pushUnsupported = Platform.OS === "web" || isExpoGo;
 
 // Lazy-load expo-notifications so importing this hook in Expo Go doesn't
@@ -20,11 +19,7 @@ async function loadNotifications(): Promise<typeof Notifications | null> {
   return await import("expo-notifications");
 }
 
-type PushPermissionState =
-  | "unsupported"
-  | "undetermined"
-  | "denied"
-  | "granted";
+type PushPermissionState = "unsupported" | "undetermined" | "denied" | "granted";
 
 type NotificationPermissionSnapshot = {
   canAskAgain?: boolean;
@@ -78,10 +73,9 @@ export function usePushRegistration(
   },
 ) {
   const autoRegister = options?.autoRegister ?? true;
-  const [permissionState, setPermissionState] =
-    useState<PushPermissionState>(
-      pushUnsupported ? "unsupported" : "undetermined",
-    );
+  const [permissionState, setPermissionState] = useState<PushPermissionState>(
+    pushUnsupported ? "unsupported" : "undetermined",
+  );
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<unknown | null>(null);
   const attemptedKeyRef = useRef<string | null>(null);

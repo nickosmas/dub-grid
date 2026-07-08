@@ -16,7 +16,15 @@ import {
 import { useEmployees, useOrganizationData, usePermissions } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 
-const APP_ROUTES = ["/dashboard", "/schedule", "/people", "/reports", "/settings", "/alerts", "/profile"];
+const APP_ROUTES = [
+  "/dashboard",
+  "/schedule",
+  "/people",
+  "/reports",
+  "/settings",
+  "/alerts",
+  "/profile",
+];
 
 function isAppRoute(pathname: string): boolean {
   return APP_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
@@ -28,10 +36,7 @@ function AppHeader() {
     queryKey: queryKeys.org.billing(perms.orgId!),
     queryFn: () => fetchOrganizationBilling(perms.orgId!),
     enabled:
-      Boolean(perms.orgId) &&
-      perms.isSuperAdmin &&
-      !perms.isGridmaster &&
-      !perms.isImpersonating,
+      Boolean(perms.orgId) && perms.isSuperAdmin && !perms.isGridmaster && !perms.isImpersonating,
     staleTime: 30_000,
   });
   const shouldLoadOrgHeader =
@@ -39,7 +44,11 @@ function AppHeader() {
     perms.isGridmaster ||
     perms.isImpersonating ||
     (!billingLoading && billing?.billingAccess.isLocked !== true);
-  const { org, setupStatus, loading: orgLoading } = useOrganizationData({
+  const {
+    org,
+    setupStatus,
+    loading: orgLoading,
+  } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
     enabled: shouldLoadOrgHeader,
   });
@@ -93,7 +102,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // resolving from null -> real id during the post-login settle would otherwise
   // remount the login page mid-sign-in and blank its fields before navigation.
   const effectiveOrgKey = isAppRoute(pathname)
-    ? bootstrapQuery.data?.org?.id ?? orgId ?? "bootstrap-pending"
+    ? (bootstrapQuery.data?.org?.id ?? orgId ?? "bootstrap-pending")
     : "public";
 
   // Publish the actual sticky-header height as a CSS custom property so that
@@ -115,7 +124,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Skip while permissions are loading to prevent mounting AppHeader (and its
   // useOrganizationData hook) before we know the user's role — gridmaster users
   // have no org and the unnecessary fetches add significant latency.
-  const showHeader = !isLoading && isAppRoute(pathname) && !(isGridmaster && pathname === "/dashboard");
+  const showHeader =
+    !isLoading && isAppRoute(pathname) && !(isGridmaster && pathname === "/dashboard");
 
   return (
     <>

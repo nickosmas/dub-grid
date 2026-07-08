@@ -113,9 +113,15 @@ export function StaffContextBar({
       : filterEmploymentType === "part_time"
         ? "Part-time"
         : null;
-  const departmentName = filterDepartment ? departments.find((department) => department.id === filterDepartment)?.name : null;
-  const focusAreaName = filterFocusArea ? focusAreas.find((fa) => fa.id === filterFocusArea)?.name : null;
-  const certificationName = filterCertification ? certifications.find((certification) => certification.id === filterCertification)?.name : null;
+  const departmentName = filterDepartment
+    ? departments.find((department) => department.id === filterDepartment)?.name
+    : null;
+  const focusAreaName = filterFocusArea
+    ? focusAreas.find((fa) => fa.id === filterFocusArea)?.name
+    : null;
+  const certificationName = filterCertification
+    ? certifications.find((certification) => certification.id === filterCertification)?.name
+    : null;
   const roleName = filterRole ? roles.find((r) => r.id === filterRole)?.name : null;
   const accountLinkLabel =
     filterAccountLink === "linked"
@@ -137,15 +143,11 @@ export function StaffContextBar({
         : null;
 
   // Bulk action helpers
-  const selectedEmployees = showBulk
-    ? displayList.filter((e) => selectedIds.has(e.id))
-    : [];
+  const selectedEmployees = showBulk ? displayList.filter((e) => selectedIds.has(e.id)) : [];
   const invitableEmployees = selectedEmployees.filter(
     (e) => e.status === "active" && e.email && !e.userId && !pendingInviteByEmployeeId.has(e.id),
   );
-  const deactivatableIds = selectedEmployees
-    .filter((e) => e.status === "active")
-    .map((e) => e.id);
+  const deactivatableIds = selectedEmployees.filter((e) => e.status === "active").map((e) => e.id);
   const activatableIds = selectedEmployees
     .filter((e) => e.status === "inactive" || e.status === "removed")
     .map((e) => e.id);
@@ -162,20 +164,43 @@ export function StaffContextBar({
       {/* Filter pills */}
       {showFilters && (
         <div className="flex items-center gap-2 flex-wrap px-4 py-2 border-b border-[var(--color-border-light)] bg-[var(--color-bg)]">
-          {employmentTypeLabel && <FilterPill label={`Employment: ${employmentTypeLabel}`} onClear={onClearEmploymentType} />}
-          {departmentName && <FilterPill label={`${departmentLabel}: ${departmentName}`} onClear={onClearDepartment} />}
+          {employmentTypeLabel && (
+            <FilterPill
+              label={`Employment: ${employmentTypeLabel}`}
+              onClear={onClearEmploymentType}
+            />
+          )}
+          {departmentName && (
+            <FilterPill
+              label={`${departmentLabel}: ${departmentName}`}
+              onClear={onClearDepartment}
+            />
+          )}
           {filterDepartmentAdminOnly && (
             <FilterPill
               label={departmentName ? `Department admin: ${departmentName}` : "Department admins"}
               onClear={onClearDepartmentAdminOnly}
             />
           )}
-          {focusAreaName && <FilterPill label={`${focusAreaLabel}: ${focusAreaName}`} onClear={onClearFocusArea} />}
-          {certificationName && <FilterPill label={`${certificationLabel}: ${certificationName}`} onClear={onClearCertification} />}
+          {focusAreaName && (
+            <FilterPill label={`${focusAreaLabel}: ${focusAreaName}`} onClear={onClearFocusArea} />
+          )}
+          {certificationName && (
+            <FilterPill
+              label={`${certificationLabel}: ${certificationName}`}
+              onClear={onClearCertification}
+            />
+          )}
           {roleName && <FilterPill label={`${roleLabel}: ${roleName}`} onClear={onClearRole} />}
-          {accountLinkLabel && <FilterPill label={`Account: ${accountLinkLabel}`} onClear={onClearAccountLink} />}
-          {emailPresenceLabel && <FilterPill label={`Email: ${emailPresenceLabel}`} onClear={onClearEmailPresence} />}
-          {phonePresenceLabel && <FilterPill label={`Phone: ${phonePresenceLabel}`} onClear={onClearPhonePresence} />}
+          {accountLinkLabel && (
+            <FilterPill label={`Account: ${accountLinkLabel}`} onClear={onClearAccountLink} />
+          )}
+          {emailPresenceLabel && (
+            <FilterPill label={`Email: ${emailPresenceLabel}`} onClear={onClearEmailPresence} />
+          )}
+          {phonePresenceLabel && (
+            <FilterPill label={`Phone: ${phonePresenceLabel}`} onClear={onClearPhonePresence} />
+          )}
           <button
             onClick={onClearAll}
             className="text-xs font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors ml-1"
@@ -189,29 +214,48 @@ export function StaffContextBar({
       {showBulk && (
         <div className="flex items-center gap-4 px-5 py-3 rounded-[var(--dg-radius-lg)] border border-[var(--color-control-active-border)] bg-[var(--color-control-active-bg)]">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-[var(--dg-radius-sm)]" style={{ background: "var(--color-control-primary)" }}>
+            <div
+              className="flex items-center justify-center w-8 h-8 rounded-[var(--dg-radius-sm)]"
+              style={{ background: "var(--color-control-primary)" }}
+            >
               <span className="text-[12px] font-bold text-white">{selectionCount}</span>
             </div>
-            <span className="text-[13px] font-semibold text-[var(--color-control-active-text)]">{selectionCount} selected</span>
+            <span className="text-[13px] font-semibold text-[var(--color-control-active-text)]">
+              {selectionCount} selected
+            </span>
           </div>
           <div className="flex-1" />
           {invitableEmployees.length > 0 && (
-            <button onClick={() => onBulkInvite(invitableEmployees)} className="dg-btn dg-btn-secondary dg-btn-sm">
+            <button
+              onClick={() => onBulkInvite(invitableEmployees)}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+            >
               Invite ({invitableEmployees.length})
             </button>
           )}
           {activatableIds.length > 0 && (
-            <button onClick={() => onBulkActivate(activatableIds)} className="dg-btn dg-btn-secondary dg-btn-sm">
-              Activate{activatableIds.length !== selectionCount ? ` (${activatableIds.length})` : ""}
+            <button
+              onClick={() => onBulkActivate(activatableIds)}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+            >
+              Activate
+              {activatableIds.length !== selectionCount ? ` (${activatableIds.length})` : ""}
             </button>
           )}
           {deactivatableIds.length > 0 && (
-            <button onClick={() => onBulkDeactivate(deactivatableIds)} className="dg-btn dg-btn-secondary dg-btn-sm">
-              Deactivate{deactivatableIds.length !== selectionCount ? ` (${deactivatableIds.length})` : ""}
+            <button
+              onClick={() => onBulkDeactivate(deactivatableIds)}
+              className="dg-btn dg-btn-secondary dg-btn-sm"
+            >
+              Deactivate
+              {deactivatableIds.length !== selectionCount ? ` (${deactivatableIds.length})` : ""}
             </button>
           )}
           {removableIds.length > 0 && (
-            <button onClick={() => onBulkRemove(removableIds)} className="dg-btn dg-btn-danger dg-btn-sm">
+            <button
+              onClick={() => onBulkRemove(removableIds)}
+              className="dg-btn dg-btn-danger dg-btn-sm"
+            >
               Remove{removableIds.length !== selectionCount ? ` (${removableIds.length})` : ""}
             </button>
           )}
@@ -225,7 +269,10 @@ export function StaffContextBar({
       {showReorder && (
         <div className="flex items-center gap-4 px-5 py-3 rounded-[var(--dg-radius-lg)] border border-[var(--color-control-active-border)] bg-[var(--color-control-active-bg)]">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-[var(--dg-radius-sm)]" style={{ background: "var(--color-control-primary)" }}>
+            <div
+              className="flex items-center justify-center w-8 h-8 rounded-[var(--dg-radius-sm)]"
+              style={{ background: "var(--color-control-primary)" }}
+            >
               <svg width="16" height="16" viewBox="0 0 14 14" fill="white">
                 <rect x="3" y="1" width="2.5" height="2.5" rx="1.25" />
                 <rect x="8.5" y="1" width="2.5" height="2.5" rx="1.25" />
@@ -236,22 +283,20 @@ export function StaffContextBar({
               </svg>
             </div>
             <div>
-              <span className="text-[13px] font-semibold text-[var(--color-control-active-text)]">Reorder Mode</span>
-              <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">Drag rows to change seniority order</p>
+              <span className="text-[13px] font-semibold text-[var(--color-control-active-text)]">
+                Reorder Mode
+              </span>
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">
+                Drag rows to change seniority order
+              </p>
             </div>
           </div>
           <div className="flex-1" />
-          <button
-            onClick={onCancelReorder}
-            className="dg-btn dg-btn-secondary dg-btn-sm"
-          >
+          <button onClick={onCancelReorder} className="dg-btn dg-btn-secondary dg-btn-sm">
             {EDITOR_ACTION_LABELS.close}
           </button>
           {isDirty && (
-            <button
-              onClick={onSaveOrder}
-              className="dg-btn dg-btn-primary dg-btn-sm"
-            >
+            <button onClick={onSaveOrder} className="dg-btn dg-btn-primary dg-btn-sm">
               Save Order
             </button>
           )}
@@ -271,8 +316,18 @@ function FilterPill({ label, onClear }: { label: string; onClear: () => void }) 
         className="ml-0.5 p-0.5 rounded-sm text-[var(--color-text-faint)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-border-light)] transition-colors cursor-pointer"
         aria-label={`Clear ${label}`}
       >
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
     </span>

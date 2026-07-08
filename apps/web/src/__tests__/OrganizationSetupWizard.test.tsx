@@ -2,9 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
-import {
-  createGridmasterOrganizationSetup,
-} from "@/features/gridmaster/client";
+import { createGridmasterOrganizationSetup } from "@/features/gridmaster/client";
 import { insertEmployee } from "@/features/employees/client";
 import type { Organization } from "@/types";
 
@@ -93,47 +91,56 @@ describe("OrganizationSetupWizard", () => {
       lastName: "Doe",
       email: "jane@example.com",
     } as Awaited<ReturnType<typeof insertEmployee>>);
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      json: async () => ({ valid: false }),
-    })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        json: async () => ({ valid: false }),
+      })),
+    );
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("removes editable employee count from org details and shows read-only counts in the employee step", { timeout: 10000 }, async () => {
-    const user = userEvent.setup();
+  it(
+    "removes editable employee count from org details and shows read-only counts in the employee step",
+    { timeout: 10000 },
+    async () => {
+      const user = userEvent.setup();
 
-    render(<OrganizationSetupWizard onCreated={vi.fn()} onCancel={vi.fn()} />);
+      render(<OrganizationSetupWizard onCreated={vi.fn()} onCancel={vi.fn()} />);
 
-    expect(screen.queryByText(/^employee count$/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^employee count$/i)).not.toBeInTheDocument();
 
-    await user.type(screen.getByPlaceholderText("Acme Healthcare"), "Acme Health");
-    await user.click(screen.getByRole("button", { name: /^next$/i }));
+      await user.type(screen.getByPlaceholderText("Acme Healthcare"), "Acme Health");
+      await user.click(screen.getByRole("button", { name: /^next$/i }));
 
-    await user.type(screen.getByPlaceholderText("Jane"), "Jane");
-    await user.type(screen.getByPlaceholderText("Doe"), "Doe");
-    await user.type(screen.getByPlaceholderText("jane@example.com"), "jane@example.com");
+      await user.type(screen.getByPlaceholderText("Jane"), "Jane");
+      await user.type(screen.getByPlaceholderText("Doe"), "Doe");
+      await user.type(screen.getByPlaceholderText("jane@example.com"), "jane@example.com");
 
-    await user.click(screen.getByRole("button", { name: /create organization/i }));
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^create organization$/i }));
+      await user.click(screen.getByRole("button", { name: /create organization/i }));
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", { name: /^create organization$/i }),
+      );
 
-    expect(await screen.findByRole("button", { name: /continue setup/i })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: /continue setup/i })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /continue setup/i }));
-    expect(screen.getAllByText(/select scheduled department/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/select focus area/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/select shift/i).length).toBeGreaterThan(0);
+      await user.click(screen.getByRole("button", { name: /continue setup/i }));
+      expect(screen.getAllByText(/select scheduled department/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/select focus area/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/select shift/i).length).toBeGreaterThan(0);
 
-    await user.click(screen.getByRole("button", { name: /^skip$/i }));
+      await user.click(screen.getByRole("button", { name: /^skip$/i }));
 
-    const readyInput = await screen.findByLabelText(/employees ready to create/i);
-    expect(readyInput).toHaveValue("0");
-    expect(readyInput).toHaveAttribute("readonly");
-    expect(screen.getByLabelText(/employees already created/i)).toHaveValue("0");
+      const readyInput = await screen.findByLabelText(/employees ready to create/i);
+      expect(readyInput).toHaveValue("0");
+      expect(readyInput).toHaveAttribute("readonly");
+      expect(screen.getByLabelText(/employees already created/i)).toHaveValue("0");
 
-    await user.type(screen.getAllByPlaceholderText("John")[0]!, "Alice");
-    expect(screen.getByLabelText(/employees ready to create/i)).toHaveValue("1");
-  });
+      await user.type(screen.getAllByPlaceholderText("John")[0]!, "Alice");
+      expect(screen.getByLabelText(/employees ready to create/i)).toHaveValue("1");
+    },
+  );
 });

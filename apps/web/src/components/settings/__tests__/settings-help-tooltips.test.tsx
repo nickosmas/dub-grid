@@ -84,12 +84,7 @@ const certification = {
 
 describe("settings help cleanup", () => {
   it("removes the custom labels explainer and shows visible inline field hints", () => {
-    render(
-      <OrganizationLabels
-        organization={organization as never}
-        onSave={vi.fn()}
-      />,
-    );
+    render(<OrganizationLabels organization={organization as never} onSave={vi.fn()} />);
 
     expect(screen.queryByText("How custom labels work")).not.toBeInTheDocument();
     expect(screen.getByText("e.g. Focus Areas, Departments, Units")).toBeInTheDocument();
@@ -131,10 +126,12 @@ describe("settings help cleanup", () => {
     render(
       <StringListSettings
         label="Roles"
-        items={[
-          { ...scheduleRole, departmentId: 1 },
-          { ...scheduleRole, id: 32, name: "Lead", abbr: "LEAD", departmentId: 1 },
-        ] as never}
+        items={
+          [
+            { ...scheduleRole, departmentId: 1 },
+            { ...scheduleRole, id: 32, name: "Lead", abbr: "LEAD", departmentId: 1 },
+          ] as never
+        }
         onSave={vi.fn().mockResolvedValue(undefined)}
         placeholder="e.g. Charge Nurse"
         initialEditing
@@ -146,7 +143,9 @@ describe("settings help cleanup", () => {
 
     const fullNameHeader = screen.getByText("Full Name").closest("div");
     const abbreviationHeader = screen.getByText("Abbreviation").closest("div");
-    const scheduleEligibilityHeader = screen.getByText("Only schedule-eligible roles can limit jobs.").closest("div");
+    const scheduleEligibilityHeader = screen
+      .getByText("Only schedule-eligible roles can limit jobs.")
+      .closest("div");
     const departmentHeader = screen.getByText("Department").closest("div");
     const helpText = screen.getByText("Only schedule-eligible roles can limit jobs.");
     const headerCell = helpText.closest("div");
@@ -167,28 +166,30 @@ describe("settings help cleanup", () => {
   it("shows visible eligibility labels on jobs instead of help buttons", () => {
     render(
       <Jobs
-        jobs={[
-          {
-            id: 51,
-            orgId: "org-1",
-            name: "Office",
-            abbr: "OFFICE",
-            showOnGrid: true,
-            assignmentMode: "shiftless",
-            eligibleRoleIds: [],
-            requiredCertificationIds: [],
-            color: "#BFDBFE",
-            border: "#93C5FD",
-            text: "#1E3A8A",
-            defaultStartTime: null,
-            defaultEndTime: null,
-            defaultDurationHours: null,
-            defaultDurationMinutes: null,
-            sortOrder: 0,
-            systemKey: null,
-            archivedAt: null,
-          },
-        ] as never}
+        jobs={
+          [
+            {
+              id: 51,
+              orgId: "org-1",
+              name: "Office",
+              abbr: "OFFICE",
+              showOnGrid: true,
+              assignmentMode: "shiftless",
+              eligibleRoleIds: [],
+              requiredCertificationIds: [],
+              color: "#BFDBFE",
+              border: "#93C5FD",
+              text: "#1E3A8A",
+              defaultStartTime: null,
+              defaultEndTime: null,
+              defaultDurationHours: null,
+              defaultDurationMinutes: null,
+              sortOrder: 0,
+              systemKey: null,
+              archivedAt: null,
+            },
+          ] as never
+        }
         orgId="org-1"
         orgRoles={[scheduleRole] as never}
         certifications={[certification] as never}
@@ -217,9 +218,7 @@ describe("settings help cleanup", () => {
       ).length,
     ).toBeGreaterThan(0);
     expect(
-      screen.getByText(
-        "Decide whether staff must match both lists, or just one.",
-      ),
+      screen.getByText("Decide whether staff must match both lists, or just one."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
   });

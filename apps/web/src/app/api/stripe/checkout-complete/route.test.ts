@@ -14,8 +14,7 @@ vi.mock("@/app/api/shared/permissions", () => ({
 }));
 
 vi.mock("@/lib/stripe", () => ({
-  syncCheckoutSessionToDb: (...args: unknown[]) =>
-    syncCheckoutSessionToDb(...args),
+  syncCheckoutSessionToDb: (...args: unknown[]) => syncCheckoutSessionToDb(...args),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -91,10 +90,7 @@ describe("POST /api/stripe/checkout-complete", () => {
 
   it("does not sync when org permissions fail", async () => {
     requireOrgPermissions.mockResolvedValueOnce({
-      response: NextResponse.json(
-        { error: "Insufficient permissions" },
-        { status: 403 },
-      ),
+      response: NextResponse.json({ error: "Insufficient permissions" }, { status: 403 }),
     });
 
     const response = await POST(

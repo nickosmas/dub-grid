@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  useMemo,
-  type MutableRefObject,
-} from "react";
+import { useState, useCallback, useRef, useEffect, useMemo, type MutableRefObject } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export interface CellLock {
@@ -73,11 +66,7 @@ function remoteSessionsEqual(
 }
 
 interface BroadcastSender {
-  (
-    event: string,
-    payload: Record<string, unknown>,
-    options?: { key?: string },
-  ): void;
+  (event: string, payload: Record<string, unknown>, options?: { key?: string }): void;
 }
 
 interface UseCellLocksReturn {
@@ -115,9 +104,9 @@ export function useCellLocks(
   canLockCells = true,
   sendBroadcast?: BroadcastSender,
 ): UseCellLocksReturn {
-  const [remoteSessions, setRemoteSessions] = useState<
-    Map<string, RemoteEditorSession>
-  >(() => new Map());
+  const [remoteSessions, setRemoteSessions] = useState<Map<string, RemoteEditorSession>>(
+    () => new Map(),
+  );
   const currentUserRef = useRef(currentUser);
   const canTrackPresenceRef = useRef(canTrackPresence);
   const canLockCellsRef = useRef(canLockCells);
@@ -130,9 +119,7 @@ export function useCellLocks(
   });
   const presenceVersionRef = useRef(0);
   const presenceFlushInFlightRef = useRef(false);
-  const presenceRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const presenceRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cellStateBroadcastKey = `cell_state:${editorSessionId}`;
   useEffect(() => {
     currentUserRef.current = currentUser;
@@ -204,11 +191,7 @@ export function useCellLocks(
   }, [channelRef, clearPresenceRetry, editorSessionId]);
 
   const queuePresence = useCallback(
-    (
-      editingCell: string | null,
-      lockRevision: number,
-      options?: { removePresence?: boolean },
-    ) => {
+    (editingCell: string | null, lockRevision: number, options?: { removePresence?: boolean }) => {
       desiredPresenceRef.current = {
         editingCell,
         lockRevision,
@@ -242,9 +225,7 @@ export function useCellLocks(
   const applyRemoteSessionUpdate = useCallback(
     (
       editorSessionIdToUpdate: string,
-      updater: (
-        current: RemoteEditorSession | undefined,
-      ) => RemoteEditorSession | undefined,
+      updater: (current: RemoteEditorSession | undefined) => RemoteEditorSession | undefined,
     ) => {
       if (editorSessionIdToUpdate === editorSessionId) return;
       setRemoteSessions((prev) => {
@@ -399,46 +380,49 @@ export function useCellLocks(
     [channelRef, cellStateBroadcastKey, editorSessionId, queuePresence, sendBroadcast],
   );
 
-  const unlockCell = useCallback((options?: { removePresence?: boolean }) => {
-    const channel = channelRef.current;
-    const user = currentUserRef.current;
-    const prev = currentCellRef.current;
+  const unlockCell = useCallback(
+    (options?: { removePresence?: boolean }) => {
+      const channel = channelRef.current;
+      const user = currentUserRef.current;
+      const prev = currentCellRef.current;
 
-    currentCellRef.current = null;
-    const lockRevision = ++lockRevisionRef.current;
+      currentCellRef.current = null;
+      const lockRevision = ++lockRevisionRef.current;
 
-    queuePresence(null, lockRevision, options);
-    if (!user) return;
-    if (!prev) return;
-    if (!canLockCellsRef.current) return;
+      queuePresence(null, lockRevision, options);
+      if (!user) return;
+      if (!prev) return;
+      if (!canLockCellsRef.current) return;
 
-    if (sendBroadcast) {
-      sendBroadcast(
-        "cell_unlocked",
-        {
+      if (sendBroadcast) {
+        sendBroadcast(
+          "cell_unlocked",
+          {
+            userId: user.id,
+            editorSessionId,
+            cellKey: prev,
+            lockRevision,
+          },
+          { key: cellStateBroadcastKey },
+        );
+        return;
+      }
+
+      if (!channel || channel.state !== "joined") return;
+
+      void channel.send({
+        type: "broadcast",
+        event: "cell_unlocked",
+        payload: {
           userId: user.id,
           editorSessionId,
           cellKey: prev,
           lockRevision,
         },
-        { key: cellStateBroadcastKey },
-      );
-      return;
-    }
-
-    if (!channel || channel.state !== "joined") return;
-
-    void channel.send({
-      type: "broadcast",
-      event: "cell_unlocked",
-      payload: {
-        userId: user.id,
-        editorSessionId,
-        cellKey: prev,
-        lockRevision,
-      },
-    });
-  }, [channelRef, cellStateBroadcastKey, editorSessionId, queuePresence, sendBroadcast]);
+      });
+    },
+    [channelRef, cellStateBroadcastKey, editorSessionId, queuePresence, sendBroadcast],
+  );
 
   const handleLockBroadcast = useCallback(
     (payload: {
@@ -504,8 +488,7 @@ export function useCellLocks(
       .map((sessions) => {
         const sorted = [...sessions].sort((a, b) => b.lockRevision - a.lockRevision);
         const latest = sorted[0];
-        const editingSession =
-          sorted.find((session) => session.editingCell) ?? latest;
+        const editingSession = sorted.find((session) => session.editingCell) ?? latest;
         return {
           editorSessionId: editingSession.editorSessionId,
           userId: latest.userId,

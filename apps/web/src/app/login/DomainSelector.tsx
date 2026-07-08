@@ -24,20 +24,23 @@ export default function DomainSelector() {
   // Hidden gridmaster entry — 5 taps on logo within 3s
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleLogoTap = useCallback((e: React.MouseEvent) => {
-    tapCountRef.current += 1;
-    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
-    if (tapCountRef.current >= 5) {
-      e.preventDefault();
-      tapCountRef.current = 0;
-      const gridmasterHost = buildSubdomainHost("gridmaster", parsed!);
-      window.location.href = `${window.location.protocol}//${gridmasterHost}/login`;
-      return;
-    }
-    tapTimerRef.current = setTimeout(() => {
-      tapCountRef.current = 0;
-    }, 3000);
-  }, [parsed]);
+  const handleLogoTap = useCallback(
+    (e: React.MouseEvent) => {
+      tapCountRef.current += 1;
+      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+      if (tapCountRef.current >= 5) {
+        e.preventDefault();
+        tapCountRef.current = 0;
+        const gridmasterHost = buildSubdomainHost("gridmaster", parsed!);
+        window.location.href = `${window.location.protocol}//${gridmasterHost}/login`;
+        return;
+      }
+      tapTimerRef.current = setTimeout(() => {
+        tapCountRef.current = 0;
+      }, 3000);
+    },
+    [parsed],
+  );
 
   function showToast(msg: string) {
     toast.error(msg, { id: "login-error" });
@@ -158,7 +161,13 @@ export default function DomainSelector() {
                   display: "inline-flex",
                 }}
               >
-                <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>Continue</ButtonLoading>
+                <ButtonLoading
+                  loading={loading}
+                  spinnerColor="var(--color-text-inverse)"
+                  spinnerSize={28}
+                >
+                  Continue
+                </ButtonLoading>
               </button>
               <button
                 type="button"
@@ -190,8 +199,8 @@ export default function DomainSelector() {
               }}
             >
               Your organization subdomain is the first part of your URL (e.g.{" "}
-              <strong>yourorg</strong>.{baseDomain}). If you don&apos;t know
-              it, contact your organization administrator.
+              <strong>yourorg</strong>.{baseDomain}). If you don&apos;t know it, contact your
+              organization administrator.
             </p>
             <button
               type="button"

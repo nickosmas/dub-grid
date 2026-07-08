@@ -1,9 +1,7 @@
 import { Platform, type PlatformOSType } from "react-native";
 
 type MobileEnvKey =
-  | "EXPO_PUBLIC_SUPABASE_URL"
-  | "EXPO_PUBLIC_SUPABASE_ANON_KEY"
-  | "EXPO_PUBLIC_API_BASE_URL";
+  "EXPO_PUBLIC_SUPABASE_URL" | "EXPO_PUBLIC_SUPABASE_ANON_KEY" | "EXPO_PUBLIC_API_BASE_URL";
 
 export type MobileEnvConfig = {
   supabaseUrl: string;
@@ -71,9 +69,7 @@ function isKnownHostedDubGridHost(hostname: string): boolean {
   return normalized === "dubgrid.com" || normalized.endsWith(".dubgrid.com");
 }
 
-export function validateMobileEnv(
-  platform: PlatformOSType = Platform.OS,
-): MobileEnvValidation {
+export function validateMobileEnv(platform: PlatformOSType = Platform.OS): MobileEnvValidation {
   const supabaseUrl = readEnvValue("EXPO_PUBLIC_SUPABASE_URL");
   const supabaseAnonKey = readEnvValue("EXPO_PUBLIC_SUPABASE_ANON_KEY");
   const apiBaseUrl = readEnvValue("EXPO_PUBLIC_API_BASE_URL");
@@ -141,10 +137,8 @@ export function validateMobileEnv(
   if (supabaseUrlObject && apiBaseUrlObject) {
     const supabaseHost = supabaseUrlObject.hostname;
     const apiHost = apiBaseUrlObject.hostname;
-    const supabaseLooksLocal =
-      isLoopbackHost(supabaseHost) || isPrivateIpv4Host(supabaseHost);
-    const apiLooksLocal =
-      isLoopbackHost(apiHost) || isPrivateIpv4Host(apiHost);
+    const supabaseLooksLocal = isLoopbackHost(supabaseHost) || isPrivateIpv4Host(supabaseHost);
+    const apiLooksLocal = isLoopbackHost(apiHost) || isPrivateIpv4Host(apiHost);
 
     if (supabaseLooksLocal && isKnownHostedDubGridHost(apiHost)) {
       issues.push({
@@ -180,9 +174,7 @@ export function validateMobileEnv(
   };
 }
 
-export function getMobileEnvConfig(
-  platform: PlatformOSType = Platform.OS,
-): MobileEnvConfig {
+export function getMobileEnvConfig(platform: PlatformOSType = Platform.OS): MobileEnvConfig {
   const validation = validateMobileEnv(platform);
   if (validation.status !== "ready") {
     const message = validation.issues.map((issue) => issue.message).join(" ");

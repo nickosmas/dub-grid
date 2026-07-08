@@ -19,12 +19,7 @@ type QueryClient = {
 type Row = Record<string, unknown>;
 
 const DAY_MS = 86_400_000;
-const HIGH_RISK_ACTION_PREFIXES = [
-  "billing.",
-  "gdpr.",
-  "gridmaster_account.",
-  "impersonation.",
-];
+const HIGH_RISK_ACTION_PREFIXES = ["billing.", "gdpr.", "gridmaster_account.", "impersonation."];
 const HIGH_RISK_ACTIONS = new Set([
   "account.deleted",
   "audit.exported",
@@ -88,9 +83,7 @@ export async function loadGridmasterOverview(
   const activeSessionCount = facts.userSessions.filter(
     (row) => now - dateMs(row.last_active_at) <= DAY_MS,
   ).length;
-  const activeMobileTokenCount = facts.mobileDeviceTokens.filter(
-    (row) => !row.disabled_at,
-  ).length;
+  const activeMobileTokenCount = facts.mobileDeviceTokens.filter((row) => !row.disabled_at).length;
   const pendingSetupCount = orgHealth.filter((org) => !org.setup.isComplete).length;
 
   return {
@@ -190,13 +183,21 @@ async function loadOversightFacts(serviceClient: QueryClient) {
     selectRows(serviceClient, "organizations", ORGANIZATION_WITH_BILLING_COLS).then((rows) =>
       rows.map((row) => rowToOrganization(row as unknown as DbOrganization)),
     ),
-    selectRows(serviceClient, "organization_memberships", "org_id, user_id, org_role, joined_at, updated_at, archived_at").then((rows) =>
-      rows.filter((row) => !row.archived_at),
+    selectRows(
+      serviceClient,
+      "organization_memberships",
+      "org_id, user_id, org_role, joined_at, updated_at, archived_at",
+    ).then((rows) => rows.filter((row) => !row.archived_at)),
+    selectRows(
+      serviceClient,
+      "employees",
+      "org_id, status, user_id, created_at, updated_at, archived_at",
+    ).then((rows) => rows.filter((row) => !row.archived_at)),
+    selectRows(
+      serviceClient,
+      "invitations",
+      "org_id, email, accepted_at, revoked_at, expires_at, created_at, updated_at",
     ),
-    selectRows(serviceClient, "employees", "org_id, status, user_id, created_at, updated_at, archived_at").then((rows) =>
-      rows.filter((row) => !row.archived_at),
-    ),
-    selectRows(serviceClient, "invitations", "org_id, email, accepted_at, revoked_at, expires_at, created_at, updated_at"),
     // L-3: push the 30-day window into the query instead of fetching the entire
     // schedule_cells table and filtering in JS (which both over-fetched and hit
     // PostgREST's silent max-rows truncation).
@@ -204,33 +205,59 @@ async function loadOversightFacts(serviceClient: QueryClient) {
       .from("schedule_cells")
       .select("org_id, created_at, updated_at")
       .gte("created_at", thirtyDaysAgo)
-      .then(
-        (res: { data: Array<Record<string, unknown>> | null }) => res.data ?? [],
-      ),
-    selectRows(serviceClient, "shift_requests", "org_id, type, status, created_at, updated_at, resolved_at, expires_at"),
-    selectRows(serviceClient, "user_sessions", "user_id, platform, app_version, device_label, last_active_at, created_at"),
-    selectRows(serviceClient, "mobile_device_tokens", "user_id, org_id, platform, last_seen_at, disabled_at, created_at"),
+      .then((res: { data: Array<Record<string, unknown>> | null }) => res.data ?? []),
+    selectRows(
+      serviceClient,
+      "shift_requests",
+      "org_id, type, status, created_at, updated_at, resolved_at, expires_at",
+    ),
+    selectRows(
+      serviceClient,
+      "user_sessions",
+      "user_id, platform, app_version, device_label, last_active_at, created_at",
+    ),
+    selectRows(
+      serviceClient,
+      "mobile_device_tokens",
+      "user_id, org_id, platform, last_seen_at, disabled_at, created_at",
+    ),
     serviceClient
       .from("audit_log")
-      .select("id, org_id, actor_id, actor_email, action, resource_type, resource_id, details, created_at, impersonation_session_id")
+      .select(
+        "id, org_id, actor_id, actor_email, action, resource_type, resource_id, details, created_at, impersonation_session_id",
+      )
       .gte("created_at", thirtyDaysAgo)
       .order("created_at", { ascending: false })
       .limit(1000)
       .then(toRows),
     serviceClient
       .from("impersonation_sessions")
-      .select("session_id, gridmaster_id, target_user_id, target_org_id, justification, ip_address, user_agent, expires_at, created_at, ended_at, end_reason")
+      .select(
+        "session_id, gridmaster_id, target_user_id, target_org_id, justification, ip_address, user_agent, expires_at, created_at, ended_at, end_reason",
+      )
       .order("created_at", { ascending: false })
       .limit(250)
       .then(toRows),
-    selectRows(serviceClient, "subscriptions", "org_id, stripe_subscription_id, stripe_customer_id, status, quantity, current_period_end, cancel_at, canceled_at, trial_end, updated_at"),
+    selectRows(
+      serviceClient,
+      "subscriptions",
+      "org_id, stripe_subscription_id, stripe_customer_id, status, quantity, current_period_end, cancel_at, canceled_at, trial_end, updated_at",
+    ),
     selectRows(serviceClient, "departments", "id, org_id, type, archived_at"),
     selectRows(serviceClient, "focus_areas", "id, org_id, department_id, archived_at"),
     selectRows(serviceClient, "shift_categories", "id, org_id, focus_area_id, archived_at"),
-    selectRows(serviceClient, "jobs", "id, org_id, show_on_grid, assignment_mode, focus_area_ids, department_ids, applicable_shift_ids, archived_at"),
+    selectRows(
+      serviceClient,
+      "jobs",
+      "id, org_id, show_on_grid, assignment_mode, focus_area_ids, department_ids, applicable_shift_ids, archived_at",
+    ),
     selectRows(serviceClient, "certifications", "id, org_id, archived_at"),
     selectRows(serviceClient, "organization_roles", "id, org_id, archived_at"),
-    selectRows(serviceClient, "profile_change_requests", "org_id, status, created_at, resolved_at, cancelled_at"),
+    selectRows(
+      serviceClient,
+      "profile_change_requests",
+      "org_id, status, created_at, resolved_at, cancelled_at",
+    ),
     countRows(serviceClient, "terms_acceptances"),
     countRows(serviceClient, "cookie_consents"),
   ]);
@@ -308,8 +335,7 @@ function buildOrgActivitySignal(
   const operationalActionCount = rows.filter(isNormalOperationAuditRow).length;
   const dominantCategory = topCategory(rows);
   const latestAt = latestDate(rows.map((row) => stringOrNull(row.created_at)));
-  const classification =
-    highRiskActionCount > 0 ? "review_recommended" : "normal_operation";
+  const classification = highRiskActionCount > 0 ? "review_recommended" : "normal_operation";
 
   return {
     orgId,
@@ -340,7 +366,9 @@ function topCategory(rows: Row[]) {
   return [...counts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null;
 }
 
-function buildOrgHealthSummaries(facts: Awaited<ReturnType<typeof loadOversightFacts>>): GridmasterOrgHealthSummary[] {
+function buildOrgHealthSummaries(
+  facts: Awaited<ReturnType<typeof loadOversightFacts>>,
+): GridmasterOrgHealthSummary[] {
   const userIdsByOrg = groupSet(facts.memberships, "org_id", "user_id");
   const membershipCount = groupCount(facts.memberships, "org_id");
   const employeeCount = groupCount(facts.employees, "org_id");
@@ -384,7 +412,9 @@ function buildOrgHealthSummaries(facts: Awaited<ReturnType<typeof loadOversightF
     );
     const lastSettingsChange = latestDate(
       auditRows
-        .filter((row) => String(row.action).startsWith("org.") || row.action === "feature_flags.updated")
+        .filter(
+          (row) => String(row.action).startsWith("org.") || row.action === "feature_flags.updated",
+        )
         .map((row) => stringOrNull(row.created_at)),
     );
     const riskFlags: GridmasterOrgHealthSummary["riskFlags"] = [];
@@ -401,8 +431,7 @@ function buildOrgHealthSummaries(facts: Awaited<ReturnType<typeof loadOversightF
 
     const oversightScore = Math.max(
       0,
-      100 -
-        riskFlags.reduce((total, flag) => total + riskPenalty(flag), 0),
+      100 - riskFlags.reduce((total, flag) => total + riskPenalty(flag), 0),
     );
 
     return {
@@ -438,7 +467,9 @@ function buildOrgHealthSummaries(facts: Awaited<ReturnType<typeof loadOversightF
   });
 }
 
-function buildSecuritySummary(facts: Awaited<ReturnType<typeof loadOversightFacts>>): GridmasterSecuritySummary {
+function buildSecuritySummary(
+  facts: Awaited<ReturnType<typeof loadOversightFacts>>,
+): GridmasterSecuritySummary {
   const nowMs = facts.now.getTime();
   const activeImpersonations = facts.impersonationSessions.filter(
     (row: Row) => !row.ended_at && dateMs(row.expires_at) > nowMs,
@@ -446,12 +477,16 @@ function buildSecuritySummary(facts: Awaited<ReturnType<typeof loadOversightFact
   const expiredUnended = facts.impersonationSessions.filter(
     (row: Row) => !row.ended_at && dateMs(row.expires_at) <= nowMs,
   );
-  const forceLogoutEvents = facts.auditRows.filter((row: Row) => row.action === "user.force_logout");
+  const forceLogoutEvents = facts.auditRows.filter(
+    (row: Row) => row.action === "user.force_logout",
+  );
   return {
     generatedAt: facts.now.toISOString(),
     sessionSummary: {
-      active24h: facts.userSessions.filter((row) => nowMs - dateMs(row.last_active_at) <= DAY_MS).length,
-      stale30d: facts.userSessions.filter((row) => nowMs - dateMs(row.last_active_at) > 30 * DAY_MS).length,
+      active24h: facts.userSessions.filter((row) => nowMs - dateMs(row.last_active_at) <= DAY_MS)
+        .length,
+      stale30d: facts.userSessions.filter((row) => nowMs - dateMs(row.last_active_at) > 30 * DAY_MS)
+        .length,
       web: facts.userSessions.filter((row) => row.platform === "web").length,
       ios: facts.userSessions.filter((row) => row.platform === "ios").length,
       android: facts.userSessions.filter((row) => row.platform === "android").length,
@@ -514,12 +549,12 @@ function buildBillingSummary(
     (row) => !row.trialEndsAt && (row.status === "trialing" || !row.status),
   );
   const riskOrganizations = organizations.filter((row) =>
-    ["past_due", "canceled", "unpaid", "incomplete", "incomplete_expired"].includes(row.status ?? ""),
+    ["past_due", "canceled", "unpaid", "incomplete", "incomplete_expired"].includes(
+      row.status ?? "",
+    ),
   );
   const missingStripeCustomer = organizations.filter((row) => !row.stripeCustomerId);
-  const seatMismatches = organizations.filter(
-    (row) => row.seatDelta != null && row.seatDelta < 0,
-  );
+  const seatMismatches = organizations.filter((row) => row.seatDelta != null && row.seatDelta < 0);
   return {
     generatedAt: facts.now.toISOString(),
     organizations,
@@ -561,7 +596,9 @@ function buildComplianceSummary(
     }));
   const gdprEvents = facts.auditRows.filter((row: Row) => String(row.action).startsWith("gdpr."));
   const deletionEvents = facts.auditRows.filter((row: Row) => row.action === "account.deleted");
-  const pendingProfileChangeRequests = facts.profileChangeRequests.filter((row: Row) => row.status === "pending");
+  const pendingProfileChangeRequests = facts.profileChangeRequests.filter(
+    (row: Row) => row.status === "pending",
+  );
   return {
     generatedAt: facts.now.toISOString(),
     termsAcceptanceCount: facts.termsCount,
@@ -575,7 +612,8 @@ function buildComplianceSummary(
       orgId: org.orgId,
       orgName: org.orgName,
       dataRetentionDays:
-        facts.organizations.find((candidate) => candidate.id === org.orgId)?.dataRetentionDays ?? 365,
+        facts.organizations.find((candidate) => candidate.id === org.orgId)?.dataRetentionDays ??
+        365,
     })),
   };
 }
@@ -679,7 +717,10 @@ function mapImpersonationRow(row: Row) {
 
 function isHighRiskAuditRow(row: Row) {
   const action = String(row.action ?? "");
-  return HIGH_RISK_ACTIONS.has(action) || HIGH_RISK_ACTION_PREFIXES.some((prefix) => action.startsWith(prefix));
+  return (
+    HIGH_RISK_ACTIONS.has(action) ||
+    HIGH_RISK_ACTION_PREFIXES.some((prefix) => action.startsWith(prefix))
+  );
 }
 
 function isNormalOperationAuditRow(row: Row) {
@@ -721,7 +762,8 @@ function isPendingInvite(row: Row, now: Date) {
 function countOrgSessions(userIds: Set<string> | undefined, sessions: Row[], now: Date) {
   if (!userIds) return 0;
   return sessions.filter(
-    (row) => userIds.has(String(row.user_id)) && now.getTime() - dateMs(row.last_active_at) <= DAY_MS,
+    (row) =>
+      userIds.has(String(row.user_id)) && now.getTime() - dateMs(row.last_active_at) <= DAY_MS,
   ).length;
 }
 

@@ -26,14 +26,8 @@ describe("settings nav config", () => {
     const general = groups.find((g) => g.id === "general");
 
     expect(general?.label).toBe("General");
-    expect(general?.items.map((item) => item.id)).toEqual([
-      "org-general",
-      "org-labels",
-    ]);
-    expect(general?.items.map((item) => item.label)).toEqual([
-      "Organization Details",
-      "Labels",
-    ]);
+    expect(general?.items.map((item) => item.id)).toEqual(["org-general", "org-labels"]);
+    expect(general?.items.map((item) => item.label)).toEqual(["Organization Details", "Labels"]);
   });
 
   it("groups Staff designations with Departments first, then Roles and Certifications", () => {

@@ -53,9 +53,22 @@ export async function GET(req: NextRequest) {
       serviceClient.from("profiles").select("*").eq("id", userId).single(),
       serviceClient.from("organization_memberships").select("*").eq("user_id", userId),
       serviceClient.from("employees").select("*").eq("user_id", userId),
-      serviceClient.from("audit_log").select("*").eq("actor_id", userId).order("created_at", { ascending: false }).limit(1000),
-      serviceClient.from("cookie_consents").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
-      serviceClient.from("terms_acceptances").select("*").eq("user_id", userId).order("accepted_at", { ascending: false }),
+      serviceClient
+        .from("audit_log")
+        .select("*")
+        .eq("actor_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(1000),
+      serviceClient
+        .from("cookie_consents")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
+      serviceClient
+        .from("terms_acceptances")
+        .select("*")
+        .eq("user_id", userId)
+        .order("accepted_at", { ascending: false }),
       serviceClient.from("notification_preferences").select("*").eq("user_id", userId),
     ]);
 
@@ -65,13 +78,15 @@ export async function GET(req: NextRequest) {
     if (employeeIds.length > 0) {
       const { data: scheduleCellData, error: scheduleCellError } = await serviceClient
         .from("schedule_cells")
-        .select(`
+        .select(
+          `
           *,
           snapshots:schedule_cell_snapshots(
             *,
             segments:schedule_cell_segments(*)
           )
-        `)
+        `,
+        )
         .in("emp_id", employeeIds)
         .order("date", { ascending: false })
         .limit(5000);

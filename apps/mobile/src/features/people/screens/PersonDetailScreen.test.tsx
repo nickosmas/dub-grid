@@ -1,10 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiResponseError } from "@dubgrid/api-client";
-import {
-  createReactNativeModule,
-  createScreenModule,
-} from "../../../test/native";
+import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
 const useMutation = vi.fn();
 const useQuery = vi.fn();
@@ -14,9 +11,7 @@ const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
 const pushToast = vi.fn();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
@@ -42,9 +37,7 @@ vi.mock("expo-router", () => ({
   useLocalSearchParams,
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("../../../shared/navigation/top-level-stack", () => ({
   createDetailStackOptions: () => ({}),
@@ -71,9 +64,7 @@ beforeAll(async () => {
 });
 
 function confirmDialog(label: string) {
-  fireEvent.click(
-    within(screen.getByRole("alert")).getByRole("button", { name: label }),
-  );
+  fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: label }));
 }
 
 describe("PersonDetailScreen", () => {
@@ -209,9 +200,7 @@ describe("PersonDetailScreen", () => {
     render(<PersonDetailScreen />);
 
     expect(screen.queryByText("Account access")).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Pending for mina@dubgrid.com"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Pending for mina@dubgrid.com")).not.toBeInTheDocument();
     expect(screen.getByText("Status updated")).toBeInTheDocument();
   });
 
@@ -347,9 +336,7 @@ describe("PersonDetailScreen", () => {
     confirmDialog("Send Invitation");
 
     expect(screen.getByText("Account found")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Minnie Diaz[\s\S]*matches this staff profile/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Minnie Diaz[\s\S]*matches this staff profile/)).toBeInTheDocument();
     expect(screen.queryByText("Name mismatch found")).not.toBeInTheDocument();
     expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
 
@@ -366,9 +353,7 @@ describe("PersonDetailScreen", () => {
     await waitFor(() => {
       expect(screen.getByText("Name mismatch found")).toBeInTheDocument();
     });
-    expect(
-      screen.getByText(/Minnie Diaz[\s\S]*Link it and update Mina Diaz/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Minnie Diaz[\s\S]*Link it and update Mina Diaz/)).toBeInTheDocument();
 
     const nameMismatchInvitationMutation = mutationCalls.at(-1);
     nameMismatchInvitationMutation?.mutate.mockClear();
@@ -452,9 +437,7 @@ describe("PersonDetailScreen", () => {
     confirmDialog("Send Invitation");
 
     expect(screen.getByText("Account found")).toBeInTheDocument();
-    expect(
-      screen.getByText(/matches this staff profile[\s\S]*new invitation/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/matches this staff profile[\s\S]*new invitation/)).toBeInTheDocument();
     expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
 
     const invitationMutation = mutationCalls.at(-1);

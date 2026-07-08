@@ -53,9 +53,7 @@ describe("gridmaster oversight read APIs", () => {
       response: NextResponse.json({ error: "Unauthorized" }, { status: 403 }),
     });
 
-    const response = await getOverview(
-      new NextRequest("http://localhost/api/gridmaster/overview"),
-    );
+    const response = await getOverview(new NextRequest("http://localhost/api/gridmaster/overview"));
 
     expect(response.status).toBe(403);
     expect(loadGridmasterOverview).not.toHaveBeenCalled();

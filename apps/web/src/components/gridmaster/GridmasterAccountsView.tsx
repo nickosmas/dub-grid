@@ -104,11 +104,9 @@ export default function GridmasterAccountsView({
     const q = search.trim().toLowerCase();
     if (!q) return accounts;
     return accounts.filter((account) =>
-      [
-        account.email,
-        account.firstName,
-        account.lastName,
-      ].some((value) => (value ?? "").toLowerCase().includes(q)),
+      [account.email, account.firstName, account.lastName].some((value) =>
+        (value ?? "").toLowerCase().includes(q),
+      ),
     );
   }, [accounts, search]);
 
@@ -168,7 +166,9 @@ export default function GridmasterAccountsView({
     const deactivate = !account.deactivatedAt;
     try {
       await updateGridmasterAccountActivation({ userId: account.id, deactivate });
-      toast.success(deactivate ? "Gridmaster account deactivated" : "Gridmaster account reactivated");
+      toast.success(
+        deactivate ? "Gridmaster account deactivated" : "Gridmaster account reactivated",
+      );
       setActivationConfirm(null);
       invalidateGridmasterQueries();
     } catch (err: unknown) {
@@ -221,7 +221,15 @@ export default function GridmasterAccountsView({
         <div className="dg-skeleton dg-skeleton--heading" style={{ marginBottom: 16 }} />
         <div style={sectionStyle}>
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} style={{ display: "flex", gap: 16, padding: "12px 14px", borderBottom: "1px solid var(--color-border-light)" }}>
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                gap: 16,
+                padding: "12px 14px",
+                borderBottom: "1px solid var(--color-border-light)",
+              }}
+            >
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "30%" }} />
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "16%" }} />
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "18%" }} />
@@ -235,17 +243,37 @@ export default function GridmasterAccountsView({
 
   return (
     <>
-      <h2 style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+      <h2
+        style={{
+          margin: "0 0 16px",
+          fontSize: "var(--dg-fs-page-title)",
+          fontWeight: 700,
+          color: "var(--color-text-primary)",
+        }}
+      >
         Gridmaster Accounts
       </h2>
 
       {accountsQuery.error instanceof Error && (
-        <div style={{ padding: "12px 16px", background: "var(--color-danger-bg)", color: "var(--color-danger)", borderRadius: "var(--dg-radius-lg)", fontSize: "var(--dg-fs-label)", fontWeight: 600, marginBottom: 16 }}>
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "var(--color-danger-bg)",
+            color: "var(--color-danger)",
+            borderRadius: "var(--dg-radius-lg)",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 600,
+            marginBottom: 16,
+          }}
+        >
           {formatClientErrorMessage(accountsQuery.error, "Failed to load gridmaster accounts")}
         </div>
       )}
 
-      <form onSubmit={handlePromote} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+      <form
+        onSubmit={handlePromote}
+        style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}
+      >
         <input
           className="dg-input"
           type="email"
@@ -255,11 +283,22 @@ export default function GridmasterAccountsView({
           aria-label="Promote by email"
           style={{ maxWidth: 300, fontSize: "var(--dg-fs-label)" }}
         />
-        <button className="dg-btn dg-btn-primary" type="submit" disabled={promoteLoading || !promoteEmail.trim()}>
+        <button
+          className="dg-btn dg-btn-primary"
+          type="submit"
+          disabled={promoteLoading || !promoteEmail.trim()}
+        >
           {promoteLoading ? "Promoting..." : "Promote"}
         </button>
         <div style={{ flex: 1 }} />
-        <span aria-live="polite" style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap" }}>
+        <span
+          aria-live="polite"
+          style={{
+            fontSize: "var(--dg-fs-caption)",
+            color: "var(--color-text-muted)",
+            whiteSpace: "nowrap",
+          }}
+        >
           Showing {filtered.length} of {accounts.length}
         </span>
         <input
@@ -292,23 +331,65 @@ export default function GridmasterAccountsView({
                   return (
                     <tr key={account.id} style={{ opacity: account.deactivatedAt ? 0.6 : 1 }}>
                       <td style={{ ...tdStyle, fontWeight: 600, fontSize: "var(--dg-fs-caption)" }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                          }}
+                        >
                           {account.email ?? "—"}
                           <StatusBadge deactivatedAt={account.deactivatedAt} />
-                          {isSelf && <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>You</span>}
+                          {isSelf && (
+                            <span
+                              style={{
+                                fontSize: "var(--dg-fs-footnote)",
+                                color: "var(--color-text-muted)",
+                              }}
+                            >
+                              You
+                            </span>
+                          )}
                         </div>
                       </td>
-                      <td style={tdStyle}><GridmasterBadge /></td>
-                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
+                      <td style={tdStyle}>
+                        <GridmasterBadge />
+                      </td>
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--color-text-muted)",
+                          whiteSpace: "nowrap",
+                          fontFamily: "var(--font-dm-mono), monospace",
+                        }}
+                      >
                         <MaybeHint
-                          content={account.lastSignInAt ? new Date(account.lastSignInAt).toLocaleString() : "Never"}
+                          content={
+                            account.lastSignInAt
+                              ? new Date(account.lastSignInAt).toLocaleString()
+                              : "Never"
+                          }
                           side="bottom"
                         >
                           <span>{formatRelativeDate(account.lastSignInAt)}</span>
                         </MaybeHint>
                       </td>
-                      <td style={{ ...tdStyle, fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", whiteSpace: "nowrap", fontFamily: "var(--font-dm-mono), monospace" }}>
-                        {new Date(account.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      <td
+                        style={{
+                          ...tdStyle,
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--color-text-muted)",
+                          whiteSpace: "nowrap",
+                          fontFamily: "var(--font-dm-mono), monospace",
+                        }}
+                      >
+                        {new Date(account.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
                       </td>
                       <td style={tdStyle}>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -332,7 +413,12 @@ export default function GridmasterAccountsView({
                           )}
                           <button
                             className="dg-btn dg-btn-secondary"
-                            style={{ fontSize: "var(--dg-fs-caption)", color: account.deactivatedAt ? "var(--color-success, green)" : "var(--color-warning, orange)" }}
+                            style={{
+                              fontSize: "var(--dg-fs-caption)",
+                              color: account.deactivatedAt
+                                ? "var(--color-success, green)"
+                                : "var(--color-warning, orange)",
+                            }}
                             onClick={() => setActivationConfirm(account)}
                             disabled={isSelf || isLoading}
                           >
@@ -340,7 +426,10 @@ export default function GridmasterAccountsView({
                           </button>
                           <button
                             className="dg-btn dg-btn-secondary"
-                            style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-danger)" }}
+                            style={{
+                              fontSize: "var(--dg-fs-caption)",
+                              color: "var(--color-danger)",
+                            }}
                             onClick={() => {
                               setDemoteTarget(account);
                               setDemoteOrgId(organizations[0]?.id ?? "");
@@ -362,7 +451,20 @@ export default function GridmasterAccountsView({
       ) : (
         <EmptyState
           icon={
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8l2 2 4-4"/></svg>
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M19 8l2 2 4-4" />
+            </svg>
           }
           title="No gridmaster accounts found"
           description="Gridmaster accounts are managed separately from organization users."
@@ -371,7 +473,9 @@ export default function GridmasterAccountsView({
 
       {activationConfirm && (
         <ConfirmDialog
-          title={activationConfirm.deactivatedAt ? "Reactivate Gridmaster" : "Deactivate Gridmaster"}
+          title={
+            activationConfirm.deactivatedAt ? "Reactivate Gridmaster" : "Deactivate Gridmaster"
+          }
           message={
             activationConfirm.deactivatedAt
               ? `Reactivate "${activationConfirm.email}"? They will regain gridmaster access.`
@@ -442,14 +546,35 @@ export default function GridmasterAccountsView({
               padding: 20,
             }}
           >
-            <h3 style={{ margin: "0 0 8px", fontSize: "var(--dg-fs-body-sm)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+            <h3
+              style={{
+                margin: "0 0 8px",
+                fontSize: "var(--dg-fs-body-sm)",
+                fontWeight: 700,
+                color: "var(--color-text-primary)",
+              }}
+            >
               Demote Gridmaster
             </h3>
-            <p style={{ margin: "0 0 16px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}>
+            <p
+              style={{
+                margin: "0 0 16px",
+                fontSize: "var(--dg-fs-label)",
+                color: "var(--color-text-muted)",
+              }}
+            >
               Move {demoteTarget.email ?? "this account"} into an organization as a normal org user.
             </p>
             <div style={{ display: "grid", gap: 12 }}>
-              <label style={{ display: "grid", gap: 6, fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+              <label
+                style={{
+                  display: "grid",
+                  gap: 6,
+                  fontSize: "var(--dg-fs-label)",
+                  fontWeight: 600,
+                  color: "var(--color-text-primary)",
+                }}
+              >
                 Organization
                 <CustomSelect
                   value={demoteOrgId}
@@ -458,7 +583,15 @@ export default function GridmasterAccountsView({
                   style={{ width: "100%" }}
                 />
               </label>
-              <label style={{ display: "grid", gap: 6, fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+              <label
+                style={{
+                  display: "grid",
+                  gap: 6,
+                  fontSize: "var(--dg-fs-label)",
+                  fontWeight: 600,
+                  color: "var(--color-text-primary)",
+                }}
+              >
                 Organization Role
                 <CustomSelect
                   value={demoteOrgRole}

@@ -43,19 +43,15 @@ export default function ExpandedOpenShifts({
   publishedWindowState = "published",
   onClose,
 }: ExpandedOpenShiftsProps) {
-  const [urgencyFilter, setUrgencyFilter] = useState<
-    "all" | OpenShift["urgency"]
-  >("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<"all" | OpenShift["urgency"]>("all");
   const [focusAreaFilter, setFocusAreaFilter] = useState<string>("all");
   const isUnpublished = publishedWindowState === "unpublished";
   const isPartial = publishedWindowState === "partial";
 
   const filtered = useMemo(() => {
     let list = openShifts;
-    if (urgencyFilter !== "all")
-      list = list.filter((s) => s.urgency === urgencyFilter);
-    if (focusAreaFilter !== "all")
-      list = list.filter((s) => s.focusAreaName === focusAreaFilter);
+    if (urgencyFilter !== "all") list = list.filter((s) => s.urgency === urgencyFilter);
+    if (focusAreaFilter !== "all") list = list.filter((s) => s.focusAreaName === focusAreaFilter);
     return list;
   }, [openShifts, urgencyFilter, focusAreaFilter]);
 
@@ -63,10 +59,7 @@ export default function ExpandedOpenShifts({
     () => [...new Set(openShifts.map((s) => s.focusAreaName))].sort(),
     [openShifts],
   );
-  const filteredSlotCount = filtered.reduce(
-    (total, shift) => total + shift.needed,
-    0,
-  );
+  const filteredSlotCount = filtered.reduce((total, shift) => total + shift.needed, 0);
 
   return (
     <Modal title="Open shifts" onClose={onClose} style={modalStyle}>
@@ -111,14 +104,9 @@ export default function ExpandedOpenShifts({
                 value={urgencyFilter}
                 options={URGENCY_OPTIONS.map((opt) => ({
                   value: opt,
-                  label:
-                    opt === "all"
-                      ? "All urgency"
-                      : opt.charAt(0).toUpperCase() + opt.slice(1),
+                  label: opt === "all" ? "All urgency" : opt.charAt(0).toUpperCase() + opt.slice(1),
                 }))}
-                onChange={(val) =>
-                  setUrgencyFilter(val as typeof urgencyFilter)
-                }
+                onChange={(val) => setUrgencyFilter(val as typeof urgencyFilter)}
                 fontSize="var(--dg-fs-label)"
               />
               <CustomSelect

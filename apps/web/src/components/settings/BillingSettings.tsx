@@ -27,23 +27,10 @@ import {
   startBillingCheckout,
 } from "@/features/billing/client";
 import { useIsInSandbox, useLogout, useSandboxSourceOrgId } from "@/hooks";
-import {
-  describeAction,
-  formatDetails,
-  formatRelativeTime,
-} from "@/lib/activity-log-utils";
-import {
-  formatBillingStatusLabel,
-  formatClientErrorMessage,
-} from "@/lib/client-facing";
+import { describeAction, formatDetails, formatRelativeTime } from "@/lib/activity-log-utils";
+import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  sectionBodyStyle,
-  sectionHeaderStyle,
-  sectionStyle,
-  tdStyle,
-  thStyle,
-} from "@/lib/styles";
+import { sectionBodyStyle, sectionHeaderStyle, sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import type {
   BillingOperationSummary,
   FullAuditLogEntry,
@@ -183,12 +170,7 @@ function BillingMetric({
             flexShrink: 0,
           }}
         >
-          <Icon
-            size={18}
-            strokeWidth={1.7}
-            color={iconAccent.color}
-            aria-hidden="true"
-          />
+          <Icon size={18} strokeWidth={1.7} color={iconAccent.color} aria-hidden="true" />
         </div>
       </div>
       <div
@@ -206,13 +188,8 @@ function BillingMetric({
   );
 }
 
-function BillingOperations({
-  operations,
-}: {
-  operations: BillingOperationSummary[];
-}) {
-  const [selectedOperation, setSelectedOperation] =
-    useState<BillingOperationSummary | null>(null);
+function BillingOperations({ operations }: { operations: BillingOperationSummary[] }) {
+  const [selectedOperation, setSelectedOperation] = useState<BillingOperationSummary | null>(null);
 
   function openOperation(operation: BillingOperationSummary) {
     setSelectedOperation(operation);
@@ -236,9 +213,7 @@ function BillingOperations({
           }}
         >
           <ReceiptText size={15} aria-hidden="true" />
-          <span id="recent-billing-operations-heading">
-            Recent billing operations
-          </span>
+          <span id="recent-billing-operations-heading">Recent billing operations</span>
         </div>
         <div style={sectionBodyStyle}>
           {operations.length === 0 ? (
@@ -272,9 +247,7 @@ function BillingOperations({
                       }}
                       style={{ cursor: "pointer" }}
                     >
-                      <td style={{ ...tdStyle, fontWeight: 700 }}>
-                        {operation.label}
-                      </td>
+                      <td style={{ ...tdStyle, fontWeight: 700 }}>{operation.label}</td>
                       <td style={tdStyle}>{operation.actorLabel}</td>
                       <td
                         style={{
@@ -426,9 +399,7 @@ function FragmentRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function billingOperationToAuditEntry(
-  operation: BillingOperationSummary,
-): FullAuditLogEntry {
+function billingOperationToAuditEntry(operation: BillingOperationSummary): FullAuditLogEntry {
   const id = Number(operation.id);
   return {
     id: Number.isFinite(id) ? id : 0,
@@ -472,9 +443,7 @@ type BillingMetricConfig = {
   tone?: "danger" | "warning";
 };
 
-function billingNoticeCopy(
-  billingAccess: OrganizationBillingSummary["billingAccess"],
-) {
+function billingNoticeCopy(billingAccess: OrganizationBillingSummary["billingAccess"]) {
   switch (billingAccess.state) {
     case "trial_ending_soon":
       return billingAccess.daysUntilTrialEnd === 1
@@ -545,11 +514,7 @@ function formatTrialTimeLeft(billing: OrganizationBillingSummary): {
   };
 }
 
-export default function BillingSettings({
-  organization,
-}: {
-  organization: { id: string };
-}) {
+export default function BillingSettings({ organization }: { organization: { id: string } }) {
   const queryClient = useQueryClient();
   const { signOut } = useLogout();
   const isInSandbox = useIsInSandbox();
@@ -564,8 +529,7 @@ export default function BillingSettings({
   // real Stripe state. Display the source organization's billing instead so
   // the user can see what's actually billed. Action buttons are still
   // gated by isInSandbox below, so the source-org data is read-only here.
-  const billingOrgId =
-    isInSandbox && sandboxSourceOrgId ? sandboxSourceOrgId : organization.id;
+  const billingOrgId = isInSandbox && sandboxSourceOrgId ? sandboxSourceOrgId : organization.id;
   const billingQuery = useQuery({
     queryKey: queryKeys.org.billing(billingOrgId),
     queryFn: () => fetchOrganizationBilling(billingOrgId),
@@ -649,18 +613,14 @@ export default function BillingSettings({
       });
       window.location.assign(url);
     } catch (error) {
-      toast.error(
-        formatClientErrorMessage(error, "Failed to open billing portal"),
-      );
+      toast.error(formatClientErrorMessage(error, "Failed to open billing portal"));
     } finally {
       setOpeningPortal(false);
     }
   }
 
-  const seatTone =
-    billing?.seatDelta != null && billing.seatDelta < 0 ? "danger" : undefined;
-  const isTrialPending =
-    Boolean(billing) && billing!.billingAccess.state === "trial_pending";
+  const seatTone = billing?.seatDelta != null && billing.seatDelta < 0 ? "danger" : undefined;
+  const isTrialPending = Boolean(billing) && billing!.billingAccess.state === "trial_pending";
   const primaryAction =
     billing?.hasStripeCustomer && billing.hasStripeSubscription
       ? "Manage billing"
@@ -766,10 +726,7 @@ export default function BillingSettings({
                 fontWeight: 700,
               }}
             >
-              {formatClientErrorMessage(
-                billingQuery.error,
-                "Failed to load billing",
-              )}
+              {formatClientErrorMessage(billingQuery.error, "Failed to load billing")}
             </div>
           )}
 
@@ -897,9 +854,8 @@ export default function BillingSettings({
                     fontWeight: 700,
                   }}
                 >
-                  Your trial starts the first time an administrator signs in. The
-                  countdown begins then. Refresh this page to see your trial end
-                  date.
+                  Your trial starts the first time an administrator signs in. The countdown begins
+                  then. Refresh this page to see your trial end date.
                 </div>
               )}
 
@@ -955,15 +911,11 @@ export default function BillingSettings({
                       isInSandbox
                     }
                     title={
-                      isInSandbox
-                        ? "Billing actions are disabled in sandbox mode."
-                        : undefined
+                      isInSandbox ? "Billing actions are disabled in sandbox mode." : undefined
                     }
                   >
                     <ExternalLink size={15} aria-hidden="true" />
-                    {openingCheckout || openingPortal
-                      ? "Opening..."
-                      : primaryAction}
+                    {openingCheckout || openingPortal ? "Opening..." : primaryAction}
                   </button>
                 </div>
               </div>
@@ -971,9 +923,7 @@ export default function BillingSettings({
           )}
         </div>
       </div>
-      {billing && (
-        <BillingOperations operations={billing.recentOperations ?? []} />
-      )}
+      {billing && <BillingOperations operations={billing.recentOperations ?? []} />}
     </div>
   );
 }

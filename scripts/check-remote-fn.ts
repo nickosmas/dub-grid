@@ -1,9 +1,7 @@
 import { Client } from "pg";
 
 async function main() {
-  const url =
-    process.env.TARGET_DB_URL ??
-    "postgres://postgres:postgres@127.0.0.1:54322/postgres";
+  const url = process.env.TARGET_DB_URL ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
   console.log(`target: ${url.replace(/:[^:@]+@/, ":****@")}`);
   const db = new Client({
     connectionString: url,

@@ -20,8 +20,7 @@ vi.mock("@/features/gridmaster/client", () => ({
 
 vi.mock("@/features/organization/client", () => ({
   createOrganizationInvitation: vi.fn(),
-  updateOrganizationSettings: (...args: unknown[]) =>
-    updateOrganizationSettings(...args),
+  updateOrganizationSettings: (...args: unknown[]) => updateOrganizationSettings(...args),
 }));
 
 vi.mock("@/features/settings/client", () => ({
@@ -111,9 +110,7 @@ describe("saveOrganizationSetupConfig", () => {
     const savedCount = await saveOrganizationSetupConfig({
       createdOrg: makeOrganization(),
       shiftDisplayMode: "code",
-      departments: [
-        { id: "dept-1", name: "Operations", abbr: "ops", type: "scheduled" },
-      ],
+      departments: [{ id: "dept-1", name: "Operations", abbr: "ops", type: "scheduled" }],
       focusAreas: [{ id: "focus-1", name: "Emergency", departmentId: "dept-1" }],
       certifications: [],
       orgRoles: [],
@@ -192,9 +189,7 @@ describe("saveOrganizationSetupConfig", () => {
       saveOrganizationSetupConfig({
         createdOrg: makeOrganization(),
         shiftDisplayMode: "code",
-        departments: [
-          { id: "dept-1", name: "Operations", abbr: "ops", type: "scheduled" },
-        ],
+        departments: [{ id: "dept-1", name: "Operations", abbr: "ops", type: "scheduled" }],
         focusAreas: [{ id: "focus-1", name: "Emergency", departmentId: null }],
         certifications: [],
         orgRoles: [],

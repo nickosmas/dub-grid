@@ -20,12 +20,8 @@ describe("ConfirmDialog", () => {
     );
 
     expect(screen.getByRole("dialog")).toHaveStyle({ maxWidth: "620px" });
-    expect(
-      screen.getByRole("button", { name: "Discard my edits" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Discard all org edits" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Discard my edits" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Discard all org edits" })).toBeInTheDocument();
   });
 
   it("can disable destructive actions while keeping cancel available", async () => {
@@ -45,12 +41,8 @@ describe("ConfirmDialog", () => {
       />,
     );
 
-    expect(
-      screen.getByRole("button", { name: "Discard my edits" }),
-    ).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "Discard all org edits" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Discard my edits" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Discard all org edits" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeEnabled();
 
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));

@@ -19,19 +19,14 @@ describe("createHeaders", () => {
   });
 
   it("skips undefined extra header values", () => {
-    const headers = createHeaders(
-      {},
-      { "x-dubgrid-org-id": undefined },
-    );
+    const headers = createHeaders({}, { "x-dubgrid-org-id": undefined });
     expect(headers.has("x-dubgrid-org-id")).toBe(false);
   });
 });
 
 describe("getRequestOrigin", () => {
   it("returns the origin of a valid URL", () => {
-    expect(getRequestOrigin("https://app.example.com/api/foo?x=1")).toBe(
-      "https://app.example.com",
-    );
+    expect(getRequestOrigin("https://app.example.com/api/foo?x=1")).toBe("https://app.example.com");
   });
 
   it("returns the candidate unchanged when it is not a valid URL", () => {
@@ -45,15 +40,13 @@ describe("appendQueryParams", () => {
   });
 
   it("appends only the defined query values", () => {
-    expect(
-      appendQueryParams("/api/people", { orgId: "org-1", search: undefined }),
-    ).toBe("/api/people?orgId=org-1");
+    expect(appendQueryParams("/api/people", { orgId: "org-1", search: undefined })).toBe(
+      "/api/people?orgId=org-1",
+    );
   });
 
   it("returns the bare path when every query value is undefined", () => {
-    expect(appendQueryParams("/api/people", { search: undefined })).toBe(
-      "/api/people",
-    );
+    expect(appendQueryParams("/api/people", { search: undefined })).toBe("/api/people");
   });
 });
 
@@ -103,9 +96,7 @@ describe("createJsonApiRequest", () => {
         init: {},
         parse: (value) => value,
       }),
-    ).rejects.toMatchObject(
-      new ApiResponseError("Not allowed", 403, { error: "Not allowed" }),
-    );
+    ).rejects.toMatchObject(new ApiResponseError("Not allowed", 403, { error: "Not allowed" }));
   });
 
   it("invokes onAuthFailure on a 401 when handleAuthFailure is set", async () => {

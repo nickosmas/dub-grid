@@ -122,18 +122,14 @@ export function AddManagementUserToScheduleModal({
 
   function toggleFocusArea(focusAreaId: number) {
     setFocusAreaIds((prev) =>
-      prev.includes(focusAreaId)
-        ? prev.filter((id) => id !== focusAreaId)
-        : [...prev, focusAreaId],
+      prev.includes(focusAreaId) ? prev.filter((id) => id !== focusAreaId) : [...prev, focusAreaId],
     );
     markTouched("focusAreaIds");
   }
 
   function toggleRole(roleId: number) {
     setRoleIds((prev) =>
-      prev.includes(roleId)
-        ? prev.filter((id) => id !== roleId)
-        : [...prev, roleId],
+      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId],
     );
   }
 
@@ -170,7 +166,9 @@ export function AddManagementUserToScheduleModal({
       onAdded(updated);
       onClose();
     } catch (err) {
-      toast.error(formatClientErrorMessage(err, "We couldn't add them to the schedule. Try again."));
+      toast.error(
+        formatClientErrorMessage(err, "We couldn't add them to the schedule. Try again."),
+      );
     } finally {
       setSaving(false);
     }
@@ -184,169 +182,175 @@ export function AddManagementUserToScheduleModal({
         onRequestClose={() => !saving && requestClose()}
         style={{ maxWidth: 560, width: "100%" }}
       >
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div
-          style={{
-            padding: "12px 16px",
-            borderRadius: "var(--dg-radius-lg)",
-            background: "var(--color-bg-secondary)",
-            color: "var(--color-text-secondary)",
-            fontSize: "var(--dg-fs-label)",
-          }}
-        >
-          Put <strong>{person.firstName || person.lastName ? `${person.firstName} ${person.lastName}`.trim() : person.email}</strong> on the schedule so you can assign them shifts.
-          They'll keep their login and management access.
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div>
-            <label style={fieldLabelStyle}>First name</label>
-            <input
-              className="dg-input"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              onBlur={() => markTouched("firstName")}
-              style={fieldErrors.firstName ? { borderColor: "var(--color-danger)" } : undefined}
-            />
-            {fieldErrors.firstName && <FieldError message={fieldErrors.firstName} />}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: "var(--dg-radius-lg)",
+              background: "var(--color-bg-secondary)",
+              color: "var(--color-text-secondary)",
+              fontSize: "var(--dg-fs-label)",
+            }}
+          >
+            Put{" "}
+            <strong>
+              {person.firstName || person.lastName
+                ? `${person.firstName} ${person.lastName}`.trim()
+                : person.email}
+            </strong>{" "}
+            on the schedule so you can assign them shifts. They'll keep their login and management
+            access.
           </div>
-          <div>
-            <label style={fieldLabelStyle}>Last name</label>
-            <input
-              className="dg-input"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              onBlur={() => markTouched("lastName")}
-              style={fieldErrors.lastName ? { borderColor: "var(--color-danger)" } : undefined}
-            />
-            {fieldErrors.lastName && <FieldError message={fieldErrors.lastName} />}
-          </div>
-        </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={fieldLabelStyle}>First name</label>
+              <input
+                className="dg-input"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                onBlur={() => markTouched("firstName")}
+                style={fieldErrors.firstName ? { borderColor: "var(--color-danger)" } : undefined}
+              />
+              {fieldErrors.firstName && <FieldError message={fieldErrors.firstName} />}
+            </div>
+            <div>
+              <label style={fieldLabelStyle}>Last name</label>
+              <input
+                className="dg-input"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                onBlur={() => markTouched("lastName")}
+                style={fieldErrors.lastName ? { borderColor: "var(--color-danger)" } : undefined}
+              />
+              {fieldErrors.lastName && <FieldError message={fieldErrors.lastName} />}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={fieldLabelStyle}>
+                Email{" "}
+                <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+                  (optional)
+                </span>
+              </label>
+              <input
+                className="dg-input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => markTouched("email")}
+                style={fieldErrors.email ? { borderColor: "var(--color-danger)" } : undefined}
+              />
+              {fieldErrors.email && <FieldError message={fieldErrors.email} />}
+            </div>
+            <div>
+              <label style={fieldLabelStyle}>Phone</label>
+              <input
+                className="dg-input"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                onBlur={() => {
+                  markTouched("phone");
+                  if (!validatePhone(phone)) {
+                    setPhone(normalizeOptionalUsPhone(phone));
+                  }
+                }}
+                style={fieldErrors.phone ? { borderColor: "var(--color-danger)" } : undefined}
+              />
+              {fieldErrors.phone && <FieldError message={fieldErrors.phone} />}
+            </div>
+          </div>
+
           <div>
             <label style={fieldLabelStyle}>
-              Email{" "}
-              <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
-                (optional)
-              </span>
+              {focusAreaLabel} <span style={{ color: "var(--color-danger)" }}>*</span>
             </label>
-            <input
-              className="dg-input"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={() => markTouched("email")}
-              style={fieldErrors.email ? { borderColor: "var(--color-danger)" } : undefined}
-            />
-            {fieldErrors.email && <FieldError message={fieldErrors.email} />}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {focusAreas.map((focusArea) => {
+                const active = focusAreaIds.includes(focusArea.id);
+                return (
+                  <SelectableTag
+                    key={focusArea.id}
+                    selected={active}
+                    onClick={() => toggleFocusArea(focusArea.id)}
+                    padding="5px 12px"
+                    unselectedBackground="var(--color-bg-secondary)"
+                    unselectedBorderColor="transparent"
+                    unselectedTextColor="var(--color-text-faint)"
+                  >
+                    {focusArea.name}
+                  </SelectableTag>
+                );
+              })}
+            </div>
+            {fieldErrors.focusAreaIds && <FieldError message={fieldErrors.focusAreaIds} />}
           </div>
-          <div>
-            <label style={fieldLabelStyle}>Phone</label>
-            <input
-              className="dg-input"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              onBlur={() => {
-                markTouched("phone");
-                if (!validatePhone(phone)) {
-                  setPhone(normalizeOptionalUsPhone(phone));
-                }
-              }}
-              style={fieldErrors.phone ? { borderColor: "var(--color-danger)" } : undefined}
-            />
-            {fieldErrors.phone && <FieldError message={fieldErrors.phone} />}
-          </div>
-        </div>
 
-        <div>
-          <label style={fieldLabelStyle}>
-            {focusAreaLabel} <span style={{ color: "var(--color-danger)" }}>*</span>
-          </label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {focusAreas.map((focusArea) => {
-              const active = focusAreaIds.includes(focusArea.id);
-              return (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={fieldLabelStyle}>{certificationLabel}</label>
+              <CustomSelect
+                value={certificationId != null ? String(certificationId) : ""}
+                options={[
+                  { value: "", label: "— None —" },
+                  ...certifications.map((item) => ({
+                    value: String(item.id),
+                    label: item.name !== item.abbr ? `${item.name} (${item.abbr})` : item.name,
+                  })),
+                ]}
+                onChange={(value) => setCertificationId(value ? Number(value) : null)}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={fieldLabelStyle}>{roleLabel}</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {roles.map((role) => (
                 <SelectableTag
-                  key={focusArea.id}
-                  selected={active}
-                  onClick={() => toggleFocusArea(focusArea.id)}
+                  key={role.id}
+                  selected={roleIds.includes(role.id)}
+                  onClick={() => toggleRole(role.id)}
                   padding="5px 12px"
                   unselectedBackground="var(--color-bg-secondary)"
                   unselectedBorderColor="transparent"
                   unselectedTextColor="var(--color-text-faint)"
                 >
-                  {focusArea.name}
+                  {role.abbr}
                 </SelectableTag>
-              );
-            })}
+              ))}
+            </div>
           </div>
-          {fieldErrors.focusAreaIds && <FieldError message={fieldErrors.focusAreaIds} />}
-        </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
-            <label style={fieldLabelStyle}>{certificationLabel}</label>
-            <CustomSelect
-              value={certificationId != null ? String(certificationId) : ""}
-              options={[
-                { value: "", label: "— None —" },
-                ...certifications.map((item) => ({
-                  value: String(item.id),
-                  label: item.name !== item.abbr ? `${item.name} (${item.abbr})` : item.name,
-                })),
-              ]}
-              onChange={(value) => setCertificationId(value ? Number(value) : null)}
+            <label style={fieldLabelStyle}>Internal notes</label>
+            <textarea
+              className="dg-input"
+              value={contactNotes}
+              onChange={(e) => setContactNotes(e.target.value)}
+              rows={3}
+              style={{ resize: "vertical", minHeight: 72 }}
             />
           </div>
-        </div>
 
-        <div>
-          <label style={fieldLabelStyle}>{roleLabel}</label>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {roles.map((role) => (
-              <SelectableTag
-                key={role.id}
-                selected={roleIds.includes(role.id)}
-                onClick={() => toggleRole(role.id)}
-                padding="5px 12px"
-                unselectedBackground="var(--color-bg-secondary)"
-                unselectedBorderColor="transparent"
-                unselectedTextColor="var(--color-text-faint)"
-              >
-                {role.abbr}
-              </SelectableTag>
-            ))}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+              {EDITOR_ACTION_LABELS.close}
+            </button>
+            <button
+              className="dg-btn dg-btn-primary"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              style={{ opacity: canSubmit ? 1 : 0.5 }}
+            >
+              <ButtonLoading loading={saving} spinnerSize={16}>
+                Add to Schedule
+              </ButtonLoading>
+            </button>
           </div>
         </div>
-
-        <div>
-          <label style={fieldLabelStyle}>Internal notes</label>
-          <textarea
-            className="dg-input"
-            value={contactNotes}
-            onChange={(e) => setContactNotes(e.target.value)}
-            rows={3}
-            style={{ resize: "vertical", minHeight: 72 }}
-          />
-        </div>
-
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
-            {EDITOR_ACTION_LABELS.close}
-          </button>
-          <button
-            className="dg-btn dg-btn-primary"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            style={{ opacity: canSubmit ? 1 : 0.5 }}
-          >
-            <ButtonLoading loading={saving} spinnerSize={16}>
-              Add to Schedule
-            </ButtonLoading>
-          </button>
-        </div>
-      </div>
       </Modal>
       {unsavedChangesDialog}
     </>

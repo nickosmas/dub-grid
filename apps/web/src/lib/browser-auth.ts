@@ -5,12 +5,7 @@ import { supabase } from "@/lib/supabase";
 function isMissingSessionError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
 
-  const {
-    name,
-    code,
-    status,
-    message,
-  } = error as {
+  const { name, code, status, message } = error as {
     name?: string;
     code?: string;
     status?: number;
@@ -27,11 +22,7 @@ function isMissingSessionError(error: unknown): boolean {
 function isStaleRefreshTokenError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
 
-  const {
-    name,
-    message,
-    status,
-  } = error as {
+  const { name, message, status } = error as {
     name?: string;
     message?: string;
     status?: number;
@@ -41,10 +32,8 @@ function isStaleRefreshTokenError(error: unknown): boolean {
   return (
     name === "AuthApiError" &&
     status === 400 &&
-    (
-      normalizedMessage.includes("invalid refresh token") ||
-      normalizedMessage.includes("refresh token not found")
-    )
+    (normalizedMessage.includes("invalid refresh token") ||
+      normalizedMessage.includes("refresh token not found"))
   );
 }
 
@@ -125,7 +114,10 @@ export function clearSupabaseBrowserAuthState(): void {
   const cookieNames = document.cookie
     .split(";")
     .map((entry) => entry.trim().split("=")[0] ?? "")
-    .filter((name) => name.startsWith("sb-") && (name.includes("-auth-token") || name.includes("-code-verifier")));
+    .filter(
+      (name) =>
+        name.startsWith("sb-") && (name.includes("-auth-token") || name.includes("-code-verifier")),
+    );
 
   const hostname = window.location.hostname;
   const domainParts = hostname.split(".").filter(Boolean);

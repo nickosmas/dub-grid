@@ -12,10 +12,7 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import { getLineTextError, normalizeLineText } from "@/lib/form-validation";
 import { SectionCard, labelStyle } from "./shared";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
-import {
-  useRegisterWizardEditor,
-  useWizardMode,
-} from "@/components/onboarding/WizardModeContext";
+import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 
 export default function OrganizationLabels({
   organization,
@@ -28,11 +25,14 @@ export default function OrganizationLabels({
 }) {
   const isMobile = useMediaQuery(MOBILE);
   const isWizardMode = useWizardMode();
-  const buildForm = useCallback(() => ({
-    focusAreaLabel: organization.focusAreaLabel,
-    certificationLabel: organization.certificationLabel,
-    roleLabel: organization.roleLabel,
-  }), [organization]);
+  const buildForm = useCallback(
+    () => ({
+      focusAreaLabel: organization.focusAreaLabel,
+      certificationLabel: organization.certificationLabel,
+      roleLabel: organization.roleLabel,
+    }),
+    [organization],
+  );
   const [form, setForm] = useState(buildForm);
   const [saving, setSaving] = useState(false);
   const fieldErrors = {
@@ -74,7 +74,9 @@ export default function OrganizationLabels({
   // Warn before navigating away with unsaved changes
   useEffect(() => {
     if (!isModified) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isModified]);
@@ -96,33 +98,30 @@ export default function OrganizationLabels({
     try {
       const updated: Organization = {
         ...organization,
-        focusAreaLabel:
-          form.focusAreaLabel.trim()
-            ? normalizeLineText(form.focusAreaLabel, {
-                label: "Focus area label",
-                maxLength: 50,
-                required: true,
-                disallowUrl: true,
-              })
-            : "Focus Areas",
-        certificationLabel:
-          form.certificationLabel.trim()
-            ? normalizeLineText(form.certificationLabel, {
-                label: "Certification label",
-                maxLength: 50,
-                required: true,
-                disallowUrl: true,
-              })
-            : "Certifications",
-        roleLabel:
-          form.roleLabel.trim()
-            ? normalizeLineText(form.roleLabel, {
-                label: "Role label",
-                maxLength: 50,
-                required: true,
-                disallowUrl: true,
-              })
-            : "Roles",
+        focusAreaLabel: form.focusAreaLabel.trim()
+          ? normalizeLineText(form.focusAreaLabel, {
+              label: "Focus area label",
+              maxLength: 50,
+              required: true,
+              disallowUrl: true,
+            })
+          : "Focus Areas",
+        certificationLabel: form.certificationLabel.trim()
+          ? normalizeLineText(form.certificationLabel, {
+              label: "Certification label",
+              maxLength: 50,
+              required: true,
+              disallowUrl: true,
+            })
+          : "Certifications",
+        roleLabel: form.roleLabel.trim()
+          ? normalizeLineText(form.roleLabel, {
+              label: "Role label",
+              maxLength: 50,
+              required: true,
+              disallowUrl: true,
+            })
+          : "Roles",
       };
       const persisted = await updateOrganizationSettings({
         orgId: organization.id,
@@ -172,7 +171,9 @@ export default function OrganizationLabels({
   return (
     <SectionCard>
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
+        <div
+          style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}
+        >
           <div>
             <label style={labelStyle}>FOCUS AREAS LABEL</label>
             <input
@@ -182,14 +183,29 @@ export default function OrganizationLabels({
               maxLength={30}
               className="dg-input"
               readOnly={readOnly}
-              style={fieldErrors.focusAreaLabel ? { borderColor: "var(--color-danger)" } : undefined}
+              style={
+                fieldErrors.focusAreaLabel ? { borderColor: "var(--color-danger)" } : undefined
+              }
             />
             {fieldErrors.focusAreaLabel ? (
-              <p role="alert" style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", margin: "4px 0 0" }}>
+              <p
+                role="alert"
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-danger)",
+                  margin: "4px 0 0",
+                }}
+              >
                 {fieldErrors.focusAreaLabel}
               </p>
             ) : null}
-            <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+            <p
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--color-text-muted)",
+                margin: "4px 0 0",
+              }}
+            >
               e.g. Focus Areas, Departments, Units
             </p>
           </div>
@@ -202,14 +218,29 @@ export default function OrganizationLabels({
               maxLength={30}
               className="dg-input"
               readOnly={readOnly}
-              style={fieldErrors.certificationLabel ? { borderColor: "var(--color-danger)" } : undefined}
+              style={
+                fieldErrors.certificationLabel ? { borderColor: "var(--color-danger)" } : undefined
+              }
             />
             {fieldErrors.certificationLabel ? (
-              <p role="alert" style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", margin: "4px 0 0" }}>
+              <p
+                role="alert"
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-danger)",
+                  margin: "4px 0 0",
+                }}
+              >
                 {fieldErrors.certificationLabel}
               </p>
             ) : null}
-            <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+            <p
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--color-text-muted)",
+                margin: "4px 0 0",
+              }}
+            >
               e.g. Certifications, Designations
             </p>
           </div>
@@ -225,34 +256,47 @@ export default function OrganizationLabels({
               style={fieldErrors.roleLabel ? { borderColor: "var(--color-danger)" } : undefined}
             />
             {fieldErrors.roleLabel ? (
-              <p role="alert" style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-danger)", margin: "4px 0 0" }}>
+              <p
+                role="alert"
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-danger)",
+                  margin: "4px 0 0",
+                }}
+              >
                 {fieldErrors.roleLabel}
               </p>
             ) : null}
-            <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: "4px 0 0" }}>
+            <p
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: "var(--color-text-muted)",
+                margin: "4px 0 0",
+              }}
+            >
               e.g. Responsibilities, Positions
             </p>
           </div>
         </div>
 
-        {!readOnly && !isWizardMode && <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
-          {isModified ? (
-            <button
-              onClick={handleCancel}
-              disabled={saving}
-              className="dg-btn dg-btn-secondary"
-            >
-              {EDITOR_ACTION_LABELS.discard}
-            </button>
-          ) : null}
-          <button
-            onClick={handleSave}
-            disabled={!isModified || saving || hasFieldErrors}
-            className="dg-btn dg-btn-primary"
+        {!readOnly && !isWizardMode && (
+          <div
+            style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}
           >
-            {saving ? "Saving…" : "Save"}
-          </button>
-        </div>}
+            {isModified ? (
+              <button onClick={handleCancel} disabled={saving} className="dg-btn dg-btn-secondary">
+                {EDITOR_ACTION_LABELS.discard}
+              </button>
+            ) : null}
+            <button
+              onClick={handleSave}
+              disabled={!isModified || saving || hasFieldErrors}
+              className="dg-btn dg-btn-primary"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        )}
       </div>
     </SectionCard>
   );

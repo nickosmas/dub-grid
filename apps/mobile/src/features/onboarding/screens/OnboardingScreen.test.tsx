@@ -1,16 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createReactNativeModule,
-  createSafeAreaContextModule,
-} from "../../../test/native";
+import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
 const routerReplace = vi.fn();
 const saveHasSeenOnboarding = vi.fn(() => Promise.resolve());
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),
@@ -45,9 +40,7 @@ describe("OnboardingScreen", () => {
   it("renders all three value-prop slides", () => {
     render(<OnboardingScreen />);
 
-    expect(
-      screen.getByText("Your schedule, always with you"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Your schedule, always with you")).toBeInTheDocument();
     expect(screen.getByText("Cover shifts on the go")).toBeInTheDocument();
     expect(screen.getByText("Stay in the loop")).toBeInTheDocument();
   });

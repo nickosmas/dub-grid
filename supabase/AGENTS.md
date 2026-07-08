@@ -84,6 +84,7 @@ Without this, all queries fail silently and auth/RBAC/subdomain routing breaks.
 
 The `custom_access_token_hook` writes claims at the **top level** of the JWT
 payload (not inside `app_metadata`):
+
 - `platform_role`, `org_role`, `org_id`, `org_slug`
 
 The middleware reads these via `jwtVerify` / `decodeJwt` at the top level.

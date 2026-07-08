@@ -65,7 +65,7 @@ device prefs, and **always** lands on `/login` from a `finally` block so a throw
 async function signOutLocal(redirectTo = "/login"): Promise<void> {
   try {
     await signOutFromBrowser("local"); // scope: "local" — this browser only
-    clearAllDgState();                 // sweep dg_* keys, keep device prefs
+    clearAllDgState(); // sweep dg_* keys, keep device prefs
     queryClient.clear();
   } finally {
     window.location.replace(redirectTo); // always reach /login, even on error
@@ -75,14 +75,14 @@ async function signOutLocal(redirectTo = "/login"): Promise<void> {
 
 ### 1.4 Logout Decision Matrix
 
-| Trigger                             | Scope  | Mechanism                                        | Other Devices Affected?          |
-| ----------------------------------- | ------ | ------------------------------------------------ | -------------------------------- |
-| User clicks "Sign Out"              | local  | `supabase.auth.signOut({ scope: 'local' })`      | No — all other sessions remain   |
-| User clicks "Sign out all devices"  | others | `supabase.auth.signOut({ scope: 'others' })`     | Yes — all other sessions revoked |
+| Trigger                             | Scope  | Mechanism                                                                      | Other Devices Affected?                       |
+| ----------------------------------- | ------ | ------------------------------------------------------------------------------ | --------------------------------------------- |
+| User clicks "Sign Out"              | local  | `supabase.auth.signOut({ scope: 'local' })`                                    | No — all other sessions remain                |
+| User clicks "Sign out all devices"  | others | `supabase.auth.signOut({ scope: 'others' })`                                   | Yes — all other sessions revoked              |
 | Super admin demotes/changes role    | forced | `jwt_refresh_locks` row → JWT hook returns 403 on next mint; user must re-auth | Yes — every device re-auths with the new role |
-| Org suspended/archived              | forced | JWT hook strips org claims + middleware denies access on next request | Yes — all sessions lose access   |
-| Session revoked via Active Sessions | single | revoke the target device's session (Profile → sessions) | Only the targeted device         |
-| JWT expires naturally               | n/a    | Token not renewed — next request hits middleware | No — each JWT independent        |
+| Org suspended/archived              | forced | JWT hook strips org claims + middleware denies access on next request          | Yes — all sessions lose access                |
+| Session revoked via Active Sessions | single | revoke the target device's session (Profile → sessions)                        | Only the targeted device                      |
+| JWT expires naturally               | n/a    | Token not renewed — next request hits middleware                               | No — each JWT independent                     |
 
 ---
 
@@ -133,26 +133,26 @@ ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
 
 ### 2.3 Invitation Flow
 
-| Step | Actor         | Action                                                                      |
-| ---- | ------------- | --------------------------------------------------------------------------- |
-| 1    | Super Admin   | Fills "Invite User" form: selects employee, enters email + role             |
-| 2    | Server        | Inserts `invitations` row with `employee_id` FK, returns token              |
-| 3    | API Route     | `/api/send-invite-email` sends invitation via Resend                        |
-| 4    | Invitee       | Clicks link → arrives at `/accept-invite?token=<uuid>`                      |
-| 5    | Accept Flow   | Validates token, creates Supabase auth user, sets `employees.user_id`       |
-| 6    | Auth Hook     | JWT issued with `platform_role`, `org_role`, `org_id`, `org_slug` claims    |
-| 7    | Invitee       | Redirected to their org dashboard, fully authenticated                      |
+| Step | Actor       | Action                                                                   |
+| ---- | ----------- | ------------------------------------------------------------------------ |
+| 1    | Super Admin | Fills "Invite User" form: selects employee, enters email + role          |
+| 2    | Server      | Inserts `invitations` row with `employee_id` FK, returns token           |
+| 3    | API Route   | `/api/send-invite-email` sends invitation via Resend                     |
+| 4    | Invitee     | Clicks link → arrives at `/accept-invite?token=<uuid>`                   |
+| 5    | Accept Flow | Validates token, creates Supabase auth user, sets `employees.user_id`    |
+| 6    | Auth Hook   | JWT issued with `platform_role`, `org_role`, `org_id`, `org_slug` claims |
+| 7    | Invitee     | Redirected to their org dashboard, fully authenticated                   |
 
 ### 2.4 Invitation Edge Cases
 
-| Scenario                            | Behavior                                         | Mechanism                                          |
-| ----------------------------------- | ------------------------------------------------ | -------------------------------------------------- |
-| Duplicate invite to same email      | Old expired invite cleaned up, new one issued     | DELETE expired + INSERT with UNIQUE constraint      |
-| User clicks expired link            | Returns error — invite expired                    | `expires_at` check in validation                   |
-| User clicks already-used link       | Returns error — already accepted                  | `accepted_at IS NULL` check                        |
-| Two users race to accept same token | First UPDATE wins; second gets no row back        | Atomic UPDATE ... WHERE accepted_at IS NULL         |
-| Admin revokes before user accepts   | Returns error — revoked                           | `revoked_at IS NULL` check                         |
-| Employee already has linked account | Invite blocked — user_id already set              | Pre-check in invite creation                       |
+| Scenario                            | Behavior                                      | Mechanism                                      |
+| ----------------------------------- | --------------------------------------------- | ---------------------------------------------- |
+| Duplicate invite to same email      | Old expired invite cleaned up, new one issued | DELETE expired + INSERT with UNIQUE constraint |
+| User clicks expired link            | Returns error — invite expired                | `expires_at` check in validation               |
+| User clicks already-used link       | Returns error — already accepted              | `accepted_at IS NULL` check                    |
+| Two users race to accept same token | First UPDATE wins; second gets no row back    | Atomic UPDATE ... WHERE accepted_at IS NULL    |
+| Admin revokes before user accepts   | Returns error — revoked                       | `revoked_at IS NULL` check                     |
+| Employee already has linked account | Invite blocked — user_id already set          | Pre-check in invite creation                   |
 
 ---
 
@@ -272,15 +272,15 @@ The `/api/auth/start-trial` route additionally verifies the caller's claim is
 
 All public-facing API routes are rate-limited via Upstash Redis (`apps/web/src/lib/rate-limit.ts`):
 
-| Limiter | Window | Key | Applied To |
-| ------- | ------ | --- | ---------- |
-| `apiLimiter` | 10 / 10s | user id (or IP) | general protected mutations (org settings/access/role-change, etc.) |
-| `inviteLimiter` | 100 / 1h | user id (per-actor) | `/api/send-invite-email` |
-| `emailTargetLimiter` | 5 / 1h | `hashEmail(target)` | layered onto invite + gridmaster password-reset so one actor can't email-bomb one inbox |
-| `demoLimiter` | 3 / 1h | IP | `/api/request-demo` |
-| `passwordResetLimiter` | 5 / 15m | `hashEmail(email)` | forgot/reset password |
-| `loginLimiter` | 15 / 15m | `hashEmail(email)` | login (app-level brute-force protection) |
-| `scheduleReviewLimiter` | 60 / 10s | user id | publish/discard review dialogs |
+| Limiter                 | Window   | Key                 | Applied To                                                                              |
+| ----------------------- | -------- | ------------------- | --------------------------------------------------------------------------------------- |
+| `apiLimiter`            | 10 / 10s | user id (or IP)     | general protected mutations (org settings/access/role-change, etc.)                     |
+| `inviteLimiter`         | 100 / 1h | user id (per-actor) | `/api/send-invite-email`                                                                |
+| `emailTargetLimiter`    | 5 / 1h   | `hashEmail(target)` | layered onto invite + gridmaster password-reset so one actor can't email-bomb one inbox |
+| `demoLimiter`           | 3 / 1h   | IP                  | `/api/request-demo`                                                                     |
+| `passwordResetLimiter`  | 5 / 15m  | `hashEmail(email)`  | forgot/reset password                                                                   |
+| `loginLimiter`          | 15 / 15m | `hashEmail(email)`  | login (app-level brute-force protection)                                                |
+| `scheduleReviewLimiter` | 60 / 10s | user id             | publish/discard review dialogs                                                          |
 
 `checkRateLimit` **fails closed** in production (returns a `misconfigured` flag so callers
 respond 503) when Upstash Redis is unconfigured or unreachable; in development it allows
@@ -291,6 +291,7 @@ through.
 ## 6. Branded Email Templates
 
 Shared email template system in `apps/web/src/lib/email.ts`:
+
 - `sanitizeHeaderValue()` — Prevents email header injection (strips CRLF, null bytes)
 - `escapeHtml()` — Prevents XSS in email content
 - `emailWrapper()` — Branded HTML template with DubGrid header, card layout, responsive design
@@ -313,66 +314,66 @@ also include Next.js's built-in CSRF protection.
 
 #### Multi-Factor Authentication (MFA) — Partially Implemented
 
-| Property         | Detail                                                                                                                |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Property         | Detail                                                                                                                                                                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status           | **Partial.** `GET /api/account/mfa-status` reports enrollment state (backed by `profiles.mfa_enabled` + Supabase MFA factors) and the web account + mobile security surfaces read it. The gridmaster MFA verify step is `async` with try/catch (no stuck screen). |
-| Gap              | No enrollment flow and no role-based *enforcement* yet. Until enrollment is required, a compromised password gives full access; gridmaster/super_admin are high-value targets. |
-| Recommendation   | Build the enrollment flow and enforce TOTP for gridmaster and super_admin. Prompt admin/user roles to enroll optionally. |
-| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challenge()` / `verify()`                                                |
+| Gap              | No enrollment flow and no role-based _enforcement_ yet. Until enrollment is required, a compromised password gives full access; gridmaster/super_admin are high-value targets.                                                                                    |
+| Recommendation   | Build the enrollment flow and enforce TOTP for gridmaster and super_admin. Prompt admin/user roles to enroll optionally.                                                                                                                                          |
+| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challenge()` / `verify()`                                                                                                                                                                                            |
 
 #### Failed Login Attempt Tracking & Account Lockout — Partial
 
-| Property            | Detail                                                                                                           |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Status              | **Partial.** App-level brute-force protection exists: `loginLimiter` caps login attempts at 15 per 15 minutes per `hashEmail(email)`. There is still no per-account lockout / email-based unlock flow. |
-| Recommendation      | Add failed-attempt tracking with a lockout + email-based unlock after a threshold, on top of the existing rate limit. |
+| Property       | Detail                                                                                                                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status         | **Partial.** App-level brute-force protection exists: `loginLimiter` caps login attempts at 15 per 15 minutes per `hashEmail(email)`. There is still no per-account lockout / email-based unlock flow. |
+| Recommendation | Add failed-attempt tracking with a lockout + email-based unlock after a threshold, on top of the existing rate limit.                                                                                  |
 
 #### IP Allowlisting for Gridmaster
 
-| Property       | Detail                                                                                                       |
-| -------------- | ------------------------------------------------------------------------------------------------------------ |
-| Gap            | Any authenticated Gridmaster can access from any IP, including a stolen laptop.                               |
-| Recommendation | Add a `gridmaster_allowed_ips` table. Middleware checks `req.ip` against the allowlist.                      |
+| Property       | Detail                                                                                  |
+| -------------- | --------------------------------------------------------------------------------------- |
+| Gap            | Any authenticated Gridmaster can access from any IP, including a stolen laptop.         |
+| Recommendation | Add a `gridmaster_allowed_ips` table. Middleware checks `req.ip` against the allowlist. |
 
 ### 8.2 Priority 2 — User Lifecycle
 
 #### Soft Delete — Orgs Done, Users Partial
 
-| Property       | Detail                                                                                                              |
-| -------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Property       | Detail                                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status         | **Orgs: done.** `organizations.archived_at` soft-deletes an org and revokes access everywhere (middleware, JWT hook, `get_my_organizations`, `switch_org`); a super_admin self-deletes from Settings → Danger Zone. **Users: partial.** `profiles` has `deactivated_at` / `scheduled_deletion_at` and memberships have `archived_at`, but there is no single uniform soft-delete contract across every table. |
-| Recommendation | Standardize the user/membership soft-delete path and confirm every relevant query filters the deactivation/archival columns. |
+| Recommendation | Standardize the user/membership soft-delete path and confirm every relevant query filters the deactivation/archival columns.                                                                                                                                                                                                                                                                                  |
 
 ### 8.3 Priority 3 — Operational
 
 #### Refresh Token Rotation & Reuse Detection
 
-| Property       | Detail                                                                                                                     |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Gap            | If a refresh token is stolen, the attacker can obtain new access tokens indefinitely.                                      |
-| Recommendation | Enable Supabase's built-in refresh token rotation. Reuse detection revokes the entire session family on theft detection.   |
+| Property       | Detail                                                                                                                   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Gap            | If a refresh token is stolen, the attacker can obtain new access tokens indefinitely.                                    |
+| Recommendation | Enable Supabase's built-in refresh token rotation. Reuse detection revokes the entire session family on theft detection. |
 
 #### Role Change Notifications
 
-| Property       | Detail                                                                                                                     |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Gap            | When a user is promoted or demoted, they receive no communication.                                                         |
-| Recommendation | Trigger an email and in-app notification from the role change flow.                                                        |
+| Property       | Detail                                                              |
+| -------------- | ------------------------------------------------------------------- |
+| Gap            | When a user is promoted or demoted, they receive no communication.  |
+| Recommendation | Trigger an email and in-app notification from the role change flow. |
 
 ### 8.4 Feature Priority Summary
 
-| Priority | Feature                                  | Status     | Risk if Skipped                                      |
-| -------- | ---------------------------------------- | ---------- | ---------------------------------------------------- |
-| P1       | MFA for Gridmaster & Super Admin         | Partial    | Status endpoint exists; enrollment + enforcement still missing → takeover via password compromise |
-| P1       | Failed login tracking & lockout          | Partial    | `loginLimiter` (15/15m) added; per-account lockout/unlock still missing |
-| P1       | IP allowlisting for Gridmaster           | Not done   | Stolen credentials = full platform access            |
-| ~~P1~~   | ~~Password reset flow~~                  | Done       | ~~Users locked out permanently if password lost~~    |
-| ~~P2~~   | ~~Email verification~~                   | Done       | ~~Unverified accounts receive org roles~~            |
-| ~~P2~~   | ~~Rate limiting on API routes~~          | Done       | ~~Abuse of public endpoints~~                        |
-| P2       | Soft delete (users & orgs)               | Partial    | Orgs done (`archived_at`); user path not yet uniform |
-| P3       | Refresh token rotation + reuse detection | Not done   | Stolen tokens usable indefinitely                    |
-| P3       | Role change notifications                | Not done   | Silent UX — confused users after demotion            |
-| ~~P3~~   | ~~GDPR data export~~                     | Done       | ~~Legal compliance gap in EU/UK markets~~            |
+| Priority | Feature                                  | Status   | Risk if Skipped                                                                                   |
+| -------- | ---------------------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| P1       | MFA for Gridmaster & Super Admin         | Partial  | Status endpoint exists; enrollment + enforcement still missing → takeover via password compromise |
+| P1       | Failed login tracking & lockout          | Partial  | `loginLimiter` (15/15m) added; per-account lockout/unlock still missing                           |
+| P1       | IP allowlisting for Gridmaster           | Not done | Stolen credentials = full platform access                                                         |
+| ~~P1~~   | ~~Password reset flow~~                  | Done     | ~~Users locked out permanently if password lost~~                                                 |
+| ~~P2~~   | ~~Email verification~~                   | Done     | ~~Unverified accounts receive org roles~~                                                         |
+| ~~P2~~   | ~~Rate limiting on API routes~~          | Done     | ~~Abuse of public endpoints~~                                                                     |
+| P2       | Soft delete (users & orgs)               | Partial  | Orgs done (`archived_at`); user path not yet uniform                                              |
+| P3       | Refresh token rotation + reuse detection | Not done | Stolen tokens usable indefinitely                                                                 |
+| P3       | Role change notifications                | Not done | Silent UX — confused users after demotion                                                         |
+| ~~P3~~   | ~~GDPR data export~~                     | Done     | ~~Legal compliance gap in EU/UK markets~~                                                         |
 
 ---
 

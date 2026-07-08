@@ -6,8 +6,7 @@ const createRequestSupabaseClient = vi.fn();
 const getServiceClient = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  createRequestSupabaseClient: (req: NextRequest) =>
-    createRequestSupabaseClient(req),
+  createRequestSupabaseClient: (req: NextRequest) => createRequestSupabaseClient(req),
   requireAuthenticatedUser: (req: NextRequest) => requireAuthenticatedUser(req),
 }));
 
@@ -129,12 +128,8 @@ function createServiceClientMock(rows: MockAccessRow) {
               error: null,
             }),
             then<TResult1 = unknown, TResult2 = never>(
-              onfulfilled?:
-                | ((value: unknown) => TResult1 | PromiseLike<TResult1>)
-                | null,
-              onrejected?:
-                | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
-                | null,
+              onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
+              onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
             ) {
               return Promise.resolve({
                 data: getListData(table),

@@ -1,10 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import {
-  Icon,
-  Label,
-  NativeTabs,
-  VectorIcon,
-} from "expo-router/unstable-native-tabs";
+import { Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
 import { mobileColors } from "../../src/shared/theme/tokens";
 
@@ -33,9 +28,7 @@ export default function TabsLayout() {
             <Label>Schedule</Label>
             <Icon
               androidSrc={{
-                default: (
-                  <VectorIcon family={Ionicons} name="calendar-outline" />
-                ),
+                default: <VectorIcon family={Ionicons} name="calendar-outline" />,
                 selected: <VectorIcon family={Ionicons} name="calendar" />,
               }}
               sf={{ default: "calendar", selected: "calendar" }}
@@ -47,9 +40,7 @@ export default function TabsLayout() {
       <Label>Requests</Label>
       <Icon
         androidSrc={{
-          default: (
-            <VectorIcon family={Ionicons} name="swap-horizontal-outline" />
-          ),
+          default: <VectorIcon family={Ionicons} name="swap-horizontal-outline" />,
           selected: <VectorIcon family={Ionicons} name="swap-horizontal" />,
         }}
         sf={{
@@ -72,9 +63,7 @@ export default function TabsLayout() {
       <Label>Profile</Label>
       <Icon
         androidSrc={{
-          default: (
-            <VectorIcon family={Ionicons} name="person-circle-outline" />
-          ),
+          default: <VectorIcon family={Ionicons} name="person-circle-outline" />,
           selected: <VectorIcon family={Ionicons} name="person-circle" />,
         }}
         sf={{

@@ -43,10 +43,7 @@ export async function POST(req: NextRequest) {
       `billing-checkout-complete:${auth.actor.id}:${parsed.data.orgId}`,
     );
     if (misconfigured) {
-      return NextResponse.json(
-        { error: "Service temporarily unavailable" },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -62,25 +59,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await syncCheckoutSessionToDb(
-      auth.serviceClient,
-      parsed.data.sessionId,
-      parsed.data.orgId,
-      {
-        actor: {
-          id: auth.actor.id,
-          email: auth.actor.email,
-        },
+    await syncCheckoutSessionToDb(auth.serviceClient, parsed.data.sessionId, parsed.data.orgId, {
+      actor: {
+        id: auth.actor.id,
+        email: auth.actor.email,
       },
-    );
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
     Sentry.captureException(error, { extra: { context: "checkout-complete" } });
     logger.error({ error }, "Failed to complete checkout billing sync");
-    return NextResponse.json(
-      { error: "Failed to sync checkout" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to sync checkout" }, { status: 500 });
   }
 }

@@ -1,8 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  mobileOrgScheduleResponseSchema,
-  mobileScheduleQuerySchema,
-} from "@dubgrid/contracts";
+import { mobileOrgScheduleResponseSchema, mobileScheduleQuerySchema } from "@dubgrid/contracts";
 import {
   loadMobileOrgSchedulePayload,
   MobileApiAuthorizationError,

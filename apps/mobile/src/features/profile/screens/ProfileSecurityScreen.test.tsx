@@ -1,16 +1,6 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createReactNativeModule,
-  createScreenModule,
-} from "../../../test/native";
+import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
 const useMutation = vi.fn();
 const useQuery = vi.fn();
@@ -20,17 +10,13 @@ const getSupabaseClient = vi.fn();
 const handleExpiredMobileSession = vi.fn();
 const pushToast = vi.fn();
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-query")>();
@@ -152,9 +138,7 @@ describe("ProfileSecurityScreen", () => {
 
     render(<ProfileSecurityScreen />);
 
-    expect(
-      screen.getByRole("button", { name: "Change password" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change password" })).toBeInTheDocument();
     expect(screen.queryByLabelText("Current password")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Confirm new password")).not.toBeInTheDocument();
@@ -164,46 +148,18 @@ describe("ProfileSecurityScreen", () => {
     expect(screen.getByLabelText("Current password")).toBeInTheDocument();
     expect(screen.getByLabelText("New password")).toBeInTheDocument();
     expect(screen.getByLabelText("Confirm new password")).toBeInTheDocument();
-    expect(screen.getByLabelText("Current password")).toHaveAttribute(
-      "type",
-      "password",
-    );
-    expect(screen.getByLabelText("New password")).toHaveAttribute(
-      "type",
-      "password",
-    );
-    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute(
-      "type",
-      "password",
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Show current password" }),
-    );
+    expect(screen.getByLabelText("Current password")).toHaveAttribute("type", "password");
+    expect(screen.getByLabelText("New password")).toHaveAttribute("type", "password");
+    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "Show current password" }));
     fireEvent.click(screen.getByRole("button", { name: "Show new password" }));
-    fireEvent.click(
-      screen.getByRole("button", { name: "Show confirm password" }),
-    );
-    expect(screen.getByLabelText("Current password")).toHaveAttribute(
-      "type",
-      "text",
-    );
-    expect(screen.getByLabelText("New password")).toHaveAttribute(
-      "type",
-      "text",
-    );
-    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute(
-      "type",
-      "text",
-    );
-    expect(
-      screen.getByRole("button", { name: "Hide current password" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Hide new password" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Hide confirm password" }),
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show confirm password" }));
+    expect(screen.getByLabelText("Current password")).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("New password")).toHaveAttribute("type", "text");
+    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Hide current password" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide new password" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide confirm password" })).toBeInTheDocument();
     expect(screen.getByText("At least 10 characters")).toBeInTheDocument();
     expect(screen.getByText("Uppercase letter")).toBeInTheDocument();
     expect(screen.getByText("Number")).toBeInTheDocument();
@@ -224,9 +180,7 @@ describe("ProfileSecurityScreen", () => {
 
     expect(screen.getByText("Update password?")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "You'll be signed out of every device after the password is updated.",
-      ),
+      screen.getByText("You'll be signed out of every device after the password is updated."),
     ).toBeInTheDocument();
 
     await act(async () => {

@@ -16,10 +16,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../../shared/components/Button";
 import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
 import { LoadingScreen } from "../../../shared/components/LoadingScreen";
@@ -32,18 +29,11 @@ import {
 } from "../../../shared/lib/api";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
-import {
-  loadLastOrgSlug,
-  saveLastOrgSlug,
-} from "../../../shared/lib/session";
+import { loadLastOrgSlug, saveLastOrgSlug } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 
 type Stage = "organization" | "credentials" | "mfa";
 
@@ -63,11 +53,7 @@ function isValidEmail(value: string): boolean {
 function getOrgSuffixLabel(apiBaseUrl: string) {
   try {
     const hostname = new URL(apiBaseUrl).hostname.replace(/^www\./, "");
-    if (
-      hostname &&
-      hostname !== "localhost" &&
-      !/^\d+\.\d+\.\d+\.\d+$/.test(hostname)
-    ) {
+    if (hostname && hostname !== "localhost" && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
       return `.${hostname}`;
     }
   } catch {
@@ -80,11 +66,7 @@ function getOrgSuffixLabel(apiBaseUrl: string) {
 function InlineError({ message }: { message: string }) {
   return (
     <View style={styles.errorRow}>
-      <Ionicons
-        color={mobileColors.dangerText}
-        name="alert-circle"
-        size={16}
-      />
+      <Ionicons color={mobileColors.dangerText} name="alert-circle" size={16} />
       <Text style={styles.errorText}>{message}</Text>
     </View>
   );
@@ -125,16 +107,15 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
-  const [pendingMfaLogin, setPendingMfaLogin] =
-    useState<PendingMfaLogin | null>(null);
+  const [pendingMfaLogin, setPendingMfaLogin] = useState<PendingMfaLogin | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showOrgHelp, setShowOrgHelp] = useState(false);
   const [orgLoading, setOrgLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [focusedField, setFocusedField] = useState<
-    "organization" | "email" | "password" | null
-  >(null);
+  const [focusedField, setFocusedField] = useState<"organization" | "email" | "password" | null>(
+    null,
+  );
   const { pushToast } = useToast();
   const { apiBaseUrl } = getMobileEnvConfig();
   const orgSuffix = getOrgSuffixLabel(apiBaseUrl);
@@ -183,10 +164,7 @@ export default function LoginScreen() {
     return <Redirect href="/(tabs)/home" />;
   }
 
-  async function finishLogin(
-    response: MobileAuthLoginResponse,
-    session = response.session,
-  ) {
+  async function finishLogin(response: MobileAuthLoginResponse, session = response.session) {
     await saveLastOrgSlug(response.organization.slug);
 
     const { error: sessionError } = await withSessionHandoffTimeout(
@@ -231,8 +209,7 @@ export default function LoginScreen() {
     } catch (organizationError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: organizationError,
-        fallbackMessage:
-          "We couldn't find that organization. Check the subdomain and try again.",
+        fallbackMessage: "We couldn't find that organization. Check the subdomain and try again.",
         preferInlineNetworkError: true,
       });
       setError(nextError);
@@ -285,8 +262,7 @@ export default function LoginScreen() {
       }
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: loginError,
-        fallbackMessage:
-          "We couldn't sign you in right now. Try again in a moment.",
+        fallbackMessage: "We couldn't sign you in right now. Try again in a moment.",
       });
       setError(nextError);
     } finally {
@@ -310,8 +286,7 @@ export default function LoginScreen() {
     } catch (mfaError) {
       const nextError = getInlineErrorMessageOrToast(pushToast, {
         error: mfaError,
-        fallbackMessage:
-          "We couldn't verify that code right now. Try again in a moment.",
+        fallbackMessage: "We couldn't verify that code right now. Try again in a moment.",
       });
       setError(nextError);
       setMfaCode("");
@@ -363,9 +338,7 @@ export default function LoginScreen() {
               <View style={styles.stage}>
                 <View style={styles.header}>
                   <Text style={styles.title}>Sign in</Text>
-                  <Text style={styles.subtitle}>
-                    Enter the subdomain for your team.
-                  </Text>
+                  <Text style={styles.subtitle}>Enter the subdomain for your team.</Text>
                 </View>
 
                 <View style={styles.fields}>
@@ -387,9 +360,7 @@ export default function LoginScreen() {
                       value={orgSlug}
                       onBlur={() => setFocusedField(null)}
                       onChangeText={(value) => {
-                        setOrgSlug(
-                          value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
-                        );
+                        setOrgSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
                         setError(null);
                       }}
                       onSubmitEditing={() => {
@@ -420,24 +391,16 @@ export default function LoginScreen() {
                     accessibilityState={{ expanded: showOrgHelp }}
                     android_ripple={{ color: mobileColors.rippleNeutral }}
                     style={styles.link}
-                    onPress={() =>
-                      setShowOrgHelp((current) => !current)
-                    }
+                    onPress={() => setShowOrgHelp((current) => !current)}
                   >
-                    <Text style={styles.linkText}>
-                      Need help with your subdomain?
-                    </Text>
+                    <Text style={styles.linkText}>Need help with your subdomain?</Text>
                   </Pressable>
 
                   {showOrgHelp ? (
                     <Text style={styles.helperText}>
-                      Your subdomain is the first part of your organization URL -
-                      for example, the{" "}
+                      Your subdomain is the first part of your organization URL - for example, the{" "}
                       <Text style={styles.helperStrong}>yourorg</Text> in{" "}
-                      <Text style={styles.helperStrong}>
-                        yourorg{orgSuffix}
-                      </Text>
-                      .
+                      <Text style={styles.helperStrong}>yourorg{orgSuffix}</Text>.
                     </Text>
                   ) : null}
                 </View>
@@ -447,9 +410,7 @@ export default function LoginScreen() {
                 <View style={styles.header}>
                   <Text style={styles.title}>Welcome back!</Text>
                   <Text style={styles.subtitle}>
-                    Continue to{" "}
-                    <Text style={styles.subtitleStrong}>{orgLabel}</Text>
-                    .
+                    Continue to <Text style={styles.subtitleStrong}>{orgLabel}</Text>.
                   </Text>
                 </View>
 
@@ -510,9 +471,7 @@ export default function LoginScreen() {
                       }}
                     />
                     <Pressable
-                      accessibilityLabel={
-                        showPassword ? "Hide password" : "Show password"
-                      }
+                      accessibilityLabel={showPassword ? "Hide password" : "Show password"}
                       accessibilityRole="button"
                       hitSlop={10}
                       style={styles.eyeButton}
@@ -573,11 +532,7 @@ export default function LoginScreen() {
 
                 <View style={styles.fields}>
                   <View
-                    style={[
-                      styles.inputRow,
-                      styles.codeRow,
-                      error ? styles.inputRowError : null,
-                    ]}
+                    style={[styles.inputRow, styles.codeRow, error ? styles.inputRowError : null]}
                   >
                     <TextInput
                       ref={mfaInputRef}
@@ -631,7 +586,6 @@ export default function LoginScreen() {
                 </View>
               </View>
             )}
-
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

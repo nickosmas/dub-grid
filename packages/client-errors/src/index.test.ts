@@ -59,17 +59,13 @@ describe("getErrorMessage", () => {
 
 describe("formatClientErrorMessage", () => {
   it("passes through a plain, non-technical raw message", () => {
-    expect(formatClientErrorMessage(new Error("boom"), "fallback")).toBe(
-      "boom",
-    );
+    expect(formatClientErrorMessage(new Error("boom"), "fallback")).toBe("boom");
   });
 
   it("returns the fallback when there is no message to show", () => {
     expect(formatClientErrorMessage(null, "fallback")).toBe("fallback");
     expect(formatClientErrorMessage(undefined, "fallback")).toBe("fallback");
-    expect(formatClientErrorMessage({ message: 42 }, "fallback")).toBe(
-      "fallback",
-    );
+    expect(formatClientErrorMessage({ message: 42 }, "fallback")).toBe("fallback");
   });
 
   it("uses the default fallback when none is provided", () => {
@@ -77,12 +73,9 @@ describe("formatClientErrorMessage", () => {
   });
 
   it("rewrites known auth errors into friendly copy", () => {
-    expect(
-      formatClientErrorMessage(
-        new Error("Invalid login credentials"),
-        "fallback",
-      ),
-    ).toBe("Check your email and password and try again.");
+    expect(formatClientErrorMessage(new Error("Invalid login credentials"), "fallback")).toBe(
+      "Check your email and password and try again.",
+    );
   });
 
   it("rewrites duplicate open-shift volunteering into friendly copy", () => {
@@ -104,12 +97,12 @@ describe("formatClientErrorMessage", () => {
   });
 
   it("returns the canonical network message for connectivity failures", () => {
-    expect(
-      formatClientErrorMessage(new Error("Failed to fetch"), "fallback"),
-    ).toBe(NETWORK_ERROR_MESSAGE);
-    expect(
-      formatClientErrorMessage(new Error("Network request failed"), "fallback"),
-    ).toBe(NETWORK_ERROR_MESSAGE);
+    expect(formatClientErrorMessage(new Error("Failed to fetch"), "fallback")).toBe(
+      NETWORK_ERROR_MESSAGE,
+    );
+    expect(formatClientErrorMessage(new Error("Network request failed"), "fallback")).toBe(
+      NETWORK_ERROR_MESSAGE,
+    );
   });
 
   it("hides technical/backend leaks behind the fallback", () => {
@@ -145,18 +138,16 @@ describe("formatClientErrorMessage", () => {
         ],
       },
     );
-    expect(
-      formatClientErrorMessage(zodError, "We couldn't load the schedule."),
-    ).toBe("We couldn't load the schedule.");
+    expect(formatClientErrorMessage(zodError, "We couldn't load the schedule.")).toBe(
+      "We couldn't load the schedule.",
+    );
   });
 
   it("hides raw JSON-issue strings carried by non-Error wrappers", () => {
     const rawIssueDump =
       '[{"code":"invalid_type","expected":"boolean","received":"undefined","path":["permissions","canEditScheduleIndicators"],"message":"Required"}]';
     expect(formatClientErrorMessage(rawIssueDump, "fallback")).toBe("fallback");
-    expect(
-      formatClientErrorMessage(new Error(rawIssueDump), "fallback"),
-    ).toBe("fallback");
+    expect(formatClientErrorMessage(new Error(rawIssueDump), "fallback")).toBe("fallback");
   });
 
   it("preserves intentional organization-unavailable gate copy", () => {
@@ -179,15 +170,11 @@ describe("isNetworkConnectionError", () => {
       ),
     ).toBe(true);
     expect(isNetworkConnectionError(new Error("Failed to fetch"))).toBe(true);
-    expect(isNetworkConnectionError(new Error("connection refused"))).toBe(
-      true,
-    );
+    expect(isNetworkConnectionError(new Error("connection refused"))).toBe(true);
   });
 
   it("returns false for unrelated errors", () => {
-    expect(isNetworkConnectionError(new Error("Invalid login credentials"))).toBe(
-      false,
-    );
+    expect(isNetworkConnectionError(new Error("Invalid login credentials"))).toBe(false);
     expect(isNetworkConnectionError(null)).toBe(false);
   });
 });
@@ -195,9 +182,7 @@ describe("isNetworkConnectionError", () => {
 describe("isAuthorizationError", () => {
   it("detects permission failures", () => {
     expect(isAuthorizationError(new Error("Unauthorized"))).toBe(true);
-    expect(isAuthorizationError(new Error("permission denied for table"))).toBe(
-      true,
-    );
+    expect(isAuthorizationError(new Error("permission denied for table"))).toBe(true);
   });
 
   it("returns false for unrelated errors", () => {
@@ -238,17 +223,11 @@ describe("translateErrorMessage", () => {
 
 describe("isTechnicalErrorMessage", () => {
   it("flags backend/infra leaks", () => {
-    expect(isTechnicalErrorMessage("PGRST301 row-level security violation")).toBe(
-      true,
-    );
-    expect(isTechnicalErrorMessage("invalid input syntax for type uuid")).toBe(
-      true,
-    );
+    expect(isTechnicalErrorMessage("PGRST301 row-level security violation")).toBe(true);
+    expect(isTechnicalErrorMessage("invalid input syntax for type uuid")).toBe(true);
   });
 
   it("does not flag plain human-readable messages", () => {
-    expect(isTechnicalErrorMessage("That shift has already started")).toBe(
-      false,
-    );
+    expect(isTechnicalErrorMessage("That shift has already started")).toBe(false);
   });
 });

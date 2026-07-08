@@ -53,10 +53,7 @@ export async function POST(req: NextRequest) {
   const isGridmaster = claims.platform_role === "gridmaster";
   const isSuperAdmin = claims.org_role === "super_admin";
   if (!isGridmaster && !isSuperAdmin) {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.FORBIDDEN },
-      { status: 403 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
   }
 
   // ── Config check ────────────────────────────────────────────────────
@@ -78,18 +75,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.INVALID_BODY },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: API_ERRORS.INVALID_INPUT },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { token, email, orgName, inviterName } = parsed.data;
@@ -115,7 +106,9 @@ export async function POST(req: NextRequest) {
   // ── Build email ─────────────────────────────────────────────────────
   const baseUrl = emailBaseUrl();
   if (!process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_VERCEL_URL) {
-    logger.warn("No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set — using localhost:3000 for invite links");
+    logger.warn(
+      "No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set — using localhost:3000 for invite links",
+    );
   }
 
   const acceptUrl = `${baseUrl}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
@@ -141,9 +134,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "send-invite-email" } });
     logger.error({ err, path: "/api/send-invite-email" }, "Failed to send invite email");
-    return NextResponse.json(
-      { success: false, error: "Failed to send email" },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: "Failed to send email" }, { status: 500 });
   }
 }

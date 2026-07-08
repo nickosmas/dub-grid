@@ -113,9 +113,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
     },
   });
 
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
 function renderGate() {
@@ -326,9 +324,7 @@ describe("OnboardingGate setup lock", () => {
     renderGate();
 
     await waitFor(() => {
-      expect(mockRouter.replace).toHaveBeenCalledWith(
-        "/settings?section=org-billing",
-      );
+      expect(mockRouter.replace).toHaveBeenCalledWith("/settings?section=org-billing");
     });
     expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
   });

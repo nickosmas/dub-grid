@@ -19,3 +19,17 @@ export const ANIMATED_LOGO_DURATION_MAX_S = 1.4;
 // Per-cell start-delay range (seconds). Min is always 0. Tight bound so every
 // cell is in motion within the first second — no slow ramp-up.
 export const ANIMATED_LOGO_DELAY_MAX_S = 0.6;
+
+export type AnimatedLogoTiming = readonly [duration: number, delay: number];
+
+export function generateAnimatedLogoTimings(): readonly AnimatedLogoTiming[] {
+  const durationSpan = ANIMATED_LOGO_DURATION_MAX_S - ANIMATED_LOGO_DURATION_MIN_S;
+  return Array.from(
+    { length: 16 },
+    () =>
+      [
+        ANIMATED_LOGO_DURATION_MIN_S + Math.random() * durationSpan,
+        Math.random() * ANIMATED_LOGO_DELAY_MAX_S,
+      ] as const,
+  );
+}

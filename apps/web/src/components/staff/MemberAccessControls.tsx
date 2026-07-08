@@ -58,7 +58,12 @@ export function MemberAccessControls({
         <div>
           <label style={fieldLabelStyle}>Role</label>
           <div style={{ maxWidth: 240 }}>
-            <CustomSelect value={orgRole} disabled onChange={() => {}} options={[{ value: orgRole, label: ROLE_LABELS[orgRole] ?? orgRole }]} />
+            <CustomSelect
+              value={orgRole}
+              disabled
+              onChange={() => {}}
+              options={[{ value: orgRole, label: ROLE_LABELS[orgRole] ?? orgRole }]}
+            />
           </div>
         </div>
       )}
@@ -67,16 +72,16 @@ export function MemberAccessControls({
           <label style={fieldLabelStyle}>Role</label>
           <div style={{ maxWidth: 240 }}>
             <CustomSelect
-            value={orgRole}
-            disabled={changingRole}
-            onChange={(value) => {
-              if (value !== orgRole) setPendingRole(value);
-            }}
-            options={[
-              { value: "user", label: "User" },
-              { value: "admin", label: "Admin" },
-              { value: "super_admin", label: "Super Admin" },
-            ]}
+              value={orgRole}
+              disabled={changingRole}
+              onChange={(value) => {
+                if (value !== orgRole) setPendingRole(value);
+              }}
+              options={[
+                { value: "user", label: "User" },
+                { value: "admin", label: "Admin" },
+                { value: "super_admin", label: "Super Admin" },
+              ]}
             />
           </div>
           {pendingRole && (
@@ -95,9 +100,7 @@ export function MemberAccessControls({
                     setPendingRole(null);
                   } catch (error) {
                     toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : "Could not change the role.",
+                      error instanceof Error ? error.message : "Could not change the role.",
                     );
                   } finally {
                     setChangingRole(false);

@@ -37,11 +37,7 @@ async function loadMobilePerson(
   orgId: string,
   employeeId: string,
 ) {
-  const row = await fetchMobileEmployeeRowById(
-    serviceClient,
-    orgId,
-    employeeId,
-  );
+  const row = await fetchMobileEmployeeRowById(serviceClient, orgId, employeeId);
   if (!row) {
     return null;
   }
@@ -52,30 +48,20 @@ async function loadMobilePerson(
     employeeId,
   );
   const managementMemberships = row.user_id
-    ? await fetchMobileManagementMembershipRowsByUserIds(serviceClient, orgId, [
-        row.user_id,
-      ])
+    ? await fetchMobileManagementMembershipRowsByUserIds(serviceClient, orgId, [row.user_id])
     : [];
   const managementMembership = row.user_id
-    ? (managementMemberships.find(
-        (membership) => membership.user_id === row.user_id,
-      ) ?? null)
+    ? (managementMemberships.find((membership) => membership.user_id === row.user_id) ?? null)
     : null;
   return mapEmployeeToMobilePerson({
     ...rowToEmployee(row),
     managementDepartmentIds:
-      managementMembership?.department_ids ??
-      pendingInvitation?.department_ids ??
-      [],
+      managementMembership?.department_ids ?? pendingInvitation?.department_ids ?? [],
     managementDeptAdminIds:
-      managementMembership?.dept_admin_ids ??
-      pendingInvitation?.dept_admin_ids ??
-      [],
+      managementMembership?.dept_admin_ids ?? pendingInvitation?.dept_admin_ids ?? [],
     orgRole: (() => {
       const role = managementMembership?.org_role;
-      return role === "super_admin" || role === "admin" || role === "user"
-        ? role
-        : null;
+      return role === "super_admin" || role === "admin" || role === "user" ? role : null;
     })(),
     pendingInvitation: pendingInvitation
       ? {
@@ -88,10 +74,7 @@ async function loadMobilePerson(
   });
 }
 
-export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) {
     return auth.response;
@@ -105,21 +88,14 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const person = await loadMobilePerson(
-    auth.serviceClient,
-    auth.currentOrg.id,
-    id,
-  );
+  const person = await loadMobilePerson(auth.serviceClient, auth.currentOrg.id, id);
   if (!person) {
     return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   }
 
   if (!auth.permissions.canManageEmployees) {
     if (person.status !== "active") {
-      return NextResponse.json(
-        { error: "Employee not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     }
 
     return NextResponse.json(
@@ -147,10 +123,7 @@ export async function GET(
   );
 }
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) {
     return auth.response;
@@ -175,31 +148,21 @@ export async function PATCH(
 
   const parsed = mobilePersonUpdateBodySchema.safeParse(body);
   if (!parsed.success) {
-    return buildStaffValidationErrorResponse(
-      getStaffFieldErrorsFromZod(parsed.error),
-    );
+    return buildStaffValidationErrorResponse(getStaffFieldErrorsFromZod(parsed.error));
   }
 
   const { id } = await context.params;
-  const currentPerson = await loadMobilePerson(
-    auth.serviceClient,
-    auth.currentOrg.id,
-    id,
-  );
+  const currentPerson = await loadMobilePerson(auth.serviceClient, auth.currentOrg.id, id);
   if (!currentPerson) {
     return NextResponse.json({ error: "Employee not found" }, { status: 404 });
   }
   if (currentPerson.status === "removed") {
-    return NextResponse.json(
-      { error: "Removed employees can't be edited." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Removed employees can't be edited." }, { status: 400 });
   }
   if (currentPerson.version !== parsed.data.expectedVersion) {
     return NextResponse.json(
       {
-        error:
-          "Employee details changed elsewhere. Review the latest values before saving again.",
+        error: "Employee details changed elsewhere. Review the latest values before saving again.",
         code: "EMPLOYEE_CONFLICT",
         person: currentPerson,
       },
@@ -207,17 +170,13 @@ export async function PATCH(
     );
   }
 
-  const referenceErrors = await validateStaffOrgReferences(
-    auth.serviceClient,
-    auth.currentOrg.id,
-    {
-      certificationId: parsed.data.certificationId,
-      departmentIds: parsed.data.departmentIds,
-      focusAreaIds: parsed.data.focusAreaIds,
-      requireFocusArea: true,
-      roleIds: parsed.data.roleIds,
-    },
-  );
+  const referenceErrors = await validateStaffOrgReferences(auth.serviceClient, auth.currentOrg.id, {
+    certificationId: parsed.data.certificationId,
+    departmentIds: parsed.data.departmentIds,
+    focusAreaIds: parsed.data.focusAreaIds,
+    requireFocusArea: true,
+    roleIds: parsed.data.roleIds,
+  });
   if (Object.keys(referenceErrors).length > 0) {
     return buildStaffValidationErrorResponse(referenceErrors);
   }
@@ -248,15 +207,10 @@ export async function PATCH(
   }
 
   if (!updatedRow) {
-    const latestPerson = await loadMobilePerson(
-      auth.serviceClient,
-      auth.currentOrg.id,
-      id,
-    );
+    const latestPerson = await loadMobilePerson(auth.serviceClient, auth.currentOrg.id, id);
     return NextResponse.json(
       {
-        error:
-          "Employee details changed elsewhere. Review the latest values before saving again.",
+        error: "Employee details changed elsewhere. Review the latest values before saving again.",
         code: "EMPLOYEE_CONFLICT",
         person: latestPerson ?? currentPerson,
       },
@@ -289,11 +243,7 @@ export async function PATCH(
     user_agent: req.headers?.get("user-agent") ?? null,
   });
 
-  const person = await loadMobilePerson(
-    auth.serviceClient,
-    auth.currentOrg.id,
-    id,
-  );
+  const person = await loadMobilePerson(auth.serviceClient, auth.currentOrg.id, id);
   return NextResponse.json(
     mobilePersonUpdateResponseSchema.parse({
       success: true,

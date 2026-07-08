@@ -1,8 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  mobilePushTokenBodySchema,
-  mobilePushTokenResponseSchema,
-} from "@dubgrid/contracts";
+import { mobilePushTokenBodySchema, mobilePushTokenResponseSchema } from "@dubgrid/contracts";
 import { registerMobilePushToken } from "@dubgrid/mobile-api-core";
 import { requireMobileAuth, upsertMobilePushToken } from "@/features/mobile/server";
 
@@ -34,7 +31,5 @@ export async function POST(req: NextRequest) {
     upsertMobilePushToken,
   });
 
-  return NextResponse.json(
-    mobilePushTokenResponseSchema.parse(payload),
-  );
+  return NextResponse.json(mobilePushTokenResponseSchema.parse(payload));
 }

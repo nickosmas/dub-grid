@@ -1,14 +1,6 @@
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
-import {
-  FOCUS_AREA_COLS,
-  JOB_COLS,
-  SHIFT_CATEGORY_COLS,
-} from "@/lib/db/shared";
-import {
-  rowToFocusArea,
-  rowToJobDefinition,
-  rowToShiftCategory,
-} from "@/lib/db/mappers";
+import { FOCUS_AREA_COLS, JOB_COLS, SHIFT_CATEGORY_COLS } from "@/lib/db/shared";
+import { rowToFocusArea, rowToJobDefinition, rowToShiftCategory } from "@/lib/db/mappers";
 import type {
   DbFocusArea,
   DbJobDefinition,
@@ -16,17 +8,9 @@ import type {
   DbScheduleCellSnapshot,
   DbShiftCategory,
 } from "@/lib/db/types";
-import {
-  buildShiftJobPairKey,
-} from "@/lib/shift-job-segments";
-import {
-  buildShiftDisplayParts,
-  formatAssignableShiftOptionLabel,
-} from "@/lib/assignable-shifts";
-import {
-  getJobPlacementShiftPool,
-  resolveJobTimesForShift,
-} from "@/lib/job-placement";
+import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
+import { buildShiftDisplayParts, formatAssignableShiftOptionLabel } from "@/lib/assignable-shifts";
+import { getJobPlacementShiftPool, resolveJobTimesForShift } from "@/lib/job-placement";
 import { isRegularStaffSystemJob } from "@/lib/system-jobs";
 import type { AssignmentDefinition, FocusArea, JobDefinition, ShiftCategory } from "@/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -98,9 +82,7 @@ type PublishedScheduleLoaderArgs = {
 type PublishedScheduleRecord = PublishedShiftRow & Record<string, unknown>;
 type NormalizedPublishedScheduleRow = DbScheduleCell & Record<string, unknown>;
 
-function buildNormalizedPublishedShiftSelect(
-  extraSelects: string[] = [],
-): string {
+function buildNormalizedPublishedShiftSelect(extraSelects: string[] = []): string {
   return [
     "id",
     "emp_id",
@@ -130,9 +112,7 @@ function buildNormalizedPublishedShiftSelect(
   ].join(", ");
 }
 
-function getPublishedSnapshot(
-  row: NormalizedPublishedScheduleRow,
-): DbScheduleCellSnapshot | null {
+function getPublishedSnapshot(row: NormalizedPublishedScheduleRow): DbScheduleCellSnapshot | null {
   return (
     ((row.snapshots as DbScheduleCellSnapshot[] | null | undefined) ?? []).find(
       (snapshot) => snapshot.snapshot_kind === "published",
@@ -161,9 +141,7 @@ export function mapNormalizedScheduleCellToPublishedShiftRow(
         const detail = segmentDetailsByPair.get(
           buildShiftJobPairKey(segment.shift_id ?? null, segment.job_id),
         );
-        return detail
-          ? { ...detail, isMentored: segment.is_mentored ?? false }
-          : null;
+        return detail ? { ...detail, isMentored: segment.is_mentored ?? false } : null;
       })
       .filter((segment): segment is PublishedScheduleSegment => segment != null),
     published_absence_type_id:
@@ -188,12 +166,10 @@ function buildPublishedSegmentDetails(input: {
       times.startTime && times.endTime
         ? Math.max(
             0,
-            durationFromTimes(times.startTime, times.endTime) -
-              (shift?.breakMinutes ?? 0) / 60,
+            durationFromTimes(times.startTime, times.endTime) - (shift?.breakMinutes ?? 0) / 60,
           )
         : shift == null
-          ? (job.defaultDurationHours ?? 0) +
-            (job.defaultDurationMinutes ?? 0) / 60
+          ? (job.defaultDurationHours ?? 0) + (job.defaultDurationMinutes ?? 0) / 60
           : 0;
     const displayParts = buildShiftDisplayParts({
       shift,
@@ -216,11 +192,7 @@ function buildPublishedSegmentDetails(input: {
     if (job.archivedAt || isRegularStaffSystemJob(job)) continue;
     const mode = job.assignmentMode ?? "with_shift";
     if (mode !== "shiftless") {
-      for (const shift of getJobPlacementShiftPool(
-        job,
-        input.shiftCategories,
-        input.focusAreas,
-      )) {
+      for (const shift of getJobPlacementShiftPool(job, input.shiftCategories, input.focusAreas)) {
         addDetails(job, shift);
       }
     }
@@ -293,10 +265,7 @@ async function fetchNormalizedPublishedShiftRows(
   if (orgIds.length > 0) {
     await Promise.all(
       orgIds.map(async (orgId) => {
-        segmentDetailsByOrg.set(
-          orgId,
-          await fetchPublishedSegmentDetailsByOrg(client, orgId),
-        );
+        segmentDetailsByOrg.set(orgId, await fetchPublishedSegmentDetailsByOrg(client, orgId));
       }),
     );
   }
@@ -318,14 +287,11 @@ export async function fetchPublishedShiftRows(
   return fetchNormalizedPublishedShiftRows(client, args);
 }
 
-function pickPipeTime(
-  value: string | null | undefined,
-  which: "first" | "last",
-): string | null {
+function pickPipeTime(value: string | null | undefined, which: "first" | "last"): string | null {
   if (!value) return null;
   const parts = value.split("|").filter(Boolean);
   if (parts.length === 0) return null;
-  return which === "first" ? parts[0] ?? null : parts[parts.length - 1] ?? null;
+  return which === "first" ? (parts[0] ?? null) : (parts[parts.length - 1] ?? null);
 }
 
 function getFallbackTime(
@@ -341,18 +307,14 @@ function getFallbackTime(
 
   if (!preset) return null;
 
-  return part === "start"
-    ? preset.defaultStartTime ?? null
-    : preset.defaultEndTime ?? null;
+  return part === "start" ? (preset.defaultStartTime ?? null) : (preset.defaultEndTime ?? null);
 }
 
 function resolveShiftLabel(
   assignmentIds: number[],
   assignmentById: Map<number, PublishedAssignmentDefinition>,
 ): string {
-  return assignmentIds
-    .map((id) => assignmentById.get(id)?.label ?? "?")
-    .join("/");
+  return assignmentIds.map((id) => assignmentById.get(id)?.label ?? "?").join("/");
 }
 
 function durationFromTimes(startTime: string | null, endTime: string | null): number {
@@ -383,20 +345,14 @@ function resolveSegmentDurationHours(
   const endTime = customEnd || segment.endTime;
 
   if (startTime && endTime) {
-    return Math.max(
-      0,
-      durationFromTimes(startTime, endTime) - (segment.breakMinutes ?? 0) / 60,
-    );
+    return Math.max(0, durationFromTimes(startTime, endTime) - (segment.breakMinutes ?? 0) / 60);
   }
 
   return segment.durationHours ?? 0;
 }
 
 export function hasPublishedScheduleContent(row: PublishedShiftRow): boolean {
-  return (
-    (row.resolvedAssignmentIds?.length ?? 0) > 0 ||
-    row.published_absence_type_id != null
-  );
+  return (row.resolvedAssignmentIds?.length ?? 0) > 0 || row.published_absence_type_id != null;
 }
 
 export function resolvePublishedScheduleEntry(

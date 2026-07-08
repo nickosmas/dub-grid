@@ -96,11 +96,7 @@ function TabBar({ active }: { active: string }) {
                 gap: 4,
               }}
             >
-              <Icon
-                size={28}
-                color={on ? C.brand : C.textSubtle}
-                strokeWidth={on ? 2.4 : 2}
-              />
+              <Icon size={28} color={on ? C.brand : C.textSubtle} strokeWidth={on ? 2.4 : 2} />
               {/* labelStyle: fontSize 11, fontWeight 600 default / 700 selected */}
               <span
                 style={{
@@ -151,9 +147,7 @@ function StatusBar() {
         flexShrink: 0,
       }}
     >
-      <span style={{ fontSize: 17, fontWeight: 600, color: C.textPrimary }}>
-        9:41
-      </span>
+      <span style={{ fontSize: 17, fontWeight: 600, color: C.textPrimary }}>9:41</span>
       <div
         style={{
           position: "absolute",
@@ -212,13 +206,7 @@ function StatusBar() {
 }
 
 /* ── Phone frame — native iPhone 17 Pro Max, rendered through transform: scale ── */
-function Phone({
-  active,
-  children,
-}: {
-  active: string;
-  children: React.ReactNode;
-}) {
+function Phone({ active, children }: { active: string; children: React.ReactNode }) {
   const outerW = SCREEN_W + BEZEL * 2;
   const outerH = SCREEN_H + BEZEL * 2;
   return (
@@ -238,8 +226,7 @@ function Phone({
           borderRadius: 62,
           background: "#0A0A0C",
           padding: BEZEL,
-          boxShadow:
-            "0 30px 80px rgba(15,23,42,0.28), 0 6px 18px rgba(15,23,42,0.14)",
+          boxShadow: "0 30px 80px rgba(15,23,42,0.28), 0 6px 18px rgba(15,23,42,0.14)",
         }}
       >
         <div
@@ -365,14 +352,10 @@ function ScheduleScreen() {
               Wed, May 14
             </span>
             {/* meWeekNavigatorRangeLabel: bodyStrong, textSecondary */}
-            <span style={{ ...bodyStrong, color: C.textSecondary }}>
-              May 12 – 18
-            </span>
+            <span style={{ ...bodyStrong, color: C.textSecondary }}>May 12 – 18</span>
           </div>
           {/* meWeekNavigatorActions */}
-          <div
-            style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}
-          >
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <IconControlButton>
                 <ChevronLeft size={20} color={C.textPrimary} />
@@ -405,8 +388,7 @@ function ScheduleScreen() {
               colors #142579 → #2C49CC → #6E90FF at stops 0 / 0.55 / 1. ── */}
         <div
           style={{
-            background:
-              "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)",
+            background: "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)",
             borderRadius: 24,
             paddingLeft: 18,
             paddingRight: 18,
@@ -471,20 +453,14 @@ function ScheduleScreen() {
                   paddingBottom: 8,
                 }}
               >
-                <span style={{ ...label, color: "rgba(255, 255, 255, 0.72)" }}>
-                  WED
-                </span>
+                <span style={{ ...label, color: "rgba(255, 255, 255, 0.72)" }}>WED</span>
                 <span style={{ ...heroMetric, color: C.textInverse }}>14</span>
               </div>
             </div>
 
             {/* meHeroTitleRow → meHeroTitle */}
-            <div
-              style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}
-            >
-              <span style={{ ...heroMetric, color: C.textInverse }}>
-                Day Shift
-              </span>
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+              <span style={{ ...heroMetric, color: C.textInverse }}>Day Shift</span>
             </div>
 
             {/* meHeroAreaRow: marginTop 2 */}
@@ -552,9 +528,7 @@ function ScheduleScreen() {
                 }}
               >
                 <Clock size={24} color="rgba(255, 255, 255, 0.82)" strokeWidth={2} />
-                <span style={{ ...sectionTitle, color: C.textInverse }}>
-                  7:00 AM – 3:30 PM
-                </span>
+                <span style={{ ...sectionTitle, color: C.textInverse }}>7:00 AM – 3:30 PM</span>
               </div>
               {/* meHeroProgressLabel. FormatDurationLabel("2h 15m left") */}
               <span
@@ -622,9 +596,7 @@ function ScheduleScreen() {
                 paddingBottom: 9,
               }}
             >
-              <span style={{ ...bodyStrong, color: C.brand }}>
-                30h this week
-              </span>
+              <span style={{ ...bodyStrong, color: C.brand }}>30h this week</span>
             </div>
           </div>
 
@@ -675,9 +647,7 @@ function ScheduleScreen() {
                       gap: 6,
                     }}
                   >
-                    <span style={{ ...micro, fontSize: 11, color: C.textSubtle }}>
-                      {r.weekday}
-                    </span>
+                    <span style={{ ...micro, fontSize: 11, color: C.textSubtle }}>{r.weekday}</span>
                     <span
                       style={{
                         ...sectionTitle,
@@ -741,15 +711,11 @@ function ScheduleScreen() {
                           }}
                         >
                           <Clock size={18} color={C.textMuted} strokeWidth={2} />
-                          <span style={{ ...bodyStrong, color: C.textSubtle }}>
-                            {r.time}
-                          </span>
+                          <span style={{ ...bodyStrong, color: C.textSubtle }}>{r.time}</span>
                         </div>
                       </div>
                       {/* upcomingShiftArea */}
-                      <span style={{ ...rowTitle, color: C.textSecondary }}>
-                        {r.area}
-                      </span>
+                      <span style={{ ...rowTitle, color: C.textSecondary }}>{r.area}</span>
                     </div>
                     {/* upcomingShiftAction */}
                     <div
@@ -875,9 +841,7 @@ function RequestsScreen() {
                   paddingTop: 3,
                   paddingBottom: 3,
                   borderRadius: 999,
-                  background: t.active
-                    ? "rgba(255, 255, 255, 0.22)"
-                    : C.surfaceSecondary,
+                  background: t.active ? "rgba(255, 255, 255, 0.22)" : C.surfaceSecondary,
                   textAlign: "center",
                 }}
               >
@@ -905,9 +869,7 @@ function RequestsScreen() {
           }}
         >
           {/* dateGroupLabel: bodyStrong, textMuted */}
-          <span style={{ ...bodyStrong, color: C.textMuted }}>
-            Saturday, May 17
-          </span>
+          <span style={{ ...bodyStrong, color: C.textMuted }}>Saturday, May 17</span>
           {/* dateGroupItems: gap 10 */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {OPEN_SHIFTS.map((s) => (
@@ -947,13 +909,9 @@ function RequestsScreen() {
                     }}
                   >
                     {/* openShiftTitle: sectionTitle, textPrimary */}
-                    <span style={{ ...sectionTitle, color: C.textPrimary }}>
-                      {s.title}
-                    </span>
+                    <span style={{ ...sectionTitle, color: C.textPrimary }}>{s.title}</span>
                     {/* shiftTitleTimeText: rowTitle → fontWeight 500, textMuted */}
-                    <span
-                      style={{ ...rowTitle, fontWeight: 500, color: C.textMuted }}
-                    >
+                    <span style={{ ...rowTitle, fontWeight: 500, color: C.textMuted }}>
                       {s.time}
                     </span>
                   </div>
@@ -987,9 +945,7 @@ function RequestsScreen() {
                    (open shifts don't surface a job/designation chip) */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {/* openShiftContextText: rowTitle, textSecondary */}
-                  <span style={{ ...rowTitle, color: C.textSecondary }}>
-                    {s.area}
-                  </span>
+                  <span style={{ ...rowTitle, color: C.textSecondary }}>{s.area}</span>
                 </div>
 
                 {/* metaText: body, textMuted */}
@@ -1013,9 +969,7 @@ function RequestsScreen() {
                     }}
                   >
                     {/* label: bodyStrong, labelSecondary color brand */}
-                    <span style={{ ...bodyStrong, color: C.brand }}>
-                      Volunteer
-                    </span>
+                    <span style={{ ...bodyStrong, color: C.brand }}>Volunteer</span>
                   </div>
                 </div>
               </div>

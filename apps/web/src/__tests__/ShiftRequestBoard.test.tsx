@@ -112,9 +112,7 @@ describe("ShiftRequestBoard", () => {
     });
     renderBoard({ openPickups: [request] });
 
-    expect(
-      screen.getByText(/Day Shift · Registered Nurse shift on/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Day Shift · Registered Nurse shift on/)).toBeInTheDocument();
     expect(screen.queryByText(/D RN shift on/)).not.toBeInTheDocument();
   });
 

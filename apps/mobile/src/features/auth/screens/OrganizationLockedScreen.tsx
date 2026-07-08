@@ -1,15 +1,8 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../../shared/components/Button";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
-import {
-  mobileColors,
-  mobileSpacing,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileSpacing, mobileText } from "../../../shared/theme/tokens";
 
 function formatLockedMessage(message: string): string {
   return message.replace(/^Organization unavailable\.\s*/i, "").trim() || message;
@@ -46,12 +39,7 @@ export function OrganizationLockedScreen({
         </View>
 
         <View style={styles.actions}>
-          <Button
-            label="Try again"
-            loading={isRetrying}
-            onPress={onRetry}
-            tone="primary"
-          />
+          <Button label="Try again" loading={isRetrying} onPress={onRetry} tone="primary" />
           <Button label="Sign out" onPress={onSignOut} tone="neutral" />
         </View>
       </ScrollView>

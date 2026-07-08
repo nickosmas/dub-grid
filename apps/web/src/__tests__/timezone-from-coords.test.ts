@@ -3,7 +3,7 @@ import { getTimezoneForCoords } from "@/lib/timezone-from-coords";
 
 describe("getTimezoneForCoords", () => {
   it("resolves coordinates to an IANA timezone", () => {
-    expect(getTimezoneForCoords(37.4220, -122.0841)).toBe("America/Los_Angeles");
+    expect(getTimezoneForCoords(37.422, -122.0841)).toBe("America/Los_Angeles");
     expect(getTimezoneForCoords(40.7128, -74.006)).toBe("America/New_York");
   });
 

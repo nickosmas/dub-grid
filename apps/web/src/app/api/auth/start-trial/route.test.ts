@@ -6,8 +6,7 @@ const rpc = vi.fn();
 const createRequestSupabaseClient = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
-  requireAuthenticatedUserWithClaims: (req: NextRequest) =>
-    requireAuthenticatedUserWithClaims(req),
+  requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
   createRequestSupabaseClient: () => createRequestSupabaseClient(),
 }));
 

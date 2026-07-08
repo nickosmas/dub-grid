@@ -194,13 +194,9 @@ describe("RecurringScheduleSection", () => {
   it("renders recurring shifts with split name labels like the main grid", async () => {
     renderSection("name");
 
-    const sundayCell = await screen.findByLabelText(
-      "Alice Smith, Sun: Day / Staff",
-    );
+    const sundayCell = await screen.findByLabelText("Alice Smith, Sun: Day / Staff");
     expect(within(sundayCell).getByText("Day")).toBeInTheDocument();
     expect(within(sundayCell).getByText("Staff")).toBeInTheDocument();
-    expect(
-      within(sundayCell).queryByText(/^Day Staff$/),
-    ).not.toBeInTheDocument();
+    expect(within(sundayCell).queryByText(/^Day Staff$/)).not.toBeInTheDocument();
   });
 });

@@ -67,9 +67,11 @@ vi.mock("@/components/ui/sidebar", () => {
       render?: React.ReactElement;
       children?: React.ReactNode;
     }) =>
-      render
-        ? React.cloneElement(render, undefined, children)
-        : <button type="button">{children}</button>,
+      render ? (
+        React.cloneElement(render, undefined, children)
+      ) : (
+        <button type="button">{children}</button>
+      ),
   };
 });
 

@@ -9,10 +9,7 @@ import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import Link from "next/link";
-import {
-  resendBrowserSignupEmail,
-  subscribeToBrowserAuthChanges,
-} from "@/features/account/client";
+import { resendBrowserSignupEmail, subscribeToBrowserAuthChanges } from "@/features/account/client";
 
 function VerifyEmailContent() {
   const [email, setEmail] = useState<string | null>(null);
@@ -86,14 +83,11 @@ function VerifyEmailContent() {
           message={
             email ? (
               <>
-                We&apos;ve sent a verification link to <strong>{email}</strong>.
-                Click the link in your email to verify your account.
+                We&apos;ve sent a verification link to <strong>{email}</strong>. Click the link in
+                your email to verify your account.
               </>
             ) : (
-              <>
-                Check your email for a verification link to complete your
-                registration.
-              </>
+              <>Check your email for a verification link to complete your registration.</>
             )
           }
         >
@@ -109,9 +103,7 @@ function VerifyEmailContent() {
                 spinnerColor="var(--color-text-muted)"
                 spinnerSize={28}
               >
-                {cooldown > 0
-                  ? `Resend in ${cooldown}s`
-                  : "Resend verification email"}
+                {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend verification email"}
               </ButtonLoading>
             </button>
           )}

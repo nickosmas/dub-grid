@@ -43,13 +43,8 @@ export function widenFetchWindow(
   opts?: { ensureStart?: string; ensureEnd?: string },
 ): { start: string; end: string } {
   const start =
-    opts?.ensureStart && opts.ensureStart < defaultStart
-      ? opts.ensureStart
-      : defaultStart;
-  const end =
-    opts?.ensureEnd && opts.ensureEnd > defaultEnd
-      ? opts.ensureEnd
-      : defaultEnd;
+    opts?.ensureStart && opts.ensureStart < defaultStart ? opts.ensureStart : defaultStart;
+  const end = opts?.ensureEnd && opts.ensureEnd > defaultEnd ? opts.ensureEnd : defaultEnd;
   return { start, end };
 }
 
@@ -177,9 +172,7 @@ export function formatImportPreviousSkipDescription(
 
   const reasons: string[] = [];
   if (breakdown.skippedTargetHasData > 0) {
-    reasons.push(
-      `${breakdown.skippedTargetHasData} target already had data`,
-    );
+    reasons.push(`${breakdown.skippedTargetHasData} target already had data`);
   }
   if (breakdown.skippedEmployeeInactive > 0) {
     reasons.push(
@@ -189,14 +182,14 @@ export function formatImportPreviousSkipDescription(
     );
   }
   const disqTotal =
-    breakdown.disqualifiedFocusArea +
-    breakdown.disqualifiedRole +
-    breakdown.disqualifiedCert;
+    breakdown.disqualifiedFocusArea + breakdown.disqualifiedRole + breakdown.disqualifiedCert;
   if (disqTotal > 0) {
     reasons.push(`${disqTotal} qualification change${disqTotal === 1 ? "" : "s"}`);
   }
   if (breakdown.skippedSourceEmpty > 0) {
-    reasons.push(`${breakdown.skippedSourceEmpty} source cell${breakdown.skippedSourceEmpty === 1 ? "" : "s"} had no usable content`);
+    reasons.push(
+      `${breakdown.skippedSourceEmpty} source cell${breakdown.skippedSourceEmpty === 1 ? "" : "s"} had no usable content`,
+    );
   }
   if (breakdown.skippedOther > 0) {
     reasons.push(`${breakdown.skippedOther} skipped for other reasons`);
@@ -208,9 +201,7 @@ export function formatImportPreviousSkipDescription(
     return `${name} on ${formatShortDate(r.targetDate)}`;
   });
   const sampleSuffix =
-    skippedRows.length > sample.length
-      ? ` and ${skippedRows.length - sample.length} more`
-      : "";
+    skippedRows.length > sample.length ? ` and ${skippedRows.length - sample.length} more` : "";
 
   return `${reasons.join(", ")}${sample.length > 0 ? ` (e.g. ${sample.join(", ")}${sampleSuffix})` : ""}`;
 }

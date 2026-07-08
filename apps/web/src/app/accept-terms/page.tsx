@@ -10,10 +10,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useTermsAcceptanceStatus } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 import { CURRENT_TERMS_VERSION } from "@/features/account/shared/terms";
-import {
-  recordCurrentTermsAcceptance,
-  signOutFromBrowser,
-} from "@/features/account/client";
+import { recordCurrentTermsAcceptance, signOutFromBrowser } from "@/features/account/client";
 
 // Default next destination if none provided. Matches the login form's default.
 const DEFAULT_NEXT = "/dashboard";

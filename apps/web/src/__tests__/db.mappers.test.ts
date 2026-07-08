@@ -306,7 +306,10 @@ describe("rowToAssignmentDefinition", () => {
   });
 
   it("focus_area_id: null maps to focusAreaId: null", () => {
-    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, focus_area_id: null });
+    const result = rowToAssignmentDefinition({
+      ...baseAssignmentDefinitionRow,
+      focus_area_id: null,
+    });
     expect(result.focusAreaId).toBeNull();
   });
 
@@ -321,27 +324,42 @@ describe("rowToAssignmentDefinition", () => {
   });
 
   it("archived_at: timestamp maps to archivedAt: string", () => {
-    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, archived_at: "2026-03-10T12:00:00Z" });
+    const result = rowToAssignmentDefinition({
+      ...baseAssignmentDefinitionRow,
+      archived_at: "2026-03-10T12:00:00Z",
+    });
     expect(result.archivedAt).toBe("2026-03-10T12:00:00Z");
   });
 
   it("default_duration_hours: null maps to defaultDurationHours: null", () => {
-    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_duration_hours: null });
+    const result = rowToAssignmentDefinition({
+      ...baseAssignmentDefinitionRow,
+      default_duration_hours: null,
+    });
     expect(result.defaultDurationHours).toBeNull();
   });
 
   it("default_duration_hours: 8 maps to defaultDurationHours: 8", () => {
-    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_duration_hours: 8 });
+    const result = rowToAssignmentDefinition({
+      ...baseAssignmentDefinitionRow,
+      default_duration_hours: 8,
+    });
     expect(result.defaultDurationHours).toBe(8);
   });
 
   it("default_duration_minutes: null maps to defaultDurationMinutes: null", () => {
-    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_duration_minutes: null });
+    const result = rowToAssignmentDefinition({
+      ...baseAssignmentDefinitionRow,
+      default_duration_minutes: null,
+    });
     expect(result.defaultDurationMinutes).toBeNull();
   });
 
   it("default_duration_minutes: 30 maps to defaultDurationMinutes: 30", () => {
-    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_duration_minutes: 30 });
+    const result = rowToAssignmentDefinition({
+      ...baseAssignmentDefinitionRow,
+      default_duration_minutes: 30,
+    });
     expect(result.defaultDurationMinutes).toBe(30);
   });
 });
@@ -469,12 +487,7 @@ describe("rowToShiftRequest", () => {
       updated_at: "2026-04-18T12:00:00.000Z",
     } satisfies DbShiftRequest;
 
-    const result = rowToShiftRequest(
-      row,
-      assignmentLabelMap,
-      undefined,
-      assignmentIdByPair,
-    );
+    const result = rowToShiftRequest(row, assignmentLabelMap, undefined, assignmentIdByPair);
 
     expect(result.requesterAssignmentDefinitionIds).toEqual([44]);
     expect(result.requesterShiftLabel).toBe("D");
@@ -594,19 +607,25 @@ describe("rowToEmployee", () => {
   });
 
   it("phone: null defaults to empty string", () => {
-    const row = { ...baseEmployeeRow, phone: null } as unknown as Parameters<typeof rowToEmployee>[0];
+    const row = { ...baseEmployeeRow, phone: null } as unknown as Parameters<
+      typeof rowToEmployee
+    >[0];
     const result = rowToEmployee(row);
     expect(result.phone).toBe("");
   });
 
   it("email: null defaults to empty string", () => {
-    const row = { ...baseEmployeeRow, email: null } as unknown as Parameters<typeof rowToEmployee>[0];
+    const row = { ...baseEmployeeRow, email: null } as unknown as Parameters<
+      typeof rowToEmployee
+    >[0];
     const result = rowToEmployee(row);
     expect(result.email).toBe("");
   });
 
   it("contact_notes: null defaults to empty string", () => {
-    const row = { ...baseEmployeeRow, contact_notes: null } as unknown as Parameters<typeof rowToEmployee>[0];
+    const row = { ...baseEmployeeRow, contact_notes: null } as unknown as Parameters<
+      typeof rowToEmployee
+    >[0];
     const result = rowToEmployee(row);
     expect(result.contactNotes).toBe("");
   });
@@ -677,7 +696,10 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
     last_name: fc.string({ minLength: 1 }),
     employment_type: fc.constantFrom("full_time" as const, "part_time" as const),
     status: fc.constantFrom("active" as const, "inactive" as const, "removed" as const),
-    status_changed_at: fc.oneof(fc.constant(null as string | null), fc.constant("2026-01-01T00:00:00Z")),
+    status_changed_at: fc.oneof(
+      fc.constant(null as string | null),
+      fc.constant("2026-01-01T00:00:00Z"),
+    ),
     status_note: fc.string(),
     certification_id: fc.oneof(fc.constant(null as number | null), fc.integer({ min: 1 })),
     role_ids: fc.array(fc.integer({ min: 1 })),
@@ -722,22 +744,34 @@ describe("rowToEmployee / employeeToRow — Property 8: round-trip", () => {
 
 describe("rowToAssignmentDefinition trimTime behavior", () => {
   it("strips seconds from default_start_time: '07:00:00' → '07:00'", () => {
-    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_start_time: "07:00:00" });
+    const result = rowToAssignmentDefinition({
+      ...baseAssignmentDefinitionRow,
+      default_start_time: "07:00:00",
+    });
     expect(result.defaultStartTime).toBe("07:00");
   });
 
   it("keeps default_start_time already in HH:MM format: '07:00' → '07:00'", () => {
-    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_start_time: "07:00" });
+    const result = rowToAssignmentDefinition({
+      ...baseAssignmentDefinitionRow,
+      default_start_time: "07:00",
+    });
     expect(result.defaultStartTime).toBe("07:00");
   });
 
   it("maps default_start_time: null → null", () => {
-    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_start_time: null });
+    const result = rowToAssignmentDefinition({
+      ...baseAssignmentDefinitionRow,
+      default_start_time: null,
+    });
     expect(result.defaultStartTime).toBeNull();
   });
 
   it("strips seconds from default_end_time: '15:30:45' → '15:30'", () => {
-    const result = rowToAssignmentDefinition({ ...baseAssignmentDefinitionRow, default_end_time: "15:30:45" });
+    const result = rowToAssignmentDefinition({
+      ...baseAssignmentDefinitionRow,
+      default_end_time: "15:30:45",
+    });
     expect(result.defaultEndTime).toBe("15:30");
   });
 });

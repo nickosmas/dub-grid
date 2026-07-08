@@ -84,8 +84,7 @@ export default function TermsAcceptanceCard({
             maxWidth: 520,
           }}
         >
-          Please read these updated Terms of Service in full before
-          continuing.
+          Please read these updated Terms of Service in full before continuing.
         </p>
       </div>
 

@@ -131,10 +131,7 @@ function resolveClientUrl(path: string): string {
   return path;
 }
 
-async function requestGridmasterJson<T>(
-  input: string,
-  init?: RequestInit,
-): Promise<T> {
+async function requestGridmasterJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(resolveClientUrl(input), init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -142,9 +139,7 @@ async function requestGridmasterJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "Gridmaster request failed."),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, "Gridmaster request failed."));
   }
 
   return body as T;
@@ -206,18 +201,13 @@ export function updateGridmasterUserActivation(input: {
 export function fetchGridmasterUserMemberships(
   userId: string,
 ): Promise<{ memberships: UserMembership[] }> {
-  return requestGridmasterJson(
-    `/api/gridmaster/users/${encodeURIComponent(userId)}/memberships`,
-  );
+  return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/memberships`);
 }
 
-export function forceLogoutGridmasterUser(
-  userId: string,
-): Promise<{ success: true }> {
-  return requestGridmasterJson(
-    `/api/gridmaster/users/${encodeURIComponent(userId)}/force-logout`,
-    { method: "POST" },
-  );
+export function forceLogoutGridmasterUser(userId: string): Promise<{ success: true }> {
+  return requestGridmasterJson(`/api/gridmaster/users/${encodeURIComponent(userId)}/force-logout`, {
+    method: "POST",
+  });
 }
 
 export function fetchGridmasterInvitations(
@@ -268,9 +258,7 @@ export function fetchGridmasterBilling(): Promise<GridmasterBillingSummary> {
   return requestGridmasterJson("/api/gridmaster/billing");
 }
 
-export function syncGridmasterBilling(
-  orgId: string,
-): Promise<{ success: true }> {
+export function syncGridmasterBilling(orgId: string): Promise<{ success: true }> {
   return requestGridmasterJson("/api/gridmaster/stripe-sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -278,29 +266,30 @@ export function syncGridmasterBilling(
   });
 }
 
-export function updateGridmasterSubscription(input:
-  | {
-      orgId: string;
-      action: "extend_trial";
-      trialDays: number;
-    }
-  | {
-      orgId: string;
-      action: "cancel";
-    }
-  | {
-      orgId: string;
-      action: "cancel_at_period_end";
-    }
-  | {
-      orgId: string;
-      action: "sync_seats";
-    }
-  | {
-      orgId: string;
-      action: "override_status";
-      status: string;
-    },
+export function updateGridmasterSubscription(
+  input:
+    | {
+        orgId: string;
+        action: "extend_trial";
+        trialDays: number;
+      }
+    | {
+        orgId: string;
+        action: "cancel";
+      }
+    | {
+        orgId: string;
+        action: "cancel_at_period_end";
+      }
+    | {
+        orgId: string;
+        action: "sync_seats";
+      }
+    | {
+        orgId: string;
+        action: "override_status";
+        status: string;
+      },
 ): Promise<{ success: true }> {
   return requestGridmasterJson("/api/gridmaster/subscription", {
     method: "POST",
@@ -429,14 +418,11 @@ export function startGridmasterImpersonation(input: {
   targetOrgId?: string;
   userAgent?: string;
 }): Promise<StartImpersonationResult> {
-  return requestGridmasterJson<StartImpersonationResult>(
-    "/api/gridmaster/impersonation",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "start", ...input }),
-    },
-  );
+  return requestGridmasterJson<StartImpersonationResult>("/api/gridmaster/impersonation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "start", ...input }),
+  });
 }
 
 export function endGridmasterImpersonation(input: {
@@ -444,61 +430,43 @@ export function endGridmasterImpersonation(input: {
   reason?: string;
   targetOrgId?: string | null;
 }): Promise<{ success: true }> {
-  return requestGridmasterJson<{ success: true }>(
-    "/api/gridmaster/impersonation",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "end", ...input }),
-    },
-  );
+  return requestGridmasterJson<{ success: true }>("/api/gridmaster/impersonation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "end", ...input }),
+  });
 }
 
 export function archiveGridmasterOrganization(orgId: string): Promise<void> {
-  return requestGridmasterJson<{ success: true }>(
-    "/api/gridmaster/organizations/manage",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "archiveOrganization", orgId }),
-    },
-  ).then(() => undefined);
+  return requestGridmasterJson<{ success: true }>("/api/gridmaster/organizations/manage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "archiveOrganization", orgId }),
+  }).then(() => undefined);
 }
 
 export function restoreGridmasterOrganization(orgId: string): Promise<void> {
-  return requestGridmasterJson<{ success: true }>(
-    "/api/gridmaster/organizations/manage",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "restoreOrganization", orgId }),
-    },
-  ).then(() => undefined);
+  return requestGridmasterJson<{ success: true }>("/api/gridmaster/organizations/manage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "restoreOrganization", orgId }),
+  }).then(() => undefined);
 }
 
-export function suspendGridmasterOrganization(
-  orgId: string,
-  reason: string,
-): Promise<void> {
-  return requestGridmasterJson<{ success: true }>(
-    "/api/gridmaster/organizations/manage",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "suspendOrganization", orgId, reason }),
-    },
-  ).then(() => undefined);
+export function suspendGridmasterOrganization(orgId: string, reason: string): Promise<void> {
+  return requestGridmasterJson<{ success: true }>("/api/gridmaster/organizations/manage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "suspendOrganization", orgId, reason }),
+  }).then(() => undefined);
 }
 
 export function unsuspendGridmasterOrganization(orgId: string): Promise<void> {
-  return requestGridmasterJson<{ success: true }>(
-    "/api/gridmaster/organizations/manage",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "unsuspendOrganization", orgId }),
-    },
-  ).then(() => undefined);
+  return requestGridmasterJson<{ success: true }>("/api/gridmaster/organizations/manage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "unsuspendOrganization", orgId }),
+  }).then(() => undefined);
 }
 
 export function assignGridmasterOrgRoleByEmail(
@@ -506,14 +474,11 @@ export function assignGridmasterOrgRoleByEmail(
   email: string,
   role: AssignableOrganizationRole,
 ): Promise<void> {
-  return requestGridmasterJson<{ success: true }>(
-    "/api/gridmaster/organizations/manage",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "assignOrgRoleByEmail", orgId, email, role }),
-    },
-  ).then(() => undefined);
+  return requestGridmasterJson<{ success: true }>("/api/gridmaster/organizations/manage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "assignOrgRoleByEmail", orgId, email, role }),
+  }).then(() => undefined);
 }
 
 export function createGridmasterOrganizationSetup(

@@ -49,7 +49,7 @@ export interface NamedItem {
   archivedAt?: string | null;
 }
 
-export type DepartmentType = 'scheduled' | 'management';
+export type DepartmentType = "scheduled" | "management";
 
 export interface Department {
   id: number;
@@ -165,8 +165,8 @@ export interface AssignmentDefinition {
   label: string;
   name: string;
   color: string;
-  border: string;   // mapped from border_color
-  text: string;     // mapped from text_color
+  border: string; // mapped from border_color
+  text: string; // mapped from text_color
   /** FK to shift_categories.id — determines which tally bucket this option counts toward. */
   categoryId?: number | null;
   /** Canonical worked shift for this option. */
@@ -317,10 +317,7 @@ export interface ScheduleCellSnapshot extends ScheduleCellInput {
   segments: ScheduleCellSegmentSnapshot[];
 }
 
-export type RecurringScheduleDraft = Record<
-  string,
-  Record<number, ScheduleCellInput | null>
->;
+export type RecurringScheduleDraft = Record<string, Record<number, ScheduleCellInput | null>>;
 
 /**
  * An absence type: off-day definitions (Off, Sick, Vacation, etc.).
@@ -329,8 +326,8 @@ export type RecurringScheduleDraft = Record<
 export interface AbsenceType {
   id: number;
   orgId: string;
-  label: string;    // "X", "V", "S"
-  name: string;     // "Off", "Vacation", "Sick"
+  label: string; // "X", "V", "S"
+  name: string; // "Off", "Vacation", "Sick"
   color: string;
   border: string;
   text: string;
@@ -338,12 +335,12 @@ export interface AbsenceType {
   archivedAt?: string | null;
 }
 
-export type DraftKind = 'new' | 'modified' | 'deleted' | null;
+export type DraftKind = "new" | "modified" | "deleted" | null;
 
 export interface PublishChange {
   empId: string;
   date: string;
-  kind: 'new' | 'modified' | 'deleted';
+  kind: "new" | "modified" | "deleted";
   from?: number[];
   to?: number[];
   fromState?: ScheduleCellState | null;
@@ -417,8 +414,8 @@ export interface ScheduleCellStateEntry {
 
 export type ShiftMap = Record<string, ScheduleCellStateEntry>;
 
-export type SeriesFrequency = 'daily' | 'weekly' | 'biweekly';
-export type SeriesScope = 'this' | 'all';
+export type SeriesFrequency = "daily" | "weekly" | "biweekly";
+export type SeriesScope = "this" | "all";
 
 export interface RecurringShift {
   id: string;
@@ -508,7 +505,7 @@ export interface ScheduleNote {
   /** FK to indicator_types.id — consistent with how schedule cells reference related config by ID */
   indicatorTypeId: number;
   focusAreaId: number | null;
-  status: 'published' | 'draft' | 'draft_deleted';
+  status: "published" | "draft" | "draft_deleted";
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
@@ -620,7 +617,7 @@ export interface NameMismatchResponseBody {
 /** A unified person record for the People Directory (union of employees + management staff + pending invites). */
 export interface DirectoryPerson {
   personId: string;
-  source: 'employee' | 'user_only' | 'pending_invite';
+  source: "employee" | "user_only" | "pending_invite";
   employeeId: string | null;
   /** Per-org employee ID badge. Null for app-only members without an employee
    *  row yet (user_only / pending_invite). */
@@ -638,7 +635,7 @@ export interface DirectoryPerson {
   roleIds: number[];
   seniority: number | null;
   lastSignInAt: string | null;
-  invitationStatus: 'pending' | 'expired' | null;
+  invitationStatus: "pending" | "expired" | null;
   /** Scheduled department IDs from the employee record. */
   scheduledDepartmentIds: number[];
   /** Subset of scheduledDepartmentIds where this employee is a dept admin. */
@@ -737,63 +734,63 @@ export interface ImpersonationHistoryEntry {
 }
 
 export type NotificationType =
-  | 'impersonation_start'
-  | 'impersonation_end'
-  | 'system'
-  | 'shift_change'
-  | 'schedule_published'
-  | 'shift_request_new'
-  | 'shift_request_approved'
-  | 'shift_request_rejected'
-  | 'shift_request_expired'
+  | "impersonation_start"
+  | "impersonation_end"
+  | "system"
+  | "shift_change"
+  | "schedule_published"
+  | "shift_request_new"
+  | "shift_request_approved"
+  | "shift_request_rejected"
+  | "shift_request_expired"
   // schedule (non-publish flows)
-  | 'recurring_shift_updated'
-  | 'shift_series_updated'
-  | 'schedule_note_published'
-  | 'recurring_schedules_applied'
+  | "recurring_shift_updated"
+  | "shift_series_updated"
+  | "schedule_note_published"
+  | "recurring_schedules_applied"
   // membership lifecycle
-  | 'invitation_received'
-  | 'invitation_accepted'
-  | 'invitation_revoked'
-  | 'invitation_resent'
-  | 'invitation_expired'
-  | 'membership_removed'
-  | 'admin_permissions_changed'
-  | 'member_dept_changed'
+  | "invitation_received"
+  | "invitation_accepted"
+  | "invitation_revoked"
+  | "invitation_resent"
+  | "invitation_expired"
+  | "membership_removed"
+  | "admin_permissions_changed"
+  | "member_dept_changed"
   // employee + org account
-  | 'employee_created'
-  | 'employee_status_changed'
-  | 'employee_profile_changed'
-  | 'org_settings_changed'
-  | 'org_suspended'
-  | 'org_unsuspended'
+  | "employee_created"
+  | "employee_status_changed"
+  | "employee_profile_changed"
+  | "org_settings_changed"
+  | "org_suspended"
+  | "org_unsuspended"
   // billing
-  | 'billing_subscription_changed'
-  | 'billing_payment_failed'
-  | 'billing_payment_succeeded'
-  | 'billing_trial_ending_soon'
-  | 'billing_trial_expired'
+  | "billing_subscription_changed"
+  | "billing_payment_failed"
+  | "billing_payment_succeeded"
+  | "billing_trial_ending_soon"
+  | "billing_trial_expired"
   // security
-  | 'security_email_changed'
-  | 'security_password_changed'
-  | 'security_mfa_changed'
-  | 'security_new_device'
-  | 'security_session_revoked'
+  | "security_email_changed"
+  | "security_password_changed"
+  | "security_mfa_changed"
+  | "security_new_device"
+  | "security_session_revoked"
   // platform / gridmaster (org lifecycle events, org_id = NULL)
-  | 'org_created'
-  | 'org_trial_started'
-  | 'org_archived'
-  | 'org_restored'
-  | 'org_subscription_converted'
-  | 'org_subscription_canceled'
-  | 'org_payment_failed';
+  | "org_created"
+  | "org_trial_started"
+  | "org_archived"
+  | "org_restored"
+  | "org_subscription_converted"
+  | "org_subscription_canceled"
+  | "org_payment_failed";
 
-export type NotificationPriority = 'low' | 'normal' | 'high' | 'critical';
+export type NotificationPriority = "low" | "normal" | "high" | "critical";
 
 export interface Notification {
   id: string;
   type: NotificationType;
-  channel: 'in_app' | 'email';
+  channel: "in_app" | "email";
   category: string | null;
   priority: NotificationPriority;
   title: string;
@@ -986,9 +983,7 @@ export interface GridmasterOrgHealthSummary {
   >;
   setup: {
     isComplete: boolean;
-    missing: Array<
-      "focusAreas" | "scheduleDefinitions" | "certifications" | "orgRoles"
-    >;
+    missing: Array<"focusAreas" | "scheduleDefinitions" | "certifications" | "orgRoles">;
   };
   supportSnapshot: {
     userCount: number;
@@ -1252,7 +1247,7 @@ export interface ShiftRequest {
 
 export interface GridOpenShift {
   id: string;
-  source: 'calloff' | 'coverage_gap';
+  source: "calloff" | "coverage_gap";
   date: string;
   focusAreaId: number;
   requirementAssignmentDefinitionId?: number;

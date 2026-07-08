@@ -26,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
       # Well-known Supabase CLI local dev keys (deterministic, not secrets).
       # See: https://supabase.com/docs/guides/local-development
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321

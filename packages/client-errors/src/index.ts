@@ -22,8 +22,7 @@ export const NETWORK_ERROR_TITLE = "Network connection issue";
  * Canonical connectivity message, shared by web and mobile. The web app may
  * append an adblocker hint as a separate description line.
  */
-export const NETWORK_ERROR_MESSAGE =
-  "Check your internet connection and try again.";
+export const NETWORK_ERROR_MESSAGE = "Check your internet connection and try again.";
 
 /** Default fallback when an error can't be translated and isn't safe to show. */
 export const DEFAULT_ERROR_FALLBACK = "Something went wrong. Please try again.";
@@ -84,8 +83,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   {
     pattern:
       /can't perform this action on your own account|cannot perform this action on your own account/i,
-    message:
-      "You can't perform this action on your own account. Ask another admin.",
+    message: "You can't perform this action on your own account. Ask another admin.",
   },
   {
     pattern: /unauthorized|forbidden|not authorized|permission denied/i,
@@ -110,8 +108,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   },
   {
     pattern: /not assigned to the focus area|required focus area/i,
-    message:
-      "You are not assigned to the focus area required for this shift.",
+    message: "You are not assigned to the focus area required for this shift.",
   },
   {
     pattern: /another active shift request/i,
@@ -124,8 +121,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   {
     pattern:
       /organization.*not found|could not find organization|no organization matched that slug/i,
-    message:
-      "We couldn't find that organization. Check the subdomain and try again.",
+    message: "We couldn't find that organization. Check the subdomain and try again.",
   },
   {
     pattern: /email not confirmed/i,
@@ -134,8 +130,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   {
     pattern:
       /invalid.*(?:mfa|totp|verification code|code)|mfa_verification_failed|challenge.*expired/i,
-    message:
-      "That code didn't work. Check your authenticator app and try again.",
+    message: "That code didn't work. Check your authenticator app and try again.",
   },
   {
     pattern:
@@ -224,18 +219,14 @@ export function isNetworkConnectionError(error: unknown): boolean {
 export function isAuthorizationError(error: unknown): boolean {
   const message = getErrorMessage(error);
   if (!message) return false;
-  return /unauthorized|forbidden|not authorized|permission denied/i.test(
-    message,
-  );
+  return /unauthorized|forbidden|not authorized|permission denied/i.test(message);
 }
 
 /**
  * When the error is an intentional "Organization unavailable." gate message,
  * return it verbatim (it is already user-facing copy). Otherwise return `null`.
  */
-export function getOrgUnavailableMessage(
-  error: unknown,
-): string | null {
+export function getOrgUnavailableMessage(error: unknown): string | null {
   const message = getErrorMessage(error);
   if (!message || !/^organization unavailable\./i.test(message)) {
     return null;
@@ -250,9 +241,7 @@ export function getOrgUnavailableMessage(
  * pattern. Returns `null` when no friendly rewrite applies.
  */
 export function translateErrorMessage(rawMessage: string): string | null {
-  const matched = CLIENT_FRIENDLY_ERROR_PATTERNS.find(({ pattern }) =>
-    pattern.test(rawMessage),
-  );
+  const matched = CLIENT_FRIENDLY_ERROR_PATTERNS.find(({ pattern }) => pattern.test(rawMessage));
   return matched ? matched.message : null;
 }
 

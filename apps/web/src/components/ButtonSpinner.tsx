@@ -1,6 +1,12 @@
 import { LoaderIcon } from "lucide-react";
 
-export default function ButtonSpinner({ color = "currentColor", size = 18 }: { color?: string; size?: number }) {
+export default function ButtonSpinner({
+  color = "currentColor",
+  size = 18,
+}: {
+  color?: string;
+  size?: number;
+}) {
   return (
     <LoaderIcon
       role="status"
@@ -31,12 +37,34 @@ export function ButtonLoading({
   spinnerSize?: number;
 }) {
   return (
-    <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-      <span style={{ visibility: loading ? "hidden" : "visible", display: "inline-flex", alignItems: "center", gap: "inherit" }}>
+    <span
+      style={{
+        position: "relative",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <span
+        style={{
+          visibility: loading ? "hidden" : "visible",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "inherit",
+        }}
+      >
         {children}
       </span>
       {loading && (
-        <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <span
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <ButtonSpinner color={spinnerColor} size={spinnerSize} />
         </span>
       )}

@@ -25,11 +25,7 @@ import {
   normalizeMobileScheduleRange,
 } from "./mobile";
 import { scheduleCellStateSchema } from "./schedule";
-import {
-  getOptionalUsPhoneError,
-  normalizeOptionalUsPhone,
-  staffNameSchema,
-} from "./staff";
+import { getOptionalUsPhoneError, normalizeOptionalUsPhone, staffNameSchema } from "./staff";
 
 describe("mobile contracts", () => {
   it("rejects invalid schedule state combinations before API handlers reach SQL", () => {
@@ -181,26 +177,16 @@ describe("mobile contracts", () => {
       expect(getOptionalUsPhoneError(input)).toBeNull();
     }
 
-    for (const input of [
-      "123",
-      "jagdhx",
-      "111-222-3333",
-      "+44 20 7946 0958",
-      "415-425-33344",
-    ]) {
+    for (const input of ["123", "jagdhx", "111-222-3333", "+44 20 7946 0958", "415-425-33344"]) {
       expect(getOptionalUsPhoneError(input)).toBeTruthy();
       expect(() => normalizeOptionalUsPhone(input)).toThrow();
     }
   });
 
   it("validates staff names without rejecting normal punctuation", () => {
-    expect(staffNameSchema.parse("  Anne-Marie O'Neil  ")).toBe(
-      "Anne-Marie O'Neil",
-    );
+    expect(staffNameSchema.parse("  Anne-Marie O'Neil  ")).toBe("Anne-Marie O'Neil");
     expect(staffNameSchema.safeParse("123").success).toBe(false);
-    expect(staffNameSchema.safeParse("https://example.com").success).toBe(
-      false,
-    );
+    expect(staffNameSchema.safeParse("https://example.com").success).toBe(false);
   });
 
   it("accepts profile phone update input", () => {

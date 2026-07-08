@@ -1,9 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
-import {
-  mobileColors,
-  mobileRadii,
-} from "../../../../shared/theme/tokens";
+import { mobileColors, mobileRadii } from "../../../../shared/theme/tokens";
 
 const AVATARS = [
   { bg: "#DBEAFE", fg: "#1D4ED8", initials: "BT" },
@@ -53,9 +50,7 @@ export function IllustrationUpcomingShift() {
                 },
               ]}
             >
-              <Text style={[styles.avatarText, { color: avatar.fg }]}>
-                {avatar.initials}
-              </Text>
+              <Text style={[styles.avatarText, { color: avatar.fg }]}>{avatar.initials}</Text>
             </View>
           ))}
           <View style={[styles.avatar, styles.avatarMore]}>

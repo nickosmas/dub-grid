@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from "react";
 
 /**
  * Imperative handle that nested settings editors expose to the wizard so a
@@ -89,9 +82,7 @@ export function useWizardEditorCollector(): {
 
   const Provider = useCallback<React.FC<{ children: React.ReactNode }>>(
     ({ children }) => (
-      <WizardModeContext.Provider value={value}>
-        {children}
-      </WizardModeContext.Provider>
+      <WizardModeContext.Provider value={value}>{children}</WizardModeContext.Provider>
     ),
     [value],
   );

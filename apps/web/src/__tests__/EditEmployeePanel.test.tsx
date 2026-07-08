@@ -169,9 +169,7 @@ describe("EditEmployeePanel", () => {
       await user.click(screen.getByRole("option", { name: "Part-time" }));
       await user.click(screen.getByRole("button", { name: "Save" }));
 
-      expect(onSave).toHaveBeenCalledWith(
-        expect.objectContaining({ employmentType: "part_time" }),
-      );
+      expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ employmentType: "part_time" }));
     });
 
     it("Save is disabled when first name is cleared even if other fields are modified", async () => {
@@ -257,9 +255,7 @@ describe("EditEmployeePanel", () => {
       await user.type(phoneInput, "123");
       await user.tab();
 
-      expect(
-        screen.getByText("Enter a 10-digit US phone number"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Enter a 10-digit US phone number")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
       expect(onSave).not.toHaveBeenCalled();
     });
@@ -291,21 +287,16 @@ describe("EditEmployeePanel", () => {
 
       expect(cancelButton).toBeInTheDocument();
       expect(
-        cancelButton.compareDocumentPosition(saveButton) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
+        cancelButton.compareDocumentPosition(saveButton) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
-      expect(
-        screen.queryByRole("button", { name: "Close" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
 
       await user.click(cancelButton);
 
       expect(onCancel).not.toHaveBeenCalled();
       expect(screen.getByDisplayValue("Alice")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: "Discard" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     });
   });
@@ -316,9 +307,7 @@ describe("EditEmployeePanel", () => {
   describe("Shared status actions", () => {
     it("does not render a terminate button inside the edit form", () => {
       renderPanel();
-      expect(
-        screen.queryByRole("button", { name: "Terminate" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Terminate" })).not.toBeInTheDocument();
     });
   });
 
@@ -330,9 +319,7 @@ describe("EditEmployeePanel", () => {
     it("isModified is false when unmodified and true after mutating a field", () => {
       const validNameArb = fc
         .array(
-          fc.constantFrom(
-            ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
-          ),
+          fc.constantFrom(..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")),
           { minLength: 1, maxLength: 20 },
         )
         .map((chars) => chars.join(""));
@@ -404,9 +391,7 @@ describe("EditEmployeePanel", () => {
             });
 
             // Assert Save is enabled after mutation
-            expect(
-              screen.getByRole("button", { name: "Save" }),
-            ).not.toBeDisabled();
+            expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
           } finally {
             unmount();
           }

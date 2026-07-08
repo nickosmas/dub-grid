@@ -62,7 +62,16 @@ export function DataPrivacyPanel() {
               The legal documents that govern your use of DubGrid.
             </p>
           </div>
-          <ul style={{ display: "flex", flexDirection: "column", gap: 8, listStyle: "none", padding: 0, margin: 0 }}>
+          <ul
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+            }}
+          >
             {POLICY_LINKS.map((link) => (
               <li key={link.href}>
                 <a
@@ -77,7 +86,11 @@ export function DataPrivacyPanel() {
                       {link.description}
                     </span>
                   </span>
-                  <ExternalLink size={14} aria-hidden="true" className="shrink-0 text-[var(--color-text-muted)]" />
+                  <ExternalLink
+                    size={14}
+                    aria-hidden="true"
+                    className="shrink-0 text-[var(--color-text-muted)]"
+                  />
                 </a>
               </li>
             ))}

@@ -101,10 +101,7 @@ export interface InvitationLookup {
   orgSlug: string | null;
 }
 
-async function requestJson<T>(
-  input: string,
-  init?: RequestInit,
-): Promise<T> {
+async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -112,9 +109,7 @@ async function requestJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "Account request failed."),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, "Account request failed."));
   }
 
   return body as T;
@@ -148,17 +143,13 @@ export function fetchAccountPermissions(): Promise<AccountPermissionsResponse> {
   return requestJson<AccountPermissionsResponse>("/api/account/permissions");
 }
 
-export function fetchSelfProfileData(
-  orgId: string | null,
-): Promise<AccountSelfProfileData> {
+export function fetchSelfProfileData(orgId: string | null): Promise<AccountSelfProfileData> {
   const params = new URLSearchParams();
   if (orgId) {
     params.set("orgId", orgId);
   }
   const suffix = params.toString();
-  return requestJson<AccountSelfProfileData>(
-    `/api/account/self${suffix ? `?${suffix}` : ""}`,
-  );
+  return requestJson<AccountSelfProfileData>(`/api/account/self${suffix ? `?${suffix}` : ""}`);
 }
 
 export function updateSelfProfileDetails(input: {
@@ -275,9 +266,7 @@ export function fetchAccountSessions(): Promise<{
   return requestJson("/api/account/sessions");
 }
 
-export function revokeAccountSession(
-  refreshTokenHash: string,
-): Promise<{ success: true }> {
+export function revokeAccountSession(refreshTokenHash: string): Promise<{ success: true }> {
   return requestJson("/api/account/sessions", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
@@ -291,9 +280,7 @@ export function fetchAccessibleOrganizations(): Promise<{
   return requestJson("/api/auth/organizations");
 }
 
-export function switchBrowserOrganization(
-  targetOrgId: string,
-): Promise<{ success: true }> {
+export function switchBrowserOrganization(targetOrgId: string): Promise<{ success: true }> {
   return requestJson("/api/auth/organizations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -303,9 +290,7 @@ export function switchBrowserOrganization(
 
 // Starts the org's trial on the first super_admin login. Idempotent + self-gated
 // to super_admins server-side, so it is safe to call after any genuine login.
-export function startBrowserTrial(
-  orgId: string,
-): Promise<{ success: true }> {
+export function startBrowserTrial(orgId: string): Promise<{ success: true }> {
   return requestJson("/api/auth/start-trial", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -329,9 +314,7 @@ export function exitSandbox(): Promise<{ success: true }> {
   });
 }
 
-export function fetchInvitationLookup(
-  token: string,
-): Promise<InvitationLookup> {
+export function fetchInvitationLookup(token: string): Promise<InvitationLookup> {
   const params = new URLSearchParams({ token });
   return requestJson(`/api/invitations/lookup?${params}`);
 }

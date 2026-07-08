@@ -42,11 +42,7 @@ interface MobileDayViewProps {
   shiftCategories: ShiftCategory[];
   indicatorTypes?: IndicatorType[];
   isCellInteractive?: boolean;
-  activeIndicatorIdsForKey?: (
-    empId: string,
-    date: Date,
-    focusAreaId?: number,
-  ) => number[];
+  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
   activeFocusArea?: number | null;
   certifications?: NamedItem[];
   orgRoles?: NamedItem[];
@@ -88,9 +84,7 @@ export default function MobileDayView({
 }: MobileDayViewProps) {
   const isNameMode = shiftDisplayMode === "name";
   const todayKey = formatDateKey(today);
-  const hasHighlightedSearch = !!(
-    highlightEmpIds && highlightEmpIds.size > 0
-  );
+  const hasHighlightedSearch = !!(highlightEmpIds && highlightEmpIds.size > 0);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Always show exactly 7 dates (navigation handled by parent chevrons)
@@ -101,9 +95,7 @@ export default function MobileDayView({
     const allNames = focusAreas.map((w) => w.name);
     if (activeFocusArea == null) return allNames;
     const activeFA = focusAreas.find((fa) => fa.id === activeFocusArea);
-    return activeFA
-      ? allNames.filter((name) => name === activeFA.name)
-      : allNames;
+    return activeFA ? allNames.filter((name) => name === activeFA.name) : allNames;
   }, [focusAreas, activeFocusArea]);
 
   const focusAreaIdByName = useMemo(
@@ -123,9 +115,7 @@ export default function MobileDayView({
         const focusAreaId = focusAreaIdByName[section];
         const ids = new Set(
           assignments
-            .filter(
-              (st) => focusAreaId != null && st.focusAreaId === focusAreaId,
-            )
+            .filter((st) => focusAreaId != null && st.focusAreaId === focusAreaId)
             .map((st) => st.id),
         );
         return [section, ids];
@@ -153,8 +143,7 @@ export default function MobileDayView({
   const hasAnySectionContent = useMemo(() => {
     return sections.some((sectionName) => {
       const sectionId = focusAreaIdByName[sectionName];
-      const exclusiveCodeIds =
-        exclusiveCodeIdsPerSection[sectionName] ?? new Set<number>();
+      const exclusiveCodeIds = exclusiveCodeIdsPerSection[sectionName] ?? new Set<number>();
       const rawHomeEmps = filteredEmployees.filter(
         (e) => sectionId != null && e.focusAreaIds.includes(sectionId),
       );
@@ -164,15 +153,12 @@ export default function MobileDayView({
             visibleDates.some((date) => {
               const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
               return codeIds.some(
-                (id) =>
-                  exclusiveCodeIds.has(id) ||
-                  assignmentById.get(id)?.focusAreaId == null,
+                (id) => exclusiveCodeIds.has(id) || assignmentById.get(id)?.focusAreaId == null,
               );
             }),
           );
       const guestEmps = filteredEmployees.filter((emp) => {
-        if (sectionId != null && emp.focusAreaIds.includes(sectionId))
-          return false;
+        if (sectionId != null && emp.focusAreaIds.includes(sectionId)) return false;
         return visibleDates.some((date) => {
           const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
           return codeIds.some((id) => exclusiveCodeIds.has(id));
@@ -213,8 +199,7 @@ export default function MobileDayView({
       {/* Sections */}
       {sections.map((sectionName) => {
         const sectionId = focusAreaIdByName[sectionName];
-        const exclusiveCodeIds =
-          exclusiveCodeIdsPerSection[sectionName] ?? new Set<number>();
+        const exclusiveCodeIds = exclusiveCodeIdsPerSection[sectionName] ?? new Set<number>();
 
         // Home employees — for read-only users, only show those with actual shifts
         const rawHomeEmps = filteredEmployees.filter(
@@ -226,17 +211,14 @@ export default function MobileDayView({
               visibleDates.some((date) => {
                 const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                 return codeIds.some(
-                  (id) =>
-                    exclusiveCodeIds.has(id) ||
-                    assignmentById.get(id)?.focusAreaId == null,
+                  (id) => exclusiveCodeIds.has(id) || assignmentById.get(id)?.focusAreaId == null,
                 );
               }),
             );
 
         // Guest employees — check ALL visible dates for exclusive codes
         const guestEmps = filteredEmployees.filter((emp) => {
-          if (sectionId != null && emp.focusAreaIds.includes(sectionId))
-            return false;
+          if (sectionId != null && emp.focusAreaIds.includes(sectionId)) return false;
           return visibleDates.some((date) => {
             const codeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
             return codeIds.some((id) => exclusiveCodeIds.has(id));
@@ -325,18 +307,14 @@ export default function MobileDayView({
                         textAlign: "center",
                         padding: "2px 0",
                         borderRadius: 8,
-                        background: isToday
-                          ? "var(--color-today-bg)"
-                          : "transparent",
+                        background: isToday ? "var(--color-today-bg)" : "transparent",
                       }}
                     >
                       <div
                         style={{
                           fontSize: 9,
                           fontWeight: 500,
-                          color: isToday
-                            ? "var(--color-today-text)"
-                            : "var(--color-text-faint)",
+                          color: isToday ? "var(--color-today-text)" : "var(--color-text-faint)",
                           textTransform: "uppercase",
                           letterSpacing: "0.3px",
                         }}
@@ -365,11 +343,9 @@ export default function MobileDayView({
             {sectionEmps.map((emp) => {
               const isGuest = !emp.focusAreaIds.includes(sectionId ?? -1);
               const isHighlighted = hasHighlightedSearch
-                ? highlightEmpIds?.has(emp.id) ?? false
+                ? (highlightEmpIds?.has(emp.id) ?? false)
                 : true;
-              const baseRowBg = isGuest
-                ? "var(--color-bg-secondary)"
-                : "var(--color-surface)";
+              const baseRowBg = isGuest ? "var(--color-bg-secondary)" : "var(--color-surface)";
               const rowBg =
                 hasHighlightedSearch && isHighlighted
                   ? isGuest
@@ -385,9 +361,7 @@ export default function MobileDayView({
               return (
                 <div
                   key={emp.id}
-                  data-search-highlight={
-                    hasHighlightedSearch && isHighlighted ? "true" : undefined
-                  }
+                  data-search-highlight={hasHighlightedSearch && isHighlighted ? "true" : undefined}
                   style={{
                     display: "grid",
                     gridTemplateColumns: GRID_COLS,
@@ -401,8 +375,7 @@ export default function MobileDayView({
                         ? "inset 4px 0 0 0 var(--color-brand)"
                         : undefined,
                     opacity: isHighlighted ? 1 : 0.35,
-                    transition:
-                      "opacity 150ms ease, background 150ms ease, box-shadow 150ms ease",
+                    transition: "opacity 150ms ease, background 150ms ease, box-shadow 150ms ease",
                   }}
                 >
                   {/* Name column */}
@@ -445,17 +418,13 @@ export default function MobileDayView({
                     const draftKind = draftKindForKey?.(emp.id, date) ?? null;
                     const hasIndicators =
                       activeIndicatorIdsForKey && sectionId != null
-                        ? (activeIndicatorIdsForKey(emp.id, date, sectionId)
-                            ?.length ?? 0) > 0
+                        ? (activeIndicatorIdsForKey(emp.id, date, sectionId)?.length ?? 0) > 0
                         : false;
 
                     // Check for absence (off-day) entry first
-                    const absenceTypeId =
-                      absenceTypeIdForKey?.(emp.id, date) ?? null;
+                    const absenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
                     const absenceType =
-                      absenceTypeId != null
-                        ? (absenceTypeMap?.get(absenceTypeId) ?? null)
-                        : null;
+                      absenceTypeId != null ? (absenceTypeMap?.get(absenceTypeId) ?? null) : null;
 
                     // Build pills for all codes (supports split shifts)
                     // For absence cells, synthesize a single pill from the absence type
@@ -485,16 +454,10 @@ export default function MobileDayView({
                             const foreignInitials = isForeign
                               ? (focusAreaInitials.get(style.focusAreaId!) ?? null)
                               : null;
-                            const foreignBg = isForeign
-                              ? "var(--color-bg-secondary)"
-                              : null;
-                            const foreignText = isForeign
-                              ? "var(--color-text-secondary)"
-                              : null;
+                            const foreignBg = isForeign ? "var(--color-bg-secondary)" : null;
+                            const foreignText = isForeign ? "var(--color-text-secondary)" : null;
                             return {
-                              label: isNameMode
-                                ? style.name || style.label
-                                : style.label,
+                              label: isNameMode ? style.name || style.label : style.label,
                               bg: style.color,
                               text: style.text || borderColor(style.color),
                               border: style.border || borderColor(style.color),
@@ -513,12 +476,8 @@ export default function MobileDayView({
                             : null;
                           // BUG 1.10: Use distinct background color for the foreign header strip
                           // Use the shift code's own color as the home area identifier
-                          const foreignBg = isForeign
-                            ? "var(--color-bg-secondary)"
-                            : null;
-                          const foreignText = isForeign
-                            ? "var(--color-text-secondary)"
-                            : null;
+                          const foreignBg = isForeign ? "var(--color-bg-secondary)" : null;
+                          const foreignText = isForeign ? "var(--color-text-secondary)" : null;
                           return {
                             label: isNameMode ? sc.name || sc.label : sc.label,
                             bg: sc.color,
@@ -534,8 +493,7 @@ export default function MobileDayView({
                       <button
                         key={dk}
                         onClick={() => {
-                          if (isCellInteractive)
-                            handleCellClick(emp, date, sectionName);
+                          if (isCellInteractive) handleCellClick(emp, date, sectionName);
                         }}
                         style={{
                           minHeight: 36,
@@ -543,9 +501,7 @@ export default function MobileDayView({
                           flexDirection: "column",
                           alignItems: "center",
                           justifyContent: "center",
-                          background: isToday
-                            ? "var(--color-today-bg)"
-                            : "transparent",
+                          background: isToday ? "var(--color-today-bg)" : "transparent",
                           border: "none",
                           borderLeft: "1px solid var(--color-border)",
                           cursor: isCellInteractive ? "pointer" : "default",
@@ -567,14 +523,9 @@ export default function MobileDayView({
                                     ? "var(--color-surface)"
                                     : pill.bg,
                                   color: pill.text,
-                                  borderRadius: pill.foreignInitials
-                                    ? "0 0 2px 2px"
-                                    : 3,
-                                  padding:
-                                    pills.length > 1 ? "2px 4px" : "2px 4px",
-                                  width: pill.foreignInitials
-                                    ? "100%"
-                                    : "calc(100% - 2px)",
+                                  borderRadius: pill.foreignInitials ? "0 0 2px 2px" : 3,
+                                  padding: pills.length > 1 ? "2px 4px" : "2px 4px",
+                                  width: pill.foreignInitials ? "100%" : "calc(100% - 2px)",
                                   textAlign: "center",
                                   lineHeight: 1.2,
                                   border: pill.foreignInitials
@@ -587,10 +538,7 @@ export default function MobileDayView({
                                   display: "block",
                                 }}
                               >
-                                <MaybeHint
-                                  content={isNameMode ? pill.label : undefined}
-                                  side="top"
-                                >
+                                <MaybeHint content={isNameMode ? pill.label : undefined} side="top">
                                   <span
                                     style={{
                                       overflow: "hidden",
@@ -599,9 +547,7 @@ export default function MobileDayView({
                                       whiteSpace: "nowrap",
                                     }}
                                   >
-                                    {isNameMode
-                                      ? pillText(pill.label, 10)
-                                      : pill.label}
+                                    {isNameMode ? pillText(pill.label, 10) : pill.label}
                                   </span>
                                 </MaybeHint>
                               </span>
@@ -626,9 +572,7 @@ export default function MobileDayView({
                                     style={{
                                       fontSize: fs,
                                       fontWeight: 700,
-                                      color:
-                                        pill.foreignText ||
-                                        "var(--color-text-secondary)",
+                                      color: pill.foreignText || "var(--color-text-secondary)",
                                       textAlign: "center",
                                       lineHeight: 1.2,
                                       padding: "1px 2px 0",
@@ -695,29 +639,20 @@ export default function MobileDayView({
               >
                 {Object.entries(tallies).map(([catId, tally]) =>
                   Object.entries(tally).map(([label, count]) => {
-                    const sc = assignments.find(
-                      (s) => s.label === label || s.name === label,
-                    );
-                    const displayLabel =
-                      isNameMode && sc ? sc.name || sc.label : label;
+                    const sc = assignments.find((s) => s.label === label || s.name === label);
+                    const displayLabel = isNameMode && sc ? sc.name || sc.label : label;
                     return (
                       <MaybeHint
                         key={`${catId}-${label}`}
-                        content={
-                          isNameMode ? `${displayLabel}: ${count}` : undefined
-                        }
+                        content={isNameMode ? `${displayLabel}: ${count}` : undefined}
                         side="top"
                       >
                         <span
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
-                            color: sc
-                              ? borderColor(sc.color)
-                              : "var(--color-text-muted)",
-                            background: sc
-                              ? `${sc.color}30`
-                              : "var(--color-border-light)",
+                            color: sc ? borderColor(sc.color) : "var(--color-text-muted)",
+                            background: sc ? `${sc.color}30` : "var(--color-border-light)",
                             padding: "2px 8px",
                             borderRadius: 8,
                             maxWidth: isNameMode ? 140 : undefined,

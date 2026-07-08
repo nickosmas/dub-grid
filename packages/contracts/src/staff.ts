@@ -5,10 +5,7 @@ const URL_LIKE_PATTERN = /(?:https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,})/i;
 const STAFF_NAME_ALLOWED_PATTERN = /^[\p{L}\p{M} .'\-\u2019]+$/u;
 const PHONE_ALLOWED_PATTERN = /^[\d\s().+\-]+$/;
 
-export function getStaffNameError(
-  value: string,
-  label = "Name",
-): string | null {
+export function getStaffNameError(value: string, label = "Name"): string | null {
   const trimmed = value.trim();
   if (!trimmed) {
     return `${label} is required`;
@@ -143,8 +140,7 @@ export const optionalStaffEmailSchema = z
     } catch (error) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          error instanceof Error ? error.message : "Invalid email address",
+        message: error instanceof Error ? error.message : "Invalid email address",
       });
     }
   })

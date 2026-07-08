@@ -11,7 +11,9 @@ import {
 
 function luminance(hex: string): number {
   const normalized = hex.toUpperCase();
-  const channels = [1, 3, 5].map((start) => Number.parseInt(normalized.slice(start, start + 2), 16) / 255);
+  const channels = [1, 3, 5].map(
+    (start) => Number.parseInt(normalized.slice(start, start + 2), 16) / 255,
+  );
   const transform = (value: number) =>
     value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
   const [r, g, b] = channels.map(transform);
@@ -67,23 +69,18 @@ describe("colors", () => {
   });
 
   it("provides at least 20 colors in each preset group", () => {
-    expect(
-      PREDEFINED_COLOR_GROUPS.every((group) => group.colors.length >= 20),
-    ).toBe(true);
+    expect(PREDEFINED_COLOR_GROUPS.every((group) => group.colors.length >= 20)).toBe(true);
   });
 
   it("uses standard and soft palette groups without deep presets", () => {
-    expect(PREDEFINED_COLOR_GROUPS.map((group) => group.id)).toEqual([
-      "standard",
-      "soft",
-    ]);
+    expect(PREDEFINED_COLOR_GROUPS.map((group) => group.id)).toEqual(["standard", "soft"]);
     expect(PREDEFINED_COLORS.some((color) => color.id === "ink")).toBe(false);
     expect(PREDEFINED_COLORS[0]?.id).toBe("slate");
   });
 
   it("keeps every predefined preset readable", () => {
-    expect(
-      PREDEFINED_COLORS.every((color) => contrastRatio(color.bg, color.text) >= 4.5),
-    ).toBe(true);
+    expect(PREDEFINED_COLORS.every((color) => contrastRatio(color.bg, color.text) >= 4.5)).toBe(
+      true,
+    );
   });
 });

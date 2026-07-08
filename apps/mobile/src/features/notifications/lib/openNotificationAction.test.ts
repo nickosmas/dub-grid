@@ -27,9 +27,7 @@ describe("openNotificationAction", () => {
   it("opens absolute URLs externally", () => {
     openNotificationAction("https://dubgrid.com/settings?section=org-billing");
 
-    expect(openURL).toHaveBeenCalledWith(
-      "https://dubgrid.com/settings?section=org-billing",
-    );
+    expect(openURL).toHaveBeenCalledWith("https://dubgrid.com/settings?section=org-billing");
     expect(push).not.toHaveBeenCalled();
   });
 
@@ -67,28 +65,18 @@ describe("openNotificationAction", () => {
 
 describe("isNotificationActionSupportedOnMobile", () => {
   it("supports absolute URLs", () => {
-    expect(
-      isNotificationActionSupportedOnMobile("https://dubgrid.com/anything"),
-    ).toBe(true);
+    expect(isNotificationActionSupportedOnMobile("https://dubgrid.com/anything")).toBe(true);
   });
 
   it("supports known in-app route prefixes", () => {
-    expect(
-      isNotificationActionSupportedOnMobile("/people?section=requests"),
-    ).toBe(true);
-    expect(isNotificationActionSupportedOnMobile("/requests?type=pickup")).toBe(
-      true,
-    );
-    expect(isNotificationActionSupportedOnMobile("/schedule?date=2026-07-07")).toBe(
-      true,
-    );
+    expect(isNotificationActionSupportedOnMobile("/people?section=requests")).toBe(true);
+    expect(isNotificationActionSupportedOnMobile("/requests?type=pickup")).toBe(true);
+    expect(isNotificationActionSupportedOnMobile("/schedule?date=2026-07-07")).toBe(true);
     expect(isNotificationActionSupportedOnMobile("/profile/security")).toBe(true);
   });
 
   it("rejects hrefs with no known mobile destination, e.g. web-only settings pages", () => {
-    expect(
-      isNotificationActionSupportedOnMobile("/settings?section=org-billing"),
-    ).toBe(false);
+    expect(isNotificationActionSupportedOnMobile("/settings?section=org-billing")).toBe(false);
     expect(isNotificationActionSupportedOnMobile("/reports/export")).toBe(false);
   });
 });

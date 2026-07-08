@@ -1,12 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -36,12 +29,7 @@ import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileSpacing,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileSpacing, mobileText } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 
 type FilterChip =
@@ -82,11 +70,7 @@ function chipToParams(filter: FilterKey): Partial<MobileNotificationsListParams>
   }
 }
 
-function getNotificationsQueryKey(
-  accessToken: string | null,
-  filter: FilterKey,
-  search: string,
-) {
+function getNotificationsQueryKey(accessToken: string | null, filter: FilterKey, search: string) {
   return ["mobile", "notifications-infinite", accessToken, filter, search] as const;
 }
 
@@ -168,8 +152,7 @@ export default function NotificationsScreen() {
     [notificationsQuery.data],
   );
 
-  const unreadCount =
-    notificationsQuery.data?.pages[0]?.unreadCount ?? 0;
+  const unreadCount = notificationsQuery.data?.pages[0]?.unreadCount ?? 0;
 
   const manualRefresh = useManualRefresh(async () => {
     await notificationsQuery.refetch();
@@ -185,9 +168,7 @@ export default function NotificationsScreen() {
     queryClient.setQueryData(
       ["mobile", "bootstrap", accessToken],
       (current: { unreadNotificationCount: number } | undefined) =>
-        current
-          ? { ...current, unreadNotificationCount: count }
-          : current,
+        current ? { ...current, unreadNotificationCount: count } : current,
     );
   }
 
@@ -196,15 +177,9 @@ export default function NotificationsScreen() {
       if (!accessToken) return;
       if (!notification.readAt) {
         try {
-          const response = await markNotificationRead(
-            accessToken,
-            notification.id,
-          );
+          const response = await markNotificationRead(accessToken, notification.id);
           syncBootstrapUnread(response.unreadCount);
-          void Promise.all([
-            notificationsQuery.refetch(),
-            facetsQuery.refetch(),
-          ]);
+          void Promise.all([notificationsQuery.refetch(), facetsQuery.refetch()]);
         } catch (error) {
           pushClientFriendlyErrorToast(pushToast, {
             error,
@@ -233,10 +208,7 @@ export default function NotificationsScreen() {
           action,
         });
         syncBootstrapUnread(response.unreadCount);
-        await Promise.all([
-          notificationsQuery.refetch(),
-          facetsQuery.refetch(),
-        ]);
+        await Promise.all([notificationsQuery.refetch(), facetsQuery.refetch()]);
         pushToast({
           tone: "success",
           message: action === "archive" ? "Archived" : "Restored",
@@ -260,10 +232,7 @@ export default function NotificationsScreen() {
     try {
       const response = await markAllNotificationsRead(accessToken);
       syncBootstrapUnread(response.unreadCount);
-      await Promise.all([
-        notificationsQuery.refetch(),
-        facetsQuery.refetch(),
-      ]);
+      await Promise.all([notificationsQuery.refetch(), facetsQuery.refetch()]);
       pushToast({ tone: "success", message: "All alerts marked read" });
     } catch (error) {
       pushClientFriendlyErrorToast(pushToast, {
@@ -275,14 +244,7 @@ export default function NotificationsScreen() {
       setBusy(false);
       setConfirmingMarkAllRead(false);
     }
-  }, [
-    accessToken,
-    busy,
-    facetsQuery,
-    notificationsQuery,
-    pushToast,
-    unreadCount,
-  ]);
+  }, [accessToken, busy, facetsQuery, notificationsQuery, pushToast, unreadCount]);
 
   return (
     <Screen
@@ -318,24 +280,10 @@ export default function NotificationsScreen() {
                 onPress={() => setFilter(chip.key)}
                 style={[styles.chip, active && styles.chipActive]}
               >
-                <Text
-                  style={[styles.chipText, active && styles.chipTextActive]}
-                >
-                  {chip.label}
-                </Text>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{chip.label}</Text>
                 {count > 0 ? (
-                  <View
-                    style={[
-                      styles.chipBadge,
-                      active && styles.chipBadgeActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.chipBadgeText,
-                        active && styles.chipBadgeTextActive,
-                      ]}
-                    >
+                  <View style={[styles.chipBadge, active && styles.chipBadgeActive]}>
+                    <Text style={[styles.chipBadgeText, active && styles.chipBadgeTextActive]}>
                       {count > 9 ? "9+" : count}
                     </Text>
                   </View>
@@ -382,11 +330,7 @@ export default function NotificationsScreen() {
               : "Schedule updates and request decisions will appear here."
           }
           iconName="notifications-outline"
-          title={
-            debouncedSearch || filter !== "all"
-              ? "No matching alerts"
-              : "No alerts yet"
-          }
+          title={debouncedSearch || filter !== "all" ? "No matching alerts" : "No alerts yet"}
         />
       ) : (
         <View style={styles.list}>
@@ -407,11 +351,7 @@ export default function NotificationsScreen() {
               compact
               tone="secondary"
               disabled={notificationsQuery.isFetchingNextPage}
-              label={
-                notificationsQuery.isFetchingNextPage
-                  ? "Loading..."
-                  : "Load more"
-              }
+              label={notificationsQuery.isFetchingNextPage ? "Loading..." : "Load more"}
               onPress={() => {
                 void notificationsQuery.fetchNextPage();
               }}
@@ -449,17 +389,11 @@ interface NotificationCardProps {
   onArchive: () => void;
 }
 
-function NotificationCard({
-  notification,
-  onPress,
-  onArchive,
-}: NotificationCardProps) {
+function NotificationCard({ notification, onPress, onArchive }: NotificationCardProps) {
   const isUnread = !notification.readAt;
   const isArchived = !!notification.archivedAt;
   const action = extractNotificationAction(notification.metadata);
-  const actionSupported = action
-    ? isNotificationActionSupportedOnMobile(action.href)
-    : false;
+  const actionSupported = action ? isNotificationActionSupportedOnMobile(action.href) : false;
 
   return (
     <Pressable
@@ -470,12 +404,7 @@ function NotificationCard({
     >
       <View style={styles.alertHeader}>
         <View style={styles.alertTitleRow}>
-          <View
-            style={[
-              styles.alertIconFrame,
-              !isUnread && styles.alertIconFrameMuted,
-            ]}
-          >
+          <View style={[styles.alertIconFrame, !isUnread && styles.alertIconFrameMuted]}>
             <Ionicons
               color={isUnread ? mobileColors.brand : mobileColors.textMuted}
               name={getNotificationIconName(notification.type)}
@@ -484,8 +413,7 @@ function NotificationCard({
           </View>
           <View style={styles.titleColumn}>
             <View style={styles.titleLine}>
-              {notification.priority === "critical" ||
-              notification.priority === "high" ? (
+              {notification.priority === "critical" || notification.priority === "high" ? (
                 <Text
                   style={[
                     styles.priorityChip,
@@ -497,22 +425,16 @@ function NotificationCard({
                   {notification.priority.toUpperCase()}
                 </Text>
               ) : null}
-              <Text
-                style={[styles.alertTitle, !isUnread && styles.alertTitleMuted]}
-              >
+              <Text style={[styles.alertTitle, !isUnread && styles.alertTitleMuted]}>
                 {notification.title}
               </Text>
               {typeof notification.metadata?.groupCount === "number" &&
               notification.metadata.groupCount > 1 ? (
-                <Text style={styles.groupBadge}>
-                  ×{notification.metadata.groupCount as number}
-                </Text>
+                <Text style={styles.groupBadge}>×{notification.metadata.groupCount as number}</Text>
               ) : null}
             </View>
             <Text style={styles.alertMessage}>{notification.message}</Text>
-            <Text style={styles.alertMeta}>
-              {formatRelativeTime(notification.createdAt)}
-            </Text>
+            <Text style={styles.alertMeta}>{formatRelativeTime(notification.createdAt)}</Text>
           </View>
         </View>
         {isUnread ? <View style={styles.unreadDot} /> : null}
@@ -526,25 +448,14 @@ function NotificationCard({
               event.stopPropagation?.();
               openNotificationAction(action.href);
             }}
-            style={({ pressed }) => [
-              styles.ctaPill,
-              pressed && styles.ctaPillPressed,
-            ]}
+            style={({ pressed }) => [styles.ctaPill, pressed && styles.ctaPillPressed]}
           >
             <Text style={styles.ctaPillLabel}>{action.label}</Text>
-            <Ionicons
-              name="arrow-forward"
-              size={14}
-              color={mobileColors.brand}
-            />
+            <Ionicons name="arrow-forward" size={14} color={mobileColors.brand} />
           </Pressable>
         ) : action ? (
           <View style={styles.webOnlyHint}>
-            <Ionicons
-              name="globe-outline"
-              size={14}
-              color={mobileColors.textMuted}
-            />
+            <Ionicons name="globe-outline" size={14} color={mobileColors.textMuted} />
             <Text style={styles.webOnlyHintLabel}>Complete on web</Text>
           </View>
         ) : (
@@ -557,10 +468,7 @@ function NotificationCard({
             event.stopPropagation?.();
             onArchive();
           }}
-          style={({ pressed }) => [
-            styles.archiveButton,
-            pressed && styles.archiveButtonPressed,
-          ]}
+          style={({ pressed }) => [styles.archiveButton, pressed && styles.archiveButtonPressed]}
           hitSlop={6}
         >
           <Ionicons

@@ -58,10 +58,7 @@ export function applyManagementDirectoryUpdate(
   };
 }
 
-export function upsertEmployeeInList(
-  employees: Employee[],
-  employee: Employee,
-): Employee[] {
+export function upsertEmployeeInList(employees: Employee[], employee: Employee): Employee[] {
   const existingIndex = employees.findIndex((current) => current.id === employee.id);
 
   if (existingIndex === -1) {

@@ -7,8 +7,7 @@ import { z } from "zod";
 
 const isStrictProductionEnv =
   process.env.NODE_ENV === "production" &&
-  (process.env.VERCEL_ENV === "production" ||
-    process.env.STRICT_PROD_ENV_VALIDATION === "1");
+  (process.env.VERCEL_ENV === "production" || process.env.STRICT_PROD_ENV_VALIDATION === "1");
 
 const serverSchema = z
   .object({
@@ -54,6 +53,7 @@ const clientSchema = z.object({
   NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
   NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
+  NEXT_PUBLIC_VERCEL_URL: z.string().optional(),
 });
 
 function validateServerEnv() {
@@ -86,6 +86,7 @@ function validateClientEnv() {
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
     NEXT_PUBLIC_BASE_DOMAIN: process.env.NEXT_PUBLIC_BASE_DOMAIN,
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+    NEXT_PUBLIC_VERCEL_URL: process.env.NEXT_PUBLIC_VERCEL_URL,
   });
   if (!result.success) {
     console.error(
@@ -99,7 +100,7 @@ function validateClientEnv() {
 }
 
 export const serverEnv = validateServerEnv();
-export const clientEnv =
-  typeof window !== "undefined" && process.env.NODE_ENV !== "test"
-    ? validateClientEnv()
-    : null;
+// NEXT_PUBLIC_* vars are inlined by Next.js at build time into every bundle
+// (server and client alike), so this validates regardless of runtime context —
+// only test env is skipped, to keep vitest output quiet.
+export const clientEnv = process.env.NODE_ENV !== "test" ? validateClientEnv() : null;

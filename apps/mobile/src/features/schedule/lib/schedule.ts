@@ -1,7 +1,4 @@
-import type {
-  MobileScheduleEntry,
-  MobileScheduleEntrySegment,
-} from "@dubgrid/contracts";
+import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import {
   getScheduleEntryAbsenceTypeId,
   getScheduleEntryFocusAreaId,
@@ -42,23 +39,17 @@ function sortSplitShiftSegments(
     .map(({ segment }) => segment);
 }
 
-function getShiftmateSegmentTitle(
-  segment: MobileScheduleEntrySegment,
-): string {
+function getShiftmateSegmentTitle(segment: MobileScheduleEntrySegment): string {
   return segment.shiftName?.trim() || segment.label?.trim() || "Shift";
 }
 
-function getShiftmateSegmentTimeKey(
-  segment: MobileScheduleEntrySegment,
-): string {
+function getShiftmateSegmentTimeKey(segment: MobileScheduleEntrySegment): string {
   return `${segment.startTime ?? segment.shiftStartTime ?? ""}-${
     segment.endTime ?? segment.shiftEndTime ?? ""
   }`;
 }
 
-function normalizeShiftmateSegmentValue(
-  value: string | null | undefined,
-): string {
+function normalizeShiftmateSegmentValue(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
@@ -136,18 +127,13 @@ export function doScheduleEntrySegmentsShareShiftAndFocusArea(
     return true;
   }
 
-  const sourceTitle = normalizeShiftmateSegmentValue(
-    getShiftmateSegmentTitle(sourceSegment),
-  );
-  const candidateTitle = normalizeShiftmateSegmentValue(
-    getShiftmateSegmentTitle(candidateSegment),
-  );
+  const sourceTitle = normalizeShiftmateSegmentValue(getShiftmateSegmentTitle(sourceSegment));
+  const candidateTitle = normalizeShiftmateSegmentValue(getShiftmateSegmentTitle(candidateSegment));
 
   return (
     sourceTitle.length > 0 &&
     sourceTitle === candidateTitle &&
-    getShiftmateSegmentTimeKey(sourceSegment) ===
-      getShiftmateSegmentTimeKey(candidateSegment)
+    getShiftmateSegmentTimeKey(sourceSegment) === getShiftmateSegmentTimeKey(candidateSegment)
   );
 }
 

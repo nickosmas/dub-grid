@@ -24,4 +24,3 @@ export function getOrgRoleBadgeStyle(
     color: "var(--color-text-muted)",
   };
 }
-

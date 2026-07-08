@@ -72,7 +72,9 @@ describe("seed schedule definition contracts", () => {
       expect(calmHavenSql).not.toContain(color);
     }
 
-    expect(calmHavenSql).toContain("INSERT INTO public.shift_categories (org_id, focus_area_id, name, abbr, start_time, end_time, color, sort_order)");
+    expect(calmHavenSql).toContain(
+      "INSERT INTO public.shift_categories (org_id, focus_area_id, name, abbr, start_time, end_time, color, sort_order)",
+    );
     for (const jobName of ["Default shift job", "Supervisor", "Mentor"]) {
       const blockStart = calmHavenSql.indexOf(`org, '${jobName}'`);
       expect(blockStart).toBeGreaterThanOrEqual(0);

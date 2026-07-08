@@ -27,10 +27,7 @@ import {
   getOptionalUsPhoneFieldError,
   normalizeLineText,
 } from "@/lib/form-validation";
-import {
-  useRegisterWizardEditor,
-  useWizardMode,
-} from "@/components/onboarding/WizardModeContext";
+import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 
 export default function OrganizationGeneral({
   organization,
@@ -98,7 +95,9 @@ export default function OrganizationGeneral({
   // Warn before navigating away with unsaved changes
   useEffect(() => {
     if (!isModified) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isModified]);
@@ -197,7 +196,9 @@ export default function OrganizationGeneral({
   return (
     <SectionCard>
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
+        <div
+          style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}
+        >
           <div>
             <label style={labelStyle}>ORGANIZATION NAME</label>
             <input

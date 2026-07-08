@@ -11,17 +11,13 @@ import { getOrgUnavailableMessage } from "../../../shared/lib/errors";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 
 export type TabsGateResult =
-  | { kind: "blocked"; element: ReactNode }
-  | { kind: "ready"; canViewTeamSchedule: boolean };
+  { kind: "blocked"; element: ReactNode } | { kind: "ready"; canViewTeamSchedule: boolean };
 
 export function useTabsGate(): TabsGateResult {
   const { accessToken, isLoading } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
   const lockedMessage = getOrgUnavailableMessage(bootstrapQuery.error);
-  usePushRegistration(
-    accessToken,
-    lockedMessage ? null : bootstrapQuery.data?.currentOrg.id,
-  );
+  usePushRegistration(accessToken, lockedMessage ? null : bootstrapQuery.data?.currentOrg.id);
   usePushResponseHandler(Boolean(accessToken));
 
   useEffect(() => {
@@ -76,7 +72,6 @@ export function useTabsGate(): TabsGateResult {
 
   return {
     kind: "ready",
-    canViewTeamSchedule:
-      bootstrapQuery.data?.permissions.canViewSchedule ?? false,
+    canViewTeamSchedule: bootstrapQuery.data?.permissions.canViewSchedule ?? false,
   };
 }

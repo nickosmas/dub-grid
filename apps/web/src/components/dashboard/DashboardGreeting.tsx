@@ -150,9 +150,7 @@ function pickHeadline(
   }
   const factor = Math.random();
   if (isFirstVisit) {
-    return name
-      ? indexAt(NAMED_WELCOMES, factor)(name)
-      : indexAt(ANON_WELCOMES, factor);
+    return name ? indexAt(NAMED_WELCOMES, factor)(name) : indexAt(ANON_WELCOMES, factor);
   }
   const bucket = getBucket(now.getHours());
   if (name) {
@@ -293,12 +291,10 @@ export default function DashboardGreeting({
         ) : (
           <>
             <span>
-              <span style={{ opacity: 0.7 }}>Local time</span> · {userDate} ·{" "}
-              {userClock}
+              <span style={{ opacity: 0.7 }}>Local time</span> · {userDate} · {userClock}
             </span>
             <span>
-              <span style={{ opacity: 0.7 }}>Organization time</span> ·{" "}
-              {orgDate} · {orgClock}
+              <span style={{ opacity: 0.7 }}>Organization time</span> · {orgDate} · {orgClock}
             </span>
           </>
         )}

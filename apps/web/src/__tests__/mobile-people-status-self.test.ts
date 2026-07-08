@@ -37,9 +37,7 @@ function makeDeps(currentEmployee: Employee) {
       lastName: emp.lastName,
       status: emp.status,
       userId: emp.userId,
-    })) as unknown as Parameters<
-      typeof updateMobilePersonStatus
-    >[2]["mapEmployeeToMobilePerson"],
+    })) as unknown as Parameters<typeof updateMobilePersonStatus>[2]["mapEmployeeToMobilePerson"],
   };
 }
 

@@ -21,9 +21,7 @@ export interface ShiftCategoryConflict {
  * the race-condition path where two clients save before the client check
  * can see the other.
  */
-export function getShiftCategoryConflict(
-  error: unknown,
-): ShiftCategoryConflict | null {
+export function getShiftCategoryConflict(error: unknown): ShiftCategoryConflict | null {
   if (!error || typeof error !== "object") {
     return null;
   }

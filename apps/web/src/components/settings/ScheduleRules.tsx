@@ -2,10 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { Organization } from "@/types";
-import {
-  DEFAULT_OPEN_SHIFT_VISIBILITY,
-  type OpenShiftVisibilityMode,
-} from "@dubgrid/domain";
+import { DEFAULT_OPEN_SHIFT_VISIBILITY, type OpenShiftVisibilityMode } from "@dubgrid/domain";
 import { toast } from "sonner";
 import {
   OrganizationSettingsConflictError,
@@ -32,27 +29,26 @@ export default function ScheduleRules({
   const [payPeriodStartDate, setPayPeriodStartDate] = useState(
     organization.payPeriodStartDate ?? "",
   );
-  const [mentoredCoverageCreditPercent, setMentoredCoverageCreditPercent] =
-    useState(organizationMentoredCredit);
+  const [mentoredCoverageCreditPercent, setMentoredCoverageCreditPercent] = useState(
+    organizationMentoredCredit,
+  );
   const organizationCoverageGapVisibility =
-    organization.openShiftVisibility?.coverageGap ??
-    DEFAULT_OPEN_SHIFT_VISIBILITY.coverageGap;
+    organization.openShiftVisibility?.coverageGap ?? DEFAULT_OPEN_SHIFT_VISIBILITY.coverageGap;
   const organizationCalloffVisibility =
-    organization.openShiftVisibility?.calloff ??
-    DEFAULT_OPEN_SHIFT_VISIBILITY.calloff;
-  const [coverageGapVisibility, setCoverageGapVisibility] =
-    useState<OpenShiftVisibilityMode>(organizationCoverageGapVisibility);
-  const [calloffVisibility, setCalloffVisibility] =
-    useState<OpenShiftVisibilityMode>(organizationCalloffVisibility);
+    organization.openShiftVisibility?.calloff ?? DEFAULT_OPEN_SHIFT_VISIBILITY.calloff;
+  const [coverageGapVisibility, setCoverageGapVisibility] = useState<OpenShiftVisibilityMode>(
+    organizationCoverageGapVisibility,
+  );
+  const [calloffVisibility, setCalloffVisibility] = useState<OpenShiftVisibilityMode>(
+    organizationCalloffVisibility,
+  );
   const [saving, setSaving] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     setEnforceConflictPrevention(organization.enforceConflictPrevention);
     setPayPeriodStartDate(organization.payPeriodStartDate ?? "");
-    setMentoredCoverageCreditPercent(
-      organizationMentoredCredit,
-    );
+    setMentoredCoverageCreditPercent(organizationMentoredCredit);
     setCoverageGapVisibility(organizationCoverageGapVisibility);
     setCalloffVisibility(organizationCalloffVisibility);
   }, [
@@ -66,11 +62,11 @@ export default function ScheduleRules({
   ]);
 
   const isModified =
-    enforceConflictPrevention !== organization.enforceConflictPrevention
-    || payPeriodStartDate !== (organization.payPeriodStartDate ?? "")
-    || mentoredCoverageCreditPercent !== organizationMentoredCredit
-    || coverageGapVisibility !== organizationCoverageGapVisibility
-    || calloffVisibility !== organizationCalloffVisibility;
+    enforceConflictPrevention !== organization.enforceConflictPrevention ||
+    payPeriodStartDate !== (organization.payPeriodStartDate ?? "") ||
+    mentoredCoverageCreditPercent !== organizationMentoredCredit ||
+    coverageGapVisibility !== organizationCoverageGapVisibility ||
+    calloffVisibility !== organizationCalloffVisibility;
 
   const handleSave = useCallback(async () => {
     if (!organization.updatedAt) {
@@ -141,135 +137,203 @@ export default function ScheduleRules({
 
   return (
     <SectionCard>
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-        <div>
-          <div style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}>Enforce shift conflict prevention</div>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>When enabled, overlapping shifts cannot be saved. Admins can override.</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-          <Switch
-            checked={enforceConflictPrevention}
-            onChange={setEnforceConflictPrevention}
-            ariaLabel="Enforce shift conflict prevention"
-          />
-        </div>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div>
-          <label
-            htmlFor="pay-period-start-date"
-            style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}
-          >
-            Biweekly pay period start date
-          </label>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
-            Set one anchor date and DubGrid will align every 2-week schedule view to that repeating pay period. Leave blank to keep 2-week views aligned to calendar weeks.
-          </div>
-        </div>
-        <div style={{ maxWidth: 260 }}>
-          <CalendarDatePicker
-            id="pay-period-start-date"
-            value={payPeriodStartDate}
-            onChange={setPayPeriodStartDate}
-            label="Biweekly pay period start date"
-            allowClear
-          />
-        </div>
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div>
-          <label
-            htmlFor="mentored-coverage-credit"
-            style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}
-          >
-            Mentored coverage credit
-          </label>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
-            Controls how mentored assignments count toward coverage requirements.
-          </div>
-        </div>
-        <CustomSelect
-          id="mentored-coverage-credit"
-          value={mentoredCoverageCreditPercent}
-          onChange={setMentoredCoverageCreditPercent}
-          options={[
-            { value: 100, label: "Counts fully" },
-            { value: 50, label: "Counts as half" },
-            { value: 0, label: "Does not count" },
-          ]}
-          style={{ maxWidth: 260, width: "100%" }}
-        />
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div>
-          <label
-            htmlFor="open-shift-coverage-visibility"
-            style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}
-          >
-            Show coverage shortages to staff
-          </label>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
-            Open shifts created when a published schedule is short of its coverage requirements. Schedulers always see these. Always shows them to staff regardless of their own schedule; hidden keeps staff from seeing them even when short-staffed.
-          </div>
-        </div>
-        <CustomSelect
-          id="open-shift-coverage-visibility"
-          value={coverageGapVisibility}
-          onChange={setCoverageGapVisibility}
-          options={visibilityOptions}
-          style={{ maxWidth: 320, width: "100%" }}
-        />
-      </div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div>
-          <label
-            htmlFor="open-shift-calloff-visibility"
-            style={{ fontSize: "var(--dg-fs-body)", fontWeight: 600, color: "var(--color-text-primary)" }}
-          >
-            Show call-off vacancies to staff
-          </label>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
-            Open shifts left behind when someone calls off and their shift is offered up for pickup. Always shows them to staff regardless of their own schedule; hidden keeps the vacancy off the staff view.
-          </div>
-        </div>
-        <CustomSelect
-          id="open-shift-calloff-visibility"
-          value={calloffVisibility}
-          onChange={setCalloffVisibility}
-          options={visibilityOptions}
-          style={{ maxWidth: 320, width: "100%" }}
-        />
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-        <button
-          onClick={() => setConfirmOpen(true)}
-          disabled={!isModified || saving}
-          className="dg-btn dg-btn-primary"
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
-      </div>
-
-      {confirmOpen && (
-        <ConfirmDialog
-          title="Save Schedule Rule"
-          message="This change updates an organization-wide scheduling rule. Review carefully before saving."
-          confirmLabel="Save Rule"
-          variant="warning"
-          isLoading={saving}
-          onConfirm={() => {
-            void handleSave();
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
           }}
-          onCancel={() => setConfirmOpen(false)}
-        />
-      )}
-    </div>
+        >
+          <div>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-body)",
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Enforce shift conflict prevention
+            </div>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginTop: 2,
+              }}
+            >
+              When enabled, overlapping shifts cannot be saved. Admins can override.
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+            <Switch
+              checked={enforceConflictPrevention}
+              onChange={setEnforceConflictPrevention}
+              ariaLabel="Enforce shift conflict prevention"
+            />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div>
+            <label
+              htmlFor="pay-period-start-date"
+              style={{
+                fontSize: "var(--dg-fs-body)",
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Biweekly pay period start date
+            </label>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginTop: 2,
+              }}
+            >
+              Set one anchor date and DubGrid will align every 2-week schedule view to that
+              repeating pay period. Leave blank to keep 2-week views aligned to calendar weeks.
+            </div>
+          </div>
+          <div style={{ maxWidth: 260 }}>
+            <CalendarDatePicker
+              id="pay-period-start-date"
+              value={payPeriodStartDate}
+              onChange={setPayPeriodStartDate}
+              label="Biweekly pay period start date"
+              allowClear
+            />
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div>
+            <label
+              htmlFor="mentored-coverage-credit"
+              style={{
+                fontSize: "var(--dg-fs-body)",
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Mentored coverage credit
+            </label>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginTop: 2,
+              }}
+            >
+              Controls how mentored assignments count toward coverage requirements.
+            </div>
+          </div>
+          <CustomSelect
+            id="mentored-coverage-credit"
+            value={mentoredCoverageCreditPercent}
+            onChange={setMentoredCoverageCreditPercent}
+            options={[
+              { value: 100, label: "Counts fully" },
+              { value: 50, label: "Counts as half" },
+              { value: 0, label: "Does not count" },
+            ]}
+            style={{ maxWidth: 260, width: "100%" }}
+          />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div>
+            <label
+              htmlFor="open-shift-coverage-visibility"
+              style={{
+                fontSize: "var(--dg-fs-body)",
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Show coverage shortages to staff
+            </label>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginTop: 2,
+              }}
+            >
+              Open shifts created when a published schedule is short of its coverage requirements.
+              Schedulers always see these. Always shows them to staff regardless of their own
+              schedule; hidden keeps staff from seeing them even when short-staffed.
+            </div>
+          </div>
+          <CustomSelect
+            id="open-shift-coverage-visibility"
+            value={coverageGapVisibility}
+            onChange={setCoverageGapVisibility}
+            options={visibilityOptions}
+            style={{ maxWidth: 320, width: "100%" }}
+          />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div>
+            <label
+              htmlFor="open-shift-calloff-visibility"
+              style={{
+                fontSize: "var(--dg-fs-body)",
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Show call-off vacancies to staff
+            </label>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginTop: 2,
+              }}
+            >
+              Open shifts left behind when someone calls off and their shift is offered up for
+              pickup. Always shows them to staff regardless of their own schedule; hidden keeps the
+              vacancy off the staff view.
+            </div>
+          </div>
+          <CustomSelect
+            id="open-shift-calloff-visibility"
+            value={calloffVisibility}
+            onChange={setCalloffVisibility}
+            options={visibilityOptions}
+            style={{ maxWidth: 320, width: "100%" }}
+          />
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button
+            onClick={() => setConfirmOpen(true)}
+            disabled={!isModified || saving}
+            className="dg-btn dg-btn-primary"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+
+        {confirmOpen && (
+          <ConfirmDialog
+            title="Save Schedule Rule"
+            message="This change updates an organization-wide scheduling rule. Review carefully before saving."
+            confirmLabel="Save Rule"
+            variant="warning"
+            isLoading={saving}
+            onConfirm={() => {
+              void handleSave();
+            }}
+            onCancel={() => setConfirmOpen(false)}
+          />
+        )}
+      </div>
     </SectionCard>
   );
 }

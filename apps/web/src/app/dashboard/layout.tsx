@@ -9,10 +9,6 @@ export const metadata: Metadata = {
 // middleware is stamped onto its scripts. A static prerender can't carry a nonce.
 export const dynamic = "force-dynamic";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return children;
 }

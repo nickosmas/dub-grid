@@ -16,9 +16,7 @@ export function QueryStateCard({
   return (
     <View style={{ gap: 10 }}>
       <Card title={title} body={body} />
-      {actionLabel && onAction ? (
-        <Button compact label={actionLabel} onPress={onAction} />
-      ) : null}
+      {actionLabel && onAction ? <Button compact label={actionLabel} onPress={onAction} /> : null}
     </View>
   );
 }

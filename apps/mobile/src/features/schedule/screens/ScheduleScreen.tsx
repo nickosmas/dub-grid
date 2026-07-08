@@ -41,20 +41,10 @@ import Reanimated, {
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import {
-  HeroSkeleton,
-  ListSkeleton,
-} from "../../../shared/components/Skeleton";
-import {
-  Card,
-  Screen,
-  type ScreenScrollHandle,
-} from "../../../shared/components/Screen";
+import { HeroSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
+import { Card, Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import {
-  SplitShiftBadge,
-  SplitShiftSegmentList,
-} from "../components/SplitShift";
+import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import {
   getMySchedule,
   getOrgSchedule,
@@ -220,10 +210,7 @@ function getFirstDateForFocusArea(
   entries: MobileScheduleEntry[],
   focusAreaKey: string,
 ): string | null {
-  const matchingEntries = filterTeamScheduleEntriesByFocusArea(
-    entries,
-    focusAreaKey,
-  );
+  const matchingEntries = filterTeamScheduleEntriesByFocusArea(entries, focusAreaKey);
 
   if (matchingEntries.length === 0) {
     return null;
@@ -236,13 +223,9 @@ function getFirstDateForFocusArea(
       }
 
       const leftTime =
-        getScheduleEntryStartTime(left) ??
-        getScheduleEntryCustomStartTime(left) ??
-        "99:99:99";
+        getScheduleEntryStartTime(left) ?? getScheduleEntryCustomStartTime(left) ?? "99:99:99";
       const rightTime =
-        getScheduleEntryStartTime(right) ??
-        getScheduleEntryCustomStartTime(right) ??
-        "99:99:99";
+        getScheduleEntryStartTime(right) ?? getScheduleEntryCustomStartTime(right) ?? "99:99:99";
       if (leftTime !== rightTime) {
         return leftTime.localeCompare(rightTime);
       }
@@ -293,8 +276,7 @@ function normalizeTeamShiftGroupKey(value: string): string {
 }
 
 function getTeamShiftSegmentTitle(segment: MobileScheduleEntrySegment): string {
-  const rawTitle =
-    segment.shiftName?.trim() || segment.label?.trim() || "Shift";
+  const rawTitle = segment.shiftName?.trim() || segment.label?.trim() || "Shift";
   const jobName = segment.jobName?.trim();
 
   if (jobName && rawTitle.endsWith(` ${jobName}`)) {
@@ -304,10 +286,7 @@ function getTeamShiftSegmentTitle(segment: MobileScheduleEntrySegment): string {
   return rawTitle;
 }
 
-function getTeamShiftSegmentGroupKey(
-  segment: MobileScheduleEntrySegment,
-  title: string,
-): string {
+function getTeamShiftSegmentGroupKey(segment: MobileScheduleEntrySegment, title: string): string {
   if (segment.shiftId != null) {
     return `shift:${segment.shiftId}`;
   }
@@ -330,9 +309,7 @@ function getTeamShiftSegmentSortKey(
   );
 }
 
-function getTeamShiftSegmentTimeRange(
-  segment: MobileScheduleEntrySegment | null,
-): string | null {
+function getTeamShiftSegmentTimeRange(segment: MobileScheduleEntrySegment | null): string | null {
   if (!segment) {
     return null;
   }
@@ -348,9 +325,7 @@ function getTeamShiftRowTimeRange(
   groupTimeRange: string | null,
 ): string | null {
   const customTimeRange = getScheduleEntryCustomTimeRange(row.entry);
-  return customTimeRange && customTimeRange !== groupTimeRange
-    ? customTimeRange
-    : null;
+  return customTimeRange && customTimeRange !== groupTimeRange ? customTimeRange : null;
 }
 
 function getTeamScheduleEntrySegmentsForCards(
@@ -394,9 +369,7 @@ function getTeamShiftRowJobSort(row: TeamScheduleShiftRow): {
   };
 }
 
-function sortTeamScheduleShiftRows(
-  rows: TeamScheduleShiftRow[],
-): TeamScheduleShiftRow[] {
+function sortTeamScheduleShiftRows(rows: TeamScheduleShiftRow[]): TeamScheduleShiftRow[] {
   return [...rows].sort((left, right) => {
     const leftJob = getTeamShiftRowJobSort(left);
     const rightJob = getTeamShiftRowJobSort(right);
@@ -480,17 +453,13 @@ function buildTeamScheduleShiftGroupsForView(
         .filter((candidate) => candidate.key !== segmentGroup.key)
         .map((candidate) => candidate.title)
         .filter(
-          (title, index, titles) =>
-            title !== segmentGroup.title && titles.indexOf(title) === index,
+          (title, index, titles) => title !== segmentGroup.title && titles.indexOf(title) === index,
         );
       const existingRow = group.rows.find((row) => row.entry === entry);
 
       if (existingRow) {
         existingRow.alternateShiftTitles = Array.from(
-          new Set([
-            ...existingRow.alternateShiftTitles,
-            ...alternateShiftTitles,
-          ]),
+          new Set([...existingRow.alternateShiftTitles, ...alternateShiftTitles]),
         );
       } else {
         group.rows.push({
@@ -563,9 +532,7 @@ function getMinutesSinceMidnight(value: string): number | null {
   return hours * 60 + minutes;
 }
 
-function expandTimeRange(
-  range: ShiftTimeRange,
-): Array<{ start: number; end: number }> {
+function expandTimeRange(range: ShiftTimeRange): Array<{ start: number; end: number }> {
   const startMinutes = getMinutesSinceMidnight(range.start);
   const endMinutes = getMinutesSinceMidnight(range.end);
 
@@ -594,9 +561,7 @@ function getSegmentStartTime(
   return segment?.startTime ?? segment?.shiftStartTime ?? null;
 }
 
-function getSegmentEndTime(
-  segment: MobileScheduleEntrySegment | null | undefined,
-): string | null {
+function getSegmentEndTime(segment: MobileScheduleEntrySegment | null | undefined): string | null {
   return segment?.endTime ?? segment?.shiftEndTime ?? null;
 }
 
@@ -657,14 +622,8 @@ function getStartingInLabel(input: {
     return null;
   }
 
-  const shiftStartMinutes = getLocalDateTimeMinutes(
-    input.shiftDate,
-    input.shiftStartTime,
-  );
-  const currentMinutes = getLocalDateTimeMinutes(
-    input.currentDate,
-    input.currentTime,
-  );
+  const shiftStartMinutes = getLocalDateTimeMinutes(input.shiftDate, input.shiftStartTime);
+  const currentMinutes = getLocalDateTimeMinutes(input.currentDate, input.currentTime);
 
   if (shiftStartMinutes == null || currentMinutes == null) {
     return null;
@@ -685,10 +644,7 @@ function getHeroTiming(
     return null;
   }
 
-  const segmentStartMinutes = getLocalDateTimeMinutes(
-    entry.date,
-    segmentStartTime,
-  );
+  const segmentStartMinutes = getLocalDateTimeMinutes(entry.date, segmentStartTime);
   const currentMinutes = getLocalDateTimeMinutes(currentDate, currentTime);
 
   if (segmentStartMinutes == null || currentMinutes == null) {
@@ -717,22 +673,14 @@ function getHeroTiming(
   }
 
   const normalizedEndMinutes =
-    segmentEndMinutes <= segmentStartMinutes
-      ? segmentEndMinutes + 24 * 60
-      : segmentEndMinutes;
+    segmentEndMinutes <= segmentStartMinutes ? segmentEndMinutes + 24 * 60 : segmentEndMinutes;
 
-  if (
-    currentMinutes < segmentStartMinutes ||
-    currentMinutes >= normalizedEndMinutes
-  ) {
+  if (currentMinutes < segmentStartMinutes || currentMinutes >= normalizedEndMinutes) {
     return null;
   }
 
   const totalMinutes = normalizedEndMinutes - segmentStartMinutes;
-  const elapsedMinutes = Math.min(
-    Math.max(currentMinutes - segmentStartMinutes, 0),
-    totalMinutes,
-  );
+  const elapsedMinutes = Math.min(Math.max(currentMinutes - segmentStartMinutes, 0), totalMinutes);
 
   if (totalMinutes <= 0) {
     return null;
@@ -748,37 +696,22 @@ function formatHoursValue(value: number): string {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
 }
 
-function getRequestSegments(
-  request: MobileShiftRequest,
-  which: "requester" | "target",
-) {
+function getRequestSegments(request: MobileShiftRequest, which: "requester" | "target") {
   const legacyRequest = request as MobileShiftRequest & {
     requesterSegments?: MobileShiftRequest["requesterPresentation"]["segments"];
-    targetSegments?:
-      | MobileShiftRequest["requesterPresentation"]["segments"]
-      | null;
+    targetSegments?: MobileShiftRequest["requesterPresentation"]["segments"] | null;
   };
 
   return which === "requester"
-    ? (request.requesterPresentation?.segments ??
-        legacyRequest.requesterSegments ??
-        [])
-    : (request.targetPresentation?.segments ??
-        legacyRequest.targetSegments ??
-        []);
+    ? (request.requesterPresentation?.segments ?? legacyRequest.requesterSegments ?? [])
+    : (request.targetPresentation?.segments ?? legacyRequest.targetSegments ?? []);
 }
 
-function getRequestPrimarySegment(
-  request: MobileShiftRequest,
-  which: "requester" | "target",
-) {
+function getRequestPrimarySegment(request: MobileShiftRequest, which: "requester" | "target") {
   return getRequestSegments(request, which)[0] ?? null;
 }
 
-function getRequestShiftName(
-  request: MobileShiftRequest,
-  which: "requester" | "target",
-): string {
+function getRequestShiftName(request: MobileShiftRequest, which: "requester" | "target"): string {
   const segment = getRequestPrimarySegment(request, which);
   if (segment?.shiftName) {
     return segment.shiftName;
@@ -793,8 +726,7 @@ function getRequestAbsenceTypeId(
   request: MobileShiftRequest,
   which: "requester" | "target",
 ): number | null {
-  const state =
-    which === "requester" ? request.requesterState : request.targetState;
+  const state = which === "requester" ? request.requesterState : request.targetState;
   if (state?.kind === "absence") {
     return state.absenceTypeId ?? null;
   }
@@ -806,10 +738,7 @@ function getRequestJobName(
   request: MobileShiftRequest,
   which: "requester" | "target",
 ): string | null {
-  return (
-    getRequestSegments(request, which).find((segment) => segment.jobName)
-      ?.jobName ?? null
-  );
+  return getRequestSegments(request, which).find((segment) => segment.jobName)?.jobName ?? null;
 }
 
 function getRequestFocusAreaName(
@@ -817,9 +746,8 @@ function getRequestFocusAreaName(
   which: "requester" | "target",
 ): string | null {
   return (
-    getRequestSegments(request, which).find(
-      (segment) => segment.displayFocusAreaName,
-    )?.displayFocusAreaName ?? null
+    getRequestSegments(request, which).find((segment) => segment.displayFocusAreaName)
+      ?.displayFocusAreaName ?? null
   );
 }
 
@@ -828,19 +756,12 @@ function getRequestTimeRange(
   which: "requester" | "target",
 ): string | null {
   const segments = getRequestSegments(request, which);
-  const firstSegmentWithTime = segments.find(
-    (segment) => segment.startTime && segment.endTime,
-  );
+  const firstSegmentWithTime = segments.find((segment) => segment.startTime && segment.endTime);
   const lastSegmentWithTime =
-    [...segments]
-      .reverse()
-      .find((segment) => segment.startTime && segment.endTime) ?? null;
+    [...segments].reverse().find((segment) => segment.startTime && segment.endTime) ?? null;
 
   if (firstSegmentWithTime && lastSegmentWithTime) {
-    return formatScheduleTimeRange(
-      firstSegmentWithTime.startTime,
-      lastSegmentWithTime.endTime,
-    );
+    return formatScheduleTimeRange(firstSegmentWithTime.startTime, lastSegmentWithTime.endTime);
   }
 
   if (which === "requester") {
@@ -862,36 +783,24 @@ function getOpenShiftPrimarySegment(openShift: MobileOpenShift) {
 
 function getOpenShiftShiftName(openShift: MobileOpenShift): string {
   const primarySegment = getOpenShiftPrimarySegment(openShift);
-  return (
-    primarySegment?.shiftName ?? openShift.presentation.label ?? "Open Shift"
-  );
+  return primarySegment?.shiftName ?? openShift.presentation.label ?? "Open Shift";
 }
 
 function getOpenShiftAbsenceTypeId(openShift: MobileOpenShift): number | null {
-  return openShift.state.kind === "absence"
-    ? (openShift.state.absenceTypeId ?? null)
-    : null;
+  return openShift.state.kind === "absence" ? (openShift.state.absenceTypeId ?? null) : null;
 }
 
 function getOpenShiftJobChip(openShift: MobileOpenShift): JobChip | null {
   if (getOpenShiftAbsenceTypeId(openShift) != null) {
-    return buildAbsenceChip(
-      getOpenShiftShiftName(openShift),
-      openShift.presentation,
-    );
+    return buildAbsenceChip(getOpenShiftShiftName(openShift), openShift.presentation);
   }
 
   const primarySegment = getOpenShiftPrimarySegment(openShift);
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(
-      getOpenShiftShiftName(openShift),
-      primarySegment,
-    );
+    return buildGeneralShiftChip(getOpenShiftShiftName(openShift), primarySegment);
   }
 
-  const jobSegment = openShift.presentation.segments.find(
-    (segment) => segment.jobName,
-  );
+  const jobSegment = openShift.presentation.segments.find((segment) => segment.jobName);
   return buildJobChip(jobSegment?.jobName ?? null, jobSegment ?? null);
 }
 
@@ -901,9 +810,8 @@ function formatOpenShiftCardCountLabel(count: number): string {
 
 function getOpenShiftFocusAreaName(openShift: MobileOpenShift): string | null {
   return (
-    openShift.presentation.segments.find(
-      (segment) => segment.displayFocusAreaName,
-    )?.displayFocusAreaName ??
+    openShift.presentation.segments.find((segment) => segment.displayFocusAreaName)
+      ?.displayFocusAreaName ??
     openShift.presentation.displayFocusAreaName ??
     openShift.focusAreaName
   );
@@ -915,17 +823,11 @@ function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
   );
 
   if (primarySegment?.startTime && primarySegment.endTime) {
-    return formatScheduleTimeRange(
-      primarySegment.startTime,
-      primarySegment.endTime,
-    );
+    return formatScheduleTimeRange(primarySegment.startTime, primarySegment.endTime);
   }
 
   return openShift.presentation.startTime && openShift.presentation.endTime
-    ? formatScheduleTimeRange(
-        openShift.presentation.startTime,
-        openShift.presentation.endTime,
-      )
+    ? formatScheduleTimeRange(openShift.presentation.startTime, openShift.presentation.endTime)
     : null;
 }
 
@@ -963,10 +865,7 @@ function getSwipeEventTimestamp(event: GestureResponderEvent): number | null {
     timestamp?: number;
   };
   const timestamp =
-    nativeEvent.timestamp ??
-    webNativeEvent.timeStamp ??
-    webEvent.timestamp ??
-    webEvent.timeStamp;
+    nativeEvent.timestamp ?? webNativeEvent.timeStamp ?? webEvent.timestamp ?? webEvent.timeStamp;
 
   return typeof timestamp === "number" ? timestamp : null;
 }
@@ -1012,24 +911,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const { pushToast } = useToast();
   const bootstrapQuery = useBootstrap(accessToken);
   const now = useRealtimeNow();
-  const [selectedTeamFocusAreaKey, setSelectedTeamFocusAreaKey] = useState<
-    string | null
-  >(null);
+  const [selectedTeamFocusAreaKey, setSelectedTeamFocusAreaKey] = useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [selectedDateOverride, setSelectedDateOverride] = useState<
-    string | null
-  >(null);
+  const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null);
   const [weekStripWidth, setWeekStripWidth] = useState(0);
-  const [weekStripRowHeight, setWeekStripRowHeight] = useState(
-    WEEK_STRIP_ROW_HEIGHT,
-  );
-  const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<string | null>(
-    null,
-  );
+  const [weekStripRowHeight, setWeekStripRowHeight] = useState(WEEK_STRIP_ROW_HEIGHT);
+  const [calendarMonthAnchor, setCalendarMonthAnchor] = useState<string | null>(null);
   const calendarExpandProgress = useSharedValue(0);
   const calendarDragStartProgress = useSharedValue(0);
-  const [pendingAction, setPendingAction] =
-    useState<PendingRequestAction>(null);
+  const [pendingAction, setPendingAction] = useState<PendingRequestAction>(null);
   const [requestActionConfirmation, setRequestActionConfirmation] =
     useState<RequestActionConfirmation>(null);
   const meScrollViewRef = useRef<ScreenScrollHandle | null>(null);
@@ -1044,61 +934,32 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const monthSwipeTranslateX = useRef(new Animated.Value(0)).current;
   const monthTransitionRef = useRef<Animated.CompositeAnimation | null>(null);
   const timeZone = bootstrapQuery.data?.currentOrg.timezone;
-  const openShiftVisibility =
-    bootstrapQuery.data?.currentOrg.openShiftVisibility;
+  const openShiftVisibility = bootstrapQuery.data?.currentOrg.openShiftVisibility;
   const todayDate = getIsoDateInTimeZone(now, timeZone);
   const selectedDate = selectedDateOverride ?? todayDate;
   selectedDateRef.current = selectedDate;
-  const range = useMemo(
-    () => getScheduleRangeForDate(selectedDate),
-    [selectedDate],
-  );
+  const range = useMemo(() => getScheduleRangeForDate(selectedDate), [selectedDate]);
   const canViewTeamSchedule = bootstrapQuery.data
     ? bootstrapQuery.data.permissions.canViewSchedule
     : false;
   const isTeamScope = scope === "team";
-  const isBlockedTeamView =
-    isTeamScope && !canViewTeamSchedule && Boolean(bootstrapQuery.data);
-  const canLoadSchedule =
-    Boolean(accessToken) && (!isTeamScope || canViewTeamSchedule);
+  const isBlockedTeamView = isTeamScope && !canViewTeamSchedule && Boolean(bootstrapQuery.data);
+  const canLoadSchedule = Boolean(accessToken) && (!isTeamScope || canViewTeamSchedule);
   const canLoadRequests = Boolean(accessToken) && !isTeamScope;
-  const canLoadMeTeamSchedule =
-    Boolean(accessToken) && !isTeamScope && canViewTeamSchedule;
+  const canLoadMeTeamSchedule = Boolean(accessToken) && !isTeamScope && canViewTeamSchedule;
   const scheduleQuery = useQuery({
-    queryKey: [
-      "mobile",
-      "schedule",
-      scope,
-      accessToken,
-      range.startDate,
-      range.endDate,
-    ],
+    queryKey: ["mobile", "schedule", scope, accessToken, range.startDate, range.endDate],
     queryFn: () =>
-      isTeamScope
-        ? getOrgSchedule(accessToken!, range)
-        : getMySchedule(accessToken!, range),
+      isTeamScope ? getOrgSchedule(accessToken!, range) : getMySchedule(accessToken!, range),
     enabled: canLoadSchedule,
   });
   const meTeamScheduleQuery = useQuery({
-    queryKey: [
-      "mobile",
-      "schedule",
-      "team",
-      accessToken,
-      range.startDate,
-      range.endDate,
-    ],
+    queryKey: ["mobile", "schedule", "team", accessToken, range.startDate, range.endDate],
     queryFn: () => getOrgSchedule(accessToken!, range),
     enabled: canLoadMeTeamSchedule,
   });
   const requestsQuery = useQuery({
-    queryKey: [
-      "mobile",
-      "requests",
-      accessToken,
-      range.startDate,
-      range.endDate,
-    ],
+    queryKey: ["mobile", "requests", accessToken, range.startDate, range.endDate],
     queryFn: () => getShiftRequests(accessToken!, range),
     enabled: canLoadRequests,
   });
@@ -1190,31 +1051,19 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const activeData = scheduleQuery.data;
   const scheduleEntries = activeData?.entries ?? [];
   const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
-  const canManageEmployees = Boolean(
-    bootstrapQuery.data?.permissions.canManageEmployees,
-  );
-  const unreadNotificationCount =
-    bootstrapQuery.data?.unreadNotificationCount ?? 0;
+  const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
+  const unreadNotificationCount = bootstrapQuery.data?.unreadNotificationCount ?? 0;
   const selectedDateLabel = formatScheduleDayLabel(selectedDate, now, timeZone);
-  const teamHeaderDateLabel = formatTeamScheduleHeaderDateLabel(
-    selectedDate,
-    now,
-    timeZone,
-  );
+  const teamHeaderDateLabel = formatTeamScheduleHeaderDateLabel(selectedDate, now, timeZone);
   const isSelectedToday = selectedDate === todayDate;
   const weekRangeLabel = formatScheduleRange(range, timeZone);
   const currentTimeValue = getCurrentTimeValue(now, timeZone);
-  const visibleCalendarMonth =
-    calendarMonthAnchor ?? getScheduleMonthStartDate(selectedDate);
+  const visibleCalendarMonth = calendarMonthAnchor ?? getScheduleMonthStartDate(selectedDate);
   const previousWeekDate = addDaysToIsoDate(selectedDate, -7);
   const nextWeekDate = addDaysToIsoDate(selectedDate, 7);
   const previousWeekDays = useMemo(
     () =>
-      buildScheduleWeekDays(
-        getScheduleRangeForDate(previousWeekDate),
-        previousWeekDate,
-        timeZone,
-      ),
+      buildScheduleWeekDays(getScheduleRangeForDate(previousWeekDate), previousWeekDate, timeZone),
     [previousWeekDate, timeZone],
   );
   const weekDays = useMemo(
@@ -1222,12 +1071,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     [range, selectedDate, timeZone],
   );
   const nextWeekDays = useMemo(
-    () =>
-      buildScheduleWeekDays(
-        getScheduleRangeForDate(nextWeekDate),
-        nextWeekDate,
-        timeZone,
-      ),
+    () => buildScheduleWeekDays(getScheduleRangeForDate(nextWeekDate), nextWeekDate, timeZone),
     [nextWeekDate, timeZone],
   );
   const monthWeeks = useMemo(
@@ -1241,29 +1085,20 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   // otherwise.
   const previousMonthWeeks = useMemo(
     () =>
-      isCalendarOpen
-        ? buildScheduleMonthDays(previousMonthAnchor, selectedDate, timeZone)
-        : [],
+      isCalendarOpen ? buildScheduleMonthDays(previousMonthAnchor, selectedDate, timeZone) : [],
     [isCalendarOpen, previousMonthAnchor, selectedDate, timeZone],
   );
   const nextMonthWeeks = useMemo(
-    () =>
-      isCalendarOpen
-        ? buildScheduleMonthDays(nextMonthAnchor, selectedDate, timeZone)
-        : [],
+    () => (isCalendarOpen ? buildScheduleMonthDays(nextMonthAnchor, selectedDate, timeZone) : []),
     [isCalendarOpen, nextMonthAnchor, selectedDate, timeZone],
   );
-  const anchorWeekIndex = getScheduleMonthWeekIndexForDate(
-    visibleCalendarMonth,
-    selectedDate,
-  );
+  const anchorWeekIndex = getScheduleMonthWeekIndexForDate(visibleCalendarMonth, selectedDate);
   // One shared row height for every week row (swipeable or static) so the
   // grid stays perfectly aligned as it slides — no per-row measurement.
   const monthGridRowsHeight =
     monthWeeks.length * weekStripRowHeight +
     Math.max(0, monthWeeks.length - 1) * MONTH_GRID_ROW_GAP;
-  const anchorRowOffsetInStack =
-    anchorWeekIndex * (weekStripRowHeight + MONTH_GRID_ROW_GAP);
+  const anchorRowOffsetInStack = anchorWeekIndex * (weekStripRowHeight + MONTH_GRID_ROW_GAP);
   // The dates panel clips from a single row's height up to the full month
   // grid height, so when fully expanded every week row is visible.
   const calendarOuterClipAnimatedStyle = useAnimatedStyle(
@@ -1295,10 +1130,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     [anchorRowOffsetInStack],
   );
   const selectedDayTeamEntries = useMemo(
-    () =>
-      isTeamScope
-        ? filterScheduleEntriesByDate(scheduleEntries, selectedDate)
-        : [],
+    () => (isTeamScope ? filterScheduleEntriesByDate(scheduleEntries, selectedDate) : []),
     [isTeamScope, scheduleEntries, selectedDate],
   );
   const teamFocusAreaTabs = useMemo(() => {
@@ -1306,10 +1138,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       return [];
     }
 
-    return buildTeamScheduleFocusAreaTabs(
-      bootstrapQuery.data?.focusAreas ?? [],
-      scheduleEntries,
-    );
+    return buildTeamScheduleFocusAreaTabs(bootstrapQuery.data?.focusAreas ?? [], scheduleEntries);
   }, [bootstrapQuery.data?.focusAreas, isBlockedTeamView, scheduleEntries]);
   const defaultTeamFocusAreaKey = useMemo(() => {
     const homeFocusAreaId = linkedEmployee?.focusAreaIds[0] ?? null;
@@ -1354,21 +1183,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       return selectedDayTeamEntries;
     }
 
-    return filterTeamScheduleEntriesByFocusArea(
-      selectedDayTeamEntries,
-      activeTeamFocusAreaKey,
-    );
-  }, [
-    activeTeamFocusAreaKey,
-    isTeamScope,
-    scheduleEntries,
-    selectedDayTeamEntries,
-  ]);
+    return filterTeamScheduleEntriesByFocusArea(selectedDayTeamEntries, activeTeamFocusAreaKey);
+  }, [activeTeamFocusAreaKey, isTeamScope, scheduleEntries, selectedDayTeamEntries]);
   const selectedEntries = useMemo(
-    () =>
-      isTeamScope
-        ? activeEntries
-        : filterScheduleEntriesByDate(activeEntries, selectedDate),
+    () => (isTeamScope ? activeEntries : filterScheduleEntriesByDate(activeEntries, selectedDate)),
     [activeEntries, isTeamScope, selectedDate],
   );
   const meHeroState = useMemo<FeaturedMeScheduleSegment>(
@@ -1385,14 +1203,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             item: null,
             status: "empty",
           },
-    [
-      activeEntries,
-      currentTimeValue,
-      isTeamScope,
-      range.startDate,
-      selectedDate,
-      todayDate,
-    ],
+    [activeEntries, currentTimeValue, isTeamScope, range.startDate, selectedDate, todayDate],
   );
   const meHeroTiming = useMemo(
     () =>
@@ -1408,28 +1219,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             currentTimeValue,
           )
         : null,
-    [
-      currentTimeValue,
-      isTeamScope,
-      meHeroState.item,
-      meHeroState.status,
-      todayDate,
-    ],
+    [currentTimeValue, isTeamScope, meHeroState.item, meHeroState.status, todayDate],
   );
   const meHeroShiftmates = useMemo(
     () =>
       !isTeamScope && canLoadMeTeamSchedule
-        ? getMeHeroShiftmates(
-            meHeroState.item,
-            meTeamScheduleQuery.data?.entries ?? [],
-          )
+        ? getMeHeroShiftmates(meHeroState.item, meTeamScheduleQuery.data?.entries ?? [])
         : [],
-    [
-      canLoadMeTeamSchedule,
-      isTeamScope,
-      meHeroState.item,
-      meTeamScheduleQuery.data?.entries,
-    ],
+    [canLoadMeTeamSchedule, isTeamScope, meHeroState.item, meTeamScheduleQuery.data?.entries],
   );
   const meUpcomingItems = useMemo(
     () =>
@@ -1442,12 +1239,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         : [],
     [activeEntries, isTeamScope, meHeroState.item, selectedDate],
   );
-  const isMeScheduleEmpty =
-    !isTeamScope && !meHeroState.item && meUpcomingItems.length === 0;
-  const meEmptyPageMinHeight = Math.max(
-    320,
-    viewportHeight - insets.top - insets.bottom - 180,
-  );
+  const isMeScheduleEmpty = !isTeamScope && !meHeroState.item && meUpcomingItems.length === 0;
+  const meEmptyPageMinHeight = Math.max(320, viewportHeight - insets.top - insets.bottom - 180);
   const meRequestSections = useMemo(
     () =>
       !isTeamScope
@@ -1461,17 +1254,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             coverRequests: [],
             openShiftRequests: [],
           },
-    [
-      isTeamScope,
-      linkedEmployee?.id,
-      now,
-      requestsQuery.data?.requests,
-      timeZone,
-    ],
+    [isTeamScope, linkedEmployee?.id, now, requestsQuery.data?.requests, timeZone],
   );
-  const meOpenShifts = !isTeamScope
-    ? (requestsQuery.data?.openShifts ?? [])
-    : [];
+  const meOpenShifts = !isTeamScope ? (requestsQuery.data?.openShifts ?? []) : [];
   const meWeeklyHours = useMemo(
     () => (!isTeamScope ? buildWeeklyHoursSummary(activeEntries, 40) : null),
     [activeEntries, isTeamScope],
@@ -1486,16 +1271,9 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     error: scheduleQuery.error ?? bootstrapQuery.error,
   });
   const emptyStateTitle = "Nothing to show yet";
-  const rawEmptyStateDateLabel = formatScheduleDayLabel(
-    selectedDate,
-    now,
-    timeZone,
-  );
-  const emptyStateDateLabel = /^(Today|Yesterday|Tomorrow),/.test(
-    rawEmptyStateDateLabel,
-  )
-    ? rawEmptyStateDateLabel.charAt(0).toLowerCase() +
-      rawEmptyStateDateLabel.slice(1)
+  const rawEmptyStateDateLabel = formatScheduleDayLabel(selectedDate, now, timeZone);
+  const emptyStateDateLabel = /^(Today|Yesterday|Tomorrow),/.test(rawEmptyStateDateLabel)
+    ? rawEmptyStateDateLabel.charAt(0).toLowerCase() + rawEmptyStateDateLabel.slice(1)
     : rawEmptyStateDateLabel;
   const emptyStateBody = isTeamScope
     ? activeTeamFocusAreaTab
@@ -1508,14 +1286,11 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       return;
     }
 
-    const subscription = AppState.addEventListener(
-      "change",
-      (nextState: AppStateStatus) => {
-        if (nextState === "active") {
-          void refetchScreenContent();
-        }
-      },
-    );
+    const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
+      if (nextState === "active") {
+        void refetchScreenContent();
+      }
+    });
 
     return () => {
       subscription.remove();
@@ -1545,13 +1320,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       animated: true,
     });
     pendingMeScrollKeyRef.current = null;
-  }, [
-    contentState.kind,
-    isTeamScope,
-    linkedEmployee,
-    range.startDate,
-    selectedDate,
-  ]);
+  }, [contentState.kind, isTeamScope, linkedEmployee, range.startDate, selectedDate]);
 
   function closeCalendarExpansion() {
     if (!isCalendarOpen) {
@@ -1625,10 +1394,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   }
 
   function completeWeekSwipe(direction: -1 | 1, deltaX: number) {
-    const nextDate = addDaysToIsoDate(
-      getCommittedSelectedDate(),
-      direction * 7,
-    );
+    const nextDate = addDaysToIsoDate(getCommittedSelectedDate(), direction * 7);
     const completeOffset = getWeekSwipeWidth();
     const releaseOffset = clampWeekSwipeDelta(deltaX, completeOffset);
     const rebasedOffset = direction * completeOffset + releaseOffset;
@@ -1656,10 +1422,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     });
   }
 
-  function handleWeekSwipeEnd(
-    releaseX: number,
-    releaseTimestamp: number | null,
-  ) {
+  function handleWeekSwipeEnd(releaseX: number, releaseTimestamp: number | null) {
     if (swipeStartXRef.current == null) {
       return;
     }
@@ -1670,9 +1433,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     swipeStartTimestampRef.current = null;
     const swipeWidth = getWeekSwipeWidth();
     const elapsedMs =
-      releaseTimestamp != null && startTimestamp != null
-        ? releaseTimestamp - startTimestamp
-        : null;
+      releaseTimestamp != null && startTimestamp != null ? releaseTimestamp - startTimestamp : null;
 
     if (
       !isCommittedWeekSwipe({
@@ -1761,12 +1522,8 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     // exactly on the 1st of the month being swiped to. Selecting it (not
     // just browsing, as the chevrons do) keeps selectedDate inside the
     // visible month, so anchorWeekIndex stays valid once collapsed.
-    const nextMonthStartDate = addMonthsToIsoDate(
-      visibleCalendarMonth,
-      direction,
-    );
-    const isTargetCurrentMonth =
-      nextMonthStartDate === getScheduleMonthStartDate(todayDate);
+    const nextMonthStartDate = addMonthsToIsoDate(visibleCalendarMonth, direction);
+    const isTargetCurrentMonth = nextMonthStartDate === getScheduleMonthStartDate(todayDate);
     setCalendarMonthAnchor(nextMonthStartDate);
     commitSelectedDate(isTargetCurrentMonth ? todayDate : nextMonthStartDate);
 
@@ -1788,10 +1545,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     });
   }
 
-  function handleMonthSwipeEnd(
-    releaseX: number,
-    releaseTimestamp: number | null,
-  ) {
+  function handleMonthSwipeEnd(releaseX: number, releaseTimestamp: number | null) {
     if (monthSwipeStartXRef.current == null) {
       return;
     }
@@ -1802,9 +1556,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     monthSwipeStartTimestampRef.current = null;
     const swipeWidth = getMonthSwipeWidth();
     const elapsedMs =
-      releaseTimestamp != null && startTimestamp != null
-        ? releaseTimestamp - startTimestamp
-        : null;
+      releaseTimestamp != null && startTimestamp != null ? releaseTimestamp - startTimestamp : null;
 
     if (
       !isCommittedWeekSwipe({
@@ -1841,10 +1593,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     }
 
     monthSwipeTranslateX.setValue(
-      clampWeekSwipeDelta(
-        moveX - monthSwipeStartXRef.current,
-        getMonthSwipeWidth(),
-      ),
+      clampWeekSwipeDelta(moveX - monthSwipeStartXRef.current, getMonthSwipeWidth()),
     );
   }
 
@@ -1906,10 +1655,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     );
 
     if (nextSelectedDayEntries.length === 0) {
-      const firstMatchingDate = getFirstDateForFocusArea(
-        scheduleEntries,
-        nextFocusAreaKey,
-      );
+      const firstMatchingDate = getFirstDateForFocusArea(scheduleEntries, nextFocusAreaKey);
 
       if (firstMatchingDate && firstMatchingDate !== selectedDate) {
         commitSelectedDate(firstMatchingDate);
@@ -1937,10 +1683,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       days: nextWeekDays,
     },
   ];
-  const calendarDragRange = Math.max(
-    1,
-    monthGridRowsHeight - weekStripRowHeight,
-  );
+  const calendarDragRange = Math.max(1, monthGridRowsHeight - weekStripRowHeight);
   const calendarDragGesture = Gesture.Pan()
     .onStart(() => {
       "worklet";
@@ -1950,8 +1693,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     })
     .onUpdate((event) => {
       "worklet";
-      const nextProgress =
-        calendarDragStartProgress.value + event.translationY / calendarDragRange;
+      const nextProgress = calendarDragStartProgress.value + event.translationY / calendarDragRange;
       calendarExpandProgress.value = Math.min(1, Math.max(0, nextProgress));
     })
     .onEnd((event) => {
@@ -1962,10 +1704,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           : event.velocityY < -600
             ? false
             : calendarExpandProgress.value > 0.5;
-      calendarExpandProgress.value = withTiming(
-        shouldOpen ? 1 : 0,
-        MONTH_EXPAND_TIMING,
-      );
+      calendarExpandProgress.value = withTiming(shouldOpen ? 1 : 0, MONTH_EXPAND_TIMING);
       runOnJS(handleCalendarDragEnd)(shouldOpen);
     });
 
@@ -1997,10 +1736,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             accessibilityRole="button"
             android_ripple={{ color: "rgba(37, 99, 235, 0.12)" }}
             onPress={handleGoToToday}
-            style={({ pressed }) => [
-              styles.meTodayButton,
-              pressed && styles.meTodayButtonPressed,
-            ]}
+            style={({ pressed }) => [styles.meTodayButton, pressed && styles.meTodayButtonPressed]}
           >
             <Text style={styles.meTodayButtonText}>Today</Text>
           </Pressable>
@@ -2010,10 +1746,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     </View>
   ) : undefined;
 
-  function renderMonthWeeks(
-    weeks: MobileScheduleMonthDay[][],
-    isCenterMonth: boolean,
-  ) {
+  function renderMonthWeeks(weeks: MobileScheduleMonthDay[][], isCenterMonth: boolean) {
     return weeks.map((week, weekIndex) => {
       if (isCenterMonth && weekIndex === anchorWeekIndex) {
         return (
@@ -2044,10 +1777,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               {weekStripRows.map((row) => (
                 <View
                   key={row.key}
-                  style={[
-                    styles.monthCalendarWeek,
-                    { width: weekStripRenderWidth },
-                  ]}
+                  style={[styles.monthCalendarWeek, { width: weekStripRenderWidth }]}
                 >
                   {row.days.map((day) => (
                     <MonthDayCell
@@ -2061,8 +1791,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                         // month membership is ignored while collapsed.
                         isCurrentMonth:
                           !isCalendarOpen ||
-                          getScheduleMonthStartDate(day.date) ===
-                            visibleCalendarMonth,
+                          getScheduleMonthStartDate(day.date) === visibleCalendarMonth,
                       }}
                       accessible={row.key === "current"}
                       onPress={() => handleSelectDate(day.date)}
@@ -2140,9 +1869,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           onTouchStart={handleMonthSwipeStart}
           style={[styles.weekStripFrame, calendarOuterClipAnimatedStyle]}
         >
-          <Reanimated.View
-            style={[styles.monthCalendarWeeks, calendarDatesStackAnimatedStyle]}
-          >
+          <Reanimated.View style={[styles.monthCalendarWeeks, calendarDatesStackAnimatedStyle]}>
             <Animated.View
               style={[
                 styles.monthSwipeTrack,
@@ -2155,19 +1882,13 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                 },
               ]}
             >
-              <View
-                style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}
-              >
+              <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
                 {renderMonthWeeks(previousMonthWeeks, false)}
               </View>
-              <View
-                style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}
-              >
+              <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
                 {renderMonthWeeks(monthWeeks, true)}
               </View>
-              <View
-                style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}
-              >
+              <View style={[styles.monthGridColumn, { width: weekStripRenderWidth }]}>
                 {renderMonthWeeks(nextMonthWeeks, false)}
               </View>
             </Animated.View>
@@ -2176,11 +1897,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
         <GestureDetector gesture={calendarDragGesture}>
           <View
-            accessibilityLabel={
-              isCalendarOpen
-                ? "Collapse month calendar"
-                : "Open month calendar"
-            }
+            accessibilityLabel={isCalendarOpen ? "Collapse month calendar" : "Open month calendar"}
             accessibilityRole="adjustable"
             hitSlop={{ top: 8, bottom: 16, left: 40, right: 40 }}
             style={styles.calendarDragHandleRow}
@@ -2204,233 +1921,221 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       stickyHeaderShellStyle={styles.scheduleCalendarStickyHeaderShell}
     >
       <View>
-      {isTeamScope && teamFocusAreaTabs.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.focusAreaPillListContent}
-          style={styles.focusAreaPillList}
-        >
-          {teamFocusAreaTabs.map((tab) => {
-            const isActive = tab.key === activeTeamFocusAreaKey;
+        {isTeamScope && teamFocusAreaTabs.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.focusAreaPillListContent}
+            style={styles.focusAreaPillList}
+          >
+            {teamFocusAreaTabs.map((tab) => {
+              const isActive = tab.key === activeTeamFocusAreaKey;
 
-            return (
-              <Pressable
-                key={tab.key}
-                accessibilityLabel={`Select ${tab.label}`}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isActive }}
-                onPress={() => {
-                  handleSelectFocusArea(tab.key);
-                }}
-                style={({ pressed }) => [
-                  styles.focusAreaPill,
-                  isActive && styles.focusAreaPillActive,
-                  pressed && styles.focusAreaPillPressed,
-                ]}
-              >
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.focusAreaPillText,
-                    isActive && styles.focusAreaPillTextActive,
+              return (
+                <Pressable
+                  key={tab.key}
+                  accessibilityLabel={`Select ${tab.label}`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isActive }}
+                  onPress={() => {
+                    handleSelectFocusArea(tab.key);
+                  }}
+                  style={({ pressed }) => [
+                    styles.focusAreaPill,
+                    isActive && styles.focusAreaPillActive,
+                    pressed && styles.focusAreaPillPressed,
                   ]}
                 >
-                  {tab.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      ) : null}
-      {contentState.kind === "loading" ? (
-        <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading schedule</Text>
-          <Text style={styles.loadingBody}>
-            Getting the latest published schedule.
-          </Text>
-          {!isTeamScope ? (
-            <>
-              <HeroSkeleton />
-              <ListSkeleton rows={2} />
-              <ListSkeleton rows={2} />
-            </>
-          ) : (
-            <ListSkeleton rows={4} showSectionHeader={false} />
-          )}
-        </View>
-      ) : contentState.kind === "error" ? (
-        <StatusBanner
-          actionLabel="Try again"
-          body={contentState.message}
-          fillScreen
-          title="Could not load schedule"
-          variant="centered"
-          onAction={() => {
-            void refetchScreenContent();
-          }}
-        />
-      ) : isBlockedTeamView ? (
-        <EmptyStateCard
-          fillScreen
-          body="You don't have permission to view the team schedule. Ask an admin if you need access."
-          iconName="lock-closed-outline"
-          title="Team schedule unavailable"
-        />
-      ) : !isTeamScope && !linkedEmployee ? (
-        <EmptyStateCard
-          fillScreen
-          body={
-            canManageEmployees
-              ? "Open the People tab to link your account to a staff profile. This page will update automatically once you're done."
-              : "Ask an admin to finish setting up your account. This page will update automatically once they're done."
-          }
-          iconName="person-add-outline"
-          title="Your account isn't linked yet"
-        />
-      ) : !isTeamScope ? (
-        <View
-          style={[
-            styles.mePage,
-            isMeScheduleEmpty && [
-              styles.mePageEmpty,
-              { minHeight: meEmptyPageMinHeight },
-            ],
-          ]}
-        >
-          <MeHeroCard
-            currentDate={todayDate}
-            currentTime={currentTimeValue}
-            featuredItem={meHeroState.item}
-            timing={meHeroTiming}
-            shiftmates={meHeroShiftmates}
-            status={meHeroState.status}
-            onPress={
-              meHeroState.item
-                ? () => handleOpenShiftDetail(meHeroState.item!.entry)
-                : undefined
-            }
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.focusAreaPillText, isActive && styles.focusAreaPillTextActive]}
+                  >
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+        {contentState.kind === "loading" ? (
+          <View style={styles.loadingState}>
+            <Text style={styles.loadingTitle}>Loading schedule</Text>
+            <Text style={styles.loadingBody}>Getting the latest published schedule.</Text>
+            {!isTeamScope ? (
+              <>
+                <HeroSkeleton />
+                <ListSkeleton rows={2} />
+                <ListSkeleton rows={2} />
+              </>
+            ) : (
+              <ListSkeleton rows={4} showSectionHeader={false} />
+            )}
+          </View>
+        ) : contentState.kind === "error" ? (
+          <StatusBanner
+            actionLabel="Try again"
+            body={contentState.message}
+            fillScreen
+            title="Could not load schedule"
+            variant="centered"
+            onAction={() => {
+              void refetchScreenContent();
+            }}
           />
-          {isMeScheduleEmpty ? null : (
-            <>
-              <ShiftCoverRequestsSection
-                isLoading={requestsQuery.isLoading}
-                linkedEmployeeId={linkedEmployee?.id ?? null}
-                pendingAction={pendingAction}
-                onRespond={(requestId, accept) => {
-                  if (!linkedEmployee?.id) {
-                    return;
-                  }
+        ) : isBlockedTeamView ? (
+          <EmptyStateCard
+            fillScreen
+            body="You don't have permission to view the team schedule. Ask an admin if you need access."
+            iconName="lock-closed-outline"
+            title="Team schedule unavailable"
+          />
+        ) : !isTeamScope && !linkedEmployee ? (
+          <EmptyStateCard
+            fillScreen
+            body={
+              canManageEmployees
+                ? "Open the People tab to link your account to a staff profile. This page will update automatically once you're done."
+                : "Ask an admin to finish setting up your account. This page will update automatically once they're done."
+            }
+            iconName="person-add-outline"
+            title="Your account isn't linked yet"
+          />
+        ) : !isTeamScope ? (
+          <View
+            style={[
+              styles.mePage,
+              isMeScheduleEmpty && [styles.mePageEmpty, { minHeight: meEmptyPageMinHeight }],
+            ]}
+          >
+            <MeHeroCard
+              currentDate={todayDate}
+              currentTime={currentTimeValue}
+              featuredItem={meHeroState.item}
+              timing={meHeroTiming}
+              shiftmates={meHeroShiftmates}
+              status={meHeroState.status}
+              onPress={
+                meHeroState.item ? () => handleOpenShiftDetail(meHeroState.item!.entry) : undefined
+              }
+            />
+            {isMeScheduleEmpty ? null : (
+              <>
+                <ShiftCoverRequestsSection
+                  isLoading={requestsQuery.isLoading}
+                  linkedEmployeeId={linkedEmployee?.id ?? null}
+                  pendingAction={pendingAction}
+                  onRespond={(requestId, accept) => {
+                    if (!linkedEmployee?.id) {
+                      return;
+                    }
 
-                  runRequestAction(requestId, {
-                    action: "respond",
-                    empId: linkedEmployee.id,
-                    accept,
-                  });
-                }}
-                requests={meRequestSections.coverRequests}
-                requestsError={requestsQuery.error}
-              />
-              <OpenShiftsSection
-                isLoading={requestsQuery.isLoading}
-                linkedEmployeeId={linkedEmployee?.id ?? null}
-                pendingAction={pendingAction}
-                now={now}
-                onClaim={(requestId) => {
-                  if (!linkedEmployee?.id) {
-                    return;
-                  }
+                    runRequestAction(requestId, {
+                      action: "respond",
+                      empId: linkedEmployee.id,
+                      accept,
+                    });
+                  }}
+                  requests={meRequestSections.coverRequests}
+                  requestsError={requestsQuery.error}
+                />
+                <OpenShiftsSection
+                  isLoading={requestsQuery.isLoading}
+                  linkedEmployeeId={linkedEmployee?.id ?? null}
+                  pendingAction={pendingAction}
+                  now={now}
+                  onClaim={(requestId) => {
+                    if (!linkedEmployee?.id) {
+                      return;
+                    }
 
-                  runRequestAction(requestId, {
-                    action: "claim",
-                    claimerEmpId: linkedEmployee.id,
-                  });
-                }}
-                onVolunteer={(openShift) => {
-                  if (!linkedEmployee?.id) {
-                    return;
-                  }
+                    runRequestAction(requestId, {
+                      action: "claim",
+                      claimerEmpId: linkedEmployee.id,
+                    });
+                  }}
+                  onVolunteer={(openShift) => {
+                    if (!linkedEmployee?.id) {
+                      return;
+                    }
 
-                  runRequestAction(openShift.id, {
-                    action: "volunteer_open_shift",
-                    empId: linkedEmployee.id,
-                    shiftDate: openShift.date,
-                    focusAreaId: openShift.focusAreaId,
-                    state: openShift.state,
-                  });
-                }}
-                onSeeAll={() => router.push("/(tabs)/requests")}
-                openShifts={meOpenShifts}
-                requests={meRequestSections.openShiftRequests}
-                requestsError={requestsQuery.error}
-                scheduleEntries={scheduleEntries}
-                timeZone={timeZone}
-                openShiftVisibility={openShiftVisibility}
-              />
-              <UpcomingShiftsSection
-                items={meUpcomingItems}
-                onPressEntry={handleOpenShiftDetail}
-                summary={meWeeklyHours}
-                todayDate={todayDate}
-              />
-            </>
-          )}
-        </View>
-      ) : shiftGroups.length === 0 ? (
-        <EmptyStateCard
-          fillScreen
-          body={emptyStateBody}
-          iconName="calendar-clear-outline"
-          title={emptyStateTitle}
-        />
-      ) : (
-        <View style={styles.shiftGroupsList}>
-          {shiftGroups.map((group, index) => {
-            const groupTimeRange = group.timeRange;
+                    runRequestAction(openShift.id, {
+                      action: "volunteer_open_shift",
+                      empId: linkedEmployee.id,
+                      shiftDate: openShift.date,
+                      focusAreaId: openShift.focusAreaId,
+                      state: openShift.state,
+                    });
+                  }}
+                  onSeeAll={() => router.push("/(tabs)/requests")}
+                  openShifts={meOpenShifts}
+                  requests={meRequestSections.openShiftRequests}
+                  requestsError={requestsQuery.error}
+                  scheduleEntries={scheduleEntries}
+                  timeZone={timeZone}
+                  openShiftVisibility={openShiftVisibility}
+                />
+                <UpcomingShiftsSection
+                  items={meUpcomingItems}
+                  onPressEntry={handleOpenShiftDetail}
+                  summary={meWeeklyHours}
+                  todayDate={todayDate}
+                />
+              </>
+            )}
+          </View>
+        ) : shiftGroups.length === 0 ? (
+          <EmptyStateCard
+            fillScreen
+            body={emptyStateBody}
+            iconName="calendar-clear-outline"
+            title={emptyStateTitle}
+          />
+        ) : (
+          <View style={styles.shiftGroupsList}>
+            {shiftGroups.map((group, index) => {
+              const groupTimeRange = group.timeRange;
 
-            return (
-              <View key={group.key} style={styles.shiftGroupBlock}>
-                {index > 0 ? <View style={styles.shiftGroupDivider} /> : null}
-                <View style={styles.shiftGroupHeader}>
-                  <Text style={styles.shiftGroupTitle}>{group.title}</Text>
-                  {groupTimeRange ? (
-                    <Text style={styles.shiftGroupTime}>{groupTimeRange}</Text>
-                  ) : null}
-                </View>
-                <View style={styles.teamGroupCard}>
-                  <View style={styles.teamGroupMembers}>
-                    {group.rows.map((row, memberIndex) => (
-                      <TeamShiftMemberRow
-                        key={`${row.entry.employeeId}-${row.entry.date}-${group.key}`}
-                        groupTimeRange={groupTimeRange}
-                        isFirst={memberIndex === 0}
-                        linkedEmployeeId={linkedEmployee?.id ?? null}
-                        row={row}
-                        onPress={() => handleOpenShiftDetail(row.entry)}
-                      />
-                    ))}
+              return (
+                <View key={group.key} style={styles.shiftGroupBlock}>
+                  {index > 0 ? <View style={styles.shiftGroupDivider} /> : null}
+                  <View style={styles.shiftGroupHeader}>
+                    <Text style={styles.shiftGroupTitle}>{group.title}</Text>
+                    {groupTimeRange ? (
+                      <Text style={styles.shiftGroupTime}>{groupTimeRange}</Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.teamGroupCard}>
+                    <View style={styles.teamGroupMembers}>
+                      {group.rows.map((row, memberIndex) => (
+                        <TeamShiftMemberRow
+                          key={`${row.entry.employeeId}-${row.entry.date}-${group.key}`}
+                          groupTimeRange={groupTimeRange}
+                          isFirst={memberIndex === 0}
+                          linkedEmployeeId={linkedEmployee?.id ?? null}
+                          row={row}
+                          onPress={() => handleOpenShiftDetail(row.entry)}
+                        />
+                      ))}
+                    </View>
                   </View>
                 </View>
-              </View>
-            );
-          })}
-        </View>
-      )}
-      <ConfirmationModal
-        body={requestActionConfirmation?.feedback.message}
-        confirmLabel={
-          requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"
-        }
-        confirmTone={
-          requestActionConfirmation?.feedback.confirmStyle === "destructive"
-            ? "dangerFilled"
-            : "primary"
-        }
-        onCancel={() => setRequestActionConfirmation(null)}
-        onConfirm={confirmRequestAction}
-        title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
-        visible={Boolean(requestActionConfirmation)}
-      />
+              );
+            })}
+          </View>
+        )}
+        <ConfirmationModal
+          body={requestActionConfirmation?.feedback.message}
+          confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
+          confirmTone={
+            requestActionConfirmation?.feedback.confirmStyle === "destructive"
+              ? "dangerFilled"
+              : "primary"
+          }
+          onCancel={() => setRequestActionConfirmation(null)}
+          onConfirm={confirmRequestAction}
+          title={requestActionConfirmation?.feedback.title ?? "Confirm action?"}
+          visible={Boolean(requestActionConfirmation)}
+        />
       </View>
     </Screen>
   );
@@ -2483,9 +2188,7 @@ function MonthDayCell({
             styles.dateHighlightText,
             day.isSelected && !day.isToday && styles.dateHighlightTextSelected,
             day.isToday && !day.isSelected && styles.dateHighlightTextToday,
-            day.isSelected &&
-              day.isToday &&
-              styles.dateHighlightTextTodaySelected,
+            day.isSelected && day.isToday && styles.dateHighlightTextTodaySelected,
           ]}
         >
           {day.dayLabel}
@@ -2518,11 +2221,7 @@ function IconControlButton({
         pressed && styles.iconControlButtonPressed,
       ]}
     >
-      <Ionicons
-        color={mobileColors.textPrimary}
-        name={iconName}
-        size={iconSize}
-      />
+      <Ionicons color={mobileColors.textPrimary} name={iconName} size={iconSize} />
     </Pressable>
   );
 }
@@ -2540,16 +2239,10 @@ function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
         pressed && styles.iconControlButtonPressed,
       ]}
     >
-      <Ionicons
-        color={mobileColors.textPrimary}
-        name="notifications-outline"
-        size={20}
-      />
+      <Ionicons color={mobileColors.textPrimary} name="notifications-outline" size={20} />
       {unreadCount > 0 ? (
         <View style={styles.alertBadge}>
-          <Text style={styles.alertBadgeText}>
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </Text>
+          <Text style={styles.alertBadgeText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
         </View>
       ) : null}
     </Pressable>
@@ -2568,16 +2261,13 @@ export default TeamScheduleScreen;
 
 function joinMetaParts(parts: Array<string | null | undefined>): string | null {
   const values = parts.filter(
-    (part): part is string =>
-      typeof part === "string" && part.trim().length > 0,
+    (part): part is string => typeof part === "string" && part.trim().length > 0,
   );
 
   return values.length > 0 ? values.join(" • ") : null;
 }
 
-function getScheduleItemShiftName(
-  item: FeaturedMeScheduleSegment["item"],
-): string {
+function getScheduleItemShiftName(item: FeaturedMeScheduleSegment["item"]): string {
   if (!item) {
     return "Nothing scheduled this week";
   }
@@ -2585,9 +2275,7 @@ function getScheduleItemShiftName(
   return item.segment.shiftName || getScheduleEntryTitle(item.entry);
 }
 
-function getScheduleItemJobName(
-  item: FeaturedMeScheduleSegment["item"],
-): string | null {
+function getScheduleItemJobName(item: FeaturedMeScheduleSegment["item"]): string | null {
   if (!item || getScheduleEntryAbsenceTypeId(item.entry) != null) {
     return null;
   }
@@ -2595,9 +2283,7 @@ function getScheduleItemJobName(
   return item.segment.jobName ?? null;
 }
 
-function getScheduleItemFocusArea(
-  item: FeaturedMeScheduleSegment["item"],
-): string | null {
+function getScheduleItemFocusArea(item: FeaturedMeScheduleSegment["item"]): string | null {
   if (!item) {
     return null;
   }
@@ -2639,9 +2325,7 @@ function readOptionalColor(value: string | null | undefined): string | null {
   return trimmedValue.toLowerCase() === "transparent" ? null : trimmedValue;
 }
 
-function readOptionalStyleColor(
-  value: string | null | undefined,
-): string | null {
+function readOptionalStyleColor(value: string | null | undefined): string | null {
   if (typeof value !== "string") {
     return value ?? null;
   }
@@ -2660,9 +2344,7 @@ function buildAbsenceChip(
 ): JobChip | null {
   const trimmedLabel = label?.trim() ?? "";
   const absenceColor = readOptionalStyleColor(colorSource?.shiftColor);
-  const absenceBorderColor = readOptionalStyleColor(
-    colorSource?.shiftBorderColor,
-  );
+  const absenceBorderColor = readOptionalStyleColor(colorSource?.shiftBorderColor);
   const absenceTextColor = readOptionalStyleColor(colorSource?.shiftTextColor);
 
   if (!trimmedLabel) {
@@ -2710,9 +2392,7 @@ function buildGeneralShiftChip(
   };
 }
 
-function isGeneralShiftSegment(
-  segment: { shiftId?: number | null } | null | undefined,
-): boolean {
+function isGeneralShiftSegment(segment: { shiftId?: number | null } | null | undefined): boolean {
   return (
     segment != null &&
     Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
@@ -2754,8 +2434,7 @@ function buildJobChip(
           borderColor: "#FBCFE8",
           textColor: "#BE185D",
         }
-      : normalizedLabel.includes("mentor") ||
-          normalizedLabel.includes("trainer")
+      : normalizedLabel.includes("mentor") || normalizedLabel.includes("trainer")
         ? {
             backgroundColor: mobileColors.warningSoft,
             borderColor: mobileColors.warningBorder,
@@ -2783,18 +2462,13 @@ function buildJobChip(
   };
 }
 
-function getScheduleItemJobChip(
-  item: FeaturedMeScheduleSegment["item"],
-): JobChip | null {
+function getScheduleItemJobChip(item: FeaturedMeScheduleSegment["item"]): JobChip | null {
   if (!item) {
     return null;
   }
 
   if (getScheduleEntryAbsenceTypeId(item.entry) != null) {
-    return buildAbsenceChip(
-      getScheduleItemShiftName(item),
-      item.entry.presentation,
-    );
+    return buildAbsenceChip(getScheduleItemShiftName(item), item.entry.presentation);
   }
 
   if (isGeneralShiftSegment(item.segment)) {
@@ -2805,9 +2479,7 @@ function getScheduleItemJobChip(
   return buildJobChip(jobName, item.segment);
 }
 
-function getSegmentJobChip(
-  segment: MobileScheduleEntrySegment,
-): JobChip | null {
+function getSegmentJobChip(segment: MobileScheduleEntrySegment): JobChip | null {
   if (isGeneralShiftSegment(segment)) {
     return buildGeneralShiftChip(segment.shiftName ?? segment.label, segment);
   }
@@ -2815,15 +2487,11 @@ function getSegmentJobChip(
   return buildJobChip(segment.jobName ?? null, segment);
 }
 
-function getScheduleItemTypeChip(
-  item: FeaturedMeScheduleSegment["item"],
-): JobChip | null {
+function getScheduleItemTypeChip(item: FeaturedMeScheduleSegment["item"]): JobChip | null {
   return getScheduleItemJobChip(item);
 }
 
-function getVisibleScheduleItemTypeChip(
-  item: FeaturedMeScheduleSegment["item"],
-): JobChip | null {
+function getVisibleScheduleItemTypeChip(item: FeaturedMeScheduleSegment["item"]): JobChip | null {
   const typeChip = getScheduleItemTypeChip(item);
 
   if (!item || !typeChip) {
@@ -2842,15 +2510,10 @@ function getVisibleScheduleItemTypeChip(
     item.entry.presentation?.label,
   ].map(normalizeScheduleLabel);
 
-  return chipLabel.length > 0 && shiftLabels.includes(chipLabel)
-    ? null
-    : typeChip;
+  return chipLabel.length > 0 && shiftLabels.includes(chipLabel) ? null : typeChip;
 }
 
-function shouldShowMePrimaryTitle(
-  title: string | null | undefined,
-  chip: JobChip | null,
-): boolean {
+function shouldShowMePrimaryTitle(title: string | null | undefined, chip: JobChip | null): boolean {
   if (!chip?.eyebrowLabel) {
     return true;
   }
@@ -2858,9 +2521,7 @@ function shouldShowMePrimaryTitle(
   return normalizeScheduleLabel(title) !== normalizeScheduleLabel(chip.label);
 }
 
-function getScheduleItemTimeRange(
-  item: FeaturedMeScheduleSegment["item"],
-): string | null {
+function getScheduleItemTimeRange(item: FeaturedMeScheduleSegment["item"]): string | null {
   if (!item) {
     return null;
   }
@@ -2876,14 +2537,11 @@ function getScheduleItemTimeRange(
   }
 
   return (
-    getScheduleEntrySegmentTimeRange(item.segment) ??
-    getScheduleEntryBaseTimeRange(item.entry)
+    getScheduleEntrySegmentTimeRange(item.segment) ?? getScheduleEntryBaseTimeRange(item.entry)
   );
 }
 
-function getScheduleItemSplitShiftLabel(
-  item: FeaturedMeScheduleSegment["item"],
-): string | null {
+function getScheduleItemSplitShiftLabel(item: FeaturedMeScheduleSegment["item"]): string | null {
   if (!item) {
     return null;
   }
@@ -2928,8 +2586,7 @@ function getMeHeroSupplementalSplitSegments(
   const featuredSegmentIndex = splitSegments.findIndex((segment) =>
     doScheduleSegmentsMatch(segment, item.segment),
   );
-  const hiddenSegmentIndex =
-    featuredSegmentIndex >= 0 ? featuredSegmentIndex : 0;
+  const hiddenSegmentIndex = featuredSegmentIndex >= 0 ? featuredSegmentIndex : 0;
   const segments: MobileScheduleEntrySegment[] = [];
   const segmentLabelIndices: number[] = [];
 
@@ -2938,9 +2595,7 @@ function getMeHeroSupplementalSplitSegments(
       return;
     }
 
-    if (
-      isHeroSplitSegmentComplete(item.entry, segment, currentDate, currentTime)
-    ) {
+    if (isHeroSplitSegmentComplete(item.entry, segment, currentDate, currentTime)) {
       return;
     }
 
@@ -2964,32 +2619,21 @@ function isHeroSplitSegmentComplete(
     return false;
   }
 
-  const segmentStartMinutes = getLocalDateTimeMinutes(
-    entry.date,
-    segmentStartTime,
-  );
+  const segmentStartMinutes = getLocalDateTimeMinutes(entry.date, segmentStartTime);
   const segmentEndMinutes = getLocalDateTimeMinutes(entry.date, segmentEndTime);
   const currentMinutes = getLocalDateTimeMinutes(currentDate, currentTime);
 
-  if (
-    segmentStartMinutes == null ||
-    segmentEndMinutes == null ||
-    currentMinutes == null
-  ) {
+  if (segmentStartMinutes == null || segmentEndMinutes == null || currentMinutes == null) {
     return false;
   }
 
   const normalizedEndMinutes =
-    segmentEndMinutes <= segmentStartMinutes
-      ? segmentEndMinutes + 24 * 60
-      : segmentEndMinutes;
+    segmentEndMinutes <= segmentStartMinutes ? segmentEndMinutes + 24 * 60 : segmentEndMinutes;
 
   return currentMinutes >= normalizedEndMinutes;
 }
 
-function getScheduleSegmentMatchKey(
-  segment: MobileScheduleEntrySegment,
-): string | null {
+function getScheduleSegmentMatchKey(segment: MobileScheduleEntrySegment): string | null {
   if (segment.shiftId != null) {
     return `shift:${segment.shiftId}`;
   }
@@ -3013,12 +2657,7 @@ function entriesShareWorkedSegment(
   for (const segment of getScheduleEntrySegments(left)) {
     if (
       getScheduleSegmentMatchKey(segment) === rightKey &&
-      doScheduleEntrySegmentsShareShiftAndFocusArea(
-        rightEntry,
-        rightSegment,
-        left,
-        segment,
-      )
+      doScheduleEntrySegmentsShareShiftAndFocusArea(rightEntry, rightSegment, left, segment)
     ) {
       return true;
     }
@@ -3045,20 +2684,13 @@ function getMeHeroShiftmates(
       entry.date === item.date &&
       entry.employeeId !== item.entry.employeeId &&
       getScheduleEntryAbsenceTypeId(entry) == null &&
-      entriesShareWorkedSegment(
-        entry,
-        item.entry,
-        item.segment,
-        featuredSegmentKey,
-      ),
+      entriesShareWorkedSegment(entry, item.entry, item.segment, featuredSegmentKey),
   );
 
   return sortScheduleEntries(
     matchingEntries.filter(
       (entry, index, entries) =>
-        entries.findIndex(
-          (candidate) => candidate.employeeId === entry.employeeId,
-        ) === index,
+        entries.findIndex((candidate) => candidate.employeeId === entry.employeeId) === index,
     ),
   );
 }
@@ -3073,23 +2705,17 @@ function getRequestJobChip(
 ): JobChip | null {
   if (getRequestAbsenceTypeId(request, which) != null) {
     const presentation =
-      which === "requester"
-        ? request.requesterPresentation
-        : request.targetPresentation;
+      which === "requester" ? request.requesterPresentation : request.targetPresentation;
     return buildAbsenceChip(getRequestShiftName(request, which), presentation);
   }
 
   const primarySegment = getRequestPrimarySegment(request, which);
 
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(
-      getRequestShiftName(request, which),
-      primarySegment,
-    );
+    return buildGeneralShiftChip(getRequestShiftName(request, which), primarySegment);
   }
 
-  const segment =
-    getRequestSegments(request, which).find((item) => item.jobName) ?? null;
+  const segment = getRequestSegments(request, which).find((item) => item.jobName) ?? null;
   const jobName = getRequestJobName(request, which);
   return buildJobChip(jobName, segment);
 }
@@ -3133,19 +2759,13 @@ function JobPill({
   }
 
   const accessibilityLabel = chip.eyebrowLabel
-    ? `${chip.eyebrowLabel} ${chip.label}${
-        isMentored ? " mentored assignment" : ""
-      }`
+    ? `${chip.eyebrowLabel} ${chip.label}${isMentored ? " mentored assignment" : ""}`
     : `Job ${chip.label}${isMentored ? " mentored assignment" : ""}`;
   const showsLabeledValue = chip.eyebrowLabel != null;
-  const shouldRenderEyebrowInsidePill =
-    eyebrowDisplay === "inside" && chip.eyebrowLabel;
-  const shouldRenderSingleLinePill =
-    !showsLabeledValue || eyebrowDisplay === "outside";
+  const shouldRenderEyebrowInsidePill = eyebrowDisplay === "inside" && chip.eyebrowLabel;
+  const shouldRenderSingleLinePill = !showsLabeledValue || eyebrowDisplay === "outside";
   const pillBorderColor =
-    chip.kind === "general"
-      ? mobileBorderColorFromText(chip.textColor)
-      : chip.borderColor;
+    chip.kind === "general" ? mobileBorderColorFromText(chip.textColor) : chip.borderColor;
 
   return (
     <View
@@ -3171,11 +2791,7 @@ function JobPill({
             {chip.label}
           </Text>
           {isMentored ? (
-            <Text
-              style={[styles.jobPillMentoredText, { color: chip.textColor }]}
-            >
-              (Mentored)
-            </Text>
+            <Text style={[styles.jobPillMentoredText, { color: chip.textColor }]}>(Mentored)</Text>
           ) : null}
         </View>
       ) : (
@@ -3200,9 +2816,7 @@ function JobPill({
           >
             {chip.label}
             {isMentored ? (
-              <Text
-                style={[styles.jobPillMentoredText, { color: chip.textColor }]}
-              >
+              <Text style={[styles.jobPillMentoredText, { color: chip.textColor }]}>
                 {" "}
                 (Mentored)
               </Text>
@@ -3240,20 +2854,13 @@ function MeTypePill({
       <Text
         style={[
           styles.meTypePillLabel,
-          titleScale === "hero"
-            ? styles.meTypePillLabelHero
-            : styles.meTypePillLabelRow,
+          titleScale === "hero" ? styles.meTypePillLabelHero : styles.meTypePillLabelRow,
           inverseLabel && styles.meTypePillLabelInverse,
         ]}
       >
         {chip.eyebrowLabel}
       </Text>
-      <JobPill
-        chip={chip}
-        compact={compact}
-        eyebrowDisplay="outside"
-        isMentored={isMentored}
-      />
+      <JobPill chip={chip} compact={compact} eyebrowDisplay="outside" isMentored={isMentored} />
     </View>
   );
 }
@@ -3269,11 +2876,7 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   return (
     <View style={styles.meHeroCollaborators}>
       <View style={styles.meHeroCollaboratorLabelRow}>
-        <Ionicons
-          color="rgba(255, 255, 255, 0.76)"
-          name="people-outline"
-          size={22}
-        />
+        <Ionicons color="rgba(255, 255, 255, 0.76)" name="people-outline" size={22} />
         <Text style={styles.meHeroCollaboratorLabel}>Working with</Text>
       </View>
       <View style={styles.meHeroAvatarStack}>
@@ -3298,10 +2901,7 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
                 ]}
               >
                 <Text
-                  style={[
-                    styles.meHeroCollaboratorAvatarText,
-                    { color: avatarTone.textColor },
-                  ]}
+                  style={[styles.meHeroCollaboratorAvatarText, { color: avatarTone.textColor }]}
                 >
                   {getInitials(entry.employeeName)}
                 </Text>
@@ -3313,14 +2913,11 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
           <View
             style={[
               styles.meHeroCollaboratorAvatarFrame,
-              visibleEntries.length > 0 &&
-                styles.meHeroCollaboratorAvatarFrameOverlap,
+              visibleEntries.length > 0 && styles.meHeroCollaboratorAvatarFrameOverlap,
             ]}
           >
             <View style={styles.meHeroCollaboratorOverflow}>
-              <Text style={styles.meHeroCollaboratorOverflowText}>
-                +{overflowCount}
-              </Text>
+              <Text style={styles.meHeroCollaboratorOverflowText}>+{overflowCount}</Text>
             </View>
           </View>
         ) : null}
@@ -3373,9 +2970,7 @@ function MeHeroCard({
   const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
   const focusAreaName = getScheduleItemFocusArea(featuredItem);
   const timeRange = getScheduleItemTimeRange(featuredItem);
-  const splitSegments = featuredItem
-    ? getSplitShiftSegmentsForEntry(featuredItem.entry)
-    : [];
+  const splitSegments = featuredItem ? getSplitShiftSegmentsForEntry(featuredItem.entry) : [];
   const splitShiftCount = splitSegments.length;
   const heroSplitSegments = getMeHeroSupplementalSplitSegments(
     featuredItem,
@@ -3384,8 +2979,7 @@ function MeHeroCard({
     currentTime,
   );
   const heroSplitShiftLabel = getScheduleItemSplitShiftLabel(featuredItem);
-  const shouldShowHeroSplitBadge =
-    splitShiftCount > 1 && heroSplitSegments.segments.length > 0;
+  const shouldShowHeroSplitBadge = splitShiftCount > 1 && heroSplitSegments.segments.length > 0;
   const badgeDotStyle =
     status === "active"
       ? styles.meHeroBadgeDotActive
@@ -3404,13 +2998,8 @@ function MeHeroCard({
             </View>
           ) : null}
           {heroDateParts ? (
-            <View
-              accessibilityLabel={heroDateLabel ?? undefined}
-              style={styles.meHeroDateTile}
-            >
-              <Text style={styles.meHeroDateWeekday}>
-                {heroDateParts.weekdayLabel}
-              </Text>
+            <View accessibilityLabel={heroDateLabel ?? undefined} style={styles.meHeroDateTile}>
+              <Text style={styles.meHeroDateWeekday}>{heroDateParts.weekdayLabel}</Text>
               <Text style={styles.meHeroDateDay}>{heroDateParts.dayLabel}</Text>
             </View>
           ) : null}
@@ -3418,25 +3007,15 @@ function MeHeroCard({
       ) : null}
       {shouldShowShiftName || shouldShowHeroSplitBadge ? (
         <View style={styles.meHeroTitleRow}>
-          {shouldShowShiftName ? (
-            <Text style={styles.meHeroTitle}>{shiftName}</Text>
-          ) : null}
+          {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{shiftName}</Text> : null}
           {shouldShowHeroSplitBadge ? (
-            <SplitShiftBadge
-              count={splitShiftCount}
-              inverse
-              label={heroSplitShiftLabel}
-            />
+            <SplitShiftBadge count={splitShiftCount} inverse label={heroSplitShiftLabel} />
           ) : null}
         </View>
       ) : null}
       {focusAreaName ? (
         <View style={styles.meHeroAreaRow}>
-          <Ionicons
-            color="rgba(255, 255, 255, 0.82)"
-            name="location-outline"
-            size={18}
-          />
+          <Ionicons color="rgba(255, 255, 255, 0.82)" name="location-outline" size={18} />
           <Text style={styles.meHeroAreaLabel}>{focusAreaName}</Text>
         </View>
       ) : null}
@@ -3456,16 +3035,10 @@ function MeHeroCard({
       {timeRange ? (
         <View style={styles.meHeroScheduleRow}>
           <View style={styles.meHeroTimeRow}>
-            <Ionicons
-              color="rgba(255, 255, 255, 0.82)"
-              name="time-outline"
-              size={24}
-            />
+            <Ionicons color="rgba(255, 255, 255, 0.82)" name="time-outline" size={24} />
             <Text style={styles.meHeroTimeText}>{timeRange}</Text>
           </View>
-          {timing ? (
-            <Text style={styles.meHeroProgressLabel}>{timing.label}</Text>
-          ) : null}
+          {timing ? <Text style={styles.meHeroProgressLabel}>{timing.label}</Text> : null}
         </View>
       ) : null}
       {timing?.progress != null ? (
@@ -3530,10 +3103,7 @@ function MeHeroCard({
         <Pressable
           accessibilityRole="button"
           onPress={onPress}
-          style={({ pressed }) => [
-            styles.meHeroCard,
-            pressed && styles.meHeroCardPressed,
-          ]}
+          style={({ pressed }) => [styles.meHeroCard, pressed && styles.meHeroCardPressed]}
           testID="me-hero-card"
         >
           {heroGradient}
@@ -3610,9 +3180,7 @@ function UpcomingShiftsSection({
                 styles.upcomingDateGroup,
                 groupIndex > 0 && styles.upcomingShiftRowBorder,
                 isToday && styles.upcomingShiftRowToday,
-                isToday &&
-                  groupIndex === 0 &&
-                  styles.upcomingShiftRowTodayFirst,
+                isToday && groupIndex === 0 && styles.upcomingShiftRowTodayFirst,
                 isToday &&
                   groupIndex === groupedItems.length - 1 &&
                   styles.upcomingShiftRowTodayLast,
@@ -3621,12 +3189,8 @@ function UpcomingShiftsSection({
             >
               <View style={styles.upcomingDateColumn}>
                 <View style={styles.upcomingDateTile}>
-                  <Text style={styles.upcomingDateWeekday}>
-                    {dateParts.weekdayLabel}
-                  </Text>
-                  <Text style={styles.upcomingDateDay}>
-                    {dateParts.dayLabel}
-                  </Text>
+                  <Text style={styles.upcomingDateWeekday}>{dateParts.weekdayLabel}</Text>
+                  <Text style={styles.upcomingDateDay}>{dateParts.dayLabel}</Text>
                   {isToday ? (
                     <View
                       pointerEvents="none"
@@ -3641,15 +3205,10 @@ function UpcomingShiftsSection({
                 {group.items.map((item, itemIndex) => {
                   const typeChip = getScheduleItemTypeChip(item);
                   const shiftName = getScheduleItemShiftName(item);
-                  const shouldShowShiftName = shouldShowMePrimaryTitle(
-                    shiftName,
-                    typeChip,
-                  );
+                  const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
                   const focusAreaName = getScheduleItemFocusArea(item);
                   const timeRange = getScheduleItemTimeRange(item);
-                  const splitSegments = getSplitShiftSegmentsForEntry(
-                    item.entry,
-                  );
+                  const splitSegments = getSplitShiftSegmentsForEntry(item.entry);
                   const splitShiftLabel = getScheduleItemSplitShiftLabel(item);
 
                   return (
@@ -3665,9 +3224,7 @@ function UpcomingShiftsSection({
                             <View style={styles.upcomingShiftTitleRow}>
                               <View style={styles.upcomingShiftTitleMeta}>
                                 {shouldShowShiftName ? (
-                                  <Text style={styles.upcomingShiftTitle}>
-                                    {shiftName}
-                                  </Text>
+                                  <Text style={styles.upcomingShiftTitle}>{shiftName}</Text>
                                 ) : null}
                                 {splitSegments.length > 1 ? (
                                   <SplitShiftBadge
@@ -3684,35 +3241,27 @@ function UpcomingShiftsSection({
                                     name="time-outline"
                                     size={18}
                                   />
-                                  <Text style={styles.upcomingShiftTimeText}>
-                                    {timeRange}
-                                  </Text>
+                                  <Text style={styles.upcomingShiftTimeText}>{timeRange}</Text>
                                 </View>
                               ) : null}
                             </View>
                           ) : null}
                           {focusAreaName ? (
-                            <Text style={styles.upcomingShiftArea}>
-                              {focusAreaName}
-                            </Text>
+                            <Text style={styles.upcomingShiftArea}>{focusAreaName}</Text>
                           ) : null}
                           <MeTypePill
                             chip={typeChip}
                             compact
                             isMentored={item.segment.isMentored === true}
                           />
-                          {timeRange &&
-                          !shouldShowShiftName &&
-                          splitSegments.length <= 1 ? (
+                          {timeRange && !shouldShowShiftName && splitSegments.length <= 1 ? (
                             <View style={styles.upcomingShiftTime}>
                               <Ionicons
                                 color={mobileColors.textMuted}
                                 name="time-outline"
                                 size={18}
                               />
-                              <Text style={styles.upcomingShiftTimeText}>
-                                {timeRange}
-                              </Text>
+                              <Text style={styles.upcomingShiftTimeText}>{timeRange}</Text>
                             </View>
                           ) : null}
                         </View>
@@ -3783,12 +3332,8 @@ function OpenShiftsSection({
   onVolunteer: (openShift: MobileOpenShift) => void;
   onSeeAll: () => void;
 }) {
-  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>(
-    {},
-  );
-  const [stackCardHeights, setStackCardHeights] = useState<
-    Record<string, number>
-  >({});
+  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+  const [stackCardHeights, setStackCardHeights] = useState<Record<string, number>>({});
   const availableOpenShiftFeed = useMemo(
     () =>
       buildAvailableOpenShiftFeed({
@@ -3801,15 +3346,7 @@ function OpenShiftsSection({
         coverageGapVisibility: openShiftVisibility?.coverageGap,
         calloffVisibility: openShiftVisibility?.calloff,
       }),
-    [
-      linkedEmployeeId,
-      now,
-      openShifts,
-      requests,
-      scheduleEntries,
-      timeZone,
-      openShiftVisibility,
-    ],
+    [linkedEmployeeId, now, openShifts, requests, scheduleEntries, timeZone, openShiftVisibility],
   );
   const dateGroups = availableOpenShiftFeed.groups;
   const noteStackCardHeight = useCallback((date: string, height: number) => {
@@ -3858,12 +3395,9 @@ function OpenShiftsSection({
         : null;
       const isVolunteerLoading =
         volunteerBody != null &&
-        pendingAction?.key ===
-          getMobileRequestActionKey(item.openShift.id, volunteerBody);
+        pendingAction?.key === getMobileRequestActionKey(item.openShift.id, volunteerBody);
       const jobChip = getOpenShiftJobChip(item.openShift);
-      const isMentored = hasMentoredSegments(
-        item.openShift.presentation.segments,
-      );
+      const isMentored = hasMentoredSegments(item.openShift.presentation.segments);
       const shiftName = getOpenShiftShiftName(item.openShift);
       const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
       const focusAreaName = getOpenShiftFocusAreaName(item.openShift);
@@ -3880,9 +3414,7 @@ function OpenShiftsSection({
               {shouldShowShiftName ? (
                 <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
               ) : null}
-              {hasSplitSegments ? (
-                <SplitShiftBadge count={splitSegments.length} compact />
-              ) : null}
+              {hasSplitSegments ? <SplitShiftBadge count={splitSegments.length} compact /> : null}
             </View>
           ) : null}
           {hasSplitSegments ? (
@@ -3902,9 +3434,7 @@ function OpenShiftsSection({
             </View>
           ) : jobChip || focusAreaName || isMentored ? (
             <View style={styles.scheduleRowContextStack}>
-              {focusAreaName ? (
-                <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text>
-              ) : null}
+              {focusAreaName ? <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text> : null}
               {jobChip || isMentored ? (
                 <View style={styles.scheduleRowContext}>
                   <MeTypePill chip={jobChip} compact isMentored={isMentored} />
@@ -3918,11 +3448,7 @@ function OpenShiftsSection({
           </Text>
           {!hasSplitSegments && timeRange ? (
             <View style={styles.scheduleRowTime}>
-              <Ionicons
-                color={mobileColors.textMuted}
-                name="time-outline"
-                size={18}
-              />
+              <Ionicons color={mobileColors.textMuted} name="time-outline" size={18} />
               <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
             </View>
           ) : null}
@@ -3941,8 +3467,7 @@ function OpenShiftsSection({
       );
       const volunteerBlockReason =
         item.openShift.canVolunteer === false
-          ? (item.openShift.volunteerBlockReason ??
-            "You can't volunteer for this shift right now.")
+          ? (item.openShift.volunteerBlockReason ?? "You can't volunteer for this shift right now.")
           : null;
 
       return (
@@ -3953,17 +3478,11 @@ function OpenShiftsSection({
           ) : null}
           <Button
             disabled={
-              Boolean(pendingAction) ||
-              !linkedEmployeeId ||
-              item.openShift.canVolunteer === false
+              Boolean(pendingAction) || !linkedEmployeeId || item.openShift.canVolunteer === false
             }
             label={isVolunteerLoading ? pendingAction.label : "Volunteer"}
             leadingAccessory={
-              <Ionicons
-                color={mobileColors.brand}
-                name="add-circle-outline"
-                size={18}
-              />
+              <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
             }
             loading={isVolunteerLoading}
             onPress={() => {
@@ -3992,12 +3511,9 @@ function OpenShiftsSection({
       item.request.parentRequestId == null;
     const isClaimLoading =
       claimBody != null &&
-      pendingAction?.key ===
-        getMobileRequestActionKey(item.request.id, claimBody);
+      pendingAction?.key === getMobileRequestActionKey(item.request.id, claimBody);
     const jobChip = getRequestJobChip(item.request, "requester");
-    const isMentored = hasMentoredSegments(
-      getRequestSegments(item.request, "requester"),
-    );
+    const isMentored = hasMentoredSegments(getRequestSegments(item.request, "requester"));
     const shiftName = getRequestShiftName(item.request, "requester");
     const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
     const focusAreaName = getRequestFocusAreaName(item.request, "requester");
@@ -4008,14 +3524,10 @@ function OpenShiftsSection({
         onPress={cardSurfaceProps.onPress}
         style={styles.openShiftCardSurface}
       >
-        {shouldShowShiftName ? (
-          <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
-        ) : null}
+        {shouldShowShiftName ? <Text style={styles.scheduleRowTitle}>{shiftName}</Text> : null}
         {jobChip || focusAreaName || isMentored ? (
           <View style={styles.scheduleRowContextStack}>
-            {focusAreaName ? (
-              <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text>
-            ) : null}
+            {focusAreaName ? <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text> : null}
             {jobChip || isMentored ? (
               <View style={styles.scheduleRowContext}>
                 <MeTypePill chip={jobChip} compact isMentored={isMentored} />
@@ -4025,25 +3537,17 @@ function OpenShiftsSection({
         ) : null}
         {timeRange ? (
           <View style={styles.scheduleRowTime}>
-            <Ionicons
-              color={mobileColors.textMuted}
-              name="time-outline"
-              size={18}
-            />
+            <Ionicons color={mobileColors.textMuted} name="time-outline" size={18} />
             <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
           </View>
         ) : null}
       </Pressable>
     ) : (
       <View style={styles.openShiftCardSurface}>
-        {shouldShowShiftName ? (
-          <Text style={styles.scheduleRowTitle}>{shiftName}</Text>
-        ) : null}
+        {shouldShowShiftName ? <Text style={styles.scheduleRowTitle}>{shiftName}</Text> : null}
         {jobChip || focusAreaName || isMentored ? (
           <View style={styles.scheduleRowContextStack}>
-            {focusAreaName ? (
-              <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text>
-            ) : null}
+            {focusAreaName ? <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text> : null}
             {jobChip || isMentored ? (
               <View style={styles.scheduleRowContext}>
                 <MeTypePill chip={jobChip} compact isMentored={isMentored} />
@@ -4053,11 +3557,7 @@ function OpenShiftsSection({
         ) : null}
         {timeRange ? (
           <View style={styles.scheduleRowTime}>
-            <Ionicons
-              color={mobileColors.textMuted}
-              name="time-outline"
-              size={18}
-            />
+            <Ionicons color={mobileColors.textMuted} name="time-outline" size={18} />
             <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
           </View>
         ) : null}
@@ -4068,11 +3568,7 @@ function OpenShiftsSection({
       <View key={item.key} style={styles.openShiftCard}>
         {cardSurface}
         <Button
-          disabled={
-            isPendingVolunteerRequest ||
-            Boolean(pendingAction) ||
-            !linkedEmployeeId
-          }
+          disabled={isPendingVolunteerRequest || Boolean(pendingAction) || !linkedEmployeeId}
           label={
             isPendingVolunteerRequest
               ? "Pending approval"
@@ -4083,11 +3579,7 @@ function OpenShiftsSection({
           leadingAccessory={
             <Ionicons
               color={mobileColors.brand}
-              name={
-                isPendingVolunteerRequest
-                  ? "hourglass-outline"
-                  : "add-circle-outline"
-              }
+              name={isPendingVolunteerRequest ? "hourglass-outline" : "add-circle-outline"}
               size={18}
             />
           }
@@ -4105,11 +3597,7 @@ function OpenShiftsSection({
 
   return (
     <View style={styles.meSectionBlock}>
-      <MeSectionHeader
-        actionLabel="See all"
-        onAction={onSeeAll}
-        title="Open Shifts"
-      />
+      <MeSectionHeader actionLabel="See all" onAction={onSeeAll} title="Open Shifts" />
 
       {isLoading ? (
         <ListSkeleton rows={2} showSectionHeader={false} />
@@ -4134,14 +3622,10 @@ function OpenShiftsSection({
               ? group.items
               : group.items.slice(0, MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS);
             const isCollapsedStack = !isExpandedDay && visibleItems.length > 1;
-            const hiddenStackCount = isCollapsedStack
-              ? visibleItems.length - 1
-              : 0;
+            const hiddenStackCount = isCollapsedStack ? visibleItems.length - 1 : 0;
             const stackedDeckHeight =
-              hiddenStackCount * OPEN_SHIFT_STACK_PEEK_HEIGHT +
-              OPEN_SHIFT_CARD_SHADOW_ALLOWANCE;
-            const stackCardHeight =
-              stackCardHeights[group.date] ?? OPEN_SHIFT_CARD_MIN_HEIGHT;
+              hiddenStackCount * OPEN_SHIFT_STACK_PEEK_HEIGHT + OPEN_SHIFT_CARD_SHADOW_ALLOWANCE;
+            const stackCardHeight = stackCardHeights[group.date] ?? OPEN_SHIFT_CARD_MIN_HEIGHT;
             const cardToggleLabel = isExpandedDay
               ? `Collapse open shifts for ${dateLabel}`
               : `Expand open shifts for ${dateLabel}`;
@@ -4151,14 +3635,10 @@ function OpenShiftsSection({
                 <View style={styles.openShiftDateHeader}>
                   <Text style={styles.scheduleRowDate}>{dateLabel}</Text>
                   <View
-                    accessibilityLabel={formatOpenShiftCardCountLabel(
-                      group.itemCount,
-                    )}
+                    accessibilityLabel={formatOpenShiftCardCountLabel(group.itemCount)}
                     style={styles.openShiftCountBadge}
                   >
-                    <Text style={styles.openShiftCountBadgeText}>
-                      {group.itemCount}
-                    </Text>
+                    <Text style={styles.openShiftCountBadgeText}>{group.itemCount}</Text>
                   </View>
                 </View>
                 <View
@@ -4198,20 +3678,14 @@ function OpenShiftsSection({
                       })}
                       <View
                         onLayout={(event) => {
-                          noteStackCardHeight(
-                            group.date,
-                            event.nativeEvent.layout.height,
-                          );
+                          noteStackCardHeight(group.date, event.nativeEvent.layout.height);
                         }}
                         style={styles.openShiftCardLead}
                       >
-                        {renderFeedCard(
-                          visibleItems[0] as AvailableShiftFeedItem,
-                          {
-                            accessibilityLabel: cardToggleLabel,
-                            onToggle: () => toggleExpandedDate(group.date),
-                          },
-                        )}
+                        {renderFeedCard(visibleItems[0] as AvailableShiftFeedItem, {
+                          accessibilityLabel: cardToggleLabel,
+                          onToggle: () => toggleExpandedDate(group.date),
+                        })}
                       </View>
                     </>
                   ) : (
@@ -4273,14 +3747,9 @@ function ShiftCoverRequestsSection({
             const avatarTone = getAvatarTone(request.requesterEmpId);
             const jobChip = getRequestJobChip(request, "requester");
             const shiftName = getRequestShiftName(request, "requester");
-            const shouldShowShiftName = shouldShowMePrimaryTitle(
-              shiftName,
-              jobChip,
-            );
+            const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
             const focusAreaName = getRequestFocusAreaName(request, "requester");
-            const isMentored = hasMentoredSegments(
-              getRequestSegments(request, "requester"),
-            );
+            const isMentored = hasMentoredSegments(getRequestSegments(request, "requester"));
             const timeRange = getRequestTimeRange(request, "requester");
             const acceptBody: RequestActionBody | null = linkedEmployeeId
               ? { action: "respond", empId: linkedEmployeeId, accept: true }
@@ -4290,12 +3759,10 @@ function ShiftCoverRequestsSection({
               : null;
             const isAcceptLoading =
               acceptBody != null &&
-              pendingAction?.key ===
-                getMobileRequestActionKey(request.id, acceptBody);
+              pendingAction?.key === getMobileRequestActionKey(request.id, acceptBody);
             const isDeclineLoading =
               declineBody != null &&
-              pendingAction?.key ===
-                getMobileRequestActionKey(request.id, declineBody);
+              pendingAction?.key === getMobileRequestActionKey(request.id, declineBody);
 
             return (
               <View key={request.id} style={styles.requestCard}>
@@ -4310,27 +3777,16 @@ function ShiftCoverRequestsSection({
                         },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.requestAvatarText,
-                          { color: avatarTone.textColor },
-                        ]}
-                      >
+                      <Text style={[styles.requestAvatarText, { color: avatarTone.textColor }]}>
                         {getInitials(request.requesterName)}
                       </Text>
                     </View>
                     <View style={styles.requestHeaderTextStack}>
-                      <Text style={styles.requestHeaderText}>
-                        {request.requesterName}
-                      </Text>
-                      <Text style={styles.requestHeaderSubtext}>
-                        Needs shift coverage
-                      </Text>
+                      <Text style={styles.requestHeaderText}>{request.requesterName}</Text>
+                      <Text style={styles.requestHeaderSubtext}>Needs shift coverage</Text>
                     </View>
                   </View>
-                  <Text style={styles.requestDateText}>
-                    {getRequestDateLabel(request)}
-                  </Text>
+                  <Text style={styles.requestDateText}>{getRequestDateLabel(request)}</Text>
                 </View>
 
                 {shouldShowShiftName ? (
@@ -4338,25 +3794,15 @@ function ShiftCoverRequestsSection({
                 ) : null}
                 {jobChip || focusAreaName || isMentored ? (
                   <View style={styles.scheduleRowContext}>
-                    <MeTypePill
-                      chip={jobChip}
-                      compact
-                      isMentored={isMentored}
-                    />
+                    <MeTypePill chip={jobChip} compact isMentored={isMentored} />
                     {focusAreaName ? (
-                      <Text style={styles.scheduleRowMeta}>
-                        {focusAreaName}
-                      </Text>
+                      <Text style={styles.scheduleRowMeta}>{focusAreaName}</Text>
                     ) : null}
                   </View>
                 ) : null}
                 {timeRange ? (
                   <View style={styles.scheduleRowTime}>
-                    <Ionicons
-                      color={mobileColors.textMuted}
-                      name="time-outline"
-                      size={18}
-                    />
+                    <Ionicons color={mobileColors.textMuted} name="time-outline" size={18} />
                     <Text style={styles.scheduleRowTimeText}>{timeRange}</Text>
                   </View>
                 ) : null}
@@ -4400,12 +3846,9 @@ function TeamShiftMemberRow({
 }) {
   const { entry, segment } = row;
   const avatarTone = getAvatarTone(entry.employeeId);
-  const memberName =
-    entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
+  const memberName = entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
   const memberTimeRange = getTeamShiftRowTimeRange(row, groupTimeRange);
-  const alternateShiftLabel = formatAlternateShiftTitles(
-    row.alternateShiftTitles,
-  );
+  const alternateShiftLabel = formatAlternateShiftTitles(row.alternateShiftTitles);
   const roleChip = getTeamMemberRoleChip(entry, segment);
   const isMentored = segment
     ? segment.isMentored === true
@@ -4426,9 +3869,7 @@ function TeamShiftMemberRow({
           },
         ]}
       >
-        <Text
-          style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}
-        >
+        <Text style={[styles.teamMemberAvatarText, { color: avatarTone.textColor }]}>
           {getInitials(entry.employeeName)}
         </Text>
       </View>
@@ -4437,9 +3878,7 @@ function TeamShiftMemberRow({
           <View style={styles.teamMemberNameRow}>
             <Text style={styles.teamMemberName}>{memberName}</Text>
           </View>
-          {memberTimeRange ? (
-            <Text style={styles.teamMemberTime}>{memberTimeRange}</Text>
-          ) : null}
+          {memberTimeRange ? <Text style={styles.teamMemberTime}>{memberTimeRange}</Text> : null}
           {alternateShiftLabel ? (
             <View style={styles.teamMemberSplitBadgeRow}>
               <SplitShiftBadge
@@ -4452,12 +3891,7 @@ function TeamShiftMemberRow({
         </View>
         {roleChip || isMentored ? (
           <View style={styles.teamMemberRoleRow}>
-            <JobPill
-              chip={roleChip}
-              compact
-              eyebrowDisplay="outside"
-              isMentored={isMentored}
-            />
+            <JobPill chip={roleChip} compact eyebrowDisplay="outside" isMentored={isMentored} />
           </View>
         ) : null}
       </View>
@@ -4482,24 +3916,19 @@ function getTeamMemberRoleChip(
     return buildGeneralShiftChip(getScheduleEntryTitle(entry), primarySegment);
   }
 
-  const jobSegment =
-    getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
+  const jobSegment = getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
   return buildJobChip(jobSegment?.jobName ?? null, jobSegment);
 }
 
 function getInitials(name: string): string {
-  const parts =
-    name.match(/[\p{L}\p{N}]+(?:['-][\p{L}\p{N}]+)*/gu)?.filter(Boolean) ?? [];
+  const parts = name.match(/[\p{L}\p{N}]+(?:['-][\p{L}\p{N}]+)*/gu)?.filter(Boolean) ?? [];
 
   if (parts.length === 0) {
     return "?";
   }
 
   const first = parts[0]?.charAt(0).toUpperCase() ?? "";
-  const last =
-    parts.length > 1
-      ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "")
-      : "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "") : "";
 
   return `${first}${last}` || "?";
 }

@@ -1,22 +1,8 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
-import {
-  CalendarDays,
-  Check,
-  Clock3,
-  MapPin,
-  UserRound,
-  Users,
-} from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { CalendarDays, Check, Clock3, MapPin, UserRound, Users } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
-import { formatDateKey } from "@/lib/dashboard-stats";
-import { getAvatarInitials } from "@/lib/utils";
+import { formatDateKey, getAvatarInitials } from "@/lib/utils";
 import {
   getCurrentTimeValueInTimeZone,
   getIsoDateInTimeZone,
@@ -136,8 +122,7 @@ const PANE_SCROLL_PADDING = 32;
 // container's clipping edge (a vertical scroll container also clips the x-axis).
 const PANE_SCROLL_GUTTER = 16;
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DASHBOARD_HERO_BG =
-  "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
+const DASHBOARD_HERO_BG = "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
 const DASHBOARD_HERO_COLLABORATOR_BG = "rgba(255, 255, 255, 0.16)";
 const DASHBOARD_HERO_AVATAR_OVERLAP = -10;
 
@@ -195,20 +180,10 @@ export default function UserDashboard(props: DashboardContentProps) {
         focusAreaById,
         shiftById,
       }),
-    [
-      absenceTypeById,
-      assignmentById,
-      currentPeriodShifts,
-      employeeById,
-      focusAreaById,
-      shiftById,
-    ],
+    [absenceTypeById, assignmentById, currentPeriodShifts, employeeById, focusAreaById, shiftById],
   );
   const myScheduleItems = useMemo(
-    () =>
-      currentEmpId
-        ? allScheduleItems.filter((item) => item.employeeId === currentEmpId)
-        : [],
+    () => (currentEmpId ? allScheduleItems.filter((item) => item.employeeId === currentEmpId) : []),
     [allScheduleItems, currentEmpId],
   );
   // The hero highlights your current/next shift, which can fall outside the
@@ -225,21 +200,10 @@ export default function UserDashboard(props: DashboardContentProps) {
         focusAreaById,
         shiftById,
       }).filter((item) => item.dateKey >= todayKey),
-    [
-      absenceTypeById,
-      allShifts,
-      assignmentById,
-      employeeById,
-      focusAreaById,
-      shiftById,
-      todayKey,
-    ],
+    [absenceTypeById, allShifts, assignmentById, employeeById, focusAreaById, shiftById, todayKey],
   );
   const heroItems = useMemo(
-    () =>
-      currentEmpId
-        ? upcomingAllItems.filter((item) => item.employeeId === currentEmpId)
-        : [],
+    () => (currentEmpId ? upcomingAllItems.filter((item) => item.employeeId === currentEmpId) : []),
     [upcomingAllItems, currentEmpId],
   );
   const hero = useMemo(
@@ -522,12 +486,14 @@ function useMinuteNow(): Date {
 
     function scheduleNextTick() {
       const current = new Date();
-      const delay =
-        60_000 - current.getSeconds() * 1000 - current.getMilliseconds();
-      timeoutId = window.setTimeout(() => {
-        setNow(new Date());
-        scheduleNextTick();
-      }, Math.max(250, delay));
+      const delay = 60_000 - current.getSeconds() * 1000 - current.getMilliseconds();
+      timeoutId = window.setTimeout(
+        () => {
+          setNow(new Date());
+          scheduleNextTick();
+        },
+        Math.max(250, delay),
+      );
     }
 
     scheduleNextTick();
@@ -615,9 +581,7 @@ function buildScheduleItemsFromShiftMap(input: {
   return items.sort(compareScheduleItems);
 }
 
-function parseShiftMapKey(
-  key: string,
-): { employeeId: string; dateKey: string } | null {
+function parseShiftMapKey(key: string): { employeeId: string; dateKey: string } | null {
   const splitIndex = key.indexOf("_");
   if (splitIndex <= 0) {
     return null;
@@ -629,9 +593,7 @@ function parseShiftMapKey(
   };
 }
 
-function getWorkedSegments(
-  entry: ScheduleCellStateEntry,
-): Array<Partial<ShiftJobSegment>> {
+function getWorkedSegments(entry: ScheduleCellStateEntry): Array<Partial<ShiftJobSegment>> {
   const explicitSegments = [...(entry.segments ?? [])].sort(
     (left, right) => (left.position ?? 0) - (right.position ?? 0),
   );
@@ -690,21 +652,15 @@ function buildWorkedSegment(input: {
 }): DashboardScheduleSegment | null {
   const assignmentId =
     input.rawSegment.assignmentId ?? input.entry.assignmentIds[input.segmentIndex];
-  const assignment =
-    assignmentId != null ? (input.assignmentById.get(assignmentId) ?? null) : null;
-  const shiftId =
-    input.rawSegment.shiftId ??
-    assignment?.shiftId ??
-    assignment?.categoryId ??
-    null;
+  const assignment = assignmentId != null ? (input.assignmentById.get(assignmentId) ?? null) : null;
+  const shiftId = input.rawSegment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
   const jobId = input.rawSegment.jobId ?? assignment?.jobId ?? null;
 
   if (jobId == null && assignment == null && !input.rawSegment.label) {
     return null;
   }
 
-  const focusAreaId =
-    input.rawSegment.focusAreaId ?? assignment?.focusAreaId ?? null;
+  const focusAreaId = input.rawSegment.focusAreaId ?? assignment?.focusAreaId ?? null;
   const focusAreaName =
     focusAreaId != null ? (input.focusAreaById.get(focusAreaId)?.name ?? null) : null;
   const rawShiftLabel =
@@ -721,15 +677,11 @@ function buildWorkedSegment(input: {
       shiftAbbr: input.rawSegment.shiftAbbr ?? null,
       shiftById: input.shiftById,
     });
-  const shiftName =
-    input.rawSegment.shiftName ??
-    shift?.name ??
-    null;
+  const shiftName = input.rawSegment.shiftName ?? shift?.name ?? null;
   const shiftAbbr = input.rawSegment.shiftAbbr ?? shift?.abbr ?? null;
   const jobName = input.rawSegment.jobName ?? null;
   const jobAbbr = input.rawSegment.jobAbbr ?? null;
-  const isGeneral =
-    assignment?.isGeneral === true || (shiftId == null && shift == null);
+  const isGeneral = assignment?.isGeneral === true || (shiftId == null && shift == null);
   const rawChipLabel =
     input.rawSegment.jobName ??
     input.rawSegment.label ??
@@ -746,10 +698,9 @@ function buildWorkedSegment(input: {
         shiftAbbr,
         shiftName,
       });
-  const title =
-    isGeneral
-      ? "General shift"
-      : (shiftName ?? assignment?.name ?? input.entry.label ?? "Shift");
+  const title = isGeneral
+    ? "General shift"
+    : (shiftName ?? assignment?.name ?? input.entry.label ?? "Shift");
   const customStartTime = getDelimitedValue(
     input.entry.customStartTime,
     input.segmentIndex,
@@ -762,8 +713,7 @@ function buildWorkedSegment(input: {
   );
   const startTime =
     customStartTime ?? input.rawSegment.startTime ?? assignment?.defaultStartTime ?? null;
-  const endTime =
-    customEndTime ?? input.rawSegment.endTime ?? assignment?.defaultEndTime ?? null;
+  const endTime = customEndTime ?? input.rawSegment.endTime ?? assignment?.defaultEndTime ?? null;
 
   return {
     assignment,
@@ -800,18 +750,18 @@ function getDelimitedValue(
     return null;
   }
 
-  const parts = value.split("|").map((part) => part.trim()).filter(Boolean);
+  const parts = value
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
   if (parts.length > 1) {
     return parts[index] ?? null;
   }
 
-  return count <= 1 ? parts[0] ?? null : null;
+  return count <= 1 ? (parts[0] ?? null) : null;
 }
 
-function compareScheduleItems(
-  left: DashboardScheduleItem,
-  right: DashboardScheduleItem,
-): number {
+function compareScheduleItems(left: DashboardScheduleItem, right: DashboardScheduleItem): number {
   if (left.dateKey !== right.dateKey) {
     return left.dateKey.localeCompare(right.dateKey);
   }
@@ -829,10 +779,7 @@ function compareRequestsByDate(left: ShiftRequest, right: ShiftRequest): number 
   return getRequestStartTime(left).localeCompare(getRequestStartTime(right));
 }
 
-function getRelevantRequestDateKey(
-  request: ShiftRequest,
-  currentEmpId: string | null,
-): string {
+function getRelevantRequestDateKey(request: ShiftRequest, currentEmpId: string | null): string {
   if (
     request.type === "swap" &&
     currentEmpId != null &&
@@ -883,17 +830,12 @@ function expandShiftDisplayLabel(input: {
   }
 
   const expandedSuffix =
-    input.jobName && labelsEqual(suffix, input.jobAbbr)
-      ? input.jobName
-      : suffix;
+    input.jobName && labelsEqual(suffix, input.jobAbbr) ? input.jobName : suffix;
 
   return `${shiftName} · ${expandedSuffix}`;
 }
 
-function getLabelSuffixAfterShiftCode(
-  rawLabel: string,
-  shiftAbbr?: string | null,
-): string | null {
+function getLabelSuffixAfterShiftCode(rawLabel: string, shiftAbbr?: string | null): string | null {
   const normalizedShiftAbbr = shiftAbbr?.trim();
   if (!normalizedShiftAbbr) {
     return null;
@@ -954,14 +896,9 @@ function findShiftByDisplayLabel(input: {
   return null;
 }
 
-function labelsEqual(
-  left: string | null | undefined,
-  right: string | null | undefined,
-): boolean {
+function labelsEqual(left: string | null | undefined, right: string | null | undefined): boolean {
   return Boolean(
-    left?.trim() &&
-      right?.trim() &&
-      left.trim().toLowerCase() === right.trim().toLowerCase(),
+    left?.trim() && right?.trim() && left.trim().toLowerCase() === right.trim().toLowerCase(),
   );
 }
 
@@ -985,25 +922,21 @@ function getFeaturedHeroItem(
       (item) =>
         !item.segment.isAbsence &&
         item.segment.startTime != null &&
-        toRelativeMinutes(item.dateKey, item.segment.startTime, todayKey) >
-          nowMinutes,
+        toRelativeMinutes(item.dateKey, item.segment.startTime, todayKey) > nowMinutes,
     ) ?? null;
 
   if (upcomingTodayItem) {
     return { item: upcomingTodayItem, status: "upcoming" };
   }
 
-  const awayTodayItem =
-    todayItems.find((item) => item.segment.isAbsence) ?? null;
+  const awayTodayItem = todayItems.find((item) => item.segment.isAbsence) ?? null;
   if (awayTodayItem) {
     return { item: awayTodayItem, status: "away" };
   }
 
   const nextWorkedItem =
-    items.find(
-      (item) =>
-        item.dateKey.localeCompare(todayKey) > 0 && !item.segment.isAbsence,
-    ) ?? null;
+    items.find((item) => item.dateKey.localeCompare(todayKey) > 0 && !item.segment.isAbsence) ??
+    null;
   if (nextWorkedItem) {
     return {
       item: nextWorkedItem,
@@ -1011,21 +944,15 @@ function getFeaturedHeroItem(
     };
   }
 
-  const nextItem =
-    items.find((item) => item.dateKey.localeCompare(todayKey) > 0) ?? null;
+  const nextItem = items.find((item) => item.dateKey.localeCompare(todayKey) > 0) ?? null;
   if (nextItem) {
     return { item: nextItem, status: "away" };
   }
 
-  const firstItem =
-    items.find((item) => !item.segment.isAbsence) ?? items[0] ?? null;
+  const firstItem = items.find((item) => !item.segment.isAbsence) ?? items[0] ?? null;
   return {
     item: firstItem,
-    status: firstItem
-      ? firstItem.segment.isAbsence
-        ? "away"
-        : "scheduled"
-      : "empty",
+    status: firstItem ? (firstItem.segment.isAbsence ? "away" : "scheduled") : "empty",
   };
 }
 
@@ -1093,11 +1020,7 @@ function getHeroTiming(
 // shift's calendar day (dateKey) and the current day (todayKey) are both org-tz
 // dates, so the day delta plus the shift's wall-clock time yields a value
 // comparable to the org-tz "now" minutes — no browser-timezone contamination.
-function toRelativeMinutes(
-  dateKey: string,
-  time: string,
-  todayKey: string,
-): number {
+function toRelativeMinutes(dateKey: string, time: string, todayKey: string): number {
   return isoDayDelta(todayKey, dateKey) * 24 * 60 + hhmmToMinutes(time);
 }
 
@@ -1219,82 +1142,82 @@ function buildAvailableShiftItems(input: {
     calloffVisibility === "hidden"
       ? []
       : input.openPickups
-    .filter((request) =>
-      isDateInCurrentOrFutureRange(
-        request.requesterShiftDate,
-        input.periodStartKey,
-        input.periodEndKey,
-        input.todayKey,
-      ) && !hasShiftRequestStarted(request, input.now, input.timeZone ?? null),
-    )
-    .map((request) => ({
-      date: new Date(`${request.requesterShiftDate}T00:00:00`),
-      dateKey: request.requesterShiftDate,
-      id: `pickup-${request.id}`,
-      kind: "pickup" as const,
-      request,
-      subtitle: formatRequestSubtitle(request, input.shiftById),
-      timeRange: formatRequestTimeRange(request),
-      title: formatRequestShiftLabel(request, input.shiftById) || "Open shift",
-    }));
+          .filter(
+            (request) =>
+              isDateInCurrentOrFutureRange(
+                request.requesterShiftDate,
+                input.periodStartKey,
+                input.periodEndKey,
+                input.todayKey,
+              ) && !hasShiftRequestStarted(request, input.now, input.timeZone ?? null),
+          )
+          .map((request) => ({
+            date: new Date(`${request.requesterShiftDate}T00:00:00`),
+            dateKey: request.requesterShiftDate,
+            id: `pickup-${request.id}`,
+            kind: "pickup" as const,
+            request,
+            subtitle: formatRequestSubtitle(request, input.shiftById),
+            timeRange: formatRequestTimeRange(request),
+            title: formatRequestShiftLabel(request, input.shiftById) || "Open shift",
+          }));
 
   const coverageItems: AvailableShiftItem[] =
     coverageGapVisibility === "hidden"
       ? []
       : input.openShifts
-    .filter((openShift) => {
-      const dateKey = formatDateKey(openShift.date);
-      if (
-        !isDateInCurrentOrFutureRange(
-          dateKey,
-          input.periodStartKey,
-          input.periodEndKey,
-          input.todayKey,
-        )
-      ) {
-        return false;
-      }
-      if (
-        hasDashboardOpenShiftStarted({
-          assignmentById: input.assignmentById,
-          now: input.now,
-          openShift,
-          timeZone: input.timeZone ?? null,
-        })
-      ) {
-        return false;
-      }
-      if (coverageGapVisibility === "always") {
-        return true;
-      }
-      return !doesOpenShiftConflictWithMySchedule({
-        assignmentById: input.assignmentById,
-        currentEmpId,
-        currentPeriodShifts: input.currentPeriodShifts,
-        openShift,
-      });
-    })
-    .map((openShift) => {
-      const assignment =
-        input.assignmentById.get(openShift.preferredOpenAssignmentDefinitionId) ??
-        null;
-      return {
-        assignment,
-        date: openShift.date,
-        dateKey: formatDateKey(openShift.date),
-        id: `coverage-${openShift.id}`,
-        kind: "coverage" as const,
-        openShift,
-        subtitle: [
-          openShift.focusAreaName,
-          openShift.needed > 1 ? `${openShift.needed} teammates needed` : null,
-        ]
-          .filter(Boolean)
-          .join(" · "),
-        timeRange: openShift.timeRange || formatAssignmentTimeRange(assignment),
-        title: formatOpenShiftTitle(openShift, assignment, input.shiftById),
-      };
-    });
+          .filter((openShift) => {
+            const dateKey = formatDateKey(openShift.date);
+            if (
+              !isDateInCurrentOrFutureRange(
+                dateKey,
+                input.periodStartKey,
+                input.periodEndKey,
+                input.todayKey,
+              )
+            ) {
+              return false;
+            }
+            if (
+              hasDashboardOpenShiftStarted({
+                assignmentById: input.assignmentById,
+                now: input.now,
+                openShift,
+                timeZone: input.timeZone ?? null,
+              })
+            ) {
+              return false;
+            }
+            if (coverageGapVisibility === "always") {
+              return true;
+            }
+            return !doesOpenShiftConflictWithMySchedule({
+              assignmentById: input.assignmentById,
+              currentEmpId,
+              currentPeriodShifts: input.currentPeriodShifts,
+              openShift,
+            });
+          })
+          .map((openShift) => {
+            const assignment =
+              input.assignmentById.get(openShift.preferredOpenAssignmentDefinitionId) ?? null;
+            return {
+              assignment,
+              date: openShift.date,
+              dateKey: formatDateKey(openShift.date),
+              id: `coverage-${openShift.id}`,
+              kind: "coverage" as const,
+              openShift,
+              subtitle: [
+                openShift.focusAreaName,
+                openShift.needed > 1 ? `${openShift.needed} teammates needed` : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+              timeRange: openShift.timeRange || formatAssignmentTimeRange(assignment),
+              title: formatOpenShiftTitle(openShift, assignment, input.shiftById),
+            };
+          });
 
   return [...pickupItems, ...coverageItems].sort((left, right) => {
     if (left.dateKey !== right.dateKey) {
@@ -1347,9 +1270,7 @@ function hasDashboardOpenShiftStarted(input: {
   openShift: DashboardContentProps["openShifts"][number];
   timeZone?: string | null;
 }): boolean {
-  const assignment = input.assignmentById.get(
-    input.openShift.preferredOpenAssignmentDefinitionId,
-  );
+  const assignment = input.assignmentById.get(input.openShift.preferredOpenAssignmentDefinitionId);
 
   return hasShiftStartedAtTimeRanges({
     shiftDate: formatDateKey(input.openShift.date),
@@ -1384,8 +1305,7 @@ function doesOpenShiftConflictWithMySchedule(input: {
 
   return rawSegments.some((segment, index) => {
     const assignmentId = segment.assignmentId ?? entry.assignmentIds[index];
-    const assignment =
-      assignmentId != null ? input.assignmentById.get(assignmentId) : null;
+    const assignment = assignmentId != null ? input.assignmentById.get(assignmentId) : null;
     const start =
       getDelimitedValue(entry.customStartTime, index, rawSegments.length) ??
       segment.startTime ??
@@ -1776,9 +1696,7 @@ function MentoredPill({ inverse = false }: { inverse?: boolean }) {
     <span
       style={{
         background: inverse ? "rgba(255,255,255,0.16)" : "var(--color-bg-secondary)",
-        border: inverse
-          ? "1px solid rgba(255,255,255,0.24)"
-          : "1px solid var(--color-border)",
+        border: inverse ? "1px solid rgba(255,255,255,0.24)" : "1px solid var(--color-border)",
         borderRadius: 7,
         color: inverse ? "#fff" : "var(--color-text-secondary)",
         display: "inline-flex",
@@ -1873,9 +1791,7 @@ function ShiftmatesRow({
       data-testid="user-dashboard-working-with"
       style={{
         alignItems: "center",
-        background: inverse
-          ? DASHBOARD_HERO_COLLABORATOR_BG
-          : "var(--color-bg-secondary)",
+        background: inverse ? DASHBOARD_HERO_COLLABORATOR_BG : "var(--color-bg-secondary)",
         border: inverse
           ? "1px solid rgba(255,255,255,0.14)"
           : "1px solid var(--color-border-light)",
@@ -1927,9 +1843,7 @@ function ShiftmatesRow({
               data-testid="user-dashboard-shiftmate-avatar-frame"
               title={item.employeeName}
               style={{
-                background: inverse
-                  ? DASHBOARD_HERO_COLLABORATOR_BG
-                  : "var(--color-bg-secondary)",
+                background: inverse ? DASHBOARD_HERO_COLLABORATOR_BG : "var(--color-bg-secondary)",
                 borderRadius: 999,
                 display: "inline-flex",
                 flexShrink: 0,
@@ -1965,15 +1879,12 @@ function ShiftmatesRow({
             data-testid="user-dashboard-shiftmate-overflow-frame"
             style={{
               alignItems: "center",
-              background: inverse
-                ? DASHBOARD_HERO_COLLABORATOR_BG
-                : "var(--color-bg-secondary)",
+              background: inverse ? DASHBOARD_HERO_COLLABORATOR_BG : "var(--color-bg-secondary)",
               borderRadius: 999,
               display: "inline-flex",
               flexShrink: 0,
               height: 42,
-              marginLeft:
-                visibleItems.length > 0 ? DASHBOARD_HERO_AVATAR_OVERLAP : 0,
+              marginLeft: visibleItems.length > 0 ? DASHBOARD_HERO_AVATAR_OVERLAP : 0,
               padding: 2,
               width: 42,
             }}
@@ -2072,9 +1983,7 @@ function AvailableShiftsSection({
   const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
   const summaryParts = [
     pickupCount > 0 ? `${pickupCount} pickup${pickupCount === 1 ? "" : "s"}` : null,
-    coverageCount > 0
-      ? `${coverageCount} coverage gap${coverageCount === 1 ? "" : "s"}`
-      : null,
+    coverageCount > 0 ? `${coverageCount} coverage gap${coverageCount === 1 ? "" : "s"}` : null,
   ].filter(Boolean);
 
   return (
@@ -2115,11 +2024,7 @@ function AvailableShiftsSection({
           />
         ) : (
           <SummaryMetricPanel
-            body={
-              summaryParts.length > 0
-                ? summaryParts.join(" · ")
-                : "Upcoming open shifts"
-            }
+            body={summaryParts.length > 0 ? summaryParts.join(" · ") : "Upcoming open shifts"}
             label="Available upcoming"
             value={items.length}
           />
@@ -2247,8 +2152,7 @@ function MyWeekSection({
 }) {
   const groups = groupScheduleItemsByDate(items);
   const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
-  const hoursLabel =
-    weeklyHours > 0 ? `${formatHoursValue(weeklyHours)}h ${periodLabel}` : null;
+  const hoursLabel = weeklyHours > 0 ? `${formatHoursValue(weeklyHours)}h ${periodLabel}` : null;
 
   if (groups.length === 0) {
     return null;
@@ -2258,9 +2162,7 @@ function MyWeekSection({
     <section className="dg-card" data-testid="user-dashboard-my-week" style={style}>
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">
-            {isTwoWeekView ? "My Schedule" : "My Week"}
-          </div>
+          <div className="dg-card-title">{isTwoWeekView ? "My Schedule" : "My Week"}</div>
           <div className="dg-card-subtitle">
             {hoursLabel ?? `Your published shifts for ${periodLabel}`}
           </div>
@@ -2276,9 +2178,7 @@ function MyWeekSection({
               style={{
                 background: isToday ? "var(--color-brand-bg)" : "transparent",
                 borderBottom:
-                  index < groups.length - 1
-                    ? "1px solid var(--color-border-light)"
-                    : "none",
+                  index < groups.length - 1 ? "1px solid var(--color-border-light)" : "none",
                 display: "grid",
                 gap: 14,
                 gridTemplateColumns: "72px minmax(0, 1fr)",
@@ -2309,13 +2209,7 @@ function MyWeekSection({
   );
 }
 
-function SectionHeader({
-  subtitle,
-  title,
-}: {
-  subtitle: string;
-  title: string;
-}) {
+function SectionHeader({ subtitle, title }: { subtitle: string; title: string }) {
   return (
     <div className="dg-card-header">
       <div>
@@ -2544,7 +2438,9 @@ function AvailableShiftActionCard({
   ) => Promise<boolean>;
 }) {
   const volunteerInput =
-    item.kind === "coverage" ? buildVolunteerInput(item.assignment, item.openShift.focusAreaId) : null;
+    item.kind === "coverage"
+      ? buildVolunteerInput(item.assignment, item.openShift.focusAreaId)
+      : null;
 
   return (
     <ActionCardShell
@@ -2612,7 +2508,9 @@ function WeekShiftRow({ item }: { item: DashboardScheduleItem }) {
               whiteSpace: "nowrap",
             }}
           >
-            {item.segment.isAbsence ? (item.segment.typeLabel ?? item.segment.title) : item.segment.title}
+            {item.segment.isAbsence
+              ? (item.segment.typeLabel ?? item.segment.title)
+              : item.segment.title}
           </div>
           {timeRange ? (
             <div
@@ -2756,9 +2654,7 @@ function DateTile({
         alignSelf: compact ? undefined : "center",
         alignItems: "center",
         background: compact ? "var(--color-bg)" : "var(--color-bg-secondary)",
-        border: compact
-          ? "1px solid var(--color-border)"
-          : "1px solid var(--color-border-light)",
+        border: compact ? "1px solid var(--color-border)" : "1px solid var(--color-border-light)",
         borderRadius: compact ? 10 : 16,
         display: "flex",
         flexDirection: "column",
@@ -2780,9 +2676,7 @@ function DateTile({
       </span>
       <span
         style={{
-          color: compact
-            ? "var(--color-text-primary)"
-            : "var(--color-text-secondary)",
+          color: compact ? "var(--color-text-primary)" : "var(--color-text-secondary)",
           fontSize: compact ? 17 : 20,
           fontWeight: 800,
           lineHeight: compact ? 1 : "24px",
@@ -2821,18 +2715,19 @@ function DashedDivider() {
 }
 
 function groupScheduleItemsByDate(items: DashboardScheduleItem[]) {
-  return items.reduce<
-    Array<{ date: Date; dateKey: string; items: DashboardScheduleItem[] }>
-  >((groups, item) => {
-    const group = groups[groups.length - 1];
-    if (group?.dateKey === item.dateKey) {
-      group.items.push(item);
-      return groups;
-    }
+  return items.reduce<Array<{ date: Date; dateKey: string; items: DashboardScheduleItem[] }>>(
+    (groups, item) => {
+      const group = groups[groups.length - 1];
+      if (group?.dateKey === item.dateKey) {
+        group.items.push(item);
+        return groups;
+      }
 
-    groups.push({ date: item.date, dateKey: item.dateKey, items: [item] });
-    return groups;
-  }, []);
+      groups.push({ date: item.date, dateKey: item.dateKey, items: [item] });
+      return groups;
+    },
+    [],
+  );
 }
 
 function buildVolunteerInput(
@@ -2868,9 +2763,7 @@ function formatSegmentTimeRange(segment: DashboardScheduleSegment): string | nul
     : null;
 }
 
-function formatAssignmentTimeRange(
-  assignment: AssignmentDefinition | null,
-): string | null {
+function formatAssignmentTimeRange(assignment: AssignmentDefinition | null): string | null {
   return assignment?.defaultStartTime && assignment.defaultEndTime
     ? `${formatTime12h(assignment.defaultStartTime)} - ${formatTime12h(assignment.defaultEndTime)}`
     : null;
@@ -2901,9 +2794,7 @@ function formatRequestTimeRange(request: ShiftRequest): string | null {
     request.requesterSegments?.[0]?.endTime ??
     null;
 
-  return start !== "99:99:99" && end
-    ? `${formatTime12h(start)} - ${formatTime12h(end)}`
-    : null;
+  return start !== "99:99:99" && end ? `${formatTime12h(start)} - ${formatTime12h(end)}` : null;
 }
 
 function getRequestStartTime(request: ShiftRequest): string {
@@ -2920,9 +2811,7 @@ function formatRequestShiftLabel(
   shiftById: Map<number, { abbr?: string | null; name: string }>,
 ): string {
   const segment =
-    request.requesterPresentation?.segments?.[0] ??
-    request.requesterSegments?.[0] ??
-    null;
+    request.requesterPresentation?.segments?.[0] ?? request.requesterSegments?.[0] ?? null;
   const shiftId =
     segment?.shiftId ??
     request.requesterShiftIds?.[0] ??

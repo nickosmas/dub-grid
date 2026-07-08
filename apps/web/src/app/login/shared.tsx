@@ -105,8 +105,8 @@ export function AccountDisabledModal({ onClose }: { onClose: () => void }) {
           color: "var(--color-text-secondary)",
         }}
       >
-        This account has been disabled by your organization. Please contact your
-        administrator if you believe this is a mistake.
+        This account has been disabled by your organization. Please contact your administrator if
+        you believe this is a mistake.
       </p>
       <button
         type="button"

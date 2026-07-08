@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import {
-  forbidIfSandboxCookie,
-  requireAuthenticatedUserWithClaims,
-} from "@/lib/api-auth";
+import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { createElement } from "react";
 import { render } from "@react-email/components";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -74,8 +71,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(empty);
   }
 
-  const trialStarted =
-    org.subscription_status === "trialing" && Boolean(org.trial_ends_at);
+  const trialStarted = org.subscription_status === "trialing" && Boolean(org.trial_ends_at);
   if (!trialStarted) {
     return NextResponse.json(empty);
   }
@@ -88,8 +84,7 @@ export async function GET(req: NextRequest) {
   // sends. On failure we roll the claim back so a later load retries.
   if (!org.trial_welcome_email_sent_at) {
     const apiKey = process.env.RESEND_API_KEY;
-    const fromEmail =
-      process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+    const fromEmail = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
     if (apiKey && user.email) {
       const claimedAt = new Date().toISOString();
       const { data: claimed, error: claimError } = await service
@@ -107,9 +102,7 @@ export async function GET(req: NextRequest) {
             apiKey,
             from: fromEmail,
             to: user.email,
-            subject: sanitizeHeaderValue(
-              `Your DubGrid trial for ${org.name} has started`,
-            ),
+            subject: sanitizeHeaderValue(`Your DubGrid trial for ${org.name} has started`),
             html: await buildTrialStartedEmail(org.name, org.trial_ends_at),
           });
         } catch (err) {

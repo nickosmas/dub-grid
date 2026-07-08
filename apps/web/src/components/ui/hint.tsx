@@ -2,11 +2,7 @@
 
 import React, { useId, useRef, useState } from "react";
 
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import type { HintContent } from "./hint.types";
 import { hint } from "./hint.types";
@@ -30,12 +26,7 @@ export interface HintProps {
  * Uses Base UI tooltip primitives — handles positioning, keyboard a11y,
  * aria-describedby, and role="tooltip" automatically.
  */
-export function Hint({
-  content,
-  side = "top",
-  disabled = false,
-  children,
-}: HintProps) {
+export function Hint({ content, side = "top", disabled = false, children }: HintProps) {
   if (disabled) {
     return children;
   }
@@ -55,12 +46,7 @@ interface MaybeHintProps {
   children: React.ReactElement;
 }
 
-export function MaybeHint({
-  content,
-  side = "top",
-  disabled = false,
-  children,
-}: MaybeHintProps) {
+export function MaybeHint({ content, side = "top", disabled = false, children }: MaybeHintProps) {
   if (!content || disabled) {
     return children;
   }
@@ -154,9 +140,4 @@ export function HelpHint({ content, side = "top", size = 14 }: HelpHintProps) {
     </>
   );
 }
-export {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "./tooltip";
+export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./tooltip";

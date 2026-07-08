@@ -13,8 +13,7 @@ vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
 }));
 vi.mock("@/features/account/server", () => ({
-  fetchNotificationPreferences: (userId: string) =>
-    fetchNotificationPreferences(userId),
+  fetchNotificationPreferences: (userId: string) => fetchNotificationPreferences(userId),
   saveNotificationPreferences: (userId: string, prefs: unknown) =>
     saveNotificationPreferences(userId, prefs),
 }));
@@ -28,10 +27,10 @@ const VALID_PREFS = {
 };
 
 function putRequest(body: unknown): NextRequest {
-  return new NextRequest(
-    "http://localhost/api/account/notification-preferences",
-    { method: "PUT", body: JSON.stringify(body) },
-  );
+  return new NextRequest("http://localhost/api/account/notification-preferences", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
 }
 
 beforeEach(() => {
@@ -44,9 +43,7 @@ beforeEach(() => {
 
 describe("GET /api/account/notification-preferences", () => {
   it("returns prefs for the authenticated user", async () => {
-    const res = await GET(
-      new NextRequest("http://localhost/api/account/notification-preferences"),
-    );
+    const res = await GET(new NextRequest("http://localhost/api/account/notification-preferences"));
     expect(res.status).toBe(200);
     expect(fetchNotificationPreferences).toHaveBeenCalledWith("user-id");
     await expect(res.json()).resolves.toEqual({ prefs: VALID_PREFS });
@@ -56,9 +53,7 @@ describe("GET /api/account/notification-preferences", () => {
     requireAuthenticatedUser.mockResolvedValueOnce({
       response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
     });
-    const res = await GET(
-      new NextRequest("http://localhost/api/account/notification-preferences"),
-    );
+    const res = await GET(new NextRequest("http://localhost/api/account/notification-preferences"));
     expect(res.status).toBe(401);
     expect(fetchNotificationPreferences).not.toHaveBeenCalled();
   });
@@ -68,10 +63,7 @@ describe("PUT /api/account/notification-preferences", () => {
   it("accepts the canonical three categories", async () => {
     const res = await PUT(putRequest({ prefs: VALID_PREFS }));
     expect(res.status).toBe(200);
-    expect(saveNotificationPreferences).toHaveBeenCalledWith(
-      "user-id",
-      VALID_PREFS,
-    );
+    expect(saveNotificationPreferences).toHaveBeenCalledWith("user-id", VALID_PREFS);
   });
 
   it("strips unknown category keys before persisting", async () => {
@@ -85,10 +77,7 @@ describe("PUT /api/account/notification-preferences", () => {
     );
     expect(res.status).toBe(200);
     expect(saveNotificationPreferences).toHaveBeenCalledTimes(1);
-    const persisted = saveNotificationPreferences.mock.calls[0]?.[1] as Record<
-      string,
-      unknown
-    >;
+    const persisted = saveNotificationPreferences.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(persisted).toEqual(VALID_PREFS);
     expect(persisted).not.toHaveProperty("marketing");
   });
@@ -116,10 +105,10 @@ describe("PUT /api/account/notification-preferences", () => {
 
   it("returns 400 on unparseable body", async () => {
     const res = await PUT(
-      new NextRequest(
-        "http://localhost/api/account/notification-preferences",
-        { method: "PUT", body: "not-json" },
-      ),
+      new NextRequest("http://localhost/api/account/notification-preferences", {
+        method: "PUT",
+        body: "not-json",
+      }),
     );
     expect(res.status).toBe(400);
     expect(saveNotificationPreferences).not.toHaveBeenCalled();

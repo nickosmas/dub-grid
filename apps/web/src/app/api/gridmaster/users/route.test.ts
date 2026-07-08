@@ -132,9 +132,7 @@ describe("GET /api/gridmaster/users", () => {
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     });
 
-    const response = await GET(
-      new NextRequest("http://localhost/api/gridmaster/users"),
-    );
+    const response = await GET(new NextRequest("http://localhost/api/gridmaster/users"));
 
     expect(response.status).toBe(403);
     expect(requestRpc).not.toHaveBeenCalled();
@@ -142,9 +140,7 @@ describe("GET /api/gridmaster/users", () => {
   });
 
   it("loads users with the authenticated request client", async () => {
-    const response = await GET(
-      new NextRequest("http://localhost/api/gridmaster/users"),
-    );
+    const response = await GET(new NextRequest("http://localhost/api/gridmaster/users"));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -174,18 +170,14 @@ describe("GET /api/gridmaster/users", () => {
   });
 
   it("filters gridmaster accounts out of the organization-user response", async () => {
-    const response = await GET(
-      new NextRequest("http://localhost/api/gridmaster/users"),
-    );
+    const response = await GET(new NextRequest("http://localhost/api/gridmaster/users"));
 
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.users).toHaveLength(1);
     expect(body.users[0].email).toBe("user@example.com");
     expect(body.users).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ platformRole: "gridmaster" }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ platformRole: "gridmaster" })]),
     );
   });
 });

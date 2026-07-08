@@ -95,9 +95,7 @@ describe("GET /api/gridmaster/accounts", () => {
       response: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     });
 
-    const response = await GET(
-      new NextRequest("http://localhost/api/gridmaster/accounts"),
-    );
+    const response = await GET(new NextRequest("http://localhost/api/gridmaster/accounts"));
 
     expect(response.status).toBe(403);
     expect(requestRpc).not.toHaveBeenCalled();
@@ -105,9 +103,7 @@ describe("GET /api/gridmaster/accounts", () => {
   });
 
   it("loads gridmaster accounts from server-only profile and auth data", async () => {
-    const response = await GET(
-      new NextRequest("http://localhost/api/gridmaster/accounts"),
-    );
+    const response = await GET(new NextRequest("http://localhost/api/gridmaster/accounts"));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({

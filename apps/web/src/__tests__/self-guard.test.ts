@@ -34,9 +34,7 @@ describe("self-guard", () => {
         throw new Error("expected throw");
       } catch (err) {
         expect(err).toBeInstanceOf(SelfActionForbiddenError);
-        expect((err as SelfActionForbiddenError).code).toBe(
-          SELF_ACTION_FORBIDDEN_CODE,
-        );
+        expect((err as SelfActionForbiddenError).code).toBe(SELF_ACTION_FORBIDDEN_CODE);
       }
     });
 

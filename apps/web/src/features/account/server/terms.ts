@@ -8,9 +8,7 @@ export interface TermsAcceptanceStatus {
   acceptedVersion: string | null;
 }
 
-export async function fetchTermsAcceptanceStatus(
-  userId: string,
-): Promise<TermsAcceptanceStatus> {
+export async function fetchTermsAcceptanceStatus(userId: string): Promise<TermsAcceptanceStatus> {
   const { data, error } = await getServiceClient()
     .from("profiles")
     .select("terms_version")
