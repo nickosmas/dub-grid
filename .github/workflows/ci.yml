@@ -115,7 +115,7 @@ jobs:
 
       - name: Run integration tests
         working-directory: apps/web
-        run: npx vitest run --config vitest.config.mts 'src/__tests__/*.integration.test.ts'
+        run: npx vitest run --config vitest.config.mts integration.test.ts
 
   build:
     name: Build
