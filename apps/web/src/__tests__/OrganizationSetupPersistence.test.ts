@@ -20,8 +20,7 @@ vi.mock("@/features/gridmaster/client", () => ({
 
 vi.mock("@/features/organization/client", () => ({
   createOrganizationInvitation: vi.fn(),
-  updateOrganizationSettings: (...args: unknown[]) =>
-    updateOrganizationSettings(...args),
+  updateOrganizationSettings: (...args: unknown[]) => updateOrganizationSettings(...args),
 }));
 
 vi.mock("@/features/settings/client", () => ({
@@ -58,12 +57,16 @@ function makeOrganization(): Organization {
     suspendedAt: null,
     suspendedReason: null,
     enforceConflictPrevention: false,
+    openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
     stripeCustomerId: null,
     subscriptionStatus: "trialing",
     trialEndsAt: null,
     subscriptionSeats: null,
     dataRetentionDays: 365,
     featureOverrides: {},
+    workspaceKind: "real",
+    sandboxOwnerUserId: null,
+    sandboxSourceOrgId: null,
   };
 }
 
@@ -107,9 +110,7 @@ describe("saveOrganizationSetupConfig", () => {
     const savedCount = await saveOrganizationSetupConfig({
       createdOrg: makeOrganization(),
       shiftDisplayMode: "code",
-      departments: [
-        { id: "dept-1", name: "Operations", abbr: "ops", type: "scheduled" },
-      ],
+      departments: [{ id: "dept-1", name: "Operations", abbr: "ops", type: "scheduled" }],
       focusAreas: [{ id: "focus-1", name: "Emergency", departmentId: "dept-1" }],
       certifications: [],
       orgRoles: [],
@@ -188,9 +189,7 @@ describe("saveOrganizationSetupConfig", () => {
       saveOrganizationSetupConfig({
         createdOrg: makeOrganization(),
         shiftDisplayMode: "code",
-        departments: [
-          { id: "dept-1", name: "Operations", abbr: "ops", type: "scheduled" },
-        ],
+        departments: [{ id: "dept-1", name: "Operations", abbr: "ops", type: "scheduled" }],
         focusAreas: [{ id: "focus-1", name: "Emergency", departmentId: null }],
         certifications: [],
         orgRoles: [],

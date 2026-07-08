@@ -34,9 +34,7 @@ export async function GET(req: NextRequest) {
       orgId: auth.currentOrg.id,
       status: "pending",
     });
-    return NextResponse.json(
-      mobileProfileChangeRequestsResponseSchema.parse({ requests }),
-    );
+    return NextResponse.json(mobileProfileChangeRequestsResponseSchema.parse({ requests }));
   }
 
   const requests = await listOwnProfileChangeRequests({
@@ -44,9 +42,7 @@ export async function GET(req: NextRequest) {
     userId: auth.user.id,
     orgId: auth.currentOrg.id,
   });
-  return NextResponse.json(
-    mobileProfileChangeRequestsResponseSchema.parse({ requests }),
-  );
+  return NextResponse.json(mobileProfileChangeRequestsResponseSchema.parse({ requests }));
 }
 
 export async function POST(req: NextRequest) {
@@ -80,23 +76,16 @@ export async function POST(req: NextRequest) {
       requestedChanges: parsed.data.requestedChanges,
       requestNote: parsed.data.requestNote,
     });
-    return NextResponse.json(
-      mobileProfileChangeRequestCreateResponseSchema.parse({ request }),
-      { status: 201 },
-    );
+    return NextResponse.json(mobileProfileChangeRequestCreateResponseSchema.parse({ request }), {
+      status: 201,
+    });
   } catch (error) {
-    const message = formatClientErrorMessage(
-      error,
-      "We couldn't send that request right now.",
-    );
+    const message = formatClientErrorMessage(error, "We couldn't send that request right now.");
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
 
@@ -156,10 +145,7 @@ export async function PATCH(
     }
 
     const rawMessage = error instanceof Error ? error.message : "";
-    const message = formatClientErrorMessage(
-      error,
-      "We couldn't update that request right now.",
-    );
+    const message = formatClientErrorMessage(error, "We couldn't update that request right now.");
     const status = rawMessage.includes("Unauthorized") ? 403 : 400;
     return NextResponse.json({ error: message }, { status });
   }

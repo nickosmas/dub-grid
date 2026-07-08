@@ -5,7 +5,7 @@ import type { PublishedWindowState } from "@/lib/schedule-logic";
 import type { CoverageGap, FocusArea, ShiftCategory } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
-import DashboardEmptyState from "@/components/dashboard/DashboardEmptyState";
+import { EmptyState } from "@/components/EmptyState";
 
 interface CoveragePanelProps {
   gaps: CoverageGap[];
@@ -68,232 +68,287 @@ export default function CoveragePanel({
 
   return (
     <>
-    <div className="dg-panel-overlay" onClick={onClose} />
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        right: 0,
-        width: panelWidth,
-        height: "100vh",
-        background: "var(--color-surface)",
-        boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
-        zIndex: 10001,
-        display: "flex",
-        flexDirection: "column",
-        animation: "slideInRight 0.2s ease-out",
-      }}
-    >
-      {/* Header */}
+      <div className="dg-panel-overlay" onClick={onClose} />
       <div
         style={{
-          padding: "16px 20px",
-          borderBottom: "1px solid var(--color-border)",
+          position: "fixed",
+          top: 0,
+          right: 0,
+          width: panelWidth,
+          height: "100vh",
+          background: "var(--color-surface)",
+          boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
+          zIndex: 10001,
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexShrink: 0,
+          flexDirection: "column",
+          animation: "slideInRight 0.2s ease-out",
         }}
       >
-        <div>
-          <div style={{ fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-primary)" }}>
-            Coverage Overview
-          </div>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 2 }}>
-            {isUnpublished
-              ? "Not published yet"
-              : gaps.length === 0
-                ? isPartial
-                  ? "No gaps on published dates"
-                  : "All requirements met"
-                : `${gaps.length} gap${gaps.length !== 1 ? "s" : ""}${isPartial ? " on published dates" : " found"}`}
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          aria-label="Close coverage panel"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            padding: 6,
-            borderRadius: 8,
-            color: "var(--color-text-muted)",
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-
-      {!isUnpublished && (
+        {/* Header */}
         <div
           style={{
-            padding: "10px 20px",
+            padding: "16px 20px",
             borderBottom: "1px solid var(--color-border)",
             display: "flex",
-            gap: 8,
+            alignItems: "center",
+            justifyContent: "space-between",
             flexShrink: 0,
           }}
         >
-          <CustomSelect
-            value={filterFocusArea === "all" ? "all" : String(filterFocusArea)}
-            options={[
-              { value: "all", label: "All Focus Areas" },
-              ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
-            ]}
-            onChange={(val) => setFilterFocusArea(val === "all" ? "all" : Number(val))}
-            fontSize="var(--dg-fs-caption)"
-            style={{ flex: 1 }}
-          />
-          <CustomSelect
-            value={filterCategory === "all" ? "all" : String(filterCategory)}
-            options={[
-              { value: "all", label: "All Categories" },
-              ...shiftCategories.map((cat) => ({ value: String(cat.id), label: cat.name })),
-            ]}
-            onChange={(val) => setFilterCategory(val === "all" ? "all" : Number(val))}
-            fontSize="var(--dg-fs-caption)"
-            style={{ flex: 1 }}
-          />
+          <div>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-body)",
+                fontWeight: 700,
+                color: "var(--color-text-primary)",
+              }}
+            >
+              Coverage Overview
+            </div>
+            <div
+              style={{
+                fontSize: "var(--dg-fs-caption)",
+                color: "var(--color-text-muted)",
+                marginTop: 2,
+              }}
+            >
+              {isUnpublished
+                ? "Not published yet"
+                : gaps.length === 0
+                  ? isPartial
+                    ? "No gaps on published dates"
+                    : "All requirements met"
+                  : `${gaps.length} gap${gaps.length !== 1 ? "s" : ""}${isPartial ? " on published dates" : " found"}`}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close coverage panel"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: 6,
+              borderRadius: 8,
+              color: "var(--color-text-muted)",
+            }}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
-      )}
 
-      {/* Body */}
-      <div style={{ flex: 1, overflow: "auto", padding: "12px 20px" }}>
-        {isUnpublished ? (
-          <DashboardEmptyState
-            variant="panel"
-            minHeight={260}
-            title="Not published yet"
-            description="Coverage details will appear after this period is published for the first time."
-          />
-        ) : (
-          <>
-            {isPartial && (
-              <div
-                style={{
-                  marginBottom: 12,
-                  padding: "10px 12px",
-                  borderRadius: "var(--dg-radius-sm)",
-                  background: "var(--color-bg)",
-                  border: "1px dashed var(--color-border)",
-                  fontSize: 11,
-                  color: "var(--color-text-subtle)",
-                }}
-              >
-                Showing published dates only.
-              </div>
-            )}
-            {filtered.length === 0 ? (
-              <div
-                style={{
-                  padding: "40px 20px",
-                  textAlign: "center",
-                  color: "var(--color-text-muted)",
-                }}
-              >
+        {!isUnpublished && (
+          <div
+            style={{
+              padding: "10px 20px",
+              borderBottom: "1px solid var(--color-border)",
+              display: "flex",
+              gap: 8,
+              flexShrink: 0,
+            }}
+          >
+            <CustomSelect
+              value={filterFocusArea === "all" ? "all" : String(filterFocusArea)}
+              options={[
+                { value: "all", label: "All Focus Areas" },
+                ...focusAreas.map((fa) => ({ value: String(fa.id), label: fa.name })),
+              ]}
+              onChange={(val) => setFilterFocusArea(val === "all" ? "all" : Number(val))}
+              fontSize="var(--dg-fs-caption)"
+              style={{ flex: 1 }}
+            />
+            <CustomSelect
+              value={filterCategory === "all" ? "all" : String(filterCategory)}
+              options={[
+                { value: "all", label: "All Categories" },
+                ...shiftCategories.map((cat) => ({ value: String(cat.id), label: cat.name })),
+              ]}
+              onChange={(val) => setFilterCategory(val === "all" ? "all" : Number(val))}
+              fontSize="var(--dg-fs-caption)"
+              style={{ flex: 1 }}
+            />
+          </div>
+        )}
+
+        {/* Body */}
+        <div style={{ flex: 1, overflow: "auto", padding: "12px 20px" }}>
+          {isUnpublished ? (
+            <EmptyState
+              size="compact"
+              style={{ minHeight: 260 }}
+              title="Not published yet"
+              description="Coverage details will appear after this period is published for the first time."
+            />
+          ) : (
+            <>
+              {isPartial && (
                 <div
                   style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: "50%",
-                    background: "var(--color-success-bg)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 12px",
+                    marginBottom: 12,
+                    padding: "10px 12px",
+                    borderRadius: "var(--dg-radius-sm)",
+                    background: "var(--color-bg)",
+                    border: "1px dashed var(--color-border)",
+                    fontSize: 11,
+                    color: "var(--color-text-subtle)",
                   }}
                 >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--color-success-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                  </svg>
+                  Showing published dates only.
                 </div>
-                <div style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600 }}>
-                  {isPartial ? "No gaps on published dates" : "All coverage requirements met"}
-                </div>
-                <div style={{ fontSize: "var(--dg-fs-caption)", marginTop: 4 }}>
-                  {gaps.length === 0
-                    ? isPartial
-                      ? "Coverage is only shown for dates that have been published."
-                      : "No gaps detected in the current schedule."
-                    : "No gaps match the current filters."}
-                </div>
-              </div>
-            ) : (
-              Array.from(grouped.entries()).map(([focusAreaId, faGaps]) => {
-                const fa = focusAreas.find((f) => f.id === focusAreaId);
-                return (
-                  <div key={focusAreaId} style={{ marginBottom: 16 }}>
-                    <div
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "4px 10px",
-                        borderRadius: 8,
-                        background: "var(--color-bg-secondary)",
-                        color: "var(--color-text-muted)",
-                        fontSize: "var(--dg-fs-footnote)",
-                        fontWeight: 700,
-                        marginBottom: 8,
-                      }}
+              )}
+              {filtered.length === 0 ? (
+                <div
+                  style={{
+                    padding: "40px 20px",
+                    textAlign: "center",
+                    color: "var(--color-text-muted)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: "50%",
+                      background: "var(--color-success-bg)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      margin: "0 auto 12px",
+                    }}
+                  >
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--color-success-text)"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      {fa?.name ?? `Area #${focusAreaId}`}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {faGaps.map((gap) => (
-                        <div
-                          key={`${focusAreaId}-${gap.date.toISOString()}-${gap.shiftCategoryId}`}
-                          style={{
-                            padding: "10px 12px",
-                            borderRadius: "var(--dg-radius-lg)",
-                            border: "1px solid var(--color-border)",
-                            background: "rgba(220, 38, 38, 0.03)",
-                          }}
-                        >
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: "var(--dg-fs-body-sm)", fontWeight: 600 }}>
+                    {isPartial ? "No gaps on published dates" : "All coverage requirements met"}
+                  </div>
+                  <div style={{ fontSize: "var(--dg-fs-caption)", marginTop: 4 }}>
+                    {gaps.length === 0
+                      ? isPartial
+                        ? "Coverage is only shown for dates that have been published."
+                        : "No gaps detected in the current schedule."
+                      : "No gaps match the current filters."}
+                  </div>
+                </div>
+              ) : (
+                Array.from(grouped.entries()).map(([focusAreaId, faGaps]) => {
+                  const fa = focusAreas.find((f) => f.id === focusAreaId);
+                  return (
+                    <div key={focusAreaId} style={{ marginBottom: 16 }}>
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "4px 10px",
+                          borderRadius: 8,
+                          background: "var(--color-bg-secondary)",
+                          color: "var(--color-text-muted)",
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontWeight: 700,
+                          marginBottom: 8,
+                        }}
+                      >
+                        {fa?.name ?? `Area #${focusAreaId}`}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {faGaps.map((gap) => (
                           <div
+                            key={`${focusAreaId}-${gap.date.toISOString()}-${gap.shiftCategoryId}`}
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
+                              padding: "10px 12px",
+                              borderRadius: "var(--dg-radius-lg)",
+                              border: "1px solid var(--color-border)",
+                              background: "rgba(220, 38, 38, 0.03)",
                             }}
                           >
-                            <span style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-secondary)" }}>
-                              {gap.shiftCategoryName}
-                            </span>
-                            <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
-                              {formatDate(gap.date)}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: "var(--color-danger-dark)", marginTop: 4 }}>
-                            {gap.status.actual}/{gap.status.required} staff
-                          </div>
-                          {gap.shortageDetails.length > 0 && (
-                            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 4 }}>
-                              {formatShortageDetails(gap)}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "var(--dg-fs-caption)",
+                                  fontWeight: 600,
+                                  color: "var(--color-text-secondary)",
+                                }}
+                              >
+                                {gap.shiftCategoryName}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "var(--dg-fs-footnote)",
+                                  color: "var(--color-text-muted)",
+                                }}
+                              >
+                                {formatDate(gap.date)}
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            <div
+                              style={{
+                                fontSize: "var(--dg-fs-caption)",
+                                fontWeight: 700,
+                                color: "var(--color-danger-dark)",
+                                marginTop: 4,
+                              }}
+                            >
+                              {gap.status.actual}/{gap.status.required} staff
+                            </div>
+                            {gap.shortageDetails.length > 0 && (
+                              <div
+                                style={{
+                                  fontSize: "var(--dg-fs-footnote)",
+                                  color: "var(--color-text-muted)",
+                                  marginTop: 4,
+                                }}
+                              >
+                                {formatShortageDetails(gap)}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
-          </>
-        )}
-      </div>
+                  );
+                })
+              )}
+            </>
+          )}
+        </div>
 
-      <style>{`
+        <style>{`
         @keyframes slideInRight {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
         }
       `}</style>
-    </div>
+      </div>
     </>
   );
 }

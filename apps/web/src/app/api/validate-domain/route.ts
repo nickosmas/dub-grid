@@ -1,7 +1,8 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
+import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
@@ -28,9 +29,12 @@ export async function GET(req: NextRequest) {
   const slug = req.nextUrl.searchParams.get("slug")?.trim().toLowerCase();
 
   if (!slug || RESERVED_SUBDOMAINS.has(slug) || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(slug)) {
-    return NextResponse.json({ valid: false }, {
-      headers: { "Cache-Control": "public, max-age=60" },
-    });
+    return NextResponse.json(
+      { valid: false },
+      {
+        headers: { "Cache-Control": "public, max-age=60" },
+      },
+    );
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -47,18 +51,32 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ valid: false }, { status: 503, headers: cacheHeaders });
   }
 
-  const supabase = createClient(url, serviceKey);
+  const supabase = getServiceClient();
 
-  const { data, error } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error) {
-    logger.error({ err: error.message, path: "/api/validate-domain" }, "Supabase query failed");
+  let data: { id: string; name: string } | null;
+  try {
+    // Only the found case is cached — organizations.slug is write-once (set
+    // at creation, never renamed), so there's no invalidation to handle.
+    // Misses aren't cached (cacheThrough can't distinguish "cached miss"
+    // from "not yet cached"), which is fine: apiLimiter already bounds
+    // repeated lookups of nonexistent slugs.
+    data = await cacheThrough(CacheKey.orgBySlug(slug), TTL.PUBLIC_LOOKUP, async () => {
+      const { data, error } = await supabase
+        .from("organizations")
+        .select("id, name")
+        .eq("slug", slug)
+        .is("archived_at", null)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; name: string } | null;
+    });
+  } catch (err) {
+    logger.error(
+      { err: err instanceof Error ? err.message : err, path: "/api/validate-domain" },
+      "Supabase query failed",
+    );
     return NextResponse.json({ valid: false }, { status: 503, headers: cacheHeaders });
   }
 
-  return NextResponse.json({ valid: !!data }, { headers: cacheHeaders });
+  return NextResponse.json({ valid: !!data, name: data?.name ?? null }, { headers: cacheHeaders });
 }

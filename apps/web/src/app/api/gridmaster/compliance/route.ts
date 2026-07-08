@@ -13,9 +13,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await loadGridmasterCompliance(getServiceClient()));
   } catch (error) {
     console.error("gridmaster compliance GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load compliance oversight" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load compliance oversight" }, { status: 500 });
   }
 }

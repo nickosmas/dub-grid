@@ -1,10 +1,4 @@
-import {
-  render,
-  screen,
-  cleanup,
-  fireEvent,
-  waitFor,
-} from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
@@ -43,7 +37,14 @@ function renderModal(
 ) {
   const onAdd = overrides.onAdd ?? vi.fn();
   const onClose = overrides.onClose ?? vi.fn();
-  render(<AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={onClose} />);
+  render(
+    <AddEmployeeModal
+      focusAreas={focusAreas}
+      certifications={defaultCertifications}
+      onAdd={onAdd}
+      onClose={onClose}
+    />,
+  );
   return { onAdd, onClose };
 }
 
@@ -51,17 +52,26 @@ function renderModal(
 // Focus area buttons appear per-row. We scope row interactions by index.
 // Modal uses createPortal to document.body, so always query document.body.
 function getFirstNameInputs() {
-  return Array.from(document.body.querySelectorAll<HTMLInputElement>('input[placeholder="First name"]'));
+  return Array.from(
+    document.body.querySelectorAll<HTMLInputElement>('input[placeholder="First name"]'),
+  );
 }
 function getLastNameInputs() {
-  return Array.from(document.body.querySelectorAll<HTMLInputElement>('input[placeholder="Last name"]'));
+  return Array.from(
+    document.body.querySelectorAll<HTMLInputElement>('input[placeholder="Last name"]'),
+  );
 }
 
 describe("AddEmployeeModal", () => {
   describe("Rendering", () => {
     it("renders first name inputs with 'First name' placeholder (one per default row)", () => {
       render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={vi.fn()} onClose={vi.fn()} />,
+        <AddEmployeeModal
+          focusAreas={focusAreas}
+          certifications={defaultCertifications}
+          onAdd={vi.fn()}
+          onClose={vi.fn()}
+        />,
       );
       const inputs = getFirstNameInputs();
       // 3 rows by default
@@ -78,7 +88,12 @@ describe("AddEmployeeModal", () => {
 
     it("renders focus area toggle buttons for each focus area (in at least the first row)", () => {
       render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={vi.fn()} onClose={vi.fn()} />,
+        <AddEmployeeModal
+          focusAreas={focusAreas}
+          certifications={defaultCertifications}
+          onAdd={vi.fn()}
+          onClose={vi.fn()}
+        />,
       );
       // At minimum one "North" and one "South" button should be present (per-row)
       const northBtns = Array.from(document.body.querySelectorAll("button")).filter(
@@ -122,7 +137,12 @@ describe("AddEmployeeModal", () => {
       const onAdd = vi.fn();
       const onClose = vi.fn();
       render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={onClose} />,
+        <AddEmployeeModal
+          focusAreas={focusAreas}
+          certifications={defaultCertifications}
+          onAdd={onAdd}
+          onClose={onClose}
+        />,
       );
 
       const firstNameInputs = getFirstNameInputs();
@@ -149,12 +169,8 @@ describe("AddEmployeeModal", () => {
       await userEvent.type(firstNameInputs[0], "123");
       await userEvent.type(lastNameInputs[0], "456");
 
-      expect(
-        screen.getByText("First name must include at least one letter"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("Last name must include at least one letter"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("First name must include at least one letter")).toBeInTheDocument();
+      expect(screen.getByText("Last name must include at least one letter")).toBeInTheDocument();
 
       const submitBtn = screen.getByRole("button", { name: /Add.*Staff Member/i });
       expect(submitBtn).toBeDisabled();
@@ -167,7 +183,12 @@ describe("AddEmployeeModal", () => {
     it("valid submission calls onAdd with correct shape (array of employees, no id or seniority)", async () => {
       const onAdd = vi.fn();
       render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
+        <AddEmployeeModal
+          focusAreas={focusAreas}
+          certifications={defaultCertifications}
+          onAdd={onAdd}
+          onClose={vi.fn()}
+        />,
       );
       const firstNameInputs = getFirstNameInputs();
       const lastNameInputs = getLastNameInputs();
@@ -205,7 +226,12 @@ describe("AddEmployeeModal", () => {
     it("clicking a focus area button selects it; resulting submission includes that focus area", async () => {
       const onAdd = vi.fn();
       render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
+        <AddEmployeeModal
+          focusAreas={focusAreas}
+          certifications={defaultCertifications}
+          onAdd={onAdd}
+          onClose={vi.fn()}
+        />,
       );
       const firstNameInputs = getFirstNameInputs();
       const lastNameInputs = getLastNameInputs();
@@ -228,7 +254,12 @@ describe("AddEmployeeModal", () => {
     it("clicking a focus area button twice returns to original state", async () => {
       const onAdd = vi.fn();
       render(
-        <AddEmployeeModal focusAreas={focusAreas} certifications={defaultCertifications} onAdd={onAdd} onClose={vi.fn()} />,
+        <AddEmployeeModal
+          focusAreas={focusAreas}
+          certifications={defaultCertifications}
+          onAdd={onAdd}
+          onClose={vi.fn()}
+        />,
       );
       const firstNameInputs = getFirstNameInputs();
       const lastNameInputs = getLastNameInputs();
@@ -253,9 +284,7 @@ describe("AddEmployeeModal", () => {
   describe("Close", () => {
     it("clicking the close button calls onClose", async () => {
       const { onClose } = renderModal();
-      await userEvent.click(
-        screen.getByRole("button", { name: "Close modal" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "Close modal" }));
       await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
     });
 
@@ -286,17 +315,15 @@ describe("AddEmployeeModal", () => {
       await fc.assert(
         fc.asyncProperty(
           fc.array(
-            fc
-              .stringMatching(/^\S[\s\S]{0,14}$/)
-              .filter((s) => s.trim().length > 0),
+            fc.stringMatching(/^\S[\s\S]{0,14}$/).filter((s) => s.trim().length > 0),
             { minLength: 1, maxLength: 6 },
           ),
           fc.integer({ min: 0, max: 5 }),
           async (focusAreaNames, indexSeed) => {
             // Deduplicate and trim focus area names to avoid RTL accessible-name normalization issues
-            const uniqueNames = [
-              ...new Set(focusAreaNames.map((n) => n.trim())),
-            ].filter((n) => n.length > 0);
+            const uniqueNames = [...new Set(focusAreaNames.map((n) => n.trim()))].filter(
+              (n) => n.length > 0,
+            );
             if (uniqueNames.length === 0) return;
 
             const focusAreaIndex = indexSeed % uniqueNames.length;
@@ -317,7 +344,7 @@ describe("AddEmployeeModal", () => {
               <AddEmployeeModal
                 focusAreas={testFocusAreas}
                 certifications={defaultCertifications}
-                               onAdd={onAdd}
+                onAdd={onAdd}
                 onClose={onClose}
               />,
             );
@@ -326,9 +353,7 @@ describe("AddEmployeeModal", () => {
             // We locate focus area buttons by matching their exact textContent to the focus area name.
             const findFocusAreaBtnInFirstRow = (name: string): HTMLElement => {
               const allBtns = document.body.querySelectorAll("button");
-              const btn = Array.from(allBtns).find(
-                (b) => b.textContent === name,
-              );
+              const btn = Array.from(allBtns).find((b) => b.textContent === name);
               if (!btn) throw new Error(`Focus area button not found: "${name}"`);
               return btn as HTMLElement;
             };
@@ -351,9 +376,7 @@ describe("AddEmployeeModal", () => {
 
             // Record final selection — must equal initial
             const finalActive = getActiveFocusAreasInFirstRow();
-            expect(finalActive.slice().sort()).toEqual(
-              initialActive.slice().sort(),
-            );
+            expect(finalActive.slice().sort()).toEqual(initialActive.slice().sort());
 
             unmount();
             cleanup();

@@ -77,6 +77,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
+  async redirects() {
+    return [
+      { source: "/notifications", destination: "/alerts", permanent: false },
+      { source: "/notifications/:path*", destination: "/alerts/:path*", permanent: false },
+    ];
+  },
 };
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");

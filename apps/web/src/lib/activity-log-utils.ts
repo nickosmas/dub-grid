@@ -19,8 +19,27 @@ export const ACTIVITY_CATEGORIES: ActivityCategory[] = [
   { value: "shift_request", label: "Shift Requests", prefixes: ["shift_request."] },
   { value: "access", label: "Access & Roles", prefixes: ["role.", "permissions.", "user."] },
   { value: "invitation", label: "Invitations", prefixes: ["invitation."] },
-  { value: "config", label: "Configuration", prefixes: ["focus_area.", "assignment.", "shift_category.", "job.", "absence_type.", "indicator_type.", "certifications.", "org_roles.", "coverage_requirements.", "coverage_rule_config."] },
-  { value: "recurring", label: "Recurring", prefixes: ["recurring_shift.", "recurring_schedule.", "shift_series."] },
+  {
+    value: "config",
+    label: "Configuration",
+    prefixes: [
+      "focus_area.",
+      "assignment.",
+      "shift_category.",
+      "job.",
+      "absence_type.",
+      "indicator_type.",
+      "certifications.",
+      "org_roles.",
+      "coverage_requirements.",
+      "coverage_rule_config.",
+    ],
+  },
+  {
+    value: "recurring",
+    label: "Recurring",
+    prefixes: ["recurring_shift.", "recurring_schedule.", "shift_series."],
+  },
   { value: "org", label: "Organization", prefixes: ["org."] },
   { value: "impersonation", label: "Impersonation", prefixes: ["impersonation."] },
   { value: "billing", label: "Billing", prefixes: ["billing."] },
@@ -29,9 +48,11 @@ export const ACTIVITY_CATEGORIES: ActivityCategory[] = [
 ];
 
 export function getCategoryForAction(action: string): ActivityCategory {
-  return ACTIVITY_CATEGORIES.find(
-    (c) => c.prefixes.length > 0 && c.prefixes.some((p) => action.startsWith(p)),
-  ) ?? ACTIVITY_CATEGORIES[0];
+  return (
+    ACTIVITY_CATEGORIES.find(
+      (c) => c.prefixes.length > 0 && c.prefixes.some((p) => action.startsWith(p)),
+    ) ?? ACTIVITY_CATEGORIES[0]
+  );
 }
 
 export function matchesCategory(action: string, categoryValue: string): boolean {
@@ -56,7 +77,8 @@ export function getActionSeverity(action: string): ActionSeverity {
     action.includes("unsuspended") ||
     action.includes("reactivated") ||
     action.includes("published")
-  ) return "create";
+  )
+    return "create";
 
   if (
     action.includes("archived") ||
@@ -70,22 +92,24 @@ export function getActionSeverity(action: string): ActionSeverity {
     action.includes("discarded") ||
     action.includes("benched") ||
     action.includes("terminated")
-  ) return "delete";
+  )
+    return "delete";
 
-  if (
-    action.includes("impersonation") ||
-    action === "role.changed"
-  ) return "warning";
+  if (action.includes("impersonation") || action === "role.changed") return "warning";
 
   return "update";
 }
 
 export function severityColor(severity: ActionSeverity): { bg: string; fg: string } {
   switch (severity) {
-    case "create": return { bg: "var(--color-success-bg, #f0fdf4)", fg: "var(--color-success, #16a34a)" };
-    case "delete": return { bg: "var(--color-danger-bg, #fde8e8)", fg: "var(--color-danger)" };
-    case "warning": return { bg: "var(--color-warning-bg, #fff8e6)", fg: "var(--color-warning, #b08800)" };
-    case "update": return { bg: "var(--color-bg-secondary)", fg: "var(--color-text-secondary)" };
+    case "create":
+      return { bg: "var(--color-success-bg, #f0fdf4)", fg: "var(--color-success, #16a34a)" };
+    case "delete":
+      return { bg: "var(--color-danger-bg, #fde8e8)", fg: "var(--color-danger)" };
+    case "warning":
+      return { bg: "var(--color-warning-bg, #fff8e6)", fg: "var(--color-warning, #b08800)" };
+    case "update":
+      return { bg: "var(--color-bg-secondary)", fg: "var(--color-text-secondary)" };
   }
 }
 
@@ -186,19 +210,30 @@ export function describeAction(entry: FullAuditLogEntry): string {
 
   switch (action) {
     // Employee
-    case "employee.created": return name ? `Added employee ${name}` : "Added a new employee";
-    case "employee.updated": return name ? `Updated employee ${name}` : "Updated an employee";
-    case "employee.archived": return name ? `Terminated employee ${name}` : "Terminated an employee";
+    case "employee.created":
+      return name ? `Added employee ${name}` : "Added a new employee";
+    case "employee.updated":
+      return name ? `Updated employee ${name}` : "Updated an employee";
+    case "employee.removed":
+    // Historical key (was "terminated" before the rename) — keep rendering.
+    case "employee.archived":
+      return name ? `Removed employee ${name}` : "Removed an employee";
+    case "employee.deactivated":
+    // Historical key (was "benched" before the rename) — keep rendering.
     case "employee.benched": {
       const note = details.note ? ` — ${details.note}` : "";
-      return `Benched employee${name ? ` ${name}` : ""}${note}`;
+      return `Marked employee${name ? ` ${name}` : ""} inactive${note}`;
     }
-    case "employee.activated": return name ? `Activated employee ${name}` : "Activated an employee";
+    case "employee.activated":
+      return name ? `Activated employee ${name}` : "Activated an employee";
 
     // Shifts
-    case "shift.created": return "Created a shift";
-    case "shift.updated": return "Updated a shift";
-    case "shift.deleted": return "Deleted a shift";
+    case "shift.created":
+      return "Created a shift";
+    case "shift.updated":
+      return "Updated a shift";
+    case "shift.deleted":
+      return "Deleted a shift";
     case "shift.moved": {
       const target = details.targetDate ? ` to ${formatShortDate(String(details.targetDate))}` : "";
       return `Moved a shift${target}`;
@@ -210,42 +245,61 @@ export function describeAction(entry: FullAuditLogEntry): string {
       const end = details.endDate ? formatShortDate(String(details.endDate)) : "";
       return start && end ? `Published schedule ${start} – ${end}` : "Published the schedule";
     }
-    case "schedule.drafts_discarded": return "Discarded schedule drafts";
+    case "schedule.drafts_discarded":
+      return "Discarded schedule drafts";
 
     // Shift requests
-    case "shift_request.created": return "Created a shift request";
-    case "shift_request.claimed": return "Claimed a shift request";
-    case "shift_request.responded": return "Responded to a shift request";
-    case "shift_request.resolved": return "Resolved a shift request";
-    case "shift_request.canceled": return "Canceled a shift request";
+    case "shift_request.created":
+      return "Created a shift request";
+    case "shift_request.claimed":
+      return "Claimed a shift request";
+    case "shift_request.responded":
+      return "Responded to a shift request";
+    case "shift_request.resolved":
+      return "Resolved a shift request";
+    case "shift_request.canceled":
+      return "Canceled a shift request";
 
     // Organization
-    case "org.updated": return name ? `Updated organization ${name}` : "Updated organization settings";
-    case "org.created": return name ? `Created organization ${name}` : "Created a new organization";
-    case "org.archived": return "Archived the organization";
-    case "org.restored": return "Restored the organization";
+    case "org.updated":
+      return name ? `Updated organization ${name}` : "Updated organization settings";
+    case "org.created":
+      return name ? `Created organization ${name}` : "Created a new organization";
+    case "org.archived":
+      return "Archived the organization";
+    case "org.restored":
+      return "Restored the organization";
     case "org.suspended": {
       const reason = details.reason ? ` — ${details.reason}` : "";
       return `Suspended the organization${reason}`;
     }
-    case "org.unsuspended": return "Unsuspended the organization";
-    case "org.deleted": return "Deleted the organization";
+    case "org.unsuspended":
+      return "Unsuspended the organization";
+    case "org.deleted":
+      return "Deleted the organization";
 
     // Access & Roles
     case "role.changed": {
       const newRole = details.newRole ?? details.new_role;
       const target = details.targetEmail ? ` for ${details.targetEmail}` : "";
-      return newRole ? `Changed role to ${titleCase(String(newRole))}${target}` : `Changed a user's role${target}`;
+      return newRole
+        ? `Changed role to ${titleCase(String(newRole))}${target}`
+        : `Changed a user's role${target}`;
     }
     case "permissions.updated": {
       const target = details.targetEmail ? ` for ${details.targetEmail}` : "";
       return `Updated admin permissions${target}`;
     }
-    case "user.removed_from_org": return "Removed a user from the organization";
-    case "user.deactivated": return "Deactivated a user";
-    case "user.reactivated": return "Reactivated a user";
-    case "user.force_logout": return "Force-logged out a user";
-    case "user.password_reset_sent": return "Sent a password reset";
+    case "user.removed_from_org":
+      return "Removed a user from the organization";
+    case "user.deactivated":
+      return "Deactivated a user";
+    case "user.reactivated":
+      return "Reactivated a user";
+    case "user.force_logout":
+      return "Force-logged out a user";
+    case "user.password_reset_sent":
+      return "Sent a password reset";
 
     // Invitations
     case "invitation.sent": {
@@ -253,80 +307,129 @@ export function describeAction(entry: FullAuditLogEntry): string {
       const role = details.role ? ` as ${titleCase(String(details.role))}` : "";
       return email ? `Invited ${email}${role}` : "Sent an invitation";
     }
-    case "invitation.accepted": return details.email ? `${details.email} accepted their invitation` : "An invitation was accepted";
-    case "invitation.revoked": return "Revoked an invitation";
-    case "invitation.resent": return "Resent an invitation";
+    case "invitation.accepted":
+      return details.email
+        ? `${details.email} accepted their invitation`
+        : "An invitation was accepted";
+    case "invitation.revoked":
+      return "Revoked an invitation";
+    case "invitation.resent":
+      return "Resent an invitation";
 
     // Config items
-    case "focus_area.upserted": return name ? `Updated focus area "${name}"` : "Updated a focus area";
-    case "focus_area.archived": return "Archived a focus area";
-    case "focus_area.restored": return "Restored a focus area";
-    case "assignment.upserted": return name ? `Updated schedule option "${name}"` : "Updated a schedule option";
-    case "assignment.archived": return "Archived a schedule option";
-    case "assignment.restored": return "Restored a schedule option";
-    case "absence_type.upserted": return name ? `Updated absence type "${name}"` : "Updated an absence type";
-    case "absence_type.archived": return "Archived an absence type";
-    case "absence_type.restored": return "Restored an absence type";
-    case "shift_category.upserted": return name ? `Updated shift "${name}"` : "Updated a shift";
-    case "shift_category.archived": return "Archived a shift";
-    case "shift_category.restored": return "Restored a shift";
-    case "job.upserted": return name ? `Updated job "${name}"` : "Updated a job";
-    case "job.archived": return "Archived a job";
-    case "job.restored": return "Restored a job";
-    case "indicator_type.upserted": return name ? `Updated indicator type "${name}"` : "Updated an indicator type";
-    case "indicator_type.archived": return "Archived an indicator type";
-    case "indicator_type.restored": return "Restored an indicator type";
-    case "certifications.saved": return "Updated certifications";
-    case "org_roles.saved": return "Updated organization roles";
-    case "coverage_requirements.saved": return "Updated coverage requirements";
-    case "coverage_rule_config.saved": return "Updated coverage rule settings";
+    case "focus_area.upserted":
+      return name ? `Updated focus area "${name}"` : "Updated a focus area";
+    case "focus_area.archived":
+      return "Archived a focus area";
+    case "focus_area.restored":
+      return "Restored a focus area";
+    case "assignment.upserted":
+      return name ? `Updated schedule option "${name}"` : "Updated a schedule option";
+    case "assignment.archived":
+      return "Archived a schedule option";
+    case "assignment.restored":
+      return "Restored a schedule option";
+    case "absence_type.upserted":
+      return name ? `Updated absence type "${name}"` : "Updated an absence type";
+    case "absence_type.archived":
+      return "Archived an absence type";
+    case "absence_type.restored":
+      return "Restored an absence type";
+    case "shift_category.upserted":
+      return name ? `Updated shift "${name}"` : "Updated a shift";
+    case "shift_category.archived":
+      return "Archived a shift";
+    case "shift_category.restored":
+      return "Restored a shift";
+    case "job.upserted":
+      return name ? `Updated job "${name}"` : "Updated a job";
+    case "job.archived":
+      return "Archived a job";
+    case "job.restored":
+      return "Restored a job";
+    case "indicator_type.upserted":
+      return name ? `Updated indicator type "${name}"` : "Updated an indicator type";
+    case "indicator_type.archived":
+      return "Archived an indicator type";
+    case "indicator_type.restored":
+      return "Restored an indicator type";
+    case "certifications.saved":
+      return "Updated certifications";
+    case "org_roles.saved":
+      return "Updated organization roles";
+    case "coverage_requirements.saved":
+      return "Updated coverage requirements";
+    case "coverage_rule_config.saved":
+      return "Updated coverage rule settings";
 
     // Recurring
-    case "recurring_shift.upserted": return "Updated a recurring shift";
-    case "recurring_shift.deleted": return "Deleted a recurring shift";
-    case "recurring_schedule.applied": return "Applied the recurring schedule";
-    case "shift_series.created": return "Created a shift series";
-    case "shift_series.updated": return "Updated a shift series";
-    case "shift_series.archived": return "Archived a shift series";
+    case "recurring_shift.upserted":
+      return "Updated a recurring shift";
+    case "recurring_shift.deleted":
+      return "Deleted a recurring shift";
+    case "recurring_schedule.applied":
+      return "Applied the recurring schedule";
+    case "shift_series.created":
+      return "Created a shift series";
+    case "shift_series.updated":
+      return "Updated a shift series";
+    case "shift_series.archived":
+      return "Archived a shift series";
 
     // Impersonation
     case "impersonation.started": {
       const justification = details.justification ? ` — ${details.justification}` : "";
       return `Started impersonation session${justification}`;
     }
-    case "impersonation.ended": return "Ended impersonation session";
+    case "impersonation.ended":
+      return "Ended impersonation session";
 
     // Notes
-    case "schedule_note.upserted": return "Updated a schedule note";
-    case "schedule_note.deleted": return "Deleted a schedule note";
+    case "schedule_note.upserted":
+      return "Updated a schedule note";
+    case "schedule_note.deleted":
+      return "Deleted a schedule note";
 
     // Billing
-    case "billing.subscription_created": return "Started subscription";
-    case "billing.subscription_updated": return "Updated subscription";
-    case "billing.subscription_cancel_scheduled": return "Scheduled subscription cancellation";
-    case "billing.trial_extended": return "Extended trial period";
-    case "billing.subscription_canceled": return "Canceled subscription";
-    case "billing.payment_failed": return "Recorded a failed payment";
-    case "billing.payment_succeeded": return "Recorded a successful payment";
-    case "billing.payment_method_updated": return "Updated payment method";
-    case "billing.billing_details_updated": return "Updated billing details";
-    case "billing.portal_opened": return "Opened billing portal";
-    case "billing.seats_synced": return "Synced billing seats";
-    case "billing.status_overridden": return "Overrode billing status";
-    case "billing.synced": return "Synced billing data";
+    case "billing.subscription_created":
+      return "Started subscription";
+    case "billing.subscription_updated":
+      return "Updated subscription";
+    case "billing.subscription_cancel_scheduled":
+      return "Scheduled subscription cancellation";
+    case "billing.trial_extended":
+      return "Extended trial period";
+    case "billing.subscription_canceled":
+      return "Canceled subscription";
+    case "billing.payment_failed":
+      return "Recorded a failed payment";
+    case "billing.payment_succeeded":
+      return "Recorded a successful payment";
+    case "billing.payment_method_updated":
+      return "Updated payment method";
+    case "billing.billing_details_updated":
+      return "Updated billing details";
+    case "billing.portal_opened":
+      return "Opened billing portal";
+    case "billing.seats_synced":
+      return "Synced billing seats";
+    case "billing.status_overridden":
+      return "Overrode billing status";
+    case "billing.synced":
+      return "Synced billing data";
 
     // Data export
-    case "data.exported": return "Exported data";
-    case "data.portability_exported": return "Exported privacy data";
+    case "data.exported":
+      return "Exported data";
+    case "data.portability_exported":
+      return "Exported privacy data";
 
-    default: return titleCase(action);
+    default:
+      return titleCase(action);
   }
 }
 
-export function describeAuditEvent(
-  action: string,
-  details: Record<string, unknown> = {},
-): string {
+export function describeAuditEvent(action: string, details: Record<string, unknown> = {}): string {
   return describeAction({ action, details } as FullAuditLogEntry);
 }
 
@@ -334,35 +437,7 @@ export function describeAuditEvent(
 // Relative time formatting
 // ---------------------------------------------------------------------------
 
-export function formatRelativeTime(isoString: string): string {
-  const now = new Date();
-  const d = new Date(isoString);
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60_000);
-  const diffHr = Math.floor(diffMs / 3_600_000);
-
-  if (diffMin < 1) return "Just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHr < 24) return `${diffHr}h ago`;
-
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) {
-    return `Yesterday at ${formatTime(d)}`;
-  }
-
-  const sixDaysAgo = new Date(now);
-  sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
-  if (d >= sixDaysAgo) {
-    return `${d.toLocaleDateString(undefined, { weekday: "long" })} at ${formatTime(d)}`;
-  }
-
-  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined })} at ${formatTime(d)}`;
-}
-
-function formatTime(d: Date): string {
-  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
+export { formatRelativeTime } from "@/lib/utils";
 
 function formatShortDate(dateStr: string): string {
   const d = new Date(dateStr + (dateStr.includes("T") ? "" : "T00:00:00"));
@@ -394,7 +469,13 @@ export function groupByDate(entries: FullAuditLogEntry[]): DateGroup[] {
     let label: string;
     if (dateStr === todayStr) label = "Today";
     else if (dateStr === yesterdayStr) label = "Yesterday";
-    else label = d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined });
+    else
+      label = d.toLocaleDateString(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+      });
 
     const existing = groups.get(dateStr);
     if (existing) {
@@ -412,7 +493,9 @@ export function groupByDate(entries: FullAuditLogEntry[]): DateGroup[] {
 // ---------------------------------------------------------------------------
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function isUuid(s: string): boolean { return UUID_RE.test(s); }
+function isUuid(s: string): boolean {
+  return UUID_RE.test(s);
+}
 function isIdKey(key: string): boolean {
   const k = key.toLowerCase();
   return k.endsWith("id") || k.endsWith("ids") || k === "id";
@@ -431,25 +514,27 @@ export function formatDetails(entry: FullAuditLogEntry): DetailItem[] {
   // to avoid redundant display (e.g. "Published schedule Mar 29 – Apr 11"
   // already contains the start/end dates).
   const DESCRIBED_ACTIONS = new Set([
-    "schedule.published",       // dates in description
-    "invitation.sent",          // email + role in description
-    "employee.created",         // name in description
-    "employee.updated",         // name in description
-    "employee.archived",        // name in description
-    "employee.benched",         // name + note in description
-    "employee.activated",       // name in description
-    "org.updated",              // name in description
-    "org.created",              // name in description
-    "org.suspended",            // reason in description
-    "role.changed",             // new role + target email in description
-    "invitation.accepted",      // email in description
-    "impersonation.started",    // justification in description
-    "shift.moved",              // target date in description
-    "focus_area.upserted",      // name in description
-    "assignment.upserted",      // name in description
-    "absence_type.upserted",    // name in description
-    "shift_category.upserted",  // name in description
-    "indicator_type.upserted",  // name in description
+    "schedule.published", // dates in description
+    "invitation.sent", // email + role in description
+    "employee.created", // name in description
+    "employee.updated", // name in description
+    "employee.removed", // name in description
+    "employee.archived", // historical alias — name in description
+    "employee.deactivated", // name + note in description
+    "employee.benched", // historical alias — name + note in description
+    "employee.activated", // name in description
+    "org.updated", // name in description
+    "org.created", // name in description
+    "org.suspended", // reason in description
+    "role.changed", // new role + target email in description
+    "invitation.accepted", // email in description
+    "impersonation.started", // justification in description
+    "shift.moved", // target date in description
+    "focus_area.upserted", // name in description
+    "assignment.upserted", // name in description
+    "absence_type.upserted", // name in description
+    "shift_category.upserted", // name in description
+    "indicator_type.upserted", // name in description
   ]);
   if (DESCRIBED_ACTIONS.has(action)) return [];
 
@@ -471,8 +556,12 @@ export function formatDetails(entry: FullAuditLogEntry): DetailItem[] {
   // Action-specific formatting for actions with extra data worth showing
   if (action === "permissions.updated" && details.permissions) {
     const perms = details.permissions as Record<string, boolean>;
-    const enabled = Object.entries(perms).filter(([, v]) => v).map(([k]) => friendlyLabel(k));
-    const disabled = Object.entries(perms).filter(([, v]) => !v).map(([k]) => friendlyLabel(k));
+    const enabled = Object.entries(perms)
+      .filter(([, v]) => v)
+      .map(([k]) => friendlyLabel(k));
+    const disabled = Object.entries(perms)
+      .filter(([, v]) => !v)
+      .map(([k]) => friendlyLabel(k));
     if (enabled.length) items.push({ label: "Enabled", value: enabled.join(", ") });
     if (disabled.length) items.push({ label: "Disabled", value: disabled.join(", ") });
     return items;
@@ -492,7 +581,10 @@ export function formatDetails(entry: FullAuditLogEntry): DetailItem[] {
       for (const [subKey, subVal] of Object.entries(val as Record<string, unknown>)) {
         if (subVal === null || subVal === undefined) continue;
         if (isIdKey(subKey)) continue;
-        items.push({ label: friendlyLabel(`${key} ${subKey}`), value: friendlyValue(subKey, subVal) });
+        items.push({
+          label: friendlyLabel(`${key} ${subKey}`),
+          value: friendlyValue(subKey, subVal),
+        });
       }
     } else {
       // Skip individual UUID values
@@ -535,7 +627,11 @@ export function getAuditTargetLabel(entry: FullAuditLogEntry): string {
 // Search matching
 // ---------------------------------------------------------------------------
 
-export function matchesSearch(entry: FullAuditLogEntry, query: string, description: string): boolean {
+export function matchesSearch(
+  entry: FullAuditLogEntry,
+  query: string,
+  description: string,
+): boolean {
   if (!query) return true;
   const q = query.toLowerCase();
   return (

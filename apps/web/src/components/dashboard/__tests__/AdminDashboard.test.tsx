@@ -4,9 +4,7 @@ import { buildPerms } from "@dubgrid/authz";
 import AdminDashboard from "@/components/dashboard/AdminDashboard";
 import type { DashboardContentProps } from "@/components/dashboard/DashboardContentProps";
 
-function makeProps(
-  overrides: Partial<DashboardContentProps> = {},
-): DashboardContentProps {
+function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardContentProps {
   const permissions = {
     ...buildPerms("admin", "org-1", false),
     canApproveShiftRequests: true,
@@ -24,8 +22,12 @@ function makeProps(
       },
     ],
     activityItems: [],
+    absenceTypeById: new Map(),
+    assignmentById: new Map(),
     coverageRequirements: [{ id: 1 }],
     currentEmpId: "emp-1",
+    currentPeriodShifts: {},
+    periodDates: [new Date("2026-05-11T00:00:00")],
     currentHours: [
       {
         dailyHours: {},
@@ -129,9 +131,7 @@ describe("AdminDashboard", () => {
     expect(screen.getByText("Day shift \u00b7 2026-05-11")).toBeInTheDocument();
     expect(screen.getByText("2 urgent coverage slots")).toBeInTheDocument();
     expect(screen.getByText("1 unpublished change")).toBeInTheDocument();
-    expect(
-      screen.getByText("these 2 weeks \u00b7 required vs scheduled"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("these 2 weeks \u00b7 required vs scheduled")).toBeInTheDocument();
     expect(screen.getByText("2 unfilled these 2 weeks")).toBeInTheDocument();
     expect(screen.getByText("Staff over 80h these 2 weeks")).toBeInTheDocument();
 
@@ -139,10 +139,52 @@ describe("AdminDashboard", () => {
     expect(coverageCard).not.toBeNull();
     const coverageText = coverageCard?.textContent ?? "";
     expect(coverageText.indexOf("Memory Care")).toBeGreaterThanOrEqual(0);
-    expect(coverageText.indexOf("Memory Care")).toBeLessThan(
-      coverageText.indexOf("Front Desk"),
-    );
+    expect(coverageText.indexOf("Memory Care")).toBeLessThan(coverageText.indexOf("Front Desk"));
     expect(container.querySelector('a[href="/schedule"]')).not.toBeNull();
     expect(container.querySelector('a[href="/people/emp-1"]')).not.toBeNull();
+  });
+
+  it("links to coverage settings when requirements aren't configured yet", () => {
+    render(
+      <AdminDashboard
+        {...makeProps({
+          coverageRequirements: [],
+          sectionCoverage: [],
+          permissions: {
+            ...buildPerms("admin", "org-1", false),
+            canApproveShiftRequests: true,
+            canEditShifts: true,
+            canViewDashboardAnalytics: true,
+            canViewSchedule: true,
+            canManageCoverageRequirements: true,
+          } as unknown as DashboardContentProps["permissions"],
+        })}
+      />,
+    );
+
+    expect(screen.getByText("No coverage requirements configured")).toBeInTheDocument();
+    const configureLink = screen.getByRole("link", { name: "Configure coverage" });
+    expect(configureLink).toHaveAttribute("href", "/settings?section=schedule-coverage");
+  });
+
+  it("hides the configure-coverage link when the admin can't manage requirements", () => {
+    render(
+      <AdminDashboard
+        {...makeProps({
+          coverageRequirements: [],
+          sectionCoverage: [],
+          permissions: {
+            ...buildPerms("admin", "org-1", false),
+            canApproveShiftRequests: true,
+            canEditShifts: true,
+            canViewDashboardAnalytics: true,
+            canViewSchedule: true,
+            canManageCoverageRequirements: false,
+          } as unknown as DashboardContentProps["permissions"],
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole("link", { name: "Configure coverage" })).not.toBeInTheDocument();
   });
 });

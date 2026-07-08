@@ -59,7 +59,5 @@ export async function DELETE(req: NextRequest) {
   }
 
   await revokeUserSessionForUser(auth.user.id, parsed.data.refreshTokenHash);
-  return NextResponse.json(
-    mobileProfileSessionRevokeResponseSchema.parse({ success: true }),
-  );
+  return NextResponse.json(mobileProfileSessionRevokeResponseSchema.parse({ success: true }));
 }

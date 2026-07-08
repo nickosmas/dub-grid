@@ -17,13 +17,23 @@
 -- supabase_auth_admin needs USAGE on public schema to locate and call the hook
 GRANT USAGE ON SCHEMA public TO supabase_auth_admin;
 
--- Hook needs to read profiles + org memberships + organizations for JWT claims
+-- Hook needs to read profiles + org memberships + organizations for JWT claims.
+-- The hook is SECURITY DEFINER (owned by postgres), so its only write
+-- (profiles.last_sign_in_at) runs with the owner's privileges. It no longer
+-- writes organizations (trials now start at org provisioning, not on sign-in),
+-- so no UPDATE grant on organizations is needed here.
 GRANT SELECT ON TABLE public.profiles TO supabase_auth_admin;
 GRANT SELECT ON TABLE public.organization_memberships TO supabase_auth_admin;
 GRANT SELECT ON TABLE public.organizations TO supabase_auth_admin;
+GRANT SELECT ON TABLE public.employees TO supabase_auth_admin;
 
 -- Hook needs to read/delete jwt_refresh_locks to check/clean locks
 GRANT SELECT, DELETE ON TABLE public.jwt_refresh_locks TO supabase_auth_admin;
+
+-- Hook needs to read user_sessions.active_org_id for per-session org isolation,
+-- and INSERT a row on first contact (freezes the session's active_org_id at
+-- profiles.org_id so later cross-device switches don't contaminate this session).
+GRANT SELECT, INSERT ON TABLE public.user_sessions TO supabase_auth_admin;
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 2. GRANTS ON EXISTING OBJECTS
@@ -86,6 +96,9 @@ GRANT SELECT (
   archived_at,
   suspended_at,
   suspended_reason,
+  workspace_kind,
+  sandbox_owner_user_id,
+  sandbox_source_org_id,
   enforce_conflict_prevention,
   coverage_rule_config,
   feature_overrides,

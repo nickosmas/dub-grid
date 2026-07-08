@@ -13,9 +13,11 @@
 
 ## Testing
 
-- [ ] `npm test` passes
+- [ ] `npm test` passes (all workspaces)
 - [ ] Tested locally in browser
 - [ ] E2E tests pass (if UI change): `npm run test:e2e`
+- [ ] Mobile / API contract changes verified: `npm run test:mobile`
+- [ ] `npm run type-check` passes across workspaces
 
 ## Migration Impact
 
@@ -28,4 +30,6 @@
 
 - [ ] No new `NEXT_PUBLIC_` env vars for server-only secrets
 - [ ] No catch-all routes added
+- [ ] Shared `packages/*` changes don't break either app (web + mobile build & test)
+- [ ] Shared `packages/*` stay platform-neutral (no Next/Expo/DOM imports)
 - [ ] Cross-references in docs updated (if applicable)

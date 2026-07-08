@@ -46,16 +46,8 @@ export function getElementCornerPlacement(
   const cellMinX = rect.left + cellInset;
   const cellMaxX = rect.right - cellInset;
   const cellCenterX = rect.left + rect.width / 2;
-  const startCornerX = clamp(
-    cellCenterX + verticalDistanceToCenter,
-    cellMinX,
-    cellMaxX,
-  );
-  const endCornerX = clamp(
-    cellCenterX - verticalDistanceToCenter,
-    cellMinX,
-    cellMaxX,
-  );
+  const startCornerX = clamp(cellCenterX + verticalDistanceToCenter, cellMinX, cellMaxX);
+  const endCornerX = clamp(cellCenterX - verticalDistanceToCenter, cellMinX, cellMaxX);
   const maxStartCornerX = window.innerWidth - viewportPadding - popupWidth;
   const canFaceRight = startCornerX <= maxStartCornerX;
 

@@ -1,8 +1,5 @@
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MobileEnvValidation } from "../lib/env";
 import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
 import { getScreenBottomPadding } from "./screen-layout";
@@ -61,8 +58,8 @@ export function ConfigurationScreen({
           <Text style={styles.eyebrow}>DubGrid Mobile Setup</Text>
           <Text style={styles.title}>Mobile configuration needs attention</Text>
           <Text style={styles.body}>
-            This Expo build does not have a phone-safe backend configuration yet.
-            For a real phone, pick one of these:
+            This Expo build does not have a phone-safe backend configuration yet. For a real phone,
+            pick one of these:
           </Text>
           <Text style={styles.step}>1. Local backend: `npm run use:mobile:local`</Text>
           <Text style={styles.step}>2. Hosted backend: `npm run use:mobile:remote`</Text>
@@ -74,9 +71,7 @@ export function ConfigurationScreen({
           {validation.issues.map((issue) => (
             <View key={`${issue.key}-${issue.message}`} style={styles.issue}>
               <Text style={styles.issueKey}>{getIssueTitle(issue.key)}</Text>
-              <Text style={styles.issueMessage}>
-                {getIssueMessage(issue.key, issue.message)}
-              </Text>
+              <Text style={styles.issueMessage}>{getIssueMessage(issue.key, issue.message)}</Text>
             </View>
           ))}
         </View>

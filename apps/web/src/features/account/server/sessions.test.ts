@@ -8,15 +8,13 @@ vi.mock("@/lib/supabase-service", () => ({
   }),
 }));
 
-import {
-  fetchActiveUserSessionsForUser,
-  getActiveUserSessionCutoff,
-} from "./sessions";
+import { fetchActiveUserSessionsForUser, getActiveUserSessionCutoff } from "./sessions";
 
 function makeUserSessionsBuilder(rows: Record<string, unknown>[]) {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    not: vi.fn(() => builder),
     gte: vi.fn(() => builder),
     order: vi.fn().mockResolvedValue({ data: rows, error: null }),
   };
@@ -52,14 +50,9 @@ describe("account session queries", () => {
       now,
     );
 
-    expect(builder.eq).toHaveBeenCalledWith(
-      "user_id",
-      "22222222-2222-4222-8222-222222222222",
-    );
-    expect(builder.gte).toHaveBeenCalledWith(
-      "last_active_at",
-      getActiveUserSessionCutoff(now),
-    );
+    expect(builder.eq).toHaveBeenCalledWith("user_id", "22222222-2222-4222-8222-222222222222");
+    expect(builder.not).toHaveBeenCalledWith("refresh_token_hash", "is", null);
+    expect(builder.gte).toHaveBeenCalledWith("last_active_at", getActiveUserSessionCutoff(now));
     expect(builder.order).toHaveBeenCalledWith("last_active_at", {
       ascending: false,
     });

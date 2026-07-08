@@ -151,9 +151,7 @@ export function useSmoothReorder<T>({
 
       const centers = items.map((item) => {
         const id = getId(item);
-        const rect =
-          rectRefs.current.get(id) ??
-          nodeRefs.current.get(id)?.getBoundingClientRect();
+        const rect = rectRefs.current.get(id) ?? nodeRefs.current.get(id)?.getBoundingClientRect();
 
         return rect ? rect.top + rect.height / 2 : null;
       });
@@ -296,9 +294,7 @@ export function useSmoothReorder<T>({
     (item: T) => {
       const id = getId(item);
       const dragging =
-        draggedIdx !== null &&
-        items[draggedIdx] !== undefined &&
-        getId(items[draggedIdx]) === id;
+        draggedIdx !== null && items[draggedIdx] !== undefined && getId(items[draggedIdx]) === id;
 
       return {
         offsetY: offsets.get(id) ?? 0,
@@ -312,7 +308,9 @@ export function useSmoothReorder<T>({
 
   const getHandleProps = useCallback(
     (index: number) => ({
-      onPointerDown: enabled ? (event: PointerEvent<HTMLElement>) => handlePointerDown(event, index) : undefined,
+      onPointerDown: enabled
+        ? (event: PointerEvent<HTMLElement>) => handlePointerDown(event, index)
+        : undefined,
       onPointerMove: enabled ? handlePointerMove : undefined,
       onPointerUp: enabled ? handlePointerEnd : undefined,
       onPointerCancel: enabled ? handlePointerCancel : undefined,

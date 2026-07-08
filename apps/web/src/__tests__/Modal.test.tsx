@@ -24,17 +24,12 @@ describe("Modal — Accessibility", () => {
 
   it("dialog has aria-label equal to the title prop", () => {
     renderModal(vi.fn(), "My Dialog");
-    expect(screen.getByRole("dialog")).toHaveAttribute(
-      "aria-label",
-      "My Dialog",
-    );
+    expect(screen.getByRole("dialog")).toHaveAttribute("aria-label", "My Dialog");
   });
 
   it("close button has aria-label='Close modal'", () => {
     renderModal();
-    expect(
-      screen.getByRole("button", { name: "Close modal" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close modal" })).toBeInTheDocument();
   });
 });
 

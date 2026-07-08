@@ -77,12 +77,7 @@ export async function deleteUserAccountWithCleanup({
   ) {
     try {
       const result = await operation();
-      if (
-        result &&
-        typeof result === "object" &&
-        "error" in result &&
-        result.error
-      ) {
+      if (result && typeof result === "object" && "error" in result && result.error) {
         throw result.error;
       }
     } catch (error) {
@@ -95,12 +90,7 @@ export async function deleteUserAccountWithCleanup({
   }
 
   await runCleanupStep("organization_memberships", () =>
-    Promise.resolve(
-      serviceClient
-        .from("organization_memberships")
-        .delete()
-        .eq("user_id", userId),
-    ),
+    Promise.resolve(serviceClient.from("organization_memberships").delete().eq("user_id", userId)),
   );
   await runCleanupStep("employees", () =>
     Promise.resolve(
@@ -111,12 +101,7 @@ export async function deleteUserAccountWithCleanup({
     Promise.resolve(serviceClient.from("profiles").delete().eq("id", userId)),
   );
   await runCleanupStep("notification_preferences", () =>
-    Promise.resolve(
-      serviceClient
-        .from("notification_preferences")
-        .delete()
-        .eq("user_id", userId),
-    ),
+    Promise.resolve(serviceClient.from("notification_preferences").delete().eq("user_id", userId)),
   );
   await runCleanupStep("user_sessions", () =>
     Promise.resolve(serviceClient.from("user_sessions").delete().eq("user_id", userId)),
@@ -125,9 +110,7 @@ export async function deleteUserAccountWithCleanup({
     Promise.resolve(serviceClient.from("cookie_consents").delete().eq("user_id", userId)),
   );
   await runCleanupStep("terms_acceptances", () =>
-    Promise.resolve(
-      serviceClient.from("terms_acceptances").delete().eq("user_id", userId),
-    ),
+    Promise.resolve(serviceClient.from("terms_acceptances").delete().eq("user_id", userId)),
   );
 
   try {

@@ -32,10 +32,7 @@ export function useUnsavedChangesPrompt({
   return {
     requestClose,
     unsavedChangesDialog: showPrompt ? (
-      <UnsavedChangesDialog
-        onKeepEditing={keepEditing}
-        onDiscard={confirmDiscard}
-      />
+      <UnsavedChangesDialog onKeepEditing={keepEditing} onDiscard={confirmDiscard} />
     ) : null,
   };
 }

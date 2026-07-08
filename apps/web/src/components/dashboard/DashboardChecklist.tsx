@@ -52,8 +52,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
               color: "var(--color-text-muted)",
             }}
           >
-            Complete these steps to set up your organization. {doneCount} of{" "}
-            {steps.length} done.
+            Complete these steps to set up your organization. {doneCount} of {steps.length} done.
           </p>
         </div>
         <div style={{ minWidth: 120, textAlign: "right" }}>
@@ -101,13 +100,9 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
               gap: 12,
               padding: "10px 14px",
               borderRadius: "var(--dg-radius-md)",
-              background: step.done
-                ? "var(--color-success-bg)"
-                : "var(--color-bg)",
+              background: step.done ? "var(--color-success-bg)" : "var(--color-bg)",
               border: `1px solid ${step.done ? "var(--color-success)" : "var(--color-border)"}`,
-              color: step.done
-                ? "var(--color-success-text)"
-                : "var(--color-text-primary)",
+              color: step.done ? "var(--color-success-text)" : "var(--color-text-primary)",
               textDecoration: "none",
               fontSize: "var(--dg-fs-body)",
               fontWeight: 500,

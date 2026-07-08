@@ -19,25 +19,41 @@ AS $$
 $$;
 
 
+-- Per-session org context: prefer the org_id claim baked into this device's
+-- JWT (written by custom_access_token_hook from user_sessions.active_org_id)
+-- so each device stays isolated. Falls back to profiles.org_id only when the
+-- claim is absent (legacy tokens issued before the hook started writing it).
+-- Reading profiles.org_id directly here would leak a sibling device's
+-- switch_org into this session, hiding/showing rows it shouldn't.
 CREATE OR REPLACE FUNCTION public.caller_org_id()
 RETURNS UUID
 LANGUAGE SQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
-  SELECT org_id FROM public.profiles WHERE id = auth.uid();
+  SELECT COALESCE(
+    NULLIF(auth.jwt() ->> 'org_id', '')::UUID,
+    (SELECT org_id FROM public.profiles WHERE id = auth.uid())
+  );
 $$;
 
 
+-- Joins memberships on caller_org_id() (now JWT-sourced) rather than
+-- profiles.org_id, so the role reflects this session's active org and not
+-- whatever org another device most recently switched to.
 CREATE OR REPLACE FUNCTION public.caller_org_role()
 RETURNS public.org_role
 LANGUAGE SQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
-  SELECT COALESCE(cm.org_role, 'user'::public.org_role)
-  FROM public.profiles p
-  LEFT JOIN public.organization_memberships cm
-    ON cm.user_id = p.id AND cm.org_id = p.org_id AND cm.archived_at IS NULL
-  WHERE p.id = auth.uid();
+  SELECT COALESCE(
+    (SELECT cm.org_role
+       FROM public.organization_memberships cm
+      WHERE cm.user_id = auth.uid()
+        AND cm.org_id = public.caller_org_id()
+        AND cm.archived_at IS NULL
+      LIMIT 1),
+    'user'::public.org_role
+  );
 $$;
 
 
@@ -97,10 +113,11 @@ LANGUAGE PLPGSQL SECURITY DEFINER VOLATILE
 SET search_path = 'public'
 AS $$
 DECLARE
-  claims       JSONB;
-  user_profile RECORD;
-  uid          UUID;
-  lock_until   TIMESTAMPTZ;
+  claims         JSONB;
+  user_profile   RECORD;
+  uid            UUID;
+  lock_until     TIMESTAMPTZ;
+  v_session_id   UUID;
 BEGIN
   claims := event -> 'claims';
 
@@ -109,16 +126,17 @@ BEGIN
     uid := (event -> 'claims' ->> 'sub')::UUID;
   END IF;
 
-  -- Check for active JWT refresh lock (role change, org switch, etc.)
+  -- Clean up expired locks once, then check for an active one. (Active locks
+  -- have locked_until > NOW(), so the cleanup never removes them.)
+  DELETE FROM public.jwt_refresh_locks
+   WHERE user_id = uid AND locked_until <= NOW();
+
   SELECT locked_until INTO lock_until
     FROM public.jwt_refresh_locks
    WHERE user_id = uid
      AND locked_until > NOW();
 
   IF lock_until IS NOT NULL THEN
-    DELETE FROM public.jwt_refresh_locks
-     WHERE user_id = uid AND locked_until <= NOW();
-
     RETURN jsonb_build_object(
       'error', jsonb_build_object(
         'http_code', 403,
@@ -127,33 +145,91 @@ BEGIN
     );
   END IF;
 
-  -- Clean up any expired locks
-  DELETE FROM public.jwt_refresh_locks
-   WHERE user_id = uid AND locked_until <= NOW();
+  -- Per-session org isolation: when the auth event carries a session_id,
+  -- the session's active_org_id (set by switch_org) overrides the user's
+  -- default. This lets multiple devices keep independent org contexts.
+  --
+  -- On first contact for a session (no row yet), eagerly INSERT one that
+  -- freezes active_org_id at the user's current default (profiles.org_id).
+  -- Without it, an established session without a row would re-read
+  -- profiles.org_id on every refresh and inherit cross-device switches —
+  -- defeating per-session isolation. ON CONFLICT makes this a no-op on every
+  -- mint after the first, so steady-state refresh cost is the single SELECT
+  -- below. The current token's effective org is unchanged either way: a
+  -- freshly inserted row holds active_org_id = profiles.org_id.
+  v_session_id := NULLIF(event -> 'claims' ->> 'session_id', '')::UUID;
 
-  -- Resolve user profile with org context.
-  -- Archived orgs are filtered out (AND o.archived_at IS NULL).
-  -- Suspended orgs are filtered out (AND o.suspended_at IS NULL).
-  -- Deactivated users get no org claims (AND p.deactivated_at IS NULL on membership join).
-  -- org_role is NOT coalesced — a NULL value means no membership exists,
-  -- which must result in no org claims being set (prevents read access
-  -- to an org the user has no membership for).
+  IF v_session_id IS NOT NULL THEN
+    INSERT INTO public.user_sessions (user_id, supabase_session_id, active_org_id)
+    SELECT uid, v_session_id, p.org_id
+      FROM public.profiles p
+     WHERE p.id = uid
+    ON CONFLICT (supabase_session_id) DO NOTHING;
+  END IF;
+
+  -- Resolve profile, effective org, membership, org status, and the caller's
+  -- employee row for the effective org in a single statement (previously a
+  -- separate session lookup fed a second join query). Effective org =
+  -- per-session active_org_id (if set) else profiles.org_id; the correlated
+  -- subquery resolves it inline so the membership/organization/employee joins
+  -- key off it in the same round-trip. When no session_id is present the
+  -- subquery matches nothing and COALESCE falls back to profiles.org_id.
+  -- Archived orgs (o.archived_at), suspended orgs (o.suspended_at), and
+  -- deactivated users (p.deactivated_at) are filtered out. org_role is NOT
+  -- coalesced — a NULL value means no membership, which must yield no org
+  -- claims (prevents read access to an org the user has no membership for).
+  -- e.status is read so the hook can refuse 'removed' employees and expose
+  -- 'inactive' downstream as an employee_status claim. Gridmaster / unlinked
+  -- super_admin users have no employees row → status is NULL → unaffected.
   SELECT
-    p.org_id,
-    p.platform_role::TEXT  AS platform_role,
+    eff.org_id              AS org_id,
+    p.platform_role::TEXT   AS platform_role,
     cm.org_role::TEXT       AS org_role,
-    o.slug                 AS org_slug
+    o.slug                  AS org_slug,
+    o.name                  AS org_name,
+    e.status::TEXT          AS employee_status
   INTO user_profile
   FROM public.profiles p
+  CROSS JOIN LATERAL (
+    SELECT COALESCE(
+      (SELECT s.active_org_id
+         FROM public.user_sessions s
+        WHERE s.supabase_session_id = v_session_id
+          AND s.user_id = uid),
+      p.org_id
+    ) AS org_id
+  ) eff
   LEFT JOIN public.organization_memberships cm
-    ON cm.user_id = p.id AND cm.org_id = p.org_id AND cm.archived_at IS NULL
+    ON cm.user_id = p.id
+   AND cm.org_id = eff.org_id
+   AND cm.archived_at IS NULL
   LEFT JOIN public.organizations o
-    ON o.id = p.org_id AND o.archived_at IS NULL AND o.suspended_at IS NULL
+    ON o.id = eff.org_id
+   AND o.archived_at IS NULL
+   AND o.suspended_at IS NULL
+  LEFT JOIN public.employees e
+    ON e.user_id = p.id
+   AND e.org_id = eff.org_id
   WHERE p.id = uid
     AND p.deactivated_at IS NULL;
 
+  -- Removed employees are denied at the hook. This mirrors the
+  -- jwt_refresh_locks 403 envelope above and kills both fresh sign-ins (the
+  -- hook fires on signInWithPassword) and silent token refreshes in one place.
+  -- The message string is the sentinel the login routes pattern-match on to
+  -- surface a friendly "account disabled" UI — keep it stable.
+  IF user_profile.employee_status = 'removed' THEN
+    RETURN jsonb_build_object(
+      'error', jsonb_build_object(
+        'http_code', 403,
+        'message', 'Your account has been disabled. Contact your organization admin.'
+      )
+    );
+  END IF;
+
   IF FOUND THEN
     claims := jsonb_set(claims, '{platform_role}', to_jsonb(COALESCE(user_profile.platform_role, 'none')));
+    claims := jsonb_set(claims, '{employee_status}', to_jsonb(COALESCE(user_profile.employee_status, 'none')));
 
     IF user_profile.org_id IS NOT NULL
        AND user_profile.org_role IS NOT NULL
@@ -162,22 +238,31 @@ BEGIN
       claims := jsonb_set(claims, '{org_role}',  to_jsonb(user_profile.org_role));
       claims := jsonb_set(claims, '{org_id}',    to_jsonb(user_profile.org_id::TEXT));
       claims := jsonb_set(claims, '{org_slug}',  to_jsonb(user_profile.org_slug));
+      claims := jsonb_set(claims, '{org_name}',  to_jsonb(COALESCE(user_profile.org_name, '')));
     ELSE
       -- No membership, no org, or archived org → strip org context.
       -- Explicit removal prevents stale org_id/org_slug from persisting
       -- if the auth server carries forward claims from the previous token.
       claims := jsonb_set(claims, '{org_role}', '"user"');
-      claims := claims - 'org_id' - 'org_slug';
+      claims := claims - 'org_id' - 'org_slug' - 'org_name';
     END IF;
     -- Track last sign-in (debounced to avoid writes on every token refresh)
     UPDATE public.profiles
        SET last_sign_in_at = NOW()
      WHERE id = uid
        AND (last_sign_in_at IS NULL OR last_sign_in_at < NOW() - INTERVAL '5 minutes');
+
+    -- NOTE: the trial clock is NOT started here. The hook fires on every token
+    -- mint (including refresh) and sees the session's defaulted/resolved org, not
+    -- the subdomain the user actually logged into (reconciliation happens client
+    -- side, after this runs), so it cannot target the right org. Trials start on
+    -- the first super_admin LOGIN via the start_trial_for_org RPC, called from the
+    -- genuine web/mobile login flow. See trial_started_at in 001.
   ELSE
-    claims := jsonb_set(claims, '{platform_role}', '"none"');
-    claims := jsonb_set(claims, '{org_role}',      '"user"');
-    claims := claims - 'org_id' - 'org_slug';
+    claims := jsonb_set(claims, '{platform_role}',  '"none"');
+    claims := jsonb_set(claims, '{org_role}',       '"user"');
+    claims := jsonb_set(claims, '{employee_status}', '"none"');
+    claims := claims - 'org_id' - 'org_slug' - 'org_name';
   END IF;
 
   RETURN jsonb_build_object('claims', claims);
@@ -301,12 +386,12 @@ AS $$
 BEGIN
   IF OLD.admin_permissions IS DISTINCT FROM NEW.admin_permissions THEN
     INSERT INTO public.role_change_log (
-      target_user_id, changed_by_id, from_role, to_role,
+      org_id, target_user_id, changed_by_id, from_role, to_role,
       change_type, permissions_before, permissions_after, idempotency_key
     ) VALUES (
-      NEW.user_id, auth.uid(), NEW.org_role::TEXT, NEW.org_role::TEXT,
+      NEW.org_id, NEW.user_id, auth.uid(), NEW.org_role::TEXT, NEW.org_role::TEXT,
       'permission_change', OLD.admin_permissions, NEW.admin_permissions,
-      'perm-' || NEW.user_id || '-' || extract(epoch from NOW())::TEXT
+      'perm-' || NEW.user_id || '-' || NEW.org_id || '-' || extract(epoch from NOW())::TEXT
     );
   END IF;
   RETURN NEW;
@@ -467,6 +552,13 @@ BEGIN
     RAISE EXCEPTION 'Caller identity mismatch';
   END IF;
 
+  -- Self-action guard: no one may change their own org role (neither demotion
+  -- nor promotion). Mirrors the gridmaster self-demotion guard. Forces another
+  -- admin to act, which also prevents self-inflicted lockout.
+  IF p_target_user_id = p_changed_by_id THEN
+    RAISE EXCEPTION 'SELF_ACTION_FORBIDDEN: you cannot change your own role';
+  END IF;
+
   -- Advisory lock prevents two callers from changing the same user's role
   -- simultaneously (last-write-wins race). Released at end of transaction.
   PERFORM pg_advisory_xact_lock(hashtext('change_role_' || p_target_user_id::TEXT));
@@ -529,9 +621,17 @@ BEGIN
     END IF;
   END IF;
 
+  -- Tier guard: an admin may not touch privileged accounts in either
+  -- direction. They cannot promote anyone INTO admin/super_admin/gridmaster,
+  -- and cannot change the role of a target who already holds one of those
+  -- tiers (which would otherwise let an admin demote a super_admin). Only
+  -- super_admins and gridmasters manage privileged roles.
   IF COALESCE(v_caller_org_role, 'user') = 'admin'
-     AND p_new_role IN ('gridmaster', 'admin', 'super_admin') THEN
-    RAISE EXCEPTION 'admin cannot promote to admin, super_admin, or gridmaster';
+     AND (
+       v_old_role IN ('gridmaster', 'admin', 'super_admin')
+       OR p_new_role IN ('gridmaster', 'admin', 'super_admin')
+     ) THEN
+    RAISE EXCEPTION 'admin cannot change the role of an admin, super_admin, or gridmaster';
   END IF;
 
   -- Prevent demotion of the last super_admin in an org.
@@ -558,9 +658,9 @@ BEGIN
   WHERE id = p_target_user_id;
 
   INSERT INTO role_change_log
-    (target_user_id, changed_by_id, from_role, to_role, idempotency_key)
+    (org_id, target_user_id, changed_by_id, from_role, to_role, idempotency_key)
   VALUES
-    (p_target_user_id, p_changed_by_id, v_old_role, p_new_role, p_idempotency_key);
+    (v_target_org_id, p_target_user_id, p_changed_by_id, v_old_role, p_new_role, p_idempotency_key);
 
   INSERT INTO jwt_refresh_locks (user_id, locked_until, reason)
     VALUES (p_target_user_id, NOW() + INTERVAL '5 seconds', 'role_change')
@@ -571,7 +671,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.change_user_role IS 'Race-condition-safe role change RPC. Verifies caller identity via auth.uid(), gates on admin/super_admin/gridmaster, enforces org scoping (explicit p_org_id or fallback to target profiles.org_id), and prevents admin self-promotion.';
+COMMENT ON FUNCTION public.change_user_role IS 'Race-condition-safe role change RPC. Verifies caller identity via auth.uid(), gates on admin/super_admin/gridmaster, enforces org scoping (explicit p_org_id or fallback to target profiles.org_id), prevents admin self-promotion, and blocks any self role change (you cannot change your own role).';
 
 
 -- ── assign_org_role_by_email ──────────────────────────────────────────────────
@@ -600,6 +700,16 @@ BEGIN
     )
   ) THEN
     RAISE EXCEPTION 'Unauthorized: insufficient permissions';
+  END IF;
+
+  -- Tier guard: a non-gridmaster admin may only assign the 'user' role. They
+  -- cannot grant admin or super_admin (which would let an admin self-promote
+  -- or escalate anyone). Only super_admins and gridmasters assign privileged
+  -- roles via this path.
+  IF NOT public.is_gridmaster()
+     AND public.caller_org_role() = 'admin'
+     AND p_org_role IN ('admin', 'super_admin') THEN
+    RAISE EXCEPTION 'admin cannot assign admin or super_admin';
   END IF;
 
   SELECT id INTO target_user_id FROM auth.users WHERE email = p_email;
@@ -654,9 +764,11 @@ LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 DECLARE
-  v_uid UUID;
+  v_uid        UUID;
+  v_session_id UUID;
 BEGIN
   v_uid := auth.uid();
+  v_session_id := NULLIF(auth.jwt() ->> 'session_id', '')::UUID;
 
   IF public.is_gridmaster() THEN
     IF NOT EXISTS (
@@ -675,25 +787,264 @@ BEGIN
     RAISE EXCEPTION 'Not a member of this organization';
   END IF;
 
+  -- Reject switching a normal member into an archived OR suspended org. The JWT
+  -- hook strips claims for suspended orgs anyway, but blocking the switch up
+  -- front avoids landing the session in a no-org limbo. (Gridmasters are exempt
+  -- above — oversight must still reach suspended orgs.)
   IF NOT EXISTS (
     SELECT 1 FROM public.organizations
-    WHERE id = target_org_id AND archived_at IS NULL
+    WHERE id = target_org_id AND archived_at IS NULL AND suspended_at IS NULL
   ) THEN
     RAISE EXCEPTION 'Organization not found';
   END IF;
 
+  -- Per-session org isolation: write active_org_id on the caller's user_sessions
+  -- row so only this device's next JWT refresh adopts the new org. Other active
+  -- sessions for this user keep their own active_org_id and are unaffected.
+  -- Upserts to handle the window before the client first calls track-session.
+  IF v_session_id IS NOT NULL THEN
+    INSERT INTO public.user_sessions (user_id, supabase_session_id, active_org_id)
+    VALUES (v_uid, v_session_id, target_org_id)
+    ON CONFLICT (supabase_session_id) DO UPDATE
+      SET active_org_id  = EXCLUDED.active_org_id,
+          last_active_at = NOW();
+  END IF;
+
+  -- Also update profiles.org_id as the default org for FUTURE sessions
+  -- (e.g., next fresh sign-in on a new device). This does NOT affect existing
+  -- sessions' claims because the hook prefers user_sessions.active_org_id.
   UPDATE public.profiles
   SET org_id = target_org_id, updated_at = NOW()
   WHERE id = v_uid;
 
+  -- NOTE: switching orgs does NOT start a trial. switch_org is called by
+  -- automatic reconciliation (web subdomain alignment after login, mobile
+  -- switchMobileOrgIfNeeded on auth/refresh), not only by deliberate user
+  -- switches, so a billing side effect here leaks trials onto orgs the user
+  -- never chose to use. Trials start on the first super_admin LOGIN, via the
+  -- start_trial_for_org RPC called from the genuine login flow (see below).
+
   -- No jwt_refresh_lock here: the caller refreshes immediately after this RPC,
-  -- and the JWT hook reads profiles.org_id from DB so the new claims resolve
-  -- correctly. A lock would block the caller's own refreshSession() call.
-  -- Other tabs/devices pick up the new org on their next natural token refresh.
+  -- and the JWT hook reads from user_sessions.active_org_id (this session only).
+  -- A lock would block the caller's own refreshSession() call. Other sessions
+  -- are unaffected and do not need to refresh.
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.switch_org(UUID) TO authenticated;
+
+
+-- ── start_trial_for_org ───────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.start_trial_for_org(p_org_id UUID)
+RETURNS VOID
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+BEGIN
+  -- Start the org's 14-day trial the first time a super_admin GENUINELY logs in to
+  -- it. Called only from the real login flow (web login handler / mobile
+  -- loginMobileUser), never from token refresh, automatic org reconciliation, or
+  -- switch_org. Idempotent: guarded by trial_ends_at IS NULL. Self-gated to a
+  -- super_admin membership so members/admins cannot start a trial. Keep the 14-day
+  -- interval in sync with DEFAULT_TRIAL_DAYS in packages/domain/src/billing.ts.
+  UPDATE public.organizations o
+     SET trial_started_at = NOW(),
+         trial_ends_at    = NOW() + INTERVAL '14 days'
+   WHERE o.id = p_org_id
+     AND o.subscription_status = 'trialing'
+     AND o.trial_ends_at IS NULL
+     AND o.archived_at IS NULL
+     AND o.suspended_at IS NULL
+     AND EXISTS (
+       SELECT 1 FROM public.organization_memberships m
+        WHERE m.user_id = auth.uid()
+          AND m.org_id = p_org_id
+          AND m.org_role = 'super_admin'
+          AND m.archived_at IS NULL
+     );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.start_trial_for_org(UUID) TO authenticated;
+
+
+-- ── notify_gridmasters_of_org_event ───────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.notify_gridmasters_of_org_event()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_type             TEXT;
+  v_priority         TEXT := 'normal';
+  v_title            TEXT;
+  v_message          TEXT;
+  v_name             TEXT := COALESCE(NEW.name, 'An organization');
+  -- Parallel fan-out to org super_admins for billing-relevant transitions.
+  -- Super_admins can't see platform-category rows (org_id = NULL); they need
+  -- an org-scoped billing-category row to surface in their inbox.
+  v_billing_type     TEXT;
+  v_billing_priority TEXT := 'normal';
+  v_billing_title    TEXT;
+  v_billing_message  TEXT;
+  -- Per-transition metadata for the super_admin row. Defaults to empty so the
+  -- inbox modal renders just the title + message (no noisy DETAILS block with
+  -- the org's own id/name). Set an actionUrl + actionLabel where there is a
+  -- concrete next step the super_admin should take.
+  v_billing_metadata JSONB := '{}'::jsonb;
+BEGIN
+  -- Surface important org lifecycle events to every gridmaster as an in-app
+  -- notification, written with org_id = NULL so it shows regardless of the
+  -- gridmaster's current org context (the get_notifications RPC returns rows where
+  -- org_id IS NULL). Fires on every writer of the organizations table (web login,
+  -- mobile login, gridmaster portal, org self-delete, Stripe webhook), so there is
+  -- a single source of truth. Emits at most one notification per row change and
+  -- returns NULL without inserting for non-noteworthy changes (settings edits,
+  -- repeated identical Stripe 'updated' events) to keep the gridmaster feed quiet.
+  IF TG_OP = 'INSERT' THEN
+    v_type    := 'org_created';
+    v_title   := 'New organization created';
+    v_message := v_name || ' was just created.';
+  ELSIF NEW.trial_started_at IS NOT NULL AND OLD.trial_started_at IS NULL THEN
+    v_type    := 'org_trial_started';
+    v_title   := 'Trial started';
+    v_message := v_name || ' started its trial.';
+    -- Super_admins see a billing-flavored welcome alert in their org inbox.
+    v_billing_type     := 'billing_subscription_changed';
+    v_billing_title    := 'Trial started';
+    v_billing_message  := 'Your 14-day free trial is now active. Start a subscription before it ends to keep your team running.';
+    v_billing_metadata := jsonb_build_object(
+      'actionUrl',   '/settings?section=org-billing',
+      'actionLabel', 'Start subscription'
+    );
+  ELSIF NEW.archived_at IS NOT NULL AND OLD.archived_at IS NULL THEN
+    v_type     := 'org_archived';
+    v_priority := 'high';
+    v_title    := 'Organization archived';
+    v_message  := v_name || ' was archived.';
+  ELSIF NEW.archived_at IS NULL AND OLD.archived_at IS NOT NULL THEN
+    v_type    := 'org_restored';
+    v_title   := 'Organization restored';
+    v_message := v_name || ' was restored.';
+  ELSIF NEW.suspended_at IS NOT NULL AND OLD.suspended_at IS NULL THEN
+    v_type     := 'org_suspended';
+    v_priority := 'high';
+    v_title    := 'Organization suspended';
+    v_message  := v_name || ' was suspended.';
+    -- Super_admins must learn immediately when their org is suspended.
+    v_billing_type     := 'billing_subscription_changed';
+    v_billing_priority := 'high';
+    v_billing_title    := 'Your organization was suspended';
+    v_billing_message  := 'Access to your organization has been suspended. Contact support to restore access.';
+  ELSIF NEW.suspended_at IS NULL AND OLD.suspended_at IS NOT NULL THEN
+    v_type    := 'org_unsuspended';
+    v_title   := 'Organization unsuspended';
+    v_message := v_name || ' was unsuspended.';
+    v_billing_type    := 'billing_subscription_changed';
+    v_billing_title   := 'Your organization was unsuspended';
+    v_billing_message := 'Access to your organization has been restored.';
+  ELSIF NEW.subscription_status IS DISTINCT FROM OLD.subscription_status THEN
+    IF OLD.subscription_status = 'trialing' AND NEW.subscription_status = 'active' THEN
+      v_type    := 'org_subscription_converted';
+      v_title   := 'Trial converted to paid';
+      v_message := v_name || ' converted from trial to a paid subscription.';
+      v_billing_type    := 'billing_subscription_changed';
+      v_billing_title   := 'Welcome to your paid plan';
+      v_billing_message := 'Your trial was converted to a paid subscription. Thanks for your support.';
+    ELSIF NEW.subscription_status = 'canceled' THEN
+      v_type     := 'org_subscription_canceled';
+      v_priority := 'high';
+      v_title    := 'Subscription canceled';
+      v_message  := v_name || ' canceled its subscription.';
+      v_billing_type     := 'billing_subscription_changed';
+      v_billing_priority := 'high';
+      v_billing_title    := 'Subscription canceled';
+      v_billing_message  := 'Your subscription was canceled. Resubscribe to keep access after the current period ends.';
+    ELSIF NEW.subscription_status IN ('past_due', 'unpaid')
+          AND OLD.subscription_status NOT IN ('past_due', 'unpaid') THEN
+      -- Fire once when the org first enters a failed-payment state; a later
+      -- past_due -> unpaid escalation must not produce a second alert.
+      v_type     := 'org_payment_failed';
+      v_priority := 'high';
+      v_title    := 'Payment failed';
+      v_message  := 'A payment for ' || v_name || ' failed.';
+      v_billing_type     := 'billing_payment_failed';
+      v_billing_priority := 'high';
+      v_billing_title    := 'Payment failed';
+      v_billing_message  := 'A payment for your subscription failed. Update your payment method to avoid losing access.';
+    ELSE
+      RETURN NULL;
+    END IF;
+  ELSE
+    RETURN NULL;
+  END IF;
+
+  -- A notification is a side effect of the org operation that fired this trigger
+  -- (trial start, Stripe webhook sync, org create/suspend/archive). Never let a
+  -- failure here roll back that operation: swallow and log instead of propagating.
+  BEGIN
+    INSERT INTO public.notifications (
+      user_id, org_id, type, channel, category, priority, title, message, metadata
+    )
+    SELECT
+      p.id, NULL, v_type, 'in_app', 'platform', v_priority, v_title, v_message,
+      jsonb_build_object('orgId', NEW.id, 'orgName', NEW.name, 'slug', NEW.slug)
+    FROM public.profiles p
+    WHERE p.platform_role = 'gridmaster';
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'notify_gridmasters_of_org_event: failed to notify gridmasters for org % (%): %',
+      NEW.id, v_type, SQLERRM;
+  END;
+
+  -- Parallel super_admin fan-out (only for billing-relevant transitions where
+  -- v_billing_type was set above). Org-scoped (org_id = NEW.id) so the row
+  -- appears in the super_admin's org inbox under the billing category.
+  IF v_billing_type IS NOT NULL THEN
+    BEGIN
+      INSERT INTO public.notifications (
+        user_id, org_id, type, channel, category, priority, title, message, metadata
+      )
+      SELECT
+        cm.user_id, NEW.id, v_billing_type, 'in_app', 'billing', v_billing_priority,
+        v_billing_title, v_billing_message, v_billing_metadata
+      FROM public.organization_memberships cm
+      WHERE cm.org_id = NEW.id
+        AND cm.org_role = 'super_admin'
+        AND cm.archived_at IS NULL;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'notify_gridmasters_of_org_event: failed to notify super_admins for org % (%): %',
+        NEW.id, v_billing_type, SQLERRM;
+    END;
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+-- Notify gridmasters of important org lifecycle events (trial start, create,
+-- archive/restore, suspend/unsuspend, subscription conversion/cancel/payment fail).
+-- Attached here (not in section 5) so the trigger is created after its function exists.
+CREATE TRIGGER trg_notify_gridmasters_of_org_event
+  AFTER INSERT OR UPDATE ON public.organizations
+  FOR EACH ROW EXECUTE FUNCTION public.notify_gridmasters_of_org_event();
+
+
+-- ── security_email_changed + security_password_changed ───────────────────────
+-- Intentionally NOT wired today.
+--
+-- Email + password changes happen client-side via supabase.auth.updateUser,
+-- so the only reliable producer is a DB trigger on auth.users. An earlier
+-- iteration shipped DB triggers that wrote in-app rows. That was wrong:
+-- the actor is the user staring at the app, so an in-app "your password
+-- changed" alert is noise — the legitimate security value lives out-of-band
+-- (email to the on-file/old address, push to other devices).
+--
+-- DB triggers can't reach Resend or Expo Push directly. A correct producer
+-- needs either pg_net to POST an internal route, or a client-side callback
+-- that hits a server route after updateUser succeeds. Until that's wired,
+-- these alerts are intentionally absent rather than created as in-app spam.
 
 
 -- ── get_my_organizations ──────────────────────────────────────────────────────
@@ -729,7 +1080,10 @@ BEGIN
   SELECT cm.org_id, o.name, o.slug, cm.org_role, (cm.org_id = v_active_oid)
   FROM public.organization_memberships cm
   JOIN public.organizations o ON o.id = cm.org_id
-  WHERE cm.user_id = v_uid ORDER BY o.name;
+  WHERE cm.user_id = v_uid
+    AND cm.archived_at IS NULL
+    AND o.archived_at IS NULL
+  ORDER BY o.name;
 END;
 $$;
 
@@ -1812,123 +2166,417 @@ $$;
 GRANT EXECUTE ON FUNCTION public.schedule_cell_has_effective_content(UUID, UUID, DATE) TO authenticated;
 
 
--- ── apply_recurring_schedules (server-side, DST-safe) ────────────────────────
--- Fills empty schedule slots from recurring shift templates.
--- Uses PostgreSQL DATE arithmetic (immune to DST issues).
--- Reads fresh data from DB (no stale client-side closures).
+-- ── is_employee_qualified_for_shift_job ───────────────────────────────────────
+-- Server-side mirror of the client's isEmployeeQualifiedForAssignableShift
+-- (apps/web/src/lib/assignable-shifts.ts). Returns NULL when the employee is
+-- qualified for the (shift, job) pair, or one of 'focus_area' / 'role' / 'cert'
+-- naming the gate that rejected them.
+--
+-- Used by import_previous_schedule to skip cells whose qualification has
+-- drifted since the source period was authored.
 
-CREATE OR REPLACE FUNCTION public.apply_recurring_schedules(
-  p_org_id     UUID,
-  p_start_date DATE,
-  p_end_date   DATE
-) RETURNS JSONB
-LANGUAGE PLPGSQL SECURITY DEFINER
-SET search_path = 'public'
+CREATE OR REPLACE FUNCTION public.is_employee_qualified_for_shift_job(
+  p_emp_id   UUID,
+  p_shift_id BIGINT,
+  p_job_id   BIGINT
+) RETURNS TEXT
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
-  v_current   DATE;
-  v_inserted  INTEGER := 0;
-  v_results   JSONB := '[]'::JSONB;
-  v_existing_version BIGINT;
-  r           RECORD;
+  v_emp_focus_area_ids BIGINT[];
+  v_emp_role_ids       BIGINT[];
+  v_emp_certification_id BIGINT;
+  v_emp_org_id         UUID;
+  v_shift_focus_area_id BIGINT;
+  v_job_eligible_role_ids BIGINT[];
+  v_job_required_cert_ids BIGINT[];
+  v_job_eligibility_mode TEXT;
+  v_schedule_role_ids  BIGINT[];
+  v_filtered_role_ids  BIGINT[];
+  v_roles_ok           BOOLEAN;
+  v_certs_ok           BOOLEAN;
+  v_has_role_gate      BOOLEAN;
+  v_has_cert_gate      BOOLEAN;
 BEGIN
-  -- Permission check
-  IF NOT public.check_admin_permission('canApplyRecurringSchedule') THEN
-    RAISE EXCEPTION 'Unauthorized: missing canApplyRecurringSchedule permission';
+  SELECT focus_area_ids, role_ids, certification_id, org_id
+    INTO v_emp_focus_area_ids, v_emp_role_ids, v_emp_certification_id, v_emp_org_id
+  FROM public.employees
+  WHERE id = p_emp_id;
+
+  IF v_emp_org_id IS NULL THEN
+    -- Employee row vanished; caller should treat as inactive elsewhere.
+    RETURN 'role';
   END IF;
 
-  -- Validate org scoping
+  -- Focus area gate (shift-scoped)
+  IF p_shift_id IS NOT NULL THEN
+    SELECT focus_area_id INTO v_shift_focus_area_id
+    FROM public.shift_categories
+    WHERE id = p_shift_id;
+    IF v_shift_focus_area_id IS NOT NULL
+       AND NOT (v_shift_focus_area_id = ANY(v_emp_focus_area_ids)) THEN
+      RETURN 'focus_area';
+    END IF;
+  END IF;
+
+  -- Job gates (role + certification)
+  SELECT eligible_role_ids, required_certification_ids, eligibility_mode
+    INTO v_job_eligible_role_ids, v_job_required_cert_ids, v_job_eligibility_mode
+  FROM public.jobs
+  WHERE id = p_job_id;
+
+  IF v_job_eligible_role_ids IS NULL THEN
+    -- Job vanished; surface as a role-gate failure rather than crashing the
+    -- whole import.
+    RETURN 'role';
+  END IF;
+
+  -- Mirror the client's getScheduleEligibleRoleIds (assignable-shifts.ts):
+  -- only roles flagged is_schedule_role count toward the role gate. NOTE:
+  -- archived roles are NOT filtered out — the client's editor still treats
+  -- them as eligible if a job references them, so the import must agree to
+  -- avoid disqualifying shifts the user could create elsewhere on the page.
+  IF COALESCE(array_length(v_job_eligible_role_ids, 1), 0) > 0 THEN
+    SELECT COALESCE(array_agg(orole.id), '{}'::BIGINT[])
+      INTO v_schedule_role_ids
+    FROM public.organization_roles orole
+    WHERE orole.org_id = v_emp_org_id
+      AND orole.is_schedule_role = TRUE
+      AND orole.id = ANY(v_job_eligible_role_ids);
+    v_filtered_role_ids := v_schedule_role_ids;
+  ELSE
+    v_filtered_role_ids := '{}'::BIGINT[];
+  END IF;
+
+  v_has_role_gate := COALESCE(array_length(v_filtered_role_ids, 1), 0) > 0;
+  v_has_cert_gate := COALESCE(array_length(v_job_required_cert_ids, 1), 0) > 0;
+
+  v_roles_ok := NOT v_has_role_gate
+    OR EXISTS (
+      SELECT 1 FROM unnest(v_filtered_role_ids) AS r(id)
+      WHERE r.id = ANY(v_emp_role_ids)
+    );
+
+  v_certs_ok := NOT v_has_cert_gate
+    OR (v_emp_certification_id IS NOT NULL
+        AND v_emp_certification_id = ANY(v_job_required_cert_ids));
+
+  IF v_has_role_gate AND v_has_cert_gate
+     AND COALESCE(v_job_eligibility_mode, 'and') = 'or' THEN
+    IF v_roles_ok OR v_certs_ok THEN
+      RETURN NULL;
+    END IF;
+    -- Both failed; surface the role gate first (matches client message order).
+    RETURN 'role';
+  END IF;
+
+  IF NOT v_roles_ok THEN
+    RETURN 'role';
+  END IF;
+  IF NOT v_certs_ok THEN
+    RETURN 'cert';
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.is_employee_qualified_for_shift_job(UUID, BIGINT, BIGINT) TO authenticated;
+
+
+-- ── import_previous_schedule ──────────────────────────────────────────────────
+-- Server-owned atomic operation that copies the effective contents of the
+-- source date range into the target date range as drafts.
+--
+-- - Source data is read from the DB (effective = draft if non-deleted, else
+--   published). Cells with no effective content are excluded.
+-- - Target emptiness is decided by schedule_cell_has_effective_content — the
+--   same rule recurring-schedule application uses, so phantom DB shapes never
+--   create disagreement between import logic and grid display.
+-- - Skip reasons are reported per source row, so the UI can explain every
+--   missing copy.
+--
+-- Idempotent: re-running the function on the same target range short-circuits
+-- because the freshly written drafts make the target non-empty.
+
+CREATE OR REPLACE FUNCTION public.import_previous_schedule(
+  p_org_id        UUID,
+  p_source_start  DATE,
+  p_source_end    DATE,
+  p_target_start  DATE,
+  p_target_end    DATE,
+  p_dry_run       BOOLEAN DEFAULT FALSE
+) RETURNS TABLE (
+  emp_id      UUID,
+  source_date DATE,
+  target_date DATE,
+  outcome     TEXT,
+  reason      TEXT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor_id        UUID := auth.uid();
+  v_source_span     INTEGER;
+  v_target_span     INTEGER;
+  r                 RECORD;
+  v_disq            TEXT;
+  v_segment_disq    TEXT;
+  v_segment_count   INTEGER;
+  v_existing_version BIGINT;
+BEGIN
+  -- Permission gates: same as every other draft-write path.
+  IF NOT public.check_admin_permission('canEditShifts') THEN
+    RAISE EXCEPTION 'Unauthorized: missing canEditShifts permission';
+  END IF;
+
   IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
     RAISE EXCEPTION 'Unauthorized: org mismatch';
   END IF;
 
-  -- Iterate dates using pure DATE arithmetic (DST-safe)
-  v_current := p_start_date;
-  WHILE v_current <= p_end_date LOOP
-    FOR r IN
-      SELECT DISTINCT ON (rs.emp_id)
-        rs.emp_id,
-        state.state_kind,
-        state.shift_ids,
-        state.job_ids,
-        state.is_mentored_flags,
-        state.absence_type_id,
-        state.focus_area_id,
+  IF p_source_start IS NULL OR p_source_end IS NULL
+     OR p_target_start IS NULL OR p_target_end IS NULL THEN
+    RAISE EXCEPTION 'Invalid date range';
+  END IF;
+
+  IF p_source_end < p_source_start OR p_target_end < p_target_start THEN
+    RAISE EXCEPTION 'Range end precedes range start';
+  END IF;
+
+  v_source_span := (p_source_end - p_source_start) + 1;
+  v_target_span := (p_target_end - p_target_start) + 1;
+  IF v_source_span <> v_target_span THEN
+    RAISE EXCEPTION 'Source and target ranges must cover the same number of days';
+  END IF;
+
+  -- Serialize concurrent imports against the same target.
+  PERFORM pg_advisory_xact_lock(
+    hashtext('import_previous_' || p_org_id::TEXT || '_' || p_target_start::TEXT)
+  );
+
+  -- Iterate the effective source cells. The CTE picks the draft if present
+  -- and not deleted, else the published snapshot — matching the client's
+  -- display rule. Cells whose effective snapshot is empty are dropped.
+  FOR r IN
+    WITH effective AS (
+      SELECT
+        c.emp_id,
+        c.date AS source_date,
         CASE
-          WHEN state.state_kind = 'absence' THEN absence.label
-          ELSE (
-            SELECT string_agg(
-              CASE
-                WHEN segment.shift_id IS NULL THEN job.abbr
-                WHEN COALESCE(job.show_on_grid, TRUE) THEN
-                  COALESCE(NULLIF(shift.abbr, ''), shift.name) || job.abbr
-                ELSE
-                  COALESCE(NULLIF(shift.abbr, ''), shift.name)
-              END,
-              '/' ORDER BY segment.ordinality
-            )
-            FROM unnest(state.shift_ids, state.job_ids) WITH ORDINALITY AS segment(shift_id, job_id, ordinality)
-            LEFT JOIN public.shift_categories shift
-              ON shift.id = segment.shift_id
-            LEFT JOIN public.jobs job
-              ON job.id = segment.job_id
-          )
-        END AS shift_label
-      FROM public.recurring_shifts rs
-      JOIN LATERAL public.resolve_schedule_state_storage(p_org_id, rs.state) state ON TRUE
-      LEFT JOIN public.absence_types absence
-        ON absence.id = state.absence_type_id
-      WHERE rs.org_id = p_org_id
-        AND rs.archived_at IS NULL
-        AND rs.day_of_week = EXTRACT(DOW FROM v_current)::INTEGER
-        AND rs.effective_from <= v_current
-        AND (rs.effective_until IS NULL OR rs.effective_until >= v_current)
-        AND NOT public.schedule_cell_has_effective_content(p_org_id, rs.emp_id, v_current)
-      ORDER BY rs.emp_id, rs.effective_from DESC
-    LOOP
-      SELECT c.version
-      INTO v_existing_version
+          WHEN draft.id IS NOT NULL AND draft.state_kind <> 'deleted'
+            THEN draft.id
+          ELSE published.id
+        END AS snapshot_id,
+        CASE
+          WHEN draft.id IS NOT NULL AND draft.state_kind <> 'deleted'
+            THEN draft.state_kind
+          ELSE published.state_kind
+        END AS state_kind,
+        CASE
+          WHEN draft.id IS NOT NULL AND draft.state_kind <> 'deleted'
+            THEN draft.absence_type_id
+          ELSE published.absence_type_id
+        END AS absence_type_id,
+        CASE
+          WHEN draft.id IS NOT NULL AND draft.state_kind <> 'deleted'
+            THEN draft.custom_start_time
+          ELSE published.custom_start_time
+        END AS custom_start_time,
+        CASE
+          WHEN draft.id IS NOT NULL AND draft.state_kind <> 'deleted'
+            THEN draft.custom_end_time
+          ELSE published.custom_end_time
+        END AS custom_end_time
       FROM public.schedule_cells c
+      LEFT JOIN public.schedule_cell_snapshots draft
+        ON draft.cell_id = c.id AND draft.snapshot_kind = 'draft'
+      LEFT JOIN public.schedule_cell_snapshots published
+        ON published.cell_id = c.id AND published.snapshot_kind = 'published'
       WHERE c.org_id = p_org_id
-        AND c.emp_id = r.emp_id
-        AND c.date = v_current;
+        AND c.date BETWEEN p_source_start AND p_source_end
+        AND (
+          (draft.id IS NOT NULL AND draft.state_kind <> 'deleted')
+          OR (draft.id IS NULL AND published.id IS NOT NULL)
+        )
+    ),
+    with_segments AS (
+      SELECT
+        eff.emp_id,
+        eff.source_date,
+        eff.state_kind,
+        eff.absence_type_id,
+        eff.custom_start_time,
+        eff.custom_end_time,
+        COALESCE(
+          ARRAY(
+            SELECT seg.shift_id
+            FROM public.schedule_cell_segments seg
+            WHERE seg.snapshot_id = eff.snapshot_id
+            ORDER BY seg.position
+          ),
+          '{}'::BIGINT[]
+        ) AS shift_ids,
+        COALESCE(
+          ARRAY(
+            SELECT seg.job_id
+            FROM public.schedule_cell_segments seg
+            WHERE seg.snapshot_id = eff.snapshot_id
+            ORDER BY seg.position
+          ),
+          '{}'::BIGINT[]
+        ) AS job_ids,
+        COALESCE(
+          ARRAY(
+            SELECT COALESCE(seg.is_mentored, FALSE)
+            FROM public.schedule_cell_segments seg
+            WHERE seg.snapshot_id = eff.snapshot_id
+            ORDER BY seg.position
+          ),
+          '{}'::BOOLEAN[]
+        ) AS is_mentored_flags
+      FROM effective eff
+    )
+    SELECT
+      ws.emp_id,
+      ws.source_date,
+      (p_target_start + (ws.source_date - p_source_start))::DATE AS target_date,
+      ws.state_kind,
+      ws.absence_type_id,
+      ws.custom_start_time,
+      ws.custom_end_time,
+      ws.shift_ids,
+      ws.job_ids,
+      ws.is_mentored_flags
+    FROM with_segments ws
+    ORDER BY ws.source_date, ws.emp_id
+  LOOP
+    -- Initialize OUT row for this iteration.
+    emp_id := r.emp_id;
+    source_date := r.source_date;
+    target_date := r.target_date;
+    outcome := NULL;
+    reason := NULL;
 
-      PERFORM public.write_schedule_cell_snapshot_internal(
-        p_org_id,
-        r.emp_id,
-        v_current,
-        'draft',
-        r.state_kind,
-        r.shift_ids,
-        r.job_ids,
-        r.absence_type_id,
-        NULL,
-        NULL,
-        NULL,
-        TRUE,
-        r.focus_area_id,
-        COALESCE(v_existing_version, 0),
-        auth.uid(),
-        r.is_mentored_flags
-      );
+    -- Defensive: effective state must actually have content. The CTE filters
+    -- empty effective snapshots, but worked-with-zero-segments could slip
+    -- past the filter; reject explicitly so the UI surfaces it.
+    IF r.state_kind = 'worked' AND COALESCE(array_length(r.job_ids, 1), 0) = 0 THEN
+      outcome := 'skipped';
+      reason := 'source_has_no_content';
+      RETURN NEXT;
+      CONTINUE;
+    END IF;
+    IF r.state_kind = 'absence' AND r.absence_type_id IS NULL THEN
+      outcome := 'skipped';
+      reason := 'source_has_no_content';
+      RETURN NEXT;
+      CONTINUE;
+    END IF;
 
-      v_inserted := v_inserted + 1;
-      v_results := v_results || jsonb_build_array(jsonb_build_object(
-        'empId', r.emp_id,
-        'date', to_char(v_current, 'YYYY-MM-DD'),
-        'label', r.shift_label,
-        'absenceTypeId', r.absence_type_id
-      ));
-    END LOOP;
+    -- Employee active gate.
+    IF NOT EXISTS (
+      SELECT 1 FROM public.employees e
+      WHERE e.id = r.emp_id
+        AND e.org_id = p_org_id
+        AND e.archived_at IS NULL
+        AND e.status = 'active'
+    ) THEN
+      outcome := 'skipped';
+      reason := 'employee_inactive';
+      RETURN NEXT;
+      CONTINUE;
+    END IF;
 
-    v_current := v_current + 1;  -- DATE + INTEGER is DST-safe in PostgreSQL
+    -- Serialize check + write against any concurrent writer of this target
+    -- cell using the same advisory key write_schedule_cell_snapshot_internal
+    -- uses. Without this lock, a manual draft landing between the empty
+    -- check and our write would be silently overwritten. Advisory locks are
+    -- reentrant within one xact, so the inner write's lock acquisition is a
+    -- no-op.
+    PERFORM pg_advisory_xact_lock(
+      hashtext('schedule_cell_' || r.emp_id::TEXT || '_' || r.target_date::TEXT)
+    );
+
+    -- Target already has effective content (any draft non-deleted, or any
+    -- published). Uses the exact same rule grid display uses.
+    IF public.schedule_cell_has_effective_content(p_org_id, r.emp_id, r.target_date) THEN
+      outcome := 'skipped';
+      reason := 'target_has_data';
+      RETURN NEXT;
+      CONTINUE;
+    END IF;
+
+    -- Per-segment qualification gate (worked only). First failing segment
+    -- names the reason.
+    IF r.state_kind = 'worked' THEN
+      v_segment_count := COALESCE(array_length(r.job_ids, 1), 0);
+      v_disq := NULL;
+      FOR i IN 1..v_segment_count LOOP
+        v_segment_disq := public.is_employee_qualified_for_shift_job(
+          r.emp_id, r.shift_ids[i], r.job_ids[i]
+        );
+        IF v_segment_disq IS NOT NULL THEN
+          v_disq := v_segment_disq;
+          EXIT;
+        END IF;
+      END LOOP;
+
+      IF v_disq IS NOT NULL THEN
+        outcome := 'skipped';
+        reason := 'disqualified:' || v_disq;
+        RETURN NEXT;
+        CONTINUE;
+      END IF;
+    END IF;
+
+    -- All gates passed.
+    IF p_dry_run THEN
+      outcome := 'imported';
+      reason := NULL;
+      RETURN NEXT;
+      CONTINUE;
+    END IF;
+
+    SELECT c.version INTO v_existing_version
+    FROM public.schedule_cells c
+    WHERE c.org_id = p_org_id
+      AND c.emp_id = r.emp_id
+      AND c.date = r.target_date;
+
+    PERFORM public.write_schedule_cell_snapshot_internal(
+      p_org_id,
+      r.emp_id,
+      r.target_date,
+      'draft',
+      r.state_kind,
+      CASE WHEN r.state_kind = 'worked' THEN r.shift_ids ELSE '{}'::BIGINT[] END,
+      CASE WHEN r.state_kind = 'worked' THEN r.job_ids ELSE '{}'::BIGINT[] END,
+      CASE WHEN r.state_kind = 'absence' THEN r.absence_type_id ELSE NULL END,
+      CASE WHEN r.state_kind = 'worked' THEN r.custom_start_time ELSE NULL END,
+      CASE WHEN r.state_kind = 'worked' THEN r.custom_end_time ELSE NULL END,
+      NULL,
+      FALSE,
+      NULL,
+      COALESCE(v_existing_version, 0),
+      v_actor_id,
+      CASE WHEN r.state_kind = 'worked' THEN r.is_mentored_flags ELSE '{}'::BOOLEAN[] END
+    );
+
+    outcome := 'imported';
+    reason := NULL;
+    RETURN NEXT;
   END LOOP;
 
-  RETURN jsonb_build_object('inserted', v_inserted, 'shifts', v_results);
+  RETURN;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.apply_recurring_schedules(UUID, DATE, DATE) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.import_previous_schedule(UUID, DATE, DATE, DATE, DATE, BOOLEAN) TO authenticated;
 
 
 -- ── send_invitation ───────────────────────────────────────────────────────────
@@ -1951,15 +2599,20 @@ DECLARE
   v_invite   public.invitations;
   v_caller_role TEXT;
 BEGIN
-  IF NOT public.is_gridmaster() THEN
+  -- Trusted backend path: API routes authorize the caller via
+  -- requireOrgPermissions / canManageEmployees and then invoke this RPC
+  -- through the service-role client (where auth.uid() / JWT claims are
+  -- absent). Direct authenticated callers still have to be a gridmaster
+  -- or a super_admin of the target org.
+  IF (auth.jwt() ->> 'role') <> 'service_role' AND NOT public.is_gridmaster() THEN
     v_caller_role := public.caller_org_role()::TEXT;
     IF public.caller_org_id() <> p_org_id OR v_caller_role <> 'super_admin' THEN
       RAISE EXCEPTION 'Unauthorized: only super_admin can send invitations';
     END IF;
   END IF;
 
-  IF p_role NOT IN ('admin', 'user') THEN
-    RAISE EXCEPTION 'Invalid role: must be admin or user';
+  IF p_role NOT IN ('admin', 'user', 'super_admin') THEN
+    RAISE EXCEPTION 'Invalid role: must be super_admin, admin, or user';
   END IF;
 
   IF NOT EXISTS (
@@ -2068,21 +2721,56 @@ BEGIN
       AND org_id = v_invite.org_id
       AND user_id IS NULL;
 
+    -- Cross-org case: if the accepting user already has a profile name
+    -- (they have an account from another org), overwrite the employees row's
+    -- first/last name with the canonical profile name. The admin's typed
+    -- "Margaret Sullivan" gets replaced by Alice's real "Alice Smith" so
+    -- the roster doesn't lie about who's actually scheduled.
+    UPDATE public.employees e
+    SET first_name = COALESCE(p.first_name, e.first_name),
+        last_name  = COALESCE(p.last_name,  e.last_name),
+        updated_at = NOW()
+    FROM public.profiles p
+    WHERE e.id = v_invite.employee_id
+      AND e.org_id = v_invite.org_id
+      AND p.id = v_uid
+      AND (p.first_name IS NOT NULL OR p.last_name IS NOT NULL);
+
     SELECT first_name, last_name INTO v_emp_first_name, v_emp_last_name
     FROM public.employees
     WHERE id = v_invite.employee_id AND org_id = v_invite.org_id;
   ELSE
-    -- App-only invite: use name from invitation record
+    -- App-only invite: no employees row was pre-created. Create one now so the
+    -- new member gets a per-org employee_number (every org member has a badge).
+    -- Names are guaranteed populated on the invitation by the send_invitation
+    -- path. Seniority lands at end-of-list; admin can drag to reorder later.
+    -- The BEFORE INSERT trigger stamps employee_number from the org counter.
     v_emp_first_name := v_invite.first_name;
     v_emp_last_name := v_invite.last_name;
+
+    INSERT INTO public.employees (
+      org_id, user_id, first_name, last_name, phone,
+      department_ids, dept_admin_ids,
+      employment_type, status, seniority
+    )
+    VALUES (
+      v_invite.org_id, v_uid, v_invite.first_name, v_invite.last_name, v_invite.phone,
+      v_invite.department_ids, v_invite.dept_admin_ids,
+      'full_time', 'active',
+      COALESCE((SELECT MAX(seniority) FROM public.employees WHERE org_id = v_invite.org_id), 0) + 1
+    );
   END IF;
 
+  -- Existing user's profile name is canonical across orgs and must not be
+  -- overwritten by an invite (admin-typed name in another org is just a
+  -- convenient pre-fill). COALESCE order: keep existing profile fields when
+  -- present; only fall through to the invite-supplied name on insert/null.
   INSERT INTO public.profiles (id, org_id, platform_role, first_name, last_name)
   VALUES (v_uid, v_invite.org_id, 'none', v_emp_first_name, v_emp_last_name)
   ON CONFLICT (id) DO UPDATE
     SET org_id     = COALESCE(profiles.org_id, EXCLUDED.org_id),
-        first_name = COALESCE(EXCLUDED.first_name, profiles.first_name),
-        last_name  = COALESCE(EXCLUDED.last_name, profiles.last_name),
+        first_name = COALESCE(profiles.first_name, EXCLUDED.first_name),
+        last_name  = COALESCE(profiles.last_name, EXCLUDED.last_name),
         updated_at = NOW();
 
   -- Bypass guard_org_role_change trigger — this is an authorised role path.
@@ -2193,93 +2881,151 @@ CREATE OR REPLACE TRIGGER trg_expire_shift_requests_on_employee_archive
   EXECUTE FUNCTION public.expire_shift_requests_on_employee_archive();
 
 
--- ── link_employee_to_user ────────────────────────────────────────────────────
--- Directly link an existing org user to an employee record (no invitation needed).
--- Use case: user already has an account and is already a member of this org.
+-- ── employee_number: stamp + immutability ───────────────────────────────────
+-- assign_employee_number: BEFORE INSERT trigger that atomically stamps
+-- NEW.employee_number from organizations.next_employee_number and bumps the
+-- counter. SECURITY DEFINER so it can read/write organizations regardless of
+-- caller RLS. The SELECT … FOR UPDATE row-locks the org row, serialising
+-- concurrent inserts within an org without blocking other orgs. Any value the
+-- caller supplied for employee_number is overwritten (numbers are never chosen
+-- by clients — the trigger is the sole source of truth).
 
-CREATE OR REPLACE FUNCTION public.link_employee_to_user(
-  p_employee_id  UUID,
-  p_user_id      UUID,
-  p_org_id       UUID
-) RETURNS JSONB
+CREATE OR REPLACE FUNCTION public.assign_employee_number()
+RETURNS TRIGGER
 LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 DECLARE
-  v_membership public.organization_memberships;
+  v_next INTEGER;
 BEGIN
-  -- Authorization: gridmaster, super_admin, or admin with canManageEmployees
-  IF NOT public.is_gridmaster() THEN
-    SELECT *
-      INTO v_membership
-      FROM public.organization_memberships
-     WHERE user_id = auth.uid()
-       AND org_id = p_org_id
-       AND archived_at IS NULL
-     LIMIT 1;
+  SELECT next_employee_number INTO v_next
+  FROM public.organizations
+  WHERE id = NEW.org_id
+  FOR UPDATE;
 
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'Unauthorized: org mismatch';
-    END IF;
-
-    IF v_membership.org_role <> 'super_admin'
-       AND NOT (
-         v_membership.org_role = 'admin'
-         AND COALESCE((v_membership.admin_permissions->>'canManageEmployees')::BOOLEAN, FALSE)
-       )
-    THEN
-      RAISE EXCEPTION 'Unauthorized: missing canManageEmployees permission';
-    END IF;
+  IF v_next IS NULL THEN
+    RAISE EXCEPTION 'Organization % not found', NEW.org_id;
   END IF;
 
-  -- Validate org exists
-  IF NOT EXISTS (
-    SELECT 1 FROM public.organizations WHERE id = p_org_id AND archived_at IS NULL
-  ) THEN
-    RAISE EXCEPTION 'Organization not found or archived';
-  END IF;
+  NEW.employee_number := v_next;
 
-  -- Validate employee belongs to org
-  IF NOT EXISTS (
-    SELECT 1 FROM public.employees
-    WHERE id = p_employee_id AND org_id = p_org_id AND archived_at IS NULL
-  ) THEN
-    RAISE EXCEPTION 'Employee not found in this organization';
-  END IF;
-  IF EXISTS (
-    SELECT 1 FROM public.employees
-    WHERE id = p_employee_id AND user_id IS NOT NULL AND user_id <> p_user_id
-  ) THEN
-    RAISE EXCEPTION 'Employee already has a linked user account';
-  END IF;
+  UPDATE public.organizations
+  SET next_employee_number = next_employee_number + 1
+  WHERE id = NEW.org_id;
 
-  -- Validate user is a member of this org
-  IF NOT EXISTS (
-    SELECT 1 FROM public.organization_memberships
-    WHERE user_id = p_user_id AND org_id = p_org_id AND archived_at IS NULL
-  ) THEN
-    RAISE EXCEPTION 'User is not a member of this organization';
-  END IF;
-
-  -- Validate user is not already linked to another employee in this org
-  IF EXISTS (
-    SELECT 1 FROM public.employees
-    WHERE org_id = p_org_id AND user_id = p_user_id AND id <> p_employee_id
-  ) THEN
-    RAISE EXCEPTION 'User is already linked to another employee in this organization';
-  END IF;
-
-  -- Link them
-  UPDATE public.employees
-  SET user_id = p_user_id,
-      updated_at = NOW()
-  WHERE id = p_employee_id AND org_id = p_org_id;
-
-  RETURN jsonb_build_object('status', 'linked', 'employee_id', p_employee_id, 'user_id', p_user_id);
+  RETURN NEW;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.link_employee_to_user(UUID, UUID, UUID) TO authenticated;
+CREATE OR REPLACE TRIGGER trg_employees_assign_number
+  BEFORE INSERT ON public.employees
+  FOR EACH ROW
+  EXECUTE FUNCTION public.assign_employee_number();
+
+
+-- prevent_employee_number_change: BEFORE UPDATE trigger that enforces
+-- immutability of employee_number. Even super_admins can't change it — a
+-- person's badge ID is a permanent record. Belt-and-suspenders alongside the
+-- API not exposing a write path.
+
+CREATE OR REPLACE FUNCTION public.prevent_employee_number_change()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL
+AS $$
+BEGIN
+  IF NEW.employee_number IS DISTINCT FROM OLD.employee_number THEN
+    RAISE EXCEPTION 'employee_number is immutable (was %, attempted %)',
+      OLD.employee_number, NEW.employee_number;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_employees_immutable_number
+  BEFORE UPDATE ON public.employees
+  FOR EACH ROW
+  EXECUTE FUNCTION public.prevent_employee_number_change();
+
+
+-- check_employee_email_belongs_to_user: BEFORE INSERT/UPDATE trigger that
+-- enforces "if a linked employees row has an email AND that email exists in
+-- auth.users, the email's owner must be the linked user." The existing
+-- partial UNIQUE index (unique_active_employee_email_per_org) only catches
+-- two employees rows with the same email; it doesn't catch the case where
+-- a management member's row has email = '' but their auth account email
+-- gets accidentally typed onto a different scheduled employee's row.
+--
+-- Pre-created rows (user_id IS NULL) are exempt so the cross-org invite
+-- flow still works: admin pre-creates with alice@example.com, leaves user_id
+-- NULL, sends invite. Once Alice accepts, accept_invitation sets user_id;
+-- this trigger re-validates (BEFORE UPDATE OF user_id) and sees that the
+-- email belongs to Alice — match — allow.
+
+CREATE OR REPLACE FUNCTION public.check_employee_email_belongs_to_user()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_email_owner UUID;
+  v_owner_has_employee_in_org BOOLEAN;
+BEGIN
+  IF btrim(NEW.email) = '' THEN
+    RETURN NEW;
+  END IF;
+
+  -- Look up the auth user (if any) that owns this email.
+  SELECT id INTO v_email_owner
+  FROM auth.users
+  WHERE lower(email::text) = lower(btrim(NEW.email))
+  LIMIT 1;
+
+  -- Unregistered emails are fine (contact-only addresses).
+  IF v_email_owner IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- The canonical case: the row is linked to the email's owner.
+  IF v_email_owner = NEW.user_id THEN
+    RETURN NEW;
+  END IF;
+
+  -- Linked to a DIFFERENT user from the email's owner → always block.
+  -- (E.g. admin types Nic's email onto Margaret's row where Margaret is
+  -- linked to user X.)
+  IF NEW.user_id IS NOT NULL THEN
+    RAISE EXCEPTION 'employee_email_belongs_to_other_user: % belongs to a different account', NEW.email
+      USING ERRCODE = '23505',
+            CONSTRAINT = 'employee_email_belongs_to_user';
+  END IF;
+
+  -- Pre-created row (user_id IS NULL): allowed ONLY when the email's
+  -- owner is NOT already a member of this org with their own employees
+  -- row. Cross-org invites are fine — Alice (Org A only) can be
+  -- pre-created in Org B. Same-org sloppy data entry — Margaret's row
+  -- with Nic's email when Nic is already on the team — is blocked.
+  SELECT EXISTS (
+    SELECT 1 FROM public.employees
+    WHERE org_id = NEW.org_id
+      AND user_id = v_email_owner
+      AND archived_at IS NULL
+      AND id <> NEW.id
+  ) INTO v_owner_has_employee_in_org;
+
+  IF v_owner_has_employee_in_org THEN
+    RAISE EXCEPTION 'employee_email_belongs_to_other_user: % belongs to another active member of this organization', NEW.email
+      USING ERRCODE = '23505',
+            CONSTRAINT = 'employee_email_belongs_to_user';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE TRIGGER trg_employees_email_belongs_to_user
+  BEFORE INSERT OR UPDATE OF email, user_id ON public.employees
+  FOR EACH ROW
+  EXECUTE FUNCTION public.check_employee_email_belongs_to_user();
 
 
 -- ── start_impersonation ───────────────────────────────────────────────────────
@@ -2299,6 +3045,7 @@ DECLARE
   v_session impersonation_sessions;
   v_target_org_id UUID;
   v_caller_id UUID;
+  v_caller_email TEXT;
   v_active_count INTEGER;
 BEGIN
   IF NOT public.is_gridmaster() THEN
@@ -2306,6 +3053,7 @@ BEGIN
   END IF;
 
   v_caller_id := auth.uid();
+  SELECT email INTO v_caller_email FROM auth.users WHERE id = v_caller_id;
 
   -- Self-impersonation prevention (defense in depth with CHECK constraint)
   IF v_caller_id = p_target_user_id THEN
@@ -2357,35 +3105,46 @@ BEGIN
   )
   RETURNING * INTO v_session;
 
-  -- Notify the target user about the impersonation (scoped to target org)
-  INSERT INTO notifications (user_id, org_id, type, title, message, metadata)
+  -- Notify the target user about the impersonation (scoped to target org).
+  -- Explicit channel/category so the email-prefs lookup in sendNotification
+  -- (keyed on category) resolves correctly if anyone wires impersonation to
+  -- the email path later. Category 'security' is in the default-email-on set.
+  INSERT INTO notifications (user_id, org_id, type, channel, category, title, message, metadata)
   VALUES (
     p_target_user_id,
     v_target_org_id,
     'impersonation_start',
+    'in_app',
+    'security',
     'Account access notice',
     'A platform administrator is currently reviewing your account for support purposes.',
     jsonb_build_object(
       'session_id', v_session.session_id,
       'expires_at', v_session.expires_at,
-      'justification', trim(p_justification)
+      'justification', trim(p_justification),
+      'gridmaster_id', v_caller_id,
+      'gridmaster_email', v_caller_email
     )
   );
 
   -- Notify all org super_admins about the impersonation (security transparency).
   -- Excludes the target user (already notified above) to avoid duplicate notifications.
-  INSERT INTO notifications (user_id, org_id, type, title, message, metadata)
+  INSERT INTO notifications (user_id, org_id, type, channel, category, title, message, metadata)
   SELECT
     cm.user_id,
     v_target_org_id,
     'impersonation_start',
+    'in_app',
+    'security',
     'Impersonation session started',
     'A platform administrator has started an impersonation session in your organization.',
     jsonb_build_object(
       'session_id', v_session.session_id,
       'expires_at', v_session.expires_at,
       'justification', trim(p_justification),
-      'target_user_id', p_target_user_id
+      'target_user_id', p_target_user_id,
+      'gridmaster_id', v_caller_id,
+      'gridmaster_email', v_caller_email
     )
   FROM organization_memberships cm
   WHERE cm.org_id = v_target_org_id
@@ -2413,32 +3172,69 @@ AS $$
 DECLARE
   v_target_user_id UUID;
   v_target_org_id  UUID;
+  v_caller_id      UUID;
+  v_caller_email   TEXT;
 BEGIN
+  v_caller_id := auth.uid();
+  SELECT email INTO v_caller_email FROM auth.users WHERE id = v_caller_id;
+
   -- Soft-delete: update instead of delete
   UPDATE impersonation_sessions
      SET ended_at = now(),
          end_reason = p_reason
    WHERE session_id = p_session_id
-     AND gridmaster_id = auth.uid()
+     AND gridmaster_id = v_caller_id
      AND ended_at IS NULL
   RETURNING target_user_id, target_org_id INTO v_target_user_id, v_target_org_id;
 
-  -- Notify the target user that the impersonation ended (scoped to target org)
+  -- Notify the target user that the impersonation ended (scoped to target org).
+  -- Explicit channel/category (see start_impersonation for rationale).
   IF v_target_user_id IS NOT NULL THEN
-    INSERT INTO notifications (user_id, org_id, type, title, message, metadata)
+    INSERT INTO notifications (user_id, org_id, type, channel, category, title, message, metadata)
     VALUES (
       v_target_user_id,
       v_target_org_id,
       'impersonation_end',
+      'in_app',
+      'security',
       'Account access ended',
       'A platform administrator has finished reviewing your account.',
-      jsonb_build_object('session_id', p_session_id, 'end_reason', p_reason)
+      jsonb_build_object(
+        'session_id', p_session_id,
+        'end_reason', p_reason,
+        'gridmaster_id', v_caller_id,
+        'gridmaster_email', v_caller_email
+      )
     );
+
+    -- Parity with start_impersonation: notify org super_admins so they see
+    -- both the start and end of any impersonation in their org.
+    INSERT INTO notifications (user_id, org_id, type, channel, category, title, message, metadata)
+    SELECT
+      cm.user_id,
+      v_target_org_id,
+      'impersonation_end',
+      'in_app',
+      'security',
+      'Impersonation session ended',
+      'A platform administrator''s impersonation session in your organization ended.',
+      jsonb_build_object(
+        'session_id', p_session_id,
+        'end_reason', p_reason,
+        'target_user_id', v_target_user_id,
+        'gridmaster_id', v_caller_id,
+        'gridmaster_email', v_caller_email
+      )
+    FROM organization_memberships cm
+    WHERE cm.org_id = v_target_org_id
+      AND cm.org_role = 'super_admin'
+      AND cm.archived_at IS NULL
+      AND cm.user_id <> v_target_user_id;
   END IF;
 END;
 $$;
 
-COMMENT ON FUNCTION public.end_impersonation IS 'Soft-ends an impersonation session (sets ended_at + reason). Inserts a notification for the target user.';
+COMMENT ON FUNCTION public.end_impersonation IS 'Soft-ends an impersonation session (sets ended_at + reason). Inserts a notification for the target user and for org super_admins (parity with start_impersonation).';
 
 
 -- ── get_impersonation_history ─────────────────────────────────────────────────
@@ -2508,24 +3304,28 @@ CREATE OR REPLACE FUNCTION public.get_notifications(
   p_offset INTEGER DEFAULT 0
 )
 RETURNS TABLE (
-  id         UUID,
-  type       TEXT,
-  channel    TEXT,
-  category   TEXT,
-  title      TEXT,
-  message    TEXT,
-  metadata   JSONB,
-  read_at    TIMESTAMPTZ,
-  created_at TIMESTAMPTZ
+  id          UUID,
+  type        TEXT,
+  channel     TEXT,
+  category    TEXT,
+  priority    TEXT,
+  title       TEXT,
+  message     TEXT,
+  metadata    JSONB,
+  read_at     TIMESTAMPTZ,
+  archived_at TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ
 )
 LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 BEGIN
   RETURN QUERY
-  SELECT n.id, n.type, n.channel, n.category, n.title, n.message, n.metadata, n.read_at, n.created_at
+  SELECT n.id, n.type, n.channel, n.category, n.priority, n.title, n.message, n.metadata, n.read_at, n.archived_at, n.created_at
   FROM notifications n
   WHERE n.user_id = auth.uid()
+    AND n.archived_at IS NULL
+    AND n.channel = 'in_app'
     AND (n.org_id = public.caller_org_id() OR n.org_id IS NULL)
   ORDER BY n.created_at DESC
   LIMIT p_limit OFFSET p_offset;
@@ -2543,6 +3343,8 @@ AS $$
   SELECT COUNT(*)::INTEGER FROM notifications
   WHERE user_id = auth.uid()
     AND read_at IS NULL
+    AND archived_at IS NULL
+    AND channel = 'in_app'
     AND (org_id = public.caller_org_id() OR org_id IS NULL);
 $$;
 
@@ -2556,7 +3358,9 @@ SET search_path = 'public'
 AS $$
 BEGIN
   UPDATE notifications SET read_at = now()
-  WHERE id = p_notification_id AND user_id = auth.uid();
+  WHERE id = p_notification_id
+    AND user_id = auth.uid()
+    AND (org_id = public.caller_org_id() OR org_id IS NULL);
 END;
 $$;
 
@@ -2572,11 +3376,65 @@ BEGIN
   UPDATE notifications SET read_at = now()
   WHERE user_id = auth.uid()
     AND read_at IS NULL
+    AND archived_at IS NULL
+    AND channel = 'in_app'
     AND (org_id = public.caller_org_id() OR org_id IS NULL);
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.mark_all_notifications_read() TO authenticated;
+
+
+CREATE OR REPLACE FUNCTION public.get_notification_facets()
+RETURNS JSONB
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT jsonb_build_object(
+    'totalInbox', (
+      SELECT COUNT(*)::INTEGER FROM notifications
+      WHERE user_id = auth.uid() AND archived_at IS NULL
+        AND channel = 'in_app'
+        AND (org_id = public.caller_org_id() OR org_id IS NULL)
+    ),
+    'totalUnread', (
+      SELECT COUNT(*)::INTEGER FROM notifications
+      WHERE user_id = auth.uid() AND read_at IS NULL AND archived_at IS NULL
+        AND channel = 'in_app'
+        AND (org_id = public.caller_org_id() OR org_id IS NULL)
+    ),
+    'totalArchived', (
+      SELECT COUNT(*)::INTEGER FROM notifications
+      WHERE user_id = auth.uid() AND archived_at IS NOT NULL
+        AND channel = 'in_app'
+        AND (org_id = public.caller_org_id() OR org_id IS NULL)
+    ),
+    'byCategory', COALESCE((
+      SELECT jsonb_object_agg(COALESCE(category, 'uncategorized'), c)
+      FROM (
+        SELECT category, COUNT(*)::INTEGER AS c
+        FROM notifications
+        WHERE user_id = auth.uid() AND archived_at IS NULL
+          AND channel = 'in_app'
+          AND (org_id = public.caller_org_id() OR org_id IS NULL)
+        GROUP BY category
+      ) t
+    ), '{}'::jsonb),
+    'byPriority', COALESCE((
+      SELECT jsonb_object_agg(priority, c)
+      FROM (
+        SELECT priority, COUNT(*)::INTEGER AS c
+        FROM notifications
+        WHERE user_id = auth.uid() AND archived_at IS NULL
+          AND channel = 'in_app'
+          AND (org_id = public.caller_org_id() OR org_id IS NULL)
+        GROUP BY priority
+      ) t
+    ), '{}'::jsonb)
+  );
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_notification_facets() TO authenticated;
 
 
 -- ── force_logout_user ─────────────────────────────────────────────────────────
@@ -2937,13 +3795,12 @@ BEGIN
   RETURN QUERY
   SELECT rcl.id, rcl.target_user_id, tu.email::TEXT, rcl.changed_by_id,
     cu.email::TEXT, rcl.from_role, rcl.to_role, rcl.created_at,
-    tp.org_id, o.name
+    rcl.org_id, o.name
   FROM public.role_change_log rcl
   LEFT JOIN auth.users tu ON tu.id = rcl.target_user_id
   LEFT JOIN auth.users cu ON cu.id = rcl.changed_by_id
-  LEFT JOIN public.profiles tp ON tp.id = rcl.target_user_id
-  LEFT JOIN public.organizations o ON o.id = tp.org_id
-  WHERE (p_org_id IS NULL OR tp.org_id = p_org_id)
+  LEFT JOIN public.organizations o ON o.id = rcl.org_id
+  WHERE (p_org_id IS NULL OR rcl.org_id = p_org_id)
     AND (p_target_user_id IS NULL OR rcl.target_user_id = p_target_user_id)
   ORDER BY rcl.created_at DESC
   LIMIT p_limit OFFSET p_offset;
@@ -6428,6 +7285,7 @@ RETURNS TABLE (
   person_id               TEXT,
   source                  TEXT,
   employee_id             UUID,
+  employee_number         INTEGER,
   user_id                 UUID,
   first_name              TEXT,
   last_name               TEXT,
@@ -6445,14 +7303,21 @@ RETURNS TABLE (
   scheduled_department_ids BIGINT[],
   scheduled_dept_admin_ids BIGINT[],
   management_department_ids BIGINT[],
-  management_dept_admin_ids BIGINT[]
+  management_dept_admin_ids BIGINT[],
+  membership_updated_at TIMESTAMPTZ,
+  membership_admin_permissions JSONB
 )
 LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 BEGIN
   IF NOT (
-    public.is_gridmaster()
+    -- Trusted backend path: API routes authorize the caller via
+    -- requireOrgPermissions, then invoke this through the service-role client
+    -- (where auth.uid()/JWT org claims are absent). Direct authenticated callers
+    -- must still be a gridmaster or a super_admin/admin of the target org.
+    (auth.jwt() ->> 'role') = 'service_role'
+    OR public.is_gridmaster()
     OR (
       public.caller_org_id() = p_org_id
       AND public.caller_org_role() IN ('super_admin', 'admin')
@@ -6468,6 +7333,7 @@ BEGIN
     e.id::TEXT AS person_id,
     'employee'::TEXT AS source,
     e.id AS employee_id,
+    e.employee_number,
     e.user_id AS user_id,
     e.first_name,
     e.last_name,
@@ -6485,7 +7351,9 @@ BEGIN
     COALESCE(e.department_ids, '{}'::BIGINT[]) AS scheduled_department_ids,
     COALESCE(e.dept_admin_ids, '{}'::BIGINT[]) AS scheduled_dept_admin_ids,
     COALESCE(cm.department_ids, emp_inv.department_ids, '{}'::BIGINT[]) AS management_department_ids,
-    COALESCE(cm.dept_admin_ids, emp_inv.dept_admin_ids, '{}'::BIGINT[]) AS management_dept_admin_ids
+    COALESCE(cm.dept_admin_ids, emp_inv.dept_admin_ids, '{}'::BIGINT[]) AS management_dept_admin_ids,
+    cm.updated_at AS membership_updated_at,
+    cm.admin_permissions AS membership_admin_permissions
   FROM public.employees e
   LEFT JOIN public.organization_memberships cm
     ON cm.user_id = e.user_id AND cm.org_id = p_org_id AND cm.archived_at IS NULL
@@ -6520,6 +7388,7 @@ BEGIN
     ('u:' || cm2.user_id::TEXT) AS person_id,
     'user_only'::TEXT AS source,
     NULL::UUID AS employee_id,
+    NULL::INTEGER AS employee_number,
     cm2.user_id AS user_id,
     p.first_name,
     p.last_name,
@@ -6537,7 +7406,9 @@ BEGIN
     '{}'::BIGINT[] AS scheduled_department_ids,
     '{}'::BIGINT[] AS scheduled_dept_admin_ids,
     cm2.department_ids AS management_department_ids,
-    cm2.dept_admin_ids AS management_dept_admin_ids
+    cm2.dept_admin_ids AS management_dept_admin_ids,
+    cm2.updated_at AS membership_updated_at,
+    cm2.admin_permissions AS membership_admin_permissions
   FROM public.organization_memberships cm2
   JOIN public.profiles p ON p.id = cm2.user_id
   JOIN auth.users au2 ON au2.id = cm2.user_id
@@ -6556,6 +7427,7 @@ BEGIN
     ('inv:' || inv3.id::TEXT) AS person_id,
     'pending_invite'::TEXT AS source,
     NULL::UUID AS employee_id,
+    NULL::INTEGER AS employee_number,
     NULL::UUID AS user_id,
     COALESCE(inv3.first_name, '') AS first_name,
     COALESCE(inv3.last_name, '') AS last_name,
@@ -6573,14 +7445,17 @@ BEGIN
     '{}'::BIGINT[] AS scheduled_department_ids,
     '{}'::BIGINT[] AS scheduled_dept_admin_ids,
     inv3.department_ids AS management_department_ids,
-    inv3.dept_admin_ids AS management_dept_admin_ids
+    inv3.dept_admin_ids AS management_dept_admin_ids,
+    NULL::TIMESTAMPTZ AS membership_updated_at,
+    NULL::JSONB AS membership_admin_permissions
   FROM public.invitations inv3
   WHERE inv3.org_id = p_org_id
     AND inv3.employee_id IS NULL
     AND inv3.accepted_at IS NULL
     AND inv3.revoked_at IS NULL
 
-  ORDER BY seniority NULLS LAST, first_name, last_name;
+  ORDER BY seniority NULLS LAST, first_name, last_name
+  LIMIT 501;
 END;
 $$;
 
@@ -7473,6 +8348,9 @@ GRANT EXECUTE ON FUNCTION public.delete_schedule_cell_draft(UUID, UUID, DATE, BI
 
 -- Lets any authenticated user mark their own onboarding as completed.
 -- SECURITY DEFINER so it bypasses RLS (users can't UPDATE memberships directly).
+-- Idempotent: if onboarding is already complete (or the user has no row), the
+-- call is a no-op rather than an error, so a stale Skip click never blocks the
+-- user from leaving the wizard.
 CREATE OR REPLACE FUNCTION public.complete_onboarding(p_org_id UUID)
 RETURNS void
 LANGUAGE plpgsql
@@ -7485,10 +8363,6 @@ BEGIN
   WHERE user_id = auth.uid()
     AND org_id = p_org_id
     AND onboarding_completed_at IS NULL;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'No pending onboarding found for this user/org';
-  END IF;
 END;
 $$;
 

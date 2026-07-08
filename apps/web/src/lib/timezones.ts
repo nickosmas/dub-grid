@@ -63,9 +63,7 @@ export function formatTimezoneOffset(timeZone: string, date = new Date()): strin
       timeZone,
       timeZoneName: "shortOffset",
     });
-    const value = formatter
-      .formatToParts(date)
-      .find((part) => part.type === "timeZoneName")?.value;
+    const value = formatter.formatToParts(date).find((part) => part.type === "timeZoneName")?.value;
 
     if (!value) return "UTC";
     if (value === "GMT") return "UTC";
@@ -97,11 +95,7 @@ export function buildTimezoneOptions({
   detectedTimeZone?: string | null;
   date?: Date;
 } = {}): TimezoneOption[] {
-  const orderedTimezones = unique([
-    selectedTimeZone,
-    detectedTimeZone,
-    ...getSupportedTimezones(),
-  ]);
+  const orderedTimezones = unique([selectedTimeZone, detectedTimeZone, ...getSupportedTimezones()]);
 
   return orderedTimezones.map((timeZone) => {
     const tags: string[] = [];

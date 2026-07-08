@@ -14,12 +14,11 @@ import {
 } from "@dubgrid/data-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireMobileAuth } from "@/features/mobile/server";
-import {
-  createNameMismatchResponseBody,
-  hasCompleteName,
-  namesMatch,
-} from "@/lib/account-linking";
-import { emailWrapper, escapeHtml, sanitizeHeaderValue } from "@/lib/email";
+import { createNameMismatchResponseBody, hasCompleteName, namesMatch } from "@/lib/account-linking";
+import { createElement } from "react";
+import { render } from "@react-email/components";
+import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
+import { InviteEmail } from "@/emails/InviteEmail";
 import logger from "@/lib/logger";
 import { rowToEmployee } from "@/lib/db/mappers";
 import { sendResendEmail } from "@/lib/resend";
@@ -46,11 +45,7 @@ async function loadMobilePerson(
   orgId: string,
   employeeId: string,
 ) {
-  const row = await fetchMobileEmployeeRowById(
-    serviceClient,
-    orgId,
-    employeeId,
-  );
+  const row = await fetchMobileEmployeeRowById(serviceClient, orgId, employeeId);
   if (!row) return null;
 
   const pendingInvitation = await fetchMobilePendingInvitationRowByEmployeeId(
@@ -78,22 +73,16 @@ function getInvitationEmailConfig(): InvitationEmailConfig | null {
     return null;
   }
 
-  const from =
-    process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
+  const from = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
   if (!process.env.RESEND_FROM_EMAIL) {
-    logger.warn(
-      "RESEND_FROM_EMAIL not set - using test domain for mobile invite",
-    );
+    logger.warn("RESEND_FROM_EMAIL not set - using test domain for mobile invite");
   }
 
   return { apiKey, from };
 }
 
 function createInvitationEmailUnavailableResponse() {
-  return NextResponse.json(
-    { error: "Email service not configured" },
-    { status: 503 },
-  );
+  return NextResponse.json({ error: "Email service not configured" }, { status: 503 });
 }
 
 async function sendInvitationEmail(input: {
@@ -107,34 +96,24 @@ async function sendInvitationEmail(input: {
     throw new Error("Invitation token unavailable");
   }
 
-  const emailBaseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.NEXT_PUBLIC_VERCEL_URL
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : null) ||
-    "http://localhost:3000";
-  const acceptUrl = `${emailBaseUrl}/accept-invite?token=${encodeURIComponent(input.token)}&email=${encodeURIComponent(input.email)}`;
-  const inviterLine = input.inviterName
-    ? `<p style="color:#3E433B;font-size:16px;line-height:1.6;margin:0 0 24px;"><strong>${escapeHtml(input.inviterName)}</strong> has invited you to join <strong>${escapeHtml(input.orgName)}</strong> on DubGrid.</p>`
-    : `<p style="color:#3E433B;font-size:16px;line-height:1.6;margin:0 0 24px;">You've been invited to join <strong>${escapeHtml(input.orgName)}</strong> on DubGrid.</p>`;
+  const baseUrl = emailBaseUrl();
+  const acceptUrl = `${baseUrl}/accept-invite?token=${encodeURIComponent(input.token)}&email=${encodeURIComponent(input.email)}`;
+
+  const html = await render(
+    createElement(InviteEmail, {
+      orgName: input.orgName,
+      inviterName: input.inviterName,
+      acceptUrl,
+      logoUrl: baseUrl,
+    }),
+  );
 
   await sendResendEmail({
     apiKey: input.config.apiKey,
     from: input.config.from,
     to: input.email,
-    subject: sanitizeHeaderValue(
-      `You're invited to join ${input.orgName} on DubGrid`,
-    ),
-    html: emailWrapper(`
-      <h2 style="color:#111410;font-size:22px;font-weight:700;margin:0 0 16px;letter-spacing:-0.02em;">You're Invited</h2>
-      ${inviterLine}
-      <p style="color:#3E433B;font-size:15px;line-height:1.6;margin:0 0 32px;">Click the button below to set your password and accept your invitation.</p>
-      <div style="text-align:center;margin:0 0 32px;">
-        <a href="${acceptUrl}" style="display:inline-block;padding:14px 40px;background:#2563EB;color:#fff;text-decoration:none;border-radius:12px;font-size:16px;font-weight:700;">Accept Invitation</a>
-      </div>
-      <p style="color:#94A3B8;font-size:13px;line-height:1.6;margin:0 0 8px;">If the button does not work, copy and paste this link into your browser:</p>
-      <p style="color:#5A5F57;font-size:13px;line-height:1.6;margin:0 0 24px;word-break:break-all;">${acceptUrl}</p>
-      <p style="color:#94A3B8;font-size:13px;margin:0;">This invitation expires in 72 hours.</p>`),
+    subject: sanitizeHeaderValue(`You're invited to join ${input.orgName} on DubGrid`),
+    html,
   });
 }
 
@@ -157,9 +136,7 @@ async function findExistingOrganizationMemberByEmail(input: {
     ),
   );
 
-  const match = users.find(
-    (result) => result.data.user?.email?.toLowerCase() === normalizedEmail,
-  );
+  const match = users.find((result) => result.data.user?.email?.toLowerCase() === normalizedEmail);
 
   return match?.data.user
     ? {
@@ -218,8 +195,7 @@ async function linkExistingOrganizationMember(input: {
   if ((otherEmployees?.length ?? 0) > 0) {
     return NextResponse.json(
       {
-        error:
-          "That account is already linked to another employee in this organization.",
+        error: "That account is already linked to another employee in this organization.",
       },
       { status: 409 },
     );
@@ -263,10 +239,7 @@ async function linkExistingOrganizationMember(input: {
   }
 
   if (!namesAlreadyMatch && !input.reconcileName) {
-    return NextResponse.json(
-      createNameMismatchResponseBody(challengeDetails),
-      { status: 409 },
-    );
+    return NextResponse.json(createNameMismatchResponseBody(challengeDetails), { status: 409 });
   }
 
   const updatePayload = {
@@ -354,35 +327,22 @@ async function requireManageableEmployee(req: NextRequest, employeeId: string) {
     };
   }
 
-  const employee = await loadMobilePerson(
-    auth.serviceClient,
-    auth.currentOrg.id,
-    employeeId,
-  );
+  const employee = await loadMobilePerson(auth.serviceClient, auth.currentOrg.id, employeeId);
   if (!employee) {
     return {
-      response: NextResponse.json(
-        { error: "Employee not found" },
-        { status: 404 },
-      ),
+      response: NextResponse.json({ error: "Employee not found" }, { status: 404 }),
     };
   }
-  if (employee.status === "terminated" || employee.userId) {
+  if (employee.status === "removed" || employee.userId) {
     return {
-      response: NextResponse.json(
-        { error: "This employee cannot be invited." },
-        { status: 400 },
-      ),
+      response: NextResponse.json({ error: "This employee cannot be invited." }, { status: 400 }),
     };
   }
 
   return { auth, employee };
 }
 
-export async function POST(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const loaded = await requireManageableEmployee(req, id);
   if ("response" in loaded) return loaded.response;
@@ -440,16 +400,13 @@ export async function POST(
     return createInvitationEmailUnavailableResponse();
   }
 
-  const invitation = await createMobileEmployeeInvitationRow(
-    loaded.auth.serviceClient,
-    {
-      orgId: loaded.auth.currentOrg.id,
-      employeeId: id,
-      invitedBy: loaded.auth.user.id,
-      email: parsed.data.email,
-      roleToAssign: "user",
-    },
-  );
+  const invitation = await createMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
+    orgId: loaded.auth.currentOrg.id,
+    employeeId: id,
+    invitedBy: loaded.auth.user.id,
+    email: parsed.data.email,
+    roleToAssign: "user",
+  });
   try {
     await sendInvitationEmail({
       config: emailConfig,
@@ -495,11 +452,7 @@ export async function POST(
     user_agent: req.headers?.get("user-agent") ?? null,
   });
 
-  const person = await loadMobilePerson(
-    loaded.auth.serviceClient,
-    loaded.auth.currentOrg.id,
-    id,
-  );
+  const person = await loadMobilePerson(loaded.auth.serviceClient, loaded.auth.currentOrg.id, id);
   return NextResponse.json(
     mobilePersonInvitationResponseSchema.parse({
       success: true,
@@ -509,10 +462,7 @@ export async function POST(
   );
 }
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const loaded = await requireManageableEmployee(req, id);
   if ("response" in loaded) return loaded.response;
@@ -532,14 +482,11 @@ export async function PATCH(
     return createInvitationEmailUnavailableResponse();
   }
 
-  const invitation = await refreshMobileEmployeeInvitationRow(
-    loaded.auth.serviceClient,
-    {
-      orgId: loaded.auth.currentOrg.id,
-      invitationId: parsed.data.invitationId,
-      expectedUpdatedAt: parsed.data.expectedUpdatedAt,
-    },
-  );
+  const invitation = await refreshMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
+    orgId: loaded.auth.currentOrg.id,
+    invitationId: parsed.data.invitationId,
+    expectedUpdatedAt: parsed.data.expectedUpdatedAt,
+  });
   if (!invitation || invitation.employee_id !== id) {
     return NextResponse.json(
       { error: "Invitation changed elsewhere. Refresh and try again." },
@@ -584,11 +531,7 @@ export async function PATCH(
     );
   }
 
-  const person = await loadMobilePerson(
-    loaded.auth.serviceClient,
-    loaded.auth.currentOrg.id,
-    id,
-  );
+  const person = await loadMobilePerson(loaded.auth.serviceClient, loaded.auth.currentOrg.id, id);
   return NextResponse.json(
     mobilePersonInvitationResponseSchema.parse({
       success: true,
@@ -598,10 +541,7 @@ export async function PATCH(
   );
 }
 
-export async function DELETE(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const loaded = await requireManageableEmployee(req, id);
   if ("response" in loaded) return loaded.response;
@@ -616,14 +556,11 @@ export async function DELETE(
     );
   }
 
-  const invitation = await revokeMobileEmployeeInvitationRow(
-    loaded.auth.serviceClient,
-    {
-      orgId: loaded.auth.currentOrg.id,
-      invitationId: parsed.data.invitationId,
-      expectedUpdatedAt: parsed.data.expectedUpdatedAt,
-    },
-  );
+  const invitation = await revokeMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
+    orgId: loaded.auth.currentOrg.id,
+    invitationId: parsed.data.invitationId,
+    expectedUpdatedAt: parsed.data.expectedUpdatedAt,
+  });
   if (!invitation || invitation.employee_id !== id) {
     return NextResponse.json(
       { error: "Invitation changed elsewhere. Refresh and try again." },
@@ -647,11 +584,7 @@ export async function DELETE(
     user_agent: req.headers?.get("user-agent") ?? null,
   });
 
-  const person = await loadMobilePerson(
-    loaded.auth.serviceClient,
-    loaded.auth.currentOrg.id,
-    id,
-  );
+  const person = await loadMobilePerson(loaded.auth.serviceClient, loaded.auth.currentOrg.id, id);
   return NextResponse.json(
     mobilePersonInvitationResponseSchema.parse({
       success: true,

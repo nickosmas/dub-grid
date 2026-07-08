@@ -3,10 +3,8 @@ import { discardScheduleDraftsDirect } from "./schedule-draft-safety";
 
 function resolvedQuery<T>(result: T) {
   return {
-    then: (
-      resolve: (value: T) => unknown,
-      reject: (reason: unknown) => unknown,
-    ) => Promise.resolve(result).then(resolve, reject),
+    then: (resolve: (value: T) => unknown, reject: (reason: unknown) => unknown) =>
+      Promise.resolve(result).then(resolve, reject),
   };
 }
 
@@ -57,11 +55,7 @@ describe("discardScheduleDraftsDirect", () => {
       serviceClient: serviceClient as never,
     });
 
-    expect(deletedCellBatches.map((batch) => batch.length)).toEqual([
-      50,
-      50,
-      20,
-    ]);
+    expect(deletedCellBatches.map((batch) => batch.length)).toEqual([50, 50, 20]);
   });
 
   it("batches modified draft snapshot deletes to keep PostgREST filters bounded", async () => {
@@ -129,11 +123,7 @@ describe("discardScheduleDraftsDirect", () => {
       serviceClient: serviceClient as never,
     });
 
-    expect(deletedSnapshotBatches.map((batch) => batch.length)).toEqual([
-      50,
-      50,
-      5,
-    ]);
+    expect(deletedSnapshotBatches.map((batch) => batch.length)).toEqual([50, 50, 5]);
     expect(touchedCells).toHaveLength(105);
   });
 });

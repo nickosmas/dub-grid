@@ -4,6 +4,7 @@ import type { OpenShift } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
+import { EmptyState } from "@/components/EmptyState";
 
 const BADGE_STYLES: Record<
   OpenShift["urgency"],
@@ -42,19 +43,15 @@ export default function ExpandedOpenShifts({
   publishedWindowState = "published",
   onClose,
 }: ExpandedOpenShiftsProps) {
-  const [urgencyFilter, setUrgencyFilter] = useState<
-    "all" | OpenShift["urgency"]
-  >("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<"all" | OpenShift["urgency"]>("all");
   const [focusAreaFilter, setFocusAreaFilter] = useState<string>("all");
   const isUnpublished = publishedWindowState === "unpublished";
   const isPartial = publishedWindowState === "partial";
 
   const filtered = useMemo(() => {
     let list = openShifts;
-    if (urgencyFilter !== "all")
-      list = list.filter((s) => s.urgency === urgencyFilter);
-    if (focusAreaFilter !== "all")
-      list = list.filter((s) => s.focusAreaName === focusAreaFilter);
+    if (urgencyFilter !== "all") list = list.filter((s) => s.urgency === urgencyFilter);
+    if (focusAreaFilter !== "all") list = list.filter((s) => s.focusAreaName === focusAreaFilter);
     return list;
   }, [openShifts, urgencyFilter, focusAreaFilter]);
 
@@ -62,19 +59,17 @@ export default function ExpandedOpenShifts({
     () => [...new Set(openShifts.map((s) => s.focusAreaName))].sort(),
     [openShifts],
   );
-  const filteredSlotCount = filtered.reduce(
-    (total, shift) => total + shift.needed,
-    0,
-  );
+  const filteredSlotCount = filtered.reduce((total, shift) => total + shift.needed, 0);
 
   return (
     <Modal title="Open shifts" onClose={onClose} style={modalStyle}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {isUnpublished ? (
-          <div style={emptyStyle}>
-            This period has not been published yet. Open shifts will appear
-            after the first publish.
-          </div>
+          <EmptyState
+            size="compact"
+            heading="Nothing to show yet"
+            description="This period has not been published yet. Open shifts will appear after the first publish."
+          />
         ) : (
           <>
             {isPartial && (
@@ -109,14 +104,9 @@ export default function ExpandedOpenShifts({
                 value={urgencyFilter}
                 options={URGENCY_OPTIONS.map((opt) => ({
                   value: opt,
-                  label:
-                    opt === "all"
-                      ? "All urgency"
-                      : opt.charAt(0).toUpperCase() + opt.slice(1),
+                  label: opt === "all" ? "All urgency" : opt.charAt(0).toUpperCase() + opt.slice(1),
                 }))}
-                onChange={(val) =>
-                  setUrgencyFilter(val as typeof urgencyFilter)
-                }
+                onChange={(val) => setUrgencyFilter(val as typeof urgencyFilter)}
                 fontSize="var(--dg-fs-label)"
               />
               <CustomSelect
@@ -153,11 +143,14 @@ export default function ExpandedOpenShifts({
               }}
             >
               {filtered.length === 0 ? (
-                <div style={emptyStyle}>
-                  {isPartial
-                    ? "No open shifts on published dates"
-                    : "No open shifts matching filters"}
-                </div>
+                <EmptyState
+                  size="compact"
+                  heading={
+                    isPartial
+                      ? "No open shifts on published dates"
+                      : "No open shifts matching filters"
+                  }
+                />
               ) : (
                 filtered.map((shift) => {
                   const badge = BADGE_STYLES[shift.urgency];
@@ -274,11 +267,4 @@ const itemStyle = {
   borderRadius: "var(--dg-radius-md)",
   background: "var(--color-bg)",
   border: "1px solid var(--color-border)",
-};
-
-const emptyStyle = {
-  fontSize: 13,
-  color: "var(--color-text-subtle)",
-  textAlign: "center" as const,
-  padding: "32px 0",
 };

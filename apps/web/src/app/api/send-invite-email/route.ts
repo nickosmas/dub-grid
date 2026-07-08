@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createElement } from "react";
+import { render } from "@react-email/components";
 import { z } from "zod";
-import { inviteLimiter, checkRateLimit } from "@/lib/rate-limit";
+import { inviteLimiter, emailTargetLimiter, checkRateLimit, hashEmail } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
-import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
+import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
+import { InviteEmail } from "@/emails/InviteEmail";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bodySchema = z.object({
   token: z.string().min(1),
@@ -18,6 +22,8 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   // ── Auth check ──────────────────────────────────────────────────────
   const auth = await requireAuthenticatedUserWithClaims(req);
@@ -47,10 +53,7 @@ export async function POST(req: NextRequest) {
   const isGridmaster = claims.platform_role === "gridmaster";
   const isSuperAdmin = claims.org_role === "super_admin";
   if (!isGridmaster && !isSuperAdmin) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 403 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
   }
 
   // ── Config check ────────────────────────────────────────────────────
@@ -72,69 +75,52 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid request body" },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: "Invalid input" },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { token, email, orgName, inviterName } = parsed.data;
 
-  // ── Build email ─────────────────────────────────────────────────────
-  const emailBaseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.NEXT_PUBLIC_VERCEL_URL
-      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
-      : null) ||
-    "http://localhost:3000";
-  if (!process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_VERCEL_URL) {
-    logger.warn("No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set — using localhost:3000 for invite links");
+  // ── Per-target-email rate limit ───────────────────────────────────────
+  // The per-actor limit above doesn't stop one sender from flooding a single
+  // inbox; cap invites to any one recipient at 5/hour.
+  const target = await checkRateLimit(emailTargetLimiter, `invite-email:${hashEmail(email)}`);
+  if (target.misconfigured) {
+    return NextResponse.json(
+      { success: false, error: "Service temporarily unavailable" },
+      { status: 503 },
+    );
+  }
+  if (target.limited) {
+    const retryAfter = target.reset ? Math.ceil((target.reset - Date.now()) / 1000) : 60;
+    return NextResponse.json(
+      { success: false, error: "Too many invites sent to this address. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } },
+    );
   }
 
-  const acceptUrl = `${emailBaseUrl}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
+  // ── Build email ─────────────────────────────────────────────────────
+  const baseUrl = emailBaseUrl();
+  if (!process.env.NEXT_PUBLIC_SITE_URL && !process.env.NEXT_PUBLIC_VERCEL_URL) {
+    logger.warn(
+      "No NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL set — using localhost:3000 for invite links",
+    );
+  }
 
-  const inviterLine = inviterName
-    ? `<p style="color:#3E433B;font-size:16px;line-height:1.6;margin:0 0 24px;">
-        <strong>${escapeHtml(inviterName)}</strong> has invited you to join
-        <strong>${escapeHtml(orgName)}</strong> on DubGrid.
-      </p>`
-    : `<p style="color:#3E433B;font-size:16px;line-height:1.6;margin:0 0 24px;">
-        You've been invited to join <strong>${escapeHtml(orgName)}</strong> on DubGrid.
-      </p>`;
+  const acceptUrl = `${baseUrl}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
 
-  const html = emailWrapper(`
-      <h2 style="color:#111410;font-size:22px;font-weight:700;margin:0 0 16px;letter-spacing:-0.02em;">
-        You're Invited
-      </h2>
-      ${inviterLine}
-      <p style="color:#3E433B;font-size:15px;line-height:1.6;margin:0 0 32px;">
-        Click the button below to set your password and accept your invitation.
-      </p>
-      <div style="text-align:center;margin:0 0 32px;">
-        <a href="${acceptUrl}"
-           style="display:inline-block;padding:14px 40px;background:#2563EB;color:#fff;text-decoration:none;border-radius:12px;font-size:16px;font-weight:700;box-shadow:0 4px 12px rgba(37,99,235,0.2);">
-          Accept Invitation
-        </a>
-      </div>
-      <p style="color:#94A3B8;font-size:13px;line-height:1.6;margin:0 0 8px;">
-        If the button doesn't work, copy and paste this link into your browser:
-      </p>
-      <p style="color:#5A5F57;font-size:13px;line-height:1.6;margin:0 0 24px;word-break:break-all;">
-        ${acceptUrl}
-      </p>
-      <div style="border-top:1px solid #D0DBD4;padding-top:20px;">
-        <p style="color:#94A3B8;font-size:13px;margin:0;">
-          This invitation expires in 72 hours. If you didn't expect this email, you can safely ignore it.
-        </p>
-      </div>`);
+  const html = await render(
+    createElement(InviteEmail, {
+      orgName,
+      inviterName,
+      acceptUrl,
+      logoUrl: baseUrl,
+    }),
+  );
 
   try {
     await sendResendEmail({
@@ -148,9 +134,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "send-invite-email" } });
     logger.error({ err, path: "/api/send-invite-email" }, "Failed to send invite email");
-    return NextResponse.json(
-      { success: false, error: "Failed to send email" },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: "Failed to send email" }, { status: 500 });
   }
 }

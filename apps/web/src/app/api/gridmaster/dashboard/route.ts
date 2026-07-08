@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  createRequestSupabaseClient,
-  requireGridmasterSession,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { rowToOrganization } from "@/lib/db/mappers";
@@ -18,10 +15,7 @@ export async function GET(req: NextRequest) {
     const service = getServiceClient();
     const userClient = createRequestSupabaseClient(req);
     const [organizationsResult, statsResult, platformUsersResult] = await Promise.all([
-      service
-        .from("organizations")
-        .select(ORGANIZATION_WITH_BILLING_COLS)
-        .order("name"),
+      service.from("organizations").select(ORGANIZATION_WITH_BILLING_COLS).order("name"),
       userClient.rpc("get_tenant_stats"),
       service
         .from("profiles")

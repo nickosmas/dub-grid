@@ -22,10 +22,7 @@ describe("schedule view fallback", () => {
   });
 
   it("finds the containing pay period from a configured biweekly anchor date", () => {
-    const start = getContainingPayPeriodStart(
-      new Date(2026, 4, 1),
-      "2026-04-20",
-    );
+    const start = getContainingPayPeriodStart(new Date(2026, 4, 1), "2026-04-20");
 
     expect(start).not.toBeNull();
     expect(formatDateKey(start!)).toBe("2026-04-20");

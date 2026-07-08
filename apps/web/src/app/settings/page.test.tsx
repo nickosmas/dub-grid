@@ -152,7 +152,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockSection = null;
   vi.mocked(fetchOrganizationBilling).mockResolvedValue(billingSummary);
-  vi.mocked(usePermissions).mockReturnValue({ ...permissions } as ReturnType<typeof usePermissions>);
+  vi.mocked(usePermissions).mockReturnValue({ ...permissions } as ReturnType<
+    typeof usePermissions
+  >);
   vi.mocked(useOrganizationData).mockReturnValue(
     organizationData as unknown as ReturnType<typeof useOrganizationData>,
   );
@@ -175,7 +177,7 @@ describe("SettingsRoute", () => {
       enabled: false,
     });
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith("/schedule");
+      expect(mockReplace).toHaveBeenCalledWith("/profile");
     });
   });
 
@@ -200,9 +202,7 @@ describe("SettingsRoute", () => {
     renderSettingsRoute();
 
     expect(await screen.findByText("Settings content")).toBeInTheDocument();
-    expect(
-      screen.queryByText("Billing recovery for org-1"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Billing recovery for org-1")).not.toBeInTheDocument();
     await waitFor(() => {
       expect(useOrganizationData).toHaveBeenCalledWith({
         includeAssignmentDefinitionCompatibility: false,
@@ -233,9 +233,7 @@ describe("SettingsRoute", () => {
 
     renderSettingsRoute();
 
-    expect(
-      await screen.findByText("Billing recovery for org-1"),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("Billing recovery for org-1")).toBeInTheDocument();
     expect(screen.queryByText("Settings content")).not.toBeInTheDocument();
     await waitFor(() => {
       expect(useOrganizationData).toHaveBeenCalledWith({

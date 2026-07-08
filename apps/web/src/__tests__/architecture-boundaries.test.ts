@@ -7,8 +7,7 @@ const sourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts"]);
 const importPattern =
   /(?:import|export)\s+(?:type\s+)?(?:[^"'`]+?\sfrom\s+)?["'`]([^"'`]+)["'`]|import\(\s*["'`]([^"'`]+)["'`]\s*\)/g;
 const browserSupabaseImportPattern = /from\s+["']@\/lib\/supabase["']/;
-const browserDatabaseImportPattern =
-  /from\s+["']@\/lib\/db(?:\/[^"']*)?["']/;
+const browserDatabaseImportPattern = /from\s+["']@\/lib\/db(?:\/[^"']*)?["']/;
 const browserSupabaseDbAccessPattern = /\bsupabase\s*\.\s*(?:from|rpc)\s*\(/;
 const browserSupabaseAdminPattern = /\bsupabase\s*\.\s*auth\s*\.\s*admin\b/;
 
@@ -25,12 +24,7 @@ function collectSourceFiles(root: string): string[] {
   const files: string[] = [];
 
   for (const entry of entries) {
-    if (
-      entry === "node_modules" ||
-      entry === ".next" ||
-      entry === "dist" ||
-      entry === "build"
-    ) {
+    if (entry === "node_modules" || entry === ".next" || entry === "dist" || entry === "build") {
       continue;
     }
 
@@ -73,13 +67,8 @@ function isUiLayerSourceFile(relativePath: string): boolean {
     relativePath.startsWith("apps/web/src/app/") ||
     relativePath.startsWith("apps/web/src/components/") ||
     relativePath.startsWith("apps/web/src/hooks/") ||
-    (
-      relativePath.startsWith("apps/web/src/features/") &&
-      (
-        relativePath.includes("/client/") ||
-        /\/use[A-Z][^/]*\.tsx?$/.test(relativePath)
-      )
-    )
+    (relativePath.startsWith("apps/web/src/features/") &&
+      (relativePath.includes("/client/") || /\/use[A-Z][^/]*\.tsx?$/.test(relativePath)))
   );
 }
 
@@ -158,10 +147,7 @@ describe("architecture boundaries", () => {
     for (const root of uiRoots) {
       for (const filePath of collectSourceFiles(root)) {
         const relativePath = toRelative(filePath);
-        if (
-          !isUiLayerSourceFile(relativePath) ||
-          isIgnoredUiLayerSourceFile(relativePath)
-        ) {
+        if (!isUiLayerSourceFile(relativePath) || isIgnoredUiLayerSourceFile(relativePath)) {
           continue;
         }
 
@@ -171,30 +157,20 @@ describe("architecture boundaries", () => {
           browserSupabaseImportPattern.test(source) &&
           !LEGACY_BROWSER_SUPABASE_IMPORT_ALLOWLIST.has(relativePath)
         ) {
-          violations.push(
-            `${relativePath} imports @/lib/supabase without being migrated`,
-          );
+          violations.push(`${relativePath} imports @/lib/supabase without being migrated`);
         }
 
         if (
           browserDatabaseImportPattern.test(source) &&
           !LEGACY_BROWSER_DATABASE_IMPORT_ALLOWLIST.has(relativePath)
         ) {
-          violations.push(
-            `${relativePath} imports @/lib/db without being migrated`,
-          );
+          violations.push(`${relativePath} imports @/lib/db without being migrated`);
         }
 
         const usesRawDbAccess =
-          browserSupabaseDbAccessPattern.test(source) ||
-          browserSupabaseAdminPattern.test(source);
-        if (
-          usesRawDbAccess &&
-          !LEGACY_UI_DB_ACCESS_ALLOWLIST.has(relativePath)
-        ) {
-          violations.push(
-            `${relativePath} performs raw Supabase DB access in the UI layer`,
-          );
+          browserSupabaseDbAccessPattern.test(source) || browserSupabaseAdminPattern.test(source);
+        if (usesRawDbAccess && !LEGACY_UI_DB_ACCESS_ALLOWLIST.has(relativePath)) {
+          violations.push(`${relativePath} performs raw Supabase DB access in the UI layer`);
         }
       }
     }

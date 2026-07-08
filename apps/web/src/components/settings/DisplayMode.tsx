@@ -1,12 +1,7 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import {
-  JobDefinition,
-  Organization,
-  ShiftCategory,
-  ShiftDisplayMode,
-} from "@/types";
+import { JobDefinition, Organization, ShiftCategory, ShiftDisplayMode } from "@/types";
 import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
@@ -87,8 +82,7 @@ function getPreviewShifts(args: {
     .sort((left, right) => left.sortOrder - right.sortOrder);
   const previewShifts = [...activeShifts, ...SAMPLE_SHIFT_CATEGORIES].slice(0, 3);
   const previewJob =
-    jobs.find((job) => !job.archivedAt && job.systemKey !== "regular_staff") ??
-    SAMPLE_JOBS[0]!;
+    jobs.find((job) => !job.archivedAt && job.systemKey !== "regular_staff") ?? SAMPLE_JOBS[0]!;
 
   return previewShifts.map((shift) => {
     const displayParts = buildShiftDisplayParts({
@@ -280,8 +274,7 @@ export function DisplayModeSample({
             display: "flex",
             alignItems: "center",
             minWidth: 0,
-            boxShadow:
-              "1px 0 0 0 var(--color-border-light), 2px 0 4px rgba(0,0,0,0.02)",
+            boxShadow: "1px 0 0 0 var(--color-border-light), 2px 0 4px rgba(0,0,0,0.02)",
           }}
         >
           <span
@@ -329,11 +322,17 @@ export function DisplayModeSample({
   );
 }
 
-export const DISPLAY_MODES: { id: ShiftDisplayMode; title: string; description: string; details: string[] }[] = [
+export const DISPLAY_MODES: {
+  id: ShiftDisplayMode;
+  title: string;
+  description: string;
+  details: string[];
+}[] = [
   {
     id: "code",
     title: "Short Codes",
-    description: "Display abbreviations like D, EVE, N on the grid. Best when your team scans the schedule by compact shift labels.",
+    description:
+      "Display abbreviations like D, EVE, N on the grid. Best when your team scans the schedule by compact shift labels.",
     details: [
       "The schedule grid shows short codes in each cell",
       "Both the code and full name are visible when creating shifts",
@@ -343,7 +342,8 @@ export const DISPLAY_MODES: { id: ShiftDisplayMode; title: string; description: 
   {
     id: "name",
     title: "Full Names",
-    description: "Display descriptive names like Day Shift, Evening, Night on the grid. Best for organizations that don't use codes.",
+    description:
+      "Display descriptive names like Day Shift, Evening, Night on the grid. Best for organizations that don't use codes.",
     details: [
       "The schedule grid shows the full shift name in each cell",
       "Short codes are hidden throughout the app",
@@ -420,17 +420,29 @@ export default function DisplayMode({
             gap: 4,
           }}
         >
-          <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+            }}
+          >
             Choose a display mode
           </div>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-caption)",
+              color: "var(--color-text-muted)",
+              lineHeight: 1.5,
+            }}
+          >
             Select the visual language people should see across the schedule and related views.
           </div>
         </div>
 
         <div style={{ padding: 18 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            {modes.map(mode => {
+            {modes.map((mode) => {
               const isActive = selected === mode.id;
               return (
                 <button
@@ -443,7 +455,9 @@ export default function DisplayMode({
                     gap: 12,
                     padding: 16,
                     borderRadius: "var(--dg-radius-md)",
-                    border: isActive ? "2px solid var(--color-brand-border)" : "1px solid var(--color-border)",
+                    border: isActive
+                      ? "2px solid var(--color-brand-border)"
+                      : "1px solid var(--color-border)",
                     background: isActive ? "var(--color-brand-bg)" : "var(--color-surface)",
                     cursor: "pointer",
                     textAlign: "left",
@@ -452,34 +466,52 @@ export default function DisplayMode({
                 >
                   {/* Radio indicator + title */}
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{
-                      width: 18,
-                      height: 18,
-                      borderRadius: "50%",
-                      border: isActive ? "2px solid var(--color-brand)" : "2px solid var(--color-border-strong, #94a3b8)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}>
-                      {isActive && <div style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--color-brand)" }} />}
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: "50%",
+                        border: isActive
+                          ? "2px solid var(--color-brand)"
+                          : "2px solid var(--color-border-strong, #94a3b8)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isActive && (
+                        <div
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: "50%",
+                            background: "var(--color-brand)",
+                          }}
+                        />
+                      )}
                     </div>
-                    <span style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)" }}>
+                    <span
+                      style={{ fontWeight: 700, fontSize: 15, color: "var(--color-text-primary)" }}
+                    >
                       {mode.title}
                     </span>
                   </div>
 
                   {/* Description */}
-                  <p style={{ fontSize: 13, color: "var(--color-text-muted)", lineHeight: 1.5, margin: 0 }}>
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: "var(--color-text-muted)",
+                      lineHeight: 1.5,
+                      margin: 0,
+                    }}
+                  >
                     {mode.description}
                   </p>
 
                   {/* Sample grid */}
-                  <DisplayModeSample
-                    mode={mode.id}
-                    shiftCategories={shiftCategories}
-                    jobs={jobs}
-                  />
+                  <DisplayModeSample mode={mode.id} shiftCategories={shiftCategories} jobs={jobs} />
                 </button>
               );
             })}

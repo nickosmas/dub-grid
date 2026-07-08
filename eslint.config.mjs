@@ -2,10 +2,8 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextPlugin from "./node_modules/eslint-config-next/node_modules/@next/eslint-plugin-next/dist/index.js";
 import reactHooks from "./node_modules/eslint-config-next/node_modules/eslint-plugin-react-hooks/index.js";
 import tseslint from "./node_modules/eslint-config-next/node_modules/typescript-eslint/dist/index.js";
-import {
-  noHtmlTitleAttribute,
-  noRawTooltipImport,
-} from "./eslint-rules/no-raw-title-tooltip.mjs";
+import eslintConfigPrettier from "eslint-config-prettier";
+import { noHtmlTitleAttribute, noRawTooltipImport } from "./eslint-rules/no-raw-title-tooltip.mjs";
 
 const tooltipPlugin = {
   rules: {
@@ -73,17 +71,11 @@ const webFeaturePrivatePatterns = [
     message: 'Import mobile route handlers from "@/features/mobile/server/routes".',
   },
   {
-    group: [
-      "@/features/notifications/server/events",
-      "@/features/notifications/server/sender",
-    ],
+    group: ["@/features/notifications/server/events", "@/features/notifications/server/sender"],
     message: 'Import notification server APIs from "@/features/notifications/server".',
   },
   {
-    group: [
-      "@/features/permissions/core",
-      "@/features/permissions/usePermissions",
-    ],
+    group: ["@/features/permissions/core", "@/features/permissions/usePermissions"],
     message: 'Import permission APIs from "@/features/permissions".',
   },
 ];
@@ -91,8 +83,7 @@ const webFeaturePrivatePatterns = [
 const featureLayerPatterns = [
   {
     group: ["@/app/*", "@/components/*", "@/hooks/*"],
-    message:
-      "Feature modules should depend on feature or lib entrypoints, not app or UI layers.",
+    message: "Feature modules should depend on feature or lib entrypoints, not app or UI layers.",
   },
 ];
 
@@ -143,9 +134,12 @@ const eslintConfig = defineConfig([
               message: "Shared packages must not import from app-local aliases.",
             },
             {
-              group: ["next/*", "expo", "expo-*", "react-native"],
-              message:
-                "Platform-specific code must stay in app adapters, not shared packages.",
+              group: ["next/*", "expo", "expo-*", "react-native", "react-dom", "react-dom/*"],
+              message: "Platform-specific code must stay in app adapters, not shared packages.",
+            },
+            {
+              group: ["fs", "fs/*", "path", "child_process", "os", "node:*"],
+              message: "Node-only APIs must stay in app adapters, not shared packages.",
             },
           ],
         },
@@ -166,6 +160,26 @@ const eslintConfig = defineConfig([
         {
           paths: webFeaturePublicPaths,
           patterns: webFeaturePrivatePatterns,
+        },
+      ],
+    },
+  },
+  {
+    files: ["apps/web/src/**/*.{ts,tsx}"],
+    ignores: [
+      "apps/web/src/lib/env.ts",
+      "apps/web/src/**/*.test.ts",
+      "apps/web/src/**/*.test.tsx",
+      "apps/web/src/**/__tests__/**",
+    ],
+    rules: {
+      "no-restricted-properties": [
+        "warn",
+        {
+          object: "process",
+          property: "env",
+          message:
+            'Import validated env vars from "@/lib/env" (serverEnv/clientEnv) instead of reading process.env directly.',
         },
       ],
     },
@@ -292,6 +306,7 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  eslintConfigPrettier,
 ]);
 
 export default eslintConfig;

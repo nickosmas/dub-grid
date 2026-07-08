@@ -1,32 +1,29 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
+import * as React from "react";
+import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-type MaybeStateValue<State, Value> =
-  | Value
-  | ((state: State) => Value | undefined)
-  | undefined
+type MaybeStateValue<State, Value> = Value | ((state: State) => Value | undefined) | undefined;
 
 function resolveStateValue<State, Value>(
   value: MaybeStateValue<State, Value>,
-  state: State
+  state: State,
 ): Value | undefined {
   return typeof value === "function"
     ? (value as (state: State) => Value | undefined)(state)
-    : value
+    : value;
 }
 
 const arrowBaseClassName =
-  "z-50 pointer-events-none origin-center data-[side=bottom]:-top-[9px] data-[side=left]:-right-[9px] data-[side=left]:rotate-90 data-[side=right]:-left-[9px] data-[side=right]:-rotate-90 data-[side=top]:-bottom-[9px] data-[side=top]:rotate-180"
+  "z-50 pointer-events-none origin-center data-[side=bottom]:-top-[9px] data-[side=left]:-right-[9px] data-[side=left]:rotate-90 data-[side=right]:-left-[9px] data-[side=right]:-rotate-90 data-[side=top]:-bottom-[9px] data-[side=top]:rotate-180";
 
 const arrowBaseStyle = {
   display: "block",
   height: 16,
   width: 16,
-} satisfies React.CSSProperties
+} satisfies React.CSSProperties;
 
 const defaultArrowRender = (
   <svg
@@ -48,12 +45,10 @@ const defaultArrowRender = (
       strokeWidth="1.5"
     />
   </svg>
-)
+);
 
-function Popover<Payload = unknown>({
-  ...props
-}: PopoverPrimitive.Root.Props<Payload>) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+function Popover<Payload = unknown>({ ...props }: PopoverPrimitive.Root.Props<Payload>) {
+  return <PopoverPrimitive.Root data-slot="popover" {...props} />;
 }
 
 const PopoverArrow = React.forwardRef<HTMLDivElement, PopoverPrimitive.Arrow.Props>(
@@ -62,9 +57,7 @@ const PopoverArrow = React.forwardRef<HTMLDivElement, PopoverPrimitive.Arrow.Pro
       <PopoverPrimitive.Arrow
         ref={ref}
         data-slot="popover-arrow"
-        className={(state) =>
-          cn(arrowBaseClassName, resolveStateValue(className, state))
-        }
+        className={(state) => cn(arrowBaseClassName, resolveStateValue(className, state))}
         render={render ?? defaultArrowRender}
         style={(state) => ({
           ...arrowBaseStyle,
@@ -72,9 +65,9 @@ const PopoverArrow = React.forwardRef<HTMLDivElement, PopoverPrimitive.Arrow.Pro
         })}
         {...props}
       />
-    )
-  }
-)
+    );
+  },
+);
 
 type PopoverContentProps = PopoverPrimitive.Popup.Props &
   Pick<
@@ -89,17 +82,11 @@ type PopoverContentProps = PopoverPrimitive.Popup.Props &
     | "side"
     | "sideOffset"
   > & {
-    positionerClassName?: MaybeStateValue<
-      PopoverPrimitive.Positioner.State,
-      string
-    >
-    positionerStyle?: MaybeStateValue<
-      PopoverPrimitive.Positioner.State,
-      React.CSSProperties
-    >
-    showArrow?: boolean
-    arrowClassName?: MaybeStateValue<PopoverPrimitive.Arrow.State, string>
-  }
+    positionerClassName?: MaybeStateValue<PopoverPrimitive.Positioner.State, string>;
+    positionerStyle?: MaybeStateValue<PopoverPrimitive.Positioner.State, React.CSSProperties>;
+    showArrow?: boolean;
+    arrowClassName?: MaybeStateValue<PopoverPrimitive.Arrow.State, string>;
+  };
 
 const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
   function PopoverContent(
@@ -121,7 +108,7 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
       showArrow = false,
       ...props
     },
-    ref
+    ref,
   ) {
     return (
       <PopoverPrimitive.Portal>
@@ -135,9 +122,7 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
           positionMethod={positionMethod}
           side={side}
           sideOffset={sideOffset}
-          className={(state) =>
-            cn("isolate z-50", resolveStateValue(positionerClassName, state))
-          }
+          className={(state) => cn("isolate z-50", resolveStateValue(positionerClassName, state))}
           style={(state) => ({
             zIndex: 10002,
             ...resolveStateValue(positionerStyle, state),
@@ -149,7 +134,7 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
             className={(state) =>
               cn(
                 "origin-(--transform-origin) data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95",
-                resolveStateValue(className, state)
+                resolveStateValue(className, state),
               )
             }
             {...props}
@@ -159,8 +144,8 @@ const PopoverContent = React.forwardRef<HTMLDivElement, PopoverContentProps>(
           </PopoverPrimitive.Popup>
         </PopoverPrimitive.Positioner>
       </PopoverPrimitive.Portal>
-    )
-  }
-)
+    );
+  },
+);
 
-export { Popover, PopoverArrow, PopoverContent }
+export { Popover, PopoverArrow, PopoverContent };

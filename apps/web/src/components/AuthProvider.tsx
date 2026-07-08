@@ -1,8 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { setSentryUser } from "@/lib/sentry";
+import { AuthContext } from "@/lib/auth-context";
+export { useAuth } from "@/lib/auth-context";
 import {
   clearBrowserAuthState,
   getBrowserAuthSession,
@@ -11,14 +13,6 @@ import {
   signOutFromBrowser,
   subscribeToBrowserAuthChanges,
 } from "@/features/account/client";
-
-interface AuthContextType {
-  user: User | null;
-  signOut: () => Promise<void>;
-  isLoading: boolean;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
  * Track session via API route so the server can capture the client IP address.
@@ -53,16 +47,9 @@ function parseUserAgent(ua: string): string {
   return `${browser} on ${os}`;
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-}
-
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -76,35 +63,42 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       try {
         const params = new URLSearchParams(window.location.search);
         const isVerifiedLoginHandoff =
-          window.location.pathname === "/login" &&
-          params.get("verified") === "1";
+          window.location.pathname === "/login" && params.get("verified") === "1";
         if (isVerifiedLoginHandoff) {
           clearBrowserAuthState();
         }
 
         const sessionPromise = getBrowserAuthSession();
+        // 12s, not 5s: a genuine token refresh on a slow network can legitimately
+        // take several seconds. 5s lost that race and silently logged the user
+        // out; 12s still escapes a truly hung getSession (stale remote↔local
+        // cookies) without nuking a session that was merely slow.
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("session_timeout")), 5000),
+          setTimeout(() => reject(new Error("session_timeout")), 12000),
         );
-        const session = await Promise.race([sessionPromise, timeoutPromise]);
+        const initialSession = await Promise.race([sessionPromise, timeoutPromise]);
 
-        const verifiedUser =
-          session?.access_token ? await getVerifiedBrowserAuthUser() : null;
+        const verifiedUser = initialSession?.access_token
+          ? await getVerifiedBrowserAuthUser()
+          : null;
+        setSession(verifiedUser ? initialSession : null);
         setUser(verifiedUser);
-        setSentryUser(
-          verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null,
-        );
+        setSentryUser(verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null);
 
         // Track existing session on page load (session restored from cookies)
-        if (session?.refresh_token && verifiedUser) {
+        if (initialSession?.refresh_token && verifiedUser) {
           trackSession().catch(() => {});
         }
       } catch (error) {
-        // Timeout or stale auth state — clear persisted browser auth so the app
-        // can recover cleanly on the next login attempt without noisy refresh-token errors.
-        if (isRecoverableBrowserAuthFailure(error) || (error instanceof Error && error.message === "session_timeout")) {
+        // Only WIPE persisted auth for a known-recoverable failure (stale/invalid
+        // refresh token), where clearing is the recovery. On a bare timeout the
+        // tokens may still be valid (just slow) — don't wipe them, or we'd convert
+        // a slow network into a forced logout; just drop the in-memory session so
+        // the next mount re-checks and can recover.
+        if (isRecoverableBrowserAuthFailure(error)) {
           clearBrowserAuthState();
         }
+        setSession(null);
         setUser(null);
         setSentryUser(null);
       } finally {
@@ -117,8 +111,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     // Listen for auth state changes
     const {
       data: { subscription },
-    } = subscribeToBrowserAuthChanges((event: AuthChangeEvent, session: Session | null) => {
-      if (event === "SIGNED_OUT" || !session?.access_token) {
+    } = subscribeToBrowserAuthChanges((event: AuthChangeEvent, nextSession: Session | null) => {
+      if (event === "SIGNED_OUT" || !nextSession?.access_token) {
+        setSession(null);
         setUser(null);
         setIsLoading(false);
         setSentryUser(null);
@@ -127,17 +122,16 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
       void (async () => {
         const verifiedUser = await getVerifiedBrowserAuthUser().catch(() => null);
+        setSession(verifiedUser ? nextSession : null);
         setUser(verifiedUser);
         setIsLoading(false);
-        setSentryUser(
-          verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null,
-        );
+        setSentryUser(verifiedUser ? { id: verifiedUser.id, email: verifiedUser.email } : null);
 
         // No redirect on SIGNED_OUT — signOutLocal() handles the apex redirect,
         // and ProtectedRoute handles session-expiry redirects to /login.
         if (
           (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") &&
-          session.refresh_token &&
+          nextSession.refresh_token &&
           verifiedUser
         ) {
           trackSession().catch(() => {});
@@ -155,13 +149,9 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const contextValue = useMemo(
-    () => ({ user, signOut, isLoading }),
-    [user, signOut, isLoading],
+    () => ({ user, session, signOut, isLoading }),
+    [user, session, signOut, isLoading],
   );
 
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }

@@ -64,9 +64,7 @@ export default function ProgressBar({ loading }: { loading: boolean }) {
           background: "var(--color-brand)",
           boxShadow: "0 0 8px var(--color-brand)",
           transition:
-            width === 100
-              ? "width 200ms ease-out, opacity 150ms ease 200ms"
-              : "width 300ms ease",
+            width === 100 ? "width 200ms ease-out, opacity 150ms ease 200ms" : "width 300ms ease",
           opacity: width === 100 ? 0 : 1,
         }}
       />

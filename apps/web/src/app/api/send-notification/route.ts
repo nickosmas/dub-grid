@@ -3,21 +3,16 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
-import {
-  dispatchNotificationEvent,
-  type NotificationEvent,
-} from "@/features/notifications/server";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import { dispatchNotificationEvent, type NotificationEvent } from "@/features/notifications/server";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 // ── Input schemas ────────────────────────────────────────────────────────
 
 const shiftRequestSchema = z.object({
-  action: z.enum([
-    "shift_request_created",
-    "shift_request_claimed",
-    "shift_request_resolved",
-  ]),
+  action: z.enum(["shift_request_created", "shift_request_claimed", "shift_request_resolved"]),
   orgId: z.string().uuid(),
   requestId: z.string().uuid(),
   requestType: z.enum(["pickup", "swap", "calloff"]),
@@ -61,15 +56,9 @@ export async function POST(req: NextRequest) {
   const { user, claims } = auth;
 
   // ── Rate limit ──────────────────────────────────────────────────────
-  const { limited, reset, misconfigured } = await checkRateLimit(
-    apiLimiter,
-    user.id,
-  );
+  const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json(
-      { error: "Service temporarily unavailable" },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
   }
   if (limited) {
     const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 60;
@@ -84,15 +73,23 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const data = parsed.data;
+
+  // Sandbox redirect — must run BEFORE the org-isolation check below,
+  // because claims.org_id is the sandbox in sandbox mode while data.orgId
+  // is the unrefreshed-JWT-derived real org id from the client.
+  const effective = await resolveEffectiveOrgId(req, user.id, data.orgId);
+  if (effective !== data.orgId) {
+    (data as { orgId: string }).orgId = effective;
+  }
 
   // ── Org isolation: verify the caller's JWT org_id matches the body orgId ──
   const claimOrgId = typeof claims.org_id === "string" ? claims.org_id : null;
@@ -104,17 +101,20 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await dispatchNotificationEvent(user.id, data as NotificationEvent);
+    const result = await dispatchNotificationEvent(user.id, data as NotificationEvent);
+    if (!result.success) {
+      Sentry.captureException(new Error(result.error), {
+        extra: { context: "send-notification", action: data.action },
+      });
+      return NextResponse.json({ error: "Failed to send notification" }, { status: 500 });
+    }
     return NextResponse.json({ success: true });
   } catch (err) {
+    // dispatchNotificationEvent now catches internally; this is a true
+    // unexpected throw (e.g. cycle of imports failing), not a notification
+    // pipeline failure.
     Sentry.captureException(err, { extra: { context: "send-notification" } });
-    logger.error(
-      { err, action: data.action },
-      "Failed to send notification",
-    );
-    return NextResponse.json(
-      { error: "Failed to send notification" },
-      { status: 500 },
-    );
+    logger.error({ err, action: data.action }, "Failed to send notification");
+    return NextResponse.json({ error: "Failed to send notification" }, { status: 500 });
   }
 }

@@ -47,12 +47,7 @@ import type {
   DbOrganizationMembership,
   DbShiftRequest,
 } from "@dubgrid/db-types";
-import {
-  trimTime,
-  resolveCodeLabels,
-  iterateDateRange,
-  MAX_SERIES_OCCURRENCES,
-} from "./shared";
+import { trimTime, resolveCodeLabels, iterateDateRange, MAX_SERIES_OCCURRENCES } from "./shared";
 import {
   deriveAssignmentDefinitionIdsFromAssignments,
   joinShiftJobSegmentLabels,
@@ -61,6 +56,7 @@ import {
 import type { SegmentCompatibilityMaps } from "@/lib/shift-job-segments";
 import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { normalizePresetBg } from "@/lib/colors";
+import { normalizeOpenShiftVisibility } from "@dubgrid/domain";
 
 const EMPTY_SCHEDULED_JOB_STYLE = {
   color: "",
@@ -77,8 +73,7 @@ function normalizeCoverageRuleConfig(value: unknown): CoverageRuleConfig {
     return DEFAULT_COVERAGE_RULE_CONFIG;
   }
 
-  const rawPercent = (value as Record<string, unknown>)
-    .mentoredCoverageCreditPercent;
+  const rawPercent = (value as Record<string, unknown>).mentoredCoverageCreditPercent;
   const percent =
     typeof rawPercent === "number" && Number.isFinite(rawPercent)
       ? Math.min(100, Math.max(0, Math.round(rawPercent)))
@@ -156,11 +151,16 @@ export function rowToOrganization(row: DbOrganization): Organization {
     archivedAt: row.archived_at ?? null,
     suspendedAt: row.suspended_at ?? null,
     suspendedReason: row.suspended_reason ?? null,
+    workspaceKind: row.workspace_kind ?? "real",
+    sandboxOwnerUserId: row.sandbox_owner_user_id ?? null,
+    sandboxSourceOrgId: row.sandbox_source_org_id ?? null,
     enforceConflictPrevention: row.enforce_conflict_prevention ?? false,
     coverageRuleConfig: normalizeCoverageRuleConfig(row.coverage_rule_config),
+    openShiftVisibility: normalizeOpenShiftVisibility(row.open_shift_visibility),
     stripeCustomerId: row.stripe_customer_id ?? null,
     subscriptionStatus: row.subscription_status ?? null,
     trialEndsAt: row.trial_ends_at ?? null,
+    trialStartedAt: row.trial_started_at ?? null,
     subscriptionSeats: row.subscription_seats ?? null,
     dataRetentionDays: row.data_retention_days ?? 365,
     featureOverrides: row.feature_overrides ?? {},
@@ -168,9 +168,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
   };
 }
 
-export function rowToOrganizationUser(
-  row: Record<string, unknown>,
-): OrganizationUser {
+export function rowToOrganizationUser(row: Record<string, unknown>): OrganizationUser {
   return {
     id: row.id as string,
     email: (row.email as string | null) ?? null,
@@ -178,8 +176,7 @@ export function rowToOrganizationUser(
     lastName: (row.last_name as string | null) ?? null,
     orgRole: (row.org_role as OrganizationRole) ?? "user",
     platformRole: (row.platform_role as PlatformRole) ?? "none",
-    adminPermissions:
-      (row.admin_permissions as AdminPermissions | null) ?? null,
+    adminPermissions: (row.admin_permissions as AdminPermissions | null) ?? null,
     createdAt: row.created_at as string,
     lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
     updatedAt: (row.updated_at as string | null) ?? null,
@@ -206,8 +203,7 @@ export function membershipRowToOrganizationUser(
     lastName: profile?.lastName ?? null,
     orgRole: membership.org_role as OrganizationRole,
     platformRole: profile?.platformRole ?? "none",
-    adminPermissions:
-      (membership.admin_permissions as AdminPermissions | null) ?? null,
+    adminPermissions: (membership.admin_permissions as AdminPermissions | null) ?? null,
     createdAt: profile?.createdAt ?? new Date(0).toISOString(),
     lastSignInAt: profile?.lastSignInAt ?? null,
     updatedAt: membership.updated_at ?? null,
@@ -282,9 +278,7 @@ export function rowToJobDefinition(row: DbJobDefinition): JobDefinition {
   const shiftColorOverrides = Object.fromEntries(
     Object.entries(row.shift_color_overrides ?? {}).filter(
       ([shiftId, value]) =>
-        shiftId.trim().length > 0 &&
-        typeof value === "string" &&
-        value.trim().length > 0,
+        shiftId.trim().length > 0 && typeof value === "string" && value.trim().length > 0,
     ),
   );
   const style =
@@ -324,9 +318,7 @@ export function rowToJobDefinition(row: DbJobDefinition): JobDefinition {
   };
 }
 
-export function rowToCoverageRequirement(
-  row: DbCoverageRequirement,
-): CoverageRequirement {
+export function rowToCoverageRequirement(row: DbCoverageRequirement): CoverageRequirement {
   return {
     id: row.id,
     orgId: row.org_id,
@@ -338,9 +330,7 @@ export function rowToCoverageRequirement(
   };
 }
 
-export function rowToAssignmentDefinition(
-  row: DbAssignmentDefinition,
-): AssignmentDefinition {
+export function rowToAssignmentDefinition(row: DbAssignmentDefinition): AssignmentDefinition {
   return {
     id: row.id,
     orgId: row.org_id,
@@ -383,6 +373,7 @@ export function rowToAbsenceType(row: DbAbsenceType): AbsenceType {
 export function rowToEmployee(row: DbEmployee): Employee {
   return {
     id: row.id,
+    employeeNumber: row.employee_number,
     firstName: row.first_name,
     lastName: row.last_name,
     employmentType: row.employment_type ?? "full_time",
@@ -401,21 +392,24 @@ export function rowToEmployee(row: DbEmployee): Employee {
     departmentIds: row.department_ids ?? [],
     deptAdminIds: row.dept_admin_ids ?? [],
     version: row.version ?? 0,
+    createdAt: row.created_at ?? null,
   };
 }
 
 export function employeeToRow(
-  emp: Omit<Employee, "id">,
+  emp: Omit<Employee, "id" | "employeeNumber" | "createdAt">,
   orgId: string,
 ): Omit<
   DbEmployee,
   | "id"
+  | "employee_number"
   | "status"
   | "status_changed_at"
   | "status_note"
   | "archived_at"
   | "user_id"
   | "version"
+  | "created_at"
 > {
   return {
     org_id: orgId,
@@ -452,16 +446,13 @@ function normalizeScheduleCellState(
   overrides?: Partial<Pick<ScheduleCellInput, "seriesId" | "fromRecurring">>,
 ): ScheduleCellInput {
   const seriesId = overrides?.seriesId ?? state.seriesId ?? null;
-  const fromRecurring =
-    overrides?.fromRecurring ?? state.fromRecurring ?? false;
+  const fromRecurring = overrides?.fromRecurring ?? state.fromRecurring ?? false;
 
   if (state.kind === "deleted") {
     return {
       kind: "deleted",
       segments: [],
-      ...(state.focusAreaId !== undefined
-        ? { focusAreaId: state.focusAreaId ?? null }
-        : {}),
+      ...(state.focusAreaId !== undefined ? { focusAreaId: state.focusAreaId ?? null } : {}),
       absenceTypeId: null,
       customStartTime: null,
       customEndTime: null,
@@ -474,9 +465,7 @@ function normalizeScheduleCellState(
     return {
       kind: "absence",
       segments: [],
-      ...(state.focusAreaId !== undefined
-        ? { focusAreaId: state.focusAreaId ?? null }
-        : {}),
+      ...(state.focusAreaId !== undefined ? { focusAreaId: state.focusAreaId ?? null } : {}),
       absenceTypeId: state.absenceTypeId ?? null,
       customStartTime: null,
       customEndTime: null,
@@ -495,9 +484,7 @@ function normalizeScheduleCellState(
         position: index,
         isMentored: segment.isMentored ?? false,
       })),
-    ...(state.focusAreaId !== undefined
-      ? { focusAreaId: state.focusAreaId ?? null }
-      : {}),
+    ...(state.focusAreaId !== undefined ? { focusAreaId: state.focusAreaId ?? null } : {}),
     absenceTypeId: null,
     customStartTime: state.customStartTime ?? null,
     customEndTime: state.customEndTime ?? null,
@@ -517,9 +504,7 @@ function getScheduleAssignments(state: ScheduleCellInput): {
     };
   }
 
-  const orderedSegments = [...state.segments].sort(
-    (left, right) => left.position - right.position,
-  );
+  const orderedSegments = [...state.segments].sort((left, right) => left.position - right.position);
   return {
     shiftIds: orderedSegments.map((segment) => segment.shiftId),
     jobIds: orderedSegments.map((segment) => segment.jobId),
@@ -566,11 +551,10 @@ function resolveSegmentsAndAssignmentDefinitions(
   segments: ShiftJobSegment[];
 } {
   const { shiftIds, jobIds } = getScheduleAssignments(state);
-  const derivedAssignmentDefinitionIds =
-    deriveAssignmentDefinitionIdsFromAssignments(
-      { shiftIds, jobIds },
-      assignmentIdByPair ?? new Map(),
-    );
+  const derivedAssignmentDefinitionIds = deriveAssignmentDefinitionIdsFromAssignments(
+    { shiftIds, jobIds },
+    assignmentIdByPair ?? new Map(),
+  );
   const segments =
     state.kind === "worked"
       ? segmentCompatibility
@@ -623,17 +607,13 @@ function buildResolvedPresentation(
     };
   }
 
-  const hasSegmentLabels = args.segments.some(
-    (segment) => segment.label.trim().length > 0,
-  );
+  const hasSegmentLabels = args.segments.some((segment) => segment.label.trim().length > 0);
   const segmentLabel =
     args.segments.length > 0 && hasSegmentLabels
       ? joinShiftJobSegmentLabels(args.segments).trim()
       : "";
   const label =
-    segmentLabel.length > 0
-      ? segmentLabel
-      : resolveCodeLabels(args.assignmentIds, args.codeMap);
+    segmentLabel.length > 0 ? segmentLabel : resolveCodeLabels(args.assignmentIds, args.codeMap);
   const firstSegment = args.segments[0] ?? null;
   const lastSegment = args.segments.at(-1) ?? null;
 
@@ -693,8 +673,7 @@ export function rowToRecurringShift(
     state: input,
     presentation,
     input,
-    absenceTypeId:
-      input.kind === "absence" ? (input.absenceTypeId ?? null) : null,
+    absenceTypeId: input.kind === "absence" ? (input.absenceTypeId ?? null) : null,
     shiftLabel: presentation.label,
     effectiveFrom: row.effective_from,
     effectiveUntil: row.effective_until,
@@ -714,9 +693,7 @@ export function rowToShiftRequest(
 ): ShiftRequest {
   const requesterState = normalizeScheduleCellState(row.requester_state);
   const targetState =
-    row.target_state != null
-      ? normalizeScheduleCellState(row.target_state)
-      : null;
+    row.target_state != null ? normalizeScheduleCellState(row.target_state) : null;
   const requesterResolved = resolveSegmentsAndAssignmentDefinitions(
     requesterState,
     segmentCompatibility,
@@ -730,21 +707,18 @@ export function rowToShiftRequest(
           assignmentIdByPair,
         )
       : null;
-  const resolvedRequesterAssignmentDefinitionIds =
-    requesterResolved.assignmentIds;
+  const resolvedRequesterAssignmentDefinitionIds = requesterResolved.assignmentIds;
   const resolvedTargetAssignmentDefinitionIds =
     targetState != null ? (targetResolved?.assignmentIds ?? []) : [];
   const requesterSegments = requesterResolved.segments;
   const targetSegments = targetResolved?.segments ?? null;
   const requesterFocusAreaId =
     requesterState.focusAreaId ??
-    requesterSegments.find((segment) => segment.focusAreaId != null)
-      ?.focusAreaId ??
+    requesterSegments.find((segment) => segment.focusAreaId != null)?.focusAreaId ??
     null;
   const targetFocusAreaId =
     targetState?.focusAreaId ??
-    targetSegments?.find((segment) => segment.focusAreaId != null)
-      ?.focusAreaId ??
+    targetSegments?.find((segment) => segment.focusAreaId != null)?.focusAreaId ??
     null;
   const requesterPresentation = buildResolvedPresentation(requesterState, {
     codeMap: assignmentLabelMap,
@@ -767,9 +741,7 @@ export function rowToShiftRequest(
     status: row.status,
     requesterEmpId: row.requester_emp_id,
     requesterName:
-      [row.requester_first_name, row.requester_last_name]
-        .filter(Boolean)
-        .join(" ") || "Unknown",
+      [row.requester_first_name, row.requester_last_name].filter(Boolean).join(" ") || "Unknown",
     requesterShiftDate: row.requester_shift_date,
     requesterState,
     requesterPresentation,
@@ -791,15 +763,10 @@ export function rowToShiftRequest(
     targetShiftIds: targetResolved?.shiftIds ?? null,
     targetJobIds: targetResolved?.jobIds ?? null,
     targetSegments,
-    targetAssignmentDefinitionIds: targetState
-      ? resolvedTargetAssignmentDefinitionIds
-      : null,
+    targetAssignmentDefinitionIds: targetState ? resolvedTargetAssignmentDefinitionIds : null,
     targetShiftLabel: targetState
       ? (targetPresentation?.label ??
-        resolveCodeLabels(
-          resolvedTargetAssignmentDefinitionIds,
-          assignmentLabelMap,
-        ))
+        resolveCodeLabels(resolvedTargetAssignmentDefinitionIds, assignmentLabelMap))
       : null,
     targetFocusAreaId,
     targetCustomStartTime: targetState?.customStartTime ?? null,
@@ -837,10 +804,7 @@ export function generateSeriesDates(
   ).getUTCDay();
 
   // DST-safe iteration using UTC arithmetic
-  for (const { dateKey, dayOfWeek, dayIndex } of iterateDateRange(
-    start,
-    maxEnd,
-  )) {
+  for (const { dateKey, dayOfWeek, dayIndex } of iterateDateRange(start, maxEnd)) {
     if (dates.length >= cap) break;
 
     let include = false;

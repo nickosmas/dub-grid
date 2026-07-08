@@ -23,7 +23,11 @@ export async function POST(req: NextRequest) {
 
   // Input
   let body: unknown;
-  try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid body" }, { status: 400 }); }
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
@@ -32,10 +36,7 @@ export async function POST(req: NextRequest) {
     `gridmaster-stripe-sync:${user.id}:${parsed.data.orgId}`,
   );
   if (misconfigured) {
-    return NextResponse.json(
-      { error: "Service temporarily unavailable" },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -66,7 +67,9 @@ export async function POST(req: NextRequest) {
         orgId: parsed.data.orgId,
         request: req,
       });
-    } catch (e) { logger.error({ err: e }, "Failed to audit billing sync"); }
+    } catch (e) {
+      logger.error({ err: e }, "Failed to audit billing sync");
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

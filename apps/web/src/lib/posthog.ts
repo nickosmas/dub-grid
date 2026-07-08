@@ -40,11 +40,7 @@ export function disablePostHog() {
  * Identify the current user for PostHog.
  */
 export function identifyUser(userId: string, properties?: Record<string, unknown>) {
-  if (
-    typeof window === "undefined" ||
-    !initialized ||
-    posthog.has_opted_out_capturing()
-  ) {
+  if (typeof window === "undefined" || !initialized || posthog.has_opted_out_capturing()) {
     return;
   }
   posthog.identify(userId, properties);
@@ -62,11 +58,7 @@ export function resetPostHog() {
  * Capture a custom event.
  */
 export function captureEvent(event: string, properties?: Record<string, unknown>) {
-  if (
-    typeof window === "undefined" ||
-    !initialized ||
-    posthog.has_opted_out_capturing()
-  ) {
+  if (typeof window === "undefined" || !initialized || posthog.has_opted_out_capturing()) {
     return;
   }
   posthog.capture(event, properties);
@@ -76,11 +68,7 @@ export function captureEvent(event: string, properties?: Record<string, unknown>
  * Evaluate a feature flag (client-side).
  */
 export function getFeatureFlag(flag: string): boolean | string | undefined {
-  if (
-    typeof window === "undefined" ||
-    !initialized ||
-    posthog.has_opted_out_capturing()
-  ) {
+  if (typeof window === "undefined" || !initialized || posthog.has_opted_out_capturing()) {
     return undefined;
   }
   return posthog.getFeatureFlag(flag) as boolean | string | undefined;

@@ -14,10 +14,8 @@ vi.mock("@/components/AuthProvider", () => ({
 }));
 
 vi.mock("@/features/account/client", () => ({
-  fetchNotificationPreferences: (...args: unknown[]) =>
-    mockFetchNotificationPreferences(...args),
-  saveNotificationPreferences: (...args: unknown[]) =>
-    mockSaveNotificationPreferences(...args),
+  fetchNotificationPreferences: (...args: unknown[]) => mockFetchNotificationPreferences(...args),
+  saveNotificationPreferences: (...args: unknown[]) => mockSaveNotificationPreferences(...args),
 }));
 
 vi.mock("sonner", () => ({

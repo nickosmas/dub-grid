@@ -9,11 +9,8 @@ import {
   isOperationsReportType,
   loadOperationsReport,
 } from "@/features/reports/server/operations";
-import {
-  operationsQuerySchema,
-  parseOperationsFilters,
-  parseOperationsRange,
-} from "../params";
+import { apiErrorResponse } from "@/lib/error-handling";
+import { operationsQuerySchema, parseOperationsFilters, parseOperationsRange } from "../params";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +24,7 @@ export async function GET(req: NextRequest) {
     Object.fromEntries(req.nextUrl.searchParams.entries()),
   );
   if (!parsed.success || !isOperationsReportType(parsed.data.report)) {
-    return NextResponse.json(
-      { error: "Choose a valid report before exporting." },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Choose a valid report before exporting." }, { status: 400 });
   }
 
   let range;
@@ -39,18 +33,14 @@ export async function GET(req: NextRequest) {
     range = parseOperationsRange(parsed.data);
     filters = parseOperationsFilters(parsed.data, range);
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Invalid filters" },
-      { status: 400 },
-    );
+    return apiErrorResponse(error, "Check the report filters and try again.", 400);
   }
 
   try {
     const auth = await requireOrgPermissions(
       req,
       parsed.data.orgId,
-      (permissions) =>
-        permissions.role === "admin" || permissions.isSuperAdmin === true,
+      (permissions) => permissions.role === "admin" || permissions.isSuperAdmin === true,
     );
     if ("response" in auth) {
       return auth.response;

@@ -1,9 +1,6 @@
 import "server-only";
 
-import type {
-  EmployeeUtilization,
-  WeeklyShiftHours,
-} from "@/features/dashboard/shared/analytics";
+import type { EmployeeUtilization, WeeklyShiftHours } from "@/features/dashboard/shared/analytics";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
   fetchPublishedShiftRows,

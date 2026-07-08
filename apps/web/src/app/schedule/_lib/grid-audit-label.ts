@@ -3,9 +3,7 @@ import type { PublishChange, ShiftMap } from "@/types";
 function formatCompactGridAuditName(fullName: string): string | null {
   const parts = fullName.split(" ").filter(Boolean);
   const compact =
-    parts.length <= 1
-      ? parts[0] ?? null
-      : `${parts[0][0]}. ${parts[parts.length - 1]}`;
+    parts.length <= 1 ? (parts[0] ?? null) : `${parts[0][0]}. ${parts[parts.length - 1]}`;
 
   if (!compact) return null;
   return compact.length > 14 ? `${compact.slice(0, 13)}\u2026` : compact;
@@ -21,8 +19,7 @@ export function resolveGridAuditLabel(args: {
   auditNames: Map<string, string>;
   currentUserId?: string | null;
 }): string | null {
-  const { cellKey, shifts, publishChangesMap, auditNames, currentUserId } =
-    args;
+  const { cellKey, shifts, publishChangesMap, auditNames, currentUserId } = args;
   const entry = shifts[cellKey];
 
   let userId: string | null = null;

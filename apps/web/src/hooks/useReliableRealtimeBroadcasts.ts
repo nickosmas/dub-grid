@@ -1,21 +1,13 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  type MutableRefObject,
-} from "react";
+import { useCallback, useEffect, useRef, type MutableRefObject } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 type BroadcastPayload = Record<string, unknown>;
 
 export interface ReliableBroadcastOptions {
   key?: string;
-  merge?: (
-    current: BroadcastPayload,
-    next: BroadcastPayload,
-  ) => BroadcastPayload;
+  merge?: (current: BroadcastPayload, next: BroadcastPayload) => BroadcastPayload;
 }
 
 interface PendingBroadcast {
@@ -97,17 +89,11 @@ export function useReliableRealtimeBroadcasts(
   }, [channelRef, clearRetryTimer]);
 
   const sendBroadcast = useCallback(
-    (
-      event: string,
-      payload: BroadcastPayload = {},
-      options?: ReliableBroadcastOptions,
-    ) => {
+    (event: string, payload: BroadcastPayload = {}, options?: ReliableBroadcastOptions) => {
       const key = options?.key ?? `${event}:${nextAutoKeyRef.current++}`;
       const current = pendingBroadcastsRef.current.get(key);
       const nextPayload =
-        current && options?.merge
-          ? options.merge(current.payload, payload)
-          : payload;
+        current && options?.merge ? options.merge(current.payload, payload) : payload;
 
       pendingBroadcastsRef.current.set(key, {
         event,
@@ -125,9 +111,7 @@ export function useReliableRealtimeBroadcasts(
 
   const clearPendingBroadcast = useCallback((key: string) => {
     pendingBroadcastsRef.current.delete(key);
-    pendingOrderRef.current = pendingOrderRef.current.filter(
-      (pendingKey) => pendingKey !== key,
-    );
+    pendingOrderRef.current = pendingOrderRef.current.filter((pendingKey) => pendingKey !== key);
   }, []);
 
   const resetPendingBroadcasts = useCallback(() => {

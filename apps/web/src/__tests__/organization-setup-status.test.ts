@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeOrganizationSetupStatus } from "@/hooks/useOrganizationData";
-import type {
-  Department,
-  FocusArea,
-  JobDefinition,
-  NamedItem,
-  ShiftCategory,
-} from "@/types";
+import type { Department, FocusArea, JobDefinition, NamedItem, ShiftCategory } from "@/types";
 
 const departments: Department[] = [
   {
@@ -67,9 +61,7 @@ const certifications: NamedItem[] = [
   { id: 50, orgId: "org-1", name: "RN", abbr: "RN", sortOrder: 0 },
 ];
 
-const orgRoles: NamedItem[] = [
-  { id: 60, orgId: "org-1", name: "Nurse", abbr: "N", sortOrder: 0 },
-];
+const orgRoles: NamedItem[] = [{ id: 60, orgId: "org-1", name: "Nurse", abbr: "N", sortOrder: 0 }];
 
 describe("computeOrganizationSetupStatus", () => {
   it("requires current department, focus area, shift, and job placement relationships", () => {

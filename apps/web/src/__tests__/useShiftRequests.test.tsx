@@ -23,10 +23,8 @@ vi.mock("@/features/schedule/client", () => ({
 }));
 
 vi.mock("@/features/account/client", () => ({
-  createBrowserRealtimeChannel: (...args: unknown[]) =>
-    mockCreateBrowserRealtimeChannel(...args),
-  removeBrowserRealtimeChannel: (...args: unknown[]) =>
-    mockRemoveBrowserRealtimeChannel(...args),
+  createBrowserRealtimeChannel: (...args: unknown[]) => mockCreateBrowserRealtimeChannel(...args),
+  removeBrowserRealtimeChannel: (...args: unknown[]) => mockRemoveBrowserRealtimeChannel(...args),
 }));
 
 vi.mock("sonner", () => ({
@@ -177,25 +175,15 @@ describe("useShiftRequests", () => {
     ]);
 
     const { result } = renderHook(() =>
-      useShiftRequests(
-        "org-1",
-        new Map(),
-        "claimer-1",
-        false,
-        "America/Los_Angeles",
-      ),
+      useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
     );
 
     await act(async () => {
       await Promise.resolve();
     });
 
-    expect(result.current.requests.map((request) => request.id)).toEqual([
-      "future-request",
-    ]);
-    expect(result.current.openPickups.map((request) => request.id)).toEqual([
-      "future-request",
-    ]);
+    expect(result.current.requests.map((request) => request.id)).toEqual(["future-request"]);
+    expect(result.current.openPickups.map((request) => request.id)).toEqual(["future-request"]);
   });
 
   it("refetches requests after a successful claim even without realtime", async () => {
@@ -205,13 +193,7 @@ describe("useShiftRequests", () => {
     mockClaimShiftRequest.mockResolvedValue(undefined);
 
     const { result } = renderHook(() =>
-      useShiftRequests(
-        "org-1",
-        new Map(),
-        "claimer-1",
-        false,
-        "America/Los_Angeles",
-      ),
+      useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
     );
 
     await act(async () => {
@@ -224,11 +206,7 @@ describe("useShiftRequests", () => {
 
     expect(result.current.requests).toEqual([]);
 
-    expect(mockClaimShiftRequest).toHaveBeenCalledWith(
-      "claimable-request",
-      "claimer-1",
-      "org-1",
-    );
+    expect(mockClaimShiftRequest).toHaveBeenCalledWith("claimable-request", "claimer-1", "org-1");
     expect(mockFetchShiftRequests).toHaveBeenCalledTimes(2);
   });
 
@@ -252,13 +230,7 @@ describe("useShiftRequests", () => {
     ]);
 
     const { result } = renderHook(() =>
-      useShiftRequests(
-        "org-1",
-        new Map(),
-        "claimer-1",
-        false,
-        "America/Los_Angeles",
-      ),
+      useShiftRequests("org-1", new Map(), "claimer-1", false, "America/Los_Angeles"),
     );
 
     await act(async () => {

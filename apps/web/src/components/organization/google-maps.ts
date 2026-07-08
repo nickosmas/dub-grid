@@ -12,9 +12,7 @@ interface GoogleAddressComponentModern {
   types: string[];
 }
 
-type GoogleAddressComponent =
-  | GoogleAddressComponentLegacy
-  | GoogleAddressComponentModern;
+type GoogleAddressComponent = GoogleAddressComponentLegacy | GoogleAddressComponentModern;
 
 function isModernAddressComponent(
   component: GoogleAddressComponent,
@@ -41,12 +39,20 @@ export interface GooglePostalAddress {
   regionCode?: string;
 }
 
+export interface GoogleLatLngLike {
+  lat?: number | (() => number);
+  lng?: number | (() => number);
+  latitude?: number;
+  longitude?: number;
+}
+
 export interface GooglePlaceResult {
   address_components?: GoogleAddressComponent[];
   addressComponents?: GoogleAddressComponent[];
   formattedAddress?: string;
   displayName?: string | null;
   postalAddress?: GooglePostalAddress;
+  location?: GoogleLatLngLike | null;
 }
 
 export interface GooglePlace extends GooglePlaceResult {
@@ -102,9 +108,7 @@ function hasPlacesAccess(googleMaps: GoogleMapsNamespace | null): boolean {
   return Boolean(googleMaps?.maps?.importLibrary || googleMaps?.maps?.places);
 }
 
-export function loadGoogleMapsPlaces(
-  apiKey: string,
-): Promise<GoogleMapsNamespace | null> {
+export function loadGoogleMapsPlaces(apiKey: string): Promise<GoogleMapsNamespace | null> {
   if (!apiKey || typeof window === "undefined") return Promise.resolve(null);
 
   const existingGoogle = getGoogleMaps();
@@ -145,9 +149,7 @@ export function loadGoogleMapsPlaces(
   return googleMapsPromise;
 }
 
-export async function loadGooglePlacesLibrary(
-  apiKey: string,
-): Promise<GooglePlacesLibrary | null> {
+export async function loadGooglePlacesLibrary(apiKey: string): Promise<GooglePlacesLibrary | null> {
   const googleMaps = await loadGoogleMapsPlaces(apiKey);
   if (!googleMaps) return null;
 
@@ -196,11 +198,31 @@ function findComponent(
 }
 
 function getFormattedAddressLine1(formattedAddress?: string): string {
-  return formattedAddress?.split(",").map((part) => part.trim()).find(Boolean) ?? "";
+  return (
+    formattedAddress
+      ?.split(",")
+      .map((part) => part.trim())
+      .find(Boolean) ?? ""
+  );
 }
 
 export function getGoogleText(text: GoogleFormattableText | undefined): string {
   return text?.text ?? text?.toString?.() ?? "";
+}
+
+export function readGoogleLatLng(
+  location: GoogleLatLngLike | null | undefined,
+): { latitude: number; longitude: number } | null {
+  if (!location) return null;
+
+  const rawLat = typeof location.lat === "function" ? location.lat() : location.lat;
+  const rawLng = typeof location.lng === "function" ? location.lng() : location.lng;
+
+  const latitude = typeof rawLat === "number" ? rawLat : (location.latitude ?? Number.NaN);
+  const longitude = typeof rawLng === "number" ? rawLng : (location.longitude ?? Number.NaN);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
 }
 
 export function parseGooglePlaceAddress(
@@ -230,9 +252,7 @@ export function parseGooglePlaceAddress(
     place.postalAddress?.postalCode ||
     "";
   const country =
-    getLongText(findComponent(components, "country")) ||
-    place.postalAddress?.regionCode ||
-    "";
+    getLongText(findComponent(components, "country")) || place.postalAddress?.regionCode || "";
   const addressLine1 =
     [streetNumber, route].filter(Boolean).join(" ").trim() ||
     place.postalAddress?.addressLines?.[0]?.trim() ||

@@ -24,12 +24,7 @@ const querySchema = z.object({
   offset: z.coerce.number().int().min(0).optional(),
 });
 
-const HIGH_RISK_ACTION_PREFIXES = [
-  "billing.",
-  "gdpr.",
-  "gridmaster_account.",
-  "impersonation.",
-];
+const HIGH_RISK_ACTION_PREFIXES = ["billing.", "gdpr.", "gridmaster_account.", "impersonation."];
 const HIGH_RISK_ACTIONS = new Set([
   "account.deleted",
   "audit.exported",
@@ -73,10 +68,7 @@ export async function GET(req: NextRequest) {
         "id, org_id, actor_id, actor_email, action, resource_type, resource_id, details, created_at",
       )
       .order("created_at", { ascending: false })
-      .range(
-        parsed.data.offset ?? 0,
-        (parsed.data.offset ?? 0) + (parsed.data.limit ?? 50) - 1,
-      );
+      .range(parsed.data.offset ?? 0, (parsed.data.offset ?? 0) + (parsed.data.limit ?? 50) - 1);
 
     if (parsed.data.orgId) {
       query = query.eq("org_id", parsed.data.orgId);
@@ -119,15 +111,15 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("gridmaster full audit-log GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load full audit log" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load full audit log" }, { status: 500 });
   }
 }
 
 function isHighRiskAction(action: string) {
-  return HIGH_RISK_ACTIONS.has(action) || HIGH_RISK_ACTION_PREFIXES.some((prefix) => action.startsWith(prefix));
+  return (
+    HIGH_RISK_ACTIONS.has(action) ||
+    HIGH_RISK_ACTION_PREFIXES.some((prefix) => action.startsWith(prefix))
+  );
 }
 
 async function authorizeOrgAuditLogAccess(req: NextRequest, orgId: string) {
@@ -172,10 +164,7 @@ async function enrichAuditRows(serviceClient: ServiceClient, rows: AuditRow[]) {
     if (!resourceId) continue;
     if (resourceType === "employee") {
       employeeTargetIds.add(resourceId);
-    } else if (
-      resourceType === "user" ||
-      resourceType === "organization_membership"
-    ) {
+    } else if (resourceType === "user" || resourceType === "organization_membership") {
       profileTargetIds.add(resourceId);
     } else if (resourceType === "invitation") {
       invitationTargetIds.add(resourceId);
@@ -187,12 +176,8 @@ async function enrichAuditRows(serviceClient: ServiceClient, rows: AuditRow[]) {
   const profileLabels = await fetchProfileLabels(serviceClient, [
     ...new Set([...actorIds, ...profileTargetIds]),
   ]);
-  const employeeLabels = await fetchEmployeeLabels(serviceClient, [
-    ...employeeTargetIds,
-  ]);
-  const invitationLabels = await fetchInvitationLabels(serviceClient, [
-    ...invitationTargetIds,
-  ]);
+  const employeeLabels = await fetchEmployeeLabels(serviceClient, [...employeeTargetIds]);
+  const invitationLabels = await fetchInvitationLabels(serviceClient, [...invitationTargetIds]);
   const organizationLabels = await fetchOrganizationLabels(serviceClient, [
     ...organizationTargetIds,
   ]);
@@ -243,11 +228,10 @@ async function fetchProfileLabels(serviceClient: ServiceClient, ids: string[]) {
     .in("id", ids);
   if (error) throw error;
   return new Map(
-    ((data ?? []) as AuditRow[])
-      .map((row) => [
-        String(row.id),
-        { name: fullName(row.first_name, row.last_name), email: null },
-      ] as const),
+    ((data ?? []) as AuditRow[]).map(
+      (row) =>
+        [String(row.id), { name: fullName(row.first_name, row.last_name), email: null }] as const,
+    ),
   );
 }
 
@@ -259,14 +243,16 @@ async function fetchEmployeeLabels(serviceClient: ServiceClient, ids: string[]) 
     .in("id", ids);
   if (error) throw error;
   return new Map(
-    ((data ?? []) as AuditRow[])
-      .map((row) => [
-        String(row.id),
-        {
-          name: fullName(row.first_name, row.last_name),
-          email: stringOrNull(row.email),
-        },
-      ] as const)
+    ((data ?? []) as AuditRow[]).map(
+      (row) =>
+        [
+          String(row.id),
+          {
+            name: fullName(row.first_name, row.last_name),
+            email: stringOrNull(row.email),
+          },
+        ] as const,
+    ),
   );
 }
 
@@ -278,14 +264,16 @@ async function fetchInvitationLabels(serviceClient: ServiceClient, ids: string[]
     .in("id", ids);
   if (error) throw error;
   return new Map(
-    ((data ?? []) as AuditRow[])
-      .map((row) => [
-        String(row.id),
-        {
-          name: fullName(row.first_name, row.last_name),
-          email: stringOrNull(row.email),
-        },
-      ] as const)
+    ((data ?? []) as AuditRow[]).map(
+      (row) =>
+        [
+          String(row.id),
+          {
+            name: fullName(row.first_name, row.last_name),
+            email: stringOrNull(row.email),
+          },
+        ] as const,
+    ),
   );
 }
 
@@ -297,11 +285,9 @@ async function fetchOrganizationLabels(serviceClient: ServiceClient, ids: string
     .in("id", ids);
   if (error) throw error;
   return new Map(
-    ((data ?? []) as AuditRow[])
-      .map((row) => [
-        String(row.id),
-        { name: stringOrNull(row.name), email: null },
-      ] as const),
+    ((data ?? []) as AuditRow[]).map(
+      (row) => [String(row.id), { name: stringOrNull(row.name), email: null }] as const,
+    ),
   );
 }
 
@@ -325,10 +311,7 @@ function resolveTargetIdentity(input: {
   let entity: AuditEntityLabel | undefined;
   if (input.resourceType === "employee") {
     entity = input.employeeLabels.get(input.resourceId);
-  } else if (
-    input.resourceType === "user" ||
-    input.resourceType === "organization_membership"
-  ) {
+  } else if (input.resourceType === "user" || input.resourceType === "organization_membership") {
     entity = input.profileLabels.get(input.resourceId);
   } else if (input.resourceType === "invitation") {
     entity = input.invitationLabels.get(input.resourceId);
@@ -337,19 +320,14 @@ function resolveTargetIdentity(input: {
   }
 
   return {
-    targetLabel:
-      entity?.name ??
-      detailIdentity.name ??
-      entity?.email ??
-      detailIdentity.email,
+    targetLabel: entity?.name ?? detailIdentity.name ?? entity?.email ?? detailIdentity.email,
     targetEmail: entity?.email ?? detailIdentity.email,
   };
 }
 
 function detailTargetIdentity(details: Record<string, unknown>): AuditEntityLabel {
   const email =
-    stringOrNull(details.targetEmail ?? details.target_email) ??
-    stringOrNull(details.email);
+    stringOrNull(details.targetEmail ?? details.target_email) ?? stringOrNull(details.email);
   const name =
     stringOrNull(details.targetName) ??
     fullName(
@@ -362,10 +340,7 @@ function detailTargetIdentity(details: Record<string, unknown>): AuditEntityLabe
 }
 
 function fullName(first: unknown, last: unknown) {
-  const value = [stringOrNull(first), stringOrNull(last)]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
+  const value = [stringOrNull(first), stringOrNull(last)].filter(Boolean).join(" ").trim();
   return value || null;
 }
 

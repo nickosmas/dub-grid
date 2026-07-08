@@ -4,14 +4,13 @@ import { useState, useEffect, useRef } from "react";
 import type { AuthChangeEvent } from "@supabase/supabase-js";
 import { PublicRoute } from "@/components/RouteGuards";
 import { PageShell, Card } from "@/components/auth/AuthCard";
+import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
-import Link from "next/link";
-import { CheckCircle } from "lucide-react";
 import {
   exchangeBrowserCodeForSession,
   getBrowserAuthSession,
@@ -30,6 +29,7 @@ function ResetPasswordContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const firstFieldRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -93,6 +93,11 @@ function ResetPasswordContent() {
     };
   }, []);
 
+  // Focus the first password field once the form becomes available.
+  useEffect(() => {
+    if (state === "form") firstFieldRef.current?.focus();
+  }, [state]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
@@ -123,7 +128,7 @@ function ResetPasswordContent() {
       } else if (msg.includes("weak") || msg.includes("short")) {
         setFormError("Password is too weak. Please choose a stronger password.");
       } else if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("Network error — please check your connection.");
+        toast.error("Network error. Check your connection and try again.");
       } else {
         toast.error("Failed to update password. Please try again.");
       }
@@ -142,123 +147,28 @@ function ResetPasswordContent() {
         </div>
 
         {state === "loading" ? (
-          <>
-            <h1
-              className="dg-auth-heading"
-              style={{ marginBottom: "12px" }}
-            >
-              Verifying Reset Link...
-            </h1>
-            <p
-              style={{
-                fontSize: "var(--dg-fs-body-sm)",
-                color: "var(--color-text-muted)",
-                textAlign: "center",
-              }}
-            >
-              Please wait while we verify your password reset link.
-            </p>
-          </>
+          <AuthStateCard
+            icon="spinner"
+            heading="Verifying reset link"
+            message="Please wait while we verify your password reset link."
+          />
         ) : state === "error" ? (
-          <>
-            <h1
-              className="dg-auth-heading"
-              style={{ marginBottom: "12px" }}
-            >
-              Invalid or Expired Link
-            </h1>
-            <p
-              style={{
-                fontSize: "var(--dg-fs-body-sm)",
-                color: "var(--color-text-muted)",
-                lineHeight: 1.5,
-                textAlign: "center",
-                marginBottom: "24px",
-              }}
-            >
-              This password reset link is invalid or has expired. Please request
-              a new one.
-            </p>
-            <Link
-              href="/forgot-password"
-              className="dg-auth-submit"
-              style={{
-                textAlign: "center",
-                textDecoration: "none",
-              }}
-            >
-              Request New Link
-            </Link>
-            <div style={{ marginTop: "16px", textAlign: "center" }}>
-              <Link
-                href="/login"
-                className="dg-auth-link"
-                style={{
-                  color: "var(--color-text-subtle)",
-                }}
-              >
-                Back to login
-              </Link>
-            </div>
-          </>
+          <AuthStateCard
+            heading="Invalid or expired link"
+            message="This password reset link is invalid or has expired. Please request a new one."
+            primaryCta={{ label: "Request New Link", href: "/forgot-password" }}
+            secondaryCta={{ label: "Back to login", href: "/login" }}
+          />
         ) : state === "success" ? (
-          <>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginBottom: "20px",
-              }}
-            >
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "50%",
-                  background: "var(--color-success-bg)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <CheckCircle size={28} color="var(--color-success)" />
-              </div>
-            </div>
-            <h1
-              className="dg-auth-heading"
-              style={{ marginBottom: "12px" }}
-            >
-              Password Updated
-            </h1>
-            <p
-              style={{
-                fontSize: "var(--dg-fs-body-sm)",
-                color: "var(--color-text-muted)",
-                lineHeight: 1.5,
-                textAlign: "center",
-                marginBottom: "24px",
-              }}
-            >
-              Your password has been successfully reset. You can now sign in with
-              your new password.
-            </p>
-            <Link
-              href="/login"
-              className="dg-auth-submit"
-              style={{
-                textAlign: "center",
-                textDecoration: "none",
-              }}
-            >
-              Sign In
-            </Link>
-          </>
+          <AuthStateCard
+            icon="check"
+            heading="Password updated"
+            message="Your password has been successfully reset. You can now sign in with your new password."
+            primaryCta={{ label: "Sign In", href: "/login" }}
+          />
         ) : (
           <>
-            <h1
-              className="dg-auth-heading"
-              style={{ marginBottom: "8px" }}
-            >
+            <h1 className="dg-auth-heading" style={{ marginBottom: "8px" }}>
               Set New Password
             </h1>
             <p
@@ -282,41 +192,47 @@ function ResetPasswordContent() {
               }}
             >
               <div>
-                <label className="dg-auth-field-label">
+                <label htmlFor="reset-new-password" className="dg-auth-field-label">
                   New Password
                 </label>
                 <PasswordInput
+                  id="reset-new-password"
+                  inputRef={firstFieldRef}
                   placeholder="Enter new password"
                   value={password}
                   onChange={setPassword}
                   showPassword={showPassword}
                   onToggle={() => setShowPassword((v) => !v)}
                   autoComplete="new-password"
-                  ariaDescribedBy="password-strength-label password-strength-hints"
+                  ariaDescribedBy={
+                    "password-strength-label password-strength-hints" +
+                    (formError ? " reset-form-error" : "")
+                  }
                   disabled={loading}
                 />
-                {password.length > 0 && (
-                  <PasswordStrength password={password} />
-                )}
+                {password.length > 0 && <PasswordStrength password={password} />}
               </div>
 
               <div>
-                <label className="dg-auth-field-label">
+                <label htmlFor="reset-confirm-password" className="dg-auth-field-label">
                   Confirm Password
                 </label>
                 <PasswordInput
+                  id="reset-confirm-password"
                   placeholder="Confirm new password"
                   value={confirmPassword}
                   onChange={setConfirmPassword}
                   showPassword={showPassword}
                   onToggle={() => setShowPassword((v) => !v)}
                   autoComplete="new-password"
+                  ariaDescribedBy={formError ? "reset-form-error" : undefined}
                   disabled={loading}
                 />
               </div>
 
               {formError && (
                 <p
+                  id="reset-form-error"
                   style={{
                     color: "var(--color-danger-dark)",
                     fontSize: "var(--dg-fs-body-sm)",

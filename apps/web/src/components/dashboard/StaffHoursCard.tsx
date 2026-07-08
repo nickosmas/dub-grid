@@ -3,7 +3,7 @@ import type { EmployeeHours } from "@/lib/dashboard-stats";
 import { getAvatarInitials } from "@/lib/utils";
 import type { Employee, FocusArea } from "@/types";
 import ExpandButton from "./ExpandButton";
-import DashboardEmptyState from "./DashboardEmptyState";
+import { EmptyState } from "@/components/EmptyState";
 
 interface StaffHoursCardProps {
   employeeHours: EmployeeHours[];
@@ -45,23 +45,15 @@ export default function StaffHoursCard({
     <div className="dg-card" style={{ display: "flex", flexDirection: "column" }}>
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">
-            {heading}
-          </div>
-          <div className="dg-card-subtitle">
-            {subtitle ?? `This week · ${otThreshold}h limit`}
-          </div>
+          <div className="dg-card-title">{heading}</div>
+          <div className="dg-card-subtitle">{subtitle ?? `This week · ${otThreshold}h limit`}</div>
         </div>
         {onExpand && <ExpandButton onClick={onExpand} label="Expand staff hours" />}
       </div>
 
       {visible.length === 0 ? (
         <div className="dg-card-body" style={{ display: "flex", flex: 1 }}>
-          <DashboardEmptyState
-            title={emptyMessage}
-            variant="inline"
-            style={{ flex: 1 }}
-          />
+          <EmptyState title={emptyMessage} size="inline" style={{ flex: 1 }} />
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column" }}>
@@ -70,9 +62,7 @@ export default function StaffHoursCard({
             if (!emp) return null;
             const faId = emp.focusAreaIds[0];
             const fa = faId != null ? faMap.get(faId) : undefined;
-            const initials = getAvatarInitials(
-              `${emp.firstName} ${emp.lastName}`,
-            );
+            const initials = getAvatarInitials(`${emp.firstName} ${emp.lastName}`);
 
             return (
               <Link
@@ -106,7 +96,9 @@ export default function StaffHoursCard({
                       fontSize: 10,
                       fontWeight: 700,
                       flexShrink: 0,
-                      background: h.isOvertime ? "var(--color-danger-bg)" : "var(--color-bg-secondary)",
+                      background: h.isOvertime
+                        ? "var(--color-danger-bg)"
+                        : "var(--color-bg-secondary)",
                       color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
                     }}
                   >

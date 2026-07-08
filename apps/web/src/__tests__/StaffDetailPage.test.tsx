@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { renderWithQuery as render } from "@/test-utils/renderWithQuery";
 import { StaffDetailPage } from "@/components/staff-detail/StaffDetailPage";
 import { makeEmployee } from "@/__tests__/factories";
 import {
@@ -8,10 +9,7 @@ import {
   fetchEmployeeInvitations,
   fetchEmployeeRoleHistory,
 } from "@/features/employees/client";
-import {
-  fetchRecurringShifts,
-  fetchShiftRequests,
-} from "@/features/schedule/client";
+import { fetchRecurringShifts, fetchShiftRequests } from "@/features/schedule/client";
 
 const mockReplace = vi.fn();
 const mockToastInfo = vi.fn();
@@ -38,11 +36,14 @@ vi.mock("@/hooks", () => ({
   useDirectory: () => mockUseDirectory(),
 }));
 
-vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({
-    invalidateQueries: mockInvalidateQueries,
-  }),
+vi.mock("@/components/AuthProvider", () => ({
+  useAuth: () => ({ user: { id: "viewer-user-id" } }),
 }));
+
+// Note: we no longer mock @tanstack/react-query; `renderWithQuery` provides a
+// real QueryClient so `useQuery` + `useQueryClient` work as in production.
+// `mockInvalidateQueries` is retained for compatibility but is unused.
+void mockInvalidateQueries;
 
 vi.mock("@/features/employees/client", () => ({
   fetchEmployeeById: vi.fn(),
@@ -50,9 +51,9 @@ vi.mock("@/features/employees/client", () => ({
   fetchEmployeeInvitations: vi.fn(),
   fetchEmployeeRoleHistory: vi.fn(),
   updateEmployee: vi.fn(),
-  benchEmployee: vi.fn(),
+  deactivateEmployee: vi.fn(),
   activateEmployee: vi.fn(),
-  deleteEmployee: vi.fn(),
+  removeEmployee: vi.fn(),
 }));
 
 vi.mock("@/features/schedule/client", () => ({
@@ -62,8 +63,7 @@ vi.mock("@/features/schedule/client", () => ({
 }));
 
 vi.mock("@/components/ProgressBar", () => ({
-  default: ({ loading }: { loading?: boolean }) =>
-    loading ? <div>Loading...</div> : null,
+  default: ({ loading }: { loading?: boolean }) => (loading ? <div>Loading...</div> : null),
 }));
 
 vi.mock("@/components/staff-detail/StaffDetailHeader", () => ({
@@ -78,7 +78,11 @@ vi.mock("@/components/staff-detail/StaffDetailHeader", () => ({
   }) => (
     <div>
       <div>Personal details header</div>
-      {canEditDetails ? <button onClick={onToggleEditDetails}>{showManagementPanel ? "Hide Edit Details" : "Edit Details"}</button> : null}
+      {canEditDetails ? (
+        <button onClick={onToggleEditDetails}>
+          {showManagementPanel ? "Hide Edit Details" : "Edit Details"}
+        </button>
+      ) : null}
     </div>
   ),
 }));
@@ -205,9 +209,7 @@ describe("StaffDetailPage", () => {
     render(<StaffDetailPage employeeId="emp-1" />);
 
     await waitFor(() => {
-      expect(mockToastInfo).toHaveBeenCalledWith(
-        "You don't have access to employee details.",
-      );
+      expect(mockToastInfo).toHaveBeenCalledWith("You don't have access to employee details.");
       expect(mockReplace).toHaveBeenCalledWith("/people");
     });
   });
@@ -249,8 +251,7 @@ describe("StaffDetailPage", () => {
     expect(screen.getByText("Staffing actions")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Bench" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Terminate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
     expect(screen.queryByText("Edit details form")).not.toBeInTheDocument();
   });
 
@@ -327,7 +328,18 @@ describe("StaffDetailPage", () => {
       shiftCategories: [],
       certifications: [],
       orgRoles: [],
-      departments: [{ id: 1, orgId: "org-1", name: "HR", abbr: "", type: "management", sortOrder: 0, archivedAt: null, permissions: null }],
+      departments: [
+        {
+          id: 1,
+          orgId: "org-1",
+          name: "HR",
+          abbr: "",
+          type: "management",
+          sortOrder: 0,
+          archivedAt: null,
+          permissions: null,
+        },
+      ],
       assignmentLabelMap: new Map(),
       absenceTypeMap: new Map(),
       loading: false,
@@ -338,8 +350,7 @@ describe("StaffDetailPage", () => {
     expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Bench" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Terminate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
     expect(screen.getByText("Management access modal")).toBeInTheDocument();

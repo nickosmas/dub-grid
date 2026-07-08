@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  createRequestSupabaseClient,
-  requireAuthenticatedSession,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireAuthenticatedSession } from "@/lib/api-auth";
 import { generateICS } from "@/lib/ical";
 import {
   fetchPublishedShiftRows,
@@ -38,10 +35,7 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = user.id;
-    const weeks = Math.min(
-      parseInt(req.nextUrl.searchParams.get("weeks") ?? "4") || 4,
-      12,
-    );
+    const weeks = Math.min(parseInt(req.nextUrl.searchParams.get("weeks") ?? "4") || 4, 12);
 
     // Find the employee record linked to this user
     const { data: employee } = await supabase
@@ -72,7 +66,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!shifts || shifts.length === 0) {
-      const empty = generateICS([], `DubGrid — ${employee.first_name} ${employee.last_name}`);
+      const empty = generateICS([], `DubGrid: ${employee.first_name} ${employee.last_name}`);
       return new NextResponse(empty, {
         headers: {
           "Content-Type": "text/calendar; charset=utf-8",
@@ -104,9 +98,7 @@ export async function GET(req: NextRequest) {
     };
 
     const events = ((shifts ?? []) as unknown as PublishedShiftRow[])
-      .map((row) =>
-        resolvePublishedScheduleEntry(row, new Map(), absenceTypeById),
-      )
+      .map((row) => resolvePublishedScheduleEntry(row, new Map(), absenceTypeById))
       .flatMap((entry) => {
         if (!entry) return [];
 
@@ -115,13 +107,15 @@ export async function GET(req: NextRequest) {
           const dtend = new Date(dtstart);
           dtend.setDate(dtend.getDate() + 1);
 
-          return [{
-            uid: `absence-${entry.empId}-${entry.date}-${entry.absenceTypeId}@dubgrid.com`,
-            summary: `${entry.label} — DubGrid`,
-            dtstart,
-            dtend,
-            description: `${employee.first_name} ${employee.last_name} — ${entry.label}`,
-          }];
+          return [
+            {
+              uid: `absence-${entry.empId}-${entry.date}-${entry.absenceTypeId}@dubgrid.com`,
+              summary: `${entry.label} (DubGrid)`,
+              dtstart,
+              dtend,
+              description: `${employee.first_name} ${employee.last_name}: ${entry.label}`,
+            },
+          ];
         }
 
         if (!entry.startTime || !entry.endTime) {
@@ -135,16 +129,18 @@ export async function GET(req: NextRequest) {
           dtend.setDate(dtend.getDate() + 1);
         }
 
-        return [{
-          uid: `shift-${entry.empId}-${entry.date}-${entry.segments?.map((segment) => `${segment.shiftId ?? "shiftless"}-${segment.jobId}`).join("-") ?? "worked"}@dubgrid.com`,
-          summary: `${entry.label} — DubGrid`,
-          dtstart,
-          dtend,
-          description: `${employee.first_name} ${employee.last_name} — ${entry.label}`,
-        }];
+        return [
+          {
+            uid: `shift-${entry.empId}-${entry.date}-${entry.segments?.map((segment) => `${segment.shiftId ?? "shiftless"}-${segment.jobId}`).join("-") ?? "worked"}@dubgrid.com`,
+            summary: `${entry.label} (DubGrid)`,
+            dtstart,
+            dtend,
+            description: `${employee.first_name} ${employee.last_name}: ${entry.label}`,
+          },
+        ];
       });
 
-    const ics = generateICS(events, `DubGrid — ${employee.first_name} ${employee.last_name}`);
+    const ics = generateICS(events, `DubGrid: ${employee.first_name} ${employee.last_name}`);
 
     return new NextResponse(ics, { headers: cacheHeaders });
   } catch (err) {

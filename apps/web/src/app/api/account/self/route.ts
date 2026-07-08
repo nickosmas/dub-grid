@@ -26,9 +26,6 @@ export async function GET(req: NextRequest) {
     );
   } catch (error) {
     console.error("account self GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load your profile" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load your profile" }, { status: 500 });
   }
 }

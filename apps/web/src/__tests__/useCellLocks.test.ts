@@ -45,9 +45,7 @@ describe("useCellLocks", () => {
       currentUser: { id: string; name: string } | null;
     };
     const { result, rerender } = renderHook(
-      ({
-        currentUser,
-      }: HookProps) =>
+      ({ currentUser }: HookProps) =>
         useCellLocks(channelRef, currentUser, "session-1", true, true),
       {
         initialProps: {

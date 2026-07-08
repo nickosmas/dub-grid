@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
-import {
-  AccessibilityInfo,
-  Animated,
-  Easing,
-  StyleSheet,
-  View,
-} from "react-native";
+import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from "react-native";
 import { mobileColors, mobileSpacing } from "../theme/tokens";
 
 const PULSE_DURATION_MS = 900;

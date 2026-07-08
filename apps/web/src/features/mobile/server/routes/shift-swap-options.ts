@@ -48,10 +48,7 @@ function getEntryTimeRanges(entry: MobileScheduleEntry): TimeRange[] {
     return segmentRanges;
   }
 
-  const presentationRange = toTimeRange(
-    entry.presentation.startTime,
-    entry.presentation.endTime,
-  );
+  const presentationRange = toTimeRange(entry.presentation.startTime, entry.presentation.endTime);
 
   return presentationRange ? [presentationRange] : [];
 }
@@ -78,8 +75,7 @@ function canWorkRequiredFocusAreas(
 
 function isWorkedShiftEntry(entry: MobileScheduleEntry): boolean {
   return (
-    entry.state.kind === "worked" &&
-    entry.state.segments.some((segment) => segment.shiftId != null)
+    entry.state.kind === "worked" && entry.state.segments.some((segment) => segment.shiftId != null)
   );
 }
 
@@ -107,10 +103,7 @@ function getSwapOptions(input: {
         input.requesterEntry.employeeFocusAreaIds,
         getRequiredFocusAreaIds(entry),
       ) ||
-      !canWorkRequiredFocusAreas(
-        entry.employeeFocusAreaIds,
-        requesterRequiredFocusAreaIds,
-      )
+      !canWorkRequiredFocusAreas(entry.employeeFocusAreaIds, requesterRequiredFocusAreaIds)
     ) {
       return false;
     }
@@ -121,8 +114,7 @@ function getSwapOptions(input: {
     }
 
     const requesterExistingTargetDateEntry =
-      entriesByEmployeeDate.get(`${input.requesterEntry.employeeId}:${entry.date}`) ??
-      null;
+      entriesByEmployeeDate.get(`${input.requesterEntry.employeeId}:${entry.date}`) ?? null;
     if (
       requesterExistingTargetDateEntry &&
       timesOverlap(getEntryTimeRanges(requesterExistingTargetDateEntry), targetRanges)
@@ -131,8 +123,7 @@ function getSwapOptions(input: {
     }
 
     const targetExistingRequesterDateEntry =
-      entriesByEmployeeDate.get(`${entry.employeeId}:${input.requesterEntry.date}`) ??
-      null;
+      entriesByEmployeeDate.get(`${entry.employeeId}:${input.requesterEntry.date}`) ?? null;
     if (
       targetExistingRequesterDateEntry &&
       timesOverlap(getEntryTimeRanges(targetExistingRequesterDateEntry), requesterRanges)
@@ -191,9 +182,7 @@ export async function GET(req: NextRequest) {
         entry.date === queryResult.data.requesterShiftDate,
     ) ?? null;
 
-  const options = requesterEntry
-    ? getSwapOptions({ requesterEntry, entries })
-    : [];
+  const options = requesterEntry ? getSwapOptions({ requesterEntry, entries }) : [];
 
   return NextResponse.json(
     mobileShiftSwapOptionsResponseSchema.parse({

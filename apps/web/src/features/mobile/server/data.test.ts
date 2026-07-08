@@ -1,3 +1,8 @@
+// Pin the runtime timezone to UTC (matching production servers) so the
+// ISO date round-trips in resolveMobileDateRange/getMobileDatesBetween are
+// stable regardless of the local machine timezone the suite runs on.
+process.env.TZ = "UTC";
+
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchMobileOpenShifts,
@@ -84,9 +89,7 @@ function buildMockJobRows(
     textColor?: string | null;
   }>,
 ) {
-  const explicitJobMap = new Map(
-    (explicitJobs ?? []).map((job) => [job.id, job]),
-  );
+  const explicitJobMap = new Map((explicitJobs ?? []).map((job) => [job.id, job]));
   const uniqueJobIds = Array.from(
     new Set(
       assignments
@@ -97,22 +100,16 @@ function buildMockJobRows(
 
   return uniqueJobIds.map((jobId, index) => {
     const explicitJob = explicitJobMap.get(jobId);
-    const matchingAssignments = assignments.filter(
-      (assignment) => assignment.jobId === jobId,
-    );
+    const matchingAssignments = assignments.filter((assignment) => assignment.jobId === jobId);
     const fallbackAssignment = matchingAssignments[0];
-    const hasWorkedShift = matchingAssignments.some(
-      (assignment) => assignment.shiftId != null,
-    );
+    const hasWorkedShift = matchingAssignments.some((assignment) => assignment.shiftId != null);
 
     return {
       id: jobId,
       org_id: "org-1",
       name: explicitJob?.name ?? fallbackAssignment?.name ?? `Job ${jobId}`,
       abbr:
-        explicitJob?.name?.slice(0, 3).toUpperCase() ??
-        fallbackAssignment?.label ??
-        `J${jobId}`,
+        explicitJob?.name?.slice(0, 3).toUpperCase() ?? fallbackAssignment?.label ?? `J${jobId}`,
       show_on_grid: false,
       assignment_mode: hasWorkedShift ? "with_shift" : "shiftless",
       eligibility_mode: "and",
@@ -126,12 +123,8 @@ function buildMockJobRows(
       text_color: explicitJob?.textColor ?? "#1d4ed8",
       shift_time_overrides: {},
       shift_color_overrides: {},
-      default_start_time: hasWorkedShift
-        ? null
-        : (fallbackAssignment?.defaultStartTime ?? null),
-      default_end_time: hasWorkedShift
-        ? null
-        : (fallbackAssignment?.defaultEndTime ?? null),
+      default_start_time: hasWorkedShift ? null : (fallbackAssignment?.defaultStartTime ?? null),
+      default_end_time: hasWorkedShift ? null : (fallbackAssignment?.defaultEndTime ?? null),
       default_duration_hours: explicitJob?.defaultDurationHours ?? null,
       default_duration_minutes: explicitJob?.defaultDurationMinutes ?? null,
       sort_order: explicitJob?.sortOrder ?? index,
@@ -292,9 +285,7 @@ function createServiceClientForSchedule(
         date: "2026-04-18",
         org_id: "org-1",
         focus_area_id:
-          options && "shiftFocusAreaId" in options
-            ? (options.shiftFocusAreaId ?? null)
-            : 12,
+          options && "shiftFocusAreaId" in options ? (options.shiftFocusAreaId ?? null) : 12,
         version: 1,
         series_id: null,
         from_recurring: false,
@@ -315,17 +306,15 @@ function createServiceClientForSchedule(
             segments:
               options?.absenceTypeId != null
                 ? []
-                : (options?.assignmentIds ?? [44]).map(
-                    (assignmentId, index) => ({
-                      id: `segment-${index}`,
-                      snapshot_id: "published-snapshot",
-                      org_id: "org-1",
-                      position: index,
-                      shift_id: options?.shiftIds?.[index] ?? null,
-                      job_id: options?.jobIds?.[index] ?? 91,
-                      is_mentored: options?.mentoredFlags?.[index] ?? false,
-                    }),
-                  ),
+                : (options?.assignmentIds ?? [44]).map((assignmentId, index) => ({
+                    id: `segment-${index}`,
+                    snapshot_id: "published-snapshot",
+                    org_id: "org-1",
+                    position: index,
+                    shift_id: options?.shiftIds?.[index] ?? null,
+                    job_id: options?.jobIds?.[index] ?? 91,
+                    is_mentored: options?.mentoredFlags?.[index] ?? false,
+                  })),
           },
         ],
         employees: employeeRelation,
@@ -462,9 +451,7 @@ function createServiceClientForShiftRequests() {
         target_shift_date: "2026-04-24",
         target_state: {
           kind: "worked",
-          segments: [
-            { shiftId: 102, jobId: 92, position: 0, isMentored: true },
-          ],
+          segments: [{ shiftId: 102, jobId: 92, position: 0, isMentored: true }],
           absenceTypeId: null,
           customStartTime: "15:30:00",
           customEndTime: "23:30:00",
@@ -687,9 +674,7 @@ function createServiceClientForOpenShifts(options?: {
   };
 }
 
-function createPendingOpenShiftVolunteerRow(
-  overrides: Record<string, unknown> = {},
-) {
+function createPendingOpenShiftVolunteerRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "request-1",
     org_id: "org-1",
@@ -1028,9 +1013,7 @@ describe("fetchMobileScheduleEntries", () => {
       endDate: "2026-04-24",
     });
 
-    expect(entries[0]?.presentation.shiftName).toBe(
-      "Day Shift / Evening Shift",
-    );
+    expect(entries[0]?.presentation.shiftName).toBe("Day Shift / Evening Shift");
     expect(entries[0]?.presentation.segments).toEqual([
       expect.objectContaining({
         shiftId: 101,
@@ -1124,9 +1107,7 @@ describe("fetchMobileScheduleEntries", () => {
       endDate: "2026-04-24",
     });
 
-    expect(entries[0]?.state.segments.map((segment) => segment.jobId)).toEqual([
-      91,
-    ]);
+    expect(entries[0]?.state.segments.map((segment) => segment.jobId)).toEqual([91]);
     expect(entries[0]?.presentation.segments[0]).toMatchObject({
       jobId: 91,
       jobName: "Mentor",
@@ -1367,8 +1348,7 @@ describe("fetchMobileOpenShifts", () => {
       expect(openShifts[0]).toMatchObject({
         id: expect.stringMatching(/^coverage_gap_12_.+_2026-04-16$/),
         canVolunteer: false,
-        volunteerBlockReason:
-          "You do not meet the eligibility requirements for this shift.",
+        volunteerBlockReason: "You do not meet the eligibility requirements for this shift.",
       });
     } finally {
       vi.useRealTimers();

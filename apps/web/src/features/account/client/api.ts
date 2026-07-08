@@ -89,7 +89,7 @@ export interface AccountPermissionsResponse {
   permissions: Permissions;
 }
 
-export interface AccessibleWorkspace {
+export interface AccessibleOrganization {
   org_id: string;
   org_name: string;
   org_slug: string | null;
@@ -101,10 +101,7 @@ export interface InvitationLookup {
   orgSlug: string | null;
 }
 
-async function requestJson<T>(
-  input: string,
-  init?: RequestInit,
-): Promise<T> {
+async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -112,9 +109,7 @@ async function requestJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, "Account request failed."),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, "Account request failed."));
   }
 
   return body as T;
@@ -148,17 +143,13 @@ export function fetchAccountPermissions(): Promise<AccountPermissionsResponse> {
   return requestJson<AccountPermissionsResponse>("/api/account/permissions");
 }
 
-export function fetchSelfProfileData(
-  orgId: string | null,
-): Promise<AccountSelfProfileData> {
+export function fetchSelfProfileData(orgId: string | null): Promise<AccountSelfProfileData> {
   const params = new URLSearchParams();
   if (orgId) {
     params.set("orgId", orgId);
   }
   const suffix = params.toString();
-  return requestJson<AccountSelfProfileData>(
-    `/api/account/self${suffix ? `?${suffix}` : ""}`,
-  );
+  return requestJson<AccountSelfProfileData>(`/api/account/self${suffix ? `?${suffix}` : ""}`);
 }
 
 export function updateSelfProfileDetails(input: {
@@ -275,9 +266,7 @@ export function fetchAccountSessions(): Promise<{
   return requestJson("/api/account/sessions");
 }
 
-export function revokeAccountSession(
-  refreshTokenHash: string,
-): Promise<{ success: true }> {
+export function revokeAccountSession(refreshTokenHash: string): Promise<{ success: true }> {
   return requestJson("/api/account/sessions", {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
@@ -285,25 +274,47 @@ export function revokeAccountSession(
   });
 }
 
-export function fetchAccessibleWorkspaces(): Promise<{
-  organizations: AccessibleWorkspace[];
+export function fetchAccessibleOrganizations(): Promise<{
+  organizations: AccessibleOrganization[];
 }> {
-  return requestJson("/api/auth/workspaces");
+  return requestJson("/api/auth/organizations");
 }
 
-export function switchBrowserWorkspace(
-  targetOrgId: string,
-): Promise<{ success: true }> {
-  return requestJson("/api/auth/workspaces", {
+export function switchBrowserOrganization(targetOrgId: string): Promise<{ success: true }> {
+  return requestJson("/api/auth/organizations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ targetOrgId }),
   });
 }
 
-export function fetchInvitationLookup(
-  token: string,
-): Promise<InvitationLookup> {
+// Starts the org's trial on the first super_admin login. Idempotent + self-gated
+// to super_admins server-side, so it is safe to call after any genuine login.
+export function startBrowserTrial(orgId: string): Promise<{ success: true }> {
+  return requestJson("/api/auth/start-trial", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orgId }),
+  });
+}
+
+/**
+ * Destroys every sandbox the caller owns and clears the sandbox cookie
+ * (the `/api/test-sandbox` "exit" action). Used in two auth paths:
+ * - on the next login, to wipe a sandbox left over from a session that ended
+ *   without an explicit exit (involuntary logout / browser close);
+ * - before a user-initiated sign-out, so the sandbox is gone before logout.
+ * Idempotent and self-gated server-side: a no-op when the user owns no sandbox.
+ */
+export function exitSandbox(): Promise<{ success: true }> {
+  return requestJson("/api/test-sandbox", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "exit" }),
+  });
+}
+
+export function fetchInvitationLookup(token: string): Promise<InvitationLookup> {
   const params = new URLSearchParams({ token });
   return requestJson(`/api/invitations/lookup?${params}`);
 }

@@ -46,8 +46,7 @@ type ReportUiMetadata = {
   targetControls: ReportTargetControl[];
 };
 
-type TargetEmployeeOption =
-  OperationsReportPayload["filterOptions"]["employees"][number];
+type TargetEmployeeOption = OperationsReportPayload["filterOptions"]["employees"][number];
 
 const QUICK_RANGES: Array<{ value: QuickRange; label: string }> = [
   { value: "current-week", label: "Current week" },
@@ -211,9 +210,7 @@ function resolveCurrentPayPeriodRangeLocal(
   const anchor = new Date(`${anchorDate}T00:00:00.000Z`);
   if (Number.isNaN(anchor.getTime())) return null;
   const today = new Date();
-  const todayUtc = new Date(
-    Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()),
-  );
+  const todayUtc = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
   const diffDays = Math.floor((todayUtc.getTime() - anchor.getTime()) / 86_400_000);
   const periodStart = addDays(anchor, Math.floor(diffDays / 14) * 14);
   return {
@@ -236,9 +233,7 @@ function buildQuickRangeOptions(
       };
     }
     const resolved =
-      option.value === "custom"
-        ? range
-        : resolveQuickRange(option.value, payPeriodStartDate);
+      option.value === "custom" ? range : resolveQuickRange(option.value, payPeriodStartDate);
     const rangeLabel = resolved ? formatCompactRangeLabel(resolved) : "not set";
     return {
       value: option.value,
@@ -541,9 +536,7 @@ function ReportsContent() {
     filters: OperationsReportFilters;
     filtersKey: string;
   } | null>(null);
-  const [exportingFormat, setExportingFormat] = useState<"csv" | "pdf" | null>(
-    null,
-  );
+  const [exportingFormat, setExportingFormat] = useState<"csv" | "pdf" | null>(null);
   const reportMetadata = REPORT_UI_METADATA[report];
   const showsPeopleTarget = reportMetadata.targetControls.includes("people");
   const showsFocusAreaTarget = reportMetadata.targetControls.includes("focusAreas");
@@ -597,9 +590,7 @@ function ReportsContent() {
     if (nextQuickRange === "pay-period") {
       toast.info("This organization does not have a pay period anchor.");
       setQuickRange("current-week");
-      updateRange(
-        resolveQuickRange("current-week", org?.payPeriodStartDate) ?? getDefaultRange(),
-      );
+      updateRange(resolveQuickRange("current-week", org?.payPeriodStartDate) ?? getDefaultRange());
     }
   };
 
@@ -617,19 +608,10 @@ function ReportsContent() {
 
   const targetOptionsQuery = useQuery({
     queryKey: orgId
-      ? queryKeys.reports.operations(
-          orgId,
-          range.startDate,
-          range.endDate,
-          emptyFiltersKey,
-        )
+      ? queryKeys.reports.operations(orgId, range.startDate, range.endDate, emptyFiltersKey)
       : ["reports", "operations", "none"],
-    queryFn: () =>
-      fetchOperationsReport({ orgId: orgId!, range, filters: EMPTY_REPORT_FILTERS }),
-    enabled:
-      Boolean(orgId) &&
-      canAccessReports &&
-      reportMetadata.targetControls.length > 0,
+    queryFn: () => fetchOperationsReport({ orgId: orgId!, range, filters: EMPTY_REPORT_FILTERS }),
+    enabled: Boolean(orgId) && canAccessReports && reportMetadata.targetControls.length > 0,
     staleTime: 30_000,
   });
 
@@ -663,10 +645,7 @@ function ReportsContent() {
   const visibleRows = preview?.rows ?? [];
   const hasExportableRows = visibleRows.length > 0;
   const isLoading =
-    permissions.isLoading ||
-    orgLoading ||
-    reportsQuery.isLoading ||
-    targetOptionsQuery.isLoading;
+    permissions.isLoading || orgLoading || reportsQuery.isLoading || targetOptionsQuery.isLoading;
   const optionsPayload = targetOptionsQuery.data ?? reportsQuery.data;
   const employeeOptions = optionsPayload?.filterOptions.employees ?? [];
   const focusAreaOptions = optionsPayload?.filterOptions.focusAreas ?? [];
@@ -843,11 +822,7 @@ function ReportsContent() {
             </label>
           ) : null}
           {reportMetadata.usesDateRange && quickRange === "custom" ? (
-            <ReportRangePicker
-              label="Date range"
-              onChange={updateCustomRange}
-              value={range}
-            />
+            <ReportRangePicker label="Date range" onChange={updateCustomRange} value={range} />
           ) : null}
           {showsFocusAreaTarget ? (
             <TargetDropdown
@@ -933,11 +908,7 @@ function ReportsContent() {
               <RefreshCw size={16} />
               Refresh
             </button>
-            <button
-              className="dg-btn dg-btn-primary"
-              onClick={handleGenerateReport}
-              type="button"
-            >
+            <button className="dg-btn dg-btn-primary" onClick={handleGenerateReport} type="button">
               Generate report
             </button>
           </div>
@@ -983,10 +954,7 @@ function ReportsContent() {
                   </thead>
                   <tbody>
                     {visibleRows.map((row, index) => (
-                      <tr
-                        key={index}
-                        style={index % 2 === 1 ? stripedRowStyle : undefined}
-                      >
+                      <tr key={index} style={index % 2 === 1 ? stripedRowStyle : undefined}>
                         {preview.columns.map((column, columnIndex) => (
                           <td key={`${column.label}-${columnIndex}`} style={tdStyle}>
                             {formatReportCellForDisplay(row[columnIndex])}
@@ -998,9 +966,7 @@ function ReportsContent() {
                 </table>
               </div>
             ) : (
-              <div style={emptyStateStyle}>
-                {preview?.emptyText ?? "Loading reports"}
-              </div>
+              <div style={emptyStateStyle}>{preview?.emptyText ?? "Loading reports"}</div>
             )}
           </section>
         ) : null}

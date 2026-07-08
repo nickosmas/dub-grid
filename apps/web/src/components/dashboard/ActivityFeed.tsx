@@ -2,7 +2,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { ActivityItem, ActivityIconVariant } from "@/lib/dashboard-stats";
 import ExpandButton from "./ExpandButton";
-import DashboardEmptyState from "./DashboardEmptyState";
+import { EmptyState } from "@/components/EmptyState";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
   success: { bg: "var(--color-success-bg)", stroke: "var(--color-success-text)" },
@@ -16,23 +16,56 @@ function ActivityIcon({ variant }: { variant: ActivityIconVariant }) {
 
   const icons: Record<ActivityIconVariant, React.ReactNode> = {
     success: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke={style.stroke} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        stroke={style.stroke}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M2 7l3.5 3.5L12 3" />
       </svg>
     ),
     danger: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke={style.stroke} strokeWidth="1.4" strokeLinecap="round">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        stroke={style.stroke}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      >
         <path d="M7 4v4M7 10v.5" />
         <circle cx="7" cy="7" r="6" />
       </svg>
     ),
     warning: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke={style.stroke} strokeWidth="1.4" strokeLinecap="round">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        stroke={style.stroke}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      >
         <path d="M7 2v3M7 9v3M2 7h3M9 7h3" />
       </svg>
     ),
     neutral: (
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke={style.stroke} strokeWidth="1.4" strokeLinecap="round">
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 14 14"
+        fill="none"
+        stroke={style.stroke}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      >
         <path d="M2 4h10M2 7h7M2 10h5" />
       </svg>
     ),
@@ -58,9 +91,9 @@ function ActivityIcon({ variant }: { variant: ActivityIconVariant }) {
 
 function EmptyActivityState() {
   return (
-    <DashboardEmptyState
-      variant="panel"
-      minHeight={134}
+    <EmptyState
+      size="compact"
+      style={{ minHeight: 134 }}
       title="No recent activity"
       description="Published updates, shift changes, requests, and new user sign-ups will appear here."
     />
@@ -80,7 +113,9 @@ export default function ActivityFeed({
   onExpand,
   defaultCollapsed = false,
 }: ActivityFeedProps) {
-  const hasUrgentItems = items.some((i) => i.iconVariant === "danger" || i.iconVariant === "warning");
+  const hasUrgentItems = items.some(
+    (i) => i.iconVariant === "danger" || i.iconVariant === "warning",
+  );
   const [collapsed, setCollapsed] = useState(defaultCollapsed && !hasUrgentItems);
   const visible = items.slice(0, maxVisible);
   const remainingCount = Math.max(0, items.length - visible.length);
@@ -120,11 +155,7 @@ export default function ActivityFeed({
               </span>
             )}
           </div>
-          {!collapsed && (
-            <div className="dg-card-subtitle">
-              Latest events
-            </div>
-          )}
+          {!collapsed && <div className="dg-card-subtitle">Latest events</div>}
         </div>
         {!collapsed && onExpand && (
           <div onClick={(e) => e.stopPropagation()}>
@@ -146,40 +177,40 @@ export default function ActivityFeed({
                   style={{ display: "block", textDecoration: "none", color: "inherit" }}
                 >
                   <div
-                  style={{
-                    display: "flex",
-                    gap: 12,
-                    padding: "12px 0",
-                    borderBottom:
-                      i < visible.length - 1 || remainingCount > 0
-                        ? "1px solid var(--color-border-light)"
-                        : "none",
-                  }}
-                >
-                  <ActivityIcon variant={item.iconVariant} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "var(--color-text-secondary)",
-                        lineHeight: 1.35,
-                      }}
-                    >
-                      {item.description}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: "var(--color-text-subtle)",
-                        marginTop: 3,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      {item.relativeTime}
+                    style={{
+                      display: "flex",
+                      gap: 12,
+                      padding: "12px 0",
+                      borderBottom:
+                        i < visible.length - 1 || remainingCount > 0
+                          ? "1px solid var(--color-border-light)"
+                          : "none",
+                    }}
+                  >
+                    <ActivityIcon variant={item.iconVariant} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "var(--color-text-secondary)",
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {item.description}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: "var(--color-text-subtle)",
+                          marginTop: 3,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        {item.relativeTime}
+                      </div>
                     </div>
                   </div>
-                </div>
                 </Link>
               ))}
               {remainingCount > 0 && (

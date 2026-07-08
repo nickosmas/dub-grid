@@ -176,20 +176,52 @@ const TENANTS = [
       { name: "Nursing", type: "scheduled" as const },
       { name: "Residential", type: "scheduled" as const },
       // Management departments (with permission templates)
-      { name: "Administration", type: "management" as const, permissions: {
-        canViewSchedule: true, canEditShifts: true, canPublishSchedule: true, canApplyRecurringSchedule: true,
-        canEditNotes: true, canManageRecurringShifts: true, canManageShiftSeries: true,
-        canViewStaff: true, canManageEmployees: true, canManageFocusAreas: true,
-        canManageScheduleDefinitions: true, canManageIndicatorTypes: true, canManageOrgSettings: false,
-        canManageOrgLabels: true, canManageCoverageRequirements: true, canApproveShiftRequests: true,
-      }},
-      { name: "Human Resources", type: "management" as const, permissions: {
-        canViewSchedule: true, canEditShifts: false, canPublishSchedule: false, canApplyRecurringSchedule: false,
-        canEditNotes: false, canManageRecurringShifts: false, canManageShiftSeries: false,
-        canViewStaff: true, canManageEmployees: true, canManageFocusAreas: false,
-        canManageScheduleDefinitions: false, canManageIndicatorTypes: false, canManageOrgSettings: false,
-        canManageOrgLabels: false, canManageCoverageRequirements: false, canApproveShiftRequests: false,
-      }},
+      {
+        name: "Administration",
+        type: "management" as const,
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: true,
+          canPublishSchedule: true,
+          canApplyRecurringSchedule: true,
+          canEditNotes: true,
+          canEditScheduleIndicators: true,
+          canManageRecurringShifts: true,
+          canManageShiftSeries: true,
+          canViewStaff: true,
+          canManageEmployees: true,
+          canManageFocusAreas: true,
+          canManageScheduleDefinitions: true,
+          canManageIndicatorTypes: true,
+          canManageOrgSettings: false,
+          canManageOrgLabels: true,
+          canManageCoverageRequirements: true,
+          canApproveShiftRequests: true,
+        },
+      },
+      {
+        name: "Human Resources",
+        type: "management" as const,
+        permissions: {
+          canViewSchedule: true,
+          canEditShifts: false,
+          canPublishSchedule: false,
+          canApplyRecurringSchedule: false,
+          canEditNotes: false,
+          canEditScheduleIndicators: false,
+          canManageRecurringShifts: false,
+          canManageShiftSeries: false,
+          canViewStaff: true,
+          canManageEmployees: true,
+          canManageFocusAreas: false,
+          canManageScheduleDefinitions: false,
+          canManageIndicatorTypes: false,
+          canManageOrgSettings: false,
+          canManageOrgLabels: false,
+          canManageCoverageRequirements: false,
+          canApproveShiftRequests: false,
+        },
+      },
       { name: "Maintenance", type: "management" as const },
     ],
     // Memory Care → Nursing (0), Assisted Living → Residential (1),
@@ -205,28 +237,189 @@ const TENANTS = [
       { name: "Day Shift", start_time: "08:00", end_time: "16:00", faIndex: 3 },
     ],
     absenceTypes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
-      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
-      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
-      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
-      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
-      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
-      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
-      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
-      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
-      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
-      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+      {
+        label: "X",
+        name: "Off",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+      },
+      {
+        label: "V",
+        name: "Vacation",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+      },
+      {
+        label: "S",
+        name: "Sick",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+      },
+      {
+        label: "PTO",
+        name: "Paid Time Off",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+      },
+      {
+        label: "P",
+        name: "Personal",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+      },
+      {
+        label: "B",
+        name: "Bereavement",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+      },
+      {
+        label: "J",
+        name: "Jury Duty",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+      },
+      {
+        label: "H",
+        name: "Holiday",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+      },
+      {
+        label: "CME",
+        name: "Education / Training",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+      },
+      {
+        label: "FMLA",
+        name: "Family / Medical Leave",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+      },
+      {
+        label: "UX",
+        name: "Unpaid Leave",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+      },
     ] as AbsenceTypeDef[],
     assignments: [
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "D", name: "Day", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
-      { label: "E", name: "Evening", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
-      { label: "N", name: "Night", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239", is_general: false, faIndex: 0, catIndex: 2, start: "23:00", end: "07:00" },
-      { label: "D", name: "Day", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3", is_general: false, faIndex: 1, catIndex: 3, start: "07:00", end: "15:00" },
-      { label: "E", name: "Evening", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 1, catIndex: 4, start: "15:00", end: "23:00" },
-      { label: "D", name: "Day", color: "#A7F3D0", border_color: "transparent", text_color: "#065F46", is_general: false, faIndex: 2, catIndex: 5, start: "08:00", end: "16:00" },
-      { label: "D", name: "Day", color: "#BFDBFE", border_color: "transparent", text_color: "#1E40AF", is_general: false, faIndex: 3, catIndex: 6, start: "08:00", end: "16:00" },
+      {
+        label: "Ofc",
+        name: "Office",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "0.3",
+        name: "Partial",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 0,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "E",
+        name: "Evening",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 1,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "N",
+        name: "Night",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 2,
+        start: "23:00",
+        end: "07:00",
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 3,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "E",
+        name: "Evening",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 4,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#A7F3D0",
+        border_color: "transparent",
+        text_color: "#065F46",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 5,
+        start: "08:00",
+        end: "16:00",
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#BFDBFE",
+        border_color: "transparent",
+        text_color: "#1E40AF",
+        is_general: false,
+        faIndex: 3,
+        catIndex: 6,
+        start: "08:00",
+        end: "16:00",
+      },
     ] as AssignmentDef[],
     employeeCount: 35,
     indicatorTypes: [
@@ -283,27 +476,177 @@ const TENANTS = [
       { name: "Clinic Hours", start_time: "09:00", end_time: "17:00", faIndex: 3 },
     ],
     absenceTypes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
-      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
-      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
-      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
-      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
-      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
-      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
-      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
-      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
-      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
-      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+      {
+        label: "X",
+        name: "Off",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+      },
+      {
+        label: "V",
+        name: "Vacation",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+      },
+      {
+        label: "S",
+        name: "Sick",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+      },
+      {
+        label: "PTO",
+        name: "Paid Time Off",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+      },
+      {
+        label: "P",
+        name: "Personal",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+      },
+      {
+        label: "B",
+        name: "Bereavement",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+      },
+      {
+        label: "J",
+        name: "Jury Duty",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+      },
+      {
+        label: "H",
+        name: "Holiday",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+      },
+      {
+        label: "CME",
+        name: "Education / Training",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+      },
+      {
+        label: "FMLA",
+        name: "Family / Medical Leave",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+      },
+      {
+        label: "UX",
+        name: "Unpaid Leave",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+      },
     ] as AbsenceTypeDef[],
     assignments: [
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "D", name: "Day", color: "#99F6E4", border_color: "transparent", text_color: "#115E59", is_general: false, faIndex: 0, catIndex: 0, start: "06:00", end: "14:00" },
-      { label: "Sw", name: "Swing", color: "#E9D5FF", border_color: "transparent", text_color: "#6B21A8", is_general: false, faIndex: 0, catIndex: 1, start: "14:00", end: "22:00" },
-      { label: "N", name: "Night", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_general: false, faIndex: 0, catIndex: 2, start: "22:00", end: "06:00" },
-      { label: "R", name: "Rehab", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3", is_general: false, faIndex: 1, catIndex: 3, start: "08:00", end: "16:30" },
-      { label: "H", name: "Hospice", color: "#F5D0FE", border_color: "transparent", text_color: "#86198F", is_general: false, faIndex: 2, catIndex: 4, start: "08:00", end: "16:00" },
-      { label: "C", name: "Clinic", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 3, catIndex: 5, start: "09:00", end: "17:00" },
+      {
+        label: "Ofc",
+        name: "Office",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "0.3",
+        name: "Partial",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#99F6E4",
+        border_color: "transparent",
+        text_color: "#115E59",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 0,
+        start: "06:00",
+        end: "14:00",
+      },
+      {
+        label: "Sw",
+        name: "Swing",
+        color: "#E9D5FF",
+        border_color: "transparent",
+        text_color: "#6B21A8",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 1,
+        start: "14:00",
+        end: "22:00",
+      },
+      {
+        label: "N",
+        name: "Night",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 2,
+        start: "22:00",
+        end: "06:00",
+      },
+      {
+        label: "R",
+        name: "Rehab",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 3,
+        start: "08:00",
+        end: "16:30",
+      },
+      {
+        label: "H",
+        name: "Hospice",
+        color: "#F5D0FE",
+        border_color: "transparent",
+        text_color: "#86198F",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 4,
+        start: "08:00",
+        end: "16:00",
+      },
+      {
+        label: "C",
+        name: "Clinic",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+        is_general: false,
+        faIndex: 3,
+        catIndex: 5,
+        start: "09:00",
+        end: "17:00",
+      },
     ] as AssignmentDef[],
     employeeCount: 40,
     indicatorTypes: [
@@ -359,29 +702,201 @@ const TENANTS = [
       { name: "Afternoon", start_time: "15:00", end_time: "23:00", faIndex: 3 },
     ],
     absenceTypes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
-      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
-      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
-      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
-      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
-      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
-      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
-      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
-      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
-      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
-      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+      {
+        label: "X",
+        name: "Off",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+      },
+      {
+        label: "V",
+        name: "Vacation",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+      },
+      {
+        label: "S",
+        name: "Sick",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+      },
+      {
+        label: "PTO",
+        name: "Paid Time Off",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+      },
+      {
+        label: "P",
+        name: "Personal",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+      },
+      {
+        label: "B",
+        name: "Bereavement",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+      },
+      {
+        label: "J",
+        name: "Jury Duty",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+      },
+      {
+        label: "H",
+        name: "Holiday",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+      },
+      {
+        label: "CME",
+        name: "Education / Training",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+      },
+      {
+        label: "FMLA",
+        name: "Family / Medical Leave",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+      },
+      {
+        label: "UX",
+        name: "Unpaid Leave",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+      },
     ] as AbsenceTypeDef[],
     assignments: [
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "M", name: "Morning", color: "#BBF7D0", border_color: "transparent", text_color: "#166534", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
-      { label: "M", name: "Morning", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 1, catIndex: 2, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D", is_general: false, faIndex: 1, catIndex: 3, start: "15:00", end: "23:00" },
-      { label: "M", name: "Morning", color: "#BAE6FD", border_color: "transparent", text_color: "#075985", is_general: false, faIndex: 2, catIndex: 4, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 2, catIndex: 5, start: "15:00", end: "23:00" },
-      { label: "M", name: "Morning", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 3, catIndex: 6, start: "07:00", end: "15:00" },
-      { label: "A", name: "Afternoon", color: "#99F6E4", border_color: "transparent", text_color: "#115E59", is_general: false, faIndex: 3, catIndex: 7, start: "15:00", end: "23:00" },
+      {
+        label: "Ofc",
+        name: "Office",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "0.3",
+        name: "Partial",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "M",
+        name: "Morning",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 0,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "A",
+        name: "Afternoon",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 1,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "M",
+        name: "Morning",
+        color: "#FECACA",
+        border_color: "transparent",
+        text_color: "#991B1B",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 2,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "A",
+        name: "Afternoon",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 3,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "M",
+        name: "Morning",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 4,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "A",
+        name: "Afternoon",
+        color: "#FECACA",
+        border_color: "transparent",
+        text_color: "#991B1B",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 5,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "M",
+        name: "Morning",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+        is_general: false,
+        faIndex: 3,
+        catIndex: 6,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "A",
+        name: "Afternoon",
+        color: "#99F6E4",
+        border_color: "transparent",
+        text_color: "#115E59",
+        is_general: false,
+        faIndex: 3,
+        catIndex: 7,
+        start: "15:00",
+        end: "23:00",
+      },
     ] as AssignmentDef[],
     employeeCount: 32,
     indicatorTypes: [
@@ -444,28 +959,189 @@ const TENANTS = [
       { name: "Day Shift", start_time: "08:00", end_time: "16:00", faIndex: 4 },
     ],
     absenceTypes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
-      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
-      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
-      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
-      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
-      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
-      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
-      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
-      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
-      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
-      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+      {
+        label: "X",
+        name: "Off",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+      },
+      {
+        label: "V",
+        name: "Vacation",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+      },
+      {
+        label: "S",
+        name: "Sick",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+      },
+      {
+        label: "PTO",
+        name: "Paid Time Off",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+      },
+      {
+        label: "P",
+        name: "Personal",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+      },
+      {
+        label: "B",
+        name: "Bereavement",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+      },
+      {
+        label: "J",
+        name: "Jury Duty",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+      },
+      {
+        label: "H",
+        name: "Holiday",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+      },
+      {
+        label: "CME",
+        name: "Education / Training",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+      },
+      {
+        label: "FMLA",
+        name: "Family / Medical Leave",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+      },
+      {
+        label: "UX",
+        name: "Unpaid Leave",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+      },
     ] as AbsenceTypeDef[],
     assignments: [
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "12D", name: "12hr Day", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "19:00" },
-      { label: "12N", name: "12hr Night", color: "#F5D0FE", border_color: "transparent", text_color: "#86198F", is_general: false, faIndex: 0, catIndex: 1, start: "19:00", end: "07:00" },
-      { label: "D", name: "Day", color: "#FDE047", border_color: "transparent", text_color: "#854D0E", is_general: false, faIndex: 1, catIndex: 2, start: "07:00", end: "15:30" },
-      { label: "E", name: "Evening", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 1, catIndex: 3, start: "15:30", end: "23:30" },
-      { label: "C", name: "Clinic", color: "#FECACA", border_color: "transparent", text_color: "#991B1B", is_general: false, faIndex: 2, catIndex: 4, start: "08:00", end: "17:00" },
-      { label: "ER", name: "ER Shift", color: "#FDE68A", border_color: "transparent", text_color: "#92400E", is_general: false, faIndex: 3, catIndex: 5, start: "07:00", end: "19:00" },
-      { label: "BH", name: "Behavioral", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75", is_general: false, faIndex: 4, catIndex: 6, start: "08:00", end: "16:00" },
+      {
+        label: "Ofc",
+        name: "Office",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "0.3",
+        name: "Partial",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "12D",
+        name: "12hr Day",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 0,
+        start: "07:00",
+        end: "19:00",
+      },
+      {
+        label: "12N",
+        name: "12hr Night",
+        color: "#F5D0FE",
+        border_color: "transparent",
+        text_color: "#86198F",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 1,
+        start: "19:00",
+        end: "07:00",
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#FDE047",
+        border_color: "transparent",
+        text_color: "#854D0E",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 2,
+        start: "07:00",
+        end: "15:30",
+      },
+      {
+        label: "E",
+        name: "Evening",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 3,
+        start: "15:30",
+        end: "23:30",
+      },
+      {
+        label: "C",
+        name: "Clinic",
+        color: "#FECACA",
+        border_color: "transparent",
+        text_color: "#991B1B",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 4,
+        start: "08:00",
+        end: "17:00",
+      },
+      {
+        label: "ER",
+        name: "ER Shift",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+        is_general: false,
+        faIndex: 3,
+        catIndex: 5,
+        start: "07:00",
+        end: "19:00",
+      },
+      {
+        label: "BH",
+        name: "Behavioral",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+        is_general: false,
+        faIndex: 4,
+        catIndex: 6,
+        start: "08:00",
+        end: "16:00",
+      },
     ] as AssignmentDef[],
     employeeCount: 45,
     indicatorTypes: [
@@ -484,11 +1160,7 @@ const TENANTS = [
     focus_area_label: "Programs",
     certification_label: "Certifications",
     role_label: "Disciplines",
-    focusAreas: [
-      { name: "Inpatient Hospice" },
-      { name: "Home Care" },
-      { name: "Bereavement" },
-    ],
+    focusAreas: [{ name: "Inpatient Hospice" }, { name: "Home Care" }, { name: "Bereavement" }],
     certifications: [
       { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
       { name: "Licensed Practical Nurse", abbr: "LPN", deptIndex: 0 },
@@ -519,26 +1191,165 @@ const TENANTS = [
       { name: "Support Group", start_time: "10:00", end_time: "16:00", faIndex: 2 },
     ],
     absenceTypes: [
-      { label: "X", name: "Off", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B" },
-      { label: "V", name: "Vacation", color: "#A5F3FC", border_color: "transparent", text_color: "#155E75" },
-      { label: "S", name: "Sick", color: "#FECDD3", border_color: "transparent", text_color: "#9F1239" },
-      { label: "PTO", name: "Paid Time Off", color: "#FDE68A", border_color: "transparent", text_color: "#92400E" },
-      { label: "P", name: "Personal", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6" },
-      { label: "B", name: "Bereavement", color: "#BAE6FD", border_color: "transparent", text_color: "#075985" },
-      { label: "J", name: "Jury Duty", color: "#C7D2FE", border_color: "transparent", text_color: "#3730A3" },
-      { label: "H", name: "Holiday", color: "#BBF7D0", border_color: "transparent", text_color: "#166534" },
-      { label: "CME", name: "Education / Training", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212" },
-      { label: "FMLA", name: "Family / Medical Leave", color: "#FBCFE8", border_color: "transparent", text_color: "#9D174D" },
-      { label: "UX", name: "Unpaid Leave", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412" },
+      {
+        label: "X",
+        name: "Off",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+      },
+      {
+        label: "V",
+        name: "Vacation",
+        color: "#A5F3FC",
+        border_color: "transparent",
+        text_color: "#155E75",
+      },
+      {
+        label: "S",
+        name: "Sick",
+        color: "#FECDD3",
+        border_color: "transparent",
+        text_color: "#9F1239",
+      },
+      {
+        label: "PTO",
+        name: "Paid Time Off",
+        color: "#FDE68A",
+        border_color: "transparent",
+        text_color: "#92400E",
+      },
+      {
+        label: "P",
+        name: "Personal",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+      },
+      {
+        label: "B",
+        name: "Bereavement",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+      },
+      {
+        label: "J",
+        name: "Jury Duty",
+        color: "#C7D2FE",
+        border_color: "transparent",
+        text_color: "#3730A3",
+      },
+      {
+        label: "H",
+        name: "Holiday",
+        color: "#BBF7D0",
+        border_color: "transparent",
+        text_color: "#166534",
+      },
+      {
+        label: "CME",
+        name: "Education / Training",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+      },
+      {
+        label: "FMLA",
+        name: "Family / Medical Leave",
+        color: "#FBCFE8",
+        border_color: "transparent",
+        text_color: "#9D174D",
+      },
+      {
+        label: "UX",
+        name: "Unpaid Leave",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+      },
     ] as AbsenceTypeDef[],
     assignments: [
-      { label: "Ofc", name: "Office", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "0.3", name: "Partial", color: "#E2E8F0", border_color: "transparent", text_color: "#1E293B", is_general: true, faIndex: null, catIndex: null },
-      { label: "D", name: "Day", color: "#BAE6FD", border_color: "transparent", text_color: "#075985", is_general: false, faIndex: 0, catIndex: 0, start: "07:00", end: "15:00" },
-      { label: "E", name: "Evening", color: "#DDD6FE", border_color: "transparent", text_color: "#5B21B6", is_general: false, faIndex: 0, catIndex: 1, start: "15:00", end: "23:00" },
-      { label: "N", name: "Night", color: "#FED7AA", border_color: "transparent", text_color: "#9A3412", is_general: false, faIndex: 0, catIndex: 2, start: "23:00", end: "07:00" },
-      { label: "FV", name: "Field Visit", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 1, catIndex: 3, start: "08:00", end: "17:00" },
-      { label: "SG", name: "Support Group", color: "#D9F99D", border_color: "transparent", text_color: "#3F6212", is_general: false, faIndex: 2, catIndex: 4, start: "10:00", end: "16:00" },
+      {
+        label: "Ofc",
+        name: "Office",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "0.3",
+        name: "Partial",
+        color: "#E2E8F0",
+        border_color: "transparent",
+        text_color: "#1E293B",
+        is_general: true,
+        faIndex: null,
+        catIndex: null,
+      },
+      {
+        label: "D",
+        name: "Day",
+        color: "#BAE6FD",
+        border_color: "transparent",
+        text_color: "#075985",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 0,
+        start: "07:00",
+        end: "15:00",
+      },
+      {
+        label: "E",
+        name: "Evening",
+        color: "#DDD6FE",
+        border_color: "transparent",
+        text_color: "#5B21B6",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 1,
+        start: "15:00",
+        end: "23:00",
+      },
+      {
+        label: "N",
+        name: "Night",
+        color: "#FED7AA",
+        border_color: "transparent",
+        text_color: "#9A3412",
+        is_general: false,
+        faIndex: 0,
+        catIndex: 2,
+        start: "23:00",
+        end: "07:00",
+      },
+      {
+        label: "FV",
+        name: "Field Visit",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+        is_general: false,
+        faIndex: 1,
+        catIndex: 3,
+        start: "08:00",
+        end: "17:00",
+      },
+      {
+        label: "SG",
+        name: "Support Group",
+        color: "#D9F99D",
+        border_color: "transparent",
+        text_color: "#3F6212",
+        is_general: false,
+        faIndex: 2,
+        catIndex: 4,
+        start: "10:00",
+        end: "16:00",
+      },
     ] as AssignmentDef[],
     employeeCount: 30,
     indicatorTypes: [
@@ -550,25 +1361,101 @@ const TENANTS = [
 ];
 
 const EMPLOYEE_NAMES = [
-  "Maria Garcia", "James Johnson", "Sarah Williams", "Robert Brown", "Jennifer Davis",
-  "Michael Miller", "Lisa Wilson", "David Moore", "Jessica Taylor", "Thomas Anderson",
-  "Amanda Martinez", "Christopher Robinson", "Ashley Clark", "Daniel Rodriguez", "Emily Lewis",
-  "Matthew Lee", "Stephanie Walker", "Andrew Hall", "Nicole Allen", "Joshua Young",
-  "Megan Hernandez", "Kevin King", "Rachel Wright", "Brian Lopez", "Lauren Hill",
-  "Ryan Scott", "Samantha Green", "Justin Adams", "Heather Baker", "Brandon Nelson",
-  "Amber Carter", "Tyler Mitchell", "Kayla Perez", "Jason Roberts", "Christina Turner",
-  "Nathan Phillips", "Tiffany Campbell", "Eric Parker", "Melissa Evans", "Aaron Edwards",
-  "Rebecca Collins", "Patrick Stewart", "Victoria Morgan", "Sean Murphy", "Hannah Cook",
-  "Cody Rogers", "Catherine Reed", "Derek Bailey", "Danielle Rivera", "Travis Cooper",
-  "Michelle Thomas", "Gregory Jackson", "Brittany White", "Keith Harris", "Diana Martin",
-  "Frank Thompson", "Janet Robinson", "Gary Clark", "Susan Lewis", "Peter Lee",
-  "Carol Walker", "George Young", "Donna Allen", "Timothy King", "Sandra Wright",
-  "Kenneth Scott", "Dorothy Hill", "Steven Green", "Nancy Adams", "Edward Baker",
-  "Carolyn Nelson", "Larry Carter", "Virginia Mitchell", "Raymond Perez", "Debra Roberts",
-  "Jeffrey Turner", "Laura Phillips", "Raymond Campbell", "Judith Parker", "Albert Evans",
-  "Helen Edwards", "Ralph Collins", "Gloria Stewart", "Louis Morgan", "Marie Murphy",
-  "Russell Cook", "Beverly Rogers", "Wayne Reed", "Frances Bailey", "Adam Rivera",
-  "Rose Cooper", "Eugene Thomas", "Patricia Jackson", "Henry White", "Martha Harris",
+  "Maria Garcia",
+  "James Johnson",
+  "Sarah Williams",
+  "Robert Brown",
+  "Jennifer Davis",
+  "Michael Miller",
+  "Lisa Wilson",
+  "David Moore",
+  "Jessica Taylor",
+  "Thomas Anderson",
+  "Amanda Martinez",
+  "Christopher Robinson",
+  "Ashley Clark",
+  "Daniel Rodriguez",
+  "Emily Lewis",
+  "Matthew Lee",
+  "Stephanie Walker",
+  "Andrew Hall",
+  "Nicole Allen",
+  "Joshua Young",
+  "Megan Hernandez",
+  "Kevin King",
+  "Rachel Wright",
+  "Brian Lopez",
+  "Lauren Hill",
+  "Ryan Scott",
+  "Samantha Green",
+  "Justin Adams",
+  "Heather Baker",
+  "Brandon Nelson",
+  "Amber Carter",
+  "Tyler Mitchell",
+  "Kayla Perez",
+  "Jason Roberts",
+  "Christina Turner",
+  "Nathan Phillips",
+  "Tiffany Campbell",
+  "Eric Parker",
+  "Melissa Evans",
+  "Aaron Edwards",
+  "Rebecca Collins",
+  "Patrick Stewart",
+  "Victoria Morgan",
+  "Sean Murphy",
+  "Hannah Cook",
+  "Cody Rogers",
+  "Catherine Reed",
+  "Derek Bailey",
+  "Danielle Rivera",
+  "Travis Cooper",
+  "Michelle Thomas",
+  "Gregory Jackson",
+  "Brittany White",
+  "Keith Harris",
+  "Diana Martin",
+  "Frank Thompson",
+  "Janet Robinson",
+  "Gary Clark",
+  "Susan Lewis",
+  "Peter Lee",
+  "Carol Walker",
+  "George Young",
+  "Donna Allen",
+  "Timothy King",
+  "Sandra Wright",
+  "Kenneth Scott",
+  "Dorothy Hill",
+  "Steven Green",
+  "Nancy Adams",
+  "Edward Baker",
+  "Carolyn Nelson",
+  "Larry Carter",
+  "Virginia Mitchell",
+  "Raymond Perez",
+  "Debra Roberts",
+  "Jeffrey Turner",
+  "Laura Phillips",
+  "Raymond Campbell",
+  "Judith Parker",
+  "Albert Evans",
+  "Helen Edwards",
+  "Ralph Collins",
+  "Gloria Stewart",
+  "Louis Morgan",
+  "Marie Murphy",
+  "Russell Cook",
+  "Beverly Rogers",
+  "Wayne Reed",
+  "Frances Bailey",
+  "Adam Rivera",
+  "Rose Cooper",
+  "Eugene Thomas",
+  "Patricia Jackson",
+  "Henry White",
+  "Martha Harris",
 ];
 
 function dateStr(y: number, m: number, d: number): string {
@@ -592,9 +1479,7 @@ interface ParsedSeedAddress {
 
 function parseUsSeedAddress(address: string): ParsedSeedAddress {
   const normalized = address.replace(/\s*\n\s*/g, ", ").trim();
-  const match = normalized.match(
-    /^(.*?),\s*([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/,
-  );
+  const match = normalized.match(/^(.*?),\s*([^,]+),\s*([A-Z]{2})\s+(\d{5}(?:-\d{4})?)$/);
 
   if (!match) {
     throw new Error(`Unable to parse seed address: ${address}`);
@@ -619,9 +1504,7 @@ function toNumberArray(value: unknown): number[] {
     return [];
   }
 
-  return value
-    .map((entry) => Number(entry))
-    .filter((entry) => Number.isFinite(entry));
+  return value.map((entry) => Number(entry)).filter((entry) => Number.isFinite(entry));
 }
 
 function normalizeSeedLookup(value: string | null | undefined): string {
@@ -633,9 +1516,9 @@ function normalizeSeedLookup(value: string | null | undefined): string {
 }
 
 function uniqueNumbers(values: number[]): number[] {
-  return Array.from(
-    new Set(values.filter((value) => Number.isFinite(value))),
-  ).sort((left, right) => left - right);
+  return Array.from(new Set(values.filter((value) => Number.isFinite(value)))).sort(
+    (left, right) => left - right,
+  );
 }
 
 function toTitleCase(value: string): string {
@@ -650,10 +1533,7 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function getPreferredJobAbbr(
-  role: SeedRoleRow | null,
-  fallback: string,
-): string {
+function getPreferredJobAbbr(role: SeedRoleRow | null, fallback: string): string {
   const abbr = role?.abbr?.trim() ?? "";
   if (abbr.length > 0 && abbr.length <= 4) {
     return abbr;
@@ -682,10 +1562,7 @@ function buildFallbackAbbr(value: string): string {
     .toUpperCase();
 }
 
-function findMatchingRoles(
-  roles: SeedRoleRow[],
-  aliases: string[],
-): SeedRoleRow[] {
+function findMatchingRoles(roles: SeedRoleRow[], aliases: string[]): SeedRoleRow[] {
   const normalizedAliases = uniqueNormalizedAliases(aliases);
   if (normalizedAliases.length === 0) {
     return [];
@@ -712,9 +1589,7 @@ function findMatchingRoles(
 }
 
 function uniqueNormalizedAliases(values: string[]): string[] {
-  return Array.from(
-    new Set(values.map((value) => normalizeSeedLookup(value)).filter(Boolean)),
-  );
+  return Array.from(new Set(values.map((value) => normalizeSeedLookup(value)).filter(Boolean)));
 }
 
 function resolveJobIdentity(
@@ -728,9 +1603,7 @@ function resolveJobIdentity(
   const raw = rawDescriptor.trim();
   const normalized = normalizeSeedLookup(raw);
 
-  const exactAbbrMatches = roles.filter(
-    (role) => normalizeSeedLookup(role.abbr) === normalized,
-  );
+  const exactAbbrMatches = roles.filter((role) => normalizeSeedLookup(role.abbr) === normalized);
   if (exactAbbrMatches.length > 0) {
     const primary = exactAbbrMatches[0];
     return {
@@ -797,9 +1670,7 @@ function resolveJobIdentity(
     return { name: "Partial", abbr: "0.3", eligibleRoleIds: [] };
   }
 
-  const exactNameMatches = roles.filter(
-    (role) => normalizeSeedLookup(role.name) === normalized,
-  );
+  const exactNameMatches = roles.filter((role) => normalizeSeedLookup(role.name) === normalized);
   if (exactNameMatches.length > 0) {
     const primary = exactNameMatches[0];
     return {
@@ -835,26 +1706,16 @@ function deriveJobDescriptor(
     .replace(/\s+/g, " ")
     .trim();
 
-  const removablePhrases = Array.from(
-    new Set([shiftName, shiftNameWithoutShift].filter(Boolean)),
-  );
+  const removablePhrases = Array.from(new Set([shiftName, shiftNameWithoutShift].filter(Boolean)));
   for (const phrase of removablePhrases) {
     working = working.replace(new RegExp(escapeRegExp(phrase), "ig"), " ");
   }
 
   const removableTokens = Array.from(
-    new Set(
-      shiftNameWithoutShift
-        .split(/\s+/)
-        .filter(Boolean)
-        .concat("shift"),
-    ),
+    new Set(shiftNameWithoutShift.split(/\s+/).filter(Boolean).concat("shift")),
   );
   for (const token of removableTokens) {
-    working = working.replace(
-      new RegExp(`\\b${escapeRegExp(token)}\\b`, "ig"),
-      " ",
-    );
+    working = working.replace(new RegExp(`\\b${escapeRegExp(token)}\\b`, "ig"), " ");
   }
 
   working = working
@@ -869,10 +1730,7 @@ function deriveJobDescriptor(
 
   const normalizedShiftName = normalizeSeedLookup(shiftName);
   const normalizedShiftBase = normalizeSeedLookup(shiftNameWithoutShift);
-  if (
-    normalizedWorking === normalizedShiftName ||
-    normalizedWorking === normalizedShiftBase
-  ) {
+  if (normalizedWorking === normalizedShiftName || normalizedWorking === normalizedShiftBase) {
     return null;
   }
 
@@ -883,106 +1741,77 @@ function selectBaseAssignment(
   codes: SeedAssignmentRow[],
   shift: SeedShiftCategoryRow,
 ): SeedAssignmentRow {
-  const baseCandidates = codes.filter(
-    (code) => deriveJobDescriptor(code, shift) == null,
-  );
+  const baseCandidates = codes.filter((code) => deriveJobDescriptor(code, shift) == null);
 
-  return [...(baseCandidates.length > 0 ? baseCandidates : codes)].sort(
-    (left, right) => {
-      if (left.sort_order !== right.sort_order) {
-        return left.sort_order - right.sort_order;
-      }
-      if (left.label.length !== right.label.length) {
-        return left.label.length - right.label.length;
-      }
-      return left.id - right.id;
-    },
-  )[0];
+  return [...(baseCandidates.length > 0 ? baseCandidates : codes)].sort((left, right) => {
+    if (left.sort_order !== right.sort_order) {
+      return left.sort_order - right.sort_order;
+    }
+    if (left.label.length !== right.label.length) {
+      return left.label.length - right.label.length;
+    }
+    return left.id - right.id;
+  })[0];
 }
 
-async function writePublishedWorkScheduleCell(
+async function writePublishedWorkScheduleCellsBatch(
   db: Client,
-  input: {
-    orgId: string;
+  orgId: string,
+  cells: Array<{
     empId: string;
     date: string;
     shiftIds: Array<number | null>;
     jobIds: number[];
     focusAreaId: number | null;
-    customStartTime?: string | null;
-    customEndTime?: string | null;
-    fromRecurring?: boolean;
-  },
+  }>,
 ): Promise<void> {
+  if (cells.length === 0) return;
+  const payload = JSON.stringify(
+    cells.map((c) => ({
+      emp_id: c.empId,
+      dt: c.date,
+      shift_ids: c.shiftIds,
+      job_ids: c.jobIds,
+      focus_area_id: c.focusAreaId,
+    })),
+  );
   await db.query(
     `SELECT public.write_schedule_cell_snapshot_internal(
-       $1::uuid,
-       $2::uuid,
-       $3::date,
-       'published',
-       'worked',
-       COALESCE($4::bigint[], '{}'::bigint[]),
-       COALESCE($5::bigint[], '{}'::bigint[]),
-       NULL,
-       $6::text,
-       $7::text,
-       NULL,
-       COALESCE($8::boolean, false),
-       $9::bigint,
-       NULL,
-       NULL
+       $1::uuid, x.emp_id, x.dt, 'published', 'worked',
+       COALESCE(x.shift_ids, '{}'::bigint[]),
+       COALESCE(x.job_ids, '{}'::bigint[]),
+       NULL, NULL, NULL, NULL, false, x.focus_area_id, NULL, NULL
+     )
+     FROM jsonb_to_recordset($2::jsonb) AS x(
+       emp_id uuid, dt date, shift_ids bigint[], job_ids bigint[], focus_area_id bigint
      )`,
-    [
-      input.orgId,
-      input.empId,
-      input.date,
-      input.shiftIds,
-      input.jobIds,
-      input.customStartTime ?? null,
-      input.customEndTime ?? null,
-      input.fromRecurring ?? false,
-      input.focusAreaId,
-    ],
+    [orgId, payload],
   );
 }
 
-async function writePublishedAbsenceScheduleCell(
+async function writePublishedAbsenceScheduleCellsBatch(
   db: Client,
-  input: {
-    orgId: string;
-    empId: string;
-    date: string;
-    absenceTypeId: number;
-    focusAreaId?: number | null;
-    fromRecurring?: boolean;
-  },
+  orgId: string,
+  cells: Array<{ empId: string; date: string; absenceTypeId: number }>,
 ): Promise<void> {
+  if (cells.length === 0) return;
+  const payload = JSON.stringify(
+    cells.map((c) => ({
+      emp_id: c.empId,
+      dt: c.date,
+      absence_type_id: c.absenceTypeId,
+    })),
+  );
   await db.query(
     `SELECT public.write_schedule_cell_snapshot_internal(
-       $1::uuid,
-       $2::uuid,
-       $3::date,
-       'published',
-       'absence',
-       '{}'::bigint[],
-       '{}'::bigint[],
-       $4::bigint,
-       NULL,
-       NULL,
-       NULL,
-       COALESCE($5::boolean, false),
-       $6::bigint,
-       NULL,
-       NULL
+       $1::uuid, x.emp_id, x.dt, 'published', 'absence',
+       '{}'::bigint[], '{}'::bigint[], x.absence_type_id,
+       NULL, NULL, NULL, false, NULL, NULL, NULL
+     )
+     FROM jsonb_to_recordset($2::jsonb) AS x(
+       emp_id uuid, dt date, absence_type_id bigint
      )`,
-    [
-      input.orgId,
-      input.empId,
-      input.date,
-      input.absenceTypeId,
-      input.fromRecurring ?? false,
-      input.focusAreaId ?? null,
-    ],
+    [orgId, payload],
   );
 }
 
@@ -1001,9 +1830,7 @@ function splitSqlBeforeFinalScheduleBlock(sql: string): {
   const scheduleSql = sql.slice(lastDoIndex).trim();
 
   if (!scheduleSql.includes("write_schedule_cell_snapshot_internal")) {
-    throw new Error(
-      "Expected final DO block in tenant SQL seed file to seed schedule cells",
-    );
+    throw new Error("Expected final DO block in tenant SQL seed file to seed schedule cells");
   }
 
   return { prefixSql, scheduleSql };
@@ -1029,7 +1856,9 @@ async function seedTenantSqlBeforeSchedule(
     await db.query(scheduleSql);
   }
 
-  const { rows: [counts] } = await db.query(
+  const {
+    rows: [counts],
+  } = await db.query(
     `SELECT
        COUNT(*)::int AS total_job_count,
        COUNT(*) FILTER (WHERE assignment_mode = 'with_shift')::int AS scheduled_job_count,
@@ -1162,19 +1991,15 @@ async function seedJobsForOrg(
       const existing = scheduledJobMap.get(key);
       const shiftDepartmentId =
         shift.focus_area_id != null
-          ? focusAreaDepartmentById.get(shift.focus_area_id) ?? null
+          ? (focusAreaDepartmentById.get(shift.focus_area_id) ?? null)
           : null;
       const nextTimeOverride = deriveShiftTimeOverride(code, shift);
       if (existing) {
         existing.focus_area_ids = uniqueNumbers(
-          existing.focus_area_ids.concat(
-            shift.focus_area_id != null ? [shift.focus_area_id] : [],
-          ),
+          existing.focus_area_ids.concat(shift.focus_area_id != null ? [shift.focus_area_id] : []),
         );
         existing.department_ids = uniqueNumbers(
-          existing.department_ids.concat(
-            shiftDepartmentId != null ? [shiftDepartmentId] : [],
-          ),
+          existing.department_ids.concat(shiftDepartmentId != null ? [shiftDepartmentId] : []),
         );
         existing.applicable_shift_ids = uniqueNumbers(
           existing.applicable_shift_ids.concat(shift.id),
@@ -1183,9 +2008,7 @@ async function seedJobsForOrg(
           existing.eligible_role_ids.concat(identity.eligibleRoleIds),
         );
         existing.required_certification_ids = uniqueNumbers(
-          existing.required_certification_ids.concat(
-            code.required_certification_ids,
-          ),
+          existing.required_certification_ids.concat(code.required_certification_ids),
         );
         if (nextTimeOverride) {
           existing.shift_time_overrides[String(shift.id)] = nextTimeOverride;
@@ -1203,9 +2026,7 @@ async function seedJobsForOrg(
           department_ids: shiftDepartmentId != null ? [shiftDepartmentId] : [],
           applicable_shift_ids: [shift.id],
           eligible_role_ids: identity.eligibleRoleIds,
-          required_certification_ids: uniqueNumbers(
-            code.required_certification_ids,
-          ),
+          required_certification_ids: uniqueNumbers(code.required_certification_ids),
           color: "#E2E8F0",
           border_color: "transparent",
           text_color: "#1E293B",
@@ -1238,15 +2059,11 @@ async function seedJobsForOrg(
         existing.eligible_role_ids.concat(identity.eligibleRoleIds),
       );
       existing.required_certification_ids = uniqueNumbers(
-        existing.required_certification_ids.concat(
-          code.required_certification_ids,
-        ),
+        existing.required_certification_ids.concat(code.required_certification_ids),
       );
       existing.sort_order = Math.min(existing.sort_order, code.sort_order);
-      existing.default_start_time =
-        existing.default_start_time ?? code.default_start_time;
-      existing.default_end_time =
-        existing.default_end_time ?? code.default_end_time;
+      existing.default_start_time = existing.default_start_time ?? code.default_start_time;
+      existing.default_end_time = existing.default_end_time ?? code.default_end_time;
       existing.default_duration_hours =
         existing.default_duration_hours ?? code.default_duration_hours;
       existing.default_duration_minutes =
@@ -1263,9 +2080,7 @@ async function seedJobsForOrg(
         department_ids: [],
         applicable_shift_ids: [],
         eligible_role_ids: identity.eligibleRoleIds,
-        required_certification_ids: uniqueNumbers(
-          code.required_certification_ids,
-        ),
+        required_certification_ids: uniqueNumbers(code.required_certification_ids),
         color: code.color,
         border_color: code.border_color,
         text_color: code.text_color,
@@ -1313,11 +2128,8 @@ async function seedJobsForOrg(
             ),
           );
     const placementShiftIds = uniqueNumbers(
-      placementFocusAreaIds.flatMap(
-        (focusAreaId) => shiftIdsByFocusAreaId.get(focusAreaId) ?? [],
-      ),
+      placementFocusAreaIds.flatMap((focusAreaId) => shiftIdsByFocusAreaId.get(focusAreaId) ?? []),
     );
-
   }
   const shiftlessJobs = [...shiftlessJobMap.values()].sort((left, right) => {
     if (left.sort_order !== right.sort_order) {
@@ -1332,80 +2144,92 @@ async function seedJobsForOrg(
   }));
 
   const jobIdByKey = new Map<string, number>();
-  for (const job of orderedJobs) {
-    const { rows: [row] } = await db.query(
-      `INSERT INTO public.jobs (
-         org_id,
-         name,
-         abbr,
-         show_on_grid,
-         assignment_mode,
-         eligibility_mode,
-         focus_area_ids,
-         department_ids,
-         applicable_shift_ids,
-         eligible_role_ids,
-         required_certification_ids,
-         color,
-         border_color,
-         text_color,
-         shift_time_overrides,
-         shift_color_overrides,
-         default_start_time,
-         default_end_time,
-         default_duration_hours,
-         default_duration_minutes,
-         sort_order,
-         system_key
+  if (orderedJobs.length > 0) {
+    const jobSeeds = orderedJobs.map((job) => ({
+      key: job.key,
+      name: job.name,
+      abbr: job.abbr,
+      show_on_grid: job.show_on_grid,
+      assignment_mode: job.assignment_mode,
+      eligibility_mode: job.eligibility_mode,
+      focus_area_ids: job.focus_area_ids,
+      department_ids: job.department_ids,
+      applicable_shift_ids: job.applicable_shift_ids,
+      eligible_role_ids: job.eligible_role_ids,
+      required_certification_ids: job.required_certification_ids,
+      color: job.color,
+      border_color: job.border_color,
+      text_color: job.text_color,
+      shift_time_overrides: job.shift_time_overrides,
+      shift_color_overrides: job.shift_color_overrides,
+      default_start_time: job.default_start_time,
+      default_end_time: job.default_end_time,
+      default_duration_hours: job.default_duration_hours,
+      default_duration_minutes: job.default_duration_minutes,
+      sort_order: job.sort_order,
+      system_key: job.system_key,
+    }));
+    const { rows } = await db.query(
+      `WITH input AS (
+         SELECT * FROM jsonb_to_recordset($2::jsonb) AS x(
+           key text, name text, abbr text, show_on_grid boolean,
+           assignment_mode text, eligibility_mode text,
+           focus_area_ids bigint[], department_ids bigint[],
+           applicable_shift_ids bigint[], eligible_role_ids bigint[],
+           required_certification_ids bigint[],
+           color text, border_color text, text_color text,
+           shift_time_overrides jsonb, shift_color_overrides jsonb,
+           default_start_time time, default_end_time time,
+           default_duration_hours smallint, default_duration_minutes smallint,
+           sort_order int, system_key text
+         )
+       ),
+       inserted AS (
+         INSERT INTO public.jobs (
+           org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode,
+           focus_area_ids, department_ids, applicable_shift_ids,
+           eligible_role_ids, required_certification_ids,
+           color, border_color, text_color,
+           shift_time_overrides, shift_color_overrides,
+           default_start_time, default_end_time,
+           default_duration_hours, default_duration_minutes,
+           sort_order, system_key
+         )
+         SELECT $1, name, abbr, show_on_grid, assignment_mode, eligibility_mode,
+                focus_area_ids, department_ids, applicable_shift_ids,
+                eligible_role_ids, required_certification_ids,
+                color, border_color, text_color,
+                shift_time_overrides, shift_color_overrides,
+                default_start_time, default_end_time,
+                default_duration_hours, default_duration_minutes,
+                sort_order, system_key
+         FROM input
+         RETURNING id, sort_order
        )
-       VALUES (
-         $1, $2, $3, $4, $5, $6,
-         $7::bigint[],
-         $8::bigint[],
-         $9::bigint[],
-         $10::bigint[],
-         $11::bigint[],
-         $12, $13, $14, $15::jsonb, $16::jsonb, $17, $18, $19, $20, $21, $22
-       )
-       RETURNING id`,
-      [
-        orgId,
-        job.name,
-        job.abbr,
-        job.show_on_grid,
-        job.assignment_mode,
-        job.eligibility_mode,
-        job.focus_area_ids,
-        job.department_ids,
-        job.applicable_shift_ids,
-        job.eligible_role_ids,
-        job.required_certification_ids,
-        job.color,
-        job.border_color,
-        job.text_color,
-        JSON.stringify(job.shift_time_overrides),
-        JSON.stringify(job.shift_color_overrides),
-        job.default_start_time,
-        job.default_end_time,
-        job.default_duration_hours,
-        job.default_duration_minutes,
-        job.sort_order,
-        job.system_key,
-      ],
+       SELECT i.id, inp.key
+       FROM inserted i
+       JOIN input inp ON inp.sort_order = i.sort_order
+       ORDER BY inp.sort_order`,
+      [orgId, JSON.stringify(jobSeeds)],
     );
-    jobIdByKey.set(job.key, id(row.id));
+    for (const row of rows) {
+      jobIdByKey.set(row.key, id(row.id));
+    }
   }
 
+  const shiftAbbrUpdatesToApply: Array<{ shift_id: number; abbr: string }> = [];
   for (const [shiftId, abbr] of shiftAbbrUpdates) {
     const shift = shiftById.get(shiftId);
-    if (shift?.abbr?.trim()) {
-      continue;
-    }
+    if (shift?.abbr?.trim()) continue;
+    shiftAbbrUpdatesToApply.push({ shift_id: shiftId, abbr });
+  }
+  if (shiftAbbrUpdatesToApply.length > 0) {
     await db.query(
-      `UPDATE public.shift_categories
-       SET abbr = $1
-       WHERE id = $2`,
-      [abbr, shiftId],
+      `UPDATE public.shift_categories sc
+       SET abbr = u.abbr
+       FROM jsonb_to_recordset($1::jsonb) AS u(shift_id bigint, abbr text)
+       WHERE sc.id = u.shift_id`,
+      [JSON.stringify(shiftAbbrUpdatesToApply)],
     );
   }
 
@@ -1451,7 +2275,9 @@ async function main() {
     const password = process.env.SUPABASE_DB_PASSWORD;
     if (!password) {
       console.error("ERROR: SUPABASE_DB_PASSWORD not found for remote DB.");
-      console.error("Ensure it's set in Vercel env vars, or use `npm run db:reset:remote` which handles this automatically.");
+      console.error(
+        "Ensure it's set in Vercel env vars, or use `npm run db:reset:remote` which handles this automatically.",
+      );
       process.exit(1);
     }
     connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
@@ -1505,7 +2331,9 @@ async function main() {
 
     // 1. Organization
     const addressFields = parseUsSeedAddress(tenant.address);
-    const { rows: [org] } = await db.query(
+    const {
+      rows: [org],
+    } = await db.query(
       `INSERT INTO public.organizations (
          name,
          slug,
@@ -1543,105 +2371,198 @@ async function main() {
         tenant.role_label,
         "Scheduled Departments",
         tenant.employeeCount,
-      ]
+      ],
     );
     const orgId: string = org.id;
 
     // 2. Departments
     const deptIds: number[] = [];
-    if (tenant.departments) {
-      for (let i = 0; i < tenant.departments.length; i++) {
-        const dept = tenant.departments[i];
-        const deptAbbr = ((dept as { abbr?: string }).abbr ?? "").trim() || deriveSeedAbbr(dept.name, "DEPT");
-        const { rows: [row] } = await db.query(
-          `INSERT INTO public.departments (org_id, name, abbr, type, sort_order, permissions)
-           VALUES ($1, $2, $3, $4::department_type, $5, $6::jsonb) RETURNING id`,
-          [orgId, dept.name, deptAbbr, dept.type, i, dept.permissions ? JSON.stringify(dept.permissions) : null]
-        );
-        deptIds.push(id(row.id));
-      }
+    if (tenant.departments && tenant.departments.length > 0) {
+      const deptSeeds = tenant.departments.map((dept, i) => ({
+        name: dept.name,
+        abbr: ((dept as { abbr?: string }).abbr ?? "").trim() || deriveSeedAbbr(dept.name, "DEPT"),
+        type: dept.type,
+        sort_order: i,
+        permissions: dept.permissions ?? null,
+      }));
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.departments (org_id, name, abbr, type, sort_order, permissions)
+           SELECT $1, name, abbr, type::department_type, sort_order, permissions
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             name text, abbr text, type text, sort_order int, permissions jsonb
+           )
+           RETURNING id, sort_order
+         )
+         SELECT id FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(deptSeeds)],
+      );
+      for (const row of rows) deptIds.push(id(row.id));
     }
 
     // 3. Focus Areas
     const focusAreaIds: number[] = [];
-    for (let i = 0; i < tenant.focusAreas.length; i++) {
-      const fa = tenant.focusAreas[i];
-      const deptId = tenant.focusAreaDeptIndex?.[i] != null
-        ? deptIds[tenant.focusAreaDeptIndex[i]]
-        : null;
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.focus_areas (org_id, department_id, name, color, sort_order)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [
-          orgId,
-          deptId,
-          fa.name,
-          FOCUS_AREA_PRESET_COLORS[i % FOCUS_AREA_PRESET_COLORS.length],
-          i,
-        ]
+    if (tenant.focusAreas.length > 0) {
+      const faSeeds = tenant.focusAreas.map((fa, i) => ({
+        department_id:
+          tenant.focusAreaDeptIndex?.[i] != null ? deptIds[tenant.focusAreaDeptIndex[i]] : null,
+        name: fa.name,
+        color: FOCUS_AREA_PRESET_COLORS[i % FOCUS_AREA_PRESET_COLORS.length],
+        sort_order: i,
+      }));
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.focus_areas (org_id, department_id, name, color, sort_order)
+           SELECT $1, department_id, name, color, sort_order
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             department_id bigint, name text, color text, sort_order int
+           )
+           RETURNING id, sort_order
+         )
+         SELECT id FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(faSeeds)],
       );
-      focusAreaIds.push(id(row.id));
+      for (const row of rows) focusAreaIds.push(id(row.id));
     }
 
     // 4. Certifications
     const certIds: number[] = [];
-    for (let i = 0; i < tenant.certifications.length; i++) {
-      const c = tenant.certifications[i];
-      const deptId = c.deptIndex != null ? deptIds[c.deptIndex] : null;
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.certifications (org_id, department_id, name, abbr, sort_order)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [orgId, deptId, c.name, c.abbr, i]
+    if (tenant.certifications.length > 0) {
+      const certSeeds = tenant.certifications.map((c, i) => ({
+        department_id: c.deptIndex != null ? deptIds[c.deptIndex] : null,
+        name: c.name,
+        abbr: c.abbr,
+        sort_order: i,
+      }));
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.certifications (org_id, department_id, name, abbr, sort_order)
+           SELECT $1, department_id, name, abbr, sort_order
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             department_id bigint, name text, abbr text, sort_order int
+           )
+           RETURNING id, sort_order
+         )
+         SELECT id FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(certSeeds)],
       );
-      certIds.push(id(row.id));
+      for (const row of rows) certIds.push(id(row.id));
     }
 
     // 5. Organization Roles
     const roleIds: number[] = [];
-    for (let i = 0; i < tenant.orgRoles.length; i++) {
-      const r = tenant.orgRoles[i];
-      const deptId = r.deptIndex != null ? deptIds[r.deptIndex] : null;
-      const isScheduleRole =
-        (r as { isScheduleRole?: boolean }).isScheduleRole ?? true;
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.organization_roles (org_id, department_id, name, abbr, is_schedule_role, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-        [orgId, deptId, r.name, r.abbr, isScheduleRole, i]
+    if (tenant.orgRoles.length > 0) {
+      const roleSeeds = tenant.orgRoles.map((r, i) => ({
+        department_id: r.deptIndex != null ? deptIds[r.deptIndex] : null,
+        name: r.name,
+        abbr: r.abbr,
+        is_schedule_role: (r as { isScheduleRole?: boolean }).isScheduleRole ?? true,
+        sort_order: i,
+      }));
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.organization_roles (org_id, department_id, name, abbr, is_schedule_role, sort_order)
+           SELECT $1, department_id, name, abbr, is_schedule_role, sort_order
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             department_id bigint, name text, abbr text, is_schedule_role boolean, sort_order int
+           )
+           RETURNING id, sort_order
+         )
+         SELECT id FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(roleSeeds)],
       );
-      roleIds.push(id(row.id));
+      for (const row of rows) roleIds.push(id(row.id));
     }
 
     // 6. Shift Categories
+    // Codes are unique per (org, focus_area). Same code may repeat across
+    // different focus areas (e.g. "D" for Day Shift in each area). Within a
+    // focus area, suffix with a counter on collision as a last-resort guard.
     const catIds: number[] = [];
-      for (let i = 0; i < tenant.shiftCategories.length; i++) {
-        const cat = tenant.shiftCategories[i];
+    if (tenant.shiftCategories.length > 0) {
+      const usedAbbrsByArea = new Map<number | null, Set<string>>();
+      const catSeeds = tenant.shiftCategories.map((cat, i) => {
         const faId = cat.faIndex !== null ? focusAreaIds[cat.faIndex] : null;
-        const catAbbr = ((cat as { abbr?: string }).abbr ?? "").trim() || deriveSeedAbbr(cat.name, "SHF");
+        const baseAbbr = (
+          ((cat as { abbr?: string }).abbr ?? "").trim() || deriveSeedAbbr(cat.name, "SHF")
+        ).toUpperCase();
+        const areaKey: number | null = faId ?? null;
+        let usedInArea = usedAbbrsByArea.get(areaKey);
+        if (!usedInArea) {
+          usedInArea = new Set<string>();
+          usedAbbrsByArea.set(areaKey, usedInArea);
+        }
+        let catAbbr = baseAbbr;
+        let suffix = 2;
+        while (usedInArea.has(catAbbr)) {
+          catAbbr = `${baseAbbr}${suffix}`.slice(0, 8);
+          suffix++;
+        }
+        usedInArea.add(catAbbr);
         const catBreakMinutes = (cat as { break_minutes?: number | null }).break_minutes ?? null;
         const catColor =
-          tenant.assignments.find((assignment) => assignment.catIndex === i && !assignment.is_general)?.color ??
-          DEFAULT_JOB_PRESET.bg;
-        const { rows: [row] } = await db.query(
-        `INSERT INTO public.shift_categories (org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-        [orgId, cat.name, catAbbr, cat.start_time, cat.end_time, catColor, i, faId, catBreakMinutes]
+          tenant.assignments.find(
+            (assignment) => assignment.catIndex === i && !assignment.is_general,
+          )?.color ?? DEFAULT_JOB_PRESET.bg;
+        return {
+          name: cat.name,
+          abbr: catAbbr,
+          start_time: cat.start_time,
+          end_time: cat.end_time,
+          color: catColor,
+          sort_order: i,
+          focus_area_id: faId,
+          break_minutes: catBreakMinutes,
+        };
+      });
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.shift_categories
+             (org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes)
+           SELECT $1, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             name text, abbr text, start_time time, end_time time, color text,
+             sort_order int, focus_area_id bigint, break_minutes int
+           )
+           RETURNING id, sort_order
+         )
+         SELECT id FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(catSeeds)],
       );
-      catIds.push(id(row.id));
+      for (const row of rows) catIds.push(id(row.id));
     }
 
     // 7a. Absence Types
-    interface AbsenceTypeRow { id: number; label: string }
+    interface AbsenceTypeRow {
+      id: number;
+      label: string;
+    }
     const absenceTypeRows: AbsenceTypeRow[] = [];
-    for (let i = 0; i < tenant.absenceTypes.length; i++) {
-      const at = tenant.absenceTypes[i];
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.absence_types
-           (org_id, label, name, color, border_color, text_color, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         RETURNING id, label`,
-        [orgId, at.label, at.name, at.color, at.border_color, at.text_color, i]
+    if (tenant.absenceTypes.length > 0) {
+      const absenceSeeds = tenant.absenceTypes.map((at, i) => ({
+        label: at.label,
+        name: at.name,
+        color: at.color,
+        border_color: at.border_color,
+        text_color: at.text_color,
+        sort_order: i,
+      }));
+      const { rows } = await db.query(
+        `WITH inserted AS (
+           INSERT INTO public.absence_types
+             (org_id, label, name, color, border_color, text_color, sort_order)
+           SELECT $1, label, name, color, border_color, text_color, sort_order
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             label text, name text, color text, border_color text, text_color text, sort_order int
+           )
+           RETURNING id, label, sort_order
+         )
+         SELECT id, label FROM inserted ORDER BY sort_order`,
+        [orgId, JSON.stringify(absenceSeeds)],
       );
-      absenceTypeRows.push({ id: id(row.id), label: row.label });
+      for (const row of rows) {
+        absenceTypeRows.push({ id: id(row.id), label: row.label });
+      }
     }
 
     const assignmentRows: SeedAssignmentRow[] = tenant.assignments.map((assignment, index) => ({
@@ -1652,10 +2573,8 @@ async function main() {
       border_color: assignment.border_color,
       text_color: assignment.text_color,
       is_general: assignment.is_general,
-      focus_area_id:
-        assignment.faIndex !== null ? focusAreaIds[assignment.faIndex] : null,
-      category_id:
-        assignment.catIndex !== null ? catIds[assignment.catIndex] : null,
+      focus_area_id: assignment.faIndex !== null ? focusAreaIds[assignment.faIndex] : null,
+      category_id: assignment.catIndex !== null ? catIds[assignment.catIndex] : null,
       sort_order: index,
       default_start_time: assignment.start ?? null,
       default_end_time: assignment.end ?? null,
@@ -1665,12 +2584,17 @@ async function main() {
     }));
 
     // 8. Indicator Types
-    for (let i = 0; i < tenant.indicatorTypes.length; i++) {
-      const it = tenant.indicatorTypes[i];
+    if (tenant.indicatorTypes.length > 0) {
+      const indSeeds = tenant.indicatorTypes.map((it, i) => ({
+        name: it.name,
+        color: it.color,
+        sort_order: i,
+      }));
       await db.query(
         `INSERT INTO public.indicator_types (org_id, name, color, sort_order)
-         VALUES ($1, $2, $3, $4)`,
-        [orgId, it.name, it.color, i]
+         SELECT $1, name, color, sort_order
+         FROM jsonb_to_recordset($2::jsonb) AS x(name text, color text, sort_order int)`,
+        [orgId, JSON.stringify(indSeeds)],
       );
     }
 
@@ -1681,61 +2605,120 @@ async function main() {
       globalNameIdx++;
     }
 
-    interface EmpRow { id: string; focus_area_ids: number[]; status: string }
-    const employees: EmpRow[] = [];
-    for (let i = 0; i < empNames.length; i++) {
-      const fullName = empNames[i];
+    interface EmpRow {
+      id: string;
+      focus_area_ids: number[];
+      status: string;
+    }
+    interface EmpSeed {
+      first_name: string;
+      last_name: string;
+      seniority: number;
+      phone: string;
+      email: string;
+      certification_id: number;
+      role_ids: number[];
+      focus_area_ids: number[];
+      status: string;
+    }
+    const empSeeds: EmpSeed[] = empNames.map((fullName, i) => {
       const nameParts = fullName.split(" ");
       const lastName = nameParts.pop()!;
       const firstName = nameParts.join(" ") || lastName;
       const certId = certIds[i % certIds.length];
-      // Spread employees across focus areas evenly
       const primaryFaIdx = i % focusAreaIds.length;
       const empFaIds = [focusAreaIds[primaryFaIdx]];
-      // Every 3rd employee gets a secondary focus area
       if (i % 3 === 0 && focusAreaIds.length > 1) {
         empFaIds.push(focusAreaIds[(primaryFaIdx + 1) % focusAreaIds.length]);
       }
       const empRoleIds = i % 4 === 0 ? [roleIds[i % roleIds.length]] : [];
-      const status = i < empNames.length - 2 ? "active" : i === empNames.length - 2 ? "benched" : "terminated";
+      const status =
+        i < empNames.length - 2 ? "active" : i === empNames.length - 2 ? "inactive" : "removed";
+      return {
+        first_name: firstName,
+        last_name: lastName,
+        seniority: empNames.length - i,
+        phone: copycat.phoneNumber(`${tenant.slug}-${fullName}-${i}`),
+        email: copycat.email(`${tenant.slug}-${fullName}-${i}`),
+        certification_id: certId,
+        role_ids: empRoleIds,
+        focus_area_ids: empFaIds,
+        status,
+      };
+    });
 
-      const { rows: [row] } = await db.query(
-        `INSERT INTO public.employees
-           (org_id, first_name, last_name, seniority, phone, email, contact_notes, certification_id, role_ids, focus_area_ids, status, status_note)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::bigint[],$10::integer[],$11::employee_status,$12)
-         RETURNING id, focus_area_ids, status`,
-        [orgId, firstName, lastName, empNames.length - i,
-         copycat.phoneNumber(`${tenant.slug}-${fullName}-${i}`),
-         copycat.email(`${tenant.slug}-${fullName}-${i}`),
-         "", certId, empRoleIds, empFaIds, status, ""]
+    const employees: EmpRow[] = [];
+    if (empSeeds.length > 0) {
+      const { rows: empRows } = await db.query(
+        `WITH input AS (
+           SELECT *, (row_number() OVER ())::int AS ord
+           FROM jsonb_to_recordset($2::jsonb) AS x(
+             first_name text, last_name text, seniority int, phone text, email text,
+             certification_id bigint, role_ids bigint[], focus_area_ids bigint[], status text
+           )
+         ),
+         inserted AS (
+           INSERT INTO public.employees
+             (org_id, first_name, last_name, seniority, phone, email, contact_notes,
+              certification_id, role_ids, focus_area_ids, status, status_note, archived_at)
+           SELECT $1, first_name, last_name, seniority, phone, email, '',
+                  certification_id, role_ids, focus_area_ids, status::employee_status, '',
+                  CASE WHEN status = 'removed' THEN NOW() ELSE NULL END
+           FROM input
+           RETURNING id, first_name, last_name, seniority, focus_area_ids, status
+         )
+         SELECT i.id, i.focus_area_ids, i.status
+         FROM inserted i
+         JOIN input inp
+           ON inp.first_name = i.first_name
+          AND inp.last_name = i.last_name
+          AND inp.seniority = i.seniority
+         ORDER BY inp.ord`,
+        [orgId, JSON.stringify(empSeeds)],
       );
-      employees.push({
-        id: row.id,
-        focus_area_ids: (row.focus_area_ids ?? []).map(id),
-        status: row.status,
-      });
+      for (const row of empRows) {
+        employees.push({
+          id: row.id,
+          focus_area_ids: (row.focus_area_ids ?? []).map(id),
+          status: row.status,
+        });
+      }
     }
 
     // 9b. Assign ~20% of employees to management departments
     // Every 5th employee gets a mgmt dept. First of each pair is a dept admin, rest are users.
-    const mgmtDeptIds = deptIds.filter((_, idx) => tenant.departments?.[idx]?.type === 'management');
+    const mgmtDeptIds = deptIds.filter(
+      (_, idx) => tenant.departments?.[idx]?.type === "management",
+    );
     if (mgmtDeptIds.length > 0) {
-      let adminToggle = true; // alternate admin/user within each dept
+      const mgmtUpdates: Array<{ emp_id: string; dept_ids: number[]; admin_ids: number[] }> = [];
+      let adminToggle = true;
       for (let i = 0; i < employees.length; i++) {
         if (i % 5 === 0) {
           const mgmtId = mgmtDeptIds[i % mgmtDeptIds.length];
-          await db.query(
-            `UPDATE public.employees SET department_ids = $1, dept_admin_ids = $2 WHERE id = $3`,
-            [[mgmtId], adminToggle ? [mgmtId] : [], employees[i].id]
-          );
+          mgmtUpdates.push({
+            emp_id: employees[i].id,
+            dept_ids: [mgmtId],
+            admin_ids: adminToggle ? [mgmtId] : [],
+          });
           adminToggle = !adminToggle;
         }
+      }
+      if (mgmtUpdates.length > 0) {
+        await db.query(
+          `UPDATE public.employees e
+           SET department_ids = u.dept_ids,
+               dept_admin_ids = u.admin_ids
+           FROM jsonb_to_recordset($1::jsonb) AS u(emp_id uuid, dept_ids bigint[], admin_ids bigint[])
+           WHERE e.id = u.emp_id`,
+          [JSON.stringify(mgmtUpdates)],
+        );
       }
     }
 
     const seededJobs = await seedJobsForOrg(db, orgId, assignmentRows);
 
-    // 10. Schedule cells (April 19 – May 2, 2026 — 2 weeks of data)
+    // 10. Schedule cells (Jul 5 – Jul 18, 2026 — 2 weeks of data)
     const offAbsenceType = absenceTypeRows[0]; // First absence type (e.g., "Off")
     let shiftCount = 0;
 
@@ -1753,16 +2736,15 @@ async function main() {
     }> = [];
 
     for (const emp of employees) {
-      if (emp.status === "terminated") continue;
+      if (emp.status === "removed") continue;
       const primaryFaId = emp.focus_area_ids[0] ?? null;
       const empWorkAssignments = seededJobs.resolvedAssignments.filter(
         (assignment) =>
-          assignment.focus_area_id === primaryFaId ||
-          assignment.focus_area_id === null,
+          assignment.focus_area_id === primaryFaId || assignment.focus_area_id === null,
       );
       if (empWorkAssignments.length === 0) continue;
 
-      const shiftStart = new Date(2026, 3, 19); // April 19, 2026
+      const shiftStart = new Date(2026, 6, 5); // July 5, 2026
       for (let i = 0; i < 14; i++) {
         const d = new Date(shiftStart);
         d.setDate(d.getDate() + i);
@@ -1781,8 +2763,7 @@ async function main() {
             });
           }
         } else {
-          const assignment =
-            empWorkAssignments[i % empWorkAssignments.length];
+          const assignment = empWorkAssignments[i % empWorkAssignments.length];
           const faId = assignment.focus_area_id ?? primaryFaId;
           workShiftValues.push({
             empId: emp.id,
@@ -1796,27 +2777,12 @@ async function main() {
       }
     }
 
-    for (const workShift of workShiftValues) {
-      await writePublishedWorkScheduleCell(db, {
-        orgId,
-        empId: workShift.empId,
-        date: workShift.date,
-        shiftIds: workShift.shiftIds,
-        jobIds: workShift.jobIds,
-        focusAreaId: workShift.focusAreaId,
-      });
-    }
+    await writePublishedWorkScheduleCellsBatch(db, orgId, workShiftValues);
+    await writePublishedAbsenceScheduleCellsBatch(db, orgId, absenceValues);
 
-    for (const absence of absenceValues) {
-      await writePublishedAbsenceScheduleCell(db, {
-        orgId,
-        empId: absence.empId,
-        date: absence.date,
-        absenceTypeId: absence.absenceTypeId,
-      });
-    }
-
-    console.log(`    ✓ ${deptIds.length} depts, ${tenant.focusAreas.length} focus areas, ${tenant.certifications.length} certs, ${tenant.assignments.length} schedule labels, ${seededJobs.totalJobCount} jobs, ${employees.length} employees, ${shiftCount} shifts`);
+    console.log(
+      `    ✓ ${deptIds.length} depts, ${tenant.focusAreas.length} focus areas, ${tenant.certifications.length} certs, ${tenant.assignments.length} schedule labels, ${seededJobs.totalJobCount} jobs, ${employees.length} employees, ${shiftCount} shifts`,
+    );
   }
 
   // ── Calm Haven (6th tenant) — from SQL seed file ────────────────────
@@ -1824,25 +2790,29 @@ async function main() {
 
   const calmHavenJobs = await seedTenantSqlBeforeSchedule(
     db,
-    'supabase/seed_calm_haven.sql',
+    "supabase/seed_calm_haven.sql",
     "b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90",
   );
 
-  console.log(`    ✓ 4 focus areas, 6 certs, 8 roles, 17 schedule labels, ${calmHavenJobs.totalJobCount} jobs, 28 employees, shifts seeded`);
+  console.log(
+    `    ✓ 4 focus areas, 6 certs, 8 roles, 17 schedule labels, ${calmHavenJobs.totalJobCount} jobs, 28 employees, shifts seeded`,
+  );
 
   // ── Arden Wood (7th tenant) — Calm Haven config + PDF-derived roster ──────
   console.log(`\n  [7/7] Arden Wood...`);
 
   const ardenWoodJobs = await seedTenantSqlBeforeSchedule(
     db,
-    'supabase/seed_arden_wood.sql',
+    "supabase/seed_arden_wood.sql",
     "964c29d1-dc1e-4cd6-861c-8b8ab00d20c0",
   );
 
-  const gridmasterSql = readFileSync('supabase/seed_gridmaster.sql', 'utf8');
+  const gridmasterSql = readFileSync("supabase/seed_gridmaster.sql", "utf8");
   await db.query(gridmasterSql);
 
-  console.log(`    ✓ Calm Haven configuration mirrored with 26 Arden Wood employees, ${ardenWoodJobs.totalJobCount} jobs, and seeded shifts`);
+  console.log(
+    `    ✓ Calm Haven configuration mirrored with 26 Arden Wood employees, ${ardenWoodJobs.totalJobCount} jobs, and seeded shifts`,
+  );
 
   // ── Auth Users & Profiles ──────────────────────────────────────────────
   // Create 3 test users, all assigned to a seeded organization.
@@ -1853,46 +2823,107 @@ async function main() {
 
   // Get organization IDs for user assignment
   const { rows: orgs } = await db.query(
-    `SELECT id, slug FROM public.organizations WHERE slug IN ('sunrise-senior', 'calmhaven', 'ardenwood')`
+    `SELECT id, slug FROM public.organizations WHERE slug IN ('sunrise-senior', 'calmhaven', 'ardenwood')`,
   );
-  const defaultOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'sunrise-senior')?.id;
-  const calmhavenOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'calmhaven')?.id;
-  const ardenwoodOrgId = orgs.find((o: Record<string, unknown>) => o.slug === 'ardenwood')?.id;
+  const defaultOrgId = orgs.find((o: Record<string, unknown>) => o.slug === "sunrise-senior")?.id;
+  const calmhavenOrgId = orgs.find((o: Record<string, unknown>) => o.slug === "calmhaven")?.id;
+  const ardenwoodOrgId = orgs.find((o: Record<string, unknown>) => o.slug === "ardenwood")?.id;
 
   const TEST_USERS = [
-    { email: "nicokosmas.dev@gmail.com",     platform_role: "gridmaster", org_role: "user",        label: "gridmaster",  first_name: "Nicodamus", last_name: "Kosmas", preferred_org: "sunrise-senior" },
-    { email: "nicokosmas@outlook.com",        platform_role: "none",       org_role: "super_admin", label: "super_admin", first_name: "Nic",       last_name: "Kosmas", preferred_org: "ardenwood" },
-    { email: "nicodamusalois@gmail.com",       platform_role: "none",       org_role: "user",        label: "user",        first_name: "Nick",      last_name: "Kosmas", preferred_org: "calmhaven" },
+    {
+      email: "nicokosmas.dev@gmail.com",
+      platform_role: "gridmaster",
+      org_role: "user",
+      label: "gridmaster",
+      first_name: "Nicodamus",
+      last_name: "Kosmas",
+      preferred_org: "sunrise-senior",
+    },
+    {
+      email: "nicokosmas@outlook.com",
+      platform_role: "none",
+      org_role: "super_admin",
+      label: "super_admin",
+      first_name: "Nic",
+      last_name: "Kosmas",
+      preferred_org: "ardenwood",
+    },
+    {
+      email: "nicodamusalois@gmail.com",
+      platform_role: "none",
+      org_role: "user",
+      label: "user",
+      first_name: "Nick",
+      last_name: "Kosmas",
+      preferred_org: "calmhaven",
+    },
   ];
 
   // All admin permissions (full edit access — for admin-role users)
-  const allAdminPerms = `'${JSON.stringify({
-    canViewSchedule: true, canEditShifts: true, canPublishSchedule: true, canApplyRecurringSchedule: true,
-    canEditNotes: true, canViewRecurringShifts: true, canManageRecurringShifts: true, canManageShiftSeries: true,
-    canViewStaff: true, canViewEmployeeDetails: true, canManageEmployees: true,
-    canViewFocusAreas: true, canManageFocusAreas: true, canViewScheduleDefinitions: true, canManageScheduleDefinitions: true,
-    canViewIndicatorTypes: true, canManageIndicatorTypes: true, canManageOrgSettings: true,
-    canViewOrgLabels: true, canManageOrgLabels: true, canViewCoverageRequirements: true, canManageCoverageRequirements: true,
-    canApproveShiftRequests: true, canViewDashboardAnalytics: true,
-  })}'::jsonb`;
+  const allAdminPermsObj = {
+    canViewSchedule: true,
+    canEditShifts: true,
+    canPublishSchedule: true,
+    canApplyRecurringSchedule: true,
+    canEditNotes: true,
+    canEditScheduleIndicators: true,
+    canViewRecurringShifts: true,
+    canManageRecurringShifts: true,
+    canManageShiftSeries: true,
+    canViewStaff: true,
+    canViewEmployeeDetails: true,
+    canManageEmployees: true,
+    canViewFocusAreas: true,
+    canManageFocusAreas: true,
+    canViewScheduleDefinitions: true,
+    canManageScheduleDefinitions: true,
+    canViewIndicatorTypes: true,
+    canManageIndicatorTypes: true,
+    canManageOrgSettings: true,
+    canViewOrgLabels: true,
+    canManageOrgLabels: true,
+    canViewCoverageRequirements: true,
+    canManageCoverageRequirements: true,
+    canApproveShiftRequests: true,
+    canViewDashboardAnalytics: true,
+  };
 
   // View-only permissions for user-role members (no edit access, can see everything)
-  const userViewPerms = `'${JSON.stringify({
-    canViewSchedule: true, canEditShifts: false, canPublishSchedule: false, canApplyRecurringSchedule: false,
-    canEditNotes: false, canViewRecurringShifts: true, canManageRecurringShifts: false, canManageShiftSeries: false,
-    canViewStaff: true, canViewEmployeeDetails: true, canManageEmployees: false,
-    canViewFocusAreas: true, canManageFocusAreas: false, canViewScheduleDefinitions: true, canManageScheduleDefinitions: false,
-    canViewIndicatorTypes: true, canManageIndicatorTypes: false, canManageOrgSettings: false,
-    canViewOrgLabels: true, canManageOrgLabels: false, canViewCoverageRequirements: true, canManageCoverageRequirements: false,
-    canApproveShiftRequests: false, canViewDashboardAnalytics: true,
-  })}'::jsonb`;
+  const userViewPermsObj = {
+    canViewSchedule: true,
+    canEditShifts: false,
+    canPublishSchedule: false,
+    canApplyRecurringSchedule: false,
+    canEditNotes: false,
+    canEditScheduleIndicators: false,
+    canViewRecurringShifts: true,
+    canManageRecurringShifts: false,
+    canManageShiftSeries: false,
+    canViewStaff: true,
+    canViewEmployeeDetails: true,
+    canManageEmployees: false,
+    canViewFocusAreas: true,
+    canManageFocusAreas: false,
+    canViewScheduleDefinitions: true,
+    canManageScheduleDefinitions: false,
+    canViewIndicatorTypes: true,
+    canManageIndicatorTypes: false,
+    canManageOrgSettings: false,
+    canViewOrgLabels: true,
+    canManageOrgLabels: false,
+    canViewCoverageRequirements: true,
+    canManageCoverageRequirements: false,
+    canApproveShiftRequests: false,
+    canViewDashboardAnalytics: true,
+  };
 
   for (const user of TEST_USERS) {
-    const orgIdStr = user.preferred_org === 'ardenwood'
-      ? ardenwoodOrgId
-      : user.preferred_org === 'calmhaven'
-        ? calmhavenOrgId
-        : defaultOrgId;
+    const orgIdStr =
+      user.preferred_org === "ardenwood"
+        ? ardenwoodOrgId
+        : user.preferred_org === "calmhaven"
+          ? calmhavenOrgId
+          : defaultOrgId;
     const orgIdSql = user.platform_role === "gridmaster" ? "NULL" : `'${orgIdStr}'`;
 
     await db.query(`
@@ -1953,32 +2984,153 @@ async function main() {
 
   console.log("\n  Creating organization memberships...");
 
-  const { rows: allOrgs } = await db.query(
-    `SELECT id FROM public.organizations ORDER BY name`
-  );
+  const { rows: allOrgs } = await db.query(`SELECT id FROM public.organizations ORDER BY name`);
+
+  // Ensure a "Tech" management department exists in every org, then assign the
+  // seeded logins to it below. Members surface as management users in the People
+  // directory. For `user`-role members the department's permission template
+  // drives their effective permissions (it replaces admin_permissions; see
+  // resolveManagementDepartmentPermissions), so Tech carries the same view-only
+  // set the `user` account already had. Nobody's access changes: the `user`
+  // account stays read-only, and super_admin is unaffected because its access is
+  // role-based, not template-driven.
+  const techDeptPermissions = JSON.stringify(userViewPermsObj);
+  await db.query(`
+    INSERT INTO public.departments (org_id, name, abbr, type, sort_order, permissions)
+    SELECT o.id, 'Tech', 'TECH', 'management',
+           (SELECT COALESCE(MAX(d.sort_order), 0) + 1 FROM public.departments d WHERE d.org_id = o.id),
+           '${techDeptPermissions}'::jsonb
+    FROM public.organizations o
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.departments d
+      WHERE d.org_id = o.id AND d.name = 'Tech' AND d.type = 'management'
+    )
+  `);
+  console.log(`    ✓ Tech management department ensured in ${allOrgs.length} organizations`);
 
   const memberUsers = TEST_USERS.filter((u) => u.platform_role !== "gridmaster");
 
+  const membershipSeeds: Array<{
+    email: string;
+    org_id: string;
+    org_role: string;
+    admin_permissions: Record<string, boolean> | null;
+  }> = [];
   for (const user of memberUsers) {
-    const adminPermsSql = user.org_role === "admin" ? allAdminPerms
-      : user.org_role === "user" ? userViewPerms
-      : "NULL";
-
+    const adminPermissions =
+      user.org_role === "admin"
+        ? allAdminPermsObj
+        : user.org_role === "user"
+          ? userViewPermsObj
+          : null;
     for (const org of allOrgs) {
-      await db.query(`
-        INSERT INTO public.organization_memberships (user_id, org_id, org_role, admin_permissions)
-        SELECT p.id, $1, '${user.org_role}'::org_role, ${adminPermsSql}
-        FROM public.profiles p
-        JOIN auth.users u ON u.id = p.id
-        WHERE u.email = '${user.email}'
-        ON CONFLICT (user_id, org_id) DO UPDATE
-          SET org_role          = EXCLUDED.org_role,
-              admin_permissions = EXCLUDED.admin_permissions
-      `, [org.id]);
+      membershipSeeds.push({
+        email: user.email,
+        org_id: org.id,
+        org_role: user.org_role,
+        admin_permissions: adminPermissions,
+      });
     }
+  }
 
+  if (membershipSeeds.length > 0) {
+    await db.query(
+      `INSERT INTO public.organization_memberships (user_id, org_id, org_role, admin_permissions, department_ids)
+       SELECT p.id, m.org_id, m.org_role::org_role, m.admin_permissions,
+              COALESCE(
+                ARRAY(
+                  SELECT d.id FROM public.departments d
+                  WHERE d.org_id = m.org_id AND d.name = 'Tech' AND d.type = 'management'
+                ),
+                '{}'::bigint[]
+              )
+       FROM jsonb_to_recordset($1::jsonb) AS m(
+         email text, org_id uuid, org_role text, admin_permissions jsonb
+       )
+       JOIN auth.users a ON a.email = m.email
+       JOIN public.profiles p ON p.id = a.id
+       ON CONFLICT (user_id, org_id) DO UPDATE
+         SET org_role          = EXCLUDED.org_role,
+             admin_permissions = EXCLUDED.admin_permissions,
+             department_ids    = EXCLUDED.department_ids`,
+      [JSON.stringify(membershipSeeds)],
+    );
+  }
+
+  for (const user of memberUsers) {
     console.log(`    ✓ ${user.label}: ${allOrgs.length} organizations`);
   }
+
+  // Every org member must have an employees row so they carry an
+  // employee_number / "ID" in the People directory. The membership insert
+  // above creates memberships directly (bypassing accept_invitation's Flow B
+  // employee-insert path), so backfill an employees row for any membership
+  // that still lacks one. The BEFORE INSERT trigger
+  // (assign_employee_number) stamps the per-org badge automatically.
+  // Seniority lands well past the scheduled-employee range so management
+  // members sort at the end of the list; admins can reorder later.
+  await db.query(`
+    INSERT INTO public.employees (
+      org_id, user_id, first_name, last_name, phone,
+      department_ids, employment_type, status, seniority
+    )
+    SELECT
+      m.org_id,
+      m.user_id,
+      COALESCE(p.first_name, ''),
+      COALESCE(p.last_name, ''),
+      COALESCE(m.phone, ''),
+      m.department_ids,
+      'full_time',
+      'active',
+      1000000 + ROW_NUMBER() OVER (PARTITION BY m.org_id ORDER BY m.user_id)
+    FROM public.organization_memberships m
+    JOIN public.profiles p ON p.id = m.user_id
+    WHERE m.archived_at IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM public.employees e
+        WHERE e.user_id = m.user_id AND e.org_id = m.org_id
+      )
+  `);
+  console.log(`    ✓ Backfilled employees rows for management members`);
+
+  // ── Publish history ────────────────────────────────────────────────────
+  // The seed writes published cell snapshots directly via
+  // write_schedule_cell_snapshot_internal, which (unlike the publish_schedule
+  // RPC used in the app) does NOT record a publish_history row. Without that
+  // row the viewer-side "is this period published?" check reports unpublished,
+  // so regular users see the "not published yet" empty state instead of the
+  // grid even though published cells exist. Backfill one publish_history row
+  // per org from the actual published cells so the seeded schedule reads as
+  // published for non-editors too. Runs after memberships exist so each org
+  // has a super_admin/admin to attribute the publish to.
+  console.log("\n  Recording publish history for seeded schedules...");
+  const { rowCount: publishHistoryCount } = await db.query(
+    `INSERT INTO public.publish_history (org_id, published_by, start_date, end_date, change_count, changes)
+     SELECT agg.org_id, publisher.user_id, agg.start_date, agg.end_date, agg.change_count, '[]'::jsonb
+     FROM (
+       SELECT c.org_id,
+              MIN(c.date) AS start_date,
+              MAX(c.date) AS end_date,
+              COUNT(*)    AS change_count
+       FROM public.schedule_cell_snapshots s
+       JOIN public.schedule_cells c ON c.id = s.cell_id
+       WHERE s.snapshot_kind = 'published'
+       GROUP BY c.org_id
+     ) agg
+     JOIN LATERAL (
+       SELECT m.user_id
+       FROM public.organization_memberships m
+       WHERE m.org_id = agg.org_id AND m.user_id IS NOT NULL
+       ORDER BY CASE m.org_role
+                  WHEN 'super_admin' THEN 0
+                  WHEN 'admin' THEN 1
+                  ELSE 2
+                END
+       LIMIT 1
+     ) publisher ON true`,
+  );
+  console.log(`    ✓ ${publishHistoryCount} organizations marked as published`);
 
   console.log("\n✅ All 7 tenants + 3 test users + memberships seeded successfully!");
   await db.end();

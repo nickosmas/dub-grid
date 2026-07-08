@@ -1,6 +1,12 @@
 /** Subdomains that cannot be used as org slugs. */
 export const RESERVED_SUBDOMAINS = new Set([
-  "www", "login", "gridmaster", "api", "admin", "status", "app",
+  "www",
+  "login",
+  "gridmaster",
+  "api",
+  "admin",
+  "status",
+  "app",
 ]);
 
 /**
@@ -8,9 +14,7 @@ export const RESERVED_SUBDOMAINS = new Set([
  * "gridmaster" is intentionally excluded — it's a routable subdomain
  * with its own portal, login, and middleware guards.
  */
-const APEX_ALIAS_SUBDOMAINS = new Set([
-  "www", "login", "api", "admin", "status", "app",
-]);
+const APEX_ALIAS_SUBDOMAINS = new Set(["www", "login", "api", "admin", "status", "app"]);
 
 /** Validates a port number and returns the formatted port string (":port") or empty string if invalid. */
 export function getValidPort(portStr: string | number | null | undefined): string {
@@ -47,7 +51,8 @@ export function parseHost(hostWithPort: string): ParsedHost {
   // 1. Anchor with NEXT_PUBLIC_BASE_DOMAIN if available
   const baseDomain = (process.env.NEXT_PUBLIC_BASE_DOMAIN || "").toLowerCase();
   if (baseDomain && (hostname === baseDomain || hostname.endsWith("." + baseDomain))) {
-    const subdomainPart = hostname === baseDomain ? null : hostname.slice(0, -(baseDomain.length + 1));
+    const subdomainPart =
+      hostname === baseDomain ? null : hostname.slice(0, -(baseDomain.length + 1));
     // Org slugs are single-label only — reject multi-part subdomains like "a.b"
     if (subdomainPart && subdomainPart.includes(".")) {
       return { subdomain: null, rootDomain: baseDomain, port, hostname };
@@ -79,7 +84,10 @@ export function parseHost(hostWithPort: string): ParsedHost {
   }
 
   // 3. Fallback to Vercel logic (for non-anchored previews)
-  const isVercelApp = labels.length >= 2 && labels[labels.length - 2] === "vercel" && labels[labels.length - 1] === "app";
+  const isVercelApp =
+    labels.length >= 2 &&
+    labels[labels.length - 2] === "vercel" &&
+    labels[labels.length - 1] === "app";
   if (isVercelApp) {
     if (labels.length === 3) {
       return {

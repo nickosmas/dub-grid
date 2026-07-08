@@ -11,6 +11,7 @@ const employeeIs = vi.fn();
 const membershipIs = vi.fn();
 const organizationEq = vi.fn();
 const organizationUpdate = vi.fn();
+const organizationSingle = vi.fn();
 const auditInsert = vi.fn();
 const scheduleSubscriptionCancellation = vi.fn();
 const syncSubscriptionSeats = vi.fn();
@@ -84,14 +85,12 @@ describe("POST /api/gridmaster/subscription", () => {
       error: null,
     });
     membershipIs.mockResolvedValue({
-      data: [
-        { user_id: "linked-user" },
-        { user_id: "management-only-user" },
-      ],
+      data: [{ user_id: "linked-user" }, { user_id: "management-only-user" }],
       error: null,
     });
     organizationEq.mockResolvedValue({ error: null });
     organizationUpdate.mockReturnValue({ eq: organizationEq });
+    organizationSingle.mockResolvedValue({ data: { trial_started_at: null }, error: null });
     scheduleSubscriptionCancellation.mockResolvedValue({
       status: "active",
       cancel_at: 1_780_876_800,
@@ -131,7 +130,14 @@ describe("POST /api/gridmaster/subscription", () => {
         };
       }
       if (table === "organizations") {
-        return { update: organizationUpdate };
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: organizationSingle,
+            })),
+          })),
+          update: organizationUpdate,
+        };
       }
       if (table === "audit_log") {
         return { insert: auditInsert };
@@ -145,9 +151,7 @@ describe("POST /api/gridmaster/subscription", () => {
       NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     );
 
-    const response = await POST(
-      makeRequest({ orgId: ORG_ID, action: "cancel" }),
-    );
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "cancel" }));
 
     expect(response.status).toBe(403);
     expect(requireGridmasterSession).not.toHaveBeenCalled();
@@ -155,9 +159,7 @@ describe("POST /api/gridmaster/subscription", () => {
   });
 
   it("validates bad input before mutating", async () => {
-    const response = await POST(
-      makeRequest({ orgId: "not-a-uuid", action: "cancel" }),
-    );
+    const response = await POST(makeRequest({ orgId: "not-a-uuid", action: "cancel" }));
 
     expect(response.status).toBe(400);
     expect(serviceFrom).not.toHaveBeenCalled();
@@ -187,6 +189,8 @@ describe("POST /api/gridmaster/subscription", () => {
       expect.objectContaining({
         subscription_status: "trialing",
         trial_ends_at: expect.any(String),
+        // Pending trial (trial_started_at null) gets its start stamped on extend.
+        trial_started_at: expect.any(String),
       }),
     );
     expect(auditInsert).toHaveBeenCalledWith(
@@ -202,9 +206,7 @@ describe("POST /api/gridmaster/subscription", () => {
   });
 
   it("cancels an organization subscription status and audits the action", async () => {
-    const response = await POST(
-      makeRequest({ orgId: ORG_ID, action: "cancel" }),
-    );
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "cancel" }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
@@ -245,9 +247,7 @@ describe("POST /api/gridmaster/subscription", () => {
       error: null,
     });
 
-    const response = await POST(
-      makeRequest({ orgId: ORG_ID, action: "sync_seats" }),
-    );
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "sync_seats" }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
@@ -281,9 +281,7 @@ describe("POST /api/gridmaster/subscription", () => {
     });
     const cancelAt = new Date(1_780_876_800 * 1000).toISOString();
 
-    const response = await POST(
-      makeRequest({ orgId: ORG_ID, action: "cancel_at_period_end" }),
-    );
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "cancel_at_period_end" }));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
@@ -314,9 +312,7 @@ describe("POST /api/gridmaster/subscription", () => {
   });
 
   it("rejects scheduled cancellation when the organization has no Stripe subscription", async () => {
-    const response = await POST(
-      makeRequest({ orgId: ORG_ID, action: "cancel_at_period_end" }),
-    );
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "cancel_at_period_end" }));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
@@ -327,9 +323,7 @@ describe("POST /api/gridmaster/subscription", () => {
   });
 
   it("rejects seat sync when the organization has no Stripe subscription", async () => {
-    const response = await POST(
-      makeRequest({ orgId: ORG_ID, action: "sync_seats" }),
-    );
+    const response = await POST(makeRequest({ orgId: ORG_ID, action: "sync_seats" }));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({

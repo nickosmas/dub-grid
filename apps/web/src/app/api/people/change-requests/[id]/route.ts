@@ -6,11 +6,11 @@ import {
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import { apiErrorResponse } from "@/lib/error-handling";
+import { extractRawErrorMessage } from "@/lib/client-facing";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
 
@@ -23,9 +23,7 @@ export async function PATCH(
     req,
     orgId,
     (permissions) =>
-      permissions.isGridmaster ||
-      permissions.isSuperAdmin ||
-      permissions.canManageEmployees,
+      permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
   );
   if ("response" in auth) return auth.response;
 
@@ -33,12 +31,12 @@ export async function PATCH(
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = resolveProfileChangeRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { id } = await context.params;
@@ -46,7 +44,9 @@ export async function PATCH(
     const request = await resolveProfileChangeRequest({
       serviceClient: auth.serviceClient,
       actor: auth.actor,
-      orgId,
+      // Effective (sandbox-redirected) org, not the raw query param — this can
+      // delete an account, so it must never act on the real org from a sandbox.
+      orgId: auth.orgId,
       requestId: id,
       action: parsed.data.action,
       resolverNote: parsed.data.resolverNote,
@@ -58,9 +58,8 @@ export async function PATCH(
       return NextResponse.json(contactConflict, { status: 409 });
     }
 
-    const message =
-      error instanceof Error ? error.message : "Failed to resolve request.";
-    const status = message.includes("changed after") ? 409 : 400;
-    return NextResponse.json({ error: message }, { status });
+    const rawMessage = extractRawErrorMessage(error) ?? "";
+    const status = rawMessage.includes("changed after") ? 409 : 400;
+    return apiErrorResponse(error, "Failed to resolve request.", status);
   }
 }

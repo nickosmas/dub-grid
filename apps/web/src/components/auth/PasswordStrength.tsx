@@ -80,10 +80,7 @@ export function PasswordStrength({ password }: { password: string }) {
                 flex: 1,
                 height: 4,
                 borderRadius: 2,
-                background:
-                  i <= level
-                    ? colors[level]
-                    : "var(--color-border-light)",
+                background: i <= level ? colors[level] : "var(--color-border-light)",
                 transition: "background 150ms ease",
               }}
             />
@@ -117,9 +114,7 @@ export function PasswordStrength({ password }: { password: string }) {
             key={hint.id}
             style={{
               alignItems: "center",
-              color: hint.met
-                ? "var(--color-success-text)"
-                : "var(--color-text-muted)",
+              color: hint.met ? "var(--color-success-text)" : "var(--color-text-muted)",
               display: "flex",
               fontSize: "var(--dg-fs-caption)",
               gap: 6,
@@ -128,9 +123,7 @@ export function PasswordStrength({ password }: { password: string }) {
             <span
               aria-hidden="true"
               style={{
-                background: hint.met
-                  ? "var(--color-success)"
-                  : "var(--color-border)",
+                background: hint.met ? "var(--color-success)" : "var(--color-border)",
                 borderRadius: 999,
                 flex: "0 0 6px",
                 height: 6,

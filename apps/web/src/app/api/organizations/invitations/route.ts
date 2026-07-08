@@ -8,7 +8,8 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
-import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -16,10 +17,9 @@ import { buildInvitationChanges, buildInvitationRevocationChanges } from "@/lib/
 import { rowToInvitation } from "@/lib/db/mappers";
 import type { DbInvitation } from "@/lib/db/types";
 import type { Invitation } from "@/types";
-import {
-  buildStaffValidationErrorResponse,
-  getStaffFieldErrors,
-} from "@/lib/staff-validation";
+import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/staff-validation";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +55,10 @@ const getSchema = z.object({
   orgId: z.string().uuid(),
 });
 
-function timestampsMatch(left: string | null | undefined, right: string | null | undefined): boolean {
+function timestampsMatch(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
   if (!left || !right) return false;
   return new Date(left).getTime() === new Date(right).getTime();
 }
@@ -82,14 +85,13 @@ async function requirePrivilegedActor(
   return { ok: true };
 }
 
-async function fetchInvitation(
-  orgId: string,
-  invitationId: string,
-): Promise<Invitation | null> {
+async function fetchInvitation(orgId: string, invitationId: string): Promise<Invitation | null> {
   const serviceClient = getServiceClient();
   const { data, error } = await serviceClient
     .from("invitations")
-    .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+    .select(
+      "id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids",
+    )
     .eq("org_id", orgId)
     .eq("id", invitationId)
     .maybeSingle();
@@ -101,8 +103,7 @@ async function fetchInvitation(
 function buildConflictResponse(latestInvitation: Invitation) {
   return NextResponse.json(
     {
-      error:
-        "Invitation changed elsewhere. Review the latest values before saving again.",
+      error: "Invitation changed elsewhere. Review the latest values before saving again.",
       code: "ORG_INVITATION_CONFLICT",
       invitation: latestInvitation,
     },
@@ -152,22 +153,26 @@ export async function GET(req: NextRequest) {
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
 
-  const parsed = getSchema.safeParse(
-    Object.fromEntries(req.nextUrl.searchParams.entries()),
-  );
+  const parsed = getSchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
+  // Sandbox: redirect the read to the sandbox org so sandbox callers
+  // don't see the real organization's pending invitations.
+  const effectiveOrgId = await resolveEffectiveOrgId(req, auth.user.id, parsed.data.orgId);
+
   try {
-    const allowed = await requirePrivilegedActor(req, parsed.data.orgId);
+    const allowed = await requirePrivilegedActor(req, effectiveOrgId);
     if (!allowed.ok) return allowed.response;
 
     const serviceClient = getServiceClient();
     const { data, error } = await serviceClient
       .from("invitations")
-      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
-      .eq("org_id", parsed.data.orgId)
+      .select(
+        "id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids",
+      )
+      .eq("org_id", effectiveOrgId)
       .order("created_at", { ascending: false });
     if (error) throw error;
 
@@ -176,9 +181,9 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     Sentry.captureException(err, {
-      extra: { context: "organizations/invitations:get", orgId: parsed.data.orgId },
+      extra: { context: "organizations/invitations:get", orgId: effectiveOrgId },
     });
-    logger.error({ error: err, orgId: parsed.data.orgId }, "Invitation fetch failed");
+    logger.error({ error: err, orgId: effectiveOrgId }, "Invitation fetch failed");
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 }
@@ -186,6 +191,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
@@ -206,12 +213,12 @@ export async function PATCH(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { orgId, invitationId, expectedUpdatedAt, ...fields } = parsed.data;
@@ -256,10 +263,7 @@ export async function PATCH(req: NextRequest) {
             ? normalizeStaffName(fields.lastName)
             : ""
           : undefined,
-      phone:
-        fields.phone !== undefined
-          ? normalizeOptionalUsPhone(fields.phone)
-          : undefined,
+      phone: fields.phone !== undefined ? normalizeOptionalUsPhone(fields.phone) : undefined,
       departmentIds: fields.departmentIds,
       deptAdminIds: fields.deptAdminIds,
     };
@@ -273,7 +277,7 @@ export async function PATCH(req: NextRequest) {
     const nextDeptAdminIds =
       fields.deptAdminIds !== undefined
         ? fields.deptAdminIds.filter((id) => deptSet.has(id))
-        : currentInvitation.deptAdminIds ?? [];
+        : (currentInvitation.deptAdminIds ?? []);
 
     const serviceClient = getServiceClient();
     const { data: updatedInvitation, error } = await serviceClient
@@ -290,7 +294,9 @@ export async function PATCH(req: NextRequest) {
       .eq("org_id", orgId)
       .eq("id", invitationId)
       .eq("updated_at", expectedUpdatedAt)
-      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+      .select(
+        "id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids",
+      )
       .maybeSingle();
 
     if (error) throw error;
@@ -315,7 +321,9 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ success: true, invitation: latestInvitation });
   } catch (err) {
-    Sentry.captureException(err, { extra: { context: "organizations/invitations", orgId, invitationId } });
+    Sentry.captureException(err, {
+      extra: { context: "organizations/invitations", orgId, invitationId },
+    });
     logger.error({ error: err, orgId, invitationId }, "Invitation update failed");
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
@@ -324,6 +332,8 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
@@ -344,12 +354,12 @@ export async function DELETE(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = deleteSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { orgId, invitationId, expectedUpdatedAt } = parsed.data;
@@ -374,7 +384,9 @@ export async function DELETE(req: NextRequest) {
       .eq("org_id", orgId)
       .eq("id", invitationId)
       .eq("updated_at", expectedUpdatedAt)
-      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+      .select(
+        "id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids",
+      )
       .maybeSingle();
 
     if (error) throw error;
@@ -397,9 +409,18 @@ export async function DELETE(req: NextRequest) {
       req,
     });
 
+    void dispatchNotificationEvent(user.id, {
+      action: "invitation_revoked",
+      orgId,
+      invitationId,
+      inviteeEmail: latestInvitation.email,
+    });
+
     return NextResponse.json({ success: true, invitation: latestInvitation });
   } catch (err) {
-    Sentry.captureException(err, { extra: { context: "organizations/invitations", orgId, invitationId } });
+    Sentry.captureException(err, {
+      extra: { context: "organizations/invitations", orgId, invitationId },
+    });
     logger.error({ error: err, orgId, invitationId }, "Invitation revocation failed");
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
@@ -408,6 +429,8 @@ export async function DELETE(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
   if (csrfError) return csrfError;
+  const sandboxBlock = forbidIfSandboxCookie(req);
+  if (sandboxBlock) return sandboxBlock;
 
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
@@ -428,12 +451,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = resendSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { orgId, invitationId, expectedUpdatedAt } = parsed.data;
@@ -466,7 +489,9 @@ export async function POST(req: NextRequest) {
       .eq("id", invitationId)
       .eq("updated_at", expectedUpdatedAt)
       .is("accepted_at", null)
-      .select("id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids")
+      .select(
+        "id, org_id, invited_by, email, role_to_assign, expires_at, accepted_at, revoked_at, created_at, updated_at, employee_id, first_name, last_name, phone, department_ids, dept_admin_ids",
+      )
       .maybeSingle();
 
     if (error) throw error;
@@ -499,6 +524,13 @@ export async function POST(req: NextRequest) {
       req,
     });
 
+    void dispatchNotificationEvent(user.id, {
+      action: "invitation_resent",
+      orgId,
+      invitationId,
+      inviteeEmail: latestInvitation.email,
+    });
+
     return NextResponse.json({
       success: true,
       invitation: latestInvitation,
@@ -506,7 +538,9 @@ export async function POST(req: NextRequest) {
       expiresAt,
     });
   } catch (err) {
-    Sentry.captureException(err, { extra: { context: "organizations/invitations", orgId, invitationId } });
+    Sentry.captureException(err, {
+      extra: { context: "organizations/invitations", orgId, invitationId },
+    });
     logger.error({ error: err, orgId, invitationId }, "Invitation resend failed");
     return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }

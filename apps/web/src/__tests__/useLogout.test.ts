@@ -1,86 +1,84 @@
-import { act, renderHook } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useLogout } from "@/hooks/useLogout";
 
-const mockQueryClientClear = vi.fn();
-const mockSignOut = vi.fn();
-const mockGetChannels = vi.fn();
-const mockRemoveChannel = vi.fn();
-const mockUntrackChannel = vi.fn();
-const mockClearLogoutCleanup = vi.fn();
-const mockClearImpersonationCookie = vi.fn();
-const mockClearPermsCache = vi.fn();
-const mockParseHost = vi.fn();
+const mockBeginLogout = vi.fn();
+const mockSignOutFromBrowser = vi.fn();
 const mockReplace = vi.fn();
 
-vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({
-    clear: mockQueryClientClear,
-  }),
+vi.mock("@/lib/logout-state", () => ({
+  beginLogout: () => mockBeginLogout(),
 }));
 
 vi.mock("@/features/account/client", () => ({
-  clearLogoutCleanup: (...args: unknown[]) =>
-    mockClearLogoutCleanup(...args),
-  getBrowserRealtimeChannels: (...args: unknown[]) =>
-    mockGetChannels(...args),
-  removeBrowserRealtimeChannel: (...args: unknown[]) =>
-    mockRemoveChannel(...args),
-  signOutFromBrowser: (...args: unknown[]) => mockSignOut(...args),
-  untrackBrowserRealtimeChannel: (...args: unknown[]) =>
-    mockUntrackChannel(...args),
-}));
-
-vi.mock("@/lib/subdomain", () => ({
-  parseHost: (...args: unknown[]) => mockParseHost(...args),
-}));
-
-vi.mock("@/lib/impersonation", () => ({
-  clearImpersonationCookie: () => mockClearImpersonationCookie(),
-}));
-
-vi.mock("@/features/permissions/client", () => ({
-  clearPermsCache: () => mockClearPermsCache(),
+  signOutFromBrowser: (...args: unknown[]) => mockSignOutFromBrowser(...args),
 }));
 
 Object.defineProperty(window, "location", {
-  value: { replace: mockReplace, href: "http://localhost" },
+  value: { replace: mockReplace, origin: "https://acme.dubgrid.com" },
   writable: true,
 });
 
-describe("useLogout", () => {
+describe("useLogout.signOut", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSignOut.mockResolvedValue(undefined);
-    mockGetChannels.mockReturnValue([]);
-    mockRemoveChannel.mockResolvedValue("ok");
-    mockUntrackChannel.mockResolvedValue("ok");
-    mockClearLogoutCleanup.mockResolvedValue({ success: true });
-    mockParseHost.mockReturnValue({ rootDomain: "localhost", port: "" });
   });
 
-  it("tears down realtime presence before signing out locally", async () => {
-    const joinedChannel = {
-      state: "joined",
-    };
-    const closedChannel = {
-      state: "closed",
-    };
-    mockGetChannels.mockReturnValue([joinedChannel, closedChannel]);
-
+  it("defaults to /goodbye with scope=local and silences in-flight query errors first", () => {
     const { result } = renderHook(() => useLogout());
 
-    await act(async () => {
-      await result.current.signOutLocal("/login");
-    });
+    result.current.signOut();
 
-    expect(mockUntrackChannel).toHaveBeenCalledTimes(1);
-    expect(mockUntrackChannel).toHaveBeenCalledWith(joinedChannel);
-    expect(mockRemoveChannel).toHaveBeenCalledTimes(2);
-    expect(mockSignOut).toHaveBeenCalledWith("local");
-    expect(mockUntrackChannel.mock.invocationCallOrder[0]).toBeLessThan(
-      mockSignOut.mock.invocationCallOrder[0],
-    );
-    expect(mockReplace).toHaveBeenCalledWith("/login");
+    // beginLogout MUST run before the navigation so error handlers stay silent
+    // during the brief window before the page unloads.
+    expect(mockBeginLogout).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledTimes(1);
+    expect(mockReplace).toHaveBeenCalledWith("/goodbye?scope=local");
+    // Critically: signOut() must NOT call signOutFromBrowser. The teardown
+    // belongs to RunLogoutTeardown on /goodbye, where there's no ProtectedRoute
+    // / AuthProvider racing for the Supabase auth lock.
+    expect(mockSignOutFromBrowser).not.toHaveBeenCalled();
+  });
+
+  it("passes through scope=global", () => {
+    const { result } = renderHook(() => useLogout());
+
+    result.current.signOut({ scope: "global" });
+
+    expect(mockReplace).toHaveBeenCalledWith("/goodbye?scope=global");
+  });
+
+  it("honours a redirectTo override", () => {
+    const { result } = renderHook(() => useLogout());
+
+    result.current.signOut({ redirectTo: "/login" });
+
+    expect(mockReplace).toHaveBeenCalledWith("/login?scope=local");
+  });
+
+  it("combines a redirectTo override with scope=global", () => {
+    const { result } = renderHook(() => useLogout());
+
+    result.current.signOut({ redirectTo: "/login", scope: "global" });
+
+    expect(mockReplace).toHaveBeenCalledWith("/login?scope=global");
+  });
+});
+
+describe("useLogout.signOutOthers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSignOutFromBrowser.mockResolvedValue(undefined);
+  });
+
+  it("calls signOutFromBrowser with scope='others' and does NOT navigate", async () => {
+    const { result } = renderHook(() => useLogout());
+
+    await result.current.signOutOthers();
+
+    expect(mockSignOutFromBrowser).toHaveBeenCalledTimes(1);
+    expect(mockSignOutFromBrowser).toHaveBeenCalledWith("others");
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockBeginLogout).not.toHaveBeenCalled();
   });
 });

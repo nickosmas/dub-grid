@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
@@ -8,11 +9,9 @@ const searchSchema = z.object({
 
 export async function GET(req: NextRequest) {
   try {
-    const parsed = searchSchema.safeParse(
-      Object.fromEntries(req.nextUrl.searchParams.entries()),
-    );
+    const parsed = searchSchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     const orgAuth = await requireOrgPermissions(
@@ -33,7 +32,7 @@ export async function GET(req: NextRequest) {
     const { count, error } = await serviceClient
       .from("employees")
       .select("id", { count: "exact", head: true })
-      .eq("org_id", parsed.data.orgId)
+      .eq("org_id", orgAuth.orgId)
       .is("archived_at", null);
 
     if (error) throw error;
@@ -41,9 +40,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ employeeCount: count ?? 0 });
   } catch (error) {
     console.error("organization employee count GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load employee count" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load employee count" }, { status: 500 });
   }
 }

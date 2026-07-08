@@ -1,26 +1,12 @@
-import {
-  act,
-  createEvent,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { act, createEvent, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createQueryStateCardModule,
   createReactNativeModule,
   createSafeAreaContextModule,
   createScreenModule,
 } from "../../../test/native";
+import { capturedPanGestures } from "../../../test/gesture-handler-stub";
 
 const useMutation = vi.fn();
 const useQuery = vi.fn();
@@ -31,14 +17,10 @@ const routerPush = vi.fn();
 const pushToast = vi.fn();
 
 function confirmDialog(label: string) {
-  fireEvent.click(
-    within(screen.getByRole("alert")).getByRole("button", { name: label }),
-  );
+  fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: label }));
 }
 
-vi.mock("react-native", async () =>
-  createReactNativeModule(await import("react")),
-);
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
 vi.mock("react-native-safe-area-context", async () =>
   createSafeAreaContextModule(await import("react")),
@@ -63,9 +45,7 @@ vi.mock("expo-router", () => ({
   },
 }));
 
-vi.mock("../../../shared/components/Screen", async () =>
-  createScreenModule(await import("react")),
-);
+vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
 vi.mock("../../../shared/components/QueryStateCard", async () =>
   createQueryStateCardModule(await import("react")),
@@ -85,7 +65,7 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
   }),
 }));
 
-let MeScheduleScreen: any;
+let HomeScheduleScreen: any;
 let TeamScheduleScreen: any;
 
 type QueryResult = {
@@ -140,6 +120,7 @@ function createScheduleEntry(overrides: Partial<Record<string, unknown>> = {}) {
         displayFocusAreaName: "Skilled Nursing",
       },
     ],
+    indicators: [],
     publishedAt: "2026-04-15T18:30:00.000Z",
     publishedByName: "Mina Diaz",
     ...overrides,
@@ -235,7 +216,7 @@ function createOpenShift(overrides: Partial<Record<string, unknown>> = {}) {
 
 beforeAll(async () => {
   const module = await import("./ScheduleScreen");
-  MeScheduleScreen = module.MeScheduleScreen;
+  HomeScheduleScreen = module.HomeScheduleScreen;
   TeamScheduleScreen = module.TeamScheduleScreen;
 });
 
@@ -515,8 +496,8 @@ describe("ScheduleScreen", () => {
     vi.useRealTimers();
   });
 
-  it("renders the redesigned Me page with current shift, upcoming shifts, open shifts, cover requests, and hours", () => {
-    render(<MeScheduleScreen />);
+  it("renders the redesigned Home page with current shift, upcoming shifts, open shifts, cover requests, and hours", () => {
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByText("On Duty")).toBeInTheDocument();
     expect(screen.getByText("Working with")).toBeInTheDocument();
@@ -535,17 +516,14 @@ describe("ScheduleScreen", () => {
     expect(screen.getByText("Sun, Apr 19")).toBeInTheDocument();
     expect(screen.getByText("Volunteer")).toBeInTheDocument();
     expect(screen.getByText("Claim Shift")).toBeInTheDocument();
-    const openShiftCarouselText =
-      screen.getByLabelText("Open shifts carousel").textContent ?? "";
+    const openShiftCarouselText = screen.getByLabelText("Open shifts carousel").textContent ?? "";
     expect(openShiftCarouselText.indexOf("Skilled Nursing")).toBeLessThan(
       openShiftCarouselText.indexOf("Nurse"),
     );
 
     expect(screen.getByText("My Week")).toBeInTheDocument();
     expect(screen.getByText("24h this week")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("upcoming-today-date-dot-2026-04-16"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("upcoming-today-date-dot-2026-04-16")).toBeInTheDocument();
     expect(screen.getByTestId("upcoming-today-row-2026-04-16")).toBeInTheDocument();
     expect(screen.getByText("FRI")).toBeInTheDocument();
     expect(screen.getAllByText("17").length).toBeGreaterThan(0);
@@ -554,25 +532,42 @@ describe("ScheduleScreen", () => {
     expect(screen.getAllByText("Paid Time Off")).toHaveLength(1);
     expect(screen.getAllByText("Absence").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("Absence Paid Time Off").length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText("Absence Paid Time Off")[0]).toHaveTextContent(
-      "Paid Time Off",
-    );
-    expect(screen.getAllByLabelText("Absence Paid Time Off")[0]).not.toHaveTextContent(
-      "Absence",
-    );
+    expect(screen.getAllByLabelText("Absence Paid Time Off")[0]).toHaveTextContent("Paid Time Off");
+    expect(screen.getAllByLabelText("Absence Paid Time Off")[0]).not.toHaveTextContent("Absence");
     expect(screen.queryByText("This Week's Hours")).not.toBeInTheDocument();
+  });
+
+  it("does not surface published schedule indicators in the Me week list", () => {
+    meScheduleEntries = [
+      createScheduleEntry({
+        indicators: [
+          { id: 1, name: "Training" },
+          { id: 2, name: "Float" },
+        ],
+      }),
+      createScheduleEntry({
+        date: "2026-04-17",
+        indicators: [{ id: 3, name: "New hire" }],
+      }),
+    ];
+
+    render(<HomeScheduleScreen />);
+
+    expect(screen.queryByText(/Assignment:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Training")).not.toBeInTheDocument();
+    expect(screen.queryByText("Float")).not.toBeInTheDocument();
+    expect(screen.queryByText("New hire")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Indicators:/)).not.toBeInTheDocument();
   });
 
   it("uses a single no-schedule message in the Me hero", () => {
     meScheduleEntries = [];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     const emptyState = screen.getByTestId("me-empty-schedule-state");
 
-    expect(
-      within(emptyState).getByText("Nothing scheduled this week"),
-    ).toBeInTheDocument();
+    expect(within(emptyState).getByText("Nothing scheduled this week")).toBeInTheDocument();
     expect(screen.queryByTestId("me-hero-card")).not.toBeInTheDocument();
     expect(screen.queryByText("Needs Your Response")).not.toBeInTheDocument();
     expect(screen.queryByText("Open Shifts")).not.toBeInTheDocument();
@@ -581,9 +576,7 @@ describe("ScheduleScreen", () => {
     expect(
       within(emptyState).queryByText("No current or upcoming shift is scheduled."),
     ).not.toBeInTheDocument();
-    expect(emptyState).not.toHaveTextContent(
-      "Published shifts for this week will appear here.",
-    );
+    expect(emptyState).not.toHaveTextContent("Published shifts for this week will appear here.");
     expect(emptyState).not.toHaveTextContent(
       "Published jobs for this selected week will appear here.",
     );
@@ -591,7 +584,7 @@ describe("ScheduleScreen", () => {
   });
 
   it("shows a success toast after a schedule request action completes", async () => {
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     const mutationConfig = useMutation.mock.calls[0][0] as {
       onSuccess: (
@@ -715,14 +708,12 @@ describe("ScheduleScreen", () => {
     openShifts = [];
     shiftRequests = [];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     const heroCard = screen.getByTestId("me-hero-card");
 
     expect(screen.getAllByLabelText("Shift 2").length).toBeGreaterThan(0);
-    expect(
-      screen.queryByLabelText("Multiple Shifts, 2 shifts"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Multiple Shifts, 2 shifts")).not.toBeInTheDocument();
     expect(within(heroCard).getByLabelText("Shift 2")).toBeInTheDocument();
     expect(heroCard).toHaveTextContent("Shift 1");
     expect(heroCard).toHaveTextContent("Shift 2");
@@ -733,30 +724,20 @@ describe("ScheduleScreen", () => {
     expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Evening Shift").length).toBeGreaterThan(0);
     const heroText = heroCard.textContent ?? "";
-    expect(heroText.indexOf("Day Shift")).toBeLessThan(
-      heroText.indexOf("Shift 1"),
-    );
+    expect(heroText.indexOf("Day Shift")).toBeLessThan(heroText.indexOf("Shift 1"));
     expect(heroText.indexOf("Shift 1")).toBeLessThan(heroText.indexOf("Nurse"));
-    expect(heroText.indexOf("Evening Shift")).toBeLessThan(
-      heroText.indexOf("Shift 2"),
-    );
+    expect(heroText.indexOf("Evening Shift")).toBeLessThan(heroText.indexOf("Shift 2"));
     expect(heroText.indexOf("Shift 2")).toBeLessThan(heroText.indexOf("Lead"));
     expect(screen.getByText("Morning Shift")).toBeInTheDocument();
     expect(screen.getByText("Desk Shift")).toBeInTheDocument();
     expect(heroCard).toHaveTextContent("Working with");
     expect(heroCard).toHaveTextContent("BS");
     expect(heroCard).not.toHaveTextContent("EP");
-    expect(
-      heroCard.textContent?.indexOf("Working with") ?? Number.MAX_SAFE_INTEGER,
-    ).toBeLessThan(
+    expect(heroCard.textContent?.indexOf("Working with") ?? Number.MAX_SAFE_INTEGER).toBeLessThan(
       heroCard.textContent?.indexOf("Shift 2") ?? Number.MAX_SAFE_INTEGER,
     );
-    expect(
-      screen.getAllByTestId("split-shift-dashed-divider").length,
-    ).toBeGreaterThan(0);
-    expect(
-      screen.getAllByTestId("upcoming-shift-dashed-divider").length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("split-shift-dashed-divider").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("upcoming-shift-dashed-divider").length).toBeGreaterThan(0);
     expect(screen.getAllByText("FRI")).toHaveLength(1);
     expect(screen.getAllByText("17")).toHaveLength(1);
   });
@@ -794,7 +775,7 @@ describe("ScheduleScreen", () => {
     openShifts = [];
     shiftRequests = [];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     const heroCard = screen.getByTestId("me-hero-card");
 
@@ -856,7 +837,7 @@ describe("ScheduleScreen", () => {
     expect(screen.getByText("Lead")).toBeInTheDocument();
   });
 
-  it("shows mentored assignments with a full label on Me", () => {
+  it("shows mentored assignments with a full label on Home", () => {
     meScheduleEntries = [
       createScheduleEntry({
         segments: [
@@ -881,19 +862,17 @@ describe("ScheduleScreen", () => {
     shiftRequests = [];
     openShifts = [];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getAllByText("(Mentored)").length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByLabelText("Job Nurse mentored assignment").length,
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("Job Nurse mentored assignment").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Mentored assignment")).not.toBeInTheDocument();
   });
 
   it("shows the next shift state when nothing is currently active", () => {
     vi.setSystemTime(new Date("2026-04-16T05:00:00.000Z"));
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByText("Upcoming")).toBeInTheDocument();
     expect(screen.getByText("Starting in 2h")).toBeInTheDocument();
@@ -962,14 +941,12 @@ describe("ScheduleScreen", () => {
       }),
     ];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getAllByText("Admin")).toHaveLength(2);
     expect(screen.getAllByText("General shift").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("General shift Admin").length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText("General shift Admin")[0]).toHaveTextContent(
-      "Admin",
-    );
+    expect(screen.getAllByLabelText("General shift Admin")[0]).toHaveTextContent("Admin");
     expect(screen.getAllByLabelText("General shift Admin")[0]).not.toHaveTextContent(
       "General shift",
     );
@@ -1049,25 +1026,20 @@ describe("ScheduleScreen", () => {
         employee: {
           id: "emp-1",
         },
-        entries:
-          queryKey[4] === "2026-04-19" ? nextWeekEntries : meScheduleEntries,
+        entries: queryKey[4] === "2026-04-19" ? nextWeekEntries : meScheduleEntries,
         range: {
-          startDate:
-            queryKey[4] === "2026-04-19" ? "2026-04-19" : "2026-04-12",
-          endDate:
-            queryKey[4] === "2026-04-19" ? "2026-04-25" : "2026-04-18",
+          startDate: queryKey[4] === "2026-04-19" ? "2026-04-19" : "2026-04-12",
+          endDate: queryKey[4] === "2026-04-19" ? "2026-04-25" : "2026-04-18",
         },
       });
     });
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByRole("button", { name: "Next week" }));
 
     expect(screen.getByLabelText("Mon, Apr 20")).toBeInTheDocument();
-    expect(screen.getAllByText("Monday First Shift").length).toBeGreaterThan(
-      1,
-    );
+    expect(screen.getAllByText("Monday First Shift").length).toBeGreaterThan(1);
   });
 
   it("updates the active shift remaining time as the clock advances", () => {
@@ -1075,7 +1047,7 @@ describe("ScheduleScreen", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-16T12:00:00.000Z"));
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByText("3h left")).toBeInTheDocument();
 
@@ -1155,7 +1127,7 @@ describe("ScheduleScreen", () => {
       };
     });
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     act(() => {
       vi.advanceTimersByTime(15_000);
@@ -1166,8 +1138,8 @@ describe("ScheduleScreen", () => {
     expect(requestsRefetch).not.toHaveBeenCalled();
   });
 
-  it("routes to the requests tab and claims an open shift from Me", () => {
-    render(<MeScheduleScreen />);
+  it("routes to the requests tab and claims an open shift from Home", () => {
+    render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByText("See all"));
     expect(routerPush).toHaveBeenCalledWith("/(tabs)/requests");
@@ -1250,7 +1222,7 @@ describe("ScheduleScreen", () => {
       }),
     ];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByLabelText("Open shifts carousel")).toBeInTheDocument();
     expect(screen.getByLabelText("2 open shift cards")).toBeInTheDocument();
@@ -1260,12 +1232,8 @@ describe("ScheduleScreen", () => {
     expect(screen.getByText("3 teammates needed")).toBeInTheDocument();
 
     const content = document.body.textContent ?? "";
-    expect(content.indexOf("Sat, Apr 18")).toBeLessThan(
-      content.indexOf("Saturday Pickup Early"),
-    );
-    expect(content.indexOf("Saturday Pickup Late")).toBeLessThan(
-      content.indexOf("Sun, Apr 19"),
-    );
+    expect(content.indexOf("Sat, Apr 18")).toBeLessThan(content.indexOf("Saturday Pickup Early"));
+    expect(content.indexOf("Saturday Pickup Late")).toBeLessThan(content.indexOf("Sun, Apr 19"));
   });
 
   it("expands a stacked Me open-shift day to show the full list", () => {
@@ -1353,7 +1321,7 @@ describe("ScheduleScreen", () => {
       }),
     ];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByLabelText("5 open shift cards")).toBeInTheDocument();
     expect(screen.queryByText("Saturday Pickup Extra")).not.toBeInTheDocument();
@@ -1464,7 +1432,7 @@ describe("ScheduleScreen", () => {
       }),
     ];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByLabelText("Expand open shifts for Sat, Apr 18"));
     fireEvent.click(screen.getByLabelText("Expand open shifts for Sun, Apr 19"));
@@ -1477,9 +1445,9 @@ describe("ScheduleScreen", () => {
     expect(screen.getByLabelText("Collapse open shifts for Sun, Apr 19")).toBeInTheDocument();
   });
 
-  it("volunteers for a coverage-gap open shift from Me", () => {
+  it("volunteers for a coverage-gap open shift from Home", () => {
     shiftRequests = [];
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByText("Volunteer"));
     expect(screen.getByText("Volunteer for open shift?")).toBeInTheDocument();
@@ -1549,7 +1517,7 @@ describe("ScheduleScreen", () => {
       }),
     ];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.getByLabelText("Multiple Shifts, 2 shifts")).toBeInTheDocument();
     expect(screen.getAllByText("Day Shift").length).toBeGreaterThan(0);
@@ -1559,20 +1527,18 @@ describe("ScheduleScreen", () => {
   });
 
   it("does not render the open shifts section when there are no open items", () => {
-    shiftRequests = shiftRequests.filter(
-      (request) => request.type !== "pickup",
-    );
+    shiftRequests = shiftRequests.filter((request) => request.type !== "pickup");
     openShifts = [];
 
-    render(<MeScheduleScreen />);
+    render(<HomeScheduleScreen />);
 
     expect(screen.queryByText("Open Shifts")).not.toBeInTheDocument();
     expect(screen.queryByText("Claim Shift")).not.toBeInTheDocument();
     expect(screen.queryByText("Volunteer")).not.toBeInTheDocument();
   });
 
-  it("accepts and declines shift cover requests from Me", () => {
-    render(<MeScheduleScreen />);
+  it("accepts and declines shift cover requests from Home", () => {
+    render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByText("Accept"));
     expect(screen.getByText("Accept request?")).toBeInTheDocument();
@@ -1611,23 +1577,22 @@ describe("ScheduleScreen", () => {
   it("shows job-focused team rows and opens shift detail from the Schedule tab", () => {
     render(<TeamScheduleScreen />);
 
-    expect(screen.getByText("Today, April 16")).toBeInTheDocument();
+    expect(screen.getByText("Today, Apr 16")).toBeInTheDocument();
     expect(screen.queryByTestId("today-date-dot-2026-04-16")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Select Skilled Nursing" }),
-    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Select Skilled Nursing" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     const headerButtonLabels = screen
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label") ?? button.textContent);
-    expect(headerButtonLabels.indexOf("Select 2026-04-18")).toBeLessThan(
+    expect(headerButtonLabels.indexOf("Select date 2026-04-18")).toBeLessThan(
       headerButtonLabels.indexOf("Select Emergency"),
     );
     expect(screen.getByText("Me")).toBeInTheDocument();
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
     expect(screen.getByText("Bri Shaw")).toBeInTheDocument();
-    const mentoredJobPill = screen.getByLabelText(
-      "Job Mentor mentored assignment",
-    );
+    const mentoredJobPill = screen.getByLabelText("Job Mentor mentored assignment");
     expect(mentoredJobPill).toHaveTextContent("Mentor");
     expect(mentoredJobPill).toHaveTextContent("(Mentored)");
     expect(mentoredJobPill).not.toHaveTextContent("(MENTORED)");
@@ -1697,13 +1662,10 @@ describe("ScheduleScreen", () => {
 
       if (queryKey[2] === "team") {
         return createQueryResult({
-          entries:
-            queryKey[4] === "2026-04-19" ? nextWeekEntries : teamScheduleEntries,
+          entries: queryKey[4] === "2026-04-19" ? nextWeekEntries : teamScheduleEntries,
           range: {
-            startDate:
-              queryKey[4] === "2026-04-19" ? "2026-04-19" : "2026-04-12",
-            endDate:
-              queryKey[4] === "2026-04-19" ? "2026-04-25" : "2026-04-18",
+            startDate: queryKey[4] === "2026-04-19" ? "2026-04-19" : "2026-04-12",
+            endDate: queryKey[4] === "2026-04-19" ? "2026-04-25" : "2026-04-18",
           },
         });
       }
@@ -1775,27 +1737,22 @@ describe("ScheduleScreen", () => {
 
     expect(screen.getByText("Me")).toBeInTheDocument();
     expect(screen.queryByText("Next Week Nurse")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Select 2026-04-23" }),
-    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Select date 2026-04-23" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
 
     for (let index = 1; index < 10; index += 1) {
       fireQuickWeekSwipe(index);
     }
 
-    expect(
-      screen.getByRole("button", { name: "Select 2026-06-25" }),
-    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Select date 2026-06-25" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(useQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        queryKey: [
-          "mobile",
-          "schedule",
-          "team",
-          "token-123",
-          "2026-06-21",
-          "2026-06-27",
-        ],
+        queryKey: ["mobile", "schedule", "team", "token-123", "2026-06-21", "2026-06-27"],
       }),
     );
     springSpy.mockRestore();
@@ -1806,28 +1763,109 @@ describe("ScheduleScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Select Emergency" }));
 
-    expect(
-      screen.queryByLabelText("Focus area filter popup"),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Select Emergency" }),
-    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByLabelText("Focus area filter popup")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Select Emergency" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(screen.getByText("Chris Hall")).toBeInTheDocument();
     expect(screen.getByText("Nurse")).toBeInTheDocument();
     expect(screen.queryByText("Me")).not.toBeInTheDocument();
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
   });
 
-  it("dismisses schedule popups when tapping outside of them", () => {
+  it("renders the month calendar drag handle collapsed by default", () => {
     render(<TeamScheduleScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open month calendar" }));
-    expect(screen.getByLabelText("Month calendar popup")).toBeInTheDocument();
+    expect(screen.getByLabelText("Open month calendar")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Collapse month calendar")).not.toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss schedule popup" }));
+  function dragCalendarHandle(shouldOpen: boolean) {
+    const gesture = capturedPanGestures.at(-1);
+    act(() => {
+      gesture?.__handlers.onStart?.({});
+      gesture?.__handlers.onEnd?.({ velocityY: shouldOpen ? 700 : -700 });
+    });
+  }
 
-    expect(
-      screen.queryByLabelText("Month calendar popup"),
-    ).not.toBeInTheDocument();
+  it("expands the month calendar via the drag handle and collapses back to a populated week strip", () => {
+    render(<TeamScheduleScreen />);
+
+    expect(screen.getByRole("button", { name: "Select date 2026-04-16" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    dragCalendarHandle(true);
+
+    expect(screen.getByLabelText("Collapse month calendar")).toBeInTheDocument();
+
+    dragCalendarHandle(false);
+
+    expect(screen.getByLabelText("Open month calendar")).toBeInTheDocument();
+    // Regression: closing used to leave calendarMonthAnchor pointed at
+    // whatever month was last browsed, which could make the collapsed
+    // week strip render nothing at all.
+    expect(screen.getByRole("button", { name: "Select date 2026-04-16" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("selects a date when swiping the month grid to a different month", () => {
+    render(<TeamScheduleScreen />);
+
+    dragCalendarHandle(true);
+
+    function fireQuickMonthSwipe(direction: "next" | "previous") {
+      const monthGrid = screen.getByLabelText("Schedule month grid");
+      const [startX, endX] = direction === "next" ? [280, 230] : [230, 280];
+      const quickStart = createEvent.touchStart(monthGrid, {
+        changedTouches: [{ pageX: startX }],
+        touches: [{ pageX: startX }],
+      });
+      Object.defineProperty(quickStart, "timeStamp", {
+        configurable: true,
+        value: 1000,
+      });
+      fireEvent(monthGrid, quickStart);
+
+      const quickMove = createEvent.touchMove(monthGrid, {
+        changedTouches: [{ pageX: endX }],
+        touches: [{ pageX: endX }],
+      });
+      Object.defineProperty(quickMove, "timeStamp", {
+        configurable: true,
+        value: 1040,
+      });
+      fireEvent(monthGrid, quickMove);
+
+      const quickEnd = createEvent.touchEnd(monthGrid, {
+        changedTouches: [{ pageX: endX }],
+      });
+      Object.defineProperty(quickEnd, "timeStamp", {
+        configurable: true,
+        value: 1080,
+      });
+      fireEvent(monthGrid, quickEnd);
+    }
+
+    // Swiping into May (not the current month) selects its 1st.
+    fireQuickMonthSwipe("next");
+    expect(screen.getByRole("button", { name: "Select date 2026-05-01" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    // Swiping back into April (the current month) selects today instead
+    // of the 1st. getByRole also implicitly asserts there's exactly one
+    // accessible match — the off-screen adjacent-month preview cells are
+    // correctly excluded from the accessibility tree.
+    fireQuickMonthSwipe("previous");
+    expect(screen.getByRole("button", { name: "Select date 2026-04-16" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 });

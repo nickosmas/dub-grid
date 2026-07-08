@@ -23,8 +23,6 @@ import type { DetailItem } from "@/lib/activity-log-utils";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { EmptyState } from "@/components/EmptyState";
 
-
-
 const PAGE_SIZE = 50;
 
 // ---------------------------------------------------------------------------
@@ -32,12 +30,20 @@ const PAGE_SIZE = 50;
 // ---------------------------------------------------------------------------
 
 const SEARCH_ICON = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <circle cx="11" cy="11" r="8" />
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
-
 
 // ---------------------------------------------------------------------------
 // Shared styles
@@ -181,27 +187,34 @@ function ActionBadge({ action }: { action: string }) {
   );
 }
 
-function DetailsCell({
-  description,
-  details,
-}: {
-  description: string;
-  details: DetailItem[];
-}) {
+function DetailsCell({ description, details }: { description: string; details: DetailItem[] }) {
   const hasDetails = details.length > 0;
 
   return (
     <td style={TD_STYLE}>
-      <div style={{ fontWeight: 500, color: "var(--color-text-primary)", marginBottom: hasDetails ? 2 : 0 }}>
+      <div
+        style={{
+          fontWeight: 500,
+          color: "var(--color-text-primary)",
+          marginBottom: hasDetails ? 2 : 0,
+        }}
+      >
         {description}
       </div>
       {hasDetails && (
-        <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", lineHeight: 1.5 }}>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--color-text-muted)",
+            lineHeight: 1.5,
+          }}
+        >
           {details.map((item, i) => (
             <span key={i}>
-              {i > 0 && <span style={{ margin: "0 4px", color: "var(--color-text-faint)" }}>·</span>}
-              <span style={{ fontWeight: 600 }}>{item.label}:</span>{" "}
-              {item.value}
+              {i > 0 && (
+                <span style={{ margin: "0 4px", color: "var(--color-text-faint)" }}>·</span>
+              )}
+              <span style={{ fontWeight: 600 }}>{item.label}:</span> {item.value}
             </span>
           ))}
         </div>
@@ -210,19 +223,11 @@ function DetailsCell({
   );
 }
 
-function IdentityStack({
-  primary,
-  secondary,
-}: {
-  primary: string;
-  secondary?: string | null;
-}) {
+function IdentityStack({ primary, secondary }: { primary: string; secondary?: string | null }) {
   const showSecondary = secondary && secondary !== primary;
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
-        {primary}
-      </div>
+      <div style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{primary}</div>
       {showSecondary && (
         <div style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)" }}>
           {secondary}
@@ -259,7 +264,9 @@ function Pagination({
         color: "var(--color-text-muted)",
       }}
     >
-      <span>Showing {start}–{end}</span>
+      <span>
+        Showing {start}–{end}
+      </span>
       <div style={{ display: "flex", gap: 8 }}>
         <button
           className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -288,6 +295,7 @@ function SkeletonTable() {
       {Array.from({ length: 6 }).map((_, i) => (
         <div
           key={i}
+          className="dg-list-row"
           style={{
             display: "flex",
             gap: 16,
@@ -328,6 +336,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    setError(null);
 
     fetchGridmasterFullAuditLog({
       orgId,
@@ -335,11 +344,20 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
       offset: page * PAGE_SIZE,
       actionPrefix: serverPrefix,
     })
-      .then((data) => { if (!cancelled) setEntries(data); })
-      .catch((err) => { if (!cancelled) setError(formatClientErrorMessage(err, "We couldn't load activity right now.")); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .then((data) => {
+        if (!cancelled) setEntries(data);
+      })
+      .catch((err) => {
+        if (!cancelled)
+          setError(formatClientErrorMessage(err, "We couldn't load activity right now."));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [orgId, page, serverPrefix]);
 
   const handleCategoryChange = (value: string) => {
@@ -375,9 +393,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
   if (error) {
     return (
-      <div style={{ textAlign: "center", padding: 40, color: "var(--color-danger)" }}>
-        {error}
-      </div>
+      <div style={{ textAlign: "center", padding: 40, color: "var(--color-danger)" }}>{error}</div>
     );
   }
 
@@ -395,18 +411,27 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
         <SkeletonTable />
       ) : filteredEntries.length === 0 ? (
         <EmptyState
-          title={searchQuery || categoryFilter !== "all" ? "No matching activity" : "No activity yet"}
-          description={searchQuery || categoryFilter !== "all"
-            ? "Try adjusting your search or filter."
-            : "Actions taken in your organization will appear here."}
-          action={searchQuery || categoryFilter !== "all" ? (
-            <button
-              className="dg-btn dg-btn-secondary dg-btn-sm"
-              onClick={() => { setSearchQuery(""); setCategoryFilter("all"); }}
-            >
-              Clear filters
-            </button>
-          ) : undefined}
+          title={
+            searchQuery || categoryFilter !== "all" ? "No matching activity" : "No activity yet"
+          }
+          description={
+            searchQuery || categoryFilter !== "all"
+              ? "Try adjusting your search or filter."
+              : "Actions taken in your organization will appear here."
+          }
+          action={
+            searchQuery || categoryFilter !== "all" ? (
+              <button
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                onClick={() => {
+                  setSearchQuery("");
+                  setCategoryFilter("all");
+                }}
+              >
+                Clear filters
+              </button>
+            ) : undefined
+          }
         />
       ) : (
         <>
@@ -430,12 +455,18 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
                       const description = descriptions.get(entry.id) ?? "";
                       const actorLabel = getAuditActorLabel(entry);
                       const targetLabel = getAuditTargetLabel(entry);
-                      const mobileDescription = `${description} — ${actorLabel} -> ${targetLabel}`;
+                      const mobileDescription = `${description}, ${actorLabel} -> ${targetLabel}`;
 
                       return (
                         <tr key={entry.id} style={{ transition: "background 150ms ease" }}>
                           {/* When */}
-                          <td style={{ ...TD_STYLE, whiteSpace: "nowrap", color: "var(--color-text-muted)" }}>
+                          <td
+                            style={{
+                              ...TD_STYLE,
+                              whiteSpace: "nowrap",
+                              color: "var(--color-text-muted)",
+                            }}
+                          >
                             {formatRelativeTime(entry.createdAt)}
                           </td>
 
@@ -469,7 +500,6 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
                             description={isMobile ? mobileDescription : description}
                             details={details}
                           />
-
                         </tr>
                       );
                     })}
@@ -481,7 +511,10 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
           <Pagination
             page={page}
-            onPageChange={(p: number) => { setPage(p); setLoading(true); }}
+            onPageChange={(p: number) => {
+              setPage(p);
+              setLoading(true);
+            }}
             entryCount={filteredEntries.length}
             pageSize={PAGE_SIZE}
           />

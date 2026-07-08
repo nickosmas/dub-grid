@@ -26,10 +26,8 @@ vi.mock("@/features/reports/server/operations", async () => {
   return {
     ...actual,
     loadOperationsReport: (...args: unknown[]) => loadOperationsReport(...args),
-    buildOperationsReportCsv: (...args: unknown[]) =>
-      buildOperationsReportCsv(...args),
-    buildOperationsReportPdf: (...args: unknown[]) =>
-      buildOperationsReportPdf(...args),
+    buildOperationsReportCsv: (...args: unknown[]) => buildOperationsReportCsv(...args),
+    buildOperationsReportPdf: (...args: unknown[]) => buildOperationsReportPdf(...args),
   };
 });
 
@@ -47,8 +45,7 @@ function makeReportRequest(query = "") {
 function makeExportRequest(query = "") {
   return new NextRequest(
     `http://localhost/api/reports/operations/export?${
-      query ||
-      `orgId=${ORG_ID}&startDate=2026-05-03&endDate=2026-05-09&report=staff-hours`
+      query || `orgId=${ORG_ID}&startDate=2026-05-03&endDate=2026-05-09&report=staff-hours`
     }`,
   );
 }
@@ -106,9 +103,7 @@ describe("reports operations API", () => {
       },
     });
     buildOperationsReportCsv.mockReturnValue("Employee,Hours\r\nAvery,8");
-    buildOperationsReportPdf.mockReturnValue(
-      new TextEncoder().encode("%PDF-1.4").buffer,
-    );
+    buildOperationsReportPdf.mockReturnValue(new TextEncoder().encode("%PDF-1.4").buffer);
   });
 
   it("validates org ids before resolving permissions", async () => {
@@ -187,9 +182,7 @@ describe("reports operations API", () => {
 
   it("rejects target dates outside the selected range", async () => {
     const response = await GET_REPORT(
-      makeReportRequest(
-        `orgId=${ORG_ID}&startDate=2026-05-03&endDate=2026-05-09&dates=2026-05-12`,
-      ),
+      makeReportRequest(`orgId=${ORG_ID}&startDate=2026-05-03&endDate=2026-05-09&dates=2026-05-12`),
     );
 
     expect(response.status).toBe(400);
@@ -270,9 +263,7 @@ describe("reports operations API", () => {
 
   it("rejects unknown export report types", async () => {
     const response = await GET_EXPORT(
-      makeExportRequest(
-        `orgId=${ORG_ID}&startDate=2026-05-03&endDate=2026-05-09&report=bogus`,
-      ),
+      makeExportRequest(`orgId=${ORG_ID}&startDate=2026-05-03&endDate=2026-05-09&report=bogus`),
     );
 
     expect(response.status).toBe(400);

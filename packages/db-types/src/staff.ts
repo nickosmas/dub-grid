@@ -3,6 +3,7 @@ import type { EmployeeEmploymentType, EmployeeStatus } from "@dubgrid/domain";
 export interface DbEmployee {
   id: string;
   org_id: string;
+  employee_number: number;
   first_name: string;
   last_name: string;
   employment_type: EmployeeEmploymentType;
@@ -21,4 +22,5 @@ export interface DbEmployee {
   department_ids: number[];
   dept_admin_ids: number[];
   version: number;
+  created_at: string | null;
 }

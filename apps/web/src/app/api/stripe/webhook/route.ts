@@ -9,6 +9,7 @@ import {
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import type Stripe from "stripe";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +19,7 @@ function stripeObjectId(value: string | { id: string } | null | undefined) {
   return typeof value === "string" ? value : value.id;
 }
 
-async function upsertSubscription(
-  sub: Stripe.Subscription,
-  event: Stripe.Event,
-) {
+async function upsertSubscription(sub: Stripe.Subscription, event: Stripe.Event) {
   const supabase = getServiceClient();
   await upsertStripeSubscriptionToDb(supabase, sub, {
     audit: {
@@ -60,6 +58,25 @@ export async function POST(req: NextRequest) {
 
   logger.info({ type: event.type, id: event.id }, "Stripe webhook received");
 
+  // Replay idempotency (M-4): Stripe redelivers events. Claim the event id
+  // first; a unique-violation means we already processed it → ack and skip so
+  // we don't write duplicate audit/activity rows. Fail open if the ledger table
+  // isn't present yet (pre-migration) so the webhook keeps working.
+  {
+    const { error: claimError } = await getServiceClient()
+      .from("stripe_processed_events")
+      .insert({ event_id: event.id });
+    if (claimError) {
+      if (claimError.code === "23505") {
+        return NextResponse.json({ received: true, duplicate: true });
+      }
+      logger.warn(
+        { error: claimError, id: event.id },
+        "Stripe event dedup ledger unavailable — processing without replay guard",
+      );
+    }
+  }
+
   try {
     switch (event.type) {
       case "customer.subscription.created":
@@ -71,7 +88,16 @@ export async function POST(req: NextRequest) {
       }
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
-        await writeStripePaymentFailedAuditLog(getServiceClient(), invoice, {
+        // The audit-log helper resolves the customer to an org and returns it.
+        // We piggyback off that lookup to fan out a billing_payment_failed
+        // alert to the org's super_admins. The dispatcher dedupes on
+        // stripeInvoiceId so Stripe retries don't multiply rows. A separate
+        // `customer.subscription.updated` event will follow when Stripe flips
+        // the subscription to past_due; that path also writes a notification
+        // via the notify_gridmasters_of_org_event DB trigger, but only on the
+        // *first* transition (past_due/unpaid guard), so the two paths don't
+        // double up.
+        const result = await writeStripePaymentFailedAuditLog(getServiceClient(), invoice, {
           stripeEventId: event.id,
           stripeEventType: event.type,
         });
@@ -79,6 +105,15 @@ export async function POST(req: NextRequest) {
           { customerId: invoice.customer, invoiceId: invoice.id },
           "Invoice payment failed",
         );
+        if (result?.orgId && invoice.id) {
+          void dispatchNotificationEvent("stripe-webhook", {
+            action: "billing_payment_failed",
+            orgId: result.orgId,
+            stripeInvoiceId: invoice.id,
+            amountDue: invoice.amount_due ?? null,
+            currency: invoice.currency ?? null,
+          });
+        }
         break;
       }
       case "invoice.payment_succeeded": {
@@ -105,11 +140,9 @@ export async function POST(req: NextRequest) {
       case "payment_method.updated": {
         const paymentMethod = event.data.object as Stripe.PaymentMethod;
         const previous = event.data.previous_attributes as
-          | Partial<Stripe.PaymentMethod>
-          | undefined;
+          Partial<Stripe.PaymentMethod> | undefined;
         const customerId =
-          stripeObjectId(paymentMethod.customer) ??
-          stripeObjectId(previous?.customer);
+          stripeObjectId(paymentMethod.customer) ?? stripeObjectId(previous?.customer);
         if (customerId) {
           await writeStripeCustomerBillingActivityLog(getServiceClient(), {
             customerId,

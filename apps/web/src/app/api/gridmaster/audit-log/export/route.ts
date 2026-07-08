@@ -18,12 +18,7 @@ const exportSchema = z.object({
   limit: z.number().int().min(1).max(5000).optional().default(1000),
 });
 
-const HIGH_RISK_ACTION_PREFIXES = [
-  "billing.",
-  "gdpr.",
-  "gridmaster_account.",
-  "impersonation.",
-];
+const HIGH_RISK_ACTION_PREFIXES = ["billing.", "gdpr.", "gridmaster_account.", "impersonation."];
 const HIGH_RISK_ACTIONS = new Set([
   "account.deleted",
   "audit.exported",
@@ -62,7 +57,9 @@ export async function POST(req: NextRequest) {
     const serviceClient = getServiceClient();
     let query = serviceClient
       .from("audit_log")
-      .select("id, org_id, actor_id, actor_email, action, resource_type, resource_id, details, created_at")
+      .select(
+        "id, org_id, actor_id, actor_email, action, resource_type, resource_id, details, created_at",
+      )
       .order("created_at", { ascending: false })
       .limit(parsed.data.limit);
 
@@ -83,9 +80,7 @@ export async function POST(req: NextRequest) {
     }
     if (parsed.data.target) {
       const needle = parsed.data.target.toLowerCase();
-      entries = entries.filter((entry) =>
-        JSON.stringify(entry).toLowerCase().includes(needle),
-      );
+      entries = entries.filter((entry) => JSON.stringify(entry).toLowerCase().includes(needle));
     }
 
     const exportedAt = new Date().toISOString();
@@ -110,10 +105,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("gridmaster audit export POST failed", error);
-    return NextResponse.json(
-      { error: "Failed to export audit log" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to export audit log" }, { status: 500 });
   }
 }
 
@@ -132,7 +124,10 @@ function mapAuditExportRow(row: Record<string, unknown>) {
 }
 
 function isHighRiskAction(action: string) {
-  return HIGH_RISK_ACTIONS.has(action) || HIGH_RISK_ACTION_PREFIXES.some((prefix) => action.startsWith(prefix));
+  return (
+    HIGH_RISK_ACTIONS.has(action) ||
+    HIGH_RISK_ACTION_PREFIXES.some((prefix) => action.startsWith(prefix))
+  );
 }
 
 function stringOrNull(value: unknown) {

@@ -11,9 +11,7 @@ import { supabase } from "@/lib/supabase";
 
 export type BrowserRealtimeChannel = ReturnType<typeof supabase.channel>;
 
-export async function signOutFromBrowser(
-  scope: "local" | "others" | "global",
-): Promise<void> {
+export async function signOutFromBrowser(scope: "local" | "others" | "global"): Promise<void> {
   const { error } = await supabase.auth.signOut({ scope });
   if (error) {
     throw error;
@@ -34,17 +32,11 @@ export async function updateBrowserUserPassword(password: string): Promise<void>
   }
 }
 
-export async function signUpBrowserUser(input: {
-  email: string;
-  password: string;
-}) {
+export async function signUpBrowserUser(input: { email: string; password: string }) {
   return supabase.auth.signUp(input);
 }
 
-export async function signInBrowserWithPassword(input: {
-  email: string;
-  password: string;
-}) {
+export async function signInBrowserWithPassword(input: { email: string; password: string }) {
   return supabase.auth.signInWithPassword(input);
 }
 
@@ -65,15 +57,13 @@ export function isRecoverableBrowserAuthFailure(error: unknown): boolean {
 }
 
 export async function getVerifiedBrowserAuth() {
-  const [session, user] = await Promise.all([
-    getBrowserAuthSession(),
-    getVerifiedBrowserAuthUser(),
-  ]);
-
-  if (!session?.access_token || !user) {
-    return { session: null, user: null };
-  }
-
+  // Sequential, not Promise.all — see lib/browser-auth.ts for why.
+  // Two concurrent auth-lock acquisitions per caller is the root cause of
+  // "Lock stolen" errors in production.
+  const session = await getBrowserAuthSession();
+  if (!session?.access_token) return { session: null, user: null };
+  const user = await getVerifiedBrowserAuthUser();
+  if (!user) return { session: null, user: null };
   return { session, user };
 }
 
@@ -94,10 +84,7 @@ export async function refreshBrowserSession(): Promise<void> {
   }
 }
 
-export async function resetBrowserPasswordForEmail(
-  email: string,
-  redirectTo: string,
-) {
+export async function resetBrowserPasswordForEmail(email: string, redirectTo: string) {
   return supabase.auth.resetPasswordForEmail(email, { redirectTo });
 }
 
@@ -118,10 +105,7 @@ export async function resendBrowserSignupEmail(email: string) {
   });
 }
 
-export async function verifyBrowserOtp(input: {
-  type: EmailOtpType;
-  token_hash: string;
-}) {
+export async function verifyBrowserOtp(input: { type: EmailOtpType; token_hash: string }) {
   return supabase.auth.verifyOtp(input);
 }
 
@@ -135,15 +119,11 @@ export function createBrowserRealtimeChannel(name: string): BrowserRealtimeChann
   return supabase.channel(name);
 }
 
-export async function untrackBrowserRealtimeChannel(
-  channel: RealtimeChannel,
-): Promise<void> {
+export async function untrackBrowserRealtimeChannel(channel: RealtimeChannel): Promise<void> {
   await channel.untrack();
 }
 
-export async function removeBrowserRealtimeChannel(
-  channel: BrowserRealtimeChannel,
-): Promise<void> {
+export async function removeBrowserRealtimeChannel(channel: BrowserRealtimeChannel): Promise<void> {
   await supabase.removeChannel(channel);
 }
 
@@ -156,10 +136,7 @@ export async function startBrowserTotpEnrollment() {
   });
 }
 
-export async function verifyBrowserTotpEnrollment(input: {
-  factorId: string;
-  code: string;
-}) {
+export async function verifyBrowserTotpEnrollment(input: { factorId: string; code: string }) {
   return supabase.auth.mfa.challengeAndVerify(input);
 }
 

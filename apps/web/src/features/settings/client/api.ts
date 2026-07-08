@@ -15,6 +15,13 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 export interface DependencyInfo {
   hasDependencies: boolean;
   summary: string;
+  /**
+   * True if anything anywhere references this row — including archived rows,
+   * historical schedule cells, recurring shifts, etc. When false the server
+   * will hard-delete (DELETE FROM) instead of archiving on the next remove.
+   * Optional for backwards compatibility with older server responses.
+   */
+  hasAnyReferences?: boolean;
 }
 
 type RequestOptions = RequestInit & {
@@ -31,10 +38,7 @@ function resolveClientUrl(path: string): string {
   return path;
 }
 
-async function requestSettingsJson<T>(
-  input: string,
-  options: RequestOptions,
-): Promise<T> {
+async function requestSettingsJson<T>(input: string, options: RequestOptions): Promise<T> {
   const response = await fetch(resolveClientUrl(input), options);
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -42,9 +46,7 @@ async function requestSettingsJson<T>(
     : null;
 
   if (!response.ok) {
-    throw new Error(
-      formatClientErrorMessage(body?.error, options.errorMessage),
-    );
+    throw new Error(formatClientErrorMessage(body?.error, options.errorMessage));
   }
 
   return body as T;
@@ -85,9 +87,10 @@ export async function saveCertifications(
   orgId: string,
   items: NamedItem[],
   existing: NamedItem[],
+  hardDeleteIds: number[] = [],
 ): Promise<NamedItem[]> {
   const body = await postSettingsAction<{ items: NamedItem[] }>(
-    { action: "saveCertifications", orgId, items, existing },
+    { action: "saveCertifications", orgId, items, existing, hardDeleteIds },
     "Failed to save certifications.",
   );
   return body.items;
@@ -106,10 +109,7 @@ export function checkCertificationDependencies(
   );
 }
 
-export function restoreCertification(
-  certId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreCertification(certId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreCertification", orgId, itemId: certId },
     "Failed to restore certification.",
@@ -134,18 +134,16 @@ export async function saveOrganizationRoles(
   orgId: string,
   items: NamedItem[],
   existing: NamedItem[],
+  hardDeleteIds: number[] = [],
 ): Promise<NamedItem[]> {
   const body = await postSettingsAction<{ items: NamedItem[] }>(
-    { action: "saveOrganizationRoles", orgId, items, existing },
+    { action: "saveOrganizationRoles", orgId, items, existing, hardDeleteIds },
     "Failed to save roles.",
   );
   return body.items;
 }
 
-export function checkRoleDependencies(
-  roleId: number,
-  orgId: string,
-): Promise<DependencyInfo> {
+export function checkRoleDependencies(roleId: number, orgId: string): Promise<DependencyInfo> {
   return requestSettingsJson<DependencyInfo>(
     buildQuery("checkRoleDependencies", {
       orgId,
@@ -155,10 +153,7 @@ export function checkRoleDependencies(
   );
 }
 
-export function restoreOrganizationRole(
-  roleId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreOrganizationRole(roleId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreOrganizationRole", orgId, itemId: roleId },
     "Failed to restore role.",
@@ -183,9 +178,10 @@ export async function saveDepartments(
   orgId: string,
   items: Department[],
   existing: Department[],
+  hardDeleteIds: number[] = [],
 ): Promise<Department[]> {
   const body = await postSettingsAction<{ items: Department[] }>(
-    { action: "saveDepartments", orgId, items, existing },
+    { action: "saveDepartments", orgId, items, existing, hardDeleteIds },
     "Failed to save departments.",
   );
   return body.items;
@@ -204,10 +200,7 @@ export function checkDepartmentDependencies(
   );
 }
 
-export function restoreDepartment(
-  deptId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreDepartment(deptId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreDepartment", orgId, itemId: deptId },
     "Failed to restore department.",
@@ -238,20 +231,31 @@ export async function upsertFocusArea(
   return body.item;
 }
 
+export function checkFocusAreaDependencies(
+  focusAreaId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
+  return requestSettingsJson<DependencyInfo>(
+    buildQuery("checkFocusAreaDependencies", {
+      orgId,
+      itemId: String(focusAreaId),
+    }),
+    { errorMessage: "Failed to check focus area dependencies." },
+  );
+}
+
 export function deleteFocusArea(
   focusAreaId: number,
   orgId: string,
+  hard = false,
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
-    { action: "deleteFocusArea", orgId, itemId: focusAreaId },
+    { action: "deleteFocusArea", orgId, itemId: focusAreaId, hard },
     "Failed to delete focus area.",
   );
 }
 
-export function restoreFocusArea(
-  focusAreaId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreFocusArea(focusAreaId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreFocusArea", orgId, itemId: focusAreaId },
     "Failed to restore focus area.",
@@ -298,17 +302,15 @@ export async function upsertShiftCategory(
 export function deleteShiftCategory(
   categoryId: number,
   orgId: string,
+  hard = false,
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
-    { action: "deleteShiftCategory", orgId, itemId: categoryId },
+    { action: "deleteShiftCategory", orgId, itemId: categoryId, hard },
     "Failed to delete shift.",
   );
 }
 
-export function restoreShiftCategory(
-  categoryId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreShiftCategory(categoryId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreShiftCategory", orgId, itemId: categoryId },
     "Failed to restore shift.",
@@ -329,10 +331,7 @@ export async function fetchJobDefinitions(
   return body.items;
 }
 
-export function checkJobDependencies(
-  jobId: number,
-  orgId: string,
-): Promise<DependencyInfo> {
+export function checkJobDependencies(jobId: number, orgId: string): Promise<DependencyInfo> {
   return requestSettingsJson<DependencyInfo>(
     buildQuery("checkJobDependencies", {
       orgId,
@@ -355,26 +354,22 @@ export async function upsertJobDefinition(
 export function deleteJobDefinition(
   jobId: number,
   orgId: string,
+  hard = false,
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
-    { action: "deleteJobDefinition", orgId, itemId: jobId },
+    { action: "deleteJobDefinition", orgId, itemId: jobId, hard },
     "Failed to delete job.",
   );
 }
 
-export function restoreJobDefinition(
-  jobId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreJobDefinition(jobId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreJobDefinition", orgId, itemId: jobId },
     "Failed to restore job.",
   ).then(() => undefined);
 }
 
-export async function fetchCoverageRequirements(
-  orgId: string,
-): Promise<CoverageRequirement[]> {
+export async function fetchCoverageRequirements(orgId: string): Promise<CoverageRequirement[]> {
   const body = await requestSettingsJson<{ items: CoverageRequirement[] }>(
     buildQuery("fetchCoverageRequirements", { orgId }),
     { errorMessage: "Failed to fetch coverage requirements." },
@@ -443,17 +438,15 @@ export async function upsertAbsenceType(
 export function deleteAbsenceType(
   absenceTypeId: number,
   orgId: string,
+  hard = false,
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
-    { action: "deleteAbsenceType", orgId, itemId: absenceTypeId },
+    { action: "deleteAbsenceType", orgId, itemId: absenceTypeId, hard },
     "Failed to delete absence type.",
   );
 }
 
-export function restoreAbsenceType(
-  absenceTypeId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreAbsenceType(absenceTypeId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreAbsenceType", orgId, itemId: absenceTypeId },
     "Failed to restore absence type.",
@@ -484,20 +477,31 @@ export async function upsertIndicatorType(
   return body.item;
 }
 
+export function checkIndicatorTypeDependencies(
+  indicatorTypeId: number,
+  orgId: string,
+): Promise<DependencyInfo> {
+  return requestSettingsJson<DependencyInfo>(
+    buildQuery("checkIndicatorTypeDependencies", {
+      orgId,
+      itemId: String(indicatorTypeId),
+    }),
+    { errorMessage: "Failed to check indicator type dependencies." },
+  );
+}
+
 export function deleteIndicatorType(
   indicatorTypeId: number,
   orgId: string,
+  hard = false,
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
-    { action: "deleteIndicatorType", orgId, itemId: indicatorTypeId },
+    { action: "deleteIndicatorType", orgId, itemId: indicatorTypeId, hard },
     "Failed to delete indicator type.",
   );
 }
 
-export function restoreIndicatorType(
-  indicatorTypeId: number,
-  orgId: string,
-): Promise<void> {
+export function restoreIndicatorType(indicatorTypeId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreIndicatorType", orgId, itemId: indicatorTypeId },
     "Failed to restore indicator type.",

@@ -9,15 +9,13 @@ vi.mock("./supabase", () => ({
 describe("mobileApiRequest", () => {
   beforeEach(() => {
     createEphemeralSupabaseClient.mockReset();
-    vi.stubEnv(
-      "EXPO_PUBLIC_SUPABASE_URL",
-      "https://example-project.supabase.co",
-    );
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://example-project.supabase.co");
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "https://app.dubgrid.com");
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
@@ -169,6 +167,7 @@ describe("mobileApiRequest", () => {
           canPublishSchedule: false,
           canApplyRecurringSchedule: false,
           canEditNotes: false,
+          canEditScheduleIndicators: false,
           canViewRecurringShifts: false,
           canManageRecurringShifts: false,
           canManageShiftSeries: false,
@@ -222,12 +221,7 @@ describe("mobileApiRequest", () => {
     const { mobileApiRequest } = await import("./api");
 
     await expect(
-      mobileApiRequest(
-        "/api/mobile/v1/ping",
-        "token-123",
-        { method: "GET" },
-        (value) => value,
-      ),
+      mobileApiRequest("/api/mobile/v1/ping", "token-123", { method: "GET" }, (value) => value),
     ).rejects.toThrow("Forbidden");
   });
 
@@ -235,31 +229,60 @@ describe("mobileApiRequest", () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError("Load failed"));
 
     vi.stubGlobal("fetch", fetchMock);
-    const { lookupWorkspace } = await import("./api");
+    const { lookupOrganization } = await import("./api");
 
-    await expect(lookupWorkspace("calmhaven")).rejects.toThrow(
+    await expect(lookupOrganization("calmhaven")).rejects.toThrow(
       "We couldn't connect to DubGrid from this device. Check your internet connection and try again.",
     );
+  });
+
+  it("times out stalled mobile API requests", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(
+      (_url: string, init: RequestInit | undefined) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            const abortError = new Error("Aborted");
+            abortError.name = "AbortError";
+            reject(abortError);
+          });
+        }),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+    const { loginToOrganization } = await import("./api");
+
+    const loginPromise = loginToOrganization({
+      orgSlug: "calmhaven",
+      email: "mina@dubgrid.com",
+      password: "super-secret",
+    });
+    const assertion = expect(loginPromise).rejects.toThrow(
+      "DubGrid took too long to respond. Check your internet connection and try again.",
+    );
+
+    await vi.advanceTimersByTimeAsync(15_000);
+
+    await assertion;
   });
 
   it("surfaces non-JSON 404 responses as client-friendly service errors", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 404,
-      url: "https://www.dubgrid.com/api/mobile/v1/auth/workspace?slug=calmhaven",
+      url: "https://www.dubgrid.com/api/mobile/v1/auth/organization?slug=calmhaven",
       json: async () => {
         throw new Error("Unexpected token <");
       },
       headers: {
-        get: (name: string) =>
-          name === "content-type" ? "text/html; charset=utf-8" : null,
+        get: (name: string) => (name === "content-type" ? "text/html; charset=utf-8" : null),
       },
     });
 
     vi.stubGlobal("fetch", fetchMock);
-    const { lookupWorkspace } = await import("./api");
+    const { lookupOrganization } = await import("./api");
 
-    await expect(lookupWorkspace("calmhaven")).rejects.toThrow(
+    await expect(lookupOrganization("calmhaven")).rejects.toThrow(
       "DubGrid isn't responding correctly right now. Try again in a moment.",
     );
   });
@@ -274,7 +297,7 @@ describe("mobileApiRequest", () => {
           expiresIn: 3600,
           tokenType: "bearer",
         },
-        workspace: {
+        organization: {
           id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
           name: "Calmhaven",
           slug: "calmhaven",
@@ -289,10 +312,10 @@ describe("mobileApiRequest", () => {
     });
 
     vi.stubGlobal("fetch", fetchMock);
-    const { loginToWorkspace } = await import("./api");
+    const { loginToOrganization } = await import("./api");
 
-    await loginToWorkspace({
-      workspaceSlug: "calmhaven",
+    await loginToOrganization({
+      orgSlug: "calmhaven",
       email: "user@example.com",
       password: "password",
     });
@@ -460,11 +483,12 @@ describe("mobileApiRequest", () => {
         success: true,
         person: {
           id: "00000000-0000-0000-0000-000000000001",
+          employeeNumber: 1042,
           firstName: "Mina",
           lastName: "Diaz",
           phone: "555-0100",
           email: "mina@dubgrid.com",
-          status: "benched",
+          status: "inactive",
           focusAreaIds: [1, 2],
           contactNotes: "Weekend availability",
           statusChangedAt: "2026-04-24T12:00:00.000Z",
@@ -477,15 +501,11 @@ describe("mobileApiRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { updateMobilePersonStatus } = await import("./api");
 
-    await updateMobilePersonStatus(
-      "token-123",
-      "00000000-0000-0000-0000-000000000001",
-      {
-        action: "bench",
-        expectedVersion: 7,
-        note: "Coverage hold",
-      },
-    );
+    await updateMobilePersonStatus("token-123", "00000000-0000-0000-0000-000000000001", {
+      action: "deactivate",
+      expectedVersion: 7,
+      note: "Coverage hold",
+    });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://app.dubgrid.com/api/mobile/v1/people/00000000-0000-0000-0000-000000000001/status",
@@ -496,7 +516,7 @@ describe("mobileApiRequest", () => {
     expect(request.method).toBe("PATCH");
     expect(request.body).toBe(
       JSON.stringify({
-        action: "bench",
+        action: "deactivate",
         expectedVersion: 7,
         note: "Coverage hold",
       }),
@@ -509,6 +529,7 @@ describe("mobileApiRequest", () => {
       json: async () => ({
         person: {
           id: "00000000-0000-0000-0000-000000000001",
+          employeeNumber: 1042,
           firstName: "Mina",
           lastName: "Diaz",
           phone: "555-0100",
@@ -526,10 +547,7 @@ describe("mobileApiRequest", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { getMobilePerson } = await import("./api");
 
-    const result = await getMobilePerson(
-      "token-123",
-      "00000000-0000-0000-0000-000000000001",
-    );
+    const result = await getMobilePerson("token-123", "00000000-0000-0000-0000-000000000001");
 
     expect(result.person.id).toBe("00000000-0000-0000-0000-000000000001");
     expect(fetchMock).toHaveBeenCalledWith(
@@ -541,6 +559,7 @@ describe("mobileApiRequest", () => {
   it("manages teammate invitations through the mobile people endpoint", async () => {
     const person = {
       id: "00000000-0000-0000-0000-000000000001",
+      employeeNumber: 1042,
       firstName: "Mina",
       lastName: "Diaz",
       phone: "555-0100",
@@ -592,27 +611,17 @@ describe("mobileApiRequest", () => {
       revokeMobilePersonInvitation,
     } = await import("./api");
 
-    await createMobilePersonInvitation(
-      "token-123",
-      "00000000-0000-0000-0000-000000000001",
-      { email: "mina@dubgrid.com" },
-    );
-    await resendMobilePersonInvitation(
-      "token-123",
-      "00000000-0000-0000-0000-000000000001",
-      {
-        invitationId: "11111111-1111-4111-8111-111111111111",
-        expectedUpdatedAt: "2026-04-28T00:00:00.000Z",
-      },
-    );
-    await revokeMobilePersonInvitation(
-      "token-123",
-      "00000000-0000-0000-0000-000000000001",
-      {
-        invitationId: "11111111-1111-4111-8111-111111111111",
-        expectedUpdatedAt: "2026-04-28T01:00:00.000Z",
-      },
-    );
+    await createMobilePersonInvitation("token-123", "00000000-0000-0000-0000-000000000001", {
+      email: "mina@dubgrid.com",
+    });
+    await resendMobilePersonInvitation("token-123", "00000000-0000-0000-0000-000000000001", {
+      invitationId: "11111111-1111-4111-8111-111111111111",
+      expectedUpdatedAt: "2026-04-28T00:00:00.000Z",
+    });
+    await revokeMobilePersonInvitation("token-123", "00000000-0000-0000-0000-000000000001", {
+      invitationId: "11111111-1111-4111-8111-111111111111",
+      expectedUpdatedAt: "2026-04-28T01:00:00.000Z",
+    });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -654,24 +663,19 @@ describe("mobileApiRequest", () => {
     });
 
     vi.stubGlobal("fetch", fetchMock);
-    const { createMobilePersonInvitation, parseMobileNameMismatchError } =
-      await import("./api");
+    const { createMobilePersonInvitation, parseMobileNameMismatchError } = await import("./api");
 
     let thrownError: unknown;
     try {
-      await createMobilePersonInvitation(
-        "token-123",
-        "00000000-0000-0000-0000-000000000001",
-        { email: "mina@dubgrid.com" },
-      );
+      await createMobilePersonInvitation("token-123", "00000000-0000-0000-0000-000000000001", {
+        email: "mina@dubgrid.com",
+      });
     } catch (error) {
       thrownError = error;
     }
 
     expect(thrownError).toBeInstanceOf(Error);
-    expect((thrownError as Error).message).toContain(
-      "The user account name does not match",
-    );
+    expect((thrownError as Error).message).toContain("The user account name does not match");
     expect(parseMobileNameMismatchError(thrownError)?.details).toMatchObject({
       accountFirstName: "Minnie",
       employeeFirstName: "Mina",
@@ -683,21 +687,17 @@ describe("mobileApiRequest", () => {
     const { parseMobileAccountLinkChallenge } = await import("./api");
 
     const challenge = parseMobileAccountLinkChallenge(
-      new ApiResponseError(
-        "An existing account was found for this email.",
-        409,
-        {
-          code: "ACCOUNT_FOUND",
-          details: {
-            employeeId: "00000000-0000-0000-0000-000000000001",
-            userId: "22222222-2222-4222-8222-222222222222",
-            employeeFirstName: "Mina",
-            employeeLastName: "Diaz",
-            accountFirstName: "Mina",
-            accountLastName: "Diaz",
-          },
+      new ApiResponseError("An existing account was found for this email.", 409, {
+        code: "ACCOUNT_FOUND",
+        details: {
+          employeeId: "00000000-0000-0000-0000-000000000001",
+          userId: "22222222-2222-4222-8222-222222222222",
+          employeeFirstName: "Mina",
+          employeeLastName: "Diaz",
+          accountFirstName: "Mina",
+          accountLastName: "Diaz",
         },
-      ),
+      }),
     );
 
     expect(challenge).toEqual({

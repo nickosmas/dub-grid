@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Button } from "./Button";
 import { mobileColors, mobileText } from "../theme/tokens";
 
@@ -9,24 +9,37 @@ export function EmptyStateCard({
   body,
   actionLabel,
   onAction,
+  compact = false,
+  fillScreen = false,
 }: {
   iconName?: keyof typeof Ionicons.glyphMap;
   title: string;
-  body: string;
+  body?: string;
   actionLabel?: string;
   onAction?: () => void;
+  compact?: boolean;
+  fillScreen?: boolean;
 }) {
+  const variant = compact ? compactStyles : styles;
+  const { height: windowHeight } = useWindowDimensions();
+  const fillStyle =
+    !compact && fillScreen
+      ? {
+          minHeight: Math.max(360, Math.min(520, windowHeight * 0.55)),
+          justifyContent: "center" as const,
+        }
+      : null;
   return (
-    <View style={styles.card}>
-      <View style={styles.iconFrame}>
-        <Ionicons color={mobileColors.brand} name={iconName} size={24} />
+    <View style={[variant.card, fillStyle]}>
+      <View style={variant.iconFrame}>
+        <Ionicons color={mobileColors.brand} name={iconName} size={compact ? 20 : 24} />
       </View>
-      <View style={styles.copy}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.body}>{body}</Text>
+      <View style={variant.copy}>
+        <Text style={variant.title}>{title}</Text>
+        {body ? <Text style={variant.body}>{body}</Text> : null}
       </View>
       {actionLabel && onAction ? (
-        <View style={styles.actionRow}>
+        <View style={variant.actionRow}>
           <Button compact label={actionLabel} onPress={onAction} tone="secondary" />
         </View>
       ) : null}
@@ -37,8 +50,8 @@ export function EmptyStateCard({
 const styles = StyleSheet.create({
   card: {
     paddingHorizontal: 4,
-    paddingVertical: 18,
-    gap: 14,
+    paddingVertical: 32,
+    gap: 16,
     alignItems: "center",
   },
   iconFrame: {
@@ -62,6 +75,43 @@ const styles = StyleSheet.create({
   },
   body: {
     ...mobileText.body,
+    color: mobileColors.textMuted,
+    textAlign: "center",
+    maxWidth: 320,
+  },
+  actionRow: {
+    alignItems: "center",
+  },
+});
+
+const compactStyles = StyleSheet.create({
+  card: {
+    paddingHorizontal: 4,
+    paddingVertical: 12,
+    gap: 10,
+    alignItems: "center",
+  },
+  iconFrame: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: mobileColors.brandSoft,
+    borderWidth: 1,
+    borderColor: mobileColors.brandBorder,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  copy: {
+    gap: 4,
+    alignItems: "center",
+  },
+  title: {
+    ...mobileText.bodyStrong,
+    color: mobileColors.textPrimary,
+    textAlign: "center",
+  },
+  body: {
+    ...mobileText.meta,
     color: mobileColors.textMuted,
     textAlign: "center",
   },

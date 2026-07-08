@@ -3,6 +3,7 @@ import "server-only";
 import { z } from "zod";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { Employee } from "@dubgrid/domain";
+import { indefiniteArticle } from "@dubgrid/domain";
 import { buildPermissionContext } from "@dubgrid/authz";
 import { fetchLinkedEmployeeForUser } from "@/features/mobile/server";
 import { deleteUserAccountWithCleanup } from "@/features/account/server/account-deletion";
@@ -33,10 +34,7 @@ export const createProfileChangeRequestSchema = z
     requestNote: z.string().trim().max(1000).optional(),
   })
   .superRefine((value, ctx) => {
-    if (
-      value.type === "profile_update" &&
-      Object.keys(value.requestedChanges ?? {}).length === 0
-    ) {
+    if (value.type === "profile_update" && Object.keys(value.requestedChanges ?? {}).length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Profile update requests must include at least one change",
@@ -52,11 +50,7 @@ export const resolveProfileChangeRequestSchema = z.object({
 
 export type ProfileRequestedChanges = z.infer<typeof profileRequestedChangesSchema>;
 export type ProfileChangeRequestType = "profile_update" | "account_deletion";
-export type ProfileChangeRequestStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "cancelled";
+export type ProfileChangeRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
 
 export interface ProfileChangeRequestRecord {
   id: string;
@@ -89,8 +83,7 @@ function mapProfileChangeRequest(row: Record<string, unknown>): ProfileChangeReq
     orgId: row.org_id as string,
     requesterUserId: (row.requester_user_id as string | null) ?? null,
     requesterEmployeeId: (row.requester_employee_id as string | null) ?? null,
-    requesterEmployeeVersion:
-      (row.requester_employee_version as number | null | undefined) ?? null,
+    requesterEmployeeVersion: (row.requester_employee_version as number | null | undefined) ?? null,
     requesterName: (row.requester_name as string | null) ?? "",
     requesterEmail: (row.requester_email as string | null) ?? null,
     type: row.request_type as ProfileChangeRequestType,
@@ -214,17 +207,83 @@ async function fetchProfileChangeRequestReviewerIds(input: {
       continue;
     }
 
-    const permissions = buildPermissionContext(
-      row.org_role,
-      input.orgId,
-      row.admin_permissions,
-    );
+    const permissions = buildPermissionContext(row.org_role, input.orgId, row.admin_permissions);
     if (permissions.isSuperAdmin || permissions.canManageEmployees) {
       reviewerIds.add(row.user_id);
     }
   }
 
   return [...reviewerIds];
+}
+
+/**
+ * Build a human-readable summary of what a profile-update request is
+ * asking to change. Returns a discriminated title (e.g. "Name change") and
+ * a list of human-readable change descriptions for the message body.
+ */
+function summarizeProfileChange(
+  type: ProfileChangeRequestType,
+  requestedChanges: ProfileRequestedChanges,
+  currentValues: Record<string, unknown>,
+): {
+  shortLabel: string;
+  changes: Array<{ field: string; from?: string; to?: string }>;
+} {
+  if (type === "account_deletion") {
+    return { shortLabel: "account deletion", changes: [] };
+  }
+  const changes: Array<{ field: string; from?: string; to?: string }> = [];
+
+  if (requestedChanges.firstName !== undefined || requestedChanges.lastName !== undefined) {
+    const currentFirst = String(currentValues.firstName ?? "");
+    const currentLast = String(currentValues.lastName ?? "");
+    const nextFirst = requestedChanges.firstName ?? currentFirst;
+    const nextLast = requestedChanges.lastName ?? currentLast;
+    changes.push({
+      field: "Name",
+      from: `${currentFirst} ${currentLast}`.trim() || undefined,
+      to: `${nextFirst} ${nextLast}`.trim() || undefined,
+    });
+  }
+  if (requestedChanges.employmentType !== undefined) {
+    const friendly = (v: string) =>
+      v === "full_time" ? "Full-time" : v === "part_time" ? "Part-time" : v;
+    changes.push({
+      field: "Employment type",
+      from:
+        typeof currentValues.employmentType === "string"
+          ? friendly(currentValues.employmentType)
+          : undefined,
+      to: friendly(requestedChanges.employmentType),
+    });
+  }
+  if (requestedChanges.certificationId !== undefined) {
+    changes.push({ field: "Certification" });
+  }
+  if (requestedChanges.focusAreaIds !== undefined) {
+    changes.push({ field: "Focus areas" });
+  }
+  if (requestedChanges.roleIds !== undefined) {
+    changes.push({ field: "Roles" });
+  }
+  if (requestedChanges.departmentIds !== undefined) {
+    changes.push({ field: "Departments" });
+  }
+
+  // Discriminated short label — most-specific wins.
+  let shortLabel: string;
+  if (changes.length === 1) {
+    shortLabel = `${changes[0]!.field.toLowerCase()} change`;
+  } else if (changes.length > 1) {
+    shortLabel = "profile change";
+  } else {
+    shortLabel = "profile change";
+  }
+  return { shortLabel, changes };
+}
+
+function capitalizeFirst(value: string): string {
+  return value.length > 0 ? `${value.slice(0, 1).toUpperCase()}${value.slice(1)}` : value;
 }
 
 async function notifyProfileChangeRequestReviewers(input: {
@@ -245,15 +304,40 @@ async function notifyProfileChangeRequestReviewers(input: {
       return;
     }
 
-    const title =
-      input.request.type === "account_deletion"
-        ? "Account deletion request"
-        : "Profile change request";
-    const requestLabel =
-      input.request.type === "account_deletion"
-        ? "account deletion"
-        : "profile change";
-    const requesterName = input.request.requesterName || "A user";
+    const { shortLabel, changes } = summarizeProfileChange(
+      input.request.type,
+      input.request.requestedChanges,
+      input.request.currentValues,
+    );
+    const requesterName = input.request.requesterName || "A teammate";
+    const title = capitalizeFirst(`${shortLabel} request`);
+
+    let message: string;
+    if (input.request.type === "account_deletion") {
+      message = `${requesterName} requested to delete their account.`;
+    } else if (changes.length === 1) {
+      const change = changes[0]!;
+      if (change.from && change.to) {
+        message = `${requesterName} requested ${shortLabel}: "${change.from}" → "${change.to}".`;
+      } else if (change.to) {
+        message = `${requesterName} requested ${shortLabel}: "${change.to}".`;
+      } else {
+        message = `${requesterName} requested ${shortLabel}.`;
+      }
+    } else if (changes.length > 1) {
+      const fields = changes.map((c) => c.field.toLowerCase()).join(", ");
+      message = `${requesterName} requested a profile change to: ${fields}.`;
+    } else {
+      message = `${requesterName} submitted ${indefiniteArticle(shortLabel)} ${shortLabel} request.`;
+    }
+
+    const changeDetails = changes
+      .filter((c) => c.from || c.to)
+      .reduce<Record<string, string>>((acc, c) => {
+        if (c.from && c.to) acc[c.field] = `${c.from} → ${c.to}`;
+        else if (c.to) acc[c.field] = c.to;
+        return acc;
+      }, {});
 
     const { error } = await input.serviceClient.from("notifications").insert(
       reviewerIds.map((userId) => ({
@@ -263,11 +347,13 @@ async function notifyProfileChangeRequestReviewers(input: {
         channel: "in_app",
         category: "system",
         title,
-        message: `${requesterName} submitted a ${requestLabel} request.`,
+        message,
         metadata: {
-          requestId: input.request.id,
-          requestType: input.request.type,
-          href: "/people?section=requests",
+          requestedBy: requesterName,
+          ...changeDetails,
+          ...(input.request.requestNote ? { note: input.request.requestNote } : {}),
+          actionUrl: "/people?section=requests",
+          actionLabel: "Review request",
         },
       })),
     );
@@ -290,11 +376,7 @@ export async function createProfileChangeRequest(input: {
   requestedChanges?: ProfileRequestedChanges;
   requestNote?: string;
 }): Promise<ProfileChangeRequestRecord> {
-  const membership = await assertActiveMembership(
-    input.serviceClient,
-    input.user.id,
-    input.orgId,
-  );
+  const membership = await assertActiveMembership(input.serviceClient, input.user.id, input.orgId);
   if (!membership) {
     throw new Error("You are not an active member of this organization.");
   }
@@ -337,13 +419,10 @@ export async function createProfileChangeRequest(input: {
       requester_employee_id: linkedEmployee?.id ?? null,
       requester_employee_version: linkedEmployee?.version ?? null,
       requester_name:
-        getEmployeeDisplayName(linkedEmployee) ||
-        input.user.email?.split("@")[0] ||
-        "User",
+        getEmployeeDisplayName(linkedEmployee) || input.user.email?.split("@")[0] || "User",
       requester_email: input.user.email ?? null,
       request_type: input.type,
-      requested_changes:
-        input.type === "profile_update" ? (input.requestedChanges ?? {}) : {},
+      requested_changes: input.type === "profile_update" ? (input.requestedChanges ?? {}) : {},
       current_values: buildCurrentValues(linkedEmployee),
       request_note: input.requestNote?.trim() ?? "",
     })
@@ -557,25 +636,76 @@ export async function resolveProfileChangeRequest(input: {
   }
 
   if (request.requesterUserId && request.type !== "account_deletion") {
+    // Resolve a human-readable description of the field(s) the admin acted on.
+    const { shortLabel, changes } = summarizeProfileChange(
+      request.type,
+      request.requestedChanges,
+      request.currentValues,
+    );
+    const resolverName = await fetchResolverDisplayName(input.serviceClient, input.actor.id);
+    const verb = input.action === "approve" ? "approved" : "declined";
+
+    let message: string;
+    if (changes.length === 1) {
+      const c = changes[0]!;
+      if (c.from && c.to && input.action === "approve") {
+        message = `${resolverName} ${verb} your ${shortLabel}: "${c.from}" → "${c.to}".`;
+      } else if (c.to) {
+        message = `${resolverName} ${verb} your ${shortLabel} to "${c.to}".`;
+      } else {
+        message = `${resolverName} ${verb} your ${shortLabel}.`;
+      }
+    } else if (changes.length > 1) {
+      const fields = changes.map((c) => c.field.toLowerCase()).join(", ");
+      message = `${resolverName} ${verb} your profile change (${fields}).`;
+    } else {
+      message = `${resolverName} ${verb} your ${shortLabel} request.`;
+    }
+
+    const changeDetails = changes
+      .filter((c) => c.from || c.to)
+      .reduce<Record<string, string>>((acc, c) => {
+        if (c.from && c.to) acc[c.field] = `${c.from} → ${c.to}`;
+        else if (c.to) acc[c.field] = c.to;
+        return acc;
+      }, {});
+
+    const title = capitalizeFirst(
+      `${shortLabel} ${input.action === "approve" ? "approved" : "declined"}`,
+    );
+
     await input.serviceClient.from("notifications").insert({
       user_id: request.requesterUserId,
       org_id: request.orgId,
       type: "system",
       channel: "in_app",
       category: "system",
-      title:
-        input.action === "approve"
-          ? "Profile request approved"
-          : "Profile request rejected",
-      message:
-        input.action === "approve"
-          ? "An admin approved your profile request."
-          : "An admin rejected your profile request.",
-      metadata: { requestId: request.id, requestType: request.type },
+      title,
+      message,
+      metadata: {
+        reviewedBy: resolverName,
+        ...changeDetails,
+        ...(input.resolverNote?.trim() ? { adminNote: input.resolverNote.trim() } : {}),
+      },
     });
   }
 
   return mapProfileChangeRequest(data as Record<string, unknown>);
+}
+
+async function fetchResolverDisplayName(
+  serviceClient: SupabaseClient,
+  userId: string,
+): Promise<string> {
+  const { data } = await serviceClient
+    .from("profiles")
+    .select("first_name, last_name")
+    .eq("id", userId)
+    .maybeSingle();
+  const first = (data?.first_name as string | null) ?? "";
+  const last = (data?.last_name as string | null) ?? "";
+  const full = `${first} ${last}`.trim();
+  return full || "An administrator";
 }
 
 export async function canManageProfileChangeRequests(input: {
@@ -607,9 +737,5 @@ export async function canManageProfileChangeRequests(input: {
     (membership?.admin_permissions as AdminPermissions | null) ?? null,
   );
 
-  return (
-    permissions.isGridmaster ||
-    permissions.isSuperAdmin ||
-    permissions.canManageEmployees
-  );
+  return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees;
 }

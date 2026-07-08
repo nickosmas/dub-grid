@@ -36,11 +36,13 @@ function createThenableQuery(result: unknown) {
     select: ReturnType<typeof vi.fn>;
     eq: ReturnType<typeof vi.fn>;
     is: ReturnType<typeof vi.fn>;
+    maybeSingle: ReturnType<typeof vi.fn>;
     then: Promise<unknown>["then"];
   } = {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
     is: vi.fn(() => Promise.resolve(result)),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
     then: Promise.resolve(result).then.bind(Promise.resolve(result)),
   };
 
@@ -59,14 +61,10 @@ function createServiceClient(input?: {
   const setupComplete = input?.setupComplete ?? true;
   const setupResults: Record<string, unknown> = {
     focus_areas: createSetupResult(
-      setupComplete
-        ? [{ id: 1, department_id: 10, archived_at: null }]
-        : [],
+      setupComplete ? [{ id: 1, department_id: 10, archived_at: null }] : [],
     ),
     shift_categories: createSetupResult(
-      setupComplete
-        ? [{ id: 2, focus_area_id: 1, archived_at: null }]
-        : [],
+      setupComplete ? [{ id: 2, focus_area_id: 1, archived_at: null }] : [],
     ),
     jobs: createSetupResult(
       setupComplete
@@ -83,16 +81,10 @@ function createServiceClient(input?: {
           ]
         : [],
     ),
-    certifications: createSetupResult(
-      setupComplete ? [{ id: 4, archived_at: null }] : [],
-    ),
-    organization_roles: createSetupResult(
-      setupComplete ? [{ id: 5, archived_at: null }] : [],
-    ),
+    certifications: createSetupResult(setupComplete ? [{ id: 4, archived_at: null }] : []),
+    organization_roles: createSetupResult(setupComplete ? [{ id: 5, archived_at: null }] : []),
     departments: createSetupResult(
-      setupComplete
-        ? [{ id: 10, type: "scheduled", archived_at: null }]
-        : [],
+      setupComplete ? [{ id: 10, type: "scheduled", archived_at: null }] : [],
     ),
     employees: createSetupResult([], setupComplete ? 1 : 0),
   };
@@ -154,7 +146,7 @@ describe("requireMobileAuth", () => {
     createMobileUserClient.mockReturnValue({});
   });
 
-  it("blocks mobile app access while workspace setup is incomplete", async () => {
+  it("blocks mobile app access while organization setup is incomplete", async () => {
     getServiceClient.mockReturnValue(createServiceClient({ setupComplete: false }));
 
     const { requireMobileAuth } = await import("./auth");
@@ -168,11 +160,11 @@ describe("requireMobileAuth", () => {
     if (!("response" in result)) return;
     expect(result.response.status).toBe(403);
     expect(await result.response.json()).toEqual({
-      error: "Workspace unavailable. Sign in on the web to finish workspace setup.",
+      error: "Organization unavailable. Sign in on the web to finish organization setup.",
     });
   });
 
-  it("allows mobile auth context once workspace setup is complete", async () => {
+  it("allows mobile auth context once organization setup is complete", async () => {
     getServiceClient.mockReturnValue(createServiceClient({ setupComplete: true }));
 
     const { requireMobileAuth } = await import("./auth");

@@ -28,9 +28,6 @@ describe("ScheduleOperationModal", () => {
     render(<ScheduleOperationModal title="Auto filling shifts..." progress={140} />);
 
     expect(screen.getByText("100%")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar")).toHaveAttribute(
-      "aria-valuenow",
-      "100",
-    );
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
   });
 });

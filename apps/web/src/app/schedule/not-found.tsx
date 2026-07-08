@@ -1,11 +1,12 @@
-import Link from "next/link";
+import { NotFoundBoundary } from "@/components/RouteBoundary";
 
 export default function ScheduleNotFound() {
   return (
-    <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, padding: 24 }}>
-      <p style={{ fontSize: "var(--dg-fs-page-title)", fontWeight: 700, color: "var(--color-text-primary)", margin: 0 }}>Schedule not found</p>
-      <p style={{ fontSize: "var(--dg-fs-body)", color: "var(--color-text-muted)", margin: 0 }}>The schedule you&apos;re looking for doesn&apos;t exist.</p>
-      <Link href="/schedule" className="dg-btn dg-btn-primary" style={{ marginTop: 8 }}>Back to Schedule</Link>
-    </div>
+    <NotFoundBoundary
+      title="Schedule not found"
+      message="The schedule you're looking for doesn't exist."
+      backHref="/schedule"
+      backLabel="Back to Schedule"
+    />
   );
 }

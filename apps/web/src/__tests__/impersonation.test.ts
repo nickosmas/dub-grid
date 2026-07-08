@@ -113,7 +113,9 @@ describe("setImpersonationCookie", () => {
   beforeEach(() => {
     cookieSetValue = "";
     Object.defineProperty(document, "cookie", {
-      set: (val: string) => { cookieSetValue = val; },
+      set: (val: string) => {
+        cookieSetValue = val;
+      },
       get: () => cookieSetValue,
       configurable: true,
     });
@@ -151,7 +153,9 @@ describe("clearImpersonationCookie", () => {
   beforeEach(() => {
     cookieSetValue = "";
     Object.defineProperty(document, "cookie", {
-      set: (val: string) => { cookieSetValue = val; },
+      set: (val: string) => {
+        cookieSetValue = val;
+      },
       get: () => cookieSetValue,
       configurable: true,
     });

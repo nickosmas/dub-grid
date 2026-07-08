@@ -4,6 +4,7 @@ import {
   mobileBootstrapResponseSchema,
   mobileCreateShiftRequestBodySchema,
   mobileNotificationPreferencesResponseSchema,
+  mobileNotificationSchema,
   mobilePersonSchema,
   mobilePersonResponseSchema,
   mobilePersonUpdateBodySchema,
@@ -20,15 +21,11 @@ import {
   mobileShiftSwapOptionsQuerySchema,
   mobileShiftSwapOptionsResponseSchema,
   mobileUpdateShiftRequestBodySchema,
-  mobileWorkspaceLookupResponseSchema,
+  mobileOrganizationLookupResponseSchema,
   normalizeMobileScheduleRange,
 } from "./mobile";
 import { scheduleCellStateSchema } from "./schedule";
-import {
-  getOptionalUsPhoneError,
-  normalizeOptionalUsPhone,
-  staffNameSchema,
-} from "./staff";
+import { getOptionalUsPhoneError, normalizeOptionalUsPhone, staffNameSchema } from "./staff";
 
 describe("mobile contracts", () => {
   it("rejects invalid schedule state combinations before API handlers reach SQL", () => {
@@ -79,9 +76,9 @@ describe("mobile contracts", () => {
     });
   });
 
-  it("accepts a valid workspace lookup response", () => {
-    const result = mobileWorkspaceLookupResponseSchema.safeParse({
-      workspace: {
+  it("accepts a valid organization lookup response", () => {
+    const result = mobileOrganizationLookupResponseSchema.safeParse({
+      organization: {
         id: "22222222-2222-4222-8222-222222222222",
         name: "Acme Care",
         slug: "acme",
@@ -99,7 +96,7 @@ describe("mobile contracts", () => {
         expiresIn: 3600,
         tokenType: "bearer",
       },
-      workspace: {
+      organization: {
         id: "22222222-2222-4222-8222-222222222222",
         name: "Acme Care",
         slug: "acme",
@@ -180,26 +177,16 @@ describe("mobile contracts", () => {
       expect(getOptionalUsPhoneError(input)).toBeNull();
     }
 
-    for (const input of [
-      "123",
-      "jagdhx",
-      "111-222-3333",
-      "+44 20 7946 0958",
-      "415-425-33344",
-    ]) {
+    for (const input of ["123", "jagdhx", "111-222-3333", "+44 20 7946 0958", "415-425-33344"]) {
       expect(getOptionalUsPhoneError(input)).toBeTruthy();
       expect(() => normalizeOptionalUsPhone(input)).toThrow();
     }
   });
 
   it("validates staff names without rejecting normal punctuation", () => {
-    expect(staffNameSchema.parse("  Anne-Marie O'Neil  ")).toBe(
-      "Anne-Marie O'Neil",
-    );
+    expect(staffNameSchema.parse("  Anne-Marie O'Neil  ")).toBe("Anne-Marie O'Neil");
     expect(staffNameSchema.safeParse("123").success).toBe(false);
-    expect(staffNameSchema.safeParse("https://example.com").success).toBe(
-      false,
-    );
+    expect(staffNameSchema.safeParse("https://example.com").success).toBe(false);
   });
 
   it("accepts profile phone update input", () => {
@@ -247,6 +234,7 @@ describe("mobile contracts", () => {
   it("accepts mobile people employment type fields", () => {
     const personResult = mobilePersonSchema.safeParse({
       id: "33333333-3333-4333-8333-333333333333",
+      employeeNumber: 1001,
       firstName: "Alex",
       lastName: "North",
       employmentType: "part_time",
@@ -277,6 +265,7 @@ describe("mobile contracts", () => {
     const result = mobilePersonResponseSchema.safeParse({
       person: {
         id: "33333333-3333-4333-8333-333333333333",
+        employeeNumber: 1042,
         firstName: "Alex",
         lastName: "North",
         employmentType: "full_time",
@@ -336,7 +325,7 @@ describe("mobile contracts", () => {
         expiresIn: 3600,
         tokenType: "bearer",
       },
-      workspace: {
+      organization: {
         id: "22222222-2222-4222-8222-222222222222",
         name: "Acme Care",
         slug: "acme",
@@ -393,6 +382,7 @@ describe("mobile contracts", () => {
         canPublishSchedule: false,
         canApplyRecurringSchedule: false,
         canEditNotes: false,
+        canEditScheduleIndicators: false,
         canViewRecurringShifts: false,
         canManageRecurringShifts: false,
         canManageShiftSeries: false,
@@ -493,6 +483,7 @@ describe("mobile contracts", () => {
         canPublishSchedule: false,
         canApplyRecurringSchedule: false,
         canEditNotes: false,
+        canEditScheduleIndicators: false,
         canViewRecurringShifts: false,
         canManageRecurringShifts: false,
         canManageShiftSeries: false,
@@ -577,6 +568,7 @@ describe("mobile contracts", () => {
         canPublishSchedule: false,
         canApplyRecurringSchedule: false,
         canEditNotes: false,
+        canEditScheduleIndicators: false,
         canViewRecurringShifts: false,
         canManageRecurringShifts: false,
         canManageShiftSeries: false,
@@ -620,6 +612,39 @@ describe("mobile contracts", () => {
 
     expect(result.success).toBe(true);
     expect(result.data?.linkedEmployee?.focusAreaIds).toEqual([]);
+  });
+
+  it("accepts notification types that mobile already receives pushes for but previously had no schema entry", () => {
+    const base = {
+      id: "5c1e2f3a-1111-4b2c-8888-abcdef123456",
+      channel: "in_app" as const,
+      category: "billing",
+      priority: "high" as const,
+      title: "Trial ending soon",
+      message: "Your trial ends in 2 days.",
+      metadata: {},
+      readAt: null,
+      archivedAt: null,
+      createdAt: "2026-07-01T00:00:00.000Z",
+    };
+
+    for (const type of [
+      "shift_request_expired",
+      "invitation_expired",
+      "member_dept_changed",
+      "billing_trial_ending_soon",
+      "billing_trial_expired",
+      "org_created",
+      "org_trial_started",
+      "org_archived",
+      "org_restored",
+      "org_subscription_converted",
+      "org_subscription_canceled",
+      "org_payment_failed",
+    ] as const) {
+      const result = mobileNotificationSchema.safeParse({ ...base, type });
+      expect(result.success).toBe(true);
+    }
   });
 
   it("accepts a valid notification read response", () => {

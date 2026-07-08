@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireAuthenticatedUser,
-} from "@/lib/api-auth";
-import type { Notification, NotificationType } from "@/types";
+import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import type { Notification, NotificationPriority, NotificationType } from "@/types";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const searchSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -12,23 +11,27 @@ const searchSchema = z.object({
   includeNotifications: z.enum(["0", "1"]).optional(),
 });
 
-const patchSchema = z.object({
-  notificationId: z.string().uuid().optional(),
-  markAll: z.boolean().optional(),
-}).refine((value) => value.markAll === true || typeof value.notificationId === "string", {
-  message: "notificationId or markAll is required",
-});
+const patchSchema = z
+  .object({
+    notificationId: z.string().uuid().optional(),
+    markAll: z.boolean().optional(),
+  })
+  .refine((value) => value.markAll === true || typeof value.notificationId === "string", {
+    message: "notificationId or markAll is required",
+  });
 
-function mapNotificationRow(row: Record<string, unknown>): Notification {
+export function mapNotificationRow(row: Record<string, unknown>): Notification {
   return {
     id: row.id as string,
     type: row.type as NotificationType,
     channel: (row.channel as "in_app" | "email") ?? "in_app",
     category: (row.category as string | null) ?? null,
+    priority: ((row.priority as string | null) ?? "normal") as NotificationPriority,
     title: row.title as string,
     message: row.message as string,
     metadata: (row.metadata ?? {}) as Record<string, unknown>,
     readAt: (row.read_at as string | null) ?? null,
+    archivedAt: (row.archived_at as string | null) ?? null,
     createdAt: row.created_at as string,
   };
 }
@@ -41,11 +44,9 @@ export async function GET(req: NextRequest) {
     }
     void auth;
 
-    const parsed = searchSchema.safeParse(
-      Object.fromEntries(req.nextUrl.searchParams.entries()),
-    );
+    const parsed = searchSchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     const supabase = createRequestSupabaseClient(req);
@@ -70,21 +71,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       unreadCount: (unreadCountResult.data as number | null) ?? 0,
       notifications: includeNotifications
-        ? ((notificationsResult.data ?? []) as Record<string, unknown>[]).map(
-            mapNotificationRow,
-          )
+        ? ((notificationsResult.data ?? []) as Record<string, unknown>[]).map(mapNotificationRow)
         : undefined,
     });
   } catch (error) {
     console.error("notifications GET failed", error);
-    return NextResponse.json(
-      { error: "Failed to load notifications" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load notifications" }, { status: 500 });
   }
 }
 
 export async function PATCH(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedUser(req);
     if ("response" in auth) {
@@ -96,12 +95,12 @@ export async function PATCH(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     const parsed = patchSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     const supabase = createRequestSupabaseClient(req);
@@ -119,9 +118,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("notifications PATCH failed", error);
-    return NextResponse.json(
-      { error: "Failed to update notifications" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 });
   }
 }

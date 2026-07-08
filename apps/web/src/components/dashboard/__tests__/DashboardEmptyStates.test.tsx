@@ -63,9 +63,7 @@ describe("dashboard empty states", () => {
       />,
     );
 
-    expect(
-      screen.getByText("No overtime alerts this period"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No overtime alerts this period")).toBeInTheDocument();
   });
 
   it("renders the open shifts empty state message", () => {
@@ -103,18 +101,11 @@ describe("dashboard empty states", () => {
   });
 
   it("renders the open shifts unpublished state message", () => {
-    render(
-      <OpenShiftsCard
-        openShifts={[]}
-        publishedWindowState="unpublished"
-      />,
-    );
+    render(<OpenShiftsCard openShifts={[]} publishedWindowState="unpublished" />);
 
     expect(screen.getAllByText("Not published yet").length).toBeGreaterThan(0);
     expect(
-      screen.getByText(
-        "Open shifts will appear after this period is published.",
-      ),
+      screen.getByText("Open shifts will appear after this period is published."),
     ).toBeInTheDocument();
   });
 
@@ -148,9 +139,7 @@ describe("dashboard empty states", () => {
 
     expect(screen.getAllByText("Not published yet").length).toBeGreaterThan(0);
     expect(
-      screen.getByText(
-        "Coverage details will appear after this period is published.",
-      ),
+      screen.getByText("Coverage details will appear after this period is published."),
     ).toBeInTheDocument();
   });
 
@@ -190,11 +179,11 @@ describe("dashboard empty states", () => {
       />,
     );
 
-    expect(
-      screen.getByLabelText("Front Desk Mon: 1 of 2 required slots filled"),
-    ).toHaveTextContent("1/2");
-    expect(
-      screen.getByLabelText("Front Desk Tue: no coverage requirement"),
-    ).toHaveTextContent("\u2014");
+    expect(screen.getByLabelText("Front Desk Mon: 1 of 2 required slots filled")).toHaveTextContent(
+      "1/2",
+    );
+    expect(screen.getByLabelText("Front Desk Tue: no coverage requirement")).toHaveTextContent(
+      "\u2014",
+    );
   });
 });

@@ -30,7 +30,9 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
   };
 }
 
-function makeAssignmentDefinition(overrides: Partial<AssignmentDefinition> = {}): AssignmentDefinition {
+function makeAssignmentDefinition(
+  overrides: Partial<AssignmentDefinition> = {},
+): AssignmentDefinition {
   return {
     id: 1,
     orgId: "org1",
@@ -234,57 +236,52 @@ describe("Property 11: headcount aggregation correctness across all count types"
     });
 
     fc.assert(
-      fc.property(
-        fc.array(arbEntry, { minLength: 0, maxLength: 15 }),
-        (entries) => {
-          const date = new Date(2024, 0, 15);
+      fc.property(fc.array(arbEntry, { minLength: 0, maxLength: 15 }), (entries) => {
+        const date = new Date(2024, 0, 15);
 
-          const employees: Employee[] = entries.map((_, i) =>
-            makeEmployee({ id: `emp-${i + 1}` }),
-          );
+        const employees: Employee[] = entries.map((_, i) => makeEmployee({ id: `emp-${i + 1}` }));
 
-          // Each entry gets a unique shift code ID (starting at 100)
-          const codes: AssignmentDefinition[] = entries.map((e, i) =>
-            makeAssignmentDefinition({ id: 100 + i, label: `SHIFT_${i}`, categoryId: e.categoryId }),
-          );
+        // Each entry gets a unique shift code ID (starting at 100)
+        const codes: AssignmentDefinition[] = entries.map((e, i) =>
+          makeAssignmentDefinition({ id: 100 + i, label: `SHIFT_${i}`, categoryId: e.categoryId }),
+        );
 
-          const codeMap = new Map(codes.map((c) => [c.id, c]));
-          const sectionIds = new Set(codes.map((c) => c.id));
+        const codeMap = new Map(codes.map((c) => [c.id, c]));
+        const sectionIds = new Set(codes.map((c) => c.id));
 
-          const assignmentIdsForKey = (empId: string): number[] => {
-            const match = empId.match(/^emp-(\d+)$/);
-            if (!match) return [];
-            const idx = parseInt(match[1], 10) - 1;
-            if (idx < 0 || idx >= entries.length) return [];
-            return entries[idx].hasShift ? [100 + idx] : [];
-          };
+        const assignmentIdsForKey = (empId: string): number[] => {
+          const match = empId.match(/^emp-(\d+)$/);
+          if (!match) return [];
+          const idx = parseInt(match[1], 10) - 1;
+          if (idx < 0 || idx >= entries.length) return [];
+          return entries[idx].hasShift ? [100 + idx] : [];
+        };
 
-          const result = computeDailyTallies(
-            employees,
-            date,
-            assignmentIdsForKey,
-            codeMap,
-            sectionIds,
-          );
+        const result = computeDailyTallies(
+          employees,
+          date,
+          assignmentIdsForKey,
+          codeMap,
+          sectionIds,
+        );
 
-          // Compute expected headcounts per category
-          const expectedCounts: Record<number, number> = {};
-          entries.forEach((e) => {
-            if (e.hasShift && e.categoryId != null) {
-              expectedCounts[e.categoryId] = (expectedCounts[e.categoryId] ?? 0) + 1;
-            }
-          });
-
-          const sumTally = (tally: Record<string, number>) =>
-            Object.values(tally).reduce((a, b) => a + b, 0);
-
-          for (const catId of [CAT_DAY, CAT_EVE, CAT_NIGHT]) {
-            const expected = expectedCounts[catId] ?? 0;
-            const actual = result[catId] ? sumTally(result[catId]) : 0;
-            expect(actual).toBe(expected);
+        // Compute expected headcounts per category
+        const expectedCounts: Record<number, number> = {};
+        entries.forEach((e) => {
+          if (e.hasShift && e.categoryId != null) {
+            expectedCounts[e.categoryId] = (expectedCounts[e.categoryId] ?? 0) + 1;
           }
-        },
-      ),
+        });
+
+        const sumTally = (tally: Record<string, number>) =>
+          Object.values(tally).reduce((a, b) => a + b, 0);
+
+        for (const catId of [CAT_DAY, CAT_EVE, CAT_NIGHT]) {
+          const expected = expectedCounts[catId] ?? 0;
+          const actual = result[catId] ? sumTally(result[catId]) : 0;
+          expect(actual).toBe(expected);
+        }
+      }),
     );
   });
 });
@@ -300,7 +297,7 @@ describe("filterAndSortEmployees", () => {
     makeEmployee({ id: "emp-5", focusAreaIds: [3], seniority: 5 }),
   ];
 
-  it('null filter (All) includes all employees with at least one focus area', () => {
+  it("null filter (All) includes all employees with at least one focus area", () => {
     const result = filterAndSortEmployees(employees, null);
     const ids = result.map((e) => e.id);
     expect(ids).toContain("emp-1");
@@ -309,7 +306,7 @@ describe("filterAndSortEmployees", () => {
     expect(ids).toContain("emp-5");
   });
 
-  it('null filter (All) excludes employees with empty focus areas', () => {
+  it("null filter (All) excludes employees with empty focus areas", () => {
     const result = filterAndSortEmployees(employees, null);
     expect(result.map((e) => e.id)).not.toContain("emp-4");
   });
@@ -348,17 +345,19 @@ describe("Property 12: Employee filter correctness and sort order", () => {
   // Feature: comprehensive-test-suite, Property 12: Employee filter correctness and sort order
   it("filtered result satisfies focus area inclusion, empty exclusion, and seniority sort", () => {
     const arbFocusAreaId = fc.constantFrom(1, 2, 3, 4);
-    const arbEmployee = fc.record({
-      id: fc.uuid(),
-      seniority: fc.integer({ min: 1, max: 1000 }),
-      focusAreaIds: fc.array(arbFocusAreaId, { minLength: 0, maxLength: 3 }),
-    }).map((e) =>
-      makeEmployee({
-        id: e.id,
-        seniority: e.seniority,
-        focusAreaIds: [...new Set(e.focusAreaIds)],
-      }),
-    );
+    const arbEmployee = fc
+      .record({
+        id: fc.uuid(),
+        seniority: fc.integer({ min: 1, max: 1000 }),
+        focusAreaIds: fc.array(arbFocusAreaId, { minLength: 0, maxLength: 3 }),
+      })
+      .map((e) =>
+        makeEmployee({
+          id: e.id,
+          seniority: e.seniority,
+          focusAreaIds: [...new Set(e.focusAreaIds)],
+        }),
+      );
 
     const arbFilter = fc.oneof(fc.constant(null as number | null), arbFocusAreaId);
 
@@ -367,7 +366,9 @@ describe("Property 12: Employee filter correctness and sort order", () => {
         fc.array(arbEmployee, { minLength: 0, maxLength: 20 }),
         arbFilter,
         (employeesRaw, activeFocusAreaId) => {
-          const employees = employeesRaw.filter((e, idx, arr) => arr.findIndex(x => x.id === e.id) === idx);
+          const employees = employeesRaw.filter(
+            (e, idx, arr) => arr.findIndex((x) => x.id === e.id) === idx,
+          );
           const result = filterAndSortEmployees(employees, activeFocusAreaId);
 
           // (a) All results must have non-empty focusAreaIds

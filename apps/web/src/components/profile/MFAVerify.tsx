@@ -5,11 +5,9 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
+import { OrganizationBadge } from "@/components/auth/OrganizationBadge";
 import { ShieldCheck } from "lucide-react";
-import {
-  listBrowserMfaFactors,
-  verifyBrowserTotpEnrollment,
-} from "@/features/account/client";
+import { listBrowserMfaFactors, verifyBrowserTotpEnrollment } from "@/features/account/client";
 
 interface MFAVerifyProps {
   /** Called after successful MFA verification */
@@ -73,7 +71,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
   }
 
   return (
-    <PageShell footerCenteredOnly>
+    <PageShell>
       <Card>
         <div className="dg-auth-logo-block" style={{ marginBottom: 24 }}>
           <DubGridLogo size={52} />
@@ -81,20 +79,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
         </div>
 
         {orgSlug && baseDomain && (
-          <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <span style={{
-              display: "inline-block",
-              background: "var(--color-brand-bg)",
-              color: "var(--color-brand)",
-              border: "1px solid var(--color-brand-border)",
-              borderRadius: 999,
-              padding: "4px 14px",
-              fontSize: "var(--dg-fs-label)",
-              fontWeight: 600,
-            }}>
-              {orgSlug}.{baseDomain}
-            </span>
-          </div>
+          <OrganizationBadge slug={orgSlug} baseDomain={baseDomain} style={{ marginBottom: 20 }} />
         )}
 
         <div
@@ -112,19 +97,18 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
               marginBottom: 8,
             }}
           >
-            <ShieldCheck
-              size={32}
-              style={{ color: "var(--color-brand)", flexShrink: 0 }}
-            />
+            <ShieldCheck size={32} style={{ color: "var(--color-brand)", flexShrink: 0 }} />
             <h1 className="dg-auth-heading" style={{ marginBottom: 0 }}>
               Two-factor authentication
             </h1>
           </div>
-          <p style={{
-            fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-secondary)",
-            margin: 0,
-          }}>
+          <p
+            style={{
+              fontSize: "var(--dg-fs-body-sm)",
+              color: "var(--color-text-secondary)",
+              margin: 0,
+            }}
+          >
             Enter the 6-digit code from your authenticator app.
           </p>
         </div>
@@ -163,12 +147,14 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
           />
 
           {error && (
-            <p style={{
-              color: "var(--color-danger-dark)",
-              fontSize: "var(--dg-fs-body-sm)",
-              margin: 0,
-              textAlign: "center",
-            }}>
+            <p
+              style={{
+                color: "var(--color-danger-dark)",
+                fontSize: "var(--dg-fs-body-sm)",
+                margin: 0,
+                textAlign: "center",
+              }}
+            >
               {error}
             </p>
           )}
@@ -179,7 +165,11 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
             className="dg-auth-submit"
             style={{ width: "100%", maxWidth: 280, marginTop: 4 }}
           >
-            <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>
+            <ButtonLoading
+              loading={loading}
+              spinnerColor="var(--color-text-inverse)"
+              spinnerSize={28}
+            >
               Verify
             </ButtonLoading>
           </button>

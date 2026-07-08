@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
-import * as Sentry from "@/lib/sentry";
+import { ErrorBoundary } from "@/components/RouteBoundary";
 
 export default function ProfileError({
   error,
@@ -10,29 +9,5 @@ export default function ProfileError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
-
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "column",
-        gap: 16,
-        fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        padding: 24,
-      }}
-    >
-      <p style={{ fontSize: "var(--dg-fs-title)", color: "var(--color-text-muted)" }}>
-        Something went wrong loading this page.
-      </p>
-      <button onClick={reset} className="dg-btn dg-btn-primary">
-        Try again
-      </button>
-    </div>
-  );
+  return <ErrorBoundary error={error} reset={reset} />;
 }

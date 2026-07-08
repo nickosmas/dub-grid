@@ -62,10 +62,16 @@ vi.mock("@/hooks", () => ({
   usePermissions: () => mockPermissions,
   useOrganizationData: () => mockOrganizationData,
   useEmployees: () => mockEmployeesData,
+  useLogout: () => ({ signOut: vi.fn(), signOutOthers: vi.fn() }),
 }));
 
 vi.mock("@/features/onboarding/client", () => ({
   fetchOnboardingStatus: vi.fn(),
+  // Same-session completion/phase guards are sessionStorage-backed; default them
+  // off so these scenarios exercise the setupStatus-driven gate logic.
+  isOnboardingComplete: vi.fn(() => false),
+  getOnboardingPhase: vi.fn(() => null),
+  freezeOnboardingPhase: vi.fn(),
 }));
 
 vi.mock("@/features/billing/client", () => ({
@@ -96,6 +102,10 @@ vi.mock("@/components/UserViewBanner", () => ({
   default: () => null,
 }));
 
+vi.mock("@/components/TrialWelcomeModal", () => ({
+  default: () => null,
+}));
+
 function renderWithQueryClient(ui: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -103,9 +113,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
     },
   });
 
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
-  );
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
 function renderGate() {
@@ -190,25 +198,39 @@ describe("OnboardingGate setup lock", () => {
     expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
   });
 
-  it("redirects setup-capable users away from operational app routes while setup is incomplete", async () => {
+  it("renders the onboarding wizard inline for setup-capable users while setup is incomplete", async () => {
     renderGate();
 
-    await waitFor(() => {
-      expect(mockRouter.replace).toHaveBeenCalledWith("/setup");
-    });
+    expect(await screen.findByText("Onboarding wizard")).toBeInTheDocument();
     expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
+    expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
-  it("allows setup-capable users to use setup completion routes while setup is incomplete", async () => {
+  it("renders the wizard inline on every route, including /settings, while setup is incomplete", async () => {
     mockPathname = "/settings";
 
     renderGate();
 
-    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+    expect(await screen.findByText("Onboarding wizard")).toBeInTheDocument();
+    expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 
-  it("allows completed organizations with employees through normally", async () => {
+  it("shows setup pending to admins without any manage-* permission while setup is incomplete", async () => {
+    // Admin role with no manage capability — can't actually advance the
+    // org config wizard, so they wait alongside regular users instead of
+    // looping on an orientation that doesn't flip isOrgSetupComplete.
+    mockPermissions.role = "admin";
+    mockPermissions.canManageOrg = false;
+
+    renderGate();
+
+    expect(await screen.findByText("Setup pending")).toBeInTheDocument();
+    expect(screen.queryByText("Onboarding wizard")).not.toBeInTheDocument();
+    expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
+  });
+
+  it("allows completed organizations through normally", async () => {
     mockOrganizationData.setupStatus = {
       isComplete: true,
       missing: {
@@ -219,6 +241,28 @@ describe("OnboardingGate setup lock", () => {
       },
     };
     mockEmployeesData.employees = [{ id: "employee-1" }];
+    vi.mocked(fetchOnboardingStatus).mockResolvedValue({
+      completed: true,
+      completedAt: "2026-05-02T00:00:00.000Z",
+      tooltipToursCompleted: {},
+    });
+
+    renderGate();
+
+    expect(await screen.findByText("Protected app")).toBeInTheDocument();
+  });
+
+  it("treats org setup as complete even when no employees exist (adding employees is post-wizard)", async () => {
+    mockOrganizationData.setupStatus = {
+      isComplete: true,
+      missing: {
+        focusAreas: false,
+        scheduleDefinitions: false,
+        certifications: false,
+        orgRoles: false,
+      },
+    };
+    mockEmployeesData.employees = [];
     vi.mocked(fetchOnboardingStatus).mockResolvedValue({
       completed: true,
       completedAt: "2026-05-02T00:00:00.000Z",
@@ -280,9 +324,7 @@ describe("OnboardingGate setup lock", () => {
     renderGate();
 
     await waitFor(() => {
-      expect(mockRouter.replace).toHaveBeenCalledWith(
-        "/settings?section=org-billing",
-      );
+      expect(mockRouter.replace).toHaveBeenCalledWith("/settings?section=org-billing");
     });
     expect(screen.queryByText("Protected app")).not.toBeInTheDocument();
   });

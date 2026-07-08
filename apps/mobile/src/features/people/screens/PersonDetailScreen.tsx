@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Linking,
-  Modal,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -10,7 +8,8 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { Stack, useLocalSearchParams } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { Stack, router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   MobileBootstrapResponse,
@@ -20,19 +19,19 @@ import type {
   MobilePersonUpdateBody,
 } from "@dubgrid/contracts";
 import {
-  getRequiredStaffEmailError,
+  getOptionalStaffEmailError,
   getStaffNameError,
   getStaffNotesError,
   getOptionalUsPhoneError,
+  normalizeOptionalStaffEmail,
   normalizeOptionalUsPhone,
-  normalizeRequiredStaffEmail,
   normalizeStaffName,
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
+import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ModalHeader } from "../../../shared/components/ModalHeader";
 import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
@@ -47,14 +46,11 @@ import {
   type MobileAccountLinkChallenge,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -68,8 +64,9 @@ import {
   ProfileSection,
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
+import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
-type ConfirmAction = "bench" | "activate" | "terminate" | null;
+type ConfirmAction = "deactivate" | "activate" | "remove" | null;
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
 
 type EditDraft = {
@@ -86,32 +83,11 @@ type EditDraft = {
 };
 
 function getFullName(person: MobilePerson): string {
-  return (
-    `${person.firstName} ${person.lastName}`.trim() ||
-    person.email ||
-    "Unnamed person"
-  );
+  return `${person.firstName} ${person.lastName}`.trim() || person.email || "Unnamed person";
 }
 
 function formatStatusLabel(status: MobilePerson["status"]): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
-}
-
-function hashCode(value: string): number {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-function getAvatarTone(seed: string) {
-  const hue = hashCode(seed) % 360;
-  return {
-    backgroundColor: `hsl(${hue}, 70%, 92%)`,
-    borderColor: `hsl(${hue}, 70%, 85%)`,
-    color: `hsl(${hue}, 70%, 35%)`,
-  };
 }
 
 function formatDate(value: string | null): string {
@@ -151,7 +127,8 @@ export default function PersonDetailScreen() {
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
-  const [benchNote, setBenchNote] = useState("");
+  const [showDiscardCancelConfirmation, setShowDiscardCancelConfirmation] = useState(false);
+  const [inactiveNote, setInactiveNote] = useState("");
   const [showCollapsedHeader, setShowCollapsedHeader] = useState(false);
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
@@ -164,15 +141,13 @@ export default function PersonDetailScreen() {
   const manualRefresh = useManualRefresh(() =>
     Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]),
   );
-  const canManageEmployees = Boolean(
-    bootstrapQuery.data?.permissions.canManageEmployees,
-  );
+  const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
+  const currentUserId = bootstrapQuery.data?.user?.id ?? null;
   const rawPerson = personQuery.data?.person ?? null;
   const person =
-    rawPerson && (canManageEmployees || rawPerson.status === "active")
-      ? rawPerson
-      : null;
-  const canEdit = canManageEmployees && person?.status !== "terminated";
+    rawPerson && (canManageEmployees || rawPerson.status === "active") ? rawPerson : null;
+  const isSelf = Boolean(currentUserId && person?.userId && person.userId === currentUserId);
+  const canEdit = canManageEmployees && person?.status !== "removed";
   const contentState = getMobileQueryContentState({
     hasData: personQuery.data !== undefined,
     isLoading: personQuery.isLoading || bootstrapQuery.isLoading,
@@ -180,16 +155,19 @@ export default function PersonDetailScreen() {
   });
 
   useEffect(() => {
+    if (isSelf) {
+      router.replace("/(tabs)/profile");
+    }
+  }, [isSelf]);
+
+  useEffect(() => {
     if (person && !editing) {
       setDraft(makeDraft(person));
-      setBenchNote(person.statusNote);
+      setInactiveNote(person.statusNote);
     }
   }, [editing, person]);
 
-  const maps = useMemo(
-    () => buildLookupMaps(bootstrapQuery.data),
-    [bootstrapQuery.data],
-  );
+  const maps = useMemo(() => buildLookupMaps(bootstrapQuery.data), [bootstrapQuery.data]);
 
   function updateCachedPerson(nextPerson: MobilePerson) {
     queryClient.setQueryData(["mobile", "person", accessToken, nextPerson.id], {
@@ -200,9 +178,7 @@ export default function PersonDetailScreen() {
       (current: { people: MobilePerson[] } | undefined) =>
         current
           ? {
-              people: current.people.map((item) =>
-                item.id === nextPerson.id ? nextPerson : item,
-              ),
+              people: current.people.map((item) => (item.id === nextPerson.id ? nextPerson : item)),
             }
           : current,
     );
@@ -232,7 +208,7 @@ export default function PersonDetailScreen() {
   });
   const statusMutation = useMutation({
     mutationFn: async (input: {
-      action: "bench" | "activate" | "terminate";
+      action: "deactivate" | "activate" | "remove";
       note?: string;
       expectedVersion: number;
     }) =>
@@ -251,16 +227,16 @@ export default function PersonDetailScreen() {
     onSuccess: async (result, variables) => {
       updateCachedPerson(result.person);
       setConfirmAction(null);
-      setBenchNote("");
+      setInactiveNote("");
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       pushToast({
         tone: "success",
         title:
           variables.action === "activate"
             ? "Person activated"
-            : variables.action === "bench"
-              ? "Person benched"
-              : "Person terminated",
+            : variables.action === "deactivate"
+              ? "Person marked inactive"
+              : "Person removed",
         message: "Staff status was updated.",
       });
     },
@@ -332,7 +308,7 @@ export default function PersonDetailScreen() {
     if (!person || !draft) return;
     const firstNameError = getStaffNameError(draft.firstName, "First name");
     const lastNameError = getStaffNameError(draft.lastName, "Last name");
-    const emailError = getRequiredStaffEmailError(draft.email);
+    const emailError = getOptionalStaffEmailError(draft.email);
     const phoneError = getOptionalUsPhoneError(draft.phone);
     const notesError = getStaffNotesError(draft.contactNotes);
     if (
@@ -370,7 +346,7 @@ export default function PersonDetailScreen() {
       lastName: normalizeStaffName(draft.lastName),
       employmentType: draft.employmentType,
       phone: normalizeOptionalUsPhone(draft.phone),
-      email: normalizeRequiredStaffEmail(draft.email),
+      email: normalizeOptionalStaffEmail(draft.email),
       contactNotes: normalizeStaffNotes(draft.contactNotes),
       certificationId: draft.certificationId,
       focusAreaIds: draft.focusAreaIds,
@@ -402,9 +378,11 @@ export default function PersonDetailScreen() {
         refreshing={manualRefresh.isRefreshing}
       >
         <StatusBanner
-          actionLabel="Try Again"
+          actionLabel="Try again"
           body={contentState.message}
+          fillScreen
           title="Could not load person"
+          variant="centered"
           onAction={() => {
             void personQuery.refetch();
           }}
@@ -421,7 +399,8 @@ export default function PersonDetailScreen() {
         refreshing={manualRefresh.isRefreshing}
       >
         <EmptyStateCard
-          body="This person is no longer available in the mobile directory."
+          fillScreen
+          body="This teammate isn't in your directory anymore."
           iconName="person-outline"
           title="Person not found"
         />
@@ -429,13 +408,11 @@ export default function PersonDetailScreen() {
     );
   }
 
-  const focusAreaLabel =
-    bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
+  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
   const roleLabel = bootstrapQuery.data?.currentOrg.labels.role ?? "Roles";
   const certificationLabel =
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certification";
-  const departmentLabel =
-    bootstrapQuery.data?.currentOrg.labels.department ?? "Departments";
+  const departmentLabel = bootstrapQuery.data?.currentOrg.labels.department ?? "Departments";
   const focusAreaNames = formatIdList(person.focusAreaIds, maps.focusAreas);
   const scheduledDepartmentNames = formatIdList(
     getScheduledDepartmentIds(person.focusAreaIds, bootstrapQuery.data),
@@ -446,10 +423,10 @@ export default function PersonDetailScreen() {
     person.certificationId != null
       ? (maps.certifications.get(person.certificationId) ?? "Unknown")
       : "None";
-  const employmentLabel =
-    person.employmentType === "part_time" ? "Part-time" : "Full-time";
+  const employmentLabel = person.employmentType === "part_time" ? "Part-time" : "Full-time";
   const avatarTone = getAvatarTone(person.id);
   const fullName = getFullName(person);
+  const orgRoleBadge = getMobileOrgRoleBadge(person.orgRole);
   const accessText = person.userId
     ? "Active app account"
     : person.pendingInvitation
@@ -469,7 +446,10 @@ export default function PersonDetailScreen() {
     statusMutation.mutate({
       action: confirmAction,
       expectedVersion: person.version,
-      note: confirmAction === "bench" ? benchNote.trim() : undefined,
+      note:
+        confirmAction === "deactivate" || confirmAction === "remove"
+          ? inactiveNote.trim() || undefined
+          : undefined,
     });
   }
 
@@ -479,23 +459,23 @@ export default function PersonDetailScreen() {
   }
 
   const statusConfirmationTitle =
-    confirmAction === "bench"
-      ? `Bench ${getFullName(person)}?`
+    confirmAction === "deactivate"
+      ? `Mark ${getFullName(person)} inactive?`
       : confirmAction === "activate"
         ? `Activate ${getFullName(person)}?`
-        : `Terminate ${getFullName(person)}?`;
+        : `Remove ${getFullName(person)}?`;
   const statusConfirmationBody =
-    confirmAction === "bench"
-      ? "They will be hidden from active scheduling and shift requests."
+    confirmAction === "deactivate"
+      ? "They'll be hidden from active scheduling and shift requests. Their history stays intact."
       : confirmAction === "activate"
-        ? "They will return to active staff lists and scheduling."
-        : "They will be archived from active staff lists and scheduling.";
+        ? "They'll return to active staff lists and scheduling."
+        : "They'll lose access and be removed from active staff lists. Their history stays intact.";
   const statusConfirmationLabel =
-    confirmAction === "bench"
-      ? "Bench"
+    confirmAction === "deactivate"
+      ? "Mark Inactive"
       : confirmAction === "activate"
         ? "Activate"
-        : "Terminate";
+        : "Remove";
   const invitationConfirmationTitle =
     invitationConfirmAction === "create"
       ? "Send invitation?"
@@ -504,10 +484,10 @@ export default function PersonDetailScreen() {
         : "Revoke invitation?";
   const invitationConfirmationBody =
     invitationConfirmAction === "create"
-      ? `Send an app invitation to ${person.email}?`
+      ? `An app invitation will be sent to ${person.email}.`
       : invitationConfirmAction === "resend"
-        ? `Revoke the existing invitation for ${person.email} and send a new one?`
-        : `Revoke the pending invitation for ${person.email}? The current invite link will stop working.`;
+        ? `The current invitation for ${person.email} will be canceled and a new one will be sent.`
+        : `The current invite link for ${person.email} will stop working.`;
   const invitationConfirmationLabel =
     invitationConfirmAction === "create"
       ? "Send Invitation"
@@ -536,9 +516,7 @@ export default function PersonDetailScreen() {
         }
       />
 
-      <Stack.Screen
-        options={createDetailStackOptions(showCollapsedHeader ? fullName : "")}
-      />
+      <Stack.Screen options={createDetailStackOptions(showCollapsedHeader ? fullName : "")} />
 
       <ProfileHero
         avatarStyle={{
@@ -547,7 +525,8 @@ export default function PersonDetailScreen() {
           borderWidth: 1,
         }}
         avatarTextStyle={{ color: avatarTone.color }}
-        badge={formatStatusLabel(person.status)}
+        badge={orgRoleBadge?.label ?? formatStatusLabel(person.status)}
+        badgeTone={orgRoleBadge?.tone}
         initials={getInitials(person)}
         subtitle={person.email || "No email on file"}
         title={fullName}
@@ -564,24 +543,31 @@ export default function PersonDetailScreen() {
             compact
             disabled={!person.phone}
             label="Call"
+            leadingAccessory={
+              <Ionicons color={mobileColors.successText} name="call-outline" size={18} />
+            }
             onPress={() => {
               if (person.phone) void Linking.openURL(`tel:${person.phone}`);
             }}
-            tone="neutral"
+            tone="success"
           />
           <Button
             compact
             disabled={!person.email}
             label="Email"
+            leadingAccessory={<Ionicons color={mobileColors.brand} name="mail-outline" size={18} />}
             onPress={() => {
               if (person.email) void Linking.openURL(`mailto:${person.email}`);
             }}
-            tone="neutral"
+            tone="secondary"
           />
           {canEdit ? (
             <Button
               compact
               label="Edit"
+              leadingAccessory={
+                <Ionicons color={mobileColors.brand} name="create-outline" size={18} />
+              }
               onPress={() => {
                 setEditing(true);
                 setDraft(makeDraft(person));
@@ -600,12 +586,15 @@ export default function PersonDetailScreen() {
           draft={draft}
           focusAreaLabel={focusAreaLabel}
           focusAreas={bootstrapQuery.data?.focusAreas ?? []}
-          onChange={setDraft}
           onCancel={() => {
             setEditing(false);
             setDraft(makeDraft(person));
           }}
+          onCancelWithChanges={() => setShowDiscardCancelConfirmation(true)}
+          onChange={setDraft}
+          onDiscard={() => setDraft(makeDraft(person))}
           onSave={handleSave}
+          original={person}
           roleLabel={roleLabel}
           roles={bootstrapQuery.data?.roles ?? []}
         />
@@ -613,11 +602,7 @@ export default function PersonDetailScreen() {
         <>
           <ProfileSection title="Staff profile">
             <ProfileList>
-              <ProfileInfoRow
-                iconName="person-circle-outline"
-                label="Name"
-                value={fullName}
-              />
+              <ProfileInfoRow iconName="person-circle-outline" label="Name" value={fullName} />
               <ProfileInfoRow
                 iconName="pulse-outline"
                 label="Status"
@@ -640,10 +625,7 @@ export default function PersonDetailScreen() {
               />
               <ProfileInfoRow
                 iconName="albums-outline"
-                isLast={
-                  !canManageEmployees ||
-                  (!person.statusChangedAt && !person.statusNote)
-                }
+                isLast={!canManageEmployees || (!person.statusChangedAt && !person.statusNote)}
                 label={focusAreaLabel}
                 value={focusAreaNames}
               />
@@ -698,35 +680,6 @@ export default function PersonDetailScreen() {
             </ProfileList>
           </ProfileSection>
 
-          {canManageEmployees && !person.userId ? (
-            <ProfileSection title="Account access">
-              <ProfileList>
-                {person.pendingInvitation ? (
-                  <>
-                    <ProfileInfoRow
-                      iconName="mail-unread-outline"
-                      label="Invitation"
-                      value={`Pending for ${person.pendingInvitation.email}`}
-                    />
-                    <ProfileInfoRow
-                      iconName="time-outline"
-                      isLast
-                      label="Expires"
-                      value={formatDate(person.pendingInvitation.expiresAt)}
-                    />
-                  </>
-                ) : (
-                  <ProfileInfoRow
-                    iconName="key-outline"
-                    isLast
-                    label="Access"
-                    value="No app invitation sent"
-                  />
-                )}
-              </ProfileList>
-            </ProfileSection>
-          ) : null}
-
           {canManageEmployees && person.contactNotes ? (
             <ProfileSection title="Notes">
               <ProfilePanel>
@@ -743,41 +696,37 @@ export default function PersonDetailScreen() {
             {person.status === "active" ? (
               <Button
                 compact
-                disabled={statusMutation.isPending}
-                label="Bench"
-                onPress={() => setConfirmAction("bench")}
+                disabled={statusMutation.isPending || isSelf}
+                label="Mark Inactive"
+                onPress={() => setConfirmAction("deactivate")}
                 tone="warningFilled"
               />
             ) : null}
             {person.status !== "active" ? (
               <Button
                 compact
-                disabled={statusMutation.isPending}
+                disabled={statusMutation.isPending || isSelf}
                 label={statusMutation.isPending ? "Updating..." : "Activate"}
                 onPress={() => setConfirmAction("activate")}
                 tone="success"
               />
             ) : null}
-            {person.status !== "terminated" ? (
+            {person.status !== "removed" ? (
               <Button
                 compact
-                disabled={statusMutation.isPending}
-                label="Terminate"
-                onPress={() => setConfirmAction("terminate")}
+                disabled={statusMutation.isPending || isSelf}
+                label="Remove"
+                onPress={() => setConfirmAction("remove")}
                 tone="dangerFilled"
               />
             ) : null}
-            {!person.userId &&
-            person.status !== "terminated" &&
-            person.email ? (
+            {!person.userId && person.status !== "removed" && person.email ? (
               person.pendingInvitation ? (
                 <View style={styles.actionRow}>
                   <Button
                     compact
                     disabled={invitationMutation.isPending}
-                    label={
-                      invitationMutation.isPending ? "Sending..." : "Reinvite"
-                    }
+                    label={invitationMutation.isPending ? "Sending..." : "Reinvite"}
                     onPress={() => setInvitationConfirmAction("resend")}
                     tone="link"
                   />
@@ -793,11 +742,7 @@ export default function PersonDetailScreen() {
                 <Button
                   compact
                   disabled={invitationMutation.isPending}
-                  label={
-                    invitationMutation.isPending
-                      ? "Sending..."
-                      : "Send Invitation"
-                  }
+                  label={invitationMutation.isPending ? "Sending..." : "Send Invitation"}
                   onPress={() => setInvitationConfirmAction("create")}
                   tone="link"
                 />
@@ -807,19 +752,32 @@ export default function PersonDetailScreen() {
         </ProfileSection>
       ) : null}
       <ConfirmationModal
-        body="Save these staff profile changes?"
+        body="The staff profile will be updated."
         confirmLabel="Save"
         loading={updateMutation.isPending}
         onCancel={() => setShowSaveConfirmation(false)}
         onConfirm={confirmSave}
-        title="Save person?"
+        title="Save these changes?"
         visible={showSaveConfirmation}
+      />
+      <ConfirmationModal
+        body="Your edits will be lost."
+        confirmLabel="Discard"
+        confirmTone="dangerFilled"
+        onCancel={() => setShowDiscardCancelConfirmation(false)}
+        onConfirm={() => {
+          setShowDiscardCancelConfirmation(false);
+          setEditing(false);
+          setDraft(makeDraft(person));
+        }}
+        title="Discard unsaved changes?"
+        visible={showDiscardCancelConfirmation}
       />
       <ConfirmationModal
         body={statusConfirmationBody}
         confirmLabel={statusConfirmationLabel}
         confirmTone={
-          confirmAction === "bench"
+          confirmAction === "deactivate"
             ? "warningFilled"
             : confirmAction === "activate"
               ? "primary"
@@ -831,22 +789,24 @@ export default function PersonDetailScreen() {
         title={statusConfirmationTitle}
         visible={confirmAction != null}
       >
-        {confirmAction === "bench" ? (
+        {confirmAction === "deactivate" || confirmAction === "remove" ? (
           <TextInput
-            onChangeText={setBenchNote}
-            placeholder="Reason (optional)"
+            onChangeText={setInactiveNote}
+            placeholder={
+              confirmAction === "remove"
+                ? "Reason (optional) - e.g. Left the company"
+                : "Reason (optional) - e.g. On leave until June"
+            }
             placeholderTextColor={mobileColors.textSubtle}
             style={styles.input}
-            value={benchNote}
+            value={inactiveNote}
           />
         ) : null}
       </ConfirmationModal>
       <ConfirmationModal
         body={invitationConfirmationBody}
         confirmLabel={invitationConfirmationLabel}
-        confirmTone={
-          invitationConfirmAction === "revoke" ? "dangerFilled" : "primary"
-        }
+        confirmTone={invitationConfirmAction === "revoke" ? "dangerFilled" : "primary"}
         loading={invitationMutation.isPending}
         onCancel={() => setInvitationConfirmAction(null)}
         onConfirm={confirmInvitationAction}
@@ -868,104 +828,70 @@ function AccountLinkChallengeModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  if (!challenge) {
-    return null;
-  }
+  const [displayed, setDisplayed] = useState(challenge);
+
+  useEffect(() => {
+    if (challenge) setDisplayed(challenge);
+  }, [challenge]);
+
+  if (!displayed) return null;
 
   const accountName =
-    `${challenge.details.accountFirstName} ${challenge.details.accountLastName}`.trim() ||
+    `${displayed.details.accountFirstName} ${displayed.details.accountLastName}`.trim() ||
     "this account";
   const employeeName =
-    `${challenge.details.employeeFirstName} ${challenge.details.employeeLastName}`.trim() ||
+    `${displayed.details.employeeFirstName} ${displayed.details.employeeLastName}`.trim() ||
     "this staff profile";
-  const isMismatch = challenge.kind === "name_mismatch";
+  const isMismatch = displayed.kind === "name_mismatch";
   const title = isMismatch ? "Name mismatch found" : "Account found";
+  const subtitle = isMismatch
+    ? "Review the existing account before linking it."
+    : "Confirm that this is the right app account.";
 
   return (
-    <Modal
-      animationType="slide"
-      allowSwipeDismissal
-      onRequestClose={() => {
-        if (!isPending) {
-          onCancel();
-        }
-      }}
-      presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
-      visible
-    >
-      <Screen
-        bottomPaddingMode="modal"
-        stickyHeader={
-          <ModalHeader
-            closeDisabled={isPending}
-            subtitle={
-              isMismatch
-                ? "Review the existing account before linking it."
-                : "Confirm that this is the right app account."
-            }
-            title={title}
-            onClose={onCancel}
-          />
-        }
-        stickyHeaderTopPadding={15}
-      >
-        <View style={styles.modalBody}>
-          <View style={styles.modalInfoPanel}>
-            <Text style={styles.modalInfoTitle}>
-              {isMismatch
-                ? "The account name is different"
-                : "Existing app account found"}
-            </Text>
-            <Text style={styles.modalInfoText}>
-              {isMismatch
-                ? `The existing account is under ${accountName}. Link it and update ${employeeName} to match that account name?`
-                : `An existing app account under ${accountName} matches this staff profile. Link it instead of sending a new invitation?`}
-            </Text>
-          </View>
+    <BottomSheetModal dismissDisabled={isPending} onDismiss={onCancel} visible={challenge != null}>
+      <View style={styles.sheetHeader}>
+        <Text style={styles.sheetTitle}>{title}</Text>
+        <Text style={styles.sheetSubtitle}>{subtitle}</Text>
+      </View>
 
-          <ProfileList>
-            <ProfileInfoRow label="Staff profile" value={employeeName} />
-            <ProfileInfoRow isLast label="Account name" value={accountName} />
-          </ProfileList>
+      <View style={styles.modalInfoPanel}>
+        <Text style={styles.modalInfoTitle}>
+          {isMismatch ? "The account name is different" : "Existing app account found"}
+        </Text>
+        <Text style={styles.modalInfoText}>
+          {isMismatch
+            ? `The existing account is under ${accountName}. Link it and update ${employeeName} to match that account name?`
+            : `An existing app account under ${accountName} matches this staff profile. Link it instead of sending a new invitation?`}
+        </Text>
+      </View>
 
-          <View style={styles.modalActionStack}>
-            <Button
-              disabled={isPending}
-              label={
-                isPending
-                  ? "Linking..."
-                  : isMismatch
-                    ? "Use Account Name"
-                    : "Link Existing Account"
-              }
-              onPress={onConfirm}
-              tone="secondary"
-            />
-            <Button
-              disabled={isPending}
-              label="Cancel"
-              onPress={onCancel}
-              tone="neutral"
-            />
-          </View>
-        </View>
-      </Screen>
-    </Modal>
+      <ProfileList>
+        <ProfileInfoRow label="Staff profile" value={employeeName} />
+        <ProfileInfoRow isLast label="Account name" value={accountName} />
+      </ProfileList>
+
+      <View style={styles.modalActionStack}>
+        <Button
+          disabled={isPending}
+          label={
+            isPending ? "Linking..." : isMismatch ? "Use Account Name" : "Link Existing Account"
+          }
+          onPress={onConfirm}
+          tone="secondary"
+        />
+        <Button disabled={isPending} label="Cancel" onPress={onCancel} tone="neutral" />
+      </View>
+    </BottomSheetModal>
   );
 }
 
 function buildLookupMaps(data: MobileBootstrapResponse | undefined) {
   return {
-    focusAreas: new Map(
-      (data?.focusAreas ?? []).map((item) => [item.id, item.name]),
-    ),
+    focusAreas: new Map((data?.focusAreas ?? []).map((item) => [item.id, item.name])),
     roles: new Map((data?.roles ?? []).map((item) => [item.id, item.name])),
-    certifications: new Map(
-      (data?.certifications ?? []).map((item) => [item.id, item.name]),
-    ),
-    departments: new Map(
-      (data?.departments ?? []).map((item) => [item.id, item.name]),
-    ),
+    certifications: new Map((data?.certifications ?? []).map((item) => [item.id, item.name])),
+    departments: new Map((data?.departments ?? []).map((item) => [item.id, item.name])),
   };
 }
 
@@ -993,10 +919,15 @@ function getScheduledDepartmentIds(
   return departmentIds;
 }
 
+function sameIds(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) return false;
+  const sortedLeft = [...left].sort((a, b) => a - b);
+  const sortedRight = [...right].sort((a, b) => a - b);
+  return sortedLeft.every((value, index) => value === sortedRight[index]);
+}
+
 function formatIdList(ids: number[], map: Map<number, string>): string {
-  const values = ids
-    .map((id) => map.get(id))
-    .filter((value): value is string => Boolean(value));
+  const values = ids.map((id) => map.get(id)).filter((value): value is string => Boolean(value));
   return values.length > 0 ? values.join(", ") : "None";
 }
 
@@ -1017,8 +948,11 @@ function EditPanel({
   certifications,
   roleLabel,
   roles,
+  original,
   onChange,
   onCancel,
+  onCancelWithChanges,
+  onDiscard,
   onSave,
 }: {
   draft: EditDraft;
@@ -1029,8 +963,11 @@ function EditPanel({
   certifications: MobileNamedItem[];
   roleLabel: string;
   roles: MobileNamedItem[];
+  original: MobilePerson;
   onChange: (draft: EditDraft) => void;
   onCancel: () => void;
+  onCancelWithChanges: () => void;
+  onDiscard: () => void;
   onSave: () => void;
 }) {
   const [focusedField, setFocusedField] = useState<
@@ -1040,12 +977,22 @@ function EditPanel({
     firstName: getStaffNameError(draft.firstName, "First name"),
     lastName: getStaffNameError(draft.lastName, "Last name"),
     phone: getOptionalUsPhoneError(draft.phone),
-    email: getRequiredStaffEmailError(draft.email),
+    email: getOptionalStaffEmailError(draft.email),
     contactNotes: getStaffNotesError(draft.contactNotes),
-    focusAreaIds:
-      draft.focusAreaIds.length === 0 ? "Select at least one focus area" : null,
+    focusAreaIds: draft.focusAreaIds.length === 0 ? "Select at least one focus area" : null,
   };
   const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
+  const hasChanges =
+    draft.firstName.trim() !== original.firstName ||
+    draft.lastName.trim() !== original.lastName ||
+    draft.employmentType !== original.employmentType ||
+    draft.phone.trim() !== original.phone ||
+    draft.email.trim() !== original.email ||
+    draft.contactNotes !== original.contactNotes ||
+    draft.certificationId !== original.certificationId ||
+    !sameIds(draft.focusAreaIds, original.focusAreaIds) ||
+    !sameIds(draft.roleIds, original.roleIds) ||
+    !sameIds(draft.departmentIds, original.departmentIds);
   const setField = <K extends keyof EditDraft>(key: K, value: EditDraft[K]) => {
     onChange({ ...draft, [key]: value });
   };
@@ -1053,9 +1000,7 @@ function EditPanel({
     const current = draft[key];
     setField(
       key,
-      current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id],
+      current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     );
   };
 
@@ -1138,9 +1083,7 @@ function EditPanel({
             ]}
             label="Employment"
             selectedIds={[draft.employmentType === "part_time" ? 1 : 0]}
-            onToggle={(id) =>
-              setField("employmentType", id === 1 ? "part_time" : "full_time")
-            }
+            onToggle={(id) => setField("employmentType", id === 1 ? "part_time" : "full_time")}
           />
           <ProfileChoiceGroup
             items={[
@@ -1152,12 +1095,8 @@ function EditPanel({
               })),
             ]}
             label={certificationLabel}
-            selectedIds={
-              draft.certificationId == null ? [-1] : [draft.certificationId]
-            }
-            onToggle={(id) =>
-              setField("certificationId", id === -1 ? null : id)
-            }
+            selectedIds={draft.certificationId == null ? [-1] : [draft.certificationId]}
+            onToggle={(id) => setField("certificationId", id === -1 ? null : id)}
           />
         </ProfilePanel>
       </ProfileSection>
@@ -1208,16 +1147,23 @@ function EditPanel({
       <View style={styles.actionsRow}>
         <Button
           compact
-          disabled={disabled || hasValidationErrors}
+          disabled={disabled || !hasChanges || hasValidationErrors}
           label={disabled ? "Saving..." : "Save changes"}
           onPress={onSave}
         />
         <Button
           compact
-          disabled={disabled}
+          disabled={disabled || !hasChanges}
           label="Discard"
-          onPress={onCancel}
+          onPress={onDiscard}
           tone="neutral"
+        />
+        <Button
+          compact
+          disabled={disabled}
+          label="Cancel"
+          onPress={hasChanges ? onCancelWithChanges : onCancel}
+          tone="ghost"
         />
       </View>
     </>
@@ -1236,6 +1182,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+    paddingBottom: 16,
   },
   actionsRow: {
     flexDirection: "row",
@@ -1247,7 +1194,12 @@ const styles = StyleSheet.create({
     color: mobileColors.textSecondary,
   },
   input: {
-    ...mobileText.sectionTitle,
+    // Explicit regular weight — don't spread `mobileText.sectionTitle`,
+    // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
+    // Omitting `fontFamily` also avoids the Android EditText
+    // non-interactive bug when DM Sans hasn't loaded.
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: "400",
     backgroundColor: mobileColors.surfaceSecondary,
     borderColor: mobileColors.borderSubtle,
@@ -1266,8 +1218,16 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 10,
   },
-  modalBody: {
-    gap: 16,
+  sheetHeader: {
+    gap: 4,
+  },
+  sheetTitle: {
+    ...mobileText.heroMetric,
+    color: mobileColors.textPrimary,
+  },
+  sheetSubtitle: {
+    ...mobileText.body,
+    color: mobileColors.textMuted,
   },
   modalInfoPanel: {
     backgroundColor: mobileColors.surfaceSecondary,
@@ -1280,6 +1240,7 @@ const styles = StyleSheet.create({
   modalInfoTitle: {
     ...mobileText.rowTitle,
     color: mobileColors.textPrimary,
+    fontWeight: "500",
   },
   modalInfoText: {
     ...mobileText.body,

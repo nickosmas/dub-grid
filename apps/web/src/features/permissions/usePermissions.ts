@@ -1,23 +1,15 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { useAuth } from "@/lib/auth-context";
 import {
   createBrowserRealtimeChannel,
   fetchAccountPermissions,
-  getVerifiedBrowserAuth,
   removeBrowserRealtimeChannel,
-  subscribeToBrowserAuthChanges,
   type BrowserRealtimeChannel,
 } from "@/features/account/client";
-import {
-  READ_ONLY_PERMS,
-  ROLE_LEVEL,
-} from "./core";
-import type { Session } from "@supabase/supabase-js";
-import {
-  buildPerms,
-  extractJwtClaims,
-} from "./shared";
+import { READ_ONLY_PERMS, ROLE_LEVEL } from "./core";
+import { buildPerms, extractJwtClaims } from "./shared";
 import type { Permissions } from "./shared";
 
 const LOADING_PERMS: Permissions = buildPerms("user", null, true);
@@ -57,7 +49,9 @@ function readUserView(): boolean {
 
 function subscribeUserView(callback: () => void): () => void {
   userViewListeners.add(callback);
-  return () => { userViewListeners.delete(callback); };
+  return () => {
+    userViewListeners.delete(callback);
+  };
 }
 
 const SERVER_SNAPSHOT = false;
@@ -66,12 +60,14 @@ function getServerSnapshot(): boolean {
 }
 
 export function setUserViewActive(active: boolean): void {
-  if (typeof window !== "undefined") {
-    if (active) {
-      sessionStorage.setItem(USER_VIEW_KEY, "1");
-    } else {
-      sessionStorage.removeItem(USER_VIEW_KEY);
-    }
+  if (typeof window === "undefined") return;
+  // No-op when unchanged (L-1) — avoids a synchronous re-render storm across
+  // every mounted usePermissions consumer when nothing actually changed.
+  if (readUserView() === active) return;
+  if (active) {
+    sessionStorage.setItem(USER_VIEW_KEY, "1");
+  } else {
+    sessionStorage.removeItem(USER_VIEW_KEY);
   }
   userViewListeners.forEach((fn) => fn());
 }
@@ -81,159 +77,165 @@ export function getUserViewActive(): boolean {
 }
 
 export function usePermissions(): Permissions {
+  // AuthProvider is the single source of truth for browser auth. usePermissions
+  // used to call supabase.auth.getSession() + getUser() itself (up to 4 times
+  // per mount), which raced AuthProvider's calls for the Web Locks API auth
+  // lock and produced "Lock stolen" errors. Reading from context eliminates
+  // that race entirely.
+  const { user, session, isLoading: authLoading } = useAuth();
   const [perms, setPerms] = useState<Permissions>(() => permsCache ?? { ...LOADING_PERMS });
 
   // Reactively subscribe to user view toggle — reads sessionStorage directly,
   // re-renders all hook instances when setUserViewActive() is called.
   const userViewActive = useSyncExternalStore(subscribeUserView, readUserView, getServerSnapshot);
 
+  const userId = user?.id ?? null;
+  const accessToken = session?.access_token ?? null;
+
   useEffect(() => {
     let mounted = true;
 
-    /** Set both React state and module-level cache. */
-    function setPermsAndCache(p: Permissions, userId: string | null = null) {
-      permsCache = p;
-      permsCacheTimestamp = Date.now();
-      permsCacheUserId = userId;
-      if (mounted) setPerms(p);
+    // Wait for AuthProvider to finish its initial session resolution before
+    // deciding anything. Treat the in-flight state as loading.
+    if (authLoading) {
+      setPerms((prev) => (prev.isLoading ? prev : { ...LOADING_PERMS }));
+      return;
     }
 
-    /**
-     * Preserve the last resolved permissions during same-user auth refreshes
-     * (for example TOKEN_REFRESHED after the tab has been backgrounded).
-     * This avoids remounting pages that gate rendering on perms.isLoading.
-     */
-    function shouldPreserveResolvedPerms(nextUserId: string | null): boolean {
-      if (!permsCache || permsCache.isLoading || !permsCacheUserId) return false;
-      if (!nextUserId) return true;
-      return permsCacheUserId === nextUserId;
+    // Signed out (or auth resolution failed): clear cache and report NO_PERMS.
+    if (!accessToken || !userId) {
+      clearPermsCache();
+      setUserViewActive(false);
+      setPerms(NO_PERMS);
+      return;
     }
 
-    async function loadSession(session: Session | null, verifiedUserId: string | null) {
-      if (!mounted) return;
+    // Different user than what's cached: invalidate so we don't flash the
+    // previous user's resolved permissions while the new ones load.
+    if (permsCache && permsCacheUserId && permsCacheUserId !== userId) {
+      clearPermsCache();
+      setPerms({ ...LOADING_PERMS });
+    }
 
-      if (!session?.access_token) {
-        setPermsAndCache(NO_PERMS, null);
-        return;
-      }
+    // Fresh same-user cache: just surface it (every hook instance reads the
+    // same module-level cache).
+    const sameUser = permsCacheUserId === userId;
+    if (permsCache && sameUser && Date.now() - permsCacheTimestamp < 10_000) {
+      setPerms(permsCache);
+      return;
+    }
 
-      const sessionUserId = verifiedUserId;
-      if (permsCache && permsCacheUserId && permsCacheUserId !== sessionUserId) {
-        permsCache = null;
-        permsCacheTimestamp = 0;
-        permsCacheUserId = null;
-        if (mounted) setPerms({ ...LOADING_PERMS });
-      }
+    const { effectiveRole, orgId } = extractJwtClaims(accessToken);
 
-      const { effectiveRole, orgId } = extractJwtClaims(session.access_token);
+    // Surface the JWT-derived orgId immediately, while permissions are still
+    // loading. orgId is a JWT claim (no network needed), so orgId-gated queries
+    // like useEmployees can start fetching in parallel with this permissions
+    // request and the org bootstrap, instead of waiting for either to resolve.
+    // isLoading stays true, so UI gates that key off permsLoading are unaffected.
+    if (orgId) {
+      setPerms((prev) =>
+        prev.orgId === orgId && prev.isLoading ? prev : { ...LOADING_PERMS, orgId },
+      );
+    }
 
+    void (async () => {
       try {
         const { permissions } = await fetchAccountPermissions();
-        if (mounted) {
-          setPermsAndCache(permissions, sessionUserId);
-        }
+        if (!mounted) return;
+        permsCache = permissions;
+        permsCacheTimestamp = Date.now();
+        permsCacheUserId = userId;
+        setPerms(permissions);
       } catch {
-        if (mounted) {
-          setPermsAndCache(buildPerms(effectiveRole, orgId, false), sessionUserId);
-        }
+        if (!mounted) return;
+        const fallback = buildPerms(effectiveRole, orgId, false);
+        permsCache = fallback;
+        permsCacheTimestamp = Date.now();
+        permsCacheUserId = userId;
+        setPerms(fallback);
       }
-    }
-
-    getVerifiedBrowserAuth()
-      .then(({ session, user }) => {
-        // Skip re-resolve if cache is fresh (< 10s old) AND belongs to the same user.
-        // Still update local state from cache so every usePermissions() instance
-        // gets the resolved value (multiple hooks share one module-level cache).
-        const verifiedUserId = user?.id ?? null;
-        const sameUser = !verifiedUserId || permsCacheUserId === verifiedUserId;
-        if (permsCache && sameUser && Date.now() - permsCacheTimestamp < 10_000) {
-          if (mounted) setPerms(permsCache);
-          return;
-        }
-        loadSession(session, verifiedUserId);
-      });
-
-    const {
-      data: { subscription },
-    } = subscribeToBrowserAuthChanges((event: string, session: Session | null) => {
-      if (event === "INITIAL_SESSION") return;
-      // On sign-out, immediately clear cached perms to prevent stale data
-      // flashing when a different user signs in.
-      if (event === "SIGNED_OUT") {
-        permsCache = null;
-        permsCacheTimestamp = 0;
-        permsCacheUserId = null;
-        setUserViewActive(false);
-        setPermsAndCache(NO_PERMS, null);
-        return;
-      }
-      const nextUserId = session?.user?.id ?? null;
-      if (!shouldPreserveResolvedPerms(nextUserId)) {
-        setPerms((prev) => ({ ...prev, isLoading: true }));
-      }
-      void getVerifiedBrowserAuth().then(({ session: freshSession, user }) => {
-        void loadSession(session ?? freshSession, user?.id ?? null);
-      });
-    });
-
-    // ── Realtime: invalidate permission cache on membership/department changes ──
-    // When another session (e.g. super_admin) updates the current user's
-    // admin_permissions, org_role, or a department's permissions template,
-    // we get a Postgres change event and immediately re-resolve.
-    let membershipChannel: BrowserRealtimeChannel | null = null;
-    let departmentChannel: BrowserRealtimeChannel | null = null;
-    // Unique channel name per effect instance avoids reusing an already-subscribed
-    // channel during React strict-mode double-mounts.
-    const channelId = `perms:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
-
-    const reResolve = () => {
-      clearPermsCache();
-      getVerifiedBrowserAuth().then(({ session: fresh, user }) => {
-        if (mounted) void loadSession(fresh, user?.id ?? null);
-      });
-    };
-
-    getVerifiedBrowserAuth().then(({ session: s, user }) => {
-      if (!mounted || !s?.access_token || !user?.id) return;
-      const uid = user.id;
-      membershipChannel = createBrowserRealtimeChannel(channelId)
-        .on(
-          "postgres_changes" as "system",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "organization_memberships",
-            filter: `user_id=eq.${uid}`,
-          } as Record<string, unknown>,
-          reResolve,
-        )
-        .subscribe();
-
-      // Listen for department permission template changes (scoped to user's org)
-      const { orgId: userOrgId } = extractJwtClaims(s.access_token);
-      if (userOrgId) {
-        departmentChannel = createBrowserRealtimeChannel(`dept-perms:${channelId}`)
-          .on(
-            "postgres_changes" as "system",
-            {
-              event: "UPDATE",
-              schema: "public",
-              table: "departments",
-              filter: `org_id=eq.${userOrgId}`,
-            } as Record<string, unknown>,
-            reResolve,
-          )
-          .subscribe();
-      }
-    });
+    })();
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
-      if (membershipChannel) void removeBrowserRealtimeChannel(membershipChannel);
-      if (departmentChannel) void removeBrowserRealtimeChannel(departmentChannel);
     };
-  }, []);
+  }, [authLoading, accessToken, userId]);
+
+  // ── Realtime: invalidate permission cache on membership changes ──
+  // When another session (e.g. super_admin) updates the current user's
+  // admin_permissions or org_role, a Postgres change event re-resolves the
+  // cache and triggers a re-render. (L-2: we no longer subscribe to
+  // `departments` — departments don't grant permissions, so those events only
+  // caused org-wide perms-refetch storms with zero permission impact.)
+  //
+  // Also subscribe to `employees` for this user: bench/activate flips the
+  // benched override (READ_ONLY_PERMS) in the permissions endpoint, and we
+  // want the open tab to drop into / out of read-only the moment an admin
+  // presses the button — not at next refresh. Terminated users get bounced at
+  // the JWT-hook level on the next token refresh, so no extra wiring needed.
+  useEffect(() => {
+    if (!accessToken || !userId) return;
+
+    let mounted = true;
+    let membershipChannel: BrowserRealtimeChannel | null = null;
+    let employeeChannel: BrowserRealtimeChannel | null = null;
+    // Unique channel name per effect instance avoids reusing an already-subscribed
+    // channel during React strict-mode double-mounts.
+    const channelSuffix = `${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+
+    const reResolve = () => {
+      clearPermsCache();
+      void (async () => {
+        try {
+          const { permissions } = await fetchAccountPermissions();
+          // Guard against an event firing in the gap between the channel
+          // emitting and our cleanup completing — and against the user
+          // changing while the fetch was in flight (don't write the new
+          // user's perms under the old user's cache key).
+          if (!mounted) return;
+          permsCache = permissions;
+          permsCacheTimestamp = Date.now();
+          permsCacheUserId = userId;
+          setPerms(permissions);
+        } catch {
+          // Leave the stale perms in place rather than dropping the user to
+          // NO_PERMS on a transient network blip.
+        }
+      })();
+    };
+
+    membershipChannel = createBrowserRealtimeChannel(`perms:m:${channelSuffix}`)
+      .on(
+        "postgres_changes" as "system",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "organization_memberships",
+          filter: `user_id=eq.${userId}`,
+        } as Record<string, unknown>,
+        reResolve,
+      )
+      .subscribe();
+
+    employeeChannel = createBrowserRealtimeChannel(`perms:e:${channelSuffix}`)
+      .on(
+        "postgres_changes" as "system",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "employees",
+          filter: `user_id=eq.${userId}`,
+        } as Record<string, unknown>,
+        reResolve,
+      )
+      .subscribe();
+
+    return () => {
+      mounted = false;
+      if (membershipChannel) void removeBrowserRealtimeChannel(membershipChannel);
+      if (employeeChannel) void removeBrowserRealtimeChannel(employeeChannel);
+    };
+  }, [accessToken, userId]);
 
   // ── User View override ──────────────────────────────────────────────
   // When active, return read-only permissions so admins see the user experience.
@@ -249,6 +251,7 @@ export function usePermissions(): Permissions {
       isSuperAdmin: false,
       isImpersonating: false,
       isUserViewActive: true,
+      isInactive: false,
       actualLevel: perms.level,
       canManageOrg: false,
       canAccessSettings: false,

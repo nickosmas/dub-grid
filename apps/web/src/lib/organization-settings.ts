@@ -1,4 +1,6 @@
 import type { Organization, ShiftDisplayMode } from "@/types";
+import type { OpenShiftVisibility, OpenShiftVisibilityMode } from "@dubgrid/domain";
+import { DEFAULT_OPEN_SHIFT_VISIBILITY } from "@dubgrid/domain";
 import { formatTimezoneLabel } from "@/lib/timezones";
 
 export type OrganizationSettingsKey =
@@ -18,6 +20,7 @@ export type OrganizationSettingsKey =
   | "shiftDisplayMode"
   | "enforceConflictPrevention"
   | "coverageRuleConfig"
+  | "openShiftVisibility"
   | "payPeriodStartDate"
   | "dataRetentionDays"
   | "featureOverrides";
@@ -28,12 +31,10 @@ type OrganizationSettingsValue =
   | boolean
   | null
   | { mentoredCoverageCreditPercent: number }
-  | Record<string, boolean | number>;
+  | OpenShiftVisibility
+  | Record<string, boolean | number | string>;
 
-export type OrganizationSettingsEditable = Pick<
-  Organization,
-  OrganizationSettingsKey
->;
+export type OrganizationSettingsEditable = Pick<Organization, OrganizationSettingsKey>;
 
 export interface OrganizationSettingsChange {
   key: OrganizationSettingsKey;
@@ -57,6 +58,12 @@ const SHIFT_DISPLAY_MODE_LABELS: Record<ShiftDisplayMode, string> = {
 };
 
 const DEFAULT_EMPTY = "Not set";
+
+const OPEN_SHIFT_VISIBILITY_MODE_LABELS: Record<OpenShiftVisibilityMode, string> = {
+  hidden: "Hidden",
+  matched: "When it fits availability",
+  always: "Always",
+};
 
 const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
   name: { label: "Organization Name", sensitive: true },
@@ -83,9 +90,7 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
     label: "Shift Display Mode",
     sensitive: false,
     format: (value) =>
-      value === "code" || value === "name"
-        ? SHIFT_DISPLAY_MODE_LABELS[value]
-        : DEFAULT_EMPTY,
+      value === "code" || value === "name" ? SHIFT_DISPLAY_MODE_LABELS[value] : DEFAULT_EMPTY,
   },
   payPeriodStartDate: {
     label: "Pay Period Start Date",
@@ -100,15 +105,22 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
     label: "Coverage Rules",
     sensitive: true,
     format: (value) =>
-      value && typeof value === "object" && !Array.isArray(value)
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      "mentoredCoverageCreditPercent" in value
         ? `Mentored coverage: ${Number(value.mentoredCoverageCreditPercent ?? 100)}%`
         : DEFAULT_EMPTY,
+  },
+  openShiftVisibility: {
+    label: "Open Shift Visibility",
+    sensitive: true,
+    format: (value) => formatOpenShiftVisibility(value),
   },
   dataRetentionDays: {
     label: "Data Retention",
     sensitive: true,
-    format: (value) =>
-      typeof value === "number" ? `${value} days` : DEFAULT_EMPTY,
+    format: (value) => (typeof value === "number" ? `${value} days` : DEFAULT_EMPTY),
   },
   featureOverrides: {
     label: "Runtime Controls",
@@ -117,13 +129,9 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
   },
 };
 
-const EDITABLE_KEYS = Object.keys(
-  FIELD_DESCRIPTORS,
-) as OrganizationSettingsKey[];
+const EDITABLE_KEYS = Object.keys(FIELD_DESCRIPTORS) as OrganizationSettingsKey[];
 
-export function pickOrganizationSettings(
-  organization: Organization,
-): OrganizationSettingsEditable {
+export function pickOrganizationSettings(organization: Organization): OrganizationSettingsEditable {
   return {
     name: organization.name,
     phone: organization.phone,
@@ -140,8 +148,8 @@ export function pickOrganizationSettings(
     departmentLabel: organization.departmentLabel,
     shiftDisplayMode: organization.shiftDisplayMode,
     enforceConflictPrevention: organization.enforceConflictPrevention,
-    coverageRuleConfig:
-      organization.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
+    coverageRuleConfig: organization.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
+    openShiftVisibility: organization.openShiftVisibility ?? DEFAULT_OPEN_SHIFT_VISIBILITY,
     payPeriodStartDate: organization.payPeriodStartDate,
     dataRetentionDays: organization.dataRetentionDays,
     featureOverrides: organization.featureOverrides ?? {},
@@ -158,24 +166,24 @@ function normalizeValue(value: OrganizationSettingsValue): OrganizationSettingsV
       Object.entries(value)
         .sort()
         .map(([key, entry]) => {
-          return [key, typeof entry === "number" ? entry : Boolean(entry)];
+          if (typeof entry === "number" || typeof entry === "string") {
+            return [key, entry];
+          }
+          return [key, Boolean(entry)];
         }),
     );
   }
   return value ?? null;
 }
 
-function valuesEqual(
-  left: OrganizationSettingsValue,
-  right: OrganizationSettingsValue,
-): boolean {
+function valuesEqual(left: OrganizationSettingsValue, right: OrganizationSettingsValue): boolean {
   if (
-    left
-    && right
-    && typeof left === "object"
-    && typeof right === "object"
-    && !Array.isArray(left)
-    && !Array.isArray(right)
+    left &&
+    right &&
+    typeof left === "object" &&
+    typeof right === "object" &&
+    !Array.isArray(left) &&
+    !Array.isArray(right)
   ) {
     return JSON.stringify(left) === JSON.stringify(right);
   }
@@ -187,6 +195,21 @@ function defaultFormat(value: OrganizationSettingsValue): string {
   if (typeof value === "number") return String(value);
   if (typeof value === "boolean") return value ? "Enabled" : "Disabled";
   return typeof value === "string" && value ? value : DEFAULT_EMPTY;
+}
+
+function isOpenShiftVisibility(value: OrganizationSettingsValue): value is OpenShiftVisibility {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    "coverageGap" in value &&
+    "calloff" in value
+  );
+}
+
+function formatOpenShiftVisibility(value: OrganizationSettingsValue): string {
+  if (!isOpenShiftVisibility(value)) return DEFAULT_EMPTY;
+  return `Coverage shortages: ${OPEN_SHIFT_VISIBILITY_MODE_LABELS[value.coverageGap]} · Call-offs: ${OPEN_SHIFT_VISIBILITY_MODE_LABELS[value.calloff]}`;
 }
 
 function formatFeatureOverrides(value: OrganizationSettingsValue): string {

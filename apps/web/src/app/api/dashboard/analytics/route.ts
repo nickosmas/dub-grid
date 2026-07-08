@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
-import {
-  fetchEmployeeUtilization,
-  fetchWeeklyShiftHours,
-} from "@/lib/analytics";
+import { fetchEmployeeUtilization, fetchWeeklyShiftHours } from "@/lib/analytics";
 import * as Sentry from "@/lib/sentry";
 import logger from "@/lib/logger";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +20,7 @@ export async function GET(req: NextRequest) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { orgId, weeks } = parsed.data;
@@ -36,9 +34,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // Effective (sandbox-redirected) org, not the raw body orgId (M-1).
     const [weeklyShiftHours, employeeUtilization] = await Promise.all([
-      fetchWeeklyShiftHours(orgId, weeks),
-      fetchEmployeeUtilization(orgId, weeks),
+      fetchWeeklyShiftHours(auth.orgId, weeks),
+      fetchEmployeeUtilization(auth.orgId, weeks),
     ]);
 
     return NextResponse.json({ weeklyShiftHours, employeeUtilization });
@@ -47,9 +46,6 @@ export async function GET(req: NextRequest) {
       extra: { context: "dashboard/analytics", orgId, weeks },
     });
     logger.error({ error, orgId, weeks }, "Dashboard analytics failed");
-    return NextResponse.json(
-      { error: "Failed to load dashboard analytics" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load dashboard analytics" }, { status: 500 });
   }
 }

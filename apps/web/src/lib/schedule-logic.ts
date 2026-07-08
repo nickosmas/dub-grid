@@ -55,8 +55,10 @@ export function isEmployeeQualified(
   emp: { certificationId: number | null; focusAreaIds: number[] },
   assignment: AssignmentDefinition,
 ): boolean {
-  const certOk = !assignment.requiredCertificationIds?.length ||
-    (emp.certificationId != null && assignment.requiredCertificationIds.includes(emp.certificationId));
+  const certOk =
+    !assignment.requiredCertificationIds?.length ||
+    (emp.certificationId != null &&
+      assignment.requiredCertificationIds.includes(emp.certificationId));
   const areaOk = !assignment.focusAreaId || emp.focusAreaIds.includes(assignment.focusAreaId);
   return certOk && areaOk;
 }
@@ -72,13 +74,17 @@ export function getDisqualificationReasons(
 ): string[] {
   const reasons: string[] = [];
   if (assignment.focusAreaId && !emp.focusAreaIds.includes(assignment.focusAreaId)) {
-    const name = focusAreaNames?.get(assignment.focusAreaId) ?? `focus area #${assignment.focusAreaId}`;
+    const name =
+      focusAreaNames?.get(assignment.focusAreaId) ?? `focus area #${assignment.focusAreaId}`;
     reasons.push(`not assigned to ${name}`);
   }
   if (assignment.requiredCertificationIds?.length) {
-    if (emp.certificationId == null || !assignment.requiredCertificationIds.includes(emp.certificationId)) {
+    if (
+      emp.certificationId == null ||
+      !assignment.requiredCertificationIds.includes(emp.certificationId)
+    ) {
       const names = assignment.requiredCertificationIds
-        .map(id => certificationNames?.get(id) ?? `cert #${id}`)
+        .map((id) => certificationNames?.get(id) ?? `cert #${id}`)
         .join(" or ");
       reasons.push(`requires ${names}`);
     }
@@ -91,9 +97,7 @@ export function getDisqualificationReasons(
  * Draft-deleted rows are intentionally treated as empty because they no longer
  * represent an active visible assignment in the draft schedule.
  */
-export function hasVisibleGridShiftEntry(
-  shift?: ShiftMap[string] | null,
-): boolean {
+export function hasVisibleGridShiftEntry(shift?: ShiftMap[string] | null): boolean {
   return !!(
     shift &&
     (shift.assignmentIds.length > 0 || shift.absenceTypeId != null) &&
@@ -111,19 +115,23 @@ export interface TimeRange {
 /** Checks if two time ranges overlap. Handles overnight shifts where start > end. */
 export function rangesOverlap(a: TimeRange, b: TimeRange): boolean {
   if (a.start > a.end) {
-    return rangesOverlap({ start: a.start, end: "24:00" }, b)
-        || rangesOverlap({ start: "00:00", end: a.end }, b);
+    return (
+      rangesOverlap({ start: a.start, end: "24:00" }, b) ||
+      rangesOverlap({ start: "00:00", end: a.end }, b)
+    );
   }
   if (b.start > b.end) {
-    return rangesOverlap(a, { start: b.start, end: "24:00" })
-        || rangesOverlap(a, { start: "00:00", end: b.end });
+    return (
+      rangesOverlap(a, { start: b.start, end: "24:00" }) ||
+      rangesOverlap(a, { start: "00:00", end: b.end })
+    );
   }
   return a.start < b.end && b.start < a.end;
 }
 
 /** True if any range in `a` overlaps with any range in `b`. */
 export function timesOverlap(a: TimeRange[], b: TimeRange[]): boolean {
-  return a.some(r1 => b.some(r2 => rangesOverlap(r1, r2)));
+  return a.some((r1) => b.some((r2) => rangesOverlap(r1, r2)));
 }
 
 /**
@@ -154,9 +162,7 @@ export function checkCrossDateOverlap(
     // Only compare against the D+1 portion of the next shift (not its D+2 tail)
     const next = normalizeEnd(adjacentShifts.next);
     const isNextOvernight = next.start > next.end;
-    const nextOnSameDay: TimeRange = isNextOvernight
-      ? { start: next.start, end: "24:00" }
-      : next;
+    const nextOnSameDay: TimeRange = isNextOvernight ? { start: next.start, end: "24:00" } : next;
     if (rangesOverlap(tailOnNextDay, nextOnSameDay)) {
       warnings.push("This overnight shift overlaps with the next day\u2019s shift");
     }
@@ -179,10 +185,7 @@ export function checkCrossDateOverlap(
 }
 
 /** Checks for time overlaps between multiple schedule options on the same day. */
-export function checkSameDayOverlaps(
-  ranges: TimeRange[],
-  labels: string[],
-): string[] {
+export function checkSameDayOverlaps(ranges: TimeRange[], labels: string[]): string[] {
   const warnings: string[] = [];
   for (let i = 0; i < ranges.length; i++) {
     for (let j = i + 1; j < ranges.length; j++) {
@@ -231,8 +234,7 @@ export function computeDailyTallies(
       if (!code || code.categoryId == null) continue;
       tallies[code.categoryId] ??= {};
       const label = labelResolver ? labelResolver(code) : code.label;
-      tallies[code.categoryId][label] =
-        (tallies[code.categoryId][label] || 0) + 1;
+      tallies[code.categoryId][label] = (tallies[code.categoryId][label] || 0) + 1;
     }
   }
 
@@ -326,13 +328,16 @@ function findCoverageAssignmentDefinition(
     if (legacyAssignmentDefinition) return legacyAssignmentDefinition;
   }
 
-  return assignments.find(
-    (assignment) =>
-      !assignment.archivedAt &&
-      assignment.jobId === (requirement.jobId ?? null) &&
-      (assignment.shiftId ?? assignment.categoryId ?? null) === (requirement.preferredShiftId ?? null) &&
-      (assignment.focusAreaId === requirement.focusAreaId || assignment.focusAreaId == null),
-  ) ?? null;
+  return (
+    assignments.find(
+      (assignment) =>
+        !assignment.archivedAt &&
+        assignment.jobId === (requirement.jobId ?? null) &&
+        (assignment.shiftId ?? assignment.categoryId ?? null) ===
+          (requirement.preferredShiftId ?? null) &&
+        (assignment.focusAreaId === requirement.focusAreaId || assignment.focusAreaId == null),
+    ) ?? null
+  );
 }
 
 /**
@@ -423,7 +428,10 @@ function getAssignmentDisplayLabel(
   return assignmentLabelMap?.get(assignment.id) || assignment.label;
 }
 
-function compareAssignmentDefinitions(left: AssignmentDefinition, right: AssignmentDefinition): number {
+function compareAssignmentDefinitions(
+  left: AssignmentDefinition,
+  right: AssignmentDefinition,
+): number {
   return left.sortOrder - right.sortOrder || left.id - right.id;
 }
 
@@ -455,7 +463,9 @@ export function computeCoverageCategorySnapshots(
   const activeAssignmentDefinitions = assignments.filter((assignment) => !assignment.archivedAt);
   const legacyRequirements = requirements.filter((requirement) => requirement.assignmentId != null);
   const newRequirements = requirements.filter((requirement) => requirement.assignmentId == null);
-  const activeAssignmentDefinitionById = new Map(activeAssignmentDefinitions.map((assignment) => [assignment.id, assignment]));
+  const activeAssignmentDefinitionById = new Map(
+    activeAssignmentDefinitions.map((assignment) => [assignment.id, assignment]),
+  );
   const requirementAssignmentDefinitionIdsByGroup = new Map<string, number[]>();
 
   for (const requirement of legacyRequirements) {
@@ -473,7 +483,10 @@ export function computeCoverageCategorySnapshots(
     const employees = employeesByFocusArea.get(focusArea.id) ?? [];
     const sectionCodeIds = assignmentIdsByFocusArea.get(focusArea.id) ?? new Set();
 
-    for (const [groupKey, requirementAssignmentDefinitionIds] of requirementAssignmentDefinitionIdsByGroup.entries()) {
+    for (const [
+      groupKey,
+      requirementAssignmentDefinitionIds,
+    ] of requirementAssignmentDefinitionIdsByGroup.entries()) {
       const [groupFocusAreaIdRaw, shiftCategoryIdRaw] = groupKey.split(":");
       if (Number(groupFocusAreaIdRaw) !== focusArea.id) continue;
 
@@ -481,18 +494,19 @@ export function computeCoverageCategorySnapshots(
       const eligibleAssignmentDefinitions = activeAssignmentDefinitions
         .filter(
           (assignment) =>
-            sectionCodeIds.has(assignment.id) &&
-            (assignment.categoryId ?? 0) === shiftCategoryId,
+            sectionCodeIds.has(assignment.id) && (assignment.categoryId ?? 0) === shiftCategoryId,
         )
         .sort(compareAssignmentDefinitions);
       if (eligibleAssignmentDefinitions.length === 0) continue;
 
-      const sortedRequirementAssignmentIds = [...requirementAssignmentDefinitionIds].sort((leftId, rightId) => {
-        const left = activeAssignmentDefinitionById.get(leftId);
-        const right = activeAssignmentDefinitionById.get(rightId);
-        if (!left || !right) return leftId - rightId;
-        return compareAssignmentDefinitions(left, right);
-      });
+      const sortedRequirementAssignmentIds = [...requirementAssignmentDefinitionIds].sort(
+        (leftId, rightId) => {
+          const left = activeAssignmentDefinitionById.get(leftId);
+          const right = activeAssignmentDefinitionById.get(rightId);
+          if (!left || !right) return leftId - rightId;
+          return compareAssignmentDefinitions(left, right);
+        },
+      );
 
       for (const date of dates) {
         const dayOfWeek = date.getDay();
@@ -557,7 +571,9 @@ export function computeCoverageCategorySnapshots(
           shiftCategoryName: categoryById.get(shiftCategoryId)?.name ?? "Uncategorized",
           date,
           status,
-          eligibleAssignmentDefinitionIds: eligibleAssignmentDefinitions.map((assignment) => assignment.id),
+          eligibleAssignmentDefinitionIds: eligibleAssignmentDefinitions.map(
+            (assignment) => assignment.id,
+          ),
           preferredOpenAssignmentDefinitionId,
           shortageDetails,
         });
@@ -577,11 +593,7 @@ export function computeCoverageCategorySnapshots(
             const jobId = requirement.jobId ?? 0;
             const preferredShiftId = requirement.preferredShiftId ?? null;
             return [
-              getRequirementGroupKey(
-                focusArea.id,
-                jobId,
-                preferredShiftId,
-              ),
+              getRequirementGroupKey(focusArea.id, jobId, preferredShiftId),
               {
                 assignment,
                 jobId,
@@ -602,9 +614,7 @@ export function computeCoverageCategorySnapshots(
             ] => entry != null,
           ),
       ).values(),
-    ).sort((left, right) =>
-      compareAssignmentDefinitions(left.assignment, right.assignment),
-    );
+    ).sort((left, right) => compareAssignmentDefinitions(left.assignment, right.assignment));
 
     for (const { assignment, jobId, preferredShiftId } of localRequirementGroups) {
       for (const date of dates) {
@@ -640,13 +650,18 @@ export function computeCoverageCategorySnapshots(
           status,
           eligibleAssignmentDefinitionIds: [assignment.id],
           preferredOpenAssignmentDefinitionId: assignment.id,
-          shortageDetails: shortage > 0 ? [{
-            assignmentId: assignment.id,
-            assignmentLabel: displayLabel,
-            required: resolvedRequirement.minStaff,
-            actual: status.actual,
-            shortage,
-          }] : [],
+          shortageDetails:
+            shortage > 0
+              ? [
+                  {
+                    assignmentId: assignment.id,
+                    assignmentLabel: displayLabel,
+                    required: resolvedRequirement.minStaff,
+                    actual: status.actual,
+                    shortage,
+                  },
+                ]
+              : [],
         });
       }
     }
@@ -724,10 +739,7 @@ export function buildPublishedDateSet(
 /**
  * Returns only the visible dates that have been published at least once.
  */
-export function filterPublishedDates(
-  dates: Date[],
-  publishedDateSet: Set<string>,
-): Date[] {
+export function filterPublishedDates(dates: Date[], publishedDateSet: Set<string>): Date[] {
   return dates.filter((date) => publishedDateSet.has(formatDateKey(date)));
 }
 

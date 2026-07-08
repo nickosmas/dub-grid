@@ -11,11 +11,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import {
-  mobileColors,
-  mobileRadii,
-  mobileText,
-} from "../../../shared/theme/tokens";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -51,20 +47,24 @@ export function ProfileHero({
   title,
   subtitle,
   badge,
+  badgeTone = "brand",
   avatarStyle,
   avatarTextStyle,
+  style,
   children,
 }: {
   initials: string;
   title: string;
   subtitle: string;
   badge?: string;
+  badgeTone?: "brand" | "contrast" | "warning";
   avatarStyle?: StyleProp<ViewStyle>;
   avatarTextStyle?: StyleProp<TextStyle>;
+  style?: StyleProp<ViewStyle>;
   children?: ReactNode;
 }) {
   return (
-    <View style={styles.hero}>
+    <View style={[styles.hero, style]}>
       <View style={styles.heroTop}>
         <View style={[styles.avatar, avatarStyle]}>
           <Text style={[styles.avatarText, avatarTextStyle]}>{initials}</Text>
@@ -75,8 +75,22 @@ export function ProfileHero({
               {title}
             </Text>
             {badge ? (
-              <View style={styles.heroBadge}>
-                <Text style={styles.heroBadgeText}>{badge}</Text>
+              <View
+                style={[
+                  styles.heroBadge,
+                  badgeTone === "contrast" && styles.heroBadgeContrast,
+                  badgeTone === "warning" && styles.heroBadgeWarning,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.heroBadgeText,
+                    badgeTone === "contrast" && styles.heroBadgeTextContrast,
+                    badgeTone === "warning" && styles.heroBadgeTextWarning,
+                  ]}
+                >
+                  {badge}
+                </Text>
               </View>
             ) : null}
           </View>
@@ -90,35 +104,30 @@ export function ProfileHero({
   );
 }
 
-export function ProfileHeroMeta({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+export function ProfileHeroMeta({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.heroMetaItem}>
       <Text style={styles.heroMetaLabel}>{label}</Text>
-      <Text numberOfLines={1} style={styles.heroMetaValue}>
-        {value}
-      </Text>
+      <Text style={styles.heroMetaValue}>{value}</Text>
     </View>
   );
 }
 
 export function ProfileSection({
   title,
+  description,
   children,
   style,
 }: {
   title?: string;
+  description?: string;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
   return (
     <View style={[styles.section, style]}>
       {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
+      {description ? <Text style={styles.sectionDescription}>{description}</Text> : null}
       {children}
     </View>
   );
@@ -141,11 +150,7 @@ export function ProfileList({
   children: ReactNode;
   variant?: "framed" | "plain";
 }) {
-  return (
-    <View style={variant === "plain" ? styles.listPlain : styles.list}>
-      {children}
-    </View>
-  );
+  return <View style={variant === "plain" ? styles.listPlain : styles.list}>{children}</View>;
 }
 
 export function ProfileInfoRow({
@@ -213,11 +218,7 @@ export function ProfileNavRow({
           </Text>
         ) : null}
       </View>
-      <Ionicons
-        color={mobileColors.textSubtle}
-        name="chevron-forward"
-        size={22}
-      />
+      <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
     </Pressable>
   );
 }
@@ -245,11 +246,7 @@ export function ProfileTextInput({
       <Text style={styles.fieldLabel}>{label}</Text>
       {trailingAccessory ? (
         <View
-          style={[
-            styles.inputShell,
-            focused && styles.inputFocused,
-            error && styles.inputError,
-          ]}
+          style={[styles.inputShell, focused && styles.inputFocused, error && styles.inputError]}
         >
           <TextInput
             {...resolvedInputProps}
@@ -315,9 +312,7 @@ export function ProfileChoiceGroup({
                 pressed && styles.chipPressed,
               ]}
             >
-              <Text
-                style={[styles.chipText, selected && styles.chipTextSelected]}
-              >
+              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
                 {item.abbr || item.name}
               </Text>
             </Pressable>
@@ -378,17 +373,8 @@ export const profilePrimitiveStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
     gap: 14,
-    padding: 18,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 2,
+    paddingTop: 4,
   },
   heroTop: {
     alignItems: "center",
@@ -429,26 +415,40 @@ const styles = StyleSheet.create({
     color: mobileColors.textMuted,
   },
   heroBadge: {
+    alignItems: "center",
     alignSelf: "flex-start",
     backgroundColor: mobileColors.brandSoft,
     borderColor: mobileColors.brandBorder,
     borderRadius: mobileRadii.pill,
     borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   heroBadgeText: {
     ...mobileText.caption,
     color: mobileColors.brand,
-    fontWeight: "700",
+    fontWeight: "600",
+  },
+  heroBadgeContrast: {
+    backgroundColor: mobileColors.textPrimary,
+    borderColor: mobileColors.textPrimary,
+  },
+  heroBadgeTextContrast: {
+    color: mobileColors.textInverse,
+  },
+  heroBadgeWarning: {
+    backgroundColor: mobileColors.warningSoft,
+    borderColor: mobileColors.warningBorder,
+  },
+  heroBadgeTextWarning: {
+    color: mobileColors.warningText,
   },
   heroDetail: {
-    borderTopColor: mobileColors.borderSubtle,
-    borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    paddingTop: 14,
   },
   heroMetaItem: {
     flex: 1,
@@ -462,6 +462,7 @@ const styles = StyleSheet.create({
   heroMetaValue: {
     ...mobileText.rowTitle,
     color: mobileColors.textPrimary,
+    fontWeight: "500",
   },
   section: {
     gap: 10,
@@ -469,7 +470,14 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...mobileText.label,
     color: mobileColors.textSubtle,
+    fontWeight: "500",
+    letterSpacing: 0.4,
     textTransform: "uppercase",
+  },
+  sectionDescription: {
+    ...mobileText.body,
+    color: mobileColors.textMuted,
+    marginTop: -4,
   },
   panel: {
     backgroundColor: mobileColors.surface,
@@ -519,6 +527,7 @@ const styles = StyleSheet.create({
   rowValue: {
     ...mobileText.rowTitle,
     color: mobileColors.textPrimary,
+    fontWeight: "500",
   },
   rowDetail: {
     ...mobileText.body,
@@ -527,6 +536,7 @@ const styles = StyleSheet.create({
   navLabel: {
     ...mobileText.cardTitle,
     color: mobileColors.textPrimary,
+    fontWeight: "500",
   },
   field: {
     gap: 7,
@@ -534,16 +544,21 @@ const styles = StyleSheet.create({
   fieldLabel: {
     ...mobileText.caption,
     color: mobileColors.textSubtle,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   input: {
-    ...mobileText.sectionTitle,
+    // Explicit regular weight — don't spread a `mobileText.*` token that
+    // carries a bold `fontFamily`, since the named family overrides
+    // `fontWeight: "400"`. Omitting `fontFamily` also avoids the Android
+    // EditText non-interactive bug when DM Sans hasn't loaded.
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "400",
     backgroundColor: mobileColors.surfaceSecondary,
     borderColor: mobileColors.borderSubtle,
     borderRadius: mobileRadii.control,
     borderWidth: 1,
     color: mobileColors.textPrimary,
-    fontWeight: "400",
     minHeight: 48,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -610,10 +625,11 @@ const styles = StyleSheet.create({
   chipText: {
     ...mobileText.caption,
     color: mobileColors.textSecondary,
-    fontWeight: "700",
+    fontWeight: "500",
   },
   chipTextSelected: {
     color: mobileColors.brand,
+    fontWeight: "600",
   },
   iconBadge: {
     alignItems: "center",

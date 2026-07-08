@@ -7,7 +7,10 @@ type RequestLike = {
 };
 
 function normalizeHostname(hostname: string): string {
-  return hostname.trim().toLowerCase().replace(/^\[|\]$/g, "");
+  return hostname
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "");
 }
 
 function isLoopbackOrigin(origin: string): boolean {

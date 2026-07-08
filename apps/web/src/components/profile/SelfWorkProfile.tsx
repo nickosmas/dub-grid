@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { Calendar, Copy } from "lucide-react";
 import { OverviewTab } from "@/components/staff-detail/tabs/OverviewTab";
 import { ScheduleTab } from "@/components/staff-detail/tabs/ScheduleTab";
-import { computeEmployeeWeeklyHours, formatDateKey, getWeekDates, getWeekStart } from "@/lib/dashboard-stats";
+import { computeEmployeeWeeklyHours, getWeekDates, getWeekStart } from "@/lib/dashboard-stats";
+import { formatDateKey } from "@/lib/utils";
 import type {
   AbsenceType,
   Employee,
@@ -40,10 +41,7 @@ function useSelfWorkMaps({
   assignments,
   shiftCategories,
   absenceTypes,
-}: Pick<
-  SharedSelfWorkProps,
-  "focusAreas" | "assignments" | "shiftCategories" | "absenceTypes"
->) {
+}: Pick<SharedSelfWorkProps, "focusAreas" | "assignments" | "shiftCategories" | "absenceTypes">) {
   const assignmentById = useMemo(() => {
     const map = new Map<number, AssignmentDefinition>();
     for (const assignment of assignments) {
@@ -128,12 +126,7 @@ export function SelfWorkSchedule({
   shiftDisplayMode,
   ...rest
 }: SharedSelfWorkProps) {
-  const {
-    assignmentById,
-    categoryById,
-    focusAreaById,
-    absenceTypeById,
-  } = useSelfWorkMaps({
+  const { assignmentById, categoryById, focusAreaById, absenceTypeById } = useSelfWorkMaps({
     focusAreas,
     assignments: rest.assignments,
     shiftCategories: rest.shiftCategories,
@@ -146,7 +139,9 @@ export function SelfWorkSchedule({
         <div className="dg-card-header">
           <div>
             <div className="dg-card-title">Calendar Subscription</div>
-            <div className="dg-card-subtitle">Subscribe to your shift schedule in your preferred calendar app.</div>
+            <div className="dg-card-subtitle">
+              Subscribe to your shift schedule in your preferred calendar app.
+            </div>
           </div>
         </div>
         <div className="dg-card-body flex flex-col gap-3">
@@ -157,7 +152,9 @@ export function SelfWorkSchedule({
             <div className="flex flex-1 items-center gap-2 rounded-[var(--dg-radius-md)] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
               <Calendar className="size-4 shrink-0 text-[var(--color-text-muted)]" />
               <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[var(--color-text-secondary)]">
-                {typeof window !== "undefined" ? `${window.location.origin}/api/calendar` : "/api/calendar"}
+                {typeof window !== "undefined"
+                  ? `${window.location.origin}/api/calendar`
+                  : "/api/calendar"}
               </code>
             </div>
             <button
@@ -176,15 +173,16 @@ export function SelfWorkSchedule({
             </button>
           </div>
           <p className="m-0 text-[12px] text-[var(--color-text-subtle)]">
-            You must be logged in for the feed to work. The URL returns your shifts for the next 4 weeks.
+            You must be logged in for the feed to work. The URL returns your shifts for the next 4
+            weeks.
           </p>
         </div>
       </div>
 
-        <ScheduleTab
-          employee={employee}
-          shifts={shifts}
-          assignmentById={assignmentById}
+      <ScheduleTab
+        employee={employee}
+        shifts={shifts}
+        assignmentById={assignmentById}
         focusAreas={focusAreas}
         categoryById={categoryById}
         focusAreaById={focusAreaById}

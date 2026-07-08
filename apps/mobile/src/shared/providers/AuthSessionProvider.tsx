@@ -107,11 +107,7 @@ export function AuthSessionProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  return (
-    <AuthSessionContext.Provider value={value}>
-      {children}
-    </AuthSessionContext.Provider>
-  );
+  return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }
 
 export function useSessionState() {

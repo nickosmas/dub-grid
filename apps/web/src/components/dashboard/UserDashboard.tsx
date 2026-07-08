@@ -1,25 +1,15 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
-import {
-  CalendarDays,
-  Check,
-  Clock3,
-  MapPin,
-  UserRound,
-  Users,
-} from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { CalendarDays, Check, Clock3, MapPin, UserRound, Users } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
-import { formatDateKey } from "@/lib/dashboard-stats";
-import { getAvatarInitials } from "@/lib/utils";
+import { EmptyState } from "@/components/EmptyState";
+import { formatDateKey, getAvatarInitials } from "@/lib/utils";
 import {
+  getCurrentTimeValueInTimeZone,
+  getIsoDateInTimeZone,
   hasShiftRequestStarted,
   hasShiftStartedAtTimeRanges,
 } from "@dubgrid/schedule-core";
+import type { OpenShiftVisibility } from "@dubgrid/domain";
 import type {
   AbsenceType,
   AssignmentDefinition,
@@ -123,13 +113,22 @@ type DashboardActionItem =
     };
 
 const HERO_MAX_WIDTH = 680;
+// Padding lives inside the desktop scroll panes (not on the outer area) so the
+// panes run edge-to-edge under the sticky header and to the bottom of the
+// screen, while their scrollable content still has breathing room at the very
+// top and bottom of the scroll. Scrolling slides content under the header.
+const PANE_SCROLL_PADDING = 32;
+// Horizontal inset inside the scroll panes so card borders/shadows clear the
+// container's clipping edge (a vertical scroll container also clips the x-axis).
+const PANE_SCROLL_GUTTER = 16;
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DASHBOARD_HERO_BG = "#2946C7";
-const DASHBOARD_HERO_COLLABORATOR_BG = "#3A55CB";
+const DASHBOARD_HERO_BG = "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
+const DASHBOARD_HERO_COLLABORATOR_BG = "rgba(255, 255, 255, 0.16)";
 const DASHBOARD_HERO_AVATAR_OVERLAP = -10;
 
 export default function UserDashboard(props: DashboardContentProps) {
   const {
+    allShifts,
     assignmentById,
     currentEmpId,
     currentEmployee,
@@ -145,9 +144,16 @@ export default function UserDashboard(props: DashboardContentProps) {
     shiftCategories,
     shiftRequests,
     absenceTypeById,
+    viewMode,
   } = props;
+  const isTwoWeekView = viewMode === "2weeks";
   const now = useMinuteNow();
-  const todayKey = formatDateKey(now);
+  // "Today" and the current clock are evaluated in the organization's timezone,
+  // not the viewer's browser timezone, so the hero highlights the right day and
+  // detects an in-progress shift correctly for staff in other timezones.
+  const timeZone = org.timezone ?? null;
+  const todayKey = getIsoDateInTimeZone(now, timeZone);
+  const nowMinutes = hhmmToMinutes(getCurrentTimeValueInTimeZone(now, timeZone));
   const periodStartKey = periodDates[0] ? formatDateKey(periodDates[0]) : "";
   const periodEndKey = periodDates[periodDates.length - 1]
     ? formatDateKey(periodDates[periodDates.length - 1])
@@ -174,38 +180,48 @@ export default function UserDashboard(props: DashboardContentProps) {
         focusAreaById,
         shiftById,
       }),
-    [
-      absenceTypeById,
-      assignmentById,
-      currentPeriodShifts,
-      employeeById,
-      focusAreaById,
-      shiftById,
-    ],
+    [absenceTypeById, assignmentById, currentPeriodShifts, employeeById, focusAreaById, shiftById],
   );
   const myScheduleItems = useMemo(
-    () =>
-      currentEmpId
-        ? allScheduleItems.filter((item) => item.employeeId === currentEmpId)
-        : [],
+    () => (currentEmpId ? allScheduleItems.filter((item) => item.employeeId === currentEmpId) : []),
     [allScheduleItems, currentEmpId],
   );
-  const hero = useMemo(
-    () => getFeaturedHeroItem(myScheduleItems, todayKey, now),
-    [myScheduleItems, now, todayKey],
+  // The hero highlights your current/next shift, which can fall outside the
+  // period being browsed (e.g. next week). Build its candidate pool from the
+  // wider, forward-looking `allShifts` window (see HERO_LOOKAHEAD_DAYS in
+  // DashboardView), anchored to today, so it never falls back to a past shift.
+  const upcomingAllItems = useMemo(
+    () =>
+      buildScheduleItemsFromShiftMap({
+        absenceTypeById,
+        assignmentById,
+        currentPeriodShifts: allShifts,
+        employeeById,
+        focusAreaById,
+        shiftById,
+      }).filter((item) => item.dateKey >= todayKey),
+    [absenceTypeById, allShifts, assignmentById, employeeById, focusAreaById, shiftById, todayKey],
   );
-  const hasScheduleItems = myScheduleItems.length > 0;
+  const heroItems = useMemo(
+    () => (currentEmpId ? upcomingAllItems.filter((item) => item.employeeId === currentEmpId) : []),
+    [upcomingAllItems, currentEmpId],
+  );
+  const hero = useMemo(
+    () => getFeaturedHeroItem(heroItems, todayKey, nowMinutes),
+    [heroItems, nowMinutes, todayKey],
+  );
+  const hasScheduleItems = myScheduleItems.length > 0 || heroItems.length > 0;
   const heroTiming = useMemo(
-    () => getHeroTiming(hero.item, now),
-    [hero.item, now],
+    () => getHeroTiming(hero.item, todayKey, nowMinutes),
+    [hero.item, nowMinutes, todayKey],
   );
   const heroShiftmates = useMemo(
-    () => getHeroShiftmates(hero.item, allScheduleItems, currentEmpId),
-    [allScheduleItems, currentEmpId, hero.item],
+    () => getHeroShiftmates(hero.item, upcomingAllItems, currentEmpId),
+    [upcomingAllItems, currentEmpId, hero.item],
   );
   const heroFollowUpItems = useMemo(
-    () => getHeroFollowUpItems(hero.item, myScheduleItems),
-    [hero.item, myScheduleItems],
+    () => getHeroFollowUpItems(hero.item, heroItems),
+    [hero.item, heroItems],
   );
   const weeklyHours = useMemo(
     () => currentHours.find((row) => row.empId === currentEmpId)?.totalHours ?? 0,
@@ -244,6 +260,7 @@ export default function UserDashboard(props: DashboardContentProps) {
         shiftById,
         todayKey,
         timeZone: org.timezone ?? null,
+        visibility: org.openShiftVisibility,
       }),
     [
       assignmentById,
@@ -251,6 +268,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       currentPeriodShifts,
       now,
       openShifts,
+      org.openShiftVisibility,
       org.timezone,
       periodEndKey,
       periodStartKey,
@@ -281,94 +299,180 @@ export default function UserDashboard(props: DashboardContentProps) {
           </div>
         </div>
         <div className="dg-card-body" style={{ padding: "18px" }}>
-          <EmptyPanel
+          <EmptyState
+            size="inline"
             icon={<UserRound size={22} />}
             title="Schedule unavailable"
-            body="Ask an administrator to link this account to a staff profile."
+            description="Ask an administrator to link this account to a staff profile."
           />
         </div>
       </section>
     );
   }
 
+  // Below the tablet breakpoint the dashboard stacks in normal flow and the
+  // page scrolls. Above it, it becomes a viewport-locked two-pane layout: the
+  // main column and the open-shifts rail each scroll on their own and the page
+  // itself never scrolls.
+  const stackLayout = isMobile || isTablet;
+
+  const topGrid = (
+    <div
+      data-testid="user-dashboard-top-grid"
+      style={{
+        alignItems: "stretch",
+        columnGap: "var(--dg-space-xl)",
+        display: "grid",
+        gridTemplateColumns: isMobile
+          ? "minmax(0, 1fr)"
+          : `minmax(0, ${HERO_MAX_WIDTH}px) minmax(320px, 1fr)`,
+        rowGap: "var(--dg-space-lg)",
+      }}
+    >
+      {hero.item ? (
+        <div
+          data-testid="user-dashboard-hero-shell"
+          style={{
+            gridColumn: isMobile ? undefined : "1",
+            gridRow: isMobile ? undefined : "1 / span 2",
+            maxWidth: isMobile ? "none" : `${HERO_MAX_WIDTH}px`,
+            width: "100%",
+          }}
+        >
+          <MeHeroCard
+            isCompact={isTablet}
+            followUpItems={heroFollowUpItems}
+            item={hero.item}
+            shiftmates={heroShiftmates}
+            status={hero.status}
+            timing={heroTiming}
+            stretch={isMobile ? false : true}
+          />
+        </div>
+      ) : null}
+
+      <CoverRequestsSection
+        requests={coverRequests}
+        style={{
+          gridColumn: isMobile ? undefined : "2",
+          gridRow: isMobile ? undefined : "1",
+        }}
+      />
+      <AvailableShiftsSection
+        isTwoWeekView={isTwoWeekView}
+        items={availableShiftItems}
+        style={{
+          gridColumn: isMobile ? undefined : "2",
+          gridRow: isMobile ? undefined : "2",
+        }}
+      />
+    </div>
+  );
+
+  const myWeek = (
+    <MyWeekSection
+      items={myScheduleItems}
+      isTwoWeekView={isTwoWeekView}
+      todayKey={todayKey}
+      weeklyHours={weeklyHours}
+    />
+  );
+
+  const railSection = (
+    <ActionRailSection
+      currentEmpId={currentEmpId}
+      items={dashboardActionItems}
+      onClaim={shiftRequests.claim}
+      onRespond={shiftRequests.respond}
+      onVolunteer={shiftRequests.volunteer}
+      scrollable={!stackLayout}
+      shiftById={shiftById}
+      style={
+        stackLayout
+          ? undefined
+          : {
+              flexShrink: 0,
+              minHeight: 0,
+              paddingTop: PANE_SCROLL_PADDING,
+              width: 360,
+            }
+      }
+    />
+  );
+
   return (
     <div
       data-testid="user-dashboard-me-layout"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--dg-space-xl)",
-      }}
+      style={
+        stackLayout
+          ? {
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--dg-space-xl)",
+            }
+          : { display: "flex", flex: 1, flexDirection: "column", minHeight: 0 }
+      }
     >
-      {hasScheduleItems ? (
-        <>
+      {!hasScheduleItems ? (
+        <ScheduleEmptyState isMobile={isMobile} isTwoWeekView={isTwoWeekView} />
+      ) : stackLayout ? (
+        <div
+          data-testid="user-dashboard-content-grid"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--dg-space-xl)",
+          }}
+        >
+          {topGrid}
+          {railSection}
+          {myWeek}
+        </div>
+      ) : (
+        <div
+          data-testid="user-dashboard-content-grid"
+          style={{
+            columnGap: "var(--dg-space-xl)",
+            display: "flex",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           <div
-            data-testid="user-dashboard-top-grid"
+            className="dg-no-scrollbar"
+            data-testid="user-dashboard-main-pane"
             style={{
-              alignItems: "stretch",
-              columnGap: "var(--dg-space-xl)",
-              display: "grid",
-              gridTemplateColumns: isMobile
-                ? "minmax(0, 1fr)"
-                : `minmax(0, ${HERO_MAX_WIDTH}px) minmax(320px, 1fr)`,
-              rowGap: "var(--dg-space-lg)",
+              flex: 1,
+              minHeight: 0,
+              minWidth: 0,
+              // Horizontal padding keeps card borders/shadows off the scroll
+              // container's clipping edge (overflow-y:auto also clips x).
+              overflowY: "auto",
+              paddingLeft: PANE_SCROLL_GUTTER,
+              paddingRight: PANE_SCROLL_GUTTER,
+              scrollbarWidth: "none",
             }}
           >
-            {hero.item ? (
-              <div
-                data-testid="user-dashboard-hero-shell"
-                style={{
-                  gridColumn: isMobile ? undefined : "1",
-                  gridRow: isMobile ? undefined : "1 / span 2",
-                  maxWidth: isMobile ? "none" : `${HERO_MAX_WIDTH}px`,
-                  width: "100%",
-                }}
-              >
-                <MeHeroCard
-                  isCompact={isTablet}
-                  followUpItems={heroFollowUpItems}
-                  item={hero.item}
-                  shiftmates={heroShiftmates}
-                  status={hero.status}
-                  timing={heroTiming}
-                  stretch={isMobile ? false : true}
-                />
-              </div>
-            ) : null}
-
-            <CoverRequestsSection
-              requests={coverRequests}
+            {/* An inner block flex column so children keep their natural
+                height; the scroll container itself must not be the flex
+                parent, or its children shrink to fit instead of overflowing.
+                Top/bottom padding give breathing room at the start and end of
+                the scroll while the pane stays flush to the screen edges. */}
+            <div
               style={{
-                gridColumn: isMobile ? undefined : "2",
-                gridRow: isMobile ? undefined : "1",
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--dg-space-xl)",
+                paddingBottom: PANE_SCROLL_PADDING,
+                paddingTop: PANE_SCROLL_PADDING,
               }}
-            />
-            <AvailableShiftsSection
-              items={availableShiftItems}
-              style={{
-                gridColumn: isMobile ? undefined : "2",
-                gridRow: isMobile ? undefined : "2",
-              }}
-            />
+            >
+              {topGrid}
+              {myWeek}
+            </div>
           </div>
-
-          <ActionCarouselSection
-            currentEmpId={currentEmpId}
-            items={dashboardActionItems}
-            onClaim={shiftRequests.claim}
-            onRespond={shiftRequests.respond}
-            onVolunteer={shiftRequests.volunteer}
-            shiftById={shiftById}
-          />
-
-          <MyWeekSection
-            items={myScheduleItems}
-            todayKey={todayKey}
-            weeklyHours={weeklyHours}
-          />
-        </>
-      ) : (
-        <ScheduleEmptyState isMobile={isMobile} />
+          {railSection}
+        </div>
       )}
     </div>
   );
@@ -382,12 +486,14 @@ function useMinuteNow(): Date {
 
     function scheduleNextTick() {
       const current = new Date();
-      const delay =
-        60_000 - current.getSeconds() * 1000 - current.getMilliseconds();
-      timeoutId = window.setTimeout(() => {
-        setNow(new Date());
-        scheduleNextTick();
-      }, Math.max(250, delay));
+      const delay = 60_000 - current.getSeconds() * 1000 - current.getMilliseconds();
+      timeoutId = window.setTimeout(
+        () => {
+          setNow(new Date());
+          scheduleNextTick();
+        },
+        Math.max(250, delay),
+      );
     }
 
     scheduleNextTick();
@@ -475,9 +581,7 @@ function buildScheduleItemsFromShiftMap(input: {
   return items.sort(compareScheduleItems);
 }
 
-function parseShiftMapKey(
-  key: string,
-): { employeeId: string; dateKey: string } | null {
+function parseShiftMapKey(key: string): { employeeId: string; dateKey: string } | null {
   const splitIndex = key.indexOf("_");
   if (splitIndex <= 0) {
     return null;
@@ -489,9 +593,7 @@ function parseShiftMapKey(
   };
 }
 
-function getWorkedSegments(
-  entry: ScheduleCellStateEntry,
-): Array<Partial<ShiftJobSegment>> {
+function getWorkedSegments(entry: ScheduleCellStateEntry): Array<Partial<ShiftJobSegment>> {
   const explicitSegments = [...(entry.segments ?? [])].sort(
     (left, right) => (left.position ?? 0) - (right.position ?? 0),
   );
@@ -550,21 +652,15 @@ function buildWorkedSegment(input: {
 }): DashboardScheduleSegment | null {
   const assignmentId =
     input.rawSegment.assignmentId ?? input.entry.assignmentIds[input.segmentIndex];
-  const assignment =
-    assignmentId != null ? (input.assignmentById.get(assignmentId) ?? null) : null;
-  const shiftId =
-    input.rawSegment.shiftId ??
-    assignment?.shiftId ??
-    assignment?.categoryId ??
-    null;
+  const assignment = assignmentId != null ? (input.assignmentById.get(assignmentId) ?? null) : null;
+  const shiftId = input.rawSegment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
   const jobId = input.rawSegment.jobId ?? assignment?.jobId ?? null;
 
   if (jobId == null && assignment == null && !input.rawSegment.label) {
     return null;
   }
 
-  const focusAreaId =
-    input.rawSegment.focusAreaId ?? assignment?.focusAreaId ?? null;
+  const focusAreaId = input.rawSegment.focusAreaId ?? assignment?.focusAreaId ?? null;
   const focusAreaName =
     focusAreaId != null ? (input.focusAreaById.get(focusAreaId)?.name ?? null) : null;
   const rawShiftLabel =
@@ -581,15 +677,11 @@ function buildWorkedSegment(input: {
       shiftAbbr: input.rawSegment.shiftAbbr ?? null,
       shiftById: input.shiftById,
     });
-  const shiftName =
-    input.rawSegment.shiftName ??
-    shift?.name ??
-    null;
+  const shiftName = input.rawSegment.shiftName ?? shift?.name ?? null;
   const shiftAbbr = input.rawSegment.shiftAbbr ?? shift?.abbr ?? null;
   const jobName = input.rawSegment.jobName ?? null;
   const jobAbbr = input.rawSegment.jobAbbr ?? null;
-  const isGeneral =
-    assignment?.isGeneral === true || (shiftId == null && shift == null);
+  const isGeneral = assignment?.isGeneral === true || (shiftId == null && shift == null);
   const rawChipLabel =
     input.rawSegment.jobName ??
     input.rawSegment.label ??
@@ -606,10 +698,9 @@ function buildWorkedSegment(input: {
         shiftAbbr,
         shiftName,
       });
-  const title =
-    isGeneral
-      ? "General shift"
-      : (shiftName ?? assignment?.name ?? input.entry.label ?? "Shift");
+  const title = isGeneral
+    ? "General shift"
+    : (shiftName ?? assignment?.name ?? input.entry.label ?? "Shift");
   const customStartTime = getDelimitedValue(
     input.entry.customStartTime,
     input.segmentIndex,
@@ -622,8 +713,7 @@ function buildWorkedSegment(input: {
   );
   const startTime =
     customStartTime ?? input.rawSegment.startTime ?? assignment?.defaultStartTime ?? null;
-  const endTime =
-    customEndTime ?? input.rawSegment.endTime ?? assignment?.defaultEndTime ?? null;
+  const endTime = customEndTime ?? input.rawSegment.endTime ?? assignment?.defaultEndTime ?? null;
 
   return {
     assignment,
@@ -660,18 +750,18 @@ function getDelimitedValue(
     return null;
   }
 
-  const parts = value.split("|").map((part) => part.trim()).filter(Boolean);
+  const parts = value
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
   if (parts.length > 1) {
     return parts[index] ?? null;
   }
 
-  return count <= 1 ? parts[0] ?? null : null;
+  return count <= 1 ? (parts[0] ?? null) : null;
 }
 
-function compareScheduleItems(
-  left: DashboardScheduleItem,
-  right: DashboardScheduleItem,
-): number {
+function compareScheduleItems(left: DashboardScheduleItem, right: DashboardScheduleItem): number {
   if (left.dateKey !== right.dateKey) {
     return left.dateKey.localeCompare(right.dateKey);
   }
@@ -689,10 +779,7 @@ function compareRequestsByDate(left: ShiftRequest, right: ShiftRequest): number 
   return getRequestStartTime(left).localeCompare(getRequestStartTime(right));
 }
 
-function getRelevantRequestDateKey(
-  request: ShiftRequest,
-  currentEmpId: string | null,
-): string {
+function getRelevantRequestDateKey(request: ShiftRequest, currentEmpId: string | null): string {
   if (
     request.type === "swap" &&
     currentEmpId != null &&
@@ -743,17 +830,12 @@ function expandShiftDisplayLabel(input: {
   }
 
   const expandedSuffix =
-    input.jobName && labelsEqual(suffix, input.jobAbbr)
-      ? input.jobName
-      : suffix;
+    input.jobName && labelsEqual(suffix, input.jobAbbr) ? input.jobName : suffix;
 
   return `${shiftName} · ${expandedSuffix}`;
 }
 
-function getLabelSuffixAfterShiftCode(
-  rawLabel: string,
-  shiftAbbr?: string | null,
-): string | null {
+function getLabelSuffixAfterShiftCode(rawLabel: string, shiftAbbr?: string | null): string | null {
   const normalizedShiftAbbr = shiftAbbr?.trim();
   if (!normalizedShiftAbbr) {
     return null;
@@ -814,26 +896,21 @@ function findShiftByDisplayLabel(input: {
   return null;
 }
 
-function labelsEqual(
-  left: string | null | undefined,
-  right: string | null | undefined,
-): boolean {
+function labelsEqual(left: string | null | undefined, right: string | null | undefined): boolean {
   return Boolean(
-    left?.trim() &&
-      right?.trim() &&
-      left.trim().toLowerCase() === right.trim().toLowerCase(),
+    left?.trim() && right?.trim() && left.trim().toLowerCase() === right.trim().toLowerCase(),
   );
 }
 
 function getFeaturedHeroItem(
   items: DashboardScheduleItem[],
   todayKey: string,
-  now: Date,
+  nowMinutes: number,
 ): { item: DashboardScheduleItem | null; status: HeroStatus } {
   const todayItems = items.filter((item) => item.dateKey === todayKey);
   const activeItem =
     todayItems.find(
-      (item) => !item.segment.isAbsence && isItemActiveAt(item, now),
+      (item) => !item.segment.isAbsence && isItemActiveAt(item, todayKey, nowMinutes),
     ) ?? null;
 
   if (activeItem) {
@@ -845,25 +922,21 @@ function getFeaturedHeroItem(
       (item) =>
         !item.segment.isAbsence &&
         item.segment.startTime != null &&
-        toAbsoluteMinutes(item.dateKey, item.segment.startTime) >
-          Math.floor(now.getTime() / 60000),
+        toRelativeMinutes(item.dateKey, item.segment.startTime, todayKey) > nowMinutes,
     ) ?? null;
 
   if (upcomingTodayItem) {
     return { item: upcomingTodayItem, status: "upcoming" };
   }
 
-  const awayTodayItem =
-    todayItems.find((item) => item.segment.isAbsence) ?? null;
+  const awayTodayItem = todayItems.find((item) => item.segment.isAbsence) ?? null;
   if (awayTodayItem) {
     return { item: awayTodayItem, status: "away" };
   }
 
   const nextWorkedItem =
-    items.find(
-      (item) =>
-        item.dateKey.localeCompare(todayKey) > 0 && !item.segment.isAbsence,
-    ) ?? null;
+    items.find((item) => item.dateKey.localeCompare(todayKey) > 0 && !item.segment.isAbsence) ??
+    null;
   if (nextWorkedItem) {
     return {
       item: nextWorkedItem,
@@ -871,44 +944,42 @@ function getFeaturedHeroItem(
     };
   }
 
-  const nextItem =
-    items.find((item) => item.dateKey.localeCompare(todayKey) > 0) ?? null;
+  const nextItem = items.find((item) => item.dateKey.localeCompare(todayKey) > 0) ?? null;
   if (nextItem) {
     return { item: nextItem, status: "away" };
   }
 
-  const firstItem =
-    items.find((item) => !item.segment.isAbsence) ?? items[0] ?? null;
+  const firstItem = items.find((item) => !item.segment.isAbsence) ?? items[0] ?? null;
   return {
     item: firstItem,
-    status: firstItem
-      ? firstItem.segment.isAbsence
-        ? "away"
-        : "scheduled"
-      : "empty",
+    status: firstItem ? (firstItem.segment.isAbsence ? "away" : "scheduled") : "empty",
   };
 }
 
-function isItemActiveAt(item: DashboardScheduleItem, now: Date): boolean {
+function isItemActiveAt(
+  item: DashboardScheduleItem,
+  todayKey: string,
+  nowMinutes: number,
+): boolean {
   const start = item.segment.startTime;
   const end = item.segment.endTime;
   if (!start || !end) {
     return false;
   }
 
-  const startMinutes = toAbsoluteMinutes(item.dateKey, start);
-  let endMinutes = toAbsoluteMinutes(item.dateKey, end);
+  const startMinutes = toRelativeMinutes(item.dateKey, start, todayKey);
+  let endMinutes = toRelativeMinutes(item.dateKey, end, todayKey);
   if (endMinutes <= startMinutes) {
     endMinutes += 24 * 60;
   }
 
-  const currentMinutes = Math.floor(now.getTime() / 60000);
-  return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+  return nowMinutes >= startMinutes && nowMinutes < endMinutes;
 }
 
 function getHeroTiming(
   item: DashboardScheduleItem | null,
-  now: Date,
+  todayKey: string,
+  nowMinutes: number,
 ): HeroTiming | null {
   if (!item || item.segment.isAbsence) {
     return null;
@@ -920,25 +991,24 @@ function getHeroTiming(
     return null;
   }
 
-  const startMinutes = toAbsoluteMinutes(item.dateKey, start);
-  let endMinutes = toAbsoluteMinutes(item.dateKey, end);
+  const startMinutes = toRelativeMinutes(item.dateKey, start, todayKey);
+  let endMinutes = toRelativeMinutes(item.dateKey, end, todayKey);
   if (endMinutes <= startMinutes) {
     endMinutes += 24 * 60;
   }
 
-  const currentMinutes = Math.floor(now.getTime() / 60000);
   const totalMinutes = Math.max(1, endMinutes - startMinutes);
 
-  if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+  if (nowMinutes >= startMinutes && nowMinutes < endMinutes) {
     return {
-      label: `Ends in ${formatDurationLabel(endMinutes - currentMinutes)}`,
-      progress: Math.min(1, Math.max(0.08, (currentMinutes - startMinutes) / totalMinutes)),
+      label: `Ends in ${formatDurationLabel(endMinutes - nowMinutes)}`,
+      progress: Math.min(1, Math.max(0.08, (nowMinutes - startMinutes) / totalMinutes)),
     };
   }
 
-  if (currentMinutes < startMinutes) {
+  if (nowMinutes < startMinutes) {
     return {
-      label: `Starts in ${formatDurationLabel(startMinutes - currentMinutes)}`,
+      label: `Starts in ${formatDurationLabel(startMinutes - nowMinutes)}`,
       progress: null,
     };
   }
@@ -946,10 +1016,26 @@ function getHeroTiming(
   return { label: "Completed", progress: 1 };
 }
 
-function toAbsoluteMinutes(dateKey: string, time: string): number {
-  const date = new Date(`${dateKey}T00:00:00`);
+// Minutes relative to today's midnight in the organization's timezone. The
+// shift's calendar day (dateKey) and the current day (todayKey) are both org-tz
+// dates, so the day delta plus the shift's wall-clock time yields a value
+// comparable to the org-tz "now" minutes — no browser-timezone contamination.
+function toRelativeMinutes(dateKey: string, time: string, todayKey: string): number {
+  return isoDayDelta(todayKey, dateKey) * 24 * 60 + hhmmToMinutes(time);
+}
+
+function hhmmToMinutes(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
-  return Math.floor(date.getTime() / 60000) + hours * 60 + (minutes || 0);
+  return (hours || 0) * 60 + (minutes || 0);
+}
+
+function isoDayDelta(fromKey: string, toKey: string): number {
+  const from = Date.parse(`${fromKey}T00:00:00Z`);
+  const to = Date.parse(`${toKey}T00:00:00Z`);
+  if (Number.isNaN(from) || Number.isNaN(to)) {
+    return 0;
+  }
+  return Math.round((to - from) / 86_400_000);
 }
 
 function formatDurationLabel(totalMinutes: number): string {
@@ -1038,83 +1124,100 @@ function buildAvailableShiftItems(input: {
   shiftById: Map<number, { abbr?: string | null; name: string }>;
   todayKey: string;
   timeZone?: string | null;
+  visibility?: OpenShiftVisibility;
 }): AvailableShiftItem[] {
   const currentEmpId = input.currentEmpId;
   if (!currentEmpId) {
     return [];
   }
 
-  const pickupItems: AvailableShiftItem[] = input.openPickups
-    .filter((request) =>
-      isDateInCurrentOrFutureRange(
-        request.requesterShiftDate,
-        input.periodStartKey,
-        input.periodEndKey,
-        input.todayKey,
-      ) && !hasShiftRequestStarted(request, input.now, input.timeZone ?? null),
-    )
-    .map((request) => ({
-      date: new Date(`${request.requesterShiftDate}T00:00:00`),
-      dateKey: request.requesterShiftDate,
-      id: `pickup-${request.id}`,
-      kind: "pickup" as const,
-      request,
-      subtitle: formatRequestSubtitle(request, input.shiftById),
-      timeRange: formatRequestTimeRange(request),
-      title: formatRequestShiftLabel(request, input.shiftById) || "Open shift",
-    }));
+  // Visibility governs the staff view only; this dashboard is never the
+  // scheduler tool. `always` shows every open shift regardless of the viewer's
+  // own schedule; `hidden` drops the source entirely; `matched` (default)
+  // keeps the conflict filter so a user only sees shifts they could take.
+  const coverageGapVisibility = input.visibility?.coverageGap ?? "matched";
+  const calloffVisibility = input.visibility?.calloff ?? "matched";
 
-  const coverageItems: AvailableShiftItem[] = input.openShifts
-    .filter((openShift) => {
-      const dateKey = formatDateKey(openShift.date);
-      if (
-        !isDateInCurrentOrFutureRange(
-          dateKey,
-          input.periodStartKey,
-          input.periodEndKey,
-          input.todayKey,
-        )
-      ) {
-        return false;
-      }
-      if (
-        hasDashboardOpenShiftStarted({
-          assignmentById: input.assignmentById,
-          now: input.now,
-          openShift,
-          timeZone: input.timeZone ?? null,
-        })
-      ) {
-        return false;
-      }
-      return !doesOpenShiftConflictWithMySchedule({
-        assignmentById: input.assignmentById,
-        currentEmpId,
-        currentPeriodShifts: input.currentPeriodShifts,
-        openShift,
-      });
-    })
-    .map((openShift) => {
-      const assignment =
-        input.assignmentById.get(openShift.preferredOpenAssignmentDefinitionId) ??
-        null;
-      return {
-        assignment,
-        date: openShift.date,
-        dateKey: formatDateKey(openShift.date),
-        id: `coverage-${openShift.id}`,
-        kind: "coverage" as const,
-        openShift,
-        subtitle: [
-          openShift.focusAreaName,
-          openShift.needed > 1 ? `${openShift.needed} teammates needed` : null,
-        ]
-          .filter(Boolean)
-          .join(" · "),
-        timeRange: openShift.timeRange || formatAssignmentTimeRange(assignment),
-        title: formatOpenShiftTitle(openShift, assignment, input.shiftById),
-      };
-    });
+  const pickupItems: AvailableShiftItem[] =
+    calloffVisibility === "hidden"
+      ? []
+      : input.openPickups
+          .filter(
+            (request) =>
+              isDateInCurrentOrFutureRange(
+                request.requesterShiftDate,
+                input.periodStartKey,
+                input.periodEndKey,
+                input.todayKey,
+              ) && !hasShiftRequestStarted(request, input.now, input.timeZone ?? null),
+          )
+          .map((request) => ({
+            date: new Date(`${request.requesterShiftDate}T00:00:00`),
+            dateKey: request.requesterShiftDate,
+            id: `pickup-${request.id}`,
+            kind: "pickup" as const,
+            request,
+            subtitle: formatRequestSubtitle(request, input.shiftById),
+            timeRange: formatRequestTimeRange(request),
+            title: formatRequestShiftLabel(request, input.shiftById) || "Open shift",
+          }));
+
+  const coverageItems: AvailableShiftItem[] =
+    coverageGapVisibility === "hidden"
+      ? []
+      : input.openShifts
+          .filter((openShift) => {
+            const dateKey = formatDateKey(openShift.date);
+            if (
+              !isDateInCurrentOrFutureRange(
+                dateKey,
+                input.periodStartKey,
+                input.periodEndKey,
+                input.todayKey,
+              )
+            ) {
+              return false;
+            }
+            if (
+              hasDashboardOpenShiftStarted({
+                assignmentById: input.assignmentById,
+                now: input.now,
+                openShift,
+                timeZone: input.timeZone ?? null,
+              })
+            ) {
+              return false;
+            }
+            if (coverageGapVisibility === "always") {
+              return true;
+            }
+            return !doesOpenShiftConflictWithMySchedule({
+              assignmentById: input.assignmentById,
+              currentEmpId,
+              currentPeriodShifts: input.currentPeriodShifts,
+              openShift,
+            });
+          })
+          .map((openShift) => {
+            const assignment =
+              input.assignmentById.get(openShift.preferredOpenAssignmentDefinitionId) ?? null;
+            return {
+              assignment,
+              date: openShift.date,
+              dateKey: formatDateKey(openShift.date),
+              id: `coverage-${openShift.id}`,
+              kind: "coverage" as const,
+              openShift,
+              subtitle: [
+                openShift.focusAreaName,
+                openShift.needed > 1 ? `${openShift.needed} teammates needed` : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
+              timeRange: openShift.timeRange || formatAssignmentTimeRange(assignment),
+              title: formatOpenShiftTitle(openShift, assignment, input.shiftById),
+            };
+          });
 
   return [...pickupItems, ...coverageItems].sort((left, right) => {
     if (left.dateKey !== right.dateKey) {
@@ -1167,9 +1270,7 @@ function hasDashboardOpenShiftStarted(input: {
   openShift: DashboardContentProps["openShifts"][number];
   timeZone?: string | null;
 }): boolean {
-  const assignment = input.assignmentById.get(
-    input.openShift.preferredOpenAssignmentDefinitionId,
-  );
+  const assignment = input.assignmentById.get(input.openShift.preferredOpenAssignmentDefinitionId);
 
   return hasShiftStartedAtTimeRanges({
     shiftDate: formatDateKey(input.openShift.date),
@@ -1204,8 +1305,7 @@ function doesOpenShiftConflictWithMySchedule(input: {
 
   return rawSegments.some((segment, index) => {
     const assignmentId = segment.assignmentId ?? entry.assignmentIds[index];
-    const assignment =
-      assignmentId != null ? input.assignmentById.get(assignmentId) : null;
+    const assignment = assignmentId != null ? input.assignmentById.get(assignmentId) : null;
     const start =
       getDelimitedValue(entry.customStartTime, index, rawSegments.length) ??
       segment.startTime ??
@@ -1283,7 +1383,6 @@ function MeHeroCard({
       data-testid="user-dashboard-hero"
       style={{
         background: DASHBOARD_HERO_BG,
-        border: "1px solid rgba(255,255,255,0.12)",
         borderRadius: "var(--dg-radius-xl)",
         boxShadow: "var(--shadow-md)",
         color: "#fff",
@@ -1466,59 +1565,27 @@ function MeHeroCard({
 
 function ScheduleEmptyState({
   isMobile,
+  isTwoWeekView,
   style,
 }: {
   isMobile: boolean;
+  isTwoWeekView: boolean;
   style?: CSSProperties;
 }) {
+  const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
   return (
-    <section
+    <EmptyState
       data-testid="user-dashboard-empty-schedule"
+      icon={<CalendarDays size={24} />}
+      title={`You're not scheduled ${periodLabel}`}
+      description="When your shifts get published, they'll show up right here."
       style={{
-        alignItems: "center",
-        border: "1px dashed var(--color-border)",
-        borderRadius: "var(--dg-radius-lg)",
-        boxSizing: "border-box",
-        color: "var(--color-text-secondary)",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        justifyContent: "center",
         minHeight: isMobile ? 260 : 360,
-        padding: isMobile ? "28px 18px" : "48px 24px",
-        textAlign: "center",
         width: "100%",
+        boxSizing: "border-box",
         ...style,
       }}
-    >
-      <span
-        aria-hidden
-        style={{
-          alignItems: "center",
-          background: "var(--color-bg-secondary)",
-          border: "1px solid var(--color-border-light)",
-          borderRadius: 14,
-          color: "var(--color-text-muted)",
-          display: "inline-flex",
-          height: 48,
-          justifyContent: "center",
-          width: 48,
-        }}
-      >
-        <CalendarDays size={24} />
-      </span>
-      <div
-        style={{
-          color: "var(--color-text-primary)",
-          fontSize: isMobile ? 20 : 24,
-          fontWeight: 760,
-          letterSpacing: 0,
-          lineHeight: 1.15,
-        }}
-      >
-        Nothing scheduled this week
-      </div>
-    </section>
+    />
   );
 }
 
@@ -1629,9 +1696,7 @@ function MentoredPill({ inverse = false }: { inverse?: boolean }) {
     <span
       style={{
         background: inverse ? "rgba(255,255,255,0.16)" : "var(--color-bg-secondary)",
-        border: inverse
-          ? "1px solid rgba(255,255,255,0.24)"
-          : "1px solid var(--color-border)",
+        border: inverse ? "1px solid rgba(255,255,255,0.24)" : "1px solid var(--color-border)",
         borderRadius: 7,
         color: inverse ? "#fff" : "var(--color-text-secondary)",
         display: "inline-flex",
@@ -1726,9 +1791,7 @@ function ShiftmatesRow({
       data-testid="user-dashboard-working-with"
       style={{
         alignItems: "center",
-        background: inverse
-          ? DASHBOARD_HERO_COLLABORATOR_BG
-          : "var(--color-bg-secondary)",
+        background: inverse ? DASHBOARD_HERO_COLLABORATOR_BG : "var(--color-bg-secondary)",
         border: inverse
           ? "1px solid rgba(255,255,255,0.14)"
           : "1px solid var(--color-border-light)",
@@ -1780,9 +1843,7 @@ function ShiftmatesRow({
               data-testid="user-dashboard-shiftmate-avatar-frame"
               title={item.employeeName}
               style={{
-                background: inverse
-                  ? DASHBOARD_HERO_COLLABORATOR_BG
-                  : "var(--color-bg-secondary)",
+                background: inverse ? DASHBOARD_HERO_COLLABORATOR_BG : "var(--color-bg-secondary)",
                 borderRadius: 999,
                 display: "inline-flex",
                 flexShrink: 0,
@@ -1818,15 +1879,12 @@ function ShiftmatesRow({
             data-testid="user-dashboard-shiftmate-overflow-frame"
             style={{
               alignItems: "center",
-              background: inverse
-                ? DASHBOARD_HERO_COLLABORATOR_BG
-                : "var(--color-bg-secondary)",
+              background: inverse ? DASHBOARD_HERO_COLLABORATOR_BG : "var(--color-bg-secondary)",
               borderRadius: 999,
               display: "inline-flex",
               flexShrink: 0,
               height: 42,
-              marginLeft:
-                visibleItems.length > 0 ? DASHBOARD_HERO_AVATAR_OVERLAP : 0,
+              marginLeft: visibleItems.length > 0 ? DASHBOARD_HERO_AVATAR_OVERLAP : 0,
               padding: 2,
               width: 42,
             }}
@@ -1884,14 +1942,20 @@ function CoverRequestsSection({
       />
       <div
         className="dg-card-body"
-        style={{ flex: 1, padding: "4px 18px 16px" }}
+        style={{
+          display: "flex",
+          flex: 1,
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "16px 18px",
+        }}
       >
         {requests.length === 0 ? (
-          <EmptyPanel
+          <EmptyState
+            size="inline"
             icon={<Check size={20} />}
             title="All caught up"
-            body="Requests for your shifts will appear here."
-            compact
+            description="Requests for your shifts will appear here."
           />
         ) : (
           <SummaryMetricPanel
@@ -1906,19 +1970,20 @@ function CoverRequestsSection({
 }
 
 function AvailableShiftsSection({
+  isTwoWeekView = false,
   items,
   style,
 }: {
+  isTwoWeekView?: boolean;
   items: AvailableShiftItem[];
   style?: CSSProperties;
 }) {
   const pickupCount = items.filter((item) => item.kind === "pickup").length;
   const coverageCount = items.length - pickupCount;
+  const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
   const summaryParts = [
     pickupCount > 0 ? `${pickupCount} pickup${pickupCount === 1 ? "" : "s"}` : null,
-    coverageCount > 0
-      ? `${coverageCount} coverage gap${coverageCount === 1 ? "" : "s"}`
-      : null,
+    coverageCount > 0 ? `${coverageCount} coverage gap${coverageCount === 1 ? "" : "s"}` : null,
   ].filter(Boolean);
 
   return (
@@ -1935,29 +2000,31 @@ function AvailableShiftsSection({
       <SectionHeader
         subtitle={
           items.length > 0
-            ? `${items.length} available this week`
-            : "Nothing available this week"
+            ? `${items.length} available ${periodLabel}`
+            : `Nothing available ${periodLabel}`
         }
         title="Available shifts"
       />
       <div
         className="dg-card-body"
-        style={{ flex: 1, padding: "4px 18px 16px" }}
+        style={{
+          display: "flex",
+          flex: 1,
+          flexDirection: "column",
+          justifyContent: "center",
+          padding: "16px 18px",
+        }}
       >
         {items.length === 0 ? (
-          <EmptyPanel
+          <EmptyState
+            size="inline"
             icon={<CalendarDays size={20} />}
             title="No open shifts"
-            body="Available pickups and coverage gaps will appear here."
-            compact
+            description="Available pickups and coverage gaps will appear here."
           />
         ) : (
           <SummaryMetricPanel
-            body={
-              summaryParts.length > 0
-                ? summaryParts.join(" · ")
-                : "Upcoming open shifts"
-            }
+            body={summaryParts.length > 0 ? summaryParts.join(" · ") : "Upcoming open shifts"}
             label="Available upcoming"
             value={items.length}
           />
@@ -1967,13 +2034,15 @@ function AvailableShiftsSection({
   );
 }
 
-function ActionCarouselSection({
+function ActionRailSection({
   currentEmpId,
   items,
   onClaim,
   onRespond,
   onVolunteer,
+  scrollable = false,
   shiftById,
+  style,
 }: {
   currentEmpId: string;
   items: DashboardActionItem[];
@@ -1985,19 +2054,30 @@ function ActionCarouselSection({
     input: ScheduleCellInput,
     focusAreaId: number,
   ) => Promise<boolean>;
+  scrollable?: boolean;
   shiftById: Map<number, { abbr?: string | null; name: string }>;
+  style?: CSSProperties;
 }) {
   return (
     <section
-      data-testid="user-dashboard-action-carousel-section"
+      data-testid="user-dashboard-action-rail-section"
       style={{
         display: "flex",
         flexDirection: "column",
         gap: 12,
+        minHeight: 0,
         minWidth: 0,
+        overflow: scrollable ? "hidden" : undefined,
+        ...style,
       }}
     >
-      <div>
+      <div
+        style={{
+          flexShrink: 0,
+          paddingLeft: scrollable ? PANE_SCROLL_GUTTER : undefined,
+          paddingRight: scrollable ? PANE_SCROLL_GUTTER : undefined,
+        }}
+      >
         <div className="dg-card-title">Open shifts &amp; requests</div>
         <div className="dg-card-subtitle">
           {items.length > 0
@@ -2006,33 +2086,29 @@ function ActionCarouselSection({
         </div>
       </div>
       {items.length === 0 ? (
-        <div
-          style={{
-            border: "1px dashed var(--color-border)",
-            borderRadius: "var(--dg-radius-lg)",
-            padding: 18,
-          }}
-        >
-          <EmptyPanel
-            icon={<Check size={20} />}
-            title="All caught up"
-            body="Open shifts and cover requests will appear here."
-            compact
-          />
-        </div>
+        <EmptyState
+          size="inline"
+          icon={<Check size={20} />}
+          title="All caught up"
+          description="Open shifts and cover requests will appear here."
+        />
       ) : (
         <div
           aria-label="Upcoming open shifts and requests"
-          data-testid="user-dashboard-action-carousel"
+          className={scrollable ? "dg-no-scrollbar" : undefined}
+          data-testid="user-dashboard-action-rail"
           role="list"
           style={{
             display: "flex",
+            flexDirection: "column",
             gap: 12,
+            minHeight: 0,
             minWidth: 0,
-            overflowX: "auto",
-            padding: "2px 2px 8px",
-            scrollPaddingLeft: 2,
-            scrollSnapType: "x mandatory",
+            overflowY: scrollable ? "auto" : undefined,
+            paddingBottom: scrollable ? PANE_SCROLL_PADDING : undefined,
+            paddingLeft: scrollable ? PANE_SCROLL_GUTTER : undefined,
+            paddingRight: scrollable ? PANE_SCROLL_GUTTER : undefined,
+            scrollbarWidth: scrollable ? "none" : undefined,
           }}
         >
           {items.map((item) =>
@@ -2063,27 +2139,32 @@ function ActionCarouselSection({
 
 function MyWeekSection({
   items,
+  isTwoWeekView = false,
+  style,
   todayKey,
   weeklyHours,
 }: {
   items: DashboardScheduleItem[];
+  isTwoWeekView?: boolean;
+  style?: CSSProperties;
   todayKey: string;
   weeklyHours: number;
 }) {
   const groups = groupScheduleItemsByDate(items);
-  const hoursLabel = weeklyHours > 0 ? `${formatHoursValue(weeklyHours)}h this week` : null;
+  const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
+  const hoursLabel = weeklyHours > 0 ? `${formatHoursValue(weeklyHours)}h ${periodLabel}` : null;
 
   if (groups.length === 0) {
     return null;
   }
 
   return (
-    <section className="dg-card" data-testid="user-dashboard-my-week">
+    <section className="dg-card" data-testid="user-dashboard-my-week" style={style}>
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">My Week</div>
+          <div className="dg-card-title">{isTwoWeekView ? "My Schedule" : "My Week"}</div>
           <div className="dg-card-subtitle">
-            {hoursLabel ?? "Your published shifts for this week"}
+            {hoursLabel ?? `Your published shifts for ${periodLabel}`}
           </div>
         </div>
       </div>
@@ -2097,9 +2178,7 @@ function MyWeekSection({
               style={{
                 background: isToday ? "var(--color-brand-bg)" : "transparent",
                 borderBottom:
-                  index < groups.length - 1
-                    ? "1px solid var(--color-border-light)"
-                    : "none",
+                  index < groups.length - 1 ? "1px solid var(--color-border-light)" : "none",
                 display: "grid",
                 gap: 14,
                 gridTemplateColumns: "72px minmax(0, 1fr)",
@@ -2130,13 +2209,7 @@ function MyWeekSection({
   );
 }
 
-function SectionHeader({
-  subtitle,
-  title,
-}: {
-  subtitle: string;
-  title: string;
-}) {
+function SectionHeader({ subtitle, title }: { subtitle: string; title: string }) {
   return (
     <div className="dg-card-header">
       <div>
@@ -2236,13 +2309,11 @@ function ActionCardShell({
         boxShadow: "var(--shadow-sm)",
         boxSizing: "border-box",
         display: "flex",
-        flex: "0 0 clamp(280px, 32vw, 360px)",
         flexDirection: "column",
+        flexShrink: 0,
         gap: 14,
-        maxWidth: "calc(100vw - 48px)",
-        minHeight: 172,
         padding: 16,
-        scrollSnapAlign: "start",
+        width: "100%",
       }}
     >
       <div
@@ -2367,7 +2438,9 @@ function AvailableShiftActionCard({
   ) => Promise<boolean>;
 }) {
   const volunteerInput =
-    item.kind === "coverage" ? buildVolunteerInput(item.assignment, item.openShift.focusAreaId) : null;
+    item.kind === "coverage"
+      ? buildVolunteerInput(item.assignment, item.openShift.focusAreaId)
+      : null;
 
   return (
     <ActionCardShell
@@ -2435,7 +2508,9 @@ function WeekShiftRow({ item }: { item: DashboardScheduleItem }) {
               whiteSpace: "nowrap",
             }}
           >
-            {item.segment.title}
+            {item.segment.isAbsence
+              ? (item.segment.typeLabel ?? item.segment.title)
+              : item.segment.title}
           </div>
           {timeRange ? (
             <div
@@ -2472,7 +2547,10 @@ function WeekShiftRow({ item }: { item: DashboardScheduleItem }) {
 }
 
 function WeekPillRow({ segment }: { segment: DashboardScheduleSegment }) {
-  const showShiftPill = shouldShowShiftPill(segment);
+  // Absence rows show "Absence" as the title above (see WeekShiftRow) and always
+  // pair it with the specific colored pill (e.g. "Sick") below, matching the
+  // mobile app's Absence-eyebrow-then-pill treatment.
+  const showShiftPill = segment.isAbsence || shouldShowShiftPill(segment);
 
   if (!showShiftPill && !segment.isMentored) {
     return null;
@@ -2576,9 +2654,7 @@ function DateTile({
         alignSelf: compact ? undefined : "center",
         alignItems: "center",
         background: compact ? "var(--color-bg)" : "var(--color-bg-secondary)",
-        border: compact
-          ? "1px solid var(--color-border)"
-          : "1px solid var(--color-border-light)",
+        border: compact ? "1px solid var(--color-border)" : "1px solid var(--color-border-light)",
         borderRadius: compact ? 10 : 16,
         display: "flex",
         flexDirection: "column",
@@ -2600,9 +2676,7 @@ function DateTile({
       </span>
       <span
         style={{
-          color: compact
-            ? "var(--color-text-primary)"
-            : "var(--color-text-secondary)",
+          color: compact ? "var(--color-text-primary)" : "var(--color-text-secondary)",
           fontSize: compact ? 17 : 20,
           fontWeight: 800,
           lineHeight: compact ? 1 : "24px",
@@ -2640,73 +2714,20 @@ function DashedDivider() {
   );
 }
 
-function EmptyPanel({
-  body,
-  compact = false,
-  icon,
-  title,
-}: {
-  body: string;
-  compact?: boolean;
-  icon: ReactNode;
-  title: string;
-}) {
-  return (
-    <div
-      style={{
-        alignItems: "center",
-        border: "1px dashed var(--color-border)",
-        borderRadius: "var(--dg-radius-lg)",
-        color: "var(--color-text-muted)",
-        display: "flex",
-        gap: 12,
-        padding: compact ? "12px" : "16px",
-      }}
-    >
-      <span
-        style={{
-          alignItems: "center",
-          background: "var(--color-bg-secondary)",
-          borderRadius: 10,
-          color: "var(--color-text-secondary)",
-          display: "inline-flex",
-          flexShrink: 0,
-          height: 38,
-          justifyContent: "center",
-          width: 38,
-        }}
-      >
-        {icon}
-      </span>
-      <div style={{ minWidth: 0 }}>
-        <div
-          style={{
-            color: "var(--color-text-primary)",
-            fontSize: 13,
-            fontWeight: 750,
-          }}
-        >
-          {title}
-        </div>
-        <div style={{ fontSize: 12, lineHeight: 1.4, marginTop: 2 }}>{body}</div>
-      </div>
-    </div>
-  );
-}
-
 function groupScheduleItemsByDate(items: DashboardScheduleItem[]) {
-  return items.reduce<
-    Array<{ date: Date; dateKey: string; items: DashboardScheduleItem[] }>
-  >((groups, item) => {
-    const group = groups[groups.length - 1];
-    if (group?.dateKey === item.dateKey) {
-      group.items.push(item);
-      return groups;
-    }
+  return items.reduce<Array<{ date: Date; dateKey: string; items: DashboardScheduleItem[] }>>(
+    (groups, item) => {
+      const group = groups[groups.length - 1];
+      if (group?.dateKey === item.dateKey) {
+        group.items.push(item);
+        return groups;
+      }
 
-    groups.push({ date: item.date, dateKey: item.dateKey, items: [item] });
-    return groups;
-  }, []);
+      groups.push({ date: item.date, dateKey: item.dateKey, items: [item] });
+      return groups;
+    },
+    [],
+  );
 }
 
 function buildVolunteerInput(
@@ -2742,9 +2763,7 @@ function formatSegmentTimeRange(segment: DashboardScheduleSegment): string | nul
     : null;
 }
 
-function formatAssignmentTimeRange(
-  assignment: AssignmentDefinition | null,
-): string | null {
+function formatAssignmentTimeRange(assignment: AssignmentDefinition | null): string | null {
   return assignment?.defaultStartTime && assignment.defaultEndTime
     ? `${formatTime12h(assignment.defaultStartTime)} - ${formatTime12h(assignment.defaultEndTime)}`
     : null;
@@ -2775,9 +2794,7 @@ function formatRequestTimeRange(request: ShiftRequest): string | null {
     request.requesterSegments?.[0]?.endTime ??
     null;
 
-  return start !== "99:99:99" && end
-    ? `${formatTime12h(start)} - ${formatTime12h(end)}`
-    : null;
+  return start !== "99:99:99" && end ? `${formatTime12h(start)} - ${formatTime12h(end)}` : null;
 }
 
 function getRequestStartTime(request: ShiftRequest): string {
@@ -2794,9 +2811,7 @@ function formatRequestShiftLabel(
   shiftById: Map<number, { abbr?: string | null; name: string }>,
 ): string {
   const segment =
-    request.requesterPresentation?.segments?.[0] ??
-    request.requesterSegments?.[0] ??
-    null;
+    request.requesterPresentation?.segments?.[0] ?? request.requesterSegments?.[0] ?? null;
   const shiftId =
     segment?.shiftId ??
     request.requesterShiftIds?.[0] ??

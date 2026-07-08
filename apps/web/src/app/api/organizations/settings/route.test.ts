@@ -38,6 +38,12 @@ vi.mock("@/lib/sentry", () => ({
   captureException: (...args: unknown[]) => captureException(...args),
 }));
 
+const cacheDel = vi.fn();
+vi.mock("@/lib/cache", () => ({
+  cacheDel: (...args: unknown[]) => cacheDel(...args),
+  CacheKey: { orgBySlug: (slug: string) => `dg:org:slug:${slug}` },
+}));
+
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({
     from: (table: string) => {
@@ -313,6 +319,33 @@ describe("PUT /api/organizations/settings", () => {
     );
     expect(captureException).not.toHaveBeenCalled();
     expect(loggerError).not.toHaveBeenCalled();
+    // Renaming invalidates the subdomain-lookup cache (keyed by slug, which
+    // doesn't change) so the cached display name isn't stale for the TTL.
+    expect(cacheDel).toHaveBeenCalledWith("dg:org:slug:acme-health");
+  });
+
+  it("does not touch the subdomain-lookup cache when name doesn't change", async () => {
+    const currentRow = makeOrganizationRow("2026-04-15T18:00:00.000000+00:00");
+    const updatedRow = makeOrganizationRow("2026-04-15T18:10:00.000000+00:00", {
+      timezone: "America/Denver",
+    });
+
+    organizationSingle.mockResolvedValueOnce({ data: currentRow, error: null });
+    organizationUpdateMaybeSingle.mockResolvedValueOnce({
+      data: updatedRow,
+      error: null,
+    });
+
+    const response = await PUT(
+      makeRequest({
+        orgId: currentRow.id,
+        expectedUpdatedAt: currentRow.updated_at,
+        timezone: "America/Denver",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(cacheDel).not.toHaveBeenCalled();
   });
 
   it("rejects invalid organization phone numbers with field errors", async () => {

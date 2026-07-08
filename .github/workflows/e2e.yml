@@ -1,5 +1,5 @@
 # End-to-end tests using Playwright against a local Supabase instance.
-# Manual trigger only. Enable the pull_request trigger once E2E tests are stable.
+# Runs on every PR targeting main, and can also be triggered manually.
 
 name: E2E Tests
 
@@ -10,9 +10,8 @@ on:
         description: "Run all browsers (chromium, firefox, webkit)? Default: chromium only."
         type: boolean
         default: false
-  # Uncomment when E2E tests exist and are stable:
-  # pull_request:
-  #   branches: [main]
+  pull_request:
+    branches: [main]
 
 concurrency:
   group: e2e-${{ github.event.pull_request.number || github.run_id }}
@@ -27,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
       # Well-known Supabase CLI local dev keys (deterministic, not secrets).
       # See: https://supabase.com/docs/guides/local-development
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
@@ -68,10 +69,10 @@ jobs:
         run: npm run build
 
       - name: Start server
-        run: npm run start &
+        run: npm run start > server.log 2>&1 &
 
       - name: Wait for server
-        run: timeout 30 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
+        run: timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
 
       - name: Run Playwright tests
         run: |
@@ -95,4 +96,12 @@ jobs:
         with:
           name: playwright-test-results
           path: test-results/
+          retention-days: 7
+
+      - name: Upload server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-log
+          path: server.log
           retention-days: 7

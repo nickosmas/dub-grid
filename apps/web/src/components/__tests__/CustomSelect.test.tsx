@@ -24,9 +24,7 @@ describe("CustomSelect", () => {
     await user.click(screen.getByRole("button", { name: /one/i }));
 
     const listbox = await screen.findByRole("listbox");
-    const focusCallIndex = focusSpy.mock.contexts.findIndex(
-      (instance) => instance === listbox,
-    );
+    const focusCallIndex = focusSpy.mock.contexts.findIndex((instance) => instance === listbox);
 
     expect(focusCallIndex).toBeGreaterThanOrEqual(0);
     expect(focusSpy.mock.calls[focusCallIndex]?.[0]).toEqual({

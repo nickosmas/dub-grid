@@ -14,6 +14,7 @@ const ALL_PERMS: AdminPermissions = {
   canPublishSchedule: true,
   canApplyRecurringSchedule: true,
   canEditNotes: true,
+  canEditScheduleIndicators: true,
   canViewRecurringShifts: true,
   canManageRecurringShifts: true,
   canManageShiftSeries: true,
@@ -41,6 +42,7 @@ export const READ_ONLY_PERMS: AdminPermissions = {
   canPublishSchedule: false,
   canApplyRecurringSchedule: false,
   canEditNotes: false,
+  canEditScheduleIndicators: false,
   canViewRecurringShifts: false,
   canManageRecurringShifts: false,
   canManageShiftSeries: false,
@@ -62,24 +64,17 @@ export const READ_ONLY_PERMS: AdminPermissions = {
   canViewDashboardAnalytics: false,
 };
 
-export function applyViewImplications(
-  permissions: AdminPermissions,
-): AdminPermissions {
+export function applyViewImplications(permissions: AdminPermissions): AdminPermissions {
   const result = { ...permissions };
-  result.canViewEmployeeDetails =
-    result.canViewEmployeeDetails || result.canManageEmployees;
-  result.canViewFocusAreas =
-    result.canViewFocusAreas || result.canManageFocusAreas;
+  result.canViewEmployeeDetails = result.canViewEmployeeDetails || result.canManageEmployees;
+  result.canViewFocusAreas = result.canViewFocusAreas || result.canManageFocusAreas;
   result.canViewScheduleDefinitions =
     result.canViewScheduleDefinitions || result.canManageScheduleDefinitions;
-  result.canViewIndicatorTypes =
-    result.canViewIndicatorTypes || result.canManageIndicatorTypes;
+  result.canViewIndicatorTypes = result.canViewIndicatorTypes || result.canManageIndicatorTypes;
   result.canViewCoverageRequirements =
     result.canViewCoverageRequirements || result.canManageCoverageRequirements;
-  result.canViewRecurringShifts =
-    result.canViewRecurringShifts || result.canManageRecurringShifts;
-  result.canViewOrgLabels =
-    result.canViewOrgLabels || result.canManageOrgLabels;
+  result.canViewRecurringShifts = result.canViewRecurringShifts || result.canManageRecurringShifts;
+  result.canViewOrgLabels = result.canViewOrgLabels || result.canManageOrgLabels;
   result.canViewDashboardAnalytics =
     result.canViewDashboardAnalytics ||
     result.canEditShifts ||
@@ -89,9 +84,7 @@ export function applyViewImplications(
   return result;
 }
 
-export function unionPermissions(
-  permissionSets: AdminPermissions[],
-): AdminPermissions {
+export function unionPermissions(permissionSets: AdminPermissions[]): AdminPermissions {
   const result: AdminPermissions = { ...READ_ONLY_PERMS };
   for (const permissions of permissionSets) {
     for (const key of Object.keys(result) as (keyof AdminPermissions)[]) {
@@ -111,6 +104,7 @@ export interface PermissionContext extends AdminPermissions {
   isSuperAdmin: boolean;
   isImpersonating: boolean;
   isUserViewActive: boolean;
+  isInactive: boolean;
   actualLevel: number;
   canManageOrg: boolean;
   canAccessSettings: boolean;
@@ -129,11 +123,40 @@ export function buildPermissionContext(
   options?: {
     isImpersonating?: boolean;
     isLoading?: boolean;
+    isInactive?: boolean;
   },
 ): PermissionContext {
   const isImpersonating = options?.isImpersonating ?? false;
   const isLoading = options?.isLoading ?? false;
-  const level = ROLE_LEVEL[role] ?? 0;
+  const isInactive = options?.isInactive ?? false;
+  const actualLevel = ROLE_LEVEL[role] ?? 0;
+
+  // Inactive employees are temporarily sidelined — strip them to read-only
+  // regardless of their underlying org_role. They still see their schedule and
+  // staff list (canViewSchedule + canViewStaff stay true per READ_ONLY_PERMS)
+  // but lose every manage capability + admin perms JSONB grants. Mirror the
+  // User-View override: collapse level/role/flags so atLeast() checks fail.
+  if (isInactive) {
+    return {
+      ...READ_ONLY_PERMS,
+      role: "user",
+      orgId,
+      level: 0,
+      isLoading,
+      isGridmaster: false,
+      isSuperAdmin: false,
+      isImpersonating: false,
+      isUserViewActive: false,
+      isInactive: true,
+      actualLevel,
+      canManageOrg: false,
+      canAccessSettings: false,
+      canManageUsers: false,
+      canConfigureAdminPermissions: false,
+    };
+  }
+
+  const level = actualLevel;
   const isGridmaster = level >= 4;
   const isSuperAdmin = level >= 3;
 
@@ -141,9 +164,7 @@ export function buildPermissionContext(
   if (isGridmaster || isSuperAdmin) {
     permissions = ALL_PERMS;
   } else if (role === "admin") {
-    permissions = adminPerms
-      ? { ...adminPerms, canViewSchedule: true }
-      : READ_ONLY_PERMS;
+    permissions = adminPerms ? { ...adminPerms, canViewSchedule: true } : READ_ONLY_PERMS;
   } else if (role === "user") {
     permissions = adminPerms
       ? {
@@ -168,6 +189,7 @@ export function buildPermissionContext(
       canManageIndicatorTypes: false,
       canManageCoverageRequirements: false,
       canApproveShiftRequests: false,
+      canEditScheduleIndicators: false,
     };
   }
 
@@ -201,12 +223,12 @@ export function buildPermissionContext(
     isSuperAdmin,
     isImpersonating,
     isUserViewActive: false,
+    isInactive: false,
     actualLevel: level,
     canManageOrg,
     canAccessSettings,
     canManageUsers: isImpersonating ? false : isSuperAdmin || isGridmaster,
-    canConfigureAdminPermissions:
-      isImpersonating ? false : isSuperAdmin || isGridmaster,
+    canConfigureAdminPermissions: isImpersonating ? false : isSuperAdmin || isGridmaster,
   };
 }
 
@@ -216,10 +238,12 @@ export function buildPerms(
   isLoading: boolean,
   adminPerms?: AdminPermissions | null,
   isImpersonating = false,
+  isInactive = false,
 ): Permissions {
   const base = buildPermissionContext(role, orgId, adminPerms, {
     isImpersonating,
     isLoading,
+    isInactive,
   });
   return {
     ...base,
@@ -229,8 +253,7 @@ export function buildPerms(
 
 function decodeBase64UrlSegment(segment: string): string {
   const normalized = segment.replace(/-/g, "+").replace(/_/g, "/");
-  const padding =
-    normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
   const padded = `${normalized}${padding}`;
 
   if (typeof atob === "function") {
@@ -240,7 +263,10 @@ function decodeBase64UrlSegment(segment: string): string {
   const bufferCtor = (
     globalThis as {
       Buffer?: {
-        from: (value: string, encoding: string) => {
+        from: (
+          value: string,
+          encoding: string,
+        ) => {
           toString: (encoding: string) => string;
         };
       };
@@ -265,9 +291,7 @@ export function extractJwtClaims(accessToken: string): {
       throw new Error("Missing JWT payload segment");
     }
 
-    payload = JSON.parse(
-      decodeBase64UrlSegment(encodedPayload),
-    ) as Record<string, unknown>;
+    payload = JSON.parse(decodeBase64UrlSegment(encodedPayload)) as Record<string, unknown>;
   } catch {
     return { effectiveRole: "user", orgId: null };
   }

@@ -62,12 +62,10 @@ function createMockRoleChangeSystem() {
     targetUserId: string,
     newRole: AllRoles,
     changedById: string,
-    idempotencyKey: string
+    idempotencyKey: string,
   ): RoleChangeResult {
     // 1. Idempotency check: Return early if this operation was already applied
-    const existingEntry = roleChangeLog.find(
-      (entry) => entry.idempotency_key === idempotencyKey
-    );
+    const existingEntry = roleChangeLog.find((entry) => entry.idempotency_key === idempotencyKey);
 
     if (existingEntry) {
       return { status: "already_applied" };
@@ -108,12 +106,10 @@ function createMockRoleChangeSystem() {
   function updateAuditLogEntry(
     idempotencyKey: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _newValues?: Partial<RoleChangeLogEntry>
+    _newValues?: Partial<RoleChangeLogEntry>,
   ): void {
     // Check if entry exists
-    const existingEntry = roleChangeLog.find(
-      (entry) => entry.idempotency_key === idempotencyKey
-    );
+    const existingEntry = roleChangeLog.find((entry) => entry.idempotency_key === idempotencyKey);
 
     if (!existingEntry) {
       throw new Error("Audit log entry not found");
@@ -121,7 +117,7 @@ function createMockRoleChangeSystem() {
 
     // Simulate RLS policy rejection - NO UPDATE policies exist on role_change_log
     throw new RLSPolicyViolationError(
-      "UPDATE operation rejected by RLS policy: role_change_log is immutable"
+      "UPDATE operation rejected by RLS policy: role_change_log is immutable",
     );
   }
 
@@ -131,9 +127,7 @@ function createMockRoleChangeSystem() {
    */
   function deleteAuditLogEntry(idempotencyKey: string): void {
     // Check if entry exists
-    const existingEntry = roleChangeLog.find(
-      (entry) => entry.idempotency_key === idempotencyKey
-    );
+    const existingEntry = roleChangeLog.find((entry) => entry.idempotency_key === idempotencyKey);
 
     if (!existingEntry) {
       throw new Error("Audit log entry not found");
@@ -141,7 +135,7 @@ function createMockRoleChangeSystem() {
 
     // Simulate RLS policy rejection - NO DELETE policies exist on role_change_log
     throw new RLSPolicyViolationError(
-      "DELETE operation rejected by RLS policy: role_change_log is immutable"
+      "DELETE operation rejected by RLS policy: role_change_log is immutable",
     );
   }
 
@@ -205,7 +199,7 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(firstResult.status).toBe("success");
 
@@ -214,12 +208,12 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(secondResult.status).toBe("already_applied");
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -242,7 +236,7 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(firstResult.status).toBe("success");
 
@@ -250,19 +244,14 @@ describe("RBAC Property Tests", () => {
             const roleAfterFirstCall = mockSystem.getUserRole(targetUserId);
 
             // Second call with same idempotency key
-            mockSystem.changeUserRole(
-              targetUserId,
-              newRole,
-              changedById,
-              idempotencyKey
-            );
+            mockSystem.changeUserRole(targetUserId, newRole, changedById, idempotencyKey);
 
             // Role should remain unchanged from first successful application
             const roleAfterSecondCall = mockSystem.getUserRole(targetUserId);
             expect(roleAfterSecondCall).toBe(roleAfterFirstCall);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -286,7 +275,7 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               firstRole,
               changedById,
-              key1
+              key1,
             );
             expect(firstResult.status).toBe("success");
 
@@ -295,15 +284,15 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               secondRole,
               changedById,
-              key2
+              key2,
             );
             expect(secondResult.status).toBe("success");
 
             // User should have the second role
             expect(mockSystem.getUserRole(targetUserId)).toBe(secondRole);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -324,7 +313,7 @@ describe("RBAC Property Tests", () => {
             role2,
             changedById1,
             changedById2,
-            idempotencyKey
+            idempotencyKey,
           ) => {
             mockSystem.reset();
 
@@ -333,7 +322,7 @@ describe("RBAC Property Tests", () => {
               targetUserId1,
               role1,
               changedById1,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(firstResult.status).toBe("success");
 
@@ -343,12 +332,12 @@ describe("RBAC Property Tests", () => {
               targetUserId2,
               role2,
               changedById2,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(secondResult.status).toBe("already_applied");
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -365,23 +354,16 @@ describe("RBAC Property Tests", () => {
 
             // Call multiple times with the same idempotency key
             for (let i = 0; i < callCount; i++) {
-              mockSystem.changeUserRole(
-                targetUserId,
-                newRole,
-                changedById,
-                idempotencyKey
-              );
+              mockSystem.changeUserRole(targetUserId, newRole, changedById, idempotencyKey);
             }
 
             // Audit log should contain exactly one entry for this key
             const log = mockSystem.getRoleChangeLog();
-            const entriesWithKey = log.filter(
-              (entry) => entry.idempotency_key === idempotencyKey
-            );
+            const entriesWithKey = log.filter((entry) => entry.idempotency_key === idempotencyKey);
             expect(entriesWithKey).toHaveLength(1);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -416,7 +398,7 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
 
             // Verify it was successful
@@ -425,9 +407,9 @@ describe("RBAC Property Tests", () => {
             // Verify exactly one audit log entry exists
             const log = mockSystem.getRoleChangeLog();
             expect(log).toHaveLength(1);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -446,16 +428,16 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(result.status).toBe("success");
 
             // Verify audit log entry has correct target_user_id
             const log = mockSystem.getRoleChangeLog();
             expect(log[0].target_user_id).toBe(targetUserId);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -478,7 +460,7 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(result.status).toBe("success");
 
@@ -486,9 +468,9 @@ describe("RBAC Property Tests", () => {
             const log = mockSystem.getRoleChangeLog();
             expect(log[0].from_role).toBe(initialRole);
             expect(log[0].to_role).toBe(newRole);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -507,16 +489,16 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(result.status).toBe("success");
 
             // Verify audit log entry has correct idempotency_key
             const log = mockSystem.getRoleChangeLog();
             expect(log[0].idempotency_key).toBe(idempotencyKey);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -536,7 +518,7 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(firstResult.status).toBe("success");
 
@@ -546,7 +528,7 @@ describe("RBAC Property Tests", () => {
                 targetUserId,
                 newRole,
                 changedById,
-                idempotencyKey
+                idempotencyKey,
               );
               expect(duplicateResult.status).toBe("already_applied");
             }
@@ -554,9 +536,9 @@ describe("RBAC Property Tests", () => {
             // Verify still only one audit log entry exists
             const log = mockSystem.getRoleChangeLog();
             expect(log).toHaveLength(1);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -564,7 +546,10 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          fc.array(fc.tuple(arbOrgRole, arbUuid, arbIdempotencyKey), { minLength: 1, maxLength: 5 }),
+          fc.array(fc.tuple(arbOrgRole, arbUuid, arbIdempotencyKey), {
+            minLength: 1,
+            maxLength: 5,
+          }),
           (targetUserId, roleChanges) => {
             // Ensure all idempotency keys are unique
             const keys = roleChanges.map(([, , key]) => key);
@@ -578,7 +563,7 @@ describe("RBAC Property Tests", () => {
                 targetUserId,
                 newRole,
                 changedById,
-                idempotencyKey
+                idempotencyKey,
               );
               expect(result.status).toBe("success");
             }
@@ -589,14 +574,12 @@ describe("RBAC Property Tests", () => {
 
             // Verify each entry has matching idempotency_key
             for (const [, , idempotencyKey] of roleChanges) {
-              const matchingEntry = log.find(
-                (entry) => entry.idempotency_key === idempotencyKey
-              );
+              const matchingEntry = log.find((entry) => entry.idempotency_key === idempotencyKey);
               expect(matchingEntry).toBeDefined();
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -617,19 +600,18 @@ describe("RBAC Property Tests", () => {
             mockSystem.setUserRole(targetUserId, roles[0]);
 
             // Perform sequential role changes and track expected transitions
-            const expectedTransitions: Array<{ from: OrganizationRole; to: OrganizationRole; key: string }> = [];
+            const expectedTransitions: Array<{
+              from: OrganizationRole;
+              to: OrganizationRole;
+              key: string;
+            }> = [];
             let currentRole = roles[0];
 
             for (let i = 1; i < roles.length && i <= keys.length; i++) {
               const newRole = roles[i];
               const key = keys[i - 1];
 
-              const result = mockSystem.changeUserRole(
-                targetUserId,
-                newRole,
-                changedById,
-                key
-              );
+              const result = mockSystem.changeUserRole(targetUserId, newRole, changedById, key);
               expect(result.status).toBe("success");
 
               expectedTransitions.push({
@@ -652,9 +634,9 @@ describe("RBAC Property Tests", () => {
               expect(entry!.to_role).toBe(expected.to);
               expect(entry!.target_user_id).toBe(targetUserId);
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -692,19 +674,14 @@ describe("RBAC Property Tests", () => {
 
             // Attempt to promote to admin should throw
             expect(() =>
-              mockSystem.changeUserRole(
-                targetUserId,
-                "admin",
-                adminCallerId,
-                idempotencyKey
-              )
+              mockSystem.changeUserRole(targetUserId, "admin", adminCallerId, idempotencyKey),
             ).toThrow(AdminPromotionError);
 
             // Verify target user's role remains unchanged
             expect(mockSystem.getUserRole(targetUserId)).toBe(initialRole);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -726,19 +703,14 @@ describe("RBAC Property Tests", () => {
 
             // Attempt to promote to gridmaster should throw
             expect(() =>
-              mockSystem.changeUserRole(
-                targetUserId,
-                "gridmaster",
-                adminCallerId,
-                idempotencyKey
-              )
+              mockSystem.changeUserRole(targetUserId, "gridmaster", adminCallerId, idempotencyKey),
             ).toThrow(AdminPromotionError);
 
             // Verify target user's role remains unchanged
             expect(mockSystem.getUserRole(targetUserId)).toBe(initialRole);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -768,7 +740,7 @@ describe("RBAC Property Tests", () => {
                 targetUserId,
                 promotableRole,
                 adminCallerId,
-                idempotencyKey
+                idempotencyKey,
               );
             } catch {
               // Expected to throw
@@ -782,9 +754,9 @@ describe("RBAC Property Tests", () => {
             // Verify no audit log entry was created
             const log = mockSystem.getRoleChangeLog();
             expect(log).toHaveLength(0);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -810,14 +782,14 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               gridmasterCallerId,
-              idempotencyKey
+              idempotencyKey,
             );
 
             expect(result.status).toBe("success");
             expect(mockSystem.getUserRole(targetUserId)).toBe(newRole);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -843,14 +815,14 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               adminCallerId,
-              idempotencyKey
+              idempotencyKey,
             );
 
             expect(result.status).toBe("success");
             expect(mockSystem.getUserRole(targetUserId)).toBe(newRole);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -873,12 +845,12 @@ describe("RBAC Property Tests", () => {
                 targetUserId,
                 promotableRole,
                 adminCallerId,
-                idempotencyKey
-              )
+                idempotencyKey,
+              ),
             ).toThrow("admin cannot promote to admin or gridmaster");
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -913,7 +885,7 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(result.status).toBe("success");
 
@@ -925,11 +897,11 @@ describe("RBAC Property Tests", () => {
             expect(() =>
               mockSystem.updateAuditLogEntry(idempotencyKey, {
                 to_role: attemptedNewRole,
-              })
+              }),
             ).toThrow(RLSPolicyViolationError);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -948,7 +920,7 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(result.status).toBe("success");
 
@@ -957,12 +929,12 @@ describe("RBAC Property Tests", () => {
             expect(logBefore).toHaveLength(1);
 
             // Attempt to delete the audit log entry should throw RLS violation
-            expect(() =>
-              mockSystem.deleteAuditLogEntry(idempotencyKey)
-            ).toThrow(RLSPolicyViolationError);
-          }
+            expect(() => mockSystem.deleteAuditLogEntry(idempotencyKey)).toThrow(
+              RLSPolicyViolationError,
+            );
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -975,7 +947,14 @@ describe("RBAC Property Tests", () => {
           arbIdempotencyKey,
           arbOrgRole,
           arbUuid,
-          (targetUserId, newRole, changedById, idempotencyKey, attemptedNewRole, attemptedNewTargetId) => {
+          (
+            targetUserId,
+            newRole,
+            changedById,
+            idempotencyKey,
+            attemptedNewRole,
+            attemptedNewTargetId,
+          ) => {
             mockSystem.reset();
 
             // Create an audit log entry via role change
@@ -983,7 +962,7 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(result.status).toBe("success");
 
@@ -1009,9 +988,9 @@ describe("RBAC Property Tests", () => {
             expect(logAfter[0].from_role).toBe(entryBefore.from_role);
             expect(logAfter[0].to_role).toBe(entryBefore.to_role);
             expect(logAfter[0].idempotency_key).toBe(entryBefore.idempotency_key);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -1030,7 +1009,7 @@ describe("RBAC Property Tests", () => {
               targetUserId,
               newRole,
               changedById,
-              idempotencyKey
+              idempotencyKey,
             );
             expect(result.status).toBe("success");
 
@@ -1053,9 +1032,9 @@ describe("RBAC Property Tests", () => {
             expect(logAfter[0].from_role).toBe(entryBefore.from_role);
             expect(logAfter[0].to_role).toBe(entryBefore.to_role);
             expect(logAfter[0].idempotency_key).toBe(entryBefore.idempotency_key);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -1063,7 +1042,10 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          fc.array(fc.tuple(arbOrgRole, arbUuid, arbIdempotencyKey), { minLength: 2, maxLength: 5 }),
+          fc.array(fc.tuple(arbOrgRole, arbUuid, arbIdempotencyKey), {
+            minLength: 2,
+            maxLength: 5,
+          }),
           (targetUserId, roleChanges) => {
             // Ensure all idempotency keys are unique
             const keys = roleChanges.map(([, , key]) => key);
@@ -1077,7 +1059,7 @@ describe("RBAC Property Tests", () => {
                 targetUserId,
                 newRole,
                 changedById,
-                idempotencyKey
+                idempotencyKey,
               );
               expect(result.status).toBe("success");
             }
@@ -1113,9 +1095,9 @@ describe("RBAC Property Tests", () => {
               expect(logAfter[i].to_role).toBe(logBefore[i].to_role);
               expect(logAfter[i].idempotency_key).toBe(logBefore[i].idempotency_key);
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -1134,11 +1116,11 @@ describe("RBAC Property Tests", () => {
 
             // Verify error message mentions RLS policy
             expect(() =>
-              mockSystem.updateAuditLogEntry(idempotencyKey, { to_role: "user" })
+              mockSystem.updateAuditLogEntry(idempotencyKey, { to_role: "user" }),
             ).toThrow(/RLS policy/);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -1156,12 +1138,10 @@ describe("RBAC Property Tests", () => {
             mockSystem.changeUserRole(targetUserId, newRole, changedById, idempotencyKey);
 
             // Verify error message mentions RLS policy
-            expect(() =>
-              mockSystem.deleteAuditLogEntry(idempotencyKey)
-            ).toThrow(/RLS policy/);
-          }
+            expect(() => mockSystem.deleteAuditLogEntry(idempotencyKey)).toThrow(/RLS policy/);
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -1221,7 +1201,7 @@ describe("RBAC Property Tests", () => {
      */
     function startImpersonation(
       callerId: string,
-      targetUserId: string
+      targetUserId: string,
     ): { session_id: string; expires_at: Date; target_org_id: string } {
       // 1. Verify caller is gridmaster
       if (!isGridmaster(callerId)) {
@@ -1237,11 +1217,11 @@ describe("RBAC Property Tests", () => {
 
       // 3. Check for existing active session (UNIQUE constraint)
       const existingSession = impersonationSessions.find(
-        (s) => s.gridmaster_id === callerId && s.target_user_id === targetUserId
+        (s) => s.gridmaster_id === callerId && s.target_user_id === targetUserId,
       );
       if (existingSession) {
         throw new UniqueConstraintError(
-          "UNIQUE constraint violation: one_active_session_per_target (gridmaster_id, target_user_id)"
+          "UNIQUE constraint violation: one_active_session_per_target (gridmaster_id, target_user_id)",
         );
       }
 
@@ -1274,7 +1254,7 @@ describe("RBAC Property Tests", () => {
      */
     function endImpersonation(callerId: string, sessionId: string): void {
       const sessionIndex = impersonationSessions.findIndex(
-        (s) => s.session_id === sessionId && s.gridmaster_id === callerId
+        (s) => s.session_id === sessionId && s.gridmaster_id === callerId,
       );
 
       if (sessionIndex !== -1) {
@@ -1293,7 +1273,7 @@ describe("RBAC Property Tests", () => {
       getSessions: () => [...impersonationSessions],
       getSessionByTargetUser: (gridmasterId: string, targetUserId: string) =>
         impersonationSessions.find(
-          (s) => s.gridmaster_id === gridmasterId && s.target_user_id === targetUserId
+          (s) => s.gridmaster_id === gridmasterId && s.target_user_id === targetUserId,
         ),
       reset: () => {
         impersonationSessions.length = 0;
@@ -1323,55 +1303,45 @@ describe("RBAC Property Tests", () => {
 
     it("gridmaster can create impersonation session for valid target user", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbUuid, (gridmasterId, targetUserId, targetOrgId) => {
+          mockSystem.reset();
 
-            // Set up gridmaster caller
-            mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
+          // Set up gridmaster caller
+          mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
-            // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+          // Set up target user with org
+          mockSystem.setUserProfile(targetUserId, targetOrgId);
 
-            // Create impersonation session
-            const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
+          // Create impersonation session
+          const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
 
-            // Verify session was created
-            expect(result.session_id).toBeDefined();
-            expect(typeof result.session_id).toBe("string");
-            expect(result.session_id.length).toBeGreaterThan(0);
-          }
-        ),
-        { numRuns: 100 }
+          // Verify session was created
+          expect(result.session_id).toBeDefined();
+          expect(typeof result.session_id).toBe("string");
+          expect(result.session_id.length).toBeGreaterThan(0);
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("impersonation session has correct target_org_id", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbUuid, (gridmasterId, targetUserId, targetOrgId) => {
+          mockSystem.reset();
 
-            // Set up gridmaster caller
-            mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
+          // Set up gridmaster caller
+          mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
-            // Set up target user with specific org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+          // Set up target user with specific org
+          mockSystem.setUserProfile(targetUserId, targetOrgId);
 
-            // Create impersonation session
-            const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
+          // Create impersonation session
+          const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
 
-            // Verify target_org_id matches the target user's org
-            expect(result.target_org_id).toBe(targetOrgId);
-          }
-        ),
-        { numRuns: 100 }
+          // Verify target_org_id matches the target user's org
+          expect(result.target_org_id).toBe(targetOrgId);
+        }),
+        { numRuns: 100 },
       );
     });
 
@@ -1404,9 +1374,9 @@ describe("RBAC Property Tests", () => {
 
             // Verify all session IDs are unique
             expect(new Set(sessionIds).size).toBe(sessionIds.length);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -1427,104 +1397,89 @@ describe("RBAC Property Tests", () => {
             mockSystem.setUserProfile(targetUserId, targetOrgId);
 
             // Attempt to create impersonation session should throw
-            expect(() =>
-              mockSystem.startImpersonation(callerId, targetUserId)
-            ).toThrow(mockSystem.NotGridmasterError);
-          }
+            expect(() => mockSystem.startImpersonation(callerId, targetUserId)).toThrow(
+              mockSystem.NotGridmasterError,
+            );
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
     it("impersonation session is stored in the sessions list", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbUuid, (gridmasterId, targetUserId, targetOrgId) => {
+          mockSystem.reset();
 
-            // Set up gridmaster caller
-            mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
+          // Set up gridmaster caller
+          mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
-            // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+          // Set up target user with org
+          mockSystem.setUserProfile(targetUserId, targetOrgId);
 
-            // Create impersonation session
-            const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
+          // Create impersonation session
+          const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
 
-            // Verify session exists in the sessions list
-            const sessions = mockSystem.getSessions();
-            expect(sessions).toHaveLength(1);
-            expect(sessions[0].session_id).toBe(result.session_id);
-            expect(sessions[0].gridmaster_id).toBe(gridmasterId);
-            expect(sessions[0].target_user_id).toBe(targetUserId);
-            expect(sessions[0].target_org_id).toBe(targetOrgId);
-          }
-        ),
-        { numRuns: 100 }
+          // Verify session exists in the sessions list
+          const sessions = mockSystem.getSessions();
+          expect(sessions).toHaveLength(1);
+          expect(sessions[0].session_id).toBe(result.session_id);
+          expect(sessions[0].gridmaster_id).toBe(gridmasterId);
+          expect(sessions[0].target_user_id).toBe(targetUserId);
+          expect(sessions[0].target_org_id).toBe(targetOrgId);
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("impersonation session has 30-minute expiry", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbUuid, (gridmasterId, targetUserId, targetOrgId) => {
+          mockSystem.reset();
 
-            // Set up gridmaster caller
-            mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
+          // Set up gridmaster caller
+          mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
-            // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+          // Set up target user with org
+          mockSystem.setUserProfile(targetUserId, targetOrgId);
 
-            // Capture time before creating session
-            const beforeCreation = new Date();
+          // Capture time before creating session
+          const beforeCreation = new Date();
 
-            // Create impersonation session
-            const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
+          // Create impersonation session
+          const result = mockSystem.startImpersonation(gridmasterId, targetUserId);
 
-            // Capture time after creating session
-            const afterCreation = new Date();
+          // Capture time after creating session
+          const afterCreation = new Date();
 
-            // Verify expires_at is approximately 30 minutes from now
-            const expectedMinExpiry = new Date(beforeCreation.getTime() + 30 * 60 * 1000);
-            const expectedMaxExpiry = new Date(afterCreation.getTime() + 30 * 60 * 1000);
+          // Verify expires_at is approximately 30 minutes from now
+          const expectedMinExpiry = new Date(beforeCreation.getTime() + 30 * 60 * 1000);
+          const expectedMaxExpiry = new Date(afterCreation.getTime() + 30 * 60 * 1000);
 
-            expect(result.expires_at.getTime()).toBeGreaterThanOrEqual(expectedMinExpiry.getTime());
-            expect(result.expires_at.getTime()).toBeLessThanOrEqual(expectedMaxExpiry.getTime());
-          }
-        ),
-        { numRuns: 100 }
+          expect(result.expires_at.getTime()).toBeGreaterThanOrEqual(expectedMinExpiry.getTime());
+          expect(result.expires_at.getTime()).toBeLessThanOrEqual(expectedMaxExpiry.getTime());
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("error message indicates only gridmaster can impersonate", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbUuid,
-          (callerId, targetUserId, targetOrgId) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbUuid, (callerId, targetUserId, targetOrgId) => {
+          mockSystem.reset();
 
-            // Set up non-gridmaster caller
-            mockSystem.setCallerPlatformRole(callerId, "none");
+          // Set up non-gridmaster caller
+          mockSystem.setCallerPlatformRole(callerId, "none");
 
-            // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+          // Set up target user with org
+          mockSystem.setUserProfile(targetUserId, targetOrgId);
 
-            // Verify error message
-            expect(() =>
-              mockSystem.startImpersonation(callerId, targetUserId)
-            ).toThrow("Only gridmaster can impersonate users");
-          }
-        ),
-        { numRuns: 100 }
+          // Verify error message
+          expect(() => mockSystem.startImpersonation(callerId, targetUserId)).toThrow(
+            "Only gridmaster can impersonate users",
+          );
+        }),
+        { numRuns: 100 },
       );
     });
   });
@@ -1546,64 +1501,54 @@ describe("RBAC Property Tests", () => {
 
     it("second impersonation session for same target user fails with uniqueness error", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbUuid, (gridmasterId, targetUserId, targetOrgId) => {
+          mockSystem.reset();
 
-            // Set up gridmaster caller
-            mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
+          // Set up gridmaster caller
+          mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
-            // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+          // Set up target user with org
+          mockSystem.setUserProfile(targetUserId, targetOrgId);
 
-            // First impersonation session should succeed
-            const firstResult = mockSystem.startImpersonation(gridmasterId, targetUserId);
-            expect(firstResult.session_id).toBeDefined();
+          // First impersonation session should succeed
+          const firstResult = mockSystem.startImpersonation(gridmasterId, targetUserId);
+          expect(firstResult.session_id).toBeDefined();
 
-            // Second impersonation session for same target should fail
-            expect(() =>
-              mockSystem.startImpersonation(gridmasterId, targetUserId)
-            ).toThrow(mockSystem.UniqueConstraintError);
-          }
-        ),
-        { numRuns: 100 }
+          // Second impersonation session for same target should fail
+          expect(() => mockSystem.startImpersonation(gridmasterId, targetUserId)).toThrow(
+            mockSystem.UniqueConstraintError,
+          );
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("only one session record exists after duplicate attempt", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbUuid, (gridmasterId, targetUserId, targetOrgId) => {
+          mockSystem.reset();
 
-            // Set up gridmaster caller
-            mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
+          // Set up gridmaster caller
+          mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
-            // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+          // Set up target user with org
+          mockSystem.setUserProfile(targetUserId, targetOrgId);
 
-            // First impersonation session
+          // First impersonation session
+          mockSystem.startImpersonation(gridmasterId, targetUserId);
+
+          // Attempt second session (should fail)
+          try {
             mockSystem.startImpersonation(gridmasterId, targetUserId);
-
-            // Attempt second session (should fail)
-            try {
-              mockSystem.startImpersonation(gridmasterId, targetUserId);
-            } catch {
-              // Expected to throw
-            }
-
-            // Verify only one session exists
-            const sessions = mockSystem.getSessions();
-            expect(sessions).toHaveLength(1);
+          } catch {
+            // Expected to throw
           }
-        ),
-        { numRuns: 100 }
+
+          // Verify only one session exists
+          const sessions = mockSystem.getSessions();
+          expect(sessions).toHaveLength(1);
+        }),
+        { numRuns: 100 },
       );
     });
 
@@ -1638,9 +1583,9 @@ describe("RBAC Property Tests", () => {
             // Both sessions should exist
             const sessions = mockSystem.getSessions();
             expect(sessions).toHaveLength(2);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -1673,114 +1618,99 @@ describe("RBAC Property Tests", () => {
             // All sessions should exist
             const sessions = mockSystem.getSessions();
             expect(sessions).toHaveLength(targetUsers.length);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
     it("error message indicates UNIQUE constraint violation", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbUuid, (gridmasterId, targetUserId, targetOrgId) => {
+          mockSystem.reset();
 
-            // Set up gridmaster caller
-            mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
+          // Set up gridmaster caller
+          mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
-            // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+          // Set up target user with org
+          mockSystem.setUserProfile(targetUserId, targetOrgId);
 
-            // First impersonation session
-            mockSystem.startImpersonation(gridmasterId, targetUserId);
+          // First impersonation session
+          mockSystem.startImpersonation(gridmasterId, targetUserId);
 
-            // Verify error message mentions UNIQUE constraint
-            expect(() =>
-              mockSystem.startImpersonation(gridmasterId, targetUserId)
-            ).toThrow(/UNIQUE constraint/);
-          }
-        ),
-        { numRuns: 100 }
+          // Verify error message mentions UNIQUE constraint
+          expect(() => mockSystem.startImpersonation(gridmasterId, targetUserId)).toThrow(
+            /UNIQUE constraint/,
+          );
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("after ending session, gridmaster can create new session for same target", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbUuid, (gridmasterId, targetUserId, targetOrgId) => {
+          mockSystem.reset();
 
-            // Set up gridmaster caller
-            mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
+          // Set up gridmaster caller
+          mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
-            // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+          // Set up target user with org
+          mockSystem.setUserProfile(targetUserId, targetOrgId);
 
-            // First impersonation session
-            const firstResult = mockSystem.startImpersonation(gridmasterId, targetUserId);
-            expect(firstResult.session_id).toBeDefined();
+          // First impersonation session
+          const firstResult = mockSystem.startImpersonation(gridmasterId, targetUserId);
+          expect(firstResult.session_id).toBeDefined();
 
-            // End the session
-            mockSystem.endImpersonation(gridmasterId, firstResult.session_id);
+          // End the session
+          mockSystem.endImpersonation(gridmasterId, firstResult.session_id);
 
-            // Verify session was removed
-            expect(mockSystem.getSessions()).toHaveLength(0);
+          // Verify session was removed
+          expect(mockSystem.getSessions()).toHaveLength(0);
 
-            // Now gridmaster can create new session for same target
-            const secondResult = mockSystem.startImpersonation(gridmasterId, targetUserId);
-            expect(secondResult.session_id).toBeDefined();
-            expect(secondResult.session_id).not.toBe(firstResult.session_id);
-          }
-        ),
-        { numRuns: 100 }
+          // Now gridmaster can create new session for same target
+          const secondResult = mockSystem.startImpersonation(gridmasterId, targetUserId);
+          expect(secondResult.session_id).toBeDefined();
+          expect(secondResult.session_id).not.toBe(firstResult.session_id);
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("first session remains unchanged after duplicate attempt fails", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbUuid,
-          (gridmasterId, targetUserId, targetOrgId) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbUuid, (gridmasterId, targetUserId, targetOrgId) => {
+          mockSystem.reset();
 
-            // Set up gridmaster caller
-            mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
+          // Set up gridmaster caller
+          mockSystem.setCallerPlatformRole(gridmasterId, "gridmaster");
 
-            // Set up target user with org
-            mockSystem.setUserProfile(targetUserId, targetOrgId);
+          // Set up target user with org
+          mockSystem.setUserProfile(targetUserId, targetOrgId);
 
-            // First impersonation session
+          // First impersonation session
+          mockSystem.startImpersonation(gridmasterId, targetUserId);
+
+          // Capture session state before duplicate attempt
+          const sessionBefore = mockSystem.getSessionByTargetUser(gridmasterId, targetUserId);
+
+          // Attempt second session (should fail)
+          try {
             mockSystem.startImpersonation(gridmasterId, targetUserId);
-
-            // Capture session state before duplicate attempt
-            const sessionBefore = mockSystem.getSessionByTargetUser(gridmasterId, targetUserId);
-
-            // Attempt second session (should fail)
-            try {
-              mockSystem.startImpersonation(gridmasterId, targetUserId);
-            } catch {
-              // Expected to throw
-            }
-
-            // Verify first session is unchanged
-            const sessionAfter = mockSystem.getSessionByTargetUser(gridmasterId, targetUserId);
-            expect(sessionAfter).toBeDefined();
-            expect(sessionAfter!.session_id).toBe(sessionBefore!.session_id);
-            expect(sessionAfter!.gridmaster_id).toBe(sessionBefore!.gridmaster_id);
-            expect(sessionAfter!.target_user_id).toBe(sessionBefore!.target_user_id);
-            expect(sessionAfter!.target_org_id).toBe(sessionBefore!.target_org_id);
-            expect(sessionAfter!.expires_at.getTime()).toBe(sessionBefore!.expires_at.getTime());
+          } catch {
+            // Expected to throw
           }
-        ),
-        { numRuns: 100 }
+
+          // Verify first session is unchanged
+          const sessionAfter = mockSystem.getSessionByTargetUser(gridmasterId, targetUserId);
+          expect(sessionAfter).toBeDefined();
+          expect(sessionAfter!.session_id).toBe(sessionBefore!.session_id);
+          expect(sessionAfter!.gridmaster_id).toBe(sessionBefore!.gridmaster_id);
+          expect(sessionAfter!.target_user_id).toBe(sessionBefore!.target_user_id);
+          expect(sessionAfter!.target_org_id).toBe(sessionBefore!.target_org_id);
+          expect(sessionAfter!.expires_at.getTime()).toBe(sessionBefore!.expires_at.getTime());
+        }),
+        { numRuns: 100 },
       );
     });
   });
@@ -1842,7 +1772,7 @@ describe("RBAC Property Tests", () => {
       callerId: string,
       email: string,
       roleToAssign: string,
-      orgId: string
+      orgId: string,
     ): { token: string; expires_at: Date; role_to_assign: string } {
       // 1. Verify caller is admin
       const callerRole = callerRoles.get(callerId);
@@ -1861,7 +1791,7 @@ describe("RBAC Property Tests", () => {
       // Admins CANNOT assign: admin, gridmaster
       if (!isValidInvitableRole(roleToAssign)) {
         throw new InvalidRoleError(
-          `Invalid role_to_assign: '${roleToAssign}'. Admins can only invite users with roles: scheduler, supervisor, user`
+          `Invalid role_to_assign: '${roleToAssign}'. Admins can only invite users with roles: scheduler, supervisor, user`,
         );
       }
 
@@ -1911,7 +1841,11 @@ describe("RBAC Property Tests", () => {
   }
 
   // Arbitraries for invitation testing
-  const arbInvitableRole = fc.constantFrom<"scheduler" | "supervisor" | "user">("scheduler", "supervisor", "user");
+  const arbInvitableRole = fc.constantFrom<"scheduler" | "supervisor" | "user">(
+    "scheduler",
+    "supervisor",
+    "user",
+  );
   const arbRestrictedRole = fc.constantFrom<"admin" | "gridmaster">("admin", "gridmaster");
   const arbEmail = fc.emailAddress();
 
@@ -1932,158 +1866,127 @@ describe("RBAC Property Tests", () => {
 
     it("admin can create invitations with role 'scheduler'", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbEmail,
-          (adminId, orgId, email) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbEmail, (adminId, orgId, email) => {
+          mockSystem.reset();
 
-            // Set up admin caller
-            mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+          // Set up admin caller
+          mockSystem.setCallerRole(adminId, "admin");
+          mockSystem.setCallerOrgId(adminId, orgId);
 
-            // Create invitation with scheduler role
-            const result = mockSystem.sendInvitation(adminId, email, "scheduler", orgId);
+          // Create invitation with scheduler role
+          const result = mockSystem.sendInvitation(adminId, email, "scheduler", orgId);
 
-            // Verify invitation was created successfully
-            expect(result.token).toBeDefined();
-            expect(result.role_to_assign).toBe("scheduler");
-          }
-        ),
-        { numRuns: 100 }
+          // Verify invitation was created successfully
+          expect(result.token).toBeDefined();
+          expect(result.role_to_assign).toBe("scheduler");
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("admin can create invitations with role 'supervisor'", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbEmail,
-          (adminId, orgId, email) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbEmail, (adminId, orgId, email) => {
+          mockSystem.reset();
 
-            // Set up admin caller
-            mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+          // Set up admin caller
+          mockSystem.setCallerRole(adminId, "admin");
+          mockSystem.setCallerOrgId(adminId, orgId);
 
-            // Create invitation with supervisor role
-            const result = mockSystem.sendInvitation(adminId, email, "supervisor", orgId);
+          // Create invitation with supervisor role
+          const result = mockSystem.sendInvitation(adminId, email, "supervisor", orgId);
 
-            // Verify invitation was created successfully
-            expect(result.token).toBeDefined();
-            expect(result.role_to_assign).toBe("supervisor");
-          }
-        ),
-        { numRuns: 100 }
+          // Verify invitation was created successfully
+          expect(result.token).toBeDefined();
+          expect(result.role_to_assign).toBe("supervisor");
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("admin can create invitations with role 'user'", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbEmail,
-          (adminId, orgId, email) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbEmail, (adminId, orgId, email) => {
+          mockSystem.reset();
 
-            // Set up admin caller
-            mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+          // Set up admin caller
+          mockSystem.setCallerRole(adminId, "admin");
+          mockSystem.setCallerOrgId(adminId, orgId);
 
-            // Create invitation with user role
-            const result = mockSystem.sendInvitation(adminId, email, "user", orgId);
+          // Create invitation with user role
+          const result = mockSystem.sendInvitation(adminId, email, "user", orgId);
 
-            // Verify invitation was created successfully
-            expect(result.token).toBeDefined();
-            expect(result.role_to_assign).toBe("user");
-          }
-        ),
-        { numRuns: 100 }
+          // Verify invitation was created successfully
+          expect(result.token).toBeDefined();
+          expect(result.role_to_assign).toBe("user");
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("admin cannot create invitations with role 'admin'", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbEmail,
-          (adminId, orgId, email) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbEmail, (adminId, orgId, email) => {
+          mockSystem.reset();
 
-            // Set up admin caller
-            mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+          // Set up admin caller
+          mockSystem.setCallerRole(adminId, "admin");
+          mockSystem.setCallerOrgId(adminId, orgId);
 
-            // Attempt to create invitation with admin role should throw
-            expect(() =>
-              mockSystem.sendInvitation(adminId, email, "admin", orgId)
-            ).toThrow(mockSystem.InvalidRoleError);
+          // Attempt to create invitation with admin role should throw
+          expect(() => mockSystem.sendInvitation(adminId, email, "admin", orgId)).toThrow(
+            mockSystem.InvalidRoleError,
+          );
 
-            // Verify no invitation was created
-            expect(mockSystem.getInvitations()).toHaveLength(0);
-          }
-        ),
-        { numRuns: 100 }
+          // Verify no invitation was created
+          expect(mockSystem.getInvitations()).toHaveLength(0);
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("admin cannot create invitations with role 'gridmaster'", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbEmail,
-          (adminId, orgId, email) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbEmail, (adminId, orgId, email) => {
+          mockSystem.reset();
 
-            // Set up admin caller
-            mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+          // Set up admin caller
+          mockSystem.setCallerRole(adminId, "admin");
+          mockSystem.setCallerOrgId(adminId, orgId);
 
-            // Attempt to create invitation with gridmaster role should throw
-            expect(() =>
-              mockSystem.sendInvitation(adminId, email, "gridmaster", orgId)
-            ).toThrow(mockSystem.InvalidRoleError);
+          // Attempt to create invitation with gridmaster role should throw
+          expect(() => mockSystem.sendInvitation(adminId, email, "gridmaster", orgId)).toThrow(
+            mockSystem.InvalidRoleError,
+          );
 
-            // Verify no invitation was created
-            expect(mockSystem.getInvitations()).toHaveLength(0);
-          }
-        ),
-        { numRuns: 100 }
+          // Verify no invitation was created
+          expect(mockSystem.getInvitations()).toHaveLength(0);
+        }),
+        { numRuns: 100 },
       );
     });
 
     it("invitation has correct role_to_assign value for all valid roles", () => {
       fc.assert(
-        fc.property(
-          arbUuid,
-          arbUuid,
-          arbEmail,
-          arbInvitableRole,
-          (adminId, orgId, email, role) => {
-            mockSystem.reset();
+        fc.property(arbUuid, arbUuid, arbEmail, arbInvitableRole, (adminId, orgId, email, role) => {
+          mockSystem.reset();
 
-            // Set up admin caller
-            mockSystem.setCallerRole(adminId, "admin");
-            mockSystem.setCallerOrgId(adminId, orgId);
+          // Set up admin caller
+          mockSystem.setCallerRole(adminId, "admin");
+          mockSystem.setCallerOrgId(adminId, orgId);
 
-            // Create invitation with the specified valid role
-            const result = mockSystem.sendInvitation(adminId, email, role, orgId);
+          // Create invitation with the specified valid role
+          const result = mockSystem.sendInvitation(adminId, email, role, orgId);
 
-            // Verify the role_to_assign matches what was requested
-            expect(result.role_to_assign).toBe(role);
+          // Verify the role_to_assign matches what was requested
+          expect(result.role_to_assign).toBe(role);
 
-            // Verify the stored invitation has the correct role
-            const invitations = mockSystem.getInvitations();
-            expect(invitations).toHaveLength(1);
-            expect(invitations[0].role_to_assign).toBe(role);
-          }
-        ),
-        { numRuns: 100 }
+          // Verify the stored invitation has the correct role
+          const invitations = mockSystem.getInvitations();
+          expect(invitations).toHaveLength(1);
+          expect(invitations[0].role_to_assign).toBe(role);
+        }),
+        { numRuns: 100 },
       );
     });
 
@@ -2102,9 +2005,9 @@ describe("RBAC Property Tests", () => {
             mockSystem.setCallerOrgId(adminId, orgId);
 
             // Attempt to create invitation with restricted role should throw
-            expect(() =>
-              mockSystem.sendInvitation(adminId, email, restrictedRole, orgId)
-            ).toThrow(mockSystem.InvalidRoleError);
+            expect(() => mockSystem.sendInvitation(adminId, email, restrictedRole, orgId)).toThrow(
+              mockSystem.InvalidRoleError,
+            );
 
             // Verify error message mentions the invalid role
             try {
@@ -2113,9 +2016,9 @@ describe("RBAC Property Tests", () => {
               expect((e as Error).message).toContain(restrictedRole);
               expect((e as Error).message).toContain("scheduler, supervisor, user");
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -2142,13 +2045,13 @@ describe("RBAC Property Tests", () => {
               expect(result.role_to_assign).toBe(role);
             } else {
               // Invalid roles should fail
-              expect(() =>
-                mockSystem.sendInvitation(adminId, email, role, orgId)
-              ).toThrow(mockSystem.InvalidRoleError);
+              expect(() => mockSystem.sendInvitation(adminId, email, role, orgId)).toThrow(
+                mockSystem.InvalidRoleError,
+              );
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -2186,9 +2089,9 @@ describe("RBAC Property Tests", () => {
               expect(invitation).toBeDefined();
               expect(invitation!.role_to_assign).toBe(role);
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -2219,9 +2122,9 @@ describe("RBAC Property Tests", () => {
             // Verify no invitation was created
             const countAfter = mockSystem.getInvitations().length;
             expect(countAfter).toBe(countBefore);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -2267,7 +2170,7 @@ describe("RBAC Property Tests", () => {
         userId: string,
         deviceLabel: string | null,
         ipAddress: string | null,
-        refreshTokenHash: string
+        refreshTokenHash: string,
       ): UserSession {
         const session: UserSession = {
           id: crypto.randomUUID(),
@@ -2367,22 +2270,29 @@ describe("RBAC Property Tests", () => {
         "Safari on iPhone",
         "Firefox on Windows",
         "Mobile App - Android",
-        "Mobile App - iOS"
-      )
+        "Mobile App - iOS",
+      ),
     );
 
     const arbIpAddress = fc.oneof(
       fc.constant(null),
-      fc.tuple(
-        fc.integer({ min: 1, max: 255 }),
-        fc.integer({ min: 0, max: 255 }),
-        fc.integer({ min: 0, max: 255 }),
-        fc.integer({ min: 1, max: 254 })
-      ).map(([a, b, c, d]) => `${a}.${b}.${c}.${d}`)
+      fc
+        .tuple(
+          fc.integer({ min: 1, max: 255 }),
+          fc.integer({ min: 0, max: 255 }),
+          fc.integer({ min: 0, max: 255 }),
+          fc.integer({ min: 1, max: 254 }),
+        )
+        .map(([a, b, c, d]) => `${a}.${b}.${c}.${d}`),
     );
 
-    const arbRefreshTokenHash = fc.string({ minLength: 64, maxLength: 64 }).map(s =>
-      s.split('').map(c => c.charCodeAt(0).toString(16).padStart(2, '0').slice(0, 2)).join('').slice(0, 64).padEnd(64, '0')
+    const arbRefreshTokenHash = fc.string({ minLength: 64, maxLength: 64 }).map((s) =>
+      s
+        .split("")
+        .map((c) => c.charCodeAt(0).toString(16).padStart(2, "0").slice(0, 2))
+        .join("")
+        .slice(0, 64)
+        .padEnd(64, "0"),
     );
 
     // ── Property Tests ──────────────────────────────────────────────────────────
@@ -2398,8 +2308,14 @@ describe("RBAC Property Tests", () => {
         fc.property(
           arbUuid,
           arbUuid,
-          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), { minLength: 1, maxLength: 5 }),
-          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), { minLength: 1, maxLength: 5 }),
+          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), {
+            minLength: 1,
+            maxLength: 5,
+          }),
+          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), {
+            minLength: 1,
+            maxLength: 5,
+          }),
           (user1Id, user2Id, user1Sessions, user2Sessions) => {
             // Ensure users are different
             fc.pre(user1Id !== user2Id);
@@ -2440,9 +2356,9 @@ describe("RBAC Property Tests", () => {
             for (const session of user2Results) {
               expect(session.user_id).toBe(user2Id);
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -2451,8 +2367,14 @@ describe("RBAC Property Tests", () => {
         fc.property(
           arbUuid,
           arbUuid,
-          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), { minLength: 1, maxLength: 3 }),
-          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), { minLength: 1, maxLength: 3 }),
+          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), {
+            minLength: 1,
+            maxLength: 3,
+          }),
+          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), {
+            minLength: 1,
+            maxLength: 3,
+          }),
           (attackerId, victimId, attackerSessions, victimSessions) => {
             // Ensure users are different
             fc.pre(attackerId !== victimId);
@@ -2485,9 +2407,9 @@ describe("RBAC Property Tests", () => {
             const allSessions = mockSystem.getAllSessionsAdmin();
             const victimSessionsInDb = allSessions.filter((s) => s.user_id === victimId);
             expect(victimSessionsInDb).toHaveLength(victimSessions.length);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -2495,7 +2417,10 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           arbUuid,
-          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), { minLength: 1, maxLength: 5 }),
+          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), {
+            minLength: 1,
+            maxLength: 5,
+          }),
           (userId, userSessions) => {
             // Ensure all refresh token hashes are unique
             const hashes = userSessions.map(([, , hash]) => hash);
@@ -2514,9 +2439,9 @@ describe("RBAC Property Tests", () => {
 
             // Should see nothing
             expect(results).toHaveLength(0);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -2527,7 +2452,10 @@ describe("RBAC Property Tests", () => {
           arbDeviceLabel,
           arbIpAddress,
           arbRefreshTokenHash,
-          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), { minLength: 0, maxLength: 3 }),
+          fc.array(fc.tuple(arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), {
+            minLength: 0,
+            maxLength: 3,
+          }),
           (userId, targetDeviceLabel, targetIpAddress, targetHash, otherSessions) => {
             // Ensure target hash is unique from other sessions
             const otherHashes = otherSessions.map(([, , hash]) => hash);
@@ -2541,7 +2469,7 @@ describe("RBAC Property Tests", () => {
               userId,
               targetDeviceLabel,
               targetIpAddress,
-              targetHash
+              targetHash,
             );
 
             // Create other sessions for the same user
@@ -2557,9 +2485,9 @@ describe("RBAC Property Tests", () => {
             expect(results).toHaveLength(1);
             expect(results[0].id).toBe(targetSession.id);
             expect(results[0].user_id).toBe(userId);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -2567,7 +2495,10 @@ describe("RBAC Property Tests", () => {
       fc.assert(
         fc.property(
           fc.array(arbUuid, { minLength: 2, maxLength: 5 }),
-          fc.array(fc.tuple(arbUuid, arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), { minLength: 5, maxLength: 20 }),
+          fc.array(fc.tuple(arbUuid, arbDeviceLabel, arbIpAddress, arbRefreshTokenHash), {
+            minLength: 5,
+            maxLength: 20,
+          }),
           (userIds, sessionData) => {
             // Ensure all user IDs are unique
             fc.pre(new Set(userIds).size === userIds.length);
@@ -2595,9 +2526,9 @@ describe("RBAC Property Tests", () => {
                 expect(session.user_id).toBe(userId);
               }
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -2620,7 +2551,7 @@ describe("RBAC Property Tests", () => {
               victimId,
               deviceLabel,
               ipAddress,
-              refreshTokenHash
+              refreshTokenHash,
             );
 
             // Attacker tries various filter combinations to access victim's session
@@ -2649,14 +2580,13 @@ describe("RBAC Property Tests", () => {
             const victimResults = mockSystem.querySessions({ id: victimSession.id });
             expect(victimResults).toHaveLength(1);
             expect(victimResults[0].id).toBe(victimSession.id);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
 });
-
 
 // ── Property 24: usePermissions Hook Correctness ──────────────────────────────
 
@@ -2722,7 +2652,13 @@ function getPermissionsFromSession(session: MockSession | null): Permissions {
 // ── Arbitraries for Property 24 ───────────────────────────────────────────────
 
 const arbPlatformRole = fc.constantFrom("gridmaster", "none", undefined);
-const arbOrgRoleForPermissions = fc.constantFrom("admin", "scheduler", "supervisor", "user", undefined);
+const arbOrgRoleForPermissions = fc.constantFrom(
+  "admin",
+  "scheduler",
+  "supervisor",
+  "user",
+  undefined,
+);
 const arbOrgId = fc.oneof(fc.uuid(), fc.constant(undefined));
 const arbRoleForAtLeast = fc.constantFrom("gridmaster", "admin", "scheduler", "supervisor", "user");
 
@@ -2765,7 +2701,7 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         const expectedIsGridmaster = permissions.level >= 4;
         expect(permissions.isGridmaster).toBe(expectedIsGridmaster);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2778,7 +2714,7 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         const expectedCanManageOrg = permissions.level >= 3;
         expect(permissions.canManageOrg).toBe(expectedCanManageOrg);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2791,7 +2727,7 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         const expectedCanEditSchedule = permissions.level >= 2;
         expect(permissions.canEditShifts).toBe(expectedCanEditSchedule);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2804,7 +2740,7 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         const expectedCanAddNotes = permissions.level >= 1;
         expect(permissions.canEditNotes).toBe(expectedCanAddNotes);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2816,7 +2752,7 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         // canViewSchedule should always be true since all roles have level >= 0
         expect(permissions.canViewSchedule).toBe(true);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2830,7 +2766,7 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         const expectedResult = permissions.level >= targetLevel;
         expect(permissions.atLeast(targetRole)).toBe(expectedResult);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2857,7 +2793,7 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         expect(permissions.canEditShifts).toBe(true);
         expect(permissions.canEditNotes).toBe(true);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2884,9 +2820,9 @@ describe("Property 24: usePermissions Hook Correctness", () => {
           // When platform_role is not gridmaster, org_role determines the level
           expect(permissions.role).toBe(orgRole);
           expect(permissions.level).toBe(expectedLevel);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2904,34 +2840,30 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         expect(permissions.canEditNotes).toBe(false);
         expect(permissions.canViewSchedule).toBe(true);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
   it("missing org_role defaults to user level", () => {
     fc.assert(
-      fc.property(
-        fc.constantFrom("none", undefined),
-        arbOrgId,
-        (platformRole, orgId) => {
-          const session: MockSession = {
-            user: {
-              app_metadata: {
-                platform_role: platformRole,
-                org_id: orgId,
-                // org_role is undefined
-              },
+      fc.property(fc.constantFrom("none", undefined), arbOrgId, (platformRole, orgId) => {
+        const session: MockSession = {
+          user: {
+            app_metadata: {
+              platform_role: platformRole,
+              org_id: orgId,
+              // org_role is undefined
             },
-          };
+          },
+        };
 
-          const permissions = getPermissionsFromSession(session);
+        const permissions = getPermissionsFromSession(session);
 
-          // Missing org_role should default to "user"
-          expect(permissions.role).toBe("user");
-          expect(permissions.level).toBe(0);
-        }
-      ),
-      { numRuns: 100 }
+        // Missing org_role should default to "user"
+        expect(permissions.role).toBe("user");
+        expect(permissions.level).toBe(0);
+      }),
+      { numRuns: 100 },
     );
   });
 
@@ -2943,7 +2875,7 @@ describe("Property 24: usePermissions Hook Correctness", () => {
 
         expect(permissions.orgId).toBe(expectedOrgId);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2959,7 +2891,7 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         expect(permissions.canEditNotes).toBe(permissions.level >= 1);
         expect(permissions.canViewSchedule).toBe(permissions.level >= 0);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2975,7 +2907,7 @@ describe("Property 24: usePermissions Hook Correctness", () => {
         expect(permissions.atLeast("supervisor")).toBe(permissions.level >= 1);
         expect(permissions.atLeast("user")).toBe(permissions.level >= 0);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -2988,16 +2920,16 @@ describe("Property 24: usePermissions Hook Correctness", () => {
     fc.assert(
       fc.property(
         arbMockSession,
-        fc.string({ minLength: 1, maxLength: 20 }).filter(s => !excludedStrings.includes(s)),
+        fc.string({ minLength: 1, maxLength: 20 }).filter((s) => !excludedStrings.includes(s)),
         (session, unknownRole) => {
           const permissions = getPermissionsFromSession(session);
 
           // Unknown roles default to level 0, so atLeast should return true
           // since all users have level >= 0
           expect(permissions.atLeast(unknownRole)).toBe(true);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -3029,11 +2961,10 @@ describe("Property 24: usePermissions Hook Correctness", () => {
           expect(permissions.canViewSchedule).toBe(true);
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
-
 
 // ── Property 25: Role Change Idempotency Key Uniqueness ───────────────────────
 
@@ -3062,7 +2993,7 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
         // Verify the key matches UUID v4 format
         expect(key).toMatch(UUID_V4_REGEX);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -3080,7 +3011,7 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
         const uniqueKeys = new Set(keys);
         expect(uniqueKeys.size).toBe(count);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -3093,7 +3024,7 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
         // Keys should be different
         expect(key1).not.toBe(key2);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -3116,7 +3047,7 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
           expect(key).toMatch(UUID_V4_REGEX);
         }
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -3134,7 +3065,7 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
         expect(key[18]).toBe("-");
         expect(key[23]).toBe("-");
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -3147,11 +3078,10 @@ describe("Property 25: Role Change Idempotency Key Uniqueness", () => {
         const hexPart = key.replace(/-/g, "");
         expect(hexPart).toMatch(/^[0-9a-f]{32}$/);
       }),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
-
 
 // ── Property 27: Middleware Route Protection ──────────────────────────────────
 
@@ -3166,10 +3096,7 @@ import { calculateEffectiveRole, getRoleLevel } from "../../middleware";
  * @param pathname - The requested path
  * @returns The redirect destination, or null if access is allowed
  */
-function simulateRouteProtection(
-  roleLevel: number,
-  pathname: string
-): string | null {
+function simulateRouteProtection(roleLevel: number, pathname: string): string | null {
   // Settings page: requires admin+ (level >= 2)
   if (pathname.startsWith("/settings") && roleLevel < 2) {
     return "/schedule";
@@ -3199,16 +3126,14 @@ describe("Property 27: Middleware Route Protection", () => {
     fc.constant("/settings/profile"),
     fc.constant("/settings/billing"),
     fc.constant("/settings/team"),
-    fc.stringMatching(/^\/settings\/[a-z]+$/)
+    fc.stringMatching(/^\/settings\/[a-z]+$/),
   );
-
-
 
   // Arbitrary for people paths
   const arbPeoplePath = fc.oneof(
     fc.constant("/people"),
     fc.constant("/people/"),
-    fc.stringMatching(/^\/people\/[a-z0-9-]+$/)
+    fc.stringMatching(/^\/people\/[a-z0-9-]+$/),
   );
 
   // Arbitrary for non-protected paths
@@ -3217,7 +3142,7 @@ describe("Property 27: Middleware Route Protection", () => {
     arbPeoplePath,
     fc.constant("/profile"),
     fc.constant("/home"),
-    fc.constant("/")
+    fc.constant("/"),
   );
 
   // Arbitrary for JWT claims
@@ -3240,7 +3165,7 @@ describe("Property 27: Middleware Route Protection", () => {
           const effectiveRole = calculateEffectiveRole(claims);
           expect(effectiveRole).toBe("gridmaster");
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3259,29 +3184,25 @@ describe("Property 27: Middleware Route Protection", () => {
 
             const effectiveRole = calculateEffectiveRole(claims);
             expect(effectiveRole).toBe(orgRole);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
     it("defaults to 'user' when org_role is undefined and platform_role is not 'gridmaster'", () => {
       fc.assert(
-        fc.property(
-          fc.constantFrom("none", undefined),
-          arbOrgId,
-          (platformRole, orgId) => {
-            const claims = {
-              platform_role: platformRole,
-              org_role: undefined,
-              org_id: orgId,
-            };
+        fc.property(fc.constantFrom("none", undefined), arbOrgId, (platformRole, orgId) => {
+          const claims = {
+            platform_role: platformRole,
+            org_role: undefined,
+            org_id: orgId,
+          };
 
-            const effectiveRole = calculateEffectiveRole(claims);
-            expect(effectiveRole).toBe("user");
-          }
-        ),
-        { numRuns: 100 }
+          const effectiveRole = calculateEffectiveRole(claims);
+          expect(effectiveRole).toBe("user");
+        }),
+        { numRuns: 100 },
       );
     });
   });
@@ -3295,7 +3216,7 @@ describe("Property 27: Middleware Route Protection", () => {
           expect(getRoleLevel("admin")).toBe(2);
           expect(getRoleLevel("user")).toBe(0);
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3307,12 +3228,12 @@ describe("Property 27: Middleware Route Protection", () => {
 
       fc.assert(
         fc.property(
-          fc.string({ minLength: 1, maxLength: 20 }).filter(s => !excludedStrings.includes(s)),
+          fc.string({ minLength: 1, maxLength: 20 }).filter((s) => !excludedStrings.includes(s)),
           (unknownRole) => {
             expect(getRoleLevel(unknownRole)).toBe(0);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -3320,28 +3241,24 @@ describe("Property 27: Middleware Route Protection", () => {
   describe("/settings route protection", () => {
     it("users with level < 2 are redirected from /settings to /schedule", () => {
       fc.assert(
-        fc.property(
-          fc.constantFrom("user"),
-          arbSettingsPath,
-          (orgRole, settingsPath) => {
-            const claims = {
-              platform_role: "none" as const,
-              org_role: orgRole,
-              org_id: "test-org-id",
-            };
+        fc.property(fc.constantFrom("user"), arbSettingsPath, (orgRole, settingsPath) => {
+          const claims = {
+            platform_role: "none" as const,
+            org_role: orgRole,
+            org_id: "test-org-id",
+          };
 
-            const effectiveRole = calculateEffectiveRole(claims);
-            const level = getRoleLevel(effectiveRole);
+          const effectiveRole = calculateEffectiveRole(claims);
+          const level = getRoleLevel(effectiveRole);
 
-            // Verify level is < 2
-            expect(level).toBeLessThan(2);
+          // Verify level is < 2
+          expect(level).toBeLessThan(2);
 
-            // Verify redirect to /schedule
-            const redirect = simulateRouteProtection(level, settingsPath);
-            expect(redirect).toBe("/schedule");
-          }
-        ),
-        { numRuns: 100 }
+          // Verify redirect to /schedule
+          const redirect = simulateRouteProtection(level, settingsPath);
+          expect(redirect).toBe("/schedule");
+        }),
+        { numRuns: 100 },
       );
     });
 
@@ -3365,9 +3282,9 @@ describe("Property 27: Middleware Route Protection", () => {
             // Verify no redirect (access allowed)
             const redirect = simulateRouteProtection(level, settingsPath);
             expect(redirect).toBeNull();
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3390,7 +3307,7 @@ describe("Property 27: Middleware Route Protection", () => {
           const redirect = simulateRouteProtection(level, settingsPath);
           expect(redirect).toBeNull();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -3405,7 +3322,7 @@ describe("Property 27: Middleware Route Protection", () => {
           const redirect = simulateRouteProtection(level, peoplePath);
           expect(redirect).toBeNull();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -3421,7 +3338,7 @@ describe("Property 27: Middleware Route Protection", () => {
           const redirect = simulateRouteProtection(level, path);
           expect(redirect).toBeNull();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -3444,7 +3361,7 @@ describe("Property 27: Middleware Route Protection", () => {
           const scheduleRedirect = simulateRouteProtection(level, "/schedule");
           expect(scheduleRedirect).toBeNull();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3462,7 +3379,7 @@ describe("Property 27: Middleware Route Protection", () => {
           const scheduleRedirect = simulateRouteProtection(level, "/schedule");
           expect(scheduleRedirect).toBeNull();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3483,7 +3400,7 @@ describe("Property 27: Middleware Route Protection", () => {
           const scheduleRedirect = simulateRouteProtection(level, "/schedule");
           expect(scheduleRedirect).toBeNull();
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -3509,14 +3426,13 @@ describe("Property 27: Middleware Route Protection", () => {
             } else {
               expect(redirect).toBeNull();
             }
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
 });
-
 
 // ── Property 28: Middleware Header Injection ──────────────────────────────────
 
@@ -3572,7 +3488,7 @@ describe("Property 28: Middleware Header Injection", () => {
 
           expect(headers.role).toBe(expectedEffectiveRole);
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3588,7 +3504,7 @@ describe("Property 28: Middleware Header Injection", () => {
           const headers = simulateHeaderInjection(claims);
           expect(headers.role).toBe("gridmaster");
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3607,29 +3523,25 @@ describe("Property 28: Middleware Header Injection", () => {
 
             const headers = simulateHeaderInjection(claims);
             expect(headers.role).toBe(orgRole);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
     it("header defaults to 'user' when org_role is undefined and platform_role is not 'gridmaster'", () => {
       fc.assert(
-        fc.property(
-          fc.constantFrom("none", undefined),
-          arbOrgId,
-          (platformRole, orgId) => {
-            const claims = {
-              platform_role: platformRole,
-              org_role: undefined,
-              org_id: orgId,
-            };
+        fc.property(fc.constantFrom("none", undefined), arbOrgId, (platformRole, orgId) => {
+          const claims = {
+            platform_role: platformRole,
+            org_role: undefined,
+            org_id: orgId,
+          };
 
-            const headers = simulateHeaderInjection(claims);
-            expect(headers.role).toBe("user");
-          }
-        ),
-        { numRuns: 100 }
+          const headers = simulateHeaderInjection(claims);
+          expect(headers.role).toBe("user");
+        }),
+        { numRuns: 100 },
       );
     });
   });
@@ -3647,7 +3559,7 @@ describe("Property 28: Middleware Header Injection", () => {
           const headers = simulateHeaderInjection(claims);
           expect(headers.orgId).toBe(orgId);
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3663,7 +3575,7 @@ describe("Property 28: Middleware Header Injection", () => {
           const headers = simulateHeaderInjection(claims);
           expect(headers.orgId).toBe("");
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3679,7 +3591,7 @@ describe("Property 28: Middleware Header Injection", () => {
           const headers = simulateHeaderInjection(claims);
           expect(headers.orgId).toBe("");
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
@@ -3696,7 +3608,7 @@ describe("Property 28: Middleware Header Injection", () => {
           expect(headers.role).toBe(expectedEffectiveRole);
           expect(headers.orgId).toBe(expectedOrgId);
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3716,7 +3628,7 @@ describe("Property 28: Middleware Header Injection", () => {
           // Org ID should be the value or empty string
           expect(headers.orgId).toBe(orgId ?? "");
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3739,9 +3651,9 @@ describe("Property 28: Middleware Header Injection", () => {
             expect(headers.role).toBe(orgRole);
             // Org ID should be the provided value
             expect(headers.orgId).toBe(orgId);
-          }
+          },
         ),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
 
@@ -3757,12 +3669,11 @@ describe("Property 28: Middleware Header Injection", () => {
           // They should match
           expect(headers.role).toBe(middlewareEffectiveRole);
         }),
-        { numRuns: 100 }
+        { numRuns: 100 },
       );
     });
   });
 });
-
 
 // ── Property 6: Shift Version Increment ───────────────────────────────────────
 
@@ -3797,11 +3708,12 @@ function createMockShiftUpdateSystem() {
     constructor(
       public readonly shiftId: string,
       public readonly expectedVersion: number,
-      public readonly actualVersion?: number
+      public readonly actualVersion?: number,
     ) {
       super(
-        `Optimistic lock failed for shift ${shiftId}: expected version ${expectedVersion}${actualVersion !== undefined ? `, but found version ${actualVersion}` : ""
-        }`
+        `Optimistic lock failed for shift ${shiftId}: expected version ${expectedVersion}${
+          actualVersion !== undefined ? `, but found version ${actualVersion}` : ""
+        }`,
       );
       this.name = "OptimisticLockError";
     }
@@ -3820,7 +3732,7 @@ function createMockShiftUpdateSystem() {
 
   /**
    * Simulates the updateShiftV2 function with optimistic locking.
-   * 
+   *
    * @param shiftId - The ID of the shift to update
    * @param updates - The fields to update
    * @param expectedVersion - The expected version for optimistic locking
@@ -3830,7 +3742,7 @@ function createMockShiftUpdateSystem() {
   function updateShiftV2(
     shiftId: string,
     updates: ShiftV2Update,
-    expectedVersion: number
+    expectedVersion: number,
   ): ShiftV2 {
     const shift = shifts.get(shiftId);
 
@@ -3874,15 +3786,16 @@ function createMockShiftUpdateSystem() {
 }
 
 // Arbitraries for shift testing
-const arbShiftDate = fc.tuple(
-  fc.integer({ min: 2024, max: 2025 }),
-  fc.integer({ min: 1, max: 12 }),
-  fc.integer({ min: 1, max: 28 }) // Use 28 to avoid invalid dates
-).map(([y, m, d]) => `${y}-${m.toString().padStart(2, "0")}-${d.toString().padStart(2, "0")}`);
-const arbTime = fc.tuple(
-  fc.integer({ min: 0, max: 23 }),
-  fc.integer({ min: 0, max: 59 })
-).map(([h, m]) => `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
+const arbShiftDate = fc
+  .tuple(
+    fc.integer({ min: 2024, max: 2025 }),
+    fc.integer({ min: 1, max: 12 }),
+    fc.integer({ min: 1, max: 28 }), // Use 28 to avoid invalid dates
+  )
+  .map(([y, m, d]) => `${y}-${m.toString().padStart(2, "0")}-${d.toString().padStart(2, "0")}`);
+const arbTime = fc
+  .tuple(fc.integer({ min: 0, max: 23 }), fc.integer({ min: 0, max: 59 }))
+  .map(([h, m]) => `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
 const arbEmpId = fc.option(fc.uuid(), { nil: null });
 const arbVersion = fc.integer({ min: 0, max: 1000 });
 
@@ -3937,14 +3850,14 @@ describe("Property 6: Shift Version Increment", () => {
           const updatedShift = mockSystem.updateShiftV2(
             shiftId,
             { empId: newEmpId },
-            initialVersion
+            initialVersion,
           );
 
           // Verify version incremented by exactly 1
           expect(updatedShift.version).toBe(versionBefore + 1);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -3983,7 +3896,7 @@ describe("Property 6: Shift Version Increment", () => {
             const updatedShift = mockSystem.updateShiftV2(
               shiftId,
               { empId: `emp-${i + 1}` },
-              currentVersion
+              currentVersion,
             );
 
             // Verify version incremented by exactly 1
@@ -3993,9 +3906,9 @@ describe("Property 6: Shift Version Increment", () => {
 
           // Final version should equal the number of updates
           expect(currentVersion).toBe(updateCount);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4012,7 +3925,18 @@ describe("Property 6: Shift Version Increment", () => {
         arbShiftDate,
         arbTime,
         arbTime,
-        (shiftId, orgId, userId, shiftDate, startTime, endTime, initialVersion, newDate, newStart, newEnd) => {
+        (
+          shiftId,
+          orgId,
+          userId,
+          shiftDate,
+          startTime,
+          endTime,
+          initialVersion,
+          newDate,
+          newStart,
+          newEnd,
+        ) => {
           mockSystem.reset();
 
           // Create initial shift
@@ -4035,7 +3959,7 @@ describe("Property 6: Shift Version Increment", () => {
           const updatedShift = mockSystem.updateShiftV2(
             shiftId,
             { shiftDate: newDate, startTime: newStart, endTime: newEnd },
-            initialVersion
+            initialVersion,
           );
 
           // Verify all updates applied and version incremented
@@ -4043,9 +3967,9 @@ describe("Property 6: Shift Version Increment", () => {
           expect(updatedShift.startTime).toBe(newStart);
           expect(updatedShift.endTime).toBe(newEnd);
           expect(updatedShift.version).toBe(initialVersion + 1);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4081,16 +4005,16 @@ describe("Property 6: Shift Version Increment", () => {
 
           // Attempt update with wrong version
           const wrongVersion = actualVersion + versionOffset;
-          expect(() =>
-            mockSystem.updateShiftV2(shiftId, { empId: "emp-1" }, wrongVersion)
-          ).toThrow(mockSystem.OptimisticLockError);
+          expect(() => mockSystem.updateShiftV2(shiftId, { empId: "emp-1" }, wrongVersion)).toThrow(
+            mockSystem.OptimisticLockError,
+          );
 
           // Verify shift version unchanged
           const shift = mockSystem.getShift(shiftId);
           expect(shift?.version).toBe(actualVersion);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4136,9 +4060,9 @@ describe("Property 6: Shift Version Increment", () => {
           // Verify version unchanged
           const versionAfter = mockSystem.getShift(shiftId)?.version;
           expect(versionAfter).toBe(versionBefore);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4175,7 +4099,7 @@ describe("Property 6: Shift Version Increment", () => {
           const returnedShift = mockSystem.updateShiftV2(
             shiftId,
             { empId: "emp-1" },
-            initialVersion
+            initialVersion,
           );
 
           // Verify returned shift has new version
@@ -4184,13 +4108,12 @@ describe("Property 6: Shift Version Increment", () => {
           // Verify stored shift also has new version
           const storedShift = mockSystem.getShift(shiftId);
           expect(storedShift?.version).toBe(initialVersion + 1);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
-
 
 // ── Property 7: Shift Idempotency Key Uniqueness ──────────────────────────────
 
@@ -4240,7 +4163,7 @@ function createMockShiftInsertSystem() {
   /**
    * Simulates the insertShiftV2 function with idempotency support.
    * Uses ON CONFLICT DO NOTHING behavior for duplicate idempotency keys.
-   * 
+   *
    * @param shift - The shift data to insert
    * @returns The inserted shift, or null if a duplicate idempotency key was provided
    */
@@ -4290,7 +4213,7 @@ function createMockShiftInsertSystem() {
    * Gets shifts by org_id.
    */
   function getShiftsByOrg(orgId: string): ShiftV2[] {
-    return Array.from(shifts.values()).filter(s => s.orgId === orgId);
+    return Array.from(shifts.values()).filter((s) => s.orgId === orgId);
   }
 
   /**
@@ -4298,7 +4221,7 @@ function createMockShiftInsertSystem() {
    */
   function getShiftByIdempotencyKey(orgId: string, idempotencyKey: string): ShiftV2 | undefined {
     return Array.from(shifts.values()).find(
-      s => s.orgId === orgId && s.idempotencyKey === idempotencyKey
+      (s) => s.orgId === orgId && s.idempotencyKey === idempotencyKey,
     );
   }
 
@@ -4363,9 +4286,9 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
             createdBy: userId,
           });
           expect(secondResult).toBeNull();
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4409,9 +4332,9 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           // Should only have one shift
           const shifts = mockSystem.getShiftsByOrg(orgId);
           expect(shifts).toHaveLength(1);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4448,11 +4371,11 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
               endTime,
               idempotencyKey,
               createdBy: userId,
-            })
+            }),
           ).not.toThrow();
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4499,9 +4422,9 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           // Both shifts should exist
           expect(mockSystem.getShiftsByOrg(org1Id)).toHaveLength(1);
           expect(mockSystem.getShiftsByOrg(org2Id)).toHaveLength(1);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4537,9 +4460,9 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           // All shifts should exist
           const shifts = mockSystem.getShiftsByOrg(orgId);
           expect(shifts).toHaveLength(idempotencyKeys.length);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4572,9 +4495,9 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           // All shifts should exist
           const shifts = mockSystem.getShiftsByOrg(orgId);
           expect(shifts).toHaveLength(insertCount);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4622,9 +4545,9 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
           expect(shift?.shiftDate).toBe(date1);
           expect(shift?.startTime).toBe(start1);
           expect(shift?.endTime).toBe(end1);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -4665,13 +4588,12 @@ describe("Property 7: Shift Idempotency Key Uniqueness", () => {
 
           // Total shifts should equal number of orgs
           expect(mockSystem.getAllShifts()).toHaveLength(orgIds.length);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });
-
 
 // ── Property 21: Shift RLS Enforcement ────────────────────────────────────────
 
@@ -4737,11 +4659,7 @@ function createMockShiftRLSSystem() {
   /**
    * Sets the current authenticated user context (simulates auth.uid() and claims)
    */
-  function setAuthContext(
-    userId: string | null,
-    orgId: string | null,
-    role: AllRoles
-  ) {
+  function setAuthContext(userId: string | null, orgId: string | null, role: AllRoles) {
     currentAuthUid = userId;
     currentUserOrgId = orgId;
     currentUserRole = role;
@@ -4818,7 +4736,7 @@ function createMockShiftRLSSystem() {
   function insertShift(shift: ShiftV2Insert): ShiftV2 {
     if (!currentAuthUid) {
       throw new RLSPolicyViolationError(
-        "INSERT operation rejected by RLS policy: not authenticated"
+        "INSERT operation rejected by RLS policy: not authenticated",
       );
     }
 
@@ -4826,12 +4744,12 @@ function createMockShiftRLSSystem() {
     if (!isGridmaster()) {
       if (!isSchedulerOrAbove()) {
         throw new RLSPolicyViolationError(
-          "INSERT operation rejected by RLS policy: requires scheduler role or above"
+          "INSERT operation rejected by RLS policy: requires scheduler role or above",
         );
       }
       if (shift.orgId !== currentUserOrgId) {
         throw new RLSPolicyViolationError(
-          "INSERT operation rejected by RLS policy: cannot insert shifts in other orgs"
+          "INSERT operation rejected by RLS policy: cannot insert shifts in other orgs",
         );
       }
     }
@@ -4844,8 +4762,8 @@ function createMockShiftRLSSystem() {
         // Silently ignore duplicate - ON CONFLICT DO NOTHING
         return shifts.get(
           Array.from(shifts.values()).find(
-            (s) => s.orgId === shift.orgId && s.idempotencyKey === idempotencyKey
-          )!.id
+            (s) => s.orgId === shift.orgId && s.idempotencyKey === idempotencyKey,
+          )!.id,
         )!;
       }
       idempotencyIndex.add(compositeKey);
@@ -4880,7 +4798,7 @@ function createMockShiftRLSSystem() {
   function updateShift(shiftId: string, updates: ShiftV2Update): ShiftV2 {
     if (!currentAuthUid) {
       throw new RLSPolicyViolationError(
-        "UPDATE operation rejected by RLS policy: not authenticated"
+        "UPDATE operation rejected by RLS policy: not authenticated",
       );
     }
 
@@ -4893,12 +4811,12 @@ function createMockShiftRLSSystem() {
     if (!isGridmaster()) {
       if (!isSchedulerOrAbove()) {
         throw new RLSPolicyViolationError(
-          "UPDATE operation rejected by RLS policy: requires scheduler role or above"
+          "UPDATE operation rejected by RLS policy: requires scheduler role or above",
         );
       }
       if (shift.orgId !== currentUserOrgId) {
         throw new RLSPolicyViolationError(
-          "UPDATE operation rejected by RLS policy: cannot update shifts in other orgs"
+          "UPDATE operation rejected by RLS policy: cannot update shifts in other orgs",
         );
       }
     }
@@ -4923,7 +4841,7 @@ function createMockShiftRLSSystem() {
   function deleteShift(shiftId: string): boolean {
     if (!currentAuthUid) {
       throw new RLSPolicyViolationError(
-        "DELETE operation rejected by RLS policy: not authenticated"
+        "DELETE operation rejected by RLS policy: not authenticated",
       );
     }
 
@@ -4936,12 +4854,12 @@ function createMockShiftRLSSystem() {
     if (!isGridmaster()) {
       if (!isSchedulerOrAbove()) {
         throw new RLSPolicyViolationError(
-          "DELETE operation rejected by RLS policy: requires scheduler role or above"
+          "DELETE operation rejected by RLS policy: requires scheduler role or above",
         );
       }
       if (shift.orgId !== currentUserOrgId) {
         throw new RLSPolicyViolationError(
-          "DELETE operation rejected by RLS policy: cannot delete shifts in other orgs"
+          "DELETE operation rejected by RLS policy: cannot delete shifts in other orgs",
         );
       }
     }
@@ -4983,13 +4901,9 @@ function createMockShiftRLSSystem() {
 // Arbitraries for shift RLS testing
 const arbRoleBelowScheduler = fc.constantFrom<"supervisor" | "user">("supervisor", "user");
 const arbRoleSchedulerOrAbove = fc.constantFrom<"scheduler" | "admin">("scheduler", "admin");
-const arbAllRolesForRLS = fc.constantFrom<"admin" | "scheduler" | "supervisor" | "user" | "gridmaster">(
-  "admin",
-  "scheduler",
-  "supervisor",
-  "user",
-  "gridmaster"
-);
+const arbAllRolesForRLS = fc.constantFrom<
+  "admin" | "scheduler" | "supervisor" | "user" | "gridmaster"
+>("admin", "scheduler", "supervisor", "user", "gridmaster");
 
 describe("Property 21: Shift RLS Enforcement", () => {
   /**
@@ -5030,11 +4944,11 @@ describe("Property 21: Shift RLS Enforcement", () => {
               startTime,
               endTime,
               createdBy: userId,
-            })
+            }),
           ).toThrow(RLSPolicyViolationError);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5071,12 +4985,12 @@ describe("Property 21: Shift RLS Enforcement", () => {
           mockSystem.setAuthContext(userId, orgId, role);
 
           // Attempt to update shift should throw RLS violation
-          expect(() =>
-            mockSystem.updateShift(shiftId, { empId: "emp-1" })
-          ).toThrow(RLSPolicyViolationError);
-        }
+          expect(() => mockSystem.updateShift(shiftId, { empId: "emp-1" })).toThrow(
+            RLSPolicyViolationError,
+          );
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5113,12 +5027,10 @@ describe("Property 21: Shift RLS Enforcement", () => {
           mockSystem.setAuthContext(userId, orgId, role);
 
           // Attempt to delete shift should throw RLS violation
-          expect(() =>
-            mockSystem.deleteShift(shiftId)
-          ).toThrow(RLSPolicyViolationError);
-        }
+          expect(() => mockSystem.deleteShift(shiftId)).toThrow(RLSPolicyViolationError);
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5158,9 +5070,9 @@ describe("Property 21: Shift RLS Enforcement", () => {
           const shifts = mockSystem.selectShifts();
           expect(shifts).toHaveLength(1);
           expect(shifts[0].id).toBe(shiftId);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5205,9 +5117,9 @@ describe("Property 21: Shift RLS Enforcement", () => {
 
           // Verify shift is gone
           expect(mockSystem.selectShifts()).toHaveLength(0);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5249,9 +5161,9 @@ describe("Property 21: Shift RLS Enforcement", () => {
           // DELETE should succeed
           const deleted = mockSystem.deleteShift(insertedShift.id);
           expect(deleted).toBe(true);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5300,9 +5212,9 @@ describe("Property 21: Shift RLS Enforcement", () => {
             const shifts = mockSystem.selectShifts();
             expect(shifts).toHaveLength(0);
           }
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5334,11 +5246,11 @@ describe("Property 21: Shift RLS Enforcement", () => {
               startTime,
               endTime,
               createdBy: userId,
-            })
+            }),
           ).toThrow(RLSPolicyViolationError);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5379,12 +5291,12 @@ describe("Property 21: Shift RLS Enforcement", () => {
           mockSystem.setAuthContext(userId, userOrgId, role);
 
           // Attempt to update shift in other org should throw RLS violation
-          expect(() =>
-            mockSystem.updateShift(shiftId, { empId: "emp-1" })
-          ).toThrow(RLSPolicyViolationError);
-        }
+          expect(() => mockSystem.updateShift(shiftId, { empId: "emp-1" })).toThrow(
+            RLSPolicyViolationError,
+          );
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5425,12 +5337,10 @@ describe("Property 21: Shift RLS Enforcement", () => {
           mockSystem.setAuthContext(userId, userOrgId, role);
 
           // Attempt to delete shift in other org should throw RLS violation
-          expect(() =>
-            mockSystem.deleteShift(shiftId)
-          ).toThrow(RLSPolicyViolationError);
-        }
+          expect(() => mockSystem.deleteShift(shiftId)).toThrow(RLSPolicyViolationError);
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5486,9 +5396,9 @@ describe("Property 21: Shift RLS Enforcement", () => {
           expect(allShifts[0].id).toBe(originalShift.id);
           expect(allShifts[0].empId).toBe(originalShift.empId);
           expect(allShifts[0].version).toBe(originalShift.version);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5516,11 +5426,11 @@ describe("Property 21: Shift RLS Enforcement", () => {
               startTime,
               endTime,
               createdBy: userId,
-            })
+            }),
           ).toThrow(/RLS policy/);
-        }
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5557,12 +5467,10 @@ describe("Property 21: Shift RLS Enforcement", () => {
           mockSystem.setAuthContext(userId, orgId, role);
 
           // Verify error message mentions RLS policy
-          expect(() =>
-            mockSystem.updateShift(shiftId, { empId: "emp-1" })
-          ).toThrow(/RLS policy/);
-        }
+          expect(() => mockSystem.updateShift(shiftId, { empId: "emp-1" })).toThrow(/RLS policy/);
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 
@@ -5599,12 +5507,10 @@ describe("Property 21: Shift RLS Enforcement", () => {
           mockSystem.setAuthContext(userId, orgId, role);
 
           // Verify error message mentions RLS policy
-          expect(() =>
-            mockSystem.deleteShift(shiftId)
-          ).toThrow(/RLS policy/);
-        }
+          expect(() => mockSystem.deleteShift(shiftId)).toThrow(/RLS policy/);
+        },
       ),
-      { numRuns: 100 }
+      { numRuns: 100 },
     );
   });
 });

@@ -113,23 +113,14 @@ const extendedEmployees: Employee[] = [
   },
 ];
 
-const week1 = Array.from(
-  { length: 7 },
-  (_, index) => new Date(2024, 0, 7 + index),
-);
-const week2 = Array.from(
-  { length: 7 },
-  (_, index) => new Date(2024, 0, 14 + index),
-);
+const week1 = Array.from({ length: 7 }, (_, index) => new Date(2024, 0, 7 + index));
+const week2 = Array.from({ length: 7 }, (_, index) => new Date(2024, 0, 14 + index));
 function getShiftStyleFromCodes(codes: AssignmentDefinition[]) {
   return (type: string) =>
     codes.find((code) => code.label === type || code.name === type) ?? codes[0];
 }
 
-function makeShiftAccessors(
-  codes: AssignmentDefinition[],
-  assignments: Record<string, number[]>,
-) {
+function makeShiftAccessors(codes: AssignmentDefinition[], assignments: Record<string, number[]>) {
   const codeById = new Map(codes.map((code) => [code.id, code]));
 
   return {
@@ -147,8 +138,7 @@ function makeShiftAccessors(
 
 let observedWidth = 1600;
 const originalResizeObserver = global.ResizeObserver;
-const originalGetBoundingClientRect =
-  HTMLElement.prototype.getBoundingClientRect;
+const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
 const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
 const scrollIntoViewMock = vi.fn();
 
@@ -185,23 +175,20 @@ beforeAll(() => {
     unobserve() {}
   } as typeof ResizeObserver;
 
-  HTMLElement.prototype.getBoundingClientRect =
-    function getBoundingClientRect() {
-      return {
-        width: observedWidth,
-        height: 0,
-        x: 0,
-        y: 0,
-        top: 0,
-        right: observedWidth,
-        bottom: 0,
-        left: 0,
-        toJSON: () => ({}),
-      } as DOMRect;
-    };
-  HTMLElement.prototype.scrollIntoView = function scrollIntoView(
-    ...args: unknown[]
-  ) {
+  HTMLElement.prototype.getBoundingClientRect = function getBoundingClientRect() {
+    return {
+      width: observedWidth,
+      height: 0,
+      x: 0,
+      y: 0,
+      top: 0,
+      right: observedWidth,
+      bottom: 0,
+      left: 0,
+      toJSON: () => ({}),
+    } as DOMRect;
+  };
+  HTMLElement.prototype.scrollIntoView = function scrollIntoView(...args: unknown[]) {
     scrollIntoViewMock(...args);
   };
 });
@@ -225,10 +212,7 @@ interface RenderGridOptions {
   shiftForKey?: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
   segmentsForKey?: (empId: string, date: Date) => ScheduleCellState["segments"];
-  publishedSegmentsForKey?: (
-    empId: string,
-    date: Date,
-  ) => ScheduleCellState["segments"];
+  publishedSegmentsForKey?: (empId: string, date: Date) => ScheduleCellState["segments"];
   getShiftStyle?: (type: string, focusAreaName?: string) => AssignmentDefinition;
   today?: Date;
   highlightEmpIds?: Set<string>;
@@ -244,11 +228,7 @@ interface RenderGridOptions {
   orgRoles?: NamedItem[];
   isCellInteractive?: boolean;
   canDragShifts?: boolean;
-  activeIndicatorIdsForKey?: (
-    empId: string,
-    date: Date,
-    focusAreaId?: number,
-  ) => number[];
+  activeIndicatorIdsForKey?: (empId: string, date: Date, focusAreaId?: number) => number[];
   activeFocusArea?: number | null;
   getCustomShiftTimes?: (
     empId: string,
@@ -271,10 +251,7 @@ interface RenderGridOptions {
   showPublishDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
-  publishedAbsenceTypeIdForKey?: (
-    empId: string,
-    date: Date,
-  ) => number | null;
+  publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
   publishDiffForKey?: (
     empId: string,
@@ -320,15 +297,12 @@ interface RenderGridOptions {
   onCopyCell?: NonNullable<ScheduleGridHandlers["onCopyCell"]>;
   onPasteCell?: NonNullable<ScheduleGridHandlers["onPasteCell"]>;
   onClearCell?: NonNullable<ScheduleGridHandlers["onClearCell"]>;
-  onToggleBulkDeleteCell?: NonNullable<
-    ScheduleGridHandlers["onToggleBulkDeleteCell"]
-  >;
+  onToggleBulkDeleteCell?: NonNullable<ScheduleGridHandlers["onToggleBulkDeleteCell"]>;
   onClaimOpenShift?: NonNullable<ScheduleGridHandlers["onClaimOpenShift"]>;
 }
 
 function renderGrid(options: RenderGridOptions = {}) {
-  const resolvedAssignmentDefinitions =
-    options.assignments ?? assignments;
+  const resolvedAssignmentDefinitions = options.assignments ?? assignments;
   const model = buildScheduleGridModel({
     filteredEmployees: options.filteredEmployees ?? employees,
     allEmployees: options.allEmployees ?? employees,
@@ -365,9 +339,7 @@ function renderGrid(options: RenderGridOptions = {}) {
       assignmentIdsForKey: options.assignmentIdsForKey ?? (() => [1]),
       segmentsForKey: options.segmentsForKey,
       publishedSegmentsForKey: options.publishedSegmentsForKey,
-      getShiftStyle:
-        options.getShiftStyle ??
-        getShiftStyleFromCodes(resolvedAssignmentDefinitions),
+      getShiftStyle: options.getShiftStyle ?? getShiftStyleFromCodes(resolvedAssignmentDefinitions),
       activeIndicatorIdsForKey: options.activeIndicatorIdsForKey,
       getCustomShiftTimes: options.getCustomShiftTimes,
       getPublishedCustomShiftTimes: options.getPublishedCustomShiftTimes,
@@ -403,11 +375,7 @@ function renderGrid(options: RenderGridOptions = {}) {
   };
 
   return render(
-    <ScheduleGrid
-      model={model}
-      interactionState={interactionState}
-      handlers={handlers}
-    />,
+    <ScheduleGrid model={model} interactionState={interactionState} handlers={handlers} />,
   );
 }
 
@@ -418,12 +386,8 @@ describe("ScheduleGrid", () => {
     const root = container.firstElementChild as HTMLElement;
 
     expect(root.dataset.gridFit).toBe("true");
-    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "220px",
-    );
-    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "98px",
-    );
+    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
+    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
   });
 
   it("preserves the staff column width when navigating to an empty 2-week grid", () => {
@@ -435,21 +399,15 @@ describe("ScheduleGrid", () => {
     const root = container.firstElementChild as HTMLElement;
 
     expect(root.dataset.gridFit).toBe("true");
-    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "220px",
-    );
-    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "98px",
-    );
+    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
+    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
   });
 
   it("anchors draggable shift wrappers to the full cell so pills stay centered", () => {
     renderGrid({ canDragShifts: true });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const draggable = firstCell.querySelector(
-      ".dg-draggable-shift",
-    ) as HTMLElement | null;
+    const draggable = firstCell.querySelector(".dg-draggable-shift") as HTMLElement | null;
 
     expect(draggable).not.toBeNull();
     expect(draggable?.style.position).toBe("absolute");
@@ -469,18 +427,12 @@ describe("ScheduleGrid", () => {
 
     renderGrid({
       assignments: localAssignments,
-      segmentsForKey: () => [
-        { shiftId: 1, jobId: 101, position: 0, isMentored: true },
-      ],
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
-    const badge = firstCell.querySelector(
-      '[data-mentored-badge="true"]',
-    ) as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
 
     expect(pill).not.toBeNull();
     expect(within(firstCell).getByText("D")).toBeInTheDocument();
@@ -709,23 +661,13 @@ describe("ScheduleGrid", () => {
       .getByLabelText("North schedule grid")
       .closest("[data-grid-fit]") as HTMLElement;
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const cellContent = firstCell.querySelector(
-      ".dg-grid-cell__content",
-    ) as HTMLElement | null;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
-    const badge = firstCell.querySelector(
-      '[data-publish-badge="modified"]',
-    ) as HTMLElement | null;
+    const cellContent = firstCell.querySelector(".dg-grid-cell__content") as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(root.dataset.gridFit).toBe("true");
-    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "220px",
-    );
-    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "98px",
-    );
+    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
+    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
     expect(firstCell.style.height).not.toBe("72px");
     expect(firstCell.style.zIndex).toBe("8");
     expect(cellContent?.style.zIndex).toBe("4");
@@ -738,8 +680,7 @@ describe("ScheduleGrid", () => {
     });
     expect(pill?.style.overflow).toBe("visible");
     expect(
-      Number.parseFloat(pill?.style.top ?? "0") +
-        Number.parseFloat(badge?.style.top ?? "0"),
+      Number.parseFloat(pill?.style.top ?? "0") + Number.parseFloat(badge?.style.top ?? "0"),
     ).toBeGreaterThanOrEqual(2);
     expect(pill?.style.borderColor).toBe("rgba(26, 61, 27, 0.35)");
     expect(badge?.style.top).toBe("-8px");
@@ -804,9 +745,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector(
-      '[data-publish-badge="modified"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(firstCell.style.background).toBe("var(--color-surface)");
     expect(badge?.textContent).toBe("Was N");
@@ -871,9 +810,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector(
-      '[data-publish-badge="time"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-publish-badge="time"]') as HTMLElement | null;
 
     expect(firstCell.style.height).not.toBe("72px");
     expect(
@@ -918,20 +855,14 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector(
-      '[data-draft-badge="modified"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
     const root = screen
       .getByLabelText("North schedule grid")
       .closest("[data-grid-fit]") as HTMLElement;
 
     expect(root.dataset.gridFit).toBe("true");
-    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "220px",
-    );
-    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "98px",
-    );
+    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
+    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
     expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
     expect(within(firstCell).queryByText("was: N")).not.toBeInTheDocument();
     expect(badge?.textContent).toBe("Was N");
@@ -968,12 +899,8 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
-    const badge = firstCell.querySelector("[data-draft-badge]") as
-      | HTMLElement
-      | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
+    const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
 
     expect(badge).toBeNull();
     expect(pill).toHaveStyle({
@@ -1019,9 +946,7 @@ describe("ScheduleGrid", () => {
     const pills = Array.from(
       firstCell.querySelectorAll('[data-shift-pill="multi"]'),
     ) as HTMLElement[];
-    const badge = firstCell.querySelector("[data-draft-badge]") as
-      | HTMLElement
-      | null;
+    const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
 
     expect(pills.length).toBe(2);
     expect(badge).toBeNull();
@@ -1080,9 +1005,7 @@ describe("ScheduleGrid", () => {
     const pills = Array.from(
       firstCell.querySelectorAll('[data-shift-pill="multi"]'),
     ) as HTMLElement[];
-    const badge = firstCell.querySelector("[data-draft-badge]") as
-      | HTMLElement
-      | null;
+    const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
 
     expect(pills).toHaveLength(2);
     expect(badge).toBeNull();
@@ -1139,9 +1062,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector(
-      '[data-draft-badge="modified"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was D · Supv");
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
@@ -1177,9 +1098,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector(
-      '[data-draft-badge="modified"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Changed");
     expect(badge?.style.borderRadius).toBe("3px");
@@ -1222,9 +1141,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const initialsBadge = within(firstCell).getByText("SC") as HTMLElement;
 
     expect(pill?.style.borderRadius).toBe("8px");
@@ -1275,9 +1192,7 @@ describe("ScheduleGrid", () => {
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const initialsBadge = within(firstCell).getByText("SC") as HTMLElement;
-    const crossPill = initialsBadge.closest(
-      '[data-shift-pill="multi"]',
-    ) as HTMLElement | null;
+    const crossPill = initialsBadge.closest('[data-shift-pill="multi"]') as HTMLElement | null;
 
     expect(crossPill?.style.borderRadius).toBe("6px");
     expect(crossPill?.style.paddingLeft).toBe("20px");
@@ -1331,9 +1246,7 @@ describe("ScheduleGrid", () => {
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const initialsBadge = within(firstCell).getByText("SC") as HTMLElement;
-    const crossPill = initialsBadge.closest(
-      '[data-shift-pill="multi"]',
-    ) as HTMLElement | null;
+    const crossPill = initialsBadge.closest('[data-shift-pill="multi"]') as HTMLElement | null;
 
     expect(crossPill?.style.background).toBe("var(--color-surface)");
     expect(crossPill).toHaveStyle({
@@ -1410,9 +1323,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const initialsBadge = within(firstCell).getByText("SC") as HTMLElement;
 
     expect(pill?.style.justifyContent).toBe("center");
@@ -1497,9 +1408,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const readableTextColor = getReadableTextOnSurface("#1D4ED8", "#F8FAFC");
     const readableTextColorRgb = `rgb(${parseInt(readableTextColor.slice(1, 3), 16)}, ${parseInt(readableTextColor.slice(3, 5), 16)}, ${parseInt(readableTextColor.slice(5, 7), 16)})`;
 
@@ -1544,18 +1453,12 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
-    const badge = firstCell.querySelector(
-      '[data-draft-badge="new"]',
-    ) as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-draft-badge="new"]') as HTMLElement | null;
 
     expect(badge).toBeNull();
     expect(pill?.style.background).toBe("var(--color-surface)");
-    expect(within(firstCell).getByText("SC").style.background).toBe(
-      "rgb(219, 234, 254)",
-    );
+    expect(within(firstCell).getByText("SC").style.background).toBe("rgb(219, 234, 254)");
   });
 
   it("keeps cross-focus draft modified cells on the white shift surface when show changes is on", () => {
@@ -1596,12 +1499,8 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
-    const badge = firstCell.querySelector(
-      '[data-draft-badge="modified"]',
-    ) as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was D");
     expect(pill?.style.background).toBe("var(--color-surface)");
@@ -1620,9 +1519,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector(
-      '[data-draft-badge="new"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-draft-badge="new"]') as HTMLElement | null;
 
     expect(badge).toBeNull();
   });
@@ -1664,12 +1561,8 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
-    const badge = firstCell.querySelector(
-      '[data-publish-badge="modified"]',
-    ) as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was D");
     expect(pill?.style.background).toBe("var(--color-surface)");
@@ -1725,9 +1618,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector(
-      '[data-publish-badge="modified"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was D · Supv");
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
@@ -1778,14 +1669,10 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
 
     expect(pill?.style.background).toBe("var(--color-surface)");
-    expect(within(firstCell).getByText("SC").style.background).toBe(
-      "rgb(219, 234, 254)",
-    );
+    expect(within(firstCell).getByText("SC").style.background).toBe("rgb(219, 234, 254)");
   });
 
   it("keeps historical cross-focus published edited cells on the white shift surface", () => {
@@ -1834,12 +1721,8 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
-    const badge = firstCell.querySelector(
-      '[data-publish-badge="modified"]',
-    ) as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was D");
     expect(pill?.style.background).toBe("var(--color-surface)");
@@ -1881,12 +1764,8 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const pill = firstCell.querySelector(
-      '[data-shift-pill="single"]',
-    ) as HTMLElement | null;
-    const badge = firstCell.querySelector(
-      '[data-publish-badge="modified"]',
-    ) as HTMLElement | null;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was VAC");
     expect(pill?.style.borderColor).toBe("rgba(26, 61, 27, 0.35)");
@@ -1907,9 +1786,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector(
-      '[data-draft-badge="time"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-draft-badge="time"]') as HTMLElement | null;
 
     expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
     expect(badge?.textContent).toBe("+ Time");
@@ -1918,9 +1795,7 @@ describe("ScheduleGrid", () => {
     });
     expect(badge?.style.top).toBe("-8px");
     expect(badge?.style.left).toBe("4px");
-    expect(badge?.getAttribute("aria-label")).toContain(
-      "Added custom time 08:00-16:00.",
-    );
+    expect(badge?.getAttribute("aria-label")).toContain("Added custom time 08:00-16:00.");
   });
 
   it("shows the meaningful edit badge when a draft adds a second shift alongside other edits", () => {
@@ -1964,9 +1839,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector(
-      '[data-draft-badge="time"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-draft-badge="time"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Time");
     expect(badge?.getAttribute("aria-label")).toContain(
@@ -2029,17 +1902,11 @@ describe("ScheduleGrid", () => {
     const deletedPill = firstCell.querySelector(
       '[data-shift-pill="deleted"]',
     ) as HTMLElement | null;
-    const badge = firstCell.querySelector(
-      '[data-publish-badge="deleted"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-publish-badge="deleted"]') as HTMLElement | null;
 
     expect(root.dataset.gridFit).toBe("true");
-    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "220px",
-    );
-    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "98px",
-    );
+    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
+    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
     expect(firstCell.style.height).not.toBe("72px");
     expect(badge?.textContent).toBe("Deleted");
     expect(badge).toHaveStyle({
@@ -2047,8 +1914,7 @@ describe("ScheduleGrid", () => {
     });
     expect(deletedPill?.style.overflow).toBe("visible");
     expect(
-      Number.parseFloat(deletedPill?.style.top ?? "0") +
-        Number.parseFloat(badge?.style.top ?? "0"),
+      Number.parseFloat(deletedPill?.style.top ?? "0") + Number.parseFloat(badge?.style.top ?? "0"),
     ).toBeGreaterThanOrEqual(2);
 
     expect(deletedPill?.getAttribute("aria-label")).toContain("Deleted N.");
@@ -2080,9 +1946,7 @@ describe("ScheduleGrid", () => {
     const cells = screen.getAllByRole("gridcell") as HTMLElement[];
     const firstCell = cells[0];
     const secondCell = cells[1];
-    const authorPill = firstCell.querySelector(
-      '[data-author-pill="true"]',
-    ) as HTMLElement | null;
+    const authorPill = firstCell.querySelector('[data-author-pill="true"]') as HTMLElement | null;
     const secondAuthorPill = secondCell.querySelector(
       '[data-author-pill="true"]',
     ) as HTMLElement | null;
@@ -2090,12 +1954,8 @@ describe("ScheduleGrid", () => {
       '[data-author-pill-icon="true"]',
     ) as HTMLElement | null;
 
-    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "220px",
-    );
-    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "98px",
-    );
+    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
+    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
     expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
     expect(authorPill?.style.left).toBe("5px");
     expect(authorPill?.style.bottom).toBe("5px");
@@ -2129,12 +1989,8 @@ describe("ScheduleGrid", () => {
       .getByLabelText("North schedule grid")
       .closest("[data-grid-fit]") as HTMLElement;
     expect(root.dataset.gridFit).toBe("false");
-    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "220px",
-    );
-    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "84px",
-    );
+    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
+    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("84px");
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
@@ -2278,10 +2134,7 @@ describe("ScheduleGrid", () => {
   it("does not keep a clicked cell active without external context", () => {
     renderGrid();
 
-    const [firstCell, secondCell] = screen.getAllByRole("gridcell") as [
-      HTMLElement,
-      HTMLElement,
-    ];
+    const [firstCell, secondCell] = screen.getAllByRole("gridcell") as [HTMLElement, HTMLElement];
 
     fireEvent.click(firstCell);
     expect(firstCell.dataset.active).toBeUndefined();
@@ -2331,10 +2184,8 @@ describe("ScheduleGrid", () => {
     const onActivateCell = vi.fn();
     const onToggleBulkDeleteCell = vi.fn();
     renderGrid({
-      shiftForKey: (_empId, date) =>
-        formatDateKey(date) === "2024-01-07" ? "D" : null,
-      assignmentIdsForKey: (_empId, date) =>
-        formatDateKey(date) === "2024-01-07" ? [1] : [],
+      shiftForKey: (_empId, date) => (formatDateKey(date) === "2024-01-07" ? "D" : null),
+      assignmentIdsForKey: (_empId, date) => (formatDateKey(date) === "2024-01-07" ? [1] : []),
       bulkDeleteMode: true,
       bulkSelectableCellKeys: new Set(["emp-1_2024-01-07"]),
       bulkSelectedCellKeys: new Set(["emp-1_2024-01-07"]),
@@ -2342,16 +2193,11 @@ describe("ScheduleGrid", () => {
       onToggleBulkDeleteCell,
     });
 
-    const [selectedCell, emptyCell] = screen.getAllByRole("gridcell") as [
-      HTMLElement,
-      HTMLElement,
-    ];
+    const [selectedCell, emptyCell] = screen.getAllByRole("gridcell") as [HTMLElement, HTMLElement];
 
     expect(selectedCell.dataset.bulkSelected).toBe("true");
     expect(selectedCell).toHaveAttribute("aria-selected", "true");
-    expect(
-      selectedCell.querySelector('[data-bulk-selection-indicator="true"]'),
-    ).not.toBeNull();
+    expect(selectedCell.querySelector('[data-bulk-selection-indicator="true"]')).not.toBeNull();
     const selectionRing = selectedCell.querySelector(
       '[data-bulk-selection-ring="true"]',
     ) as HTMLElement | null;
@@ -2491,19 +2337,11 @@ describe("ScheduleGrid", () => {
     ) as HTMLElement | null;
 
     expect(categoryRow).not.toBeNull();
-    expect(
-      northGrid.querySelector('[data-tally-label="Day"]'),
-    ).toBeInTheDocument();
+    expect(northGrid.querySelector('[data-tally-label="Day"]')).toBeInTheDocument();
     expect(northGrid.querySelector('[data-tally-row="category-2"]')).toBeNull();
-    expect(
-      northGrid.querySelector('[data-tally-count="1-0"]')?.textContent,
-    ).toBe("2");
-    expect(
-      northGrid.querySelector('[data-tally-count="1-1"]')?.textContent,
-    ).toBe("1");
-    expect(
-      northGrid.querySelector('[data-tally-count="1-2"]')?.textContent,
-    ).toBe("-");
+    expect(northGrid.querySelector('[data-tally-count="1-0"]')?.textContent).toBe("2");
+    expect(northGrid.querySelector('[data-tally-count="1-1"]')?.textContent).toBe("1");
+    expect(northGrid.querySelector('[data-tally-count="1-2"]')?.textContent).toBe("-");
   });
 
   it("keeps open shifts separate from footer totals", () => {
@@ -2533,9 +2371,7 @@ describe("ScheduleGrid", () => {
 
     const northGrid = screen.getByLabelText("North schedule grid");
     expect(screen.getByText("Open Shifts")).toBeInTheDocument();
-    expect(
-      northGrid.querySelector('[data-tally-count="1-0"]')?.textContent,
-    ).toBe("1");
+    expect(northGrid.querySelector('[data-tally-count="1-0"]')?.textContent).toBe("1");
   });
 
   it("colors covered category totals green and short staffing red", () => {
@@ -2579,15 +2415,9 @@ describe("ScheduleGrid", () => {
     });
 
     const northGrid = screen.getByLabelText("North schedule grid");
-    const coveredCell = northGrid.querySelector(
-      '[data-tally-count="1-0"]',
-    ) as HTMLElement;
-    const shortCell = northGrid.querySelector(
-      '[data-tally-count="1-1"]',
-    ) as HTMLElement;
-    const zeroShortCell = northGrid.querySelector(
-      '[data-tally-count="1-2"]',
-    ) as HTMLElement;
+    const coveredCell = northGrid.querySelector('[data-tally-count="1-0"]') as HTMLElement;
+    const shortCell = northGrid.querySelector('[data-tally-count="1-1"]') as HTMLElement;
+    const zeroShortCell = northGrid.querySelector('[data-tally-count="1-2"]') as HTMLElement;
 
     expect(coveredCell.dataset.tallyStatus).toBe("covered");
     expect(coveredCell.style.background).toBe("rgba(22, 163, 74, 0.12)");
@@ -2642,15 +2472,9 @@ describe("ScheduleGrid", () => {
     const northGrid = screen.getByLabelText("North schedule grid");
 
     expect(northGrid.querySelectorAll("[data-tally-row]").length).toBe(1);
-    expect(
-      northGrid.querySelector('[data-tally-count="1-0"]')?.textContent,
-    ).toBe("-");
-    expect(
-      northGrid.querySelector('[data-tally-count="1-1"]')?.textContent,
-    ).toBe("1");
-    expect(
-      northGrid.querySelector('[data-tally-count="1-2"]')?.textContent,
-    ).toBe("1");
+    expect(northGrid.querySelector('[data-tally-count="1-0"]')?.textContent).toBe("-");
+    expect(northGrid.querySelector('[data-tally-count="1-1"]')?.textContent).toBe("1");
+    expect(northGrid.querySelector('[data-tally-count="1-2"]')?.textContent).toBe("1");
   });
 
   it("keeps a section visible when it only has open shifts", () => {
@@ -2676,9 +2500,7 @@ describe("ScheduleGrid", () => {
     expect(screen.getByLabelText("North schedule grid")).toBeInTheDocument();
     expect(screen.getByText("Open Shifts")).toBeInTheDocument();
     expect(
-      screen
-        .getByLabelText("North schedule grid")
-        .querySelector("[data-tally-row]"),
+      screen.getByLabelText("North schedule grid").querySelector("[data-tally-row]"),
     ).toBeNull();
     expect(screen.queryByText("No staff added yet")).not.toBeInTheDocument();
   });
@@ -2694,9 +2516,7 @@ describe("ScheduleGrid", () => {
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const badge = firstCell.querySelector(
-      '[data-draft-badge="deleted"]',
-    ) as HTMLElement | null;
+    const badge = firstCell.querySelector('[data-draft-badge="deleted"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Deleted");
     expect(screen.queryByText("OFF")).not.toBeInTheDocument();
@@ -2726,9 +2546,7 @@ describe("ScheduleGrid", () => {
     const secondMondayRow2 = cells[columnCount + 1];
     const secondSundayRow2 = cells[columnCount + 7];
     const secondSundayRow3 = cells[columnCount * 2 + 7];
-    const splitTallyCell = northGrid.querySelector(
-      '[data-tally-count="1-7"]',
-    ) as HTMLElement;
+    const splitTallyCell = northGrid.querySelector('[data-tally-count="1-7"]') as HTMLElement;
 
     expect(secondMondayRow2.dataset.leadingDivider).toBe("light");
     expect(secondSundayRow2.dataset.leadingDivider).toBe("split");
@@ -2761,14 +2579,10 @@ describe("ScheduleGrid", () => {
     observedWidth = 1600;
     renderGrid({
       showDiffOverlay: true,
-      draftKindForKey: (_empId, date) =>
-        formatDateKey(date) === "2024-01-07" ? "modified" : null,
+      draftKindForKey: (_empId, date) => (formatDateKey(date) === "2024-01-07" ? "modified" : null),
     });
 
-    const [editedCell, nextCell] = screen.getAllByRole("gridcell") as [
-      HTMLElement,
-      HTMLElement,
-    ];
+    const [editedCell, nextCell] = screen.getAllByRole("gridcell") as [HTMLElement, HTMLElement];
 
     expect(editedCell.dataset.topDivider).toBe("dark");
     expect(nextCell.dataset.topDivider).toBeUndefined();
@@ -2778,8 +2592,7 @@ describe("ScheduleGrid", () => {
     observedWidth = 1600;
     renderGrid({
       showDiffOverlay: true,
-      draftKindForKey: (_empId, date) =>
-        formatDateKey(date) === "2024-01-07" ? "modified" : null,
+      draftKindForKey: (_empId, date) => (formatDateKey(date) === "2024-01-07" ? "modified" : null),
       openShifts: [
         {
           id: "open-1",
@@ -2818,9 +2631,7 @@ describe("ScheduleGrid", () => {
     const cells = screen.getAllByRole("gridcell") as HTMLElement[];
     const firstCell = cells[0];
     const secondCell = cells[1];
-    const authorPill = firstCell.querySelector(
-      '[data-author-pill="true"]',
-    ) as HTMLElement | null;
+    const authorPill = firstCell.querySelector('[data-author-pill="true"]') as HTMLElement | null;
     const secondAuthorPill = secondCell.querySelector(
       '[data-author-pill="true"]',
     ) as HTMLElement | null;
@@ -2828,12 +2639,8 @@ describe("ScheduleGrid", () => {
       '[data-author-pill-icon="true"]',
     ) as HTMLElement | null;
 
-    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe(
-      "220px",
-    );
-    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe(
-      "98px",
-    );
+    expect(root.style.getPropertyValue("--dg-grid-name-col-current")).toBe("220px");
+    expect(root.style.getPropertyValue("--dg-grid-col-min-current")).toBe("98px");
     expect(firstCell.style.height).toBe("var(--dg-grid-cell-height)");
     expect(authorPill?.style.left).toBe("5px");
     expect(authorPill?.style.bottom).toBe("5px");
@@ -2858,9 +2665,7 @@ describe("ScheduleGrid", () => {
       .getByLabelText("North schedule grid")
       .closest("[data-grid-fit]") as HTMLElement;
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
-    const authorPill = firstCell.querySelector(
-      '[data-author-pill="true"]',
-    ) as HTMLElement | null;
+    const authorPill = firstCell.querySelector('[data-author-pill="true"]') as HTMLElement | null;
     const authorPillIcon = firstCell.querySelector(
       '[data-author-pill-icon="true"]',
     ) as HTMLElement | null;
@@ -2977,9 +2782,7 @@ describe("ScheduleGrid", () => {
       .closest("[data-grid-fit]") as HTMLElement;
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const multiPills = firstCell.querySelectorAll('[data-shift-pill="multi"]');
-    const authorPill = firstCell.querySelector(
-      '[data-author-pill="true"]',
-    ) as HTMLElement | null;
+    const authorPill = firstCell.querySelector('[data-author-pill="true"]') as HTMLElement | null;
     const dayLabel = within(firstCell).getByText(longDayName) as HTMLElement;
     const nightLabel = within(firstCell).getByText(longNightName) as HTMLElement;
 

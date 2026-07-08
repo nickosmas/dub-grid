@@ -25,6 +25,11 @@ const ORG_FILTER_TABLES: MobileRealtimeTable[] = [
   "schedule_cell_snapshots",
   "schedule_cell_segments",
   "schedule_notes",
+  "profile_change_requests",
+  "recurring_shifts",
+  "publish_history",
+  "audit_log",
+  "impersonation_sessions",
 ];
 
 export function useMobileRealtimeInvalidation({

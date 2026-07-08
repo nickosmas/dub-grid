@@ -1,12 +1,7 @@
 "use client";
 
 import StepLayout from "../StepLayout";
-import {
-  LayoutDashboard,
-  CalendarDays,
-  Users,
-  Settings,
-} from "lucide-react";
+import { LayoutDashboard, CalendarDays, Users, Settings } from "lucide-react";
 
 interface AdminOrientationStepProps {
   onNext: () => void;
@@ -32,14 +27,11 @@ const sections = [
   {
     icon: <Settings size={22} />,
     name: "Settings",
-    desc: "Configure departments, shifts, jobs, roles, and other workspace options.",
+    desc: "Configure departments, shifts, jobs, roles, and other organization options.",
   },
 ];
 
-export default function AdminOrientationStep({
-  onNext,
-  onBack,
-}: AdminOrientationStepProps) {
+export default function AdminOrientationStep({ onNext, onBack }: AdminOrientationStepProps) {
   return (
     <StepLayout
       title="Getting Around"

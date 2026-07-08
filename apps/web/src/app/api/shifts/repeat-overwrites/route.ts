@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  createRequestSupabaseClient,
-  requireAuthenticatedUser,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
+import { validateCsrfOrigin } from "@/lib/csrf";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -13,6 +12,9 @@ const repeatOverwritesSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateCsrfOrigin(req);
+  if (csrfError) return csrfError;
+
   try {
     const auth = await requireAuthenticatedUser(req);
     if ("response" in auth) {
@@ -24,12 +26,12 @@ export async function POST(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     const parsed = repeatOverwritesSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     const dates = Array.from(new Set(parsed.data.dates)).sort();
@@ -56,9 +58,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ overwriteCount });
   } catch (error) {
     console.error("repeat overwrites POST failed", error);
-    return NextResponse.json(
-      { error: "Failed to load repeat overwrite count" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to load repeat overwrite count" }, { status: 500 });
   }
 }

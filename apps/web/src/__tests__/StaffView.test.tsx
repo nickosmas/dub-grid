@@ -31,7 +31,13 @@ const ROLES: NamedItem[] = [
   { id: 4, orgId: "org-1", name: "Mentor", abbr: "Mentor", sortOrder: 3 },
   { id: 5, orgId: "org-1", name: "CN", abbr: "CN", sortOrder: 4 },
   { id: 6, orgId: "org-1", name: "SC. Mgr.", abbr: "SC. Mgr.", sortOrder: 5 },
-  { id: 7, orgId: "org-1", name: "Activity Coordinator", abbr: "Activity Coordinator", sortOrder: 6 },
+  {
+    id: 7,
+    orgId: "org-1",
+    name: "Activity Coordinator",
+    abbr: "Activity Coordinator",
+    sortOrder: 6,
+  },
   { id: 8, orgId: "org-1", name: "SC/Asst/Act/Cor", abbr: "SC/Asst/Act/Cor", sortOrder: 7 },
 ];
 
@@ -53,7 +59,19 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ href, children, ...rest }: { href: string; children: React.ReactNode; [key: string]: unknown }) => <a href={href} {...rest}>{children}</a>,
+  default: ({
+    href,
+    children,
+    ...rest
+  }: {
+    href: string;
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
 }));
 
 vi.mock("@/components/AuthProvider", () => ({
@@ -69,16 +87,16 @@ vi.mock("@/components/ShiftPicker", () => ({
     onSelect,
     onAbsenceSelect,
   }: {
-      assignments?: Array<{ id: number; label: string }>;
-      absenceTypes?: Array<{ id: number; label: string }>;
-      orgRoles?: Array<{ id: number }>;
-      certifications?: Array<{ id: number }>;
-      onSelect: (segments: ScheduleCellSegmentInput[]) => void;
-      onAbsenceSelect?: (absenceType: { id: number; label: string }) => void;
-    }) => {
-      mockShiftPickerRender({ assignments, absenceTypes, orgRoles, certifications });
-      return (
-        <div>
+    assignments?: Array<{ id: number; label: string }>;
+    absenceTypes?: Array<{ id: number; label: string }>;
+    orgRoles?: Array<{ id: number }>;
+    certifications?: Array<{ id: number }>;
+    onSelect: (segments: ScheduleCellSegmentInput[]) => void;
+    onAbsenceSelect?: (absenceType: { id: number; label: string }) => void;
+  }) => {
+    mockShiftPickerRender({ assignments, absenceTypes, orgRoles, certifications });
+    return (
+      <div>
         {assignments.map((assignment) => (
           <button
             key={assignment.id}
@@ -96,10 +114,7 @@ vi.mock("@/components/ShiftPicker", () => ({
           </button>
         ))}
         {absenceTypes.map((absenceType) => (
-          <button
-            key={`absence-${absenceType.id}`}
-            onClick={() => onAbsenceSelect?.(absenceType)}
-          >
+          <button key={`absence-${absenceType.id}`} onClick={() => onAbsenceSelect?.(absenceType)}>
             {`absence-${absenceType.label}`}
           </button>
         ))}
@@ -130,7 +145,13 @@ vi.mock("@/components/ui/sidebar", () => {
   const passthrough = ({ children }: { children: React.ReactNode }) => <>{children}</>;
   return {
     SidebarProvider: passthrough,
-    SidebarInset: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => <main {...props}>{children}</main>,
+    SidebarInset: ({
+      children,
+      ...props
+    }: {
+      children: React.ReactNode;
+      [key: string]: unknown;
+    }) => <main {...props}>{children}</main>,
     Sidebar: () => <div data-testid="mock-sidebar" />,
     SidebarContent: passthrough,
     SidebarGroup: passthrough,
@@ -149,7 +170,14 @@ vi.mock("@base-ui/react/popover", () => {
   return {
     Popover: {
       Root: passthrough,
-      Trigger: ({ children, ...props }: { children: React.ReactNode; render?: unknown; [key: string]: unknown }) => <button {...props}>{children}</button>,
+      Trigger: ({
+        children,
+        ...props
+      }: {
+        children: React.ReactNode;
+        render?: unknown;
+        [key: string]: unknown;
+      }) => <button {...props}>{children}</button>,
       Portal: passthrough,
       Positioner: passthrough,
       Popup: ({
@@ -158,10 +186,15 @@ vi.mock("@base-ui/react/popover", () => {
       }: {
         children: React.ReactNode;
         className?:
-          | string
-          | ((state: { open: boolean; side: string; align: string }) => string | undefined);
+          string | ((state: { open: boolean; side: string; align: string }) => string | undefined);
       }) => (
-        <div className={typeof className === "function" ? className({ open: true, side: "bottom", align: "start" }) : className}>
+        <div
+          className={
+            typeof className === "function"
+              ? className({ open: true, side: "bottom", align: "start" })
+              : className
+          }
+        >
           {children}
         </div>
       ),
@@ -170,7 +203,12 @@ vi.mock("@base-ui/react/popover", () => {
       }: {
         className?:
           | string
-          | ((state: { open: boolean; side: string; align: string; uncentered: boolean }) => string | undefined);
+          | ((state: {
+              open: boolean;
+              side: string;
+              align: string;
+              uncentered: boolean;
+            }) => string | undefined);
       }) => (
         <div
           className={
@@ -259,6 +297,8 @@ const employees: Employee[] = [
     departmentIds: [],
     deptAdminIds: [],
     version: 0,
+    employeeNumber: 1001,
+    createdAt: null,
   },
   {
     id: "emp-2",
@@ -279,6 +319,8 @@ const employees: Employee[] = [
     departmentIds: [],
     deptAdminIds: [],
     version: 0,
+    employeeNumber: 1002,
+    createdAt: null,
   },
 ];
 
@@ -340,8 +382,8 @@ const defaultProps = {
   certifications: defaultCertifications,
   roles: defaultRoles,
   onSave: vi.fn(),
-  onDelete: vi.fn(),
-  onBench: vi.fn(),
+  onRemove: vi.fn(),
+  onDeactivate: vi.fn(),
   onActivate: vi.fn(),
   onAdd: vi.fn(),
   canViewEmployeeDetails: true,
@@ -378,19 +420,21 @@ describe("StaffView", () => {
 
     it("renders sortable column headers", async () => {
       renderWithProviders(<StaffView {...defaultProps} />);
-      // The # column header is clickable for seniority sort; the Name column header is clickable for name sort
-      expect(screen.getByText("#")).toBeInTheDocument();
+      // The ID column header is clickable for seniority sort; the Name column header is clickable for name sort.
+      expect(screen.getByText("ID")).toBeInTheDocument();
       expect(screen.getByText("Name")).toBeInTheDocument();
     });
 
     it("grays out empty roster export and reorder while leaving import available", async () => {
-      renderWithProviders(
-        <StaffView {...defaultProps} employees={[]} orgId="org-1" />,
-      );
+      renderWithProviders(<StaffView {...defaultProps} employees={[]} orgId="org-1" />);
 
       await waitFor(() => {
         expect(screen.getByRole("button", { name: "Import" })).toBeInTheDocument();
       });
+      // Reorder only shows on the Active tab (reordering rewrites seniority on
+      // active employees only). Default landed on the All tab after the
+      // 4-tab restructure, so switch to Active to assert the disabled state.
+      await userEvent.click(screen.getByRole("button", { name: /^Active/ }));
       expect(screen.getByRole("button", { name: "Export" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "Reorder" })).toBeDisabled();
     });
@@ -464,27 +508,33 @@ describe("StaffView", () => {
               employmentType: "part_time",
             },
           ]}
-          benchedEmployees={[
+          inactiveEmployees={[
             {
               ...employees[0],
-              id: "emp-benched",
+              id: "emp-inactive",
               employmentType: "part_time",
-              status: "benched",
+              status: "inactive",
             },
           ]}
-          terminatedEmployees={[
+          removedEmployees={[
             {
               ...employees[1],
-              id: "emp-terminated",
-              status: "terminated",
+              id: "emp-removed",
+              status: "removed",
             },
           ]}
         />,
       );
 
-      expect(within(screen.getByLabelText("On schedule staff count")).getByText("2")).toBeInTheDocument();
-      expect(within(screen.getByLabelText("Full-time staff count")).getByText("1")).toBeInTheDocument();
-      expect(within(screen.getByLabelText("Part-time staff count")).getByText("1")).toBeInTheDocument();
+      expect(
+        within(screen.getByLabelText("On schedule staff count")).getByText("2"),
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByLabelText("Full-time staff count")).getByText("1"),
+      ).toBeInTheDocument();
+      expect(
+        within(screen.getByLabelText("Part-time staff count")).getByText("1"),
+      ).toBeInTheDocument();
       expect(screen.queryByLabelText("Management staff count")).not.toBeInTheDocument();
       expect(screen.queryByLabelText("Benched staff count")).not.toBeInTheDocument();
       expect(screen.queryByLabelText("Terminated staff count")).not.toBeInTheDocument();
@@ -512,7 +562,10 @@ describe("StaffView", () => {
       );
 
       expect(screen.getByRole("link", { name: "Alice Smith" })).toHaveAttribute("href", "/profile");
-      expect(screen.getByRole("link", { name: "Bob Jones" })).toHaveAttribute("href", "/people/emp-2");
+      expect(screen.getByRole("link", { name: "Bob Jones" })).toHaveAttribute(
+        "href",
+        "/people/emp-2",
+      );
     });
   });
 
@@ -618,7 +671,9 @@ describe("StaffView", () => {
 
   describe("Recurring permissions", () => {
     it("hides the Recurring Shifts section when recurring view permission is absent", async () => {
-      renderWithProviders(<StaffView {...defaultProps} orgId="org-1" canViewRecurringShifts={false} />);
+      renderWithProviders(
+        <StaffView {...defaultProps} orgId="org-1" canViewRecurringShifts={false} />,
+      );
       expect(await screen.findByText("Alice Smith")).toBeInTheDocument();
       expect(screen.queryByText("Recurring Shifts")).not.toBeInTheDocument();
     });
@@ -635,7 +690,7 @@ describe("StaffView", () => {
       );
 
       expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
-      expect(screen.getAllByRole("gridcell")[0]).toHaveAttribute("tabindex", "-1");
+      expect((await screen.findAllByRole("gridcell"))[0]).toHaveAttribute("tabindex", "-1");
       expect(screen.queryByRole("button", { name: "Save Draft" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Save Changes" })).not.toBeInTheDocument();
     });
@@ -676,15 +731,13 @@ describe("StaffView", () => {
 
       expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
 
-      await user.click(screen.getAllByRole("gridcell")[0]);
+      await user.click((await screen.findAllByRole("gridcell"))[0]);
       await user.click(screen.getByRole("button", { name: "pick-D" }));
       await user.click(screen.getByRole("button", { name: "Save Changes" }));
       const confirmDialog = await screen.findByRole("dialog", {
         name: "Save Recurring Schedule Changes?",
       });
-      await user.click(
-        within(confirmDialog).getByRole("button", { name: "Save Changes" }),
-      );
+      await user.click(within(confirmDialog).getByRole("button", { name: "Save Changes" }));
 
       expect(mockedUpsertRecurringShift).toHaveBeenCalledTimes(1);
       expect(mockedUpsertRecurringShift).toHaveBeenCalledWith(
@@ -745,7 +798,7 @@ describe("StaffView", () => {
       );
 
       expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
-      await user.click(screen.getAllByRole("gridcell")[0]);
+      await user.click((await screen.findAllByRole("gridcell"))[0]);
 
       expect(mockShiftPickerRender).toHaveBeenCalled();
       const lastCall = mockShiftPickerRender.mock.calls.at(-1)?.[0] as {
@@ -793,7 +846,7 @@ describe("StaffView", () => {
 
       expect(await screen.findByText("Recurring Shifts")).toBeInTheDocument();
 
-      await user.click(screen.getAllByRole("gridcell")[0]);
+      await user.click((await screen.findAllByRole("gridcell"))[0]);
       expect(screen.getByRole("button", { name: "pick-D" })).toBeInTheDocument();
 
       act(() => {
@@ -801,9 +854,7 @@ describe("StaffView", () => {
       });
 
       await waitFor(() => {
-        expect(
-          screen.queryByRole("button", { name: "pick-D" }),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: "pick-D" })).not.toBeInTheDocument();
       });
     });
   });
@@ -815,18 +866,29 @@ describe("Property-based tests", () => {
   const arbUniqueEmployees = fc
     .array(
       fc.record({
-        firstName: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0 && /[a-zA-Z]/.test(s)),
-        lastName: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0 && /[a-zA-Z]/.test(s)),
+        firstName: fc
+          .string({ minLength: 1, maxLength: 20 })
+          .filter((s) => s.trim().length > 0 && /[a-zA-Z]/.test(s)),
+        lastName: fc
+          .string({ minLength: 1, maxLength: 20 })
+          .filter((s) => s.trim().length > 0 && /[a-zA-Z]/.test(s)),
         employmentType: fc.constant("full_time" as const),
         status: fc.constant("active" as const),
         statusChangedAt: fc.constant(null as string | null),
         statusNote: fc.constant(""),
-        certificationId: fc.oneof(fc.constant(null as number | null), fc.constantFrom(...DESIGNATIONS.map((d) => d.id))),
-        roleIds: fc.array(fc.constantFrom(...ROLES.map((r) => r.id))).map(ids => [...new Set(ids)]),
+        certificationId: fc.oneof(
+          fc.constant(null as number | null),
+          fc.constantFrom(...DESIGNATIONS.map((d) => d.id)),
+        ),
+        roleIds: fc
+          .array(fc.constantFrom(...ROLES.map((r) => r.id)))
+          .map((ids) => [...new Set(ids)]),
         seniority: fc.integer({ min: 1, max: 999 }),
-        focusAreaIds: fc.array(fc.integer({ min: 1, max: 10 }), {
-          minLength: 1,
-        }).map(ids => [...new Set(ids)]),
+        focusAreaIds: fc
+          .array(fc.integer({ min: 1, max: 10 }), {
+            minLength: 1,
+          })
+          .map((ids) => [...new Set(ids)]),
         phone: fc.string(),
         email: fc.string(),
         contactNotes: fc.string(),
@@ -855,15 +917,17 @@ describe("Property-based tests", () => {
             certifications={defaultCertifications}
             roles={defaultRoles}
             onSave={vi.fn()}
-            onDelete={vi.fn()}
-            onBench={vi.fn()}
+            onRemove={vi.fn()}
+            onDeactivate={vi.fn()}
             onActivate={vi.fn()}
             onAdd={vi.fn()}
           />,
         );
 
         // Seniority sort is the default — no interaction needed
-        const tableContainer = container.querySelector('[data-testid="staff-table"]') as HTMLElement;
+        const tableContainer = container.querySelector(
+          '[data-testid="staff-table"]',
+        ) as HTMLElement;
 
         // Table uses <table> with <tbody>; each row is a <tr>
         const tbody = tableContainer.querySelector("tbody") as HTMLElement;
@@ -891,64 +955,63 @@ describe("Property-based tests", () => {
     );
   });
 
-  it(
-    "name sort produces non-decreasing alphabetical sequence",
-    { timeout: 30000 },
-    async () => {
-      // Validates: Requirements 5.5
-      // Use a dedicated arbitrary with unique ids to avoid React key conflicts
+  it("name sort produces non-decreasing alphabetical sequence", { timeout: 30000 }, async () => {
+    // Validates: Requirements 5.5
+    // Use a dedicated arbitrary with unique ids to avoid React key conflicts
 
-      await fc.assert(
-        fc.asyncProperty(arbUniqueEmployees, async (emps) => {
-          // The component sorts by firstName then lastName.
-          // Verify the rendered order matches that sort.
-          const expected = [...emps].sort(
-            (a, b) => a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName),
-          );
+    await fc.assert(
+      fc.asyncProperty(arbUniqueEmployees, async (emps) => {
+        // The component sorts by firstName then lastName.
+        // Verify the rendered order matches that sort.
+        const expected = [...emps].sort(
+          (a, b) => a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName),
+        );
 
-          const { unmount, container } = renderWithProviders(
-            <StaffView
-              employees={emps}
-              focusAreas={[]}
-              certifications={defaultCertifications}
-              roles={defaultRoles}
-              onSave={vi.fn()}
-              onDelete={vi.fn()}
-              onBench={vi.fn()}
-              onActivate={vi.fn()}
-              onAdd={vi.fn()}
-            />,
-          );
+        const { unmount, container } = renderWithProviders(
+          <StaffView
+            employees={emps}
+            focusAreas={[]}
+            certifications={defaultCertifications}
+            roles={defaultRoles}
+            onSave={vi.fn()}
+            onRemove={vi.fn()}
+            onDeactivate={vi.fn()}
+            onActivate={vi.fn()}
+            onAdd={vi.fn()}
+            canViewEmployeeDetails
+            canManageEmployees
+          />,
+        );
 
-          // Click the "Name" column header to sort by name
-          const tableContainer = container.querySelector('[data-testid="staff-table"]') as HTMLElement;
-          const nameHeader = tableContainer.querySelector("th:nth-child(2)") as HTMLElement;
-          await userEvent.click(nameHeader);
+        // Click the "Name" column header to sort by name
+        const tableContainer = container.querySelector(
+          '[data-testid="staff-table"]',
+        ) as HTMLElement;
+        const nameHeader = tableContainer.querySelector("th:nth-child(2)") as HTMLElement;
+        await userEvent.click(nameHeader);
 
-          // Table uses <table> with <tbody>; each row is a <tr>
-          const tbody = tableContainer.querySelector("tbody") as HTMLElement;
-          const rows = Array.from(tbody.querySelectorAll("tr"));
+        // Table uses <table> with <tbody>; each row is a <tr>
+        const tbody = tableContainer.querySelector("tbody") as HTMLElement;
+        const rows = Array.from(tbody.querySelectorAll("tr"));
 
-          // Each row's second <td> contains the name cell
-          // Inside: <div> > <Avatar/> + <div> > <div> > <a>Name</a>
-          const names = rows.map((row) => {
-            const nameCell = row.querySelectorAll("td")[1] as HTMLElement;
-            const link = nameCell.querySelector("a") as HTMLElement;
-            return link?.textContent ?? "";
-          });
+        // Each row's second <td> contains the name cell
+        // Inside: <div> > <Avatar/> + <div> > <div> > <a>Name</a>
+        const names = rows.map((row) => {
+          const nameCell = row.querySelectorAll("td")[1] as HTMLElement;
+          const link = nameCell.querySelector("a") as HTMLElement;
+          return link?.textContent ?? "";
+        });
 
-          unmount();
+        unmount();
 
-          // Compare rendered order against expected order (firstName then lastName)
-          const expectedNames = expected.map((e) => `${e.firstName} ${e.lastName}`.trim());
-          for (let i = 0; i < expectedNames.length; i++) {
-            if (names[i] !== expectedNames[i]) return false;
-          }
-          return true;
-        }),
-        { numRuns: 30 },
-      );
-    },
-  );
-
+        // Compare rendered order against expected order (firstName then lastName)
+        const expectedNames = expected.map((e) => `${e.firstName} ${e.lastName}`.trim());
+        for (let i = 0; i < expectedNames.length; i++) {
+          if (names[i] !== expectedNames[i]) return false;
+        }
+        return true;
+      }),
+      { numRuns: 30 },
+    );
+  });
 });

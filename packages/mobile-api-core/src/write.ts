@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { MobileNotificationBulkBody } from "@dubgrid/contracts";
 
 export class MobileApiRefreshError extends Error {
   constructor(message = "Unable to refresh unread notification count") {
@@ -20,12 +21,8 @@ export type MobilePushTokenContext = {
   };
 };
 
-async function readUnreadNotificationCount(
-  userClient: SupabaseClient,
-): Promise<number> {
-  const unreadCountResult = await userClient.rpc(
-    "get_unread_notification_count",
-  );
+async function readUnreadNotificationCount(userClient: SupabaseClient): Promise<number> {
+  const unreadCountResult = await userClient.rpc("get_unread_notification_count");
   if (unreadCountResult.error) {
     throw unreadCountResult.error;
   }
@@ -53,9 +50,7 @@ export async function markMobileNotificationRead(
       unreadCount,
     };
   } catch (error) {
-    throw new MobileApiRefreshError(
-      error instanceof Error ? error.message : undefined,
-    );
+    throw new MobileApiRefreshError(error instanceof Error ? error.message : undefined);
   }
 }
 
@@ -75,9 +70,46 @@ export async function markAllMobileNotificationsRead(
       unreadCount,
     };
   } catch (error) {
-    throw new MobileApiRefreshError(
-      error instanceof Error ? error.message : undefined,
-    );
+    throw new MobileApiRefreshError(error instanceof Error ? error.message : undefined);
+  }
+}
+
+export async function bulkMutateMobileNotifications(
+  auth: MobileNotificationMutationContext,
+  input: MobileNotificationBulkBody,
+): Promise<{ success: true; unreadCount: number; updatedCount: number }> {
+  const { ids, action } = input;
+
+  const patch =
+    action === "read"
+      ? { read_at: new Date().toISOString() }
+      : action === "unread"
+        ? { read_at: null }
+        : action === "archive"
+          ? { archived_at: new Date().toISOString() }
+          : { archived_at: null };
+
+  const { error: mutationError, count } = await auth.userClient
+    .from("notifications")
+    .update(patch, { count: "exact" })
+    .in("id", ids);
+
+  if (mutationError) {
+    throw mutationError;
+  }
+
+  const updatedCount = count ?? 0;
+
+  try {
+    const unreadCount = await readUnreadNotificationCount(auth.userClient);
+
+    return {
+      success: true,
+      unreadCount,
+      updatedCount,
+    };
+  } catch (error) {
+    throw new MobileApiRefreshError(error instanceof Error ? error.message : undefined);
   }
 }
 

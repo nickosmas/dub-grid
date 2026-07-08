@@ -191,8 +191,7 @@ describe("syncSubscriptionToDb", () => {
         line_items: [{ price: "price_123", quantity: 9 }],
         success_url:
           "http://localhost:3000/settings?section=org-billing&billing=success&stripe_checkout_session_id={CHECKOUT_SESSION_ID}",
-        cancel_url:
-          "http://localhost:3000/settings?section=org-billing&billing=canceled",
+        cancel_url: "http://localhost:3000/settings?section=org-billing&billing=canceled",
       }),
     );
   });
@@ -225,17 +224,12 @@ describe("syncSubscriptionToDb", () => {
     });
     const { syncCheckoutSessionToDb } = await import("./stripe");
 
-    await syncCheckoutSessionToDb(
-      { from: serviceFrom },
-      "cs_test_123",
-      ORG_ID,
-      {
-        actor: {
-          id: "user-1",
-          email: "owner@example.com",
-        },
+    await syncCheckoutSessionToDb({ from: serviceFrom }, "cs_test_123", ORG_ID, {
+      actor: {
+        id: "user-1",
+        email: "owner@example.com",
       },
-    );
+    });
 
     expect(checkoutSessionsRetrieve).toHaveBeenCalledWith("cs_test_123", {
       expand: ["subscription"],

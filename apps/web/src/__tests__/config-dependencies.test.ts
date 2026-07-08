@@ -111,8 +111,7 @@ describe("config dependency checks", () => {
     });
 
     const firstSelectCall = scheduleCellsBuilder.select.mock.calls[0] as unknown as
-      | [string]
-      | undefined;
+      [string] | undefined;
     const projection = normalizeWhitespace(firstSelectCall?.[0] ?? "");
     expect(projection).toContain("segments:schedule_cell_segments( shift_id, job_id )");
     expect(projection).not.toMatch(/job_id\s*,\s*\)/);

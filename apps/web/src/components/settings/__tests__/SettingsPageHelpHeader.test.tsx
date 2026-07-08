@@ -67,9 +67,11 @@ vi.mock("@/components/ui/sidebar", () => {
       render?: React.ReactElement;
       children?: React.ReactNode;
     }) =>
-      render
-        ? React.cloneElement(render, undefined, children)
-        : <button type="button">{children}</button>,
+      render ? (
+        React.cloneElement(render, undefined, children)
+      ) : (
+        <button type="button">{children}</button>
+      ),
   };
 });
 
@@ -186,7 +188,7 @@ describe("SettingsPage title help", () => {
 
     expect(
       screen.getByText(
-        "Jobs can be scheduled or general and can restrict qualification.",
+        "Define responsibilities like Supervisor, Mentor, Nurse, and Office, including assignment rules and grid visibility.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();
@@ -199,7 +201,7 @@ describe("SettingsPage title help", () => {
 
     expect(
       screen.queryByText(
-        "Jobs can be scheduled or general and can restrict qualification.",
+        "Define responsibilities like Supervisor, Mentor, Nurse, and Office, including assignment rules and grid visibility.",
       ),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Help" })).not.toBeInTheDocument();

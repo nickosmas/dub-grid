@@ -9,12 +9,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import {
-  StyleSheet,
-  Text,
-  View,
-  type GestureResponderEvent,
-} from "react-native";
+import { StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetworkStatus } from "./NetworkStateProvider";
 import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
@@ -116,24 +111,27 @@ export function ToastProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  const pushToast = useCallback((toast: ToastInput) => {
-    setQueue((current) => {
-      if (isOffline) {
-        return current;
-      }
+  const pushToast = useCallback(
+    (toast: ToastInput) => {
+      setQueue((current) => {
+        if (isOffline) {
+          return current;
+        }
 
-      if (
-        toast.dedupeKey &&
-        (activeToast?.dedupeKey === toast.dedupeKey ||
-          current.some((queuedToast) => queuedToast.dedupeKey === toast.dedupeKey))
-      ) {
-        return current;
-      }
+        if (
+          toast.dedupeKey &&
+          (activeToast?.dedupeKey === toast.dedupeKey ||
+            current.some((queuedToast) => queuedToast.dedupeKey === toast.dedupeKey))
+        ) {
+          return current;
+        }
 
-      idRef.current += 1;
-      return [...current, { ...toast, id: idRef.current }];
-    });
-  }, [activeToast, isOffline]);
+        idRef.current += 1;
+        return [...current, { ...toast, id: idRef.current }];
+      });
+    },
+    [activeToast, isOffline],
+  );
 
   useEffect(() => {
     if (activeToast || queue.length === 0) {
@@ -221,11 +219,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
             ]}
           >
             <View style={styles.toastMain}>
-              <Ionicons
-                color={offlinePalette.iconColor}
-                name={offlinePalette.iconName}
-                size={20}
-              />
+              <Ionicons color={offlinePalette.iconColor} name={offlinePalette.iconName} size={20} />
               <View style={styles.toastCopy}>
                 <Text style={styles.toastTitle}>{OFFLINE_TOAST_TITLE}</Text>
                 <Text style={styles.toastMessage}>{OFFLINE_TOAST_MESSAGE}</Text>

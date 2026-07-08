@@ -2,11 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "types": [
-      "expo-router/types",
-      "@testing-library/jest-dom",
-      "vitest/globals"
-    ]
+    "types": ["expo-router/types", "@testing-library/jest-dom", "vitest/globals"]
   },
   "include": ["app/**/*.ts", "app/**/*.tsx", "src/**/*.ts", "src/**/*.tsx"]
 }

@@ -4,20 +4,35 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@/lib/utils";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
+import { indefiniteArticle } from "@dubgrid/domain";
 import type { TimeRange } from "@/lib/schedule-logic";
-import { EditModalState, AssignmentDefinition, ShiftCategory, JobDefinition, AbsenceType, IndicatorType, SeriesScope, SeriesFrequency, FocusArea, NamedItem, DraftKind, ShiftDisplayMode, Employee, ScheduleCellInput, ShiftJobSegment } from "@/types";
+import {
+  EditModalState,
+  AssignmentDefinition,
+  ShiftCategory,
+  JobDefinition,
+  AbsenceType,
+  IndicatorType,
+  SeriesScope,
+  SeriesFrequency,
+  FocusArea,
+  NamedItem,
+  DraftKind,
+  ShiftDisplayMode,
+  Employee,
+  ScheduleCellInput,
+  ShiftJobSegment,
+} from "@/types";
 import CustomSelect from "./CustomSelect";
 import ShiftPicker from "./ShiftPicker";
-import {
-  buildAssignableShiftDisplayMap,
-  buildShiftDisplayParts,
-} from "@/lib/assignable-shifts";
+import { buildAssignableShiftDisplayMap, buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
 import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
+import { Switch } from "@/components/ui/switch";
 import { Check, ChevronLeft, ChevronRight, User } from "lucide-react";
 import {
   buildShiftDiffDescriptors,
@@ -40,7 +55,7 @@ interface ShiftEditPanelProps {
   onSelect: (input: ScheduleCellInput | null, seriesScope?: SeriesScope) => void;
   onClose: () => void;
   allowShiftEdits?: boolean;
-  canEditNotes?: boolean;
+  canEditScheduleIndicators?: boolean;
   getActiveIndicatorIds?: (focusAreaId: number) => number[];
   onNoteToggle?: (indicatorTypeId: number, active: boolean, focusAreaId: number) => void;
   /** Series ID if the current shift belongs to a repeating series */
@@ -121,11 +136,7 @@ interface ShiftEditPanelProps {
   /** True when the target shift is already in progress or in the past. */
   isShiftStarted?: (empId: string, date: Date) => boolean;
   /** True when a specific chronological segment is already in progress or in the past. */
-  isShiftSegmentStarted?: (
-    empId: string,
-    date: Date,
-    segmentIndex: number,
-  ) => boolean;
+  isShiftSegmentStarted?: (empId: string, date: Date, segmentIndex: number) => boolean;
   /** Returns time ranges used to detect swap conflicts. */
   getShiftTimeRanges?: (empId: string, date: Date) => TimeRange[];
   /** Returns focus area IDs required by the published shift on a given date. */
@@ -156,7 +167,11 @@ interface ShiftEditPanelProps {
 }
 
 // ── Time helpers ────────────────────────────────────────────────────────────
-function parseTo12h(time24: string | null | undefined): { hour: string; minute: string; period: "AM" | "PM" } {
+function parseTo12h(time24: string | null | undefined): {
+  hour: string;
+  minute: string;
+  period: "AM" | "PM";
+} {
   if (!time24) return { hour: "", minute: "00", period: "AM" };
   // Handle pipe-delimited multi-shift times — use first segment
   const seg = time24.split("|")[0];
@@ -265,41 +280,36 @@ function darkenColor(color: string, amount = 0.25): string {
 // ── Pipe-delimited per-sub-shift time helpers ─────────────────────────────
 function parseMultiTimes(time: string | null | undefined, count: number): (string | null)[] {
   if (!time) return Array(count).fill(null);
-  const parts = time.split('|');
+  const parts = time.split("|");
   return Array.from({ length: count }, (_, i) => parts[i] || null);
 }
 
-function getPanelDiffBadgeBackground(
-  kind: ShiftDiffBadgeDescriptor['kind'],
-): string {
+function getPanelDiffBadgeBackground(kind: ShiftDiffBadgeDescriptor["kind"]): string {
   switch (kind) {
-    case 'new':
-      return 'var(--color-success-text)';
+    case "new":
+      return "var(--color-success-text)";
     default:
-      return 'var(--color-warning)';
+      return "var(--color-warning)";
   }
 }
 
 const shiftEditCardOuterRadius = "var(--dg-radius-md)";
 const shiftEditCardInnerRadius = "calc(var(--dg-radius-md) - 2px)";
 
-function getPanelDiffBorder(args: {
-  diffKind: ShiftDiffBorderKind;
-  fallback: string;
-}): string {
+function getPanelDiffBorder(args: { diffKind: ShiftDiffBorderKind; fallback: string }): string {
   const { diffKind, fallback } = args;
-  if (diffKind === 'new') {
+  if (diffKind === "new") {
     return `2px dashed var(--color-success-text)`;
   }
-  if (diffKind === 'modified') {
+  if (diffKind === "modified") {
     return `2px dashed var(--color-warning)`;
   }
   return fallback;
 }
 
 function joinMultiTimes(times: (string | null)[]): string | null {
-  if (times.every(t => !t)) return null;
-  return times.map(t => t ?? '').join('|');
+  if (times.every((t) => !t)) return null;
+  return times.map((t) => t ?? "").join("|");
 }
 
 function getFirstTimeSegment(time: string | null | undefined): string | null {
@@ -309,13 +319,13 @@ function getFirstTimeSegment(time: string | null | undefined): string | null {
 }
 
 function timeToMinutes(t: string): number {
-  const [h, m] = t.split(':').map(Number);
+  const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 }
 
 // ── Per-pill custom time editor (custom dropdown views, immediate save) ───
-const HOURS = [1,2,3,4,5,6,7,8,9,10,11,12];
-const MINUTES = ["00","05","10","15","20","25","30","35","40","45","50","55"];
+const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
 
 function TimeDropdown({
   value,
@@ -477,18 +487,47 @@ function PillTimeEditor({
           data-tour="edit-panel-custom-time"
           onClick={() => startEditing()}
           style={{
-            display: "flex", alignItems: "center", gap: 5, fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-subtle)", background: "none",
-            border: "1px dashed var(--color-border)", borderRadius: "var(--dg-radius-md)",
-            padding: "6px 10px", cursor: "pointer", fontFamily: "inherit",
-            width: "100%", justifyContent: "center", marginTop: 8,
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--color-text-subtle)",
+            background: "none",
+            border: "1px dashed var(--color-border)",
+            borderRadius: "var(--dg-radius-md)",
+            padding: "6px 10px",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            width: "100%",
+            justifyContent: "center",
+            marginTop: 8,
           }}
         >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
           </svg>
           Custom time
-          {(defaultStart || defaultEnd) && <span style={{ opacity: 0.6 }}>· {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}{calcTimeDuration(defaultStart, defaultEnd) ? ` (${calcTimeDuration(defaultStart, defaultEnd)})` : ""}</span>}
+          {(defaultStart || defaultEnd) && (
+            <span style={{ opacity: 0.6 }}>
+              ·{" "}
+              {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null]
+                .filter(Boolean)
+                .join(" – ")}
+              {calcTimeDuration(defaultStart, defaultEnd)
+                ? ` (${calcTimeDuration(defaultStart, defaultEnd)})`
+                : ""}
+            </span>
+          )}
         </button>
       </Hint>
     );
@@ -498,17 +537,55 @@ function PillTimeEditor({
   if (hasCustomTime && !editing) {
     const duration = calcTimeDuration(customStart ?? null, customEnd ?? null);
     return (
-      <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "var(--dg-radius-md)", padding: "10px", marginTop: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-          <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
+      <div
+        style={{
+          background: "var(--color-bg)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--dg-radius-md)",
+          padding: "10px",
+          marginTop: 8,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 4,
+          }}
+        >
+          <span
+            style={{
+              fontSize: "var(--dg-fs-badge)",
+              fontWeight: 700,
+              color: "var(--color-text-secondary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+            }}
+          >
+            Custom Time
+          </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-secondary)" }}>
+            <span
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 600,
+                color: "var(--color-text-secondary)",
+              }}
+            >
               {fmt12h(customStart)} – {fmt12h(customEnd)}
             </span>
             {duration && (
-              <span style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-muted)", marginLeft: 8, fontWeight: 600 }}>
+              <span
+                style={{
+                  fontSize: "var(--dg-fs-badge)",
+                  color: "var(--color-text-muted)",
+                  marginLeft: 8,
+                  fontWeight: 600,
+                }}
+              >
                 ({duration})
               </span>
             )}
@@ -516,12 +593,38 @@ function PillTimeEditor({
           <div style={{ display: "flex", gap: 6 }}>
             <button
               onClick={() => startEditing()}
-              style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-brand)", background: "var(--color-brand-bg)", border: "1px solid var(--color-brand-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
-            >Edit</button>
+              style={{
+                fontSize: "var(--dg-fs-badge)",
+                color: "var(--color-brand)",
+                background: "var(--color-brand-bg)",
+                border: "1px solid var(--color-brand-border)",
+                borderRadius: 6,
+                cursor: "pointer",
+                padding: "4px 10px",
+                fontFamily: "inherit",
+                fontWeight: 600,
+              }}
+            >
+              Edit
+            </button>
             <button
-              onClick={() => { onRemove(); }}
-              style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-danger)", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
-            >Remove</button>
+              onClick={() => {
+                onRemove();
+              }}
+              style={{
+                fontSize: "var(--dg-fs-badge)",
+                color: "var(--color-danger)",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 6,
+                cursor: "pointer",
+                padding: "4px 10px",
+                fontFamily: "inherit",
+                fontWeight: 600,
+              }}
+            >
+              Remove
+            </button>
           </div>
         </div>
       </div>
@@ -530,61 +633,212 @@ function PillTimeEditor({
 
   // State 3: Editing — show the dropdowns
   return (
-    <div style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)", borderRadius: "var(--dg-radius-md)", padding: "10px", marginTop: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>Custom Time</span>
+    <div
+      style={{
+        background: "var(--color-bg)",
+        border: "1px solid var(--color-border)",
+        borderRadius: "var(--dg-radius-md)",
+        padding: "10px",
+        marginTop: 8,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 10,
+        }}
+      >
+        <span
+          style={{
+            fontSize: "var(--dg-fs-badge)",
+            fontWeight: 700,
+            color: "var(--color-text-secondary)",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+          }}
+        >
+          Custom Time
+        </span>
         <div style={{ display: "flex", gap: 6 }}>
           <button
             onClick={handleCancel}
-            style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-secondary)", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
-          >Cancel</button>
+            style={{
+              fontSize: "var(--dg-fs-badge)",
+              color: "var(--color-text-secondary)",
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-border)",
+              borderRadius: 6,
+              cursor: "pointer",
+              padding: "4px 10px",
+              fontFamily: "inherit",
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </button>
           {hasCustomTime && (
             <button
-              onClick={() => { onRemove(); setEditing(false); }}
-              style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-danger)", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit", fontWeight: 600 }}
-            >Remove</button>
+              onClick={() => {
+                onRemove();
+                setEditing(false);
+              }}
+              style={{
+                fontSize: "var(--dg-fs-badge)",
+                color: "var(--color-danger)",
+                background: "var(--color-surface)",
+                border: "1px solid var(--color-border)",
+                borderRadius: 6,
+                cursor: "pointer",
+                padding: "4px 10px",
+                fontFamily: "inherit",
+                fontWeight: 600,
+              }}
+            >
+              Remove
+            </button>
           )}
         </div>
       </div>
 
       {/* Start row */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 8 }}>
-        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)", width: 40, flexShrink: 0 }}>START</span>
-        <TimeDropdown value={s.hour} options={hourOptions} onChange={(v) => updateStart(v, s.minute, s.period)} width={50} placeholder="--" />
-        <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)" }}>:</span>
-        <TimeDropdown value={s.minute} options={minuteOptions} onChange={(v) => updateStart(s.hour, v, s.period)} width={50} />
-        <TimeDropdown value={s.period} options={periodOptions} onChange={(v) => updateStart(s.hour, s.minute, v as "AM" | "PM")} width={54} />
+        <span
+          style={{
+            fontSize: "var(--dg-fs-badge)",
+            fontWeight: 700,
+            color: "var(--color-text-subtle)",
+            width: 40,
+            flexShrink: 0,
+          }}
+        >
+          START
+        </span>
+        <TimeDropdown
+          value={s.hour}
+          options={hourOptions}
+          onChange={(v) => updateStart(v, s.minute, s.period)}
+          width={64}
+          placeholder="--"
+        />
+        <span
+          style={{
+            fontWeight: 700,
+            color: "var(--color-text-muted)",
+            fontSize: "var(--dg-fs-caption)",
+          }}
+        >
+          :
+        </span>
+        <TimeDropdown
+          value={s.minute}
+          options={minuteOptions}
+          onChange={(v) => updateStart(s.hour, v, s.period)}
+          width={64}
+        />
+        <TimeDropdown
+          value={s.period}
+          options={periodOptions}
+          onChange={(v) => updateStart(s.hour, s.minute, v as "AM" | "PM")}
+          width={68}
+        />
       </div>
 
       {/* End row */}
       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color: "var(--color-text-subtle)", width: 40, flexShrink: 0 }}>END</span>
-        <TimeDropdown value={e.hour} options={hourOptions} onChange={(v) => updateEnd(v, e.minute, e.period)} width={50} placeholder="--" />
-        <span style={{ fontWeight: 700, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-caption)" }}>:</span>
-        <TimeDropdown value={e.minute} options={minuteOptions} onChange={(v) => updateEnd(e.hour, v, e.period)} width={50} />
-        <TimeDropdown value={e.period} options={periodOptions} onChange={(v) => updateEnd(e.hour, e.minute, v as "AM" | "PM")} width={54} />
+        <span
+          style={{
+            fontSize: "var(--dg-fs-badge)",
+            fontWeight: 700,
+            color: "var(--color-text-subtle)",
+            width: 40,
+            flexShrink: 0,
+          }}
+        >
+          END
+        </span>
+        <TimeDropdown
+          value={e.hour}
+          options={hourOptions}
+          onChange={(v) => updateEnd(v, e.minute, e.period)}
+          width={64}
+          placeholder="--"
+        />
+        <span
+          style={{
+            fontWeight: 700,
+            color: "var(--color-text-muted)",
+            fontSize: "var(--dg-fs-caption)",
+          }}
+        >
+          :
+        </span>
+        <TimeDropdown
+          value={e.minute}
+          options={minuteOptions}
+          onChange={(v) => updateEnd(e.hour, v, e.period)}
+          width={64}
+        />
+        <TimeDropdown
+          value={e.period}
+          options={periodOptions}
+          onChange={(v) => updateEnd(e.hour, e.minute, v as "AM" | "PM")}
+          width={68}
+        />
       </div>
 
       {/* Duration display */}
       {calcTimeDuration(localStart, localEnd) && !hasTimeError && (
-        <div style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-muted)", marginTop: 8, fontWeight: 600 }}>
-          Duration: <span style={{ color: "var(--color-text-secondary)" }}>{calcTimeDuration(localStart, localEnd)}</span>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-badge)",
+            color: "var(--color-text-muted)",
+            marginTop: 8,
+            fontWeight: 600,
+          }}
+        >
+          Duration:{" "}
+          <span style={{ color: "var(--color-text-secondary)" }}>
+            {calcTimeDuration(localStart, localEnd)}
+          </span>
         </div>
       )}
 
       {/* Validation errors */}
       {hasTimeError && (
-        <div style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-badge)", fontWeight: 600, marginTop: 6 }}>
+        <div
+          style={{
+            color: "var(--color-danger)",
+            fontSize: "var(--dg-fs-badge)",
+            fontWeight: 600,
+            marginTop: 6,
+          }}
+        >
           Start and end time cannot be the same
         </div>
       )}
       {isStartTooEarly && minTime && (
-        <div style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-badge)", fontWeight: 600, marginTop: 6 }}>
+        <div
+          style={{
+            color: "var(--color-danger)",
+            fontSize: "var(--dg-fs-badge)",
+            fontWeight: 600,
+            marginTop: 6,
+          }}
+        >
           Start cannot be before {fmt12h(minTime)}
         </div>
       )}
       {isEndTooLate && maxTime && (
-        <div style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-badge)", fontWeight: 600, marginTop: 6 }}>
+        <div
+          style={{
+            color: "var(--color-danger)",
+            fontSize: "var(--dg-fs-badge)",
+            fontWeight: 600,
+            marginTop: 6,
+          }}
+        >
           End cannot be after {fmt12h(maxTime)}
         </div>
       )}
@@ -605,7 +859,7 @@ export default function ShiftEditPanel({
   onSelect,
   onClose,
   allowShiftEdits = true,
-  canEditNotes = false,
+  canEditScheduleIndicators = false,
   getActiveIndicatorIds,
   onNoteToggle,
   seriesId,
@@ -663,24 +917,22 @@ export default function ShiftEditPanel({
   );
   const isMobile = useMediaQuery(MOBILE);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
-  const [pendingDelete, setPendingDelete] = useState<{ type: "all" } | { type: "pill"; index: number } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<
+    { type: "all" } | { type: "pill"; index: number } | null
+  >(null);
 
   const hasActiveShift = !!(currentShift && currentShift !== "OFF");
   const isAbsence = currentAbsenceTypeId != null;
   const [showPicker, setShowPicker] = useState(!hasActiveShift);
   const [showRepeatForm, setShowRepeatForm] = useState(false);
-  const [activeRequestMode, setActiveRequestMode] = useState<
-    EditModalState["requestMode"] | null
-  >(modal.requestMode ?? null);
-  const [showCoverageCalloffOptions, setShowCoverageCalloffOptions] = useState(
-    false,
+  const [activeRequestMode, setActiveRequestMode] = useState<EditModalState["requestMode"] | null>(
+    modal.requestMode ?? null,
   );
+  const [showCoverageCalloffOptions, setShowCoverageCalloffOptions] = useState(false);
   const [showPickupTargetOptions, setShowPickupTargetOptions] = useState(false);
-  const [selectedRequesterSegmentIndex, setSelectedRequesterSegmentIndex] =
-    useState(0);
+  const [selectedRequesterSegmentIndex, setSelectedRequesterSegmentIndex] = useState(0);
   const [swapViewDate, setSwapViewDate] = useState(formatDateKey(modal.date));
-  const [hasExplicitSwapDateSelection, setHasExplicitSwapDateSelection] =
-    useState(false);
+  const [hasExplicitSwapDateSelection, setHasExplicitSwapDateSelection] = useState(false);
   const [swapWeekStartDate, setSwapWeekStartDate] = useState(
     getCalendarWeekStart(formatDateKey(modal.date)),
   );
@@ -713,8 +965,7 @@ export default function ShiftEditPanel({
       }
     | null
   >(null);
-  const [isSubmittingRequestConfirmation, setIsSubmittingRequestConfirmation] =
-    useState(false);
+  const [isSubmittingRequestConfirmation, setIsSubmittingRequestConfirmation] = useState(false);
   const repeatFormRef = useRef<RepeatFormHandle | null>(null);
   const activeAbsenceTypes = absenceTypes.filter((at) => !at.archivedAt);
   const requestShiftDate = formatDateKey(modal.date);
@@ -726,15 +977,14 @@ export default function ShiftEditPanel({
   const requesterShiftLabel =
     currentShift && currentShift !== "OFF"
       ? currentShift
-      : shiftForKey?.(modal.empId, modal.date) ?? "";
+      : (shiftForKey?.(modal.empId, modal.date) ?? "");
   const getSwapShiftLabel = useCallback(
     (employeeId: string, date: Date) =>
       shiftNameForKey?.(employeeId, date) ?? shiftForKey?.(employeeId, date) ?? "",
     [shiftForKey, shiftNameForKey],
   );
   const focusAreaNameById = useMemo(
-    () =>
-      new Map((focusAreas ?? []).map((focusArea) => [focusArea.id, focusArea.name])),
+    () => new Map((focusAreas ?? []).map((focusArea) => [focusArea.id, focusArea.name])),
     [focusAreas],
   );
 
@@ -757,18 +1007,13 @@ export default function ShiftEditPanel({
     }
     return record;
   });
-  const hasPublishedBaseline =
-    publishedAssignmentIds.length > 0 || publishedAbsenceTypeId != null;
+  const hasPublishedBaseline = publishedAssignmentIds.length > 0 || publishedAbsenceTypeId != null;
   const panelDiff = useMemo(
     () =>
       buildShiftDiffDescriptors({
         before: {
-          assignmentIds: hasPublishedBaseline
-            ? publishedAssignmentIds
-            : initialAssignmentIds,
-          absenceTypeId: hasPublishedBaseline
-            ? publishedAbsenceTypeId
-            : initialAbsenceTypeId,
+          assignmentIds: hasPublishedBaseline ? publishedAssignmentIds : initialAssignmentIds,
+          absenceTypeId: hasPublishedBaseline ? publishedAbsenceTypeId : initialAbsenceTypeId,
           timeRanges: hasPublishedBaseline
             ? expandDelimitedTimeRanges(
                 publishedCustomStartTime,
@@ -790,8 +1035,9 @@ export default function ShiftEditPanel({
             currentAssignmentIds.length,
           ),
         },
-        beforeShiftLabels: (
-          hasPublishedBaseline ? publishedAssignmentIds : initialAssignmentIds
+        beforeShiftLabels: (hasPublishedBaseline
+          ? publishedAssignmentIds
+          : initialAssignmentIds
         ).map((assignmentId) => assignableShiftDisplayMap.get(assignmentId) ?? "?"),
         afterShiftLabels: currentAssignmentIds.map(
           (assignmentId) => assignableShiftDisplayMap.get(assignmentId) ?? "?",
@@ -802,7 +1048,7 @@ export default function ShiftEditPanel({
         resolveAbsenceLabel: (absenceTypeId) => {
           const absenceType = absenceTypes.find((item) => item.id === absenceTypeId);
           if (!absenceType) return "?";
-          return isNameMode ? (absenceType.name || absenceType.label) : absenceType.label;
+          return isNameMode ? absenceType.name || absenceType.label : absenceType.label;
         },
       }),
     [
@@ -844,8 +1090,9 @@ export default function ShiftEditPanel({
     currentShift !== initialShift ||
     (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId ||
     !segmentsMatchInitial();
-  const hasTimeEdit = (customStartTime ?? null) !== initialCustomStartTime
-    || (customEndTime ?? null) !== initialCustomEndTime;
+  const hasTimeEdit =
+    (customStartTime ?? null) !== initialCustomStartTime ||
+    (customEndTime ?? null) !== initialCustomEndTime;
   const hasNoteEdit = (() => {
     if (!getActiveIndicatorIds) return false;
     for (const [faIdStr, initTypes] of Object.entries(initialNotesByFocusArea)) {
@@ -865,9 +1112,9 @@ export default function ShiftEditPanel({
     if ((currentAbsenceTypeId ?? null) !== initialAbsenceTypeId) {
       const resolveLabel = (shift: string | null, absId: number | null): string | null => {
         if (absId != null) {
-          const at = absenceTypes.find(a => a.id === absId);
+          const at = absenceTypes.find((a) => a.id === absId);
           if (!at) return null;
-          return isNameMode ? (at.name || at.label) : `${at.name} (${at.label})`;
+          return isNameMode ? at.name || at.label : `${at.name} (${at.label})`;
         }
         return shift && shift !== "OFF" ? shift : null;
       };
@@ -941,7 +1188,7 @@ export default function ShiftEditPanel({
     const parts: string[] = [];
     for (let i = 0; i < pillCount; i++) {
       if (initStarts[i] === curStarts[i] && initEnds[i] === curEnds[i]) continue;
-      const label = currentAssignmentIds[i] != null ? codeLabel(currentAssignmentIds[i]) : '?';
+      const label = currentAssignmentIds[i] != null ? codeLabel(currentAssignmentIds[i]) : "?";
       const hadPillTime = initStarts[i] != null || initEnds[i] != null;
       const hasPillTime = curStarts[i] != null || curEnds[i] != null;
       if (!hadPillTime && hasPillTime) {
@@ -949,7 +1196,9 @@ export default function ShiftEditPanel({
       } else if (hadPillTime && !hasPillTime) {
         parts.push(`${label}: removed custom time`);
       } else {
-        parts.push(`${label}: ${fmt12h(initStarts[i])} \u2013 ${fmt12h(initEnds[i])} \u2192 ${fmt12h(curStarts[i])} \u2013 ${fmt12h(curEnds[i])}`);
+        parts.push(
+          `${label}: ${fmt12h(initStarts[i])} \u2013 ${fmt12h(initEnds[i])} \u2192 ${fmt12h(curStarts[i])} \u2013 ${fmt12h(curEnds[i])}`,
+        );
       }
     }
     return parts.length > 0 ? `Time: ${parts.join("; ")}` : null;
@@ -962,13 +1211,13 @@ export default function ShiftEditPanel({
       const curTypes = getActiveIndicatorIds(Number(faIdStr));
       for (const id of curTypes) {
         if (!initTypes.includes(id)) {
-          const name = indicatorTypes.find(ind => ind.id === id)?.name ?? "?";
+          const name = indicatorTypes.find((ind) => ind.id === id)?.name ?? "?";
           tokens.push(`+${name}`);
         }
       }
       for (const id of initTypes) {
         if (!curTypes.includes(id)) {
-          const name = indicatorTypes.find(ind => ind.id === id)?.name ?? "?";
+          const name = indicatorTypes.find((ind) => ind.id === id)?.name ?? "?";
           tokens.push(`\u2212${name}`);
         }
       }
@@ -981,8 +1230,8 @@ export default function ShiftEditPanel({
   const noteSummary = hasNoteEdit ? describeNoteChange() : null;
   const confirmBlocked = isStale || (enforceConflicts && overlapWarnings.length > 0);
 
-	  function buildPanelInput(args: {
-	    segments: Array<Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">>;
+  function buildPanelInput(args: {
+    segments: Array<Pick<ShiftJobSegment, "shiftId" | "jobId" | "position" | "isMentored">>;
     absenceTypeId: number | null;
     customStartTime: string | null;
     customEndTime: string | null;
@@ -1017,17 +1266,14 @@ export default function ShiftEditPanel({
           ? getFirstTimeSegment(args.customStartTime)
           : args.customStartTime,
       customEndTime:
-        args.segments.length === 1
-          ? getFirstTimeSegment(args.customEndTime)
-          : args.customEndTime,
+        args.segments.length === 1 ? getFirstTimeSegment(args.customEndTime) : args.customEndTime,
       seriesId: seriesId ?? null,
       fromRecurring,
     };
-	  }
+  }
 
   const isMentoredAssignment =
-    currentSegments.length > 0 &&
-    currentSegments.every((segment) => segment.isMentored === true);
+    currentSegments.length > 0 && currentSegments.every((segment) => segment.isMentored === true);
 
   function handleMentoredToggleAtIndex(segmentIndex: number, nextMentored: boolean) {
     onSelect(
@@ -1052,10 +1298,7 @@ export default function ShiftEditPanel({
 
   function handleUndo() {
     // Revert absence type if it changed
-    if (
-      (currentAbsenceTypeId ?? null) !== initialAbsenceTypeId ||
-      currentShift !== initialShift
-    ) {
+    if ((currentAbsenceTypeId ?? null) !== initialAbsenceTypeId || currentShift !== initialShift) {
       onSelect(
         buildPanelInput({
           segments: initialSegments,
@@ -1086,12 +1329,15 @@ export default function ShiftEditPanel({
   }
 
   // Resolve effective default times: shift code custom times → category times
-  function resolveDefaultTimes(assignment: AssignmentDefinition | undefined): { start: string | null; end: string | null } {
+  function resolveDefaultTimes(assignment: AssignmentDefinition | undefined): {
+    start: string | null;
+    end: string | null;
+  } {
     if (assignment?.defaultStartTime && assignment?.defaultEndTime) {
       return { start: assignment.defaultStartTime, end: assignment.defaultEndTime };
     }
     if (assignment?.categoryId && shiftCategories.length > 0) {
-      const cat = shiftCategories.find(c => c.id === assignment.categoryId);
+      const cat = shiftCategories.find((c) => c.id === assignment.categoryId);
       if (cat?.startTime && cat?.endTime) {
         return { start: cat.startTime, end: cat.endTime };
       }
@@ -1100,12 +1346,15 @@ export default function ShiftEditPanel({
   }
 
   // Compute custom-time bounds from the shift code's category (±1hr buffer)
-  function getTimeBounds(assignment: AssignmentDefinition | undefined): { minTime: string | null; maxTime: string | null } {
+  function getTimeBounds(assignment: AssignmentDefinition | undefined): {
+    minTime: string | null;
+    maxTime: string | null;
+  } {
     let windowStart: string | null = null;
     let windowEnd: string | null = null;
 
     if (assignment?.categoryId && shiftCategories.length > 0) {
-      const cat = shiftCategories.find(c => c.id === assignment.categoryId);
+      const cat = shiftCategories.find((c) => c.id === assignment.categoryId);
       windowStart = cat?.startTime ?? null;
       windowEnd = cat?.endTime ?? null;
     }
@@ -1125,21 +1374,22 @@ export default function ShiftEditPanel({
 
   const firstShiftEndTime: string | null = (() => {
     if (!isAddingSecondShift) return null;
-    const firstCode = assignments.find(sc => sc.id === firstShiftId);
+    const firstCode = assignments.find((sc) => sc.id === firstShiftId);
     return resolveDefaultTimes(firstCode).end;
   })();
 
-  const pickerAssignmentDefinitions = isAddingSecondShift && firstShiftEndTime
-    ? assignments.filter(sc => {
-        // Never show the already-selected first shift
-        if (sc.id === firstShiftId) return false;
-        if (sc.isGeneral) return false;
-        const { start } = resolveDefaultTimes(sc);
-        if (!start) return false;
-        // Candidate must start at or after first shift ends (prevents overlap + same-time)
-        return timeToMinutes(start) >= timeToMinutes(firstShiftEndTime);
-      })
-    : assignments;
+  const pickerAssignmentDefinitions =
+    isAddingSecondShift && firstShiftEndTime
+      ? assignments.filter((sc) => {
+          // Never show the already-selected first shift
+          if (sc.id === firstShiftId) return false;
+          if (sc.isGeneral) return false;
+          const { start } = resolveDefaultTimes(sc);
+          if (!start) return false;
+          // Candidate must start at or after first shift ends (prevents overlap + same-time)
+          return timeToMinutes(start) >= timeToMinutes(firstShiftEndTime);
+        })
+      : assignments;
 
   const pickerAbsenceTypes = isAddingSecondShift ? [] : absenceTypes;
 
@@ -1155,9 +1405,10 @@ export default function ShiftEditPanel({
   const primaryFocusAreaId = modal.empFocusAreaIds[0] ?? 0;
   const [activeTab] = useState<number>(primaryFocusAreaId);
 
-  const currentLabels = typeof currentShift === "string" && currentShift
-    ? currentShift.split("/").filter((l) => l !== "OFF")
-    : [];
+  const currentLabels =
+    typeof currentShift === "string" && currentShift
+      ? currentShift.split("/").filter((l) => l !== "OFF")
+      : [];
 
   function getSegmentSortTime(segment: ShiftJobSegment): string {
     return segment.startTime ?? "99:99:99";
@@ -1170,17 +1421,12 @@ export default function ShiftEditPanel({
         const timeComparison = getSegmentSortTime(left.segment).localeCompare(
           getSegmentSortTime(right.segment),
         );
-        return timeComparison === 0
-          ? left.originalIndex - right.originalIndex
-          : timeComparison;
+        return timeComparison === 0 ? left.originalIndex - right.originalIndex : timeComparison;
       })
       .map(({ segment }, index) => ({ segment, segmentIndex: index }));
   }
 
-  function getSpelledOutSegmentLabel(
-    segment: ShiftJobSegment,
-    fallbackLabel: string,
-  ): string {
+  function getSpelledOutSegmentLabel(segment: ShiftJobSegment, fallbackLabel: string): string {
     const explicitShiftName = segment.shiftName?.trim();
     if (explicitShiftName) {
       return explicitShiftName;
@@ -1192,13 +1438,11 @@ export default function ShiftEditPanel({
         : null) ??
       assignments.find(
         (candidate) =>
-          (candidate.shiftId ?? candidate.categoryId ?? null) ===
-            (segment.shiftId ?? null) &&
+          (candidate.shiftId ?? candidate.categoryId ?? null) === (segment.shiftId ?? null) &&
           candidate.jobId === segment.jobId,
       ) ??
       null;
-    const shiftId =
-      segment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
+    const shiftId = segment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
     const shift =
       shiftId != null
         ? (shiftCategories.find((candidate) => candidate.id === shiftId) ?? null)
@@ -1247,9 +1491,8 @@ export default function ShiftEditPanel({
     [isShiftSegmentStarted, modal.date, modal.empId],
   );
   const firstRequestableRequesterSegmentIndex =
-    requesterSegmentOptions.find(
-      (option) => !isRequesterSegmentStarted(option.segmentIndex),
-    )?.segmentIndex ?? 0;
+    requesterSegmentOptions.find((option) => !isRequesterSegmentStarted(option.segmentIndex))
+      ?.segmentIndex ?? 0;
   const requesterSegmentIndexForRequest =
     requesterSegmentOptions.length > 1 ? selectedRequesterSegmentIndex : undefined;
 
@@ -1259,12 +1502,9 @@ export default function ShiftEditPanel({
     displayMode: ShiftDisplayMode = shiftDisplayMode,
   ) {
     const assignment =
-      (codeId != null
-        ? assignments.find((candidate) => candidate.id === codeId)
-        : undefined) ??
+      (codeId != null ? assignments.find((candidate) => candidate.id === codeId) : undefined) ??
       assignments.find(
-        (candidate) =>
-          candidate.label === fallbackLabel || candidate.name === fallbackLabel,
+        (candidate) => candidate.label === fallbackLabel || candidate.name === fallbackLabel,
       ) ??
       null;
 
@@ -1281,12 +1521,11 @@ export default function ShiftEditPanel({
     const shiftCategoryId = assignment.shiftId ?? assignment.categoryId ?? null;
     const shiftCategory =
       shiftCategoryId != null
-        ? shiftCategories.find((category) => category.id === shiftCategoryId) ??
-          null
+        ? (shiftCategories.find((category) => category.id === shiftCategoryId) ?? null)
         : null;
     const job =
       assignment.jobId != null
-        ? jobs.find((candidate) => candidate.id === assignment.jobId) ?? null
+        ? (jobs.find((candidate) => candidate.id === assignment.jobId) ?? null)
         : null;
 
     return {
@@ -1353,7 +1592,6 @@ export default function ShiftEditPanel({
       }
     );
   }
-
 
   const sectionLabel: React.CSSProperties = {
     marginBottom: 8,
@@ -1457,56 +1695,52 @@ export default function ShiftEditPanel({
     [assignments],
   );
 
-  const getEligibleSwapEmployeesForDate = useCallback((date: string) => {
-    if (!canRenderSwap || !isRequestableShift) {
-      return [];
-    }
+  const getEligibleSwapEmployeesForDate = useCallback(
+    (date: string) => {
+      if (!canRenderSwap || !isRequestableShift) {
+        return [];
+      }
 
-    if (date < todayIso()) {
-      return [];
-    }
+      if (date < todayIso()) {
+        return [];
+      }
 
-    const viewDateObj = new Date(`${date}T00:00:00`);
-    const requestDateObj = new Date(`${requestShiftDate}T00:00:00`);
-    const requesterShiftFocusAreaIds =
-      getShiftFocusAreaIds?.(modal.empId, requestDateObj) ??
-      getFallbackRequiredFocusAreaIds(currentAssignmentIds);
+      const viewDateObj = new Date(`${date}T00:00:00`);
+      const requestDateObj = new Date(`${requestShiftDate}T00:00:00`);
+      const requesterShiftFocusAreaIds =
+        getShiftFocusAreaIds?.(modal.empId, requestDateObj) ??
+        getFallbackRequiredFocusAreaIds(currentAssignmentIds);
 
-    return employees.filter((employee) => {
-      const targetShiftFocusAreaIds =
-        getShiftFocusAreaIds?.(employee.id, viewDateObj) ?? [];
+      return employees.filter((employee) => {
+        const targetShiftFocusAreaIds = getShiftFocusAreaIds?.(employee.id, viewDateObj) ?? [];
 
-      return (
-        employee.id !== modal.empId &&
-        !employee.archivedAt &&
-        employee.status === "active" &&
-        isRequestableShift(employee.id, viewDateObj) &&
-        !isShiftStarted?.(employee.id, viewDateObj) &&
-        canWorkRequiredFocusAreas(
-          modal.empFocusAreaIds,
-          targetShiftFocusAreaIds,
-        ) &&
-        canWorkRequiredFocusAreas(
-          employee.focusAreaIds,
-          requesterShiftFocusAreaIds,
-        ) &&
-        !hasSwapTimeConflict(employee.id, date)
-      );
-    });
-  }, [
-    canRenderSwap,
-    canWorkRequiredFocusAreas,
-    currentAssignmentIds,
-    employees,
-    getFallbackRequiredFocusAreaIds,
-    getShiftFocusAreaIds,
-    hasSwapTimeConflict,
-    isRequestableShift,
-    isShiftStarted,
-    modal.empFocusAreaIds,
-    modal.empId,
-    requestShiftDate,
-  ]);
+        return (
+          employee.id !== modal.empId &&
+          !employee.archivedAt &&
+          employee.status === "active" &&
+          isRequestableShift(employee.id, viewDateObj) &&
+          !isShiftStarted?.(employee.id, viewDateObj) &&
+          canWorkRequiredFocusAreas(modal.empFocusAreaIds, targetShiftFocusAreaIds) &&
+          canWorkRequiredFocusAreas(employee.focusAreaIds, requesterShiftFocusAreaIds) &&
+          !hasSwapTimeConflict(employee.id, date)
+        );
+      });
+    },
+    [
+      canRenderSwap,
+      canWorkRequiredFocusAreas,
+      currentAssignmentIds,
+      employees,
+      getFallbackRequiredFocusAreaIds,
+      getShiftFocusAreaIds,
+      hasSwapTimeConflict,
+      isRequestableShift,
+      isShiftStarted,
+      modal.empFocusAreaIds,
+      modal.empId,
+      requestShiftDate,
+    ],
+  );
 
   const swapNavigationDates = useMemo(() => {
     const loadedDates = [...new Set(availableSwapDates ?? [])]
@@ -1536,24 +1770,14 @@ export default function ShiftEditPanel({
     return weekStarts.sort();
   }, [getEligibleSwapEmployeesForDate, requestShiftDate, swapNavigationDates]);
   const previousEligibleSwapWeekStart =
-    [...eligibleSwapWeekStarts].reverse().find(
-      (weekStart) => weekStart < swapWeekStartDate,
-    ) ?? null;
-  const nextEligibleSwapWeekStart =
-    eligibleSwapWeekStarts.find((weekStart) => weekStart > swapWeekStartDate) ??
+    [...eligibleSwapWeekStarts].reverse().find((weekStart) => weekStart < swapWeekStartDate) ??
     null;
-  const swapWeekDates = useMemo(
-    () => getWeekDates(swapWeekStartDate),
-    [swapWeekStartDate],
-  );
+  const nextEligibleSwapWeekStart =
+    eligibleSwapWeekStarts.find((weekStart) => weekStart > swapWeekStartDate) ?? null;
+  const swapWeekDates = useMemo(() => getWeekDates(swapWeekStartDate), [swapWeekStartDate]);
   const swapWeekCounts = useMemo(
     () =>
-      new Map(
-        swapWeekDates.map((date) => [
-          date,
-          getEligibleSwapEmployeesForDate(date).length,
-        ]),
-      ),
+      new Map(swapWeekDates.map((date) => [date, getEligibleSwapEmployeesForDate(date).length])),
     [getEligibleSwapEmployeesForDate, swapWeekDates],
   );
   const firstEligibleSwapDate = useMemo(
@@ -1565,75 +1789,73 @@ export default function ShiftEditPanel({
   );
   const swapViewDateIsInWeek = swapWeekDates.includes(swapViewDate);
   const activeSwapViewDate =
-    hasExplicitSwapDateSelection && swapViewDateIsInWeek
-      ? swapViewDate
-      : firstEligibleSwapDate;
+    hasExplicitSwapDateSelection && swapViewDateIsInWeek ? swapViewDate : firstEligibleSwapDate;
   const eligibleSwapEmployees = useMemo(
     () => getEligibleSwapEmployeesForDate(activeSwapViewDate),
     [activeSwapViewDate, getEligibleSwapEmployeesForDate],
   );
 
-  const getTargetedPickupTargetsForDate = useCallback((date: string) => {
-    if (!getAbsenceTypeIdForKey) {
-      return [];
-    }
+  const getTargetedPickupTargetsForDate = useCallback(
+    (date: string) => {
+      if (!getAbsenceTypeIdForKey) {
+        return [];
+      }
 
-    const requestDateObj = new Date(`${date}T00:00:00`);
-    const requesterShiftFocusAreaIds =
-      getShiftFocusAreaIds?.(modal.empId, requestDateObj) ??
-      getFallbackRequiredFocusAreaIds(currentAssignmentIds);
+      const requestDateObj = new Date(`${date}T00:00:00`);
+      const requesterShiftFocusAreaIds =
+        getShiftFocusAreaIds?.(modal.empId, requestDateObj) ??
+        getFallbackRequiredFocusAreaIds(currentAssignmentIds);
 
-    return employees
-      .flatMap((employee) => {
-        const absenceTypeId = getAbsenceTypeIdForKey(employee.id, requestDateObj);
-        if (
-          employee.id === modal.empId ||
-          employee.archivedAt ||
-          employee.status !== "active" ||
-          absenceTypeId == null ||
-          !canWorkRequiredFocusAreas(
-            employee.focusAreaIds,
-            requesterShiftFocusAreaIds,
-          )
-        ) {
-          return [];
-        }
+      return employees
+        .flatMap((employee) => {
+          const absenceTypeId = getAbsenceTypeIdForKey(employee.id, requestDateObj);
+          if (
+            employee.id === modal.empId ||
+            employee.archivedAt ||
+            employee.status !== "active" ||
+            absenceTypeId == null ||
+            !canWorkRequiredFocusAreas(employee.focusAreaIds, requesterShiftFocusAreaIds)
+          ) {
+            return [];
+          }
 
-        const absenceType =
-          absenceTypes.find((candidate) => candidate.id === absenceTypeId) ?? null;
+          const absenceType =
+            absenceTypes.find((candidate) => candidate.id === absenceTypeId) ?? null;
 
-        return [
-          {
-            employee,
-            absenceType,
-            absenceTypeId,
-            absenceTypeLabel: getAbsenceTypeDisplayName(absenceType),
-          },
-        ];
-      })
-      .sort((left, right) => {
-        const seniorityComparison =
-          (left.employee.seniority ?? Number.MAX_SAFE_INTEGER) -
-          (right.employee.seniority ?? Number.MAX_SAFE_INTEGER);
+          return [
+            {
+              employee,
+              absenceType,
+              absenceTypeId,
+              absenceTypeLabel: getAbsenceTypeDisplayName(absenceType),
+            },
+          ];
+        })
+        .sort((left, right) => {
+          const seniorityComparison =
+            (left.employee.seniority ?? Number.MAX_SAFE_INTEGER) -
+            (right.employee.seniority ?? Number.MAX_SAFE_INTEGER);
 
-        if (seniorityComparison !== 0) {
-          return seniorityComparison;
-        }
+          if (seniorityComparison !== 0) {
+            return seniorityComparison;
+          }
 
-        return `${left.employee.firstName} ${left.employee.lastName}`.localeCompare(
-          `${right.employee.firstName} ${right.employee.lastName}`,
-        );
-      });
-  }, [
-    absenceTypes,
-    canWorkRequiredFocusAreas,
-    currentAssignmentIds,
-    employees,
-    getAbsenceTypeIdForKey,
-    getFallbackRequiredFocusAreaIds,
-    getShiftFocusAreaIds,
-    modal.empId,
-  ]);
+          return `${left.employee.firstName} ${left.employee.lastName}`.localeCompare(
+            `${right.employee.firstName} ${right.employee.lastName}`,
+          );
+        });
+    },
+    [
+      absenceTypes,
+      canWorkRequiredFocusAreas,
+      currentAssignmentIds,
+      employees,
+      getAbsenceTypeIdForKey,
+      getFallbackRequiredFocusAreaIds,
+      getShiftFocusAreaIds,
+      modal.empId,
+    ],
+  );
   const targetedPickupTargets = useMemo(
     () => getTargetedPickupTargetsForDate(requestShiftDate),
     [getTargetedPickupTargetsForDate, requestShiftDate],
@@ -1672,8 +1894,7 @@ export default function ShiftEditPanel({
   }
 
   function handleSwapWeek(delta: 1 | -1) {
-    const nextWeekStart =
-      delta < 0 ? previousEligibleSwapWeekStart : nextEligibleSwapWeekStart;
+    const nextWeekStart = delta < 0 ? previousEligibleSwapWeekStart : nextEligibleSwapWeekStart;
 
     if (!nextWeekStart) {
       return;
@@ -1829,31 +2050,29 @@ export default function ShiftEditPanel({
             ? "Offer shift for pickup?"
             : pendingRequestConfirmation.kind === "targeted_pickup"
               ? "Request pickup?"
-            : pendingRequestConfirmation.kind === "calloff"
-              ? "Submit call off request?"
-              : "Submit swap request?"
+              : pendingRequestConfirmation.kind === "calloff"
+                ? "Submit call off request?"
+                : "Submit swap request?"
         }
         message={
           pendingRequestConfirmation.kind === "pickup"
             ? `Offer your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} for pickup?`
             : pendingRequestConfirmation.kind === "targeted_pickup"
               ? `Ask ${pendingRequestConfirmation.targetName} to pick up your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} while you use ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)}?`
-            : pendingRequestConfirmation.kind === "calloff"
-              ? `Submit a ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)} absence request for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
-              : `Swap your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} with ${pendingRequestConfirmation.targetName}'s ${pendingRequestConfirmation.targetShiftLabel || "selected"} shift on ${formatDate(new Date(`${pendingRequestConfirmation.targetShiftDate}T00:00:00`))}?`
+              : pendingRequestConfirmation.kind === "calloff"
+                ? `Submit ${indefiniteArticle(getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType))} ${getAbsenceTypeDisplayName(pendingRequestConfirmation.absenceType)} absence request for your ${selectedRequesterLabel} shift on ${formatDate(modal.date)}?`
+                : `Swap your ${selectedRequesterLabel} shift on ${formatDate(modal.date)} with ${pendingRequestConfirmation.targetName}'s ${pendingRequestConfirmation.targetShiftLabel || "selected"} shift on ${formatDate(new Date(`${pendingRequestConfirmation.targetShiftDate}T00:00:00`))}?`
         }
         confirmLabel={
           pendingRequestConfirmation.kind === "pickup"
             ? "Offer for pickup"
             : pendingRequestConfirmation.kind === "targeted_pickup"
               ? "Request pickup"
-            : pendingRequestConfirmation.kind === "calloff"
-              ? "Submit call off"
-              : "Submit swap"
+              : pendingRequestConfirmation.kind === "calloff"
+                ? "Submit call off"
+                : "Submit swap"
         }
-        variant={
-          pendingRequestConfirmation.kind === "calloff" ? "danger" : "info"
-        }
+        variant={pendingRequestConfirmation.kind === "calloff" ? "danger" : "info"}
         isLoading={isSubmittingRequestConfirmation}
         onConfirm={() => void confirmPendingRequest()}
         onCancel={() => {
@@ -1865,11 +2084,7 @@ export default function ShiftEditPanel({
     );
   }
 
-  function renderCoverageChooser({
-    standalone = false,
-  }: {
-    standalone?: boolean;
-  }) {
+  function renderCoverageChooser({ standalone = false }: { standalone?: boolean }) {
     const choiceButtonBaseStyle: React.CSSProperties = {
       width: "100%",
       borderRadius: 12,
@@ -1910,11 +2125,7 @@ export default function ShiftEditPanel({
           ...(standalone ? { flex: 1 } : null),
         }}
       >
-        {!standalone && (
-          <div style={sectionLabel}>
-            Drop shift
-          </div>
-        )}
+        {!standalone && <div style={sectionLabel}>Drop shift</div>}
         <div
           style={{
             fontSize: "var(--dg-fs-body-sm)",
@@ -1935,9 +2146,7 @@ export default function ShiftEditPanel({
             disabled={!onMakeAvailable}
             style={{
               ...choiceButtonBaseStyle,
-              borderColor: showPickupTargetOptions
-                ? "var(--color-brand)"
-                : "var(--color-border)",
+              borderColor: showPickupTargetOptions ? "var(--color-brand)" : "var(--color-border)",
               background: showPickupTargetOptions
                 ? "var(--color-bg-secondary)"
                 : "var(--color-surface)",
@@ -1978,8 +2187,8 @@ export default function ShiftEditPanel({
             >
               <div style={choiceTitleStyle}>Offer for pickup</div>
               <div style={choiceBodyStyle}>
-                Post the shift for teammates to claim. It stays yours unless
-                someone claims it and approval completes.
+                Post the shift for teammates to claim. It stays yours unless someone claims it and
+                approval completes.
               </div>
             </div>
           </button>
@@ -1999,10 +2208,7 @@ export default function ShiftEditPanel({
               background: showCoverageCalloffOptions
                 ? "var(--color-danger-bg)"
                 : "var(--color-surface)",
-              cursor:
-                onCallOff && activeAbsenceTypes.length > 0
-                  ? "pointer"
-                  : "not-allowed",
+              cursor: onCallOff && activeAbsenceTypes.length > 0 ? "pointer" : "not-allowed",
               opacity: onCallOff && activeAbsenceTypes.length > 0 ? 1 : 0.6,
             }}
           >
@@ -2038,8 +2244,8 @@ export default function ShiftEditPanel({
                 Call off
               </div>
               <div style={choiceBodyStyle}>
-                Use this when you cannot work the shift yourself. Approval
-                records the absence and opens coverage automatically.
+                Use this when you cannot work the shift yourself. Approval records the absence and
+                opens coverage automatically.
               </div>
             </div>
           </button>
@@ -2110,32 +2316,32 @@ export default function ShiftEditPanel({
                   Only teammates with an absence on this date are shown.
                 </div>
               </div>
-	              <div
-	                style={{
-	                  display: "flex",
-	                  flexDirection: "column",
-	                  border: "1px solid var(--color-border)",
-	                  borderRadius: 12,
-	                  overflow: "hidden",
-                    flex: 1,
-                    minHeight: 0,
-	                  overflowY: "auto",
-	                }}
-	              >
-	                {targetedPickupTargets.length === 0 ? (
-	                  <div
-	                    style={{
-	                      padding: "18px 14px",
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: "auto",
+                }}
+              >
+                {targetedPickupTargets.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "18px 14px",
                       textAlign: "center",
                       color: "var(--color-text-muted)",
                       fontSize: "var(--dg-fs-body-sm)",
                     }}
                   >
-	                    No absent teammates are available on this date.
-	                  </div>
-	                ) : (
-	                  targetedPickupTargets.map((target, index) => {
-	                    const { employee } = target;
+                    No absent teammates are available on this date.
+                  </div>
+                ) : (
+                  targetedPickupTargets.map((target, index) => {
+                    const { employee } = target;
 
                     return (
                       <button
@@ -2165,14 +2371,14 @@ export default function ShiftEditPanel({
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
-	                          gap: 10,
-	                          width: "100%",
-	                          padding: "12px 14px",
-	                          border: "none",
-	                          borderBottom:
-	                            index < targetedPickupTargets.length - 1
-	                              ? "1px solid var(--color-border)"
-	                              : "none",
+                          gap: 10,
+                          width: "100%",
+                          padding: "12px 14px",
+                          border: "none",
+                          borderBottom:
+                            index < targetedPickupTargets.length - 1
+                              ? "1px solid var(--color-border)"
+                              : "none",
                           background: "var(--color-surface)",
                           color: "var(--color-text-primary)",
                           fontFamily: "inherit",
@@ -2182,20 +2388,20 @@ export default function ShiftEditPanel({
                           textAlign: "left",
                         }}
                       >
-	                        <span style={{ fontWeight: 600 }}>
-	                          {employee.firstName} {employee.lastName}
-	                        </span>
-	                        <span
-	                          style={{
-	                            color: "var(--color-text-secondary)",
-	                            fontSize: "var(--dg-fs-caption)",
-	                            fontWeight: 600,
+                        <span style={{ fontWeight: 600 }}>
+                          {employee.firstName} {employee.lastName}
+                        </span>
+                        <span
+                          style={{
+                            color: "var(--color-text-secondary)",
+                            fontSize: "var(--dg-fs-caption)",
+                            fontWeight: 600,
                             textAlign: "right",
-	                          }}
-	                        >
-	                          {target.absenceTypeLabel}
-	                        </span>
-	                      </button>
+                          }}
+                        >
+                          {target.absenceTypeLabel}
+                        </span>
+                      </button>
                     );
                   })
                 )}
@@ -2319,11 +2525,7 @@ export default function ShiftEditPanel({
     );
   }
 
-  function renderSwapChooser({
-    standalone = false,
-  }: {
-    standalone?: boolean;
-  }) {
+  function renderSwapChooser({ standalone = false }: { standalone?: boolean }) {
     const canGoPrev = previousEligibleSwapWeekStart != null;
     const canGoNext = nextEligibleSwapWeekStart != null;
     const swapWeekRangeLabel = formatWeekRangeLabel(swapWeekStartDate);
@@ -2368,18 +2570,18 @@ export default function ShiftEditPanel({
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
-              >
-                {selectedRequesterLabel || "Current shift"}
-                <span
-                  style={{
-                    fontWeight: 500,
+            >
+              {selectedRequesterLabel || "Current shift"}
+              <span
+                style={{
+                  fontWeight: 500,
                   color: "var(--color-text-secondary)",
                   marginLeft: 8,
                 }}
-                >
-                  {requestShiftDate}
-                </span>
-              </div>
+              >
+                {requestShiftDate}
+              </span>
+            </div>
           </MaybeHint>
           {requesterSwapTimeLabel || requesterSwapFocusAreaLabel ? (
             <div
@@ -2389,9 +2591,7 @@ export default function ShiftEditPanel({
                 marginTop: 4,
               }}
             >
-              {[requesterSwapTimeLabel, requesterSwapFocusAreaLabel]
-                .filter(Boolean)
-                .join(" · ")}
+              {[requesterSwapTimeLabel, requesterSwapFocusAreaLabel].filter(Boolean).join(" · ")}
             </div>
           ) : null}
         </div>
@@ -2525,11 +2725,7 @@ export default function ShiftEditPanel({
               >
                 Back
               </button>
-              <button
-                type="button"
-                className="dg-btn dg-btn-primary"
-                onClick={handleSubmitSwap}
-              >
+              <button type="button" className="dg-btn dg-btn-primary" onClick={handleSubmitSwap}>
                 Submit Swap Request
               </button>
             </div>
@@ -2565,8 +2761,7 @@ export default function ShiftEditPanel({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "var(--dg-toolbar-h) minmax(130px, 1fr) var(--dg-toolbar-h)",
+                  gridTemplateColumns: "var(--dg-toolbar-h) minmax(130px, 1fr) var(--dg-toolbar-h)",
                   alignItems: "center",
                   gap: 10,
                   minWidth: 240,
@@ -2587,12 +2782,7 @@ export default function ShiftEditPanel({
                     flexShrink: 0,
                   }}
                 >
-                  <ChevronLeft
-                    aria-hidden="true"
-                    focusable="false"
-                    size={24}
-                    strokeWidth={2.5}
-                  />
+                  <ChevronLeft aria-hidden="true" focusable="false" size={24} strokeWidth={2.5} />
                 </button>
                 <div
                   aria-label={`Current swap week ${swapWeekRangeLabel}`}
@@ -2621,12 +2811,7 @@ export default function ShiftEditPanel({
                     flexShrink: 0,
                   }}
                 >
-                  <ChevronRight
-                    aria-hidden="true"
-                    focusable="false"
-                    size={24}
-                    strokeWidth={2.5}
-                  />
+                  <ChevronRight aria-hidden="true" focusable="false" size={24} strokeWidth={2.5} />
                 </button>
               </div>
             </div>
@@ -2655,17 +2840,9 @@ export default function ShiftEditPanel({
                     style={{
                       minHeight: 68,
                       borderRadius: 10,
-                      border: `1px solid ${
-                        active
-                          ? "var(--color-brand)"
-                          : "var(--color-border)"
-                      }`,
-                      background: active
-                        ? "var(--color-bg-secondary)"
-                        : "var(--color-surface)",
-                      color: active
-                        ? "var(--color-brand)"
-                        : "var(--color-text-primary)",
+                      border: `1px solid ${active ? "var(--color-brand)" : "var(--color-border)"}`,
+                      background: active ? "var(--color-bg-secondary)" : "var(--color-surface)",
+                      color: active ? "var(--color-brand)" : "var(--color-text-primary)",
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
@@ -2681,9 +2858,7 @@ export default function ShiftEditPanel({
                       style={{
                         fontSize: "var(--dg-fs-badge)",
                         fontWeight: 700,
-                        color: active
-                          ? "var(--color-brand)"
-                          : "var(--color-text-subtle)",
+                        color: active ? "var(--color-brand)" : "var(--color-text-subtle)",
                         textTransform: "uppercase",
                       }}
                     >
@@ -2708,12 +2883,7 @@ export default function ShiftEditPanel({
                         color: "var(--color-text-muted)",
                       }}
                     >
-                      <User
-                        aria-hidden="true"
-                        focusable="false"
-                        size={11}
-                        strokeWidth={2.4}
-                      />
+                      <User aria-hidden="true" focusable="false" size={11} strokeWidth={2.4} />
                       {count}
                     </span>
                   </button>
@@ -2742,9 +2912,9 @@ export default function ShiftEditPanel({
                     color: "var(--color-text-muted)",
                     fontSize: "var(--dg-fs-body-sm)",
                     lineHeight: 1.5,
-                    }}
-                  >
-                    No eligible employees on this date.
+                  }}
+                >
+                  No eligible employees on this date.
                   <div
                     style={{
                       fontSize: "var(--dg-fs-caption)",
@@ -2755,33 +2925,29 @@ export default function ShiftEditPanel({
                     Try another day.
                   </div>
                 </div>
-	              ) : (
-	                eligibleSwapEmployees.map((employee, index) => {
-	                  const dateObj = new Date(`${activeSwapViewDate}T00:00:00`);
-                    const targetSegments = getShiftSegments?.(employee.id, dateObj) ?? [];
-                    const targetSegmentOptions = getRequestSegmentOptions(targetSegments);
-                    const renderTargetOptions =
-                      targetSegmentOptions.length > 1
-                        ? targetSegmentOptions.filter(
-                            (option) =>
-                              !isShiftSegmentStarted?.(
-                                employee.id,
-                                dateObj,
-                                option.segmentIndex,
-                              ),
+              ) : (
+                eligibleSwapEmployees.map((employee, index) => {
+                  const dateObj = new Date(`${activeSwapViewDate}T00:00:00`);
+                  const targetSegments = getShiftSegments?.(employee.id, dateObj) ?? [];
+                  const targetSegmentOptions = getRequestSegmentOptions(targetSegments);
+                  const renderTargetOptions =
+                    targetSegmentOptions.length > 1
+                      ? targetSegmentOptions.filter(
+                          (option) =>
+                            !isShiftSegmentStarted?.(employee.id, dateObj, option.segmentIndex),
+                        )
+                      : targetSegmentOptions[0]
+                        ? isShiftSegmentStarted?.(
+                            employee.id,
+                            dateObj,
+                            targetSegmentOptions[0].segmentIndex,
                           )
-                        : targetSegmentOptions[0]
-                          ? isShiftSegmentStarted?.(
-                              employee.id,
-                              dateObj,
-                              targetSegmentOptions[0].segmentIndex,
-                            )
-                            ? []
-                            : [targetSegmentOptions[0]]
-                          : [{ segment: null, segmentIndex: undefined }];
-	                  const targetLabel = getSwapShiftLabel(employee.id, dateObj);
-                    const timeLabel = getSwapTimeLabel(employee.id, dateObj);
-                    const focusAreaLabel = getSwapFocusAreaLabel(employee.id, dateObj);
+                          ? []
+                          : [targetSegmentOptions[0]]
+                        : [{ segment: null, segmentIndex: undefined }];
+                  const targetLabel = getSwapShiftLabel(employee.id, dateObj);
+                  const timeLabel = getSwapTimeLabel(employee.id, dateObj);
+                  const focusAreaLabel = getSwapFocusAreaLabel(employee.id, dateObj);
                   return renderTargetOptions.map((targetOption) => {
                     const optionLabel =
                       targetOption.segmentIndex != null
@@ -2793,55 +2959,57 @@ export default function ShiftEditPanel({
                         : targetLabel;
 
                     return (
-                    <button
-                      key={`${employee.id}-${targetOption.segmentIndex ?? "shift"}`}
-                      type="button"
-                      onClick={() => handleSelectSwapEmployee(employee, targetOption.segmentIndex)}
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "stretch",
-                        gap: 4,
-                        width: "100%",
-                        padding: "12px 14px",
-                        border: "none",
-                        borderBottom:
-                          index < eligibleSwapEmployees.length - 1
-                            ? "1px solid var(--color-border)"
-                            : "none",
-                        background: "var(--color-surface)",
-                        color: "var(--color-text-primary)",
-                        fontFamily: "inherit",
-                        fontSize: "var(--dg-fs-body-sm)",
-                        cursor: "pointer",
-                        textAlign: "left",
-                      }}
-                    >
-                      <span style={{ fontWeight: 600 }}>
-                        {employee.firstName} {employee.lastName}
-                      </span>
-                      <span
+                      <button
+                        key={`${employee.id}-${targetOption.segmentIndex ?? "shift"}`}
+                        type="button"
+                        onClick={() =>
+                          handleSelectSwapEmployee(employee, targetOption.segmentIndex)
+                        }
                         style={{
-                          color: "var(--color-text-secondary)",
-                          fontSize: "var(--dg-fs-caption)",
-                          fontWeight: 600,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "stretch",
+                          gap: 4,
+                          width: "100%",
+                          padding: "12px 14px",
+                          border: "none",
+                          borderBottom:
+                            index < eligibleSwapEmployees.length - 1
+                              ? "1px solid var(--color-border)"
+                              : "none",
+                          background: "var(--color-surface)",
+                          color: "var(--color-text-primary)",
+                          fontFamily: "inherit",
+                          fontSize: "var(--dg-fs-body-sm)",
+                          cursor: "pointer",
+                          textAlign: "left",
                         }}
                       >
-                        {targetOption.segmentIndex != null
-                          ? `Shift ${targetOption.segmentIndex + 1}: ${optionLabel}`
-                          : optionLabel}
-                      </span>
-                      {timeLabel || focusAreaLabel ? (
+                        <span style={{ fontWeight: 600 }}>
+                          {employee.firstName} {employee.lastName}
+                        </span>
                         <span
                           style={{
-                            color: "var(--color-text-muted)",
+                            color: "var(--color-text-secondary)",
                             fontSize: "var(--dg-fs-caption)",
+                            fontWeight: 600,
                           }}
                         >
-                          {[timeLabel, focusAreaLabel].filter(Boolean).join(" · ")}
+                          {targetOption.segmentIndex != null
+                            ? `Shift ${targetOption.segmentIndex + 1}: ${optionLabel}`
+                            : optionLabel}
                         </span>
-                      ) : null}
-                    </button>
+                        {timeLabel || focusAreaLabel ? (
+                          <span
+                            style={{
+                              color: "var(--color-text-muted)",
+                              fontSize: "var(--dg-fs-caption)",
+                            }}
+                          >
+                            {[timeLabel, focusAreaLabel].filter(Boolean).join(" · ")}
+                          </span>
+                        ) : null}
+                      </button>
                     );
                   });
                 })
@@ -2867,11 +3035,7 @@ export default function ShiftEditPanel({
     );
   }
 
-  function renderRequestControls({
-    standalone = false,
-  }: {
-    standalone?: boolean;
-  }) {
+  function renderRequestControls({ standalone = false }: { standalone?: boolean }) {
     const modeButtonStyle = (
       isActive: boolean,
       tone: "neutral" | "danger" = "neutral",
@@ -2880,9 +3044,7 @@ export default function ShiftEditPanel({
       padding: "10px 12px",
       borderRadius: 10,
       border: `1px solid ${
-        tone === "danger" && isActive
-          ? "var(--color-danger-border)"
-          : "var(--color-border)"
+        tone === "danger" && isActive ? "var(--color-danger-border)" : "var(--color-border)"
       }`,
       background:
         tone === "danger" && isActive
@@ -2906,16 +3068,16 @@ export default function ShiftEditPanel({
       cursor: "pointer",
     });
 
-	    return (
-	      <div
-	        style={{
-	          display: "flex",
-	          flexDirection: "column",
-	          gap: 14,
-	          minHeight: 0,
-            ...(standalone ? { minHeight: "100%" } : null),
-	        }}
-	      >
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          minHeight: 0,
+          ...(standalone ? { minHeight: "100%" } : null),
+        }}
+      >
         <div style={{ display: "flex", gap: 8 }}>
           {canRenderCoverage && (
             <button
@@ -3031,13 +3193,10 @@ export default function ShiftEditPanel({
         {activeRequestMode === "coverage" && canRenderCoverage
           ? renderCoverageChooser({ standalone })
           : null}
-        {activeRequestMode === "swap" && canRenderSwap
-          ? renderSwapChooser({ standalone })
-          : null}
+        {activeRequestMode === "swap" && canRenderSwap ? renderSwapChooser({ standalone }) : null}
       </div>
     );
   }
-
 
   function renderNoteDots(activeIds: number[], side: "left" | "right" = "right") {
     if (activeIds.length === 0) return null;
@@ -3071,10 +3230,7 @@ export default function ShiftEditPanel({
     );
   }
 
-  function renderShiftDiffBadge(
-    badge: ShiftDiffBadgeDescriptor | null,
-    index?: number,
-  ) {
+  function renderShiftDiffBadge(badge: ShiftDiffBadgeDescriptor | null, index?: number) {
     if (!badge || (badge.kind === "new" && badge.text === "New")) return null;
     return (
       <span
@@ -3107,17 +3263,13 @@ export default function ShiftEditPanel({
     const noteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(activeTab) : [];
     const cellDiffBadge = panelDiff.cellBadge;
     const cellBorderKind: ShiftDiffBorderKind =
-      cellDiffBadge?.kind === 'new'
-        ? 'new'
-        : cellDiffBadge
-          ? 'modified'
-          : null;
+      cellDiffBadge?.kind === "new" ? "new" : cellDiffBadge ? "modified" : null;
 
     // Absence type pill — use absence type colors directly
     if (isAbsence) {
-      const at = absenceTypes.find(a => a.id === currentAbsenceTypeId);
+      const at = absenceTypes.find((a) => a.id === currentAbsenceTypeId);
       if (!at) return null;
-      const absenceLabel = isNameMode ? (at.name || at.label) : at.label;
+      const absenceLabel = isNameMode ? at.name || at.label : at.label;
       return (
         <div
           style={{
@@ -3125,7 +3277,7 @@ export default function ShiftEditPanel({
             border: getPanelDiffBorder({
               diffKind: cellBorderKind,
               fallback:
-                at.border === 'transparent'
+                at.border === "transparent"
                   ? `1.5px solid ${darkenColor(at.color, 0.25)}`
                   : `1.5px solid ${at.border}`,
             }),
@@ -3143,24 +3295,42 @@ export default function ShiftEditPanel({
         >
           {renderShiftDiffBadge(cellDiffBadge)}
           <MaybeHint content={absenceLabel} side="top">
-            <span style={{
-            fontWeight: 800,
-            fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
-            color: at.text,
-            lineHeight: isNameMode ? 1.3 : 1,
-            maxWidth: "90%",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            textAlign: "center",
-            ...(isNameMode
-              ? { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
-              : { whiteSpace: "nowrap" }),
-            }}>
+            <span
+              style={{
+                fontWeight: 800,
+                fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
+                color: at.text,
+                lineHeight: isNameMode ? 1.3 : 1,
+                maxWidth: "90%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                textAlign: "center",
+                ...(isNameMode
+                  ? {
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical" as const,
+                      wordBreak: "break-word" as const,
+                    }
+                  : { whiteSpace: "nowrap" }),
+              }}
+            >
               {absenceLabel}
             </span>
           </MaybeHint>
           {!isNameMode && at.name && (
-            <span style={{ fontSize: "var(--dg-fs-footnote)", color: at.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                color: at.text,
+                opacity: 0.7,
+                lineHeight: 1,
+                maxWidth: "90%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {at.name}
             </span>
           )}
@@ -3169,18 +3339,14 @@ export default function ShiftEditPanel({
     }
 
     if (currentLabels.length === 1) {
-      const preview = resolveShiftPreview(
-        currentAssignmentIds[0],
-        currentLabels[0],
-        "name",
-      );
+      const preview = resolveShiftPreview(currentAssignmentIds[0], currentLabels[0], "name");
       const s =
         preview.assignment ??
         getAssignmentDefinitionStyle(currentLabels[0], currentAssignmentIds[0]);
       const previewLabel = formatPreviewLabel(preview.displayParts);
       const focusAreaLabel =
         preview.assignment?.focusAreaId != null
-          ? focusAreaNameById.get(preview.assignment.focusAreaId) ?? null
+          ? (focusAreaNameById.get(preview.assignment.focusAreaId) ?? null)
           : null;
       return (
         <div
@@ -3204,28 +3370,43 @@ export default function ShiftEditPanel({
         >
           {renderShiftDiffBadge(cellDiffBadge)}
           <MaybeHint content={previewLabel} side="top">
-            <span style={{
-            fontWeight: 800,
-            fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
-            color: s.text,
-            lineHeight: isNameMode ? 1.3 : 1,
-            maxWidth: "90%",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            textAlign: "center",
-            ...(isNameMode
-              ? { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
-              : { whiteSpace: "nowrap" }),
-            }}>
+            <span
+              style={{
+                fontWeight: 800,
+                fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
+                color: s.text,
+                lineHeight: isNameMode ? 1.3 : 1,
+                maxWidth: "90%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                textAlign: "center",
+                ...(isNameMode
+                  ? {
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical" as const,
+                      wordBreak: "break-word" as const,
+                    }
+                  : { whiteSpace: "nowrap" }),
+              }}
+            >
               {preview.displayParts.primaryLabel}
             </span>
           </MaybeHint>
           {preview.displayParts.secondaryLabel ? (
-            <MaybeHint
-              content={previewLabel}
-              side="top"
-            >
-              <span style={{ fontSize: "var(--dg-fs-footnote)", color: s.text, opacity: 0.7, lineHeight: 1, maxWidth: "90%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <MaybeHint content={previewLabel} side="top">
+              <span
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: s.text,
+                  opacity: 0.7,
+                  lineHeight: 1,
+                  maxWidth: "90%",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {preview.displayParts.secondaryLabel}
               </span>
             </MaybeHint>
@@ -3266,7 +3447,7 @@ export default function ShiftEditPanel({
               : assignments.find((st) => st.label === label));
           const shiftFaId = assignment?.focusAreaId;
           const focusAreaLabel =
-            shiftFaId != null ? focusAreaNameById.get(shiftFaId) ?? null : null;
+            shiftFaId != null ? (focusAreaNameById.get(shiftFaId) ?? null) : null;
           const shiftWingId = shiftFaId ?? activeTab;
           const pillNoteTypes = getActiveIndicatorIds ? getActiveIndicatorIds(shiftWingId) : [];
           const pillDiff = panelDiff.pillDiffs[i] ?? {
@@ -3306,29 +3487,45 @@ export default function ShiftEditPanel({
                   gap: 2,
                 }}
               >
-                <div style={{ textAlign: "center", maxWidth: "calc(100% - 48px)", overflow: "hidden" }}>
+                <div
+                  style={{ textAlign: "center", maxWidth: "calc(100% - 48px)", overflow: "hidden" }}
+                >
                   <MaybeHint content={previewLabel} side="top">
-                    <span style={{
-                    fontWeight: 800,
-                    fontSize: isNameMode ? "var(--dg-fs-body-sm)" : "var(--dg-fs-heading)",
-                    color: s.text,
-                    lineHeight: isNameMode ? 1.3 : 1,
-                    display: isNameMode ? "-webkit-box" : "block",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    ...(isNameMode
-                      ? { WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const, wordBreak: "break-word" as const }
-                      : { whiteSpace: "nowrap" }),
-                    }}>
+                    <span
+                      style={{
+                        fontWeight: 800,
+                        fontSize: isNameMode ? "var(--dg-fs-body-sm)" : "var(--dg-fs-heading)",
+                        color: s.text,
+                        lineHeight: isNameMode ? 1.3 : 1,
+                        display: isNameMode ? "-webkit-box" : "block",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        ...(isNameMode
+                          ? {
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical" as const,
+                              wordBreak: "break-word" as const,
+                            }
+                          : { whiteSpace: "nowrap" }),
+                      }}
+                    >
                       {preview.displayParts.primaryLabel}
                     </span>
                   </MaybeHint>
                   {preview.displayParts.secondaryLabel ? (
-                    <MaybeHint
-                      content={previewLabel}
-                      side="top"
-                    >
-                      <div style={{ fontSize: "var(--dg-fs-badge)", color: s.text, opacity: 0.65, lineHeight: 1, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <MaybeHint content={previewLabel} side="top">
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-badge)",
+                          color: s.text,
+                          opacity: 0.65,
+                          lineHeight: 1,
+                          marginTop: 4,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {preview.displayParts.secondaryLabel}
                       </div>
                     </MaybeHint>
@@ -3365,7 +3562,14 @@ export default function ShiftEditPanel({
                 {renderNoteDots(pillNoteTypes, "left")}
               </div>
               {/* Card body: default time, per-pill custom time editor, + indicators */}
-              <div data-shift-edit-card-body={i} style={{ padding: "10px 12px", background: "var(--color-surface)", borderRadius: `0 0 ${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius}` }}>
+              <div
+                data-shift-edit-card-body={i}
+                style={{
+                  padding: "10px 12px",
+                  background: "var(--color-surface)",
+                  borderRadius: `0 0 ${shiftEditCardInnerRadius} ${shiftEditCardInnerRadius}`,
+                }}
+              >
                 {/* Default time info */}
                 {(defaultStart || defaultEnd) && (
                   <div
@@ -3377,14 +3581,32 @@ export default function ShiftEditPanel({
                       color: "var(--color-text-subtle)",
                     }}
                   >
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    <svg
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
                     </svg>
                     <span style={{ fontWeight: 500 }}>
-                      {[defaultStart ? fmt12h(defaultStart) : null, defaultEnd ? fmt12h(defaultEnd) : null].filter(Boolean).join(" – ")}
+                      {[
+                        defaultStart ? fmt12h(defaultStart) : null,
+                        defaultEnd ? fmt12h(defaultEnd) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" – ")}
                     </span>
                     {calcTimeDuration(defaultStart, defaultEnd) && (
-                      <span style={{ opacity: 0.7 }}>· {calcTimeDuration(defaultStart, defaultEnd)}</span>
+                      <span style={{ opacity: 0.7 }}>
+                        · {calcTimeDuration(defaultStart, defaultEnd)}
+                      </span>
                     )}
                   </div>
                 )}
@@ -3424,75 +3646,44 @@ export default function ShiftEditPanel({
                     >
                       Mentored
                     </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleMentoredToggleAtIndex(
-                          i,
-                          !(currentSegments[i]?.isMentored ?? false),
-                        )
-                      }
-                      aria-pressed={currentSegments[i]?.isMentored === true}
-                      aria-label={`Mentored assignment for ${previewLabel}`}
-                      style={{
-                        width: 44,
-                        height: 24,
-                        borderRadius: 12,
-                        border: "none",
-                        cursor: "pointer",
-                        background: currentSegments[i]?.isMentored
-                          ? "var(--color-brand)"
-                          : "var(--color-border)",
-                        position: "relative",
-                        transition: "background 0.2s",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: "50%",
-                          background: "#fff",
-                          position: "absolute",
-                          top: 3,
-                          left: currentSegments[i]?.isMentored ? 23 : 3,
-                          transition: "left 0.2s",
-                          boxShadow: "0 1px 3px rgba(0,0,0,.2)",
-                        }}
-                      />
-                    </button>
+                    <Switch
+                      checked={currentSegments[i]?.isMentored === true}
+                      onChange={(next) => handleMentoredToggleAtIndex(i, next)}
+                      ariaLabel={`Mentored assignment for ${previewLabel}`}
+                    />
                   </div>
                 ) : null}
                 {/* Per-pill custom time editor */}
-                {allowShiftEdits && onCustomTimeChange && (() => {
-                  const pillStarts = parseMultiTimes(customStartTime, currentLabels.length);
-                  const pillEnds = parseMultiTimes(customEndTime, currentLabels.length);
-                  return (
-                    <PillTimeEditor
-                      customStart={pillStarts[i]}
-                      customEnd={pillEnds[i]}
-                      defaultStart={defaultStart}
-                      defaultEnd={defaultEnd}
-                      minTime={getTimeBounds(assignment).minTime}
-                      maxTime={getTimeBounds(assignment).maxTime}
-                      onSave={(start, end) => {
-                        const newStarts = [...pillStarts];
-                        const newEnds = [...pillEnds];
-                        newStarts[i] = start;
-                        newEnds[i] = end;
-                        onCustomTimeChange(joinMultiTimes(newStarts), joinMultiTimes(newEnds));
-                      }}
-                      onRemove={() => {
-                        const newStarts = [...pillStarts];
-                        const newEnds = [...pillEnds];
-                        newStarts[i] = null;
-                        newEnds[i] = null;
-                        onCustomTimeChange(joinMultiTimes(newStarts), joinMultiTimes(newEnds));
-                      }}
-                    />
-                  );
-                })()}
+                {allowShiftEdits &&
+                  onCustomTimeChange &&
+                  (() => {
+                    const pillStarts = parseMultiTimes(customStartTime, currentLabels.length);
+                    const pillEnds = parseMultiTimes(customEndTime, currentLabels.length);
+                    return (
+                      <PillTimeEditor
+                        customStart={pillStarts[i]}
+                        customEnd={pillEnds[i]}
+                        defaultStart={defaultStart}
+                        defaultEnd={defaultEnd}
+                        minTime={getTimeBounds(assignment).minTime}
+                        maxTime={getTimeBounds(assignment).maxTime}
+                        onSave={(start, end) => {
+                          const newStarts = [...pillStarts];
+                          const newEnds = [...pillEnds];
+                          newStarts[i] = start;
+                          newEnds[i] = end;
+                          onCustomTimeChange(joinMultiTimes(newStarts), joinMultiTimes(newEnds));
+                        }}
+                        onRemove={() => {
+                          const newStarts = [...pillStarts];
+                          const newEnds = [...pillEnds];
+                          newStarts[i] = null;
+                          newEnds[i] = null;
+                          onCustomTimeChange(joinMultiTimes(newStarts), joinMultiTimes(newEnds));
+                        }}
+                      />
+                    );
+                  })()}
                 {/* Inline indicators for this shift's focus area */}
                 {renderInlineIndicators(shiftWingId)}
               </div>
@@ -3504,11 +3695,13 @@ export default function ShiftEditPanel({
   }
 
   function renderInlineIndicators(focusAreaId: number) {
-    if (!canEditNotes || indicatorTypes.length === 0) return null;
+    if (!canEditScheduleIndicators || indicatorTypes.length === 0) return null;
     return (
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 6 }}>
         {indicatorTypes.map(({ id, name, color }) => {
-          const isActive = getActiveIndicatorIds ? getActiveIndicatorIds(focusAreaId).includes(id) : false;
+          const isActive = getActiveIndicatorIds
+            ? getActiveIndicatorIds(focusAreaId).includes(id)
+            : false;
           return (
             <button
               key={id}
@@ -3547,13 +3740,15 @@ export default function ShiftEditPanel({
   }
 
   function renderNotesSection() {
-    if (!canEditNotes || indicatorTypes.length === 0) return null;
+    if (!canEditScheduleIndicators || indicatorTypes.length === 0) return null;
     return (
       <div>
         <div style={sectionLabel}>Indicators</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {indicatorTypes.map(({ id, name, color }) => {
-            const isActive = getActiveIndicatorIds ? getActiveIndicatorIds(activeTab).includes(id) : false;
+            const isActive = getActiveIndicatorIds
+              ? getActiveIndicatorIds(activeTab).includes(id)
+              : false;
             return (
               <button
                 key={id}
@@ -3584,15 +3779,36 @@ export default function ShiftEditPanel({
                   }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 700, color: isActive ? color : "var(--color-text-secondary)" }}>
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      fontWeight: 700,
+                      color: isActive ? color : "var(--color-text-secondary)",
+                    }}
+                  >
                     {name}
                   </div>
-                  <div style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-subtle)", marginTop: 1 }}>
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-badge)",
+                      color: "var(--color-text-subtle)",
+                      marginTop: 1,
+                    }}
+                  >
                     Appears as a colored dot
                   </div>
                 </div>
                 {isActive && (
-                  <div style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 700, color, flexShrink: 0 }}>ON</div>
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-badge)",
+                      fontWeight: 700,
+                      color,
+                      flexShrink: 0,
+                    }}
+                  >
+                    ON
+                  </div>
                 )}
               </button>
             );
@@ -3602,15 +3818,11 @@ export default function ShiftEditPanel({
     );
   }
 
-
-
   // Detail mode: show when we have an active shift and aren't in picker mode
   // (or when shift edits are not allowed)
   const inDetailMode = !allowShiftEdits || (!showPicker && hasActiveShift);
   const showStandaloneRequestFlow =
-    !requestOnlyMode &&
-    activeRequestMode != null &&
-    (canRenderCoverage || canRenderSwap);
+    !requestOnlyMode && activeRequestMode != null && (canRenderCoverage || canRenderSwap);
 
   // ── Request-only mode: show the shared request controls without edit UI ──
   if (requestOnlyMode && (canRenderCoverage || canRenderSwap)) {
@@ -3622,7 +3834,9 @@ export default function ShiftEditPanel({
           role="dialog"
           aria-modal="true"
           aria-label="Shift requests"
-          onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") onClose();
+          }}
         >
           {/* Header */}
           <div
@@ -3635,11 +3849,28 @@ export default function ShiftEditPanel({
             }}
           >
             <div>
-              <div style={{ fontSize: "var(--dg-fs-title)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-title)",
+                  fontWeight: 700,
+                  color: "var(--color-text-primary)",
+                }}
+              >
                 Shift requests
               </div>
-              <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-secondary)", marginTop: 2 }}>
-                {modal.empName} &middot; {modal.date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-caption)",
+                  color: "var(--color-text-secondary)",
+                  marginTop: 2,
+                }}
+              >
+                {modal.empName} &middot;{" "}
+                {modal.date.toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                })}
               </div>
             </div>
             <button
@@ -3648,7 +3879,16 @@ export default function ShiftEditPanel({
               style={{ padding: 6, borderRadius: 8, lineHeight: 1 }}
               aria-label="Close"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -3710,7 +3950,9 @@ export default function ShiftEditPanel({
         role="dialog"
         aria-modal="true"
         aria-label="Edit shift"
-        onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
+        }}
       >
         {/* Panel Header */}
         <div
@@ -3742,7 +3984,16 @@ export default function ShiftEditPanel({
                 flexShrink: 0,
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--color-text-primary)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
@@ -3797,7 +4048,6 @@ export default function ShiftEditPanel({
           )}
         </div>
 
-
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "20px 24px" }}>
           {showStandaloneRequestFlow ? (
@@ -3821,107 +4071,90 @@ export default function ShiftEditPanel({
               jobs={jobs}
               shiftDisplayMode={shiftDisplayMode}
               onConfirm={onRepeatConfirm}
-              absenceType={isAbsence ? absenceTypes?.find(at => at.id === currentAbsenceTypeId) : undefined}
+              absenceType={
+                isAbsence ? absenceTypes?.find((at) => at.id === currentAbsenceTypeId) : undefined
+              }
             />
           ) : inDetailMode ? (
             // ── Detail mode ──────────────────────────────────────────────────
             <>
-	              {/* Current shift displayed prominently */}
-	              {renderCurrentShiftPill()}
+              {/* Current shift displayed prominently */}
+              {renderCurrentShiftPill()}
 
-              {allowShiftEdits && hasActiveShift && !currentAbsenceTypeId && currentSegments.length === 1 && (
-                <div
-                  style={{
-                    marginBottom: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 12,
-                    padding: "10px 12px",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: 8,
-                    background: "var(--color-surface)",
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-label)",
-                        fontWeight: 700,
-                        color: "var(--color-text-primary)",
-                      }}
-                    >
-                      Mentored
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "var(--dg-fs-caption)",
-                        color: "var(--color-text-muted)",
-                        marginTop: 2,
-                      }}
-                    >
-                      Applies the organization&apos;s mentored coverage rule.
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleMentoredToggle}
-                    aria-pressed={isMentoredAssignment}
-                    aria-label="Mentored assignment"
+              {allowShiftEdits &&
+                hasActiveShift &&
+                !currentAbsenceTypeId &&
+                currentSegments.length === 1 && (
+                  <div
                     style={{
-                      width: 44,
-                      height: 24,
-                      borderRadius: 12,
-                      border: "none",
-                      cursor: "pointer",
-                      background: isMentoredAssignment
-                        ? "var(--color-brand)"
-                        : "var(--color-border)",
-                      position: "relative",
-                      transition: "background 0.2s",
-                      flexShrink: 0,
+                      marginBottom: 16,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      padding: "10px 12px",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: 8,
+                      background: "var(--color-surface)",
                     }}
                   >
-                    <span
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: "50%",
-                        background: "#fff",
-                        position: "absolute",
-                        top: 3,
-                        left: isMentoredAssignment ? 23 : 3,
-                        transition: "left 0.2s",
-                        boxShadow: "0 1px 3px rgba(0,0,0,.2)",
-                      }}
-                    />
-                  </button>
-                </div>
-              )}
-
-	              {/* Custom time override — single-shift only (multi-shift has per-pill editors); hidden for absence types */}
-		              {hasActiveShift && !currentAbsenceTypeId && allowShiftEdits && onCustomTimeChange && currentLabels.length <= 1 && (() => {
-	                const matchedCode = currentAssignmentIds[0] != null
-	                  ? assignments.find(st => st.id === currentAssignmentIds[0])
-	                  : assignments.find(st => st.label === currentLabels[0]);
-	                const defaults = resolveDefaultTimes(matchedCode);
-	                const singleCustomStart = getFirstTimeSegment(customStartTime);
-	                const singleCustomEnd = getFirstTimeSegment(customEndTime);
-	                return (
-	                  <div style={{ marginBottom: 16 }}>
-	                    <PillTimeEditor
-	                      customStart={singleCustomStart}
-	                      customEnd={singleCustomEnd}
-	                      defaultStart={defaults.start}
-	                      defaultEnd={defaults.end}
-	                      minTime={getTimeBounds(matchedCode).minTime}
-                      maxTime={getTimeBounds(matchedCode).maxTime}
-                      onSave={(start, end) => onCustomTimeChange(start, end)}
-                      onRemove={() => onCustomTimeChange(null, null)}
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 700,
+                          color: "var(--color-text-primary)",
+                        }}
+                      >
+                        Mentored
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-caption)",
+                          color: "var(--color-text-muted)",
+                          marginTop: 2,
+                        }}
+                      >
+                        Applies the organization&apos;s mentored coverage rule.
+                      </div>
+                    </div>
+                    <Switch
+                      checked={isMentoredAssignment}
+                      onChange={() => handleMentoredToggle()}
+                      ariaLabel="Mentored assignment"
                     />
                   </div>
-                );
-              })()}
+                )}
+
+              {/* Custom time override — single-shift only (multi-shift has per-pill editors); hidden for absence types */}
+              {hasActiveShift &&
+                !currentAbsenceTypeId &&
+                allowShiftEdits &&
+                onCustomTimeChange &&
+                currentLabels.length <= 1 &&
+                (() => {
+                  const matchedCode =
+                    currentAssignmentIds[0] != null
+                      ? assignments.find((st) => st.id === currentAssignmentIds[0])
+                      : assignments.find((st) => st.label === currentLabels[0]);
+                  const defaults = resolveDefaultTimes(matchedCode);
+                  const singleCustomStart = getFirstTimeSegment(customStartTime);
+                  const singleCustomEnd = getFirstTimeSegment(customEndTime);
+                  return (
+                    <div style={{ marginBottom: 16 }}>
+                      <PillTimeEditor
+                        customStart={singleCustomStart}
+                        customEnd={singleCustomEnd}
+                        defaultStart={defaults.start}
+                        defaultEnd={defaults.end}
+                        minTime={getTimeBounds(matchedCode).minTime}
+                        maxTime={getTimeBounds(matchedCode).maxTime}
+                        onSave={(start, end) => onCustomTimeChange(start, end)}
+                        onRemove={() => onCustomTimeChange(null, null)}
+                      />
+                    </div>
+                  );
+                })()}
 
               {!hasActiveShift && !allowShiftEdits && (
                 <div
@@ -3978,44 +4211,53 @@ export default function ShiftEditPanel({
               )}
 
               {/* Make repeating — disabled for split shifts (max 1 code) */}
-              {allowShiftEdits && hasActiveShift && !seriesId && onRepeatConfirm && currentLabels.length <= 1 && (
-                <div style={{ marginBottom: 16 }}>
-                  <div style={sectionLabel}>Repeating</div>
-                  <Hint content={hint("Create a recurring pattern (daily, weekly, biweekly)")} side="top">
-                    <button
-                      data-tour="edit-panel-repeat-btn"
-                      onClick={() => { setShowRepeatForm(true); }}
-                      className="dg-btn dg-btn-secondary"
-                      style={{
-                        width: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 6,
-                        fontSize: "var(--dg-fs-caption)",
-                        padding: "9px 12px",
-                      }}
+              {allowShiftEdits &&
+                hasActiveShift &&
+                !seriesId &&
+                onRepeatConfirm &&
+                currentLabels.length <= 1 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={sectionLabel}>Repeating</div>
+                    <Hint
+                      content={hint("Create a recurring pattern (daily, weekly, biweekly)")}
+                      side="top"
                     >
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                      <button
+                        data-tour="edit-panel-repeat-btn"
+                        onClick={() => {
+                          setShowRepeatForm(true);
+                        }}
+                        className="dg-btn dg-btn-secondary"
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                          fontSize: "var(--dg-fs-caption)",
+                          padding: "9px 12px",
+                        }}
                       >
-                        <polyline points="17 1 21 5 17 9" />
-                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                        <polyline points="7 23 3 19 7 15" />
-                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                      </svg>
-                      {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
-                    </button>
-                  </Hint>
-                </div>
-              )}
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="17 1 21 5 17 9" />
+                          <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                          <polyline points="7 23 3 19 7 15" />
+                          <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                        </svg>
+                        {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
+                      </button>
+                    </Hint>
+                  </div>
+                )}
 
               {/* Notes / Indicators — single shift only; multi-shift shows inline per pill; hidden for absences */}
               {currentLabels.length <= 1 && !isAbsence && renderNotesSection()}
@@ -4093,42 +4335,45 @@ export default function ShiftEditPanel({
               )}
 
               {/* Add another shift — hidden when at max (2), absence type, or first shift has no resolvable end time */}
-              {allowShiftEdits && !isAbsence && currentLabels.length < 2 && (() => {
-                const firstCode = assignments.find(sc => sc.id === currentAssignmentIds[0]);
-                return firstCode ? resolveDefaultTimes(firstCode).end != null : true;
-              })() && (
-                <div style={{ marginTop: 8 }}>
-                  <button
-                    onClick={() => setShowPicker(true)}
-                    className="dg-btn dg-btn-ghost"
-                    style={{
-                      width: "100%",
-                      fontSize: "var(--dg-fs-caption)",
-                      padding: "9px 12px",
-                      border: "1px dashed var(--color-border)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 6,
-                    }}
-                  >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+              {allowShiftEdits &&
+                !isAbsence &&
+                currentLabels.length < 2 &&
+                (() => {
+                  const firstCode = assignments.find((sc) => sc.id === currentAssignmentIds[0]);
+                  return firstCode ? resolveDefaultTimes(firstCode).end != null : true;
+                })() && (
+                  <div style={{ marginTop: 8 }}>
+                    <button
+                      onClick={() => setShowPicker(true)}
+                      className="dg-btn dg-btn-ghost"
+                      style={{
+                        width: "100%",
+                        fontSize: "var(--dg-fs-caption)",
+                        padding: "9px 12px",
+                        border: "1px dashed var(--color-border)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                      }}
                     >
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    Add another shift
-                  </button>
-                </div>
-              )}
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      Add another shift
+                    </button>
+                  </div>
+                )}
 
               {/* ── Shift Request Actions (employee self-service) ─────────── */}
               {isOwnShift && hasActiveShift && !hasActiveRequest && !hasEdits && (
@@ -4184,38 +4429,59 @@ export default function ShiftEditPanel({
                     color: "var(--color-danger-dark)",
                   }}
                 >
-                  This shift changed in another tab or by another editor. Close and reopen it before saving.
+                  This shift changed in another tab or by another editor. Close and reopen it before
+                  saving.
                 </div>
               )}
               {overlapWarnings.length > 0 && (
-                <div style={{
-                  marginTop: 16,
-                  padding: "10px 12px",
-                  background: enforceConflicts ? "var(--color-danger-bg)" : "var(--color-warning-bg)",
-                  border: `1px solid ${enforceConflicts ? "var(--color-danger-border)" : "var(--color-warning-border)"}`,
-                  borderRadius: 8,
-                }}>
-                  <div style={{
-                    fontSize: "var(--dg-fs-badge)",
-                    fontWeight: 700,
-                    color: enforceConflicts ? "var(--color-danger-dark)" : "var(--color-warning-text)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    marginBottom: 4,
-                  }}>
+                <div
+                  style={{
+                    marginTop: 16,
+                    padding: "10px 12px",
+                    background: enforceConflicts
+                      ? "var(--color-danger-bg)"
+                      : "var(--color-warning-bg)",
+                    border: `1px solid ${enforceConflicts ? "var(--color-danger-border)" : "var(--color-warning-border)"}`,
+                    borderRadius: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-badge)",
+                      fontWeight: 700,
+                      color: enforceConflicts
+                        ? "var(--color-danger-dark)"
+                        : "var(--color-warning-text)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      marginBottom: 4,
+                    }}
+                  >
                     {enforceConflicts ? "Conflict Blocked" : "Overlap Warning"}
                   </div>
                   {overlapWarnings.map((w, i) => (
-                    <div key={i} style={{
-                      fontSize: "var(--dg-fs-caption)",
-                      color: enforceConflicts ? "var(--color-danger-dark)" : "var(--color-warning-text)",
-                      marginTop: i > 0 ? 4 : 0,
-                    }}>
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: enforceConflicts
+                          ? "var(--color-danger-dark)"
+                          : "var(--color-warning-text)",
+                        marginTop: i > 0 ? 4 : 0,
+                      }}
+                    >
                       {w}
                     </div>
                   ))}
                   {enforceConflicts && (
-                    <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)", marginTop: 6, fontStyle: "italic" }}>
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--color-text-muted)",
+                        marginTop: 6,
+                        fontStyle: "italic",
+                      }}
+                    >
                       Resolve the overlap to save this shift.
                     </div>
                   )}
@@ -4270,54 +4536,54 @@ export default function ShiftEditPanel({
                 </div>
               ) : (
                 <div data-tour="shift-picker">
-                <ShiftPicker
-                  assignments={pickerAssignmentDefinitions}
-                  shiftCategories={shiftCategories}
-                  jobs={jobs}
-                  orgRoles={orgRoles}
-                  certifications={certifications}
-                  absenceTypes={pickerAbsenceTypes}
-                  focusAreas={focusAreas}
-                  currentAssignmentDefinitionIds={currentAssignmentIds}
-	                  currentSegments={currentSegments.map((segment, index) => ({
-	                    shiftId: segment.shiftId,
-	                    jobId: segment.jobId,
-	                    position: segment.position ?? index,
-	                    isMentored: segment.isMentored ?? false,
-	                  }))}
-                  currentAbsenceTypeId={currentAbsenceTypeId}
-                  onSelect={(segments) => {
-                    onSelect(
-                      buildPanelInput({
-                        segments,
-                        absenceTypeId: null,
-                        customStartTime: customStartTime ?? null,
-                        customEndTime: customEndTime ?? null,
-                      }),
-                      seriesId ? seriesScope : undefined,
-                    );
-                    if (segments.length > 0) setShowPicker(false);
-                  }}
-                  onAbsenceSelect={(at) => {
-                    onSelect(
-                      buildPanelInput({
-                        segments: [],
-                        absenceTypeId: at.id,
-                        customStartTime: null,
-                        customEndTime: null,
-                      }),
-                      seriesId ? seriesScope : undefined,
-                    );
-                    setShowPicker(false);
-                  }}
-                  empFocusAreaIds={modal.empFocusAreaIds}
-                  empCertificationId={modal.empCertificationId}
-                  empRoleIds={modal.empRoleIds}
-                  initialTab={modal.activeFocusAreaId}
-                  multiSelect={true}
-                  closeOnSelect={false}
-                  shiftDisplayMode={shiftDisplayMode}
-                />
+                  <ShiftPicker
+                    assignments={pickerAssignmentDefinitions}
+                    shiftCategories={shiftCategories}
+                    jobs={jobs}
+                    orgRoles={orgRoles}
+                    certifications={certifications}
+                    absenceTypes={pickerAbsenceTypes}
+                    focusAreas={focusAreas}
+                    currentAssignmentDefinitionIds={currentAssignmentIds}
+                    currentSegments={currentSegments.map((segment, index) => ({
+                      shiftId: segment.shiftId,
+                      jobId: segment.jobId,
+                      position: segment.position ?? index,
+                      isMentored: segment.isMentored ?? false,
+                    }))}
+                    currentAbsenceTypeId={currentAbsenceTypeId}
+                    onSelect={(segments) => {
+                      onSelect(
+                        buildPanelInput({
+                          segments,
+                          absenceTypeId: null,
+                          customStartTime: customStartTime ?? null,
+                          customEndTime: customEndTime ?? null,
+                        }),
+                        seriesId ? seriesScope : undefined,
+                      );
+                      if (segments.length > 0) setShowPicker(false);
+                    }}
+                    onAbsenceSelect={(at) => {
+                      onSelect(
+                        buildPanelInput({
+                          segments: [],
+                          absenceTypeId: at.id,
+                          customStartTime: null,
+                          customEndTime: null,
+                        }),
+                        seriesId ? seriesScope : undefined,
+                      );
+                      setShowPicker(false);
+                    }}
+                    empFocusAreaIds={modal.empFocusAreaIds}
+                    empCertificationId={modal.empCertificationId}
+                    empRoleIds={modal.empRoleIds}
+                    initialTab={modal.activeFocusAreaId}
+                    multiSelect={true}
+                    closeOnSelect={false}
+                    shiftDisplayMode={shiftDisplayMode}
+                  />
                 </div>
               )}
             </>
@@ -4378,9 +4644,7 @@ export default function ShiftEditPanel({
               disabled={isCreatingRepeatSeries}
             >
               <ButtonLoading loading={isCreatingRepeatSeries} spinnerSize={16}>
-                {isAbsence
-                  ? "Create Repeating Off Day"
-                  : "Create Repeating Shift"}
+                {isAbsence ? "Create Repeating Off Day" : "Create Repeating Shift"}
               </ButtonLoading>
             </button>
           </div>
@@ -4400,33 +4664,39 @@ export default function ShiftEditPanel({
             }}
           >
             {(shiftSummary || timeSummary || noteSummary) && (
-              <div style={{ fontSize: "var(--dg-fs-badge)", color: "var(--color-text-muted)", lineHeight: 1.4 }}>
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-badge)",
+                  color: "var(--color-text-muted)",
+                  lineHeight: 1.4,
+                }}
+              >
                 {shiftSummary && <div>{shiftSummary}</div>}
                 {timeSummary && <div>{timeSummary}</div>}
                 {noteSummary && <div>{noteSummary}</div>}
               </div>
             )}
             <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handleUndo}
-              className="dg-btn dg-btn-ghost"
-              style={{
-                flex: 1,
-                fontSize: "var(--dg-fs-caption)",
-                padding: "9px 12px",
-                border: "1px solid var(--color-border)",
-              }}
-            >
-              Undo
-            </button>
-            <button
-              onClick={() => onConfirmDraft?.(seriesId ? seriesScope : undefined)}
-              className="dg-btn dg-btn-primary"
-              style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
-              disabled={confirmBlocked}
-            >
-              Confirm
-            </button>
+              <button
+                onClick={handleUndo}
+                className="dg-btn dg-btn-ghost"
+                style={{
+                  flex: 1,
+                  fontSize: "var(--dg-fs-caption)",
+                  padding: "9px 12px",
+                  border: "1px solid var(--color-border)",
+                }}
+              >
+                Undo
+              </button>
+              <button
+                onClick={() => onConfirmDraft?.(seriesId ? seriesScope : undefined)}
+                className="dg-btn dg-btn-primary"
+                style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
+                disabled={confirmBlocked}
+              >
+                Confirm
+              </button>
             </div>
           </div>
         )}

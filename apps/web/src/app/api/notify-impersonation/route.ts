@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { createElement } from "react";
+import { render } from "@react-email/components";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
-import { escapeHtml, sanitizeHeaderValue, emailWrapper } from "@/lib/email";
+import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
+import { ImpersonationNoticeEmail } from "@/emails/ImpersonationNoticeEmail";
 import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bodySchema = z.object({
   targetEmail: z.string().email(),
@@ -47,10 +51,7 @@ export async function POST(req: NextRequest) {
 
   // ── Authorization — only gridmaster can trigger impersonation notifications ──
   if (claims.platform_role !== "gridmaster") {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 403 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
   }
 
   // ── Config check ──────────────────────────────────────────────────
@@ -68,48 +69,29 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid request body" },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: "Invalid input" },
-      { status: 400 },
-    );
+    return NextResponse.json({ success: false, error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const { targetEmail, targetOrgName, type, justification } = parsed.data;
-  const orgDisplay = targetOrgName ? escapeHtml(targetOrgName) : "your organization";
 
   const isStart = type === "start";
   const subject = isStart
     ? `Account access notice — ${targetOrgName || "DubGrid"}`
     : `Account access ended — ${targetOrgName || "DubGrid"}`;
 
-  const headline = isStart ? "Account Access Notice" : "Account Access Ended";
-  const justificationHtml = isStart && justification
-    ? `<br><br><strong>Reason:</strong> ${escapeHtml(justification)}`
-    : "";
-  const bodyText = isStart
-    ? `A platform administrator is currently reviewing your account on <strong>${orgDisplay}</strong> for support purposes. This is a routine support action.${justificationHtml}`
-    : `A platform administrator has finished reviewing your account on <strong>${orgDisplay}</strong>. No further action is required.`;
-
-  const html = emailWrapper(`
-      <h2 style="color:#111410;font-size:22px;font-weight:700;margin:0 0 16px;letter-spacing:-0.02em;">
-        ${headline}
-      </h2>
-      <p style="color:#3E433B;font-size:16px;line-height:1.6;margin:0 0 24px;">
-        ${bodyText}
-      </p>
-      <div style="border-top:1px solid #D0DBD4;padding-top:20px;">
-        <p style="color:#94A3B8;font-size:13px;margin:0;">
-          This is an automated notification from DubGrid. If you have questions about this access, please contact your organization administrator.
-        </p>
-      </div>`);
+  const html = await render(
+    createElement(ImpersonationNoticeEmail, {
+      orgName: targetOrgName,
+      ended: !isStart,
+      reason: isStart ? justification : undefined,
+      logoUrl: emailBaseUrl(),
+    }),
+  );
 
   try {
     await sendResendEmail({
@@ -128,10 +110,7 @@ export async function POST(req: NextRequest) {
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
       if (ip && serviceRoleKey) {
         try {
-          const supabaseAdmin = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            serviceRoleKey,
-          );
+          const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);
           await supabaseAdmin
             .from("impersonation_sessions")
             .update({ ip_address: ip })
@@ -145,10 +124,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "notify-impersonation" } });
-    logger.error({ err, path: "/api/notify-impersonation" }, "Failed to send impersonation notification email");
-    return NextResponse.json(
-      { success: false, error: "Failed to send email" },
-      { status: 500 },
+    logger.error(
+      { err, path: "/api/notify-impersonation" },
+      "Failed to send impersonation notification email",
     );
+    return NextResponse.json({ success: false, error: "Failed to send email" }, { status: 500 });
   }
 }

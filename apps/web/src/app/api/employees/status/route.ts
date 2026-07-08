@@ -4,18 +4,21 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
 import { EMPLOYEE_COLS } from "@/lib/db/shared";
+import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   empId: z.string().uuid(),
   orgId: z.string().uuid(),
-  action: z.enum(["bench", "activate", "terminate"]),
+  action: z.enum(["deactivate", "activate", "remove"]),
   expectedVersion: z.number().int().min(0),
   note: z.string().optional(),
 });
@@ -23,8 +26,7 @@ const bodySchema = z.object({
 function buildConflictResponse(employee: ReturnType<typeof rowToEmployee>) {
   return NextResponse.json(
     {
-      error:
-        "Employee status changed elsewhere. Review the latest values before saving again.",
+      error: "Employee status changed elsewhere. Review the latest values before saving again.",
       code: "EMPLOYEE_STATUS_CONFLICT",
       employee,
     },
@@ -69,17 +71,25 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { empId, orgId, action, expectedVersion, note } = parsed.data;
+  const { empId, action, expectedVersion, note } = parsed.data;
+  // Effective (sandbox-redirected) org; resolved inside the try, declared here
+  // so the catch block can reference it for logging. (H-1)
+  let orgId = parsed.data.orgId;
 
   try {
+    // Resolve the effective org: if the caller is in sandbox mode, route the
+    // check AND the mutation to their sandbox, never the raw request orgId
+    // (otherwise a sandbox user could mutate the real org). See H-1.
+    orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
+
     // ── Permission check ──────────────────────────────────────────────
     const serviceClient = getServiceClient();
     const [{ data: membership }, { data: profile }] = await Promise.all([
@@ -89,11 +99,7 @@ export async function POST(req: NextRequest) {
         .eq("user_id", user.id)
         .eq("org_id", orgId)
         .maybeSingle(),
-      serviceClient
-        .from("profiles")
-        .select("platform_role")
-        .eq("id", user.id)
-        .single(),
+      serviceClient.from("profiles").select("platform_role").eq("id", user.id).single(),
     ]);
 
     const isGridmaster = profile?.platform_role === "gridmaster";
@@ -102,12 +108,10 @@ export async function POST(req: NextRequest) {
     const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
 
     const hasPermission =
-      isGridmaster ||
-      isSuperAdmin ||
-      (isAdmin && adminPerms?.canManageEmployees === true);
+      isGridmaster || isSuperAdmin || (isAdmin && adminPerms?.canManageEmployees === true);
 
     if (!hasPermission) {
-      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
     }
 
     const { data: currentRow, error: currentError } = await serviceClient
@@ -120,6 +124,15 @@ export async function POST(req: NextRequest) {
     if (currentError) throw currentError;
 
     const currentEmployee = rowToEmployee(currentRow as DbEmployee);
+
+    // Self-action guard: you cannot change your own staffing status
+    // (bench / terminate / activate). Another admin must act.
+    if (currentEmployee.userId === user.id) {
+      return NextResponse.json(
+        { error: SELF_ACTION_FORBIDDEN_MESSAGE, code: SELF_ACTION_FORBIDDEN_CODE },
+        { status: 403 },
+      );
+    }
 
     if (currentEmployee.version !== expectedVersion) {
       return buildConflictResponse(currentEmployee);
@@ -137,13 +150,13 @@ export async function POST(req: NextRequest) {
     };
 
     switch (action) {
-      case "bench":
-        update.status = "benched";
+      case "deactivate":
+        update.status = "inactive";
         update.status_note = note ?? "";
-        auditAction = "employee.benched";
+        auditAction = "employee.deactivated";
         auditDetails = {
           ...auditDetails,
-          toStatus: "benched",
+          toStatus: "inactive",
           note: note ?? "",
         };
         break;
@@ -157,13 +170,15 @@ export async function POST(req: NextRequest) {
           toStatus: "active",
         };
         break;
-      case "terminate":
-        update.status = "terminated";
+      case "remove":
+        update.status = "removed";
+        update.status_note = note ?? "";
         update.archived_at = now;
-        auditAction = "employee.archived";
+        auditAction = "employee.removed";
         auditDetails = {
           ...auditDetails,
-          toStatus: "terminated",
+          toStatus: "removed",
+          note: note ?? "",
         };
         break;
     }
@@ -193,22 +208,20 @@ export async function POST(req: NextRequest) {
 
     const updatedEmployee = rowToEmployee(updatedRow as DbEmployee);
 
-    const { error: auditError } = await serviceClient
-      .from("audit_log")
-      .insert({
-        org_id: orgId,
-        actor_id: user.id,
-        actor_email: user.email ?? null,
-        action: auditAction,
-        resource_type: "employee",
-        resource_id: empId,
-        details: {
-          ...auditDetails,
-          changedFields: ["status"],
-        },
-        ip_address: getRequestIp(req),
-        user_agent: req.headers.get("user-agent"),
-      });
+    const { error: auditError } = await serviceClient.from("audit_log").insert({
+      org_id: orgId,
+      actor_id: user.id,
+      actor_email: user.email ?? null,
+      action: auditAction,
+      resource_type: "employee",
+      resource_id: empId,
+      details: {
+        ...auditDetails,
+        changedFields: ["status"],
+      },
+      ip_address: getRequestIp(req),
+      user_agent: req.headers.get("user-agent"),
+    });
 
     if (auditError) {
       logger.error(

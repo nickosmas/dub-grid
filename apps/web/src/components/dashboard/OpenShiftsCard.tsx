@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import type { OpenShift } from "@/lib/dashboard-stats";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import ExpandButton from "./ExpandButton";
-import DashboardEmptyState from "./DashboardEmptyState";
+import { EmptyState } from "@/components/EmptyState";
 
 const BADGE_STYLES: Record<
   OpenShift["urgency"],
@@ -48,10 +48,7 @@ export default function OpenShiftsCard({
 }: OpenShiftsCardProps) {
   const visible = openShifts.slice(0, maxVisible);
   const remainingCount = Math.max(0, openShifts.length - visible.length);
-  const openSlotCount = openShifts.reduce(
-    (total, shift) => total + shift.needed,
-    0,
-  );
+  const openSlotCount = openShifts.reduce((total, shift) => total + shift.needed, 0);
   const isUnpublished = publishedWindowState === "unpublished";
   const isPartial = publishedWindowState === "partial";
   const subtitle = isUnpublished
@@ -61,21 +58,22 @@ export default function OpenShiftsCard({
       : `${openSlotCount} unfilled ${periodLabel}`;
 
   return (
-    <div className="dg-card">
+    <div className="dg-card" style={{ display: "flex", flexDirection: "column" }}>
       {/* Header */}
       <div className="dg-card-header">
         <div>
           <div className="dg-card-title">Open shifts</div>
           <div className="dg-card-subtitle">{subtitle}</div>
         </div>
-        {onExpand && (
-          <ExpandButton onClick={onExpand} label="Expand open shifts" />
-        )}
+        {onExpand && <ExpandButton onClick={onExpand} label="Expand open shifts" />}
       </div>
 
-      <div className="dg-card-body">
+      <div
+        className="dg-card-body"
+        style={openShifts.length === 0 ? { display: "flex", flex: 1 } : undefined}
+      >
         {openShifts.length === 0 ? (
-          <DashboardEmptyState
+          <EmptyState
             title={
               isUnpublished
                 ? "Not published yet"
@@ -90,7 +88,8 @@ export default function OpenShiftsCard({
                   ? "Only published dates are counted here."
                   : undefined
             }
-            variant="inline"
+            size="inline"
+            style={{ flex: 1 }}
           />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -113,9 +112,7 @@ export default function OpenShiftsCard({
                 border: "1px solid var(--color-border)",
               };
               const rowContent = (
-                <div
-                  style={rowStyle}
-                >
+                <div style={rowStyle}>
                   {/* Date block */}
                   <div style={{ textAlign: "center", minWidth: 34 }}>
                     <div

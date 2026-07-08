@@ -3,6 +3,9 @@ import { z } from "zod";
 import { trackUserSessionForUser } from "@/features/account/server";
 import { requireAuthenticatedSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { getServiceClient } from "@/lib/supabase-service";
+import logger from "@/lib/logger";
 
 const bodySchema = z.object({
   platform: z.literal("web"),
@@ -36,6 +39,16 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ??
       null;
 
+    // Detect a previously-unseen device before the upsert. "New" = no prior
+    // user_sessions row for (user_id, platform, device_label) — not "no row
+    // other than the current session's", which would refire on every refresh
+    // within the same session.
+    const isNewDevice = await isNewDeviceForUser({
+      userId: auth.user.id,
+      platform,
+      deviceLabel,
+    });
+
     await trackUserSessionForUser({
       userId: auth.user.id,
       orgId: sessionClaims.orgId,
@@ -45,6 +58,18 @@ export async function POST(req: NextRequest) {
       appVersion: appVersion ?? null,
       ipAddress: ip,
     });
+
+    if (isNewDevice) {
+      // Fire-and-forget — a notification failure must not block sign-in.
+      void dispatchNotificationEvent(auth.user.id, {
+        action: "security_new_device",
+        orgId: sessionClaims.orgId,
+        targetUserId: auth.user.id,
+        platform,
+        deviceLabel,
+        ipAddress: ip,
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -69,16 +94,12 @@ function extractSupabaseSessionClaims(accessToken: string): {
     }
 
     const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
-    const padding =
-      normalized.length % 4 === 0
-        ? ""
-        : "=".repeat(4 - (normalized.length % 4));
+    const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
     const payload = JSON.parse(
       Buffer.from(`${normalized}${padding}`, "base64").toString("utf8"),
     ) as Record<string, unknown>;
     return {
-      supabaseSessionId:
-        typeof payload.session_id === "string" ? payload.session_id : null,
+      supabaseSessionId: typeof payload.session_id === "string" ? payload.session_id : null,
       orgId: typeof payload.org_id === "string" ? payload.org_id : null,
     };
   } catch {
@@ -93,4 +114,27 @@ function isSupabaseErrorCode(error: unknown, code: string): boolean {
     "code" in error &&
     (error as { code?: unknown }).code === code
   );
+}
+
+async function isNewDeviceForUser(input: {
+  userId: string;
+  platform: "web" | "ios" | "android";
+  deviceLabel: string;
+}): Promise<boolean> {
+  try {
+    const { data, error } = await getServiceClient()
+      .from("user_sessions")
+      .select("id")
+      .eq("user_id", input.userId)
+      .eq("platform", input.platform)
+      .eq("device_label", input.deviceLabel)
+      .limit(1);
+    if (error) throw error;
+    return (data ?? []).length === 0;
+  } catch (err) {
+    // Detection is best-effort — never block sign-in over a notification
+    // false-negative. Treat lookup failures as "not new".
+    logger.warn({ err, userId: input.userId }, "new-device detection failed");
+    return false;
+  }
 }

@@ -29,9 +29,7 @@ describe("DraftBanner", () => {
     expect(screen.getByText("Edited")).toBeInTheDocument();
     expect(screen.getByText("Deleted")).toBeInTheDocument();
     expect(screen.queryByText("Changed / Time")).not.toBeInTheDocument();
-    expect(
-      legend.querySelector('[data-change-legend-dot="modified"]'),
-    ).toHaveStyle({
+    expect(legend.querySelector('[data-change-legend-dot="modified"]')).toHaveStyle({
       background: "rgba(217, 119, 6, 0.94)",
     });
 

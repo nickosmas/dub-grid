@@ -5,10 +5,7 @@ const URL_LIKE_PATTERN = /(?:https?:\/\/|www\.|[a-z0-9-]+\.[a-z]{2,})/i;
 const STAFF_NAME_ALLOWED_PATTERN = /^[\p{L}\p{M} .'\-\u2019]+$/u;
 const PHONE_ALLOWED_PATTERN = /^[\d\s().+\-]+$/;
 
-export function getStaffNameError(
-  value: string,
-  label = "Name",
-): string | null {
+export function getStaffNameError(value: string, label = "Name"): string | null {
   const trimmed = value.trim();
   if (!trimmed) {
     return `${label} is required`;
@@ -111,14 +108,26 @@ export const requiredStaffEmailSchema = z
   })
   .transform((value) => value.trim().toLowerCase());
 
+export function getOptionalStaffEmailError(value: string): string | null {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+  const result = z.string().email().safeParse(trimmed);
+  if (!result.success) {
+    return "Invalid email address";
+  }
+  return null;
+}
+
 export function normalizeOptionalStaffEmail(value: string): string {
   const trimmed = value.trim().toLowerCase();
   if (!trimmed) {
     return "";
   }
-  const result = z.string().email().safeParse(trimmed);
-  if (!result.success) {
-    throw new Error("Invalid email address");
+  const error = getOptionalStaffEmailError(trimmed);
+  if (error) {
+    throw new Error(error);
   }
   return trimmed;
 }
@@ -131,8 +140,7 @@ export const optionalStaffEmailSchema = z
     } catch (error) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          error instanceof Error ? error.message : "Invalid email address",
+        message: error instanceof Error ? error.message : "Invalid email address",
       });
     }
   })

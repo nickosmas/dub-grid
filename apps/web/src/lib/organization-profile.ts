@@ -10,7 +10,10 @@ export interface StructuredOrganizationAddress {
 }
 
 function joinNonEmpty(parts: Array<string | null | undefined>, separator: string): string {
-  return parts.map((part) => part?.trim() ?? "").filter(Boolean).join(separator);
+  return parts
+    .map((part) => part?.trim() ?? "")
+    .filter(Boolean)
+    .join(separator);
 }
 
 export function composeOrganizationAddress(address: StructuredOrganizationAddress): string {
@@ -18,11 +21,11 @@ export function composeOrganizationAddress(address: StructuredOrganizationAddres
   const cityStatePostal = [
     address.addressCity.trim(),
     joinNonEmpty([address.addressState, address.addressPostalCode], " "),
-  ].filter(Boolean).join(", ");
-
-  return [lineBlock, cityStatePostal, address.addressCountry.trim()]
+  ]
     .filter(Boolean)
     .join(", ");
+
+  return [lineBlock, cityStatePostal, address.addressCountry.trim()].filter(Boolean).join(", ");
 }
 
 export function getOrganizationAddressFields(
@@ -47,7 +50,9 @@ export function getOrganizationAddressFields(
   };
 }
 
-export function withComposedOrganizationAddress<T extends StructuredOrganizationAddress>(value: T): T & { address: string } {
+export function withComposedOrganizationAddress<T extends StructuredOrganizationAddress>(
+  value: T,
+): T & { address: string } {
   return {
     ...value,
     address: composeOrganizationAddress(value),

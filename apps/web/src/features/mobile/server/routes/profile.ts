@@ -35,35 +35,26 @@ function readUserMetadataName(value: unknown): {
 
   const metadata = value as { first_name?: unknown; last_name?: unknown };
   return {
-    firstName:
-      typeof metadata.first_name === "string" ? metadata.first_name : null,
-    lastName:
-      typeof metadata.last_name === "string" ? metadata.last_name : null,
+    firstName: typeof metadata.first_name === "string" ? metadata.first_name : null,
+    lastName: typeof metadata.last_name === "string" ? metadata.last_name : null,
   };
 }
 
-async function buildMobileProfilePayload(
-  auth: Awaited<ReturnType<typeof requireMobileAuth>>,
-) {
+async function buildMobileProfilePayload(auth: Awaited<ReturnType<typeof requireMobileAuth>>) {
   if ("response" in auth) {
     return auth;
   }
 
-  const [profile, linkedEmployee, focusAreas, changeRequests] =
-    await Promise.all([
-      fetchSelfProfileSnapshot(auth.user.id),
-      fetchLinkedEmployeeForUser(
-        auth.serviceClient,
-        auth.currentOrg.id,
-        auth.user.id,
-      ),
-      fetchMobileFocusAreas(auth.serviceClient, auth.currentOrg.id),
-      listOwnProfileChangeRequests({
-        serviceClient: auth.serviceClient,
-        userId: auth.user.id,
-        orgId: auth.currentOrg.id,
-      }),
-    ]);
+  const [profile, linkedEmployee, focusAreas, changeRequests] = await Promise.all([
+    fetchSelfProfileSnapshot(auth.user.id),
+    fetchLinkedEmployeeForUser(auth.serviceClient, auth.currentOrg.id, auth.user.id),
+    fetchMobileFocusAreas(auth.serviceClient, auth.currentOrg.id),
+    listOwnProfileChangeRequests({
+      serviceClient: auth.serviceClient,
+      userId: auth.user.id,
+      orgId: auth.currentOrg.id,
+    }),
+  ]);
   const metadataName = readUserMetadataName(auth.user.user_metadata);
   const firstName = profile?.firstName ?? metadataName.firstName;
   const lastName = profile?.lastName ?? metadataName.lastName;
@@ -107,12 +98,10 @@ async function buildMobileProfilePayload(
       : null,
     focusAreas,
     pendingProfileChangeRequest: changeRequests.some(
-      (request) =>
-        request.type === "profile_update" && request.status === "pending",
+      (request) => request.type === "profile_update" && request.status === "pending",
     ),
     pendingAccountDeletionRequest: changeRequests.some(
-      (request) =>
-        request.type === "account_deletion" && request.status === "pending",
+      (request) => request.type === "account_deletion" && request.status === "pending",
     ),
   };
 }
@@ -141,16 +130,13 @@ export async function PATCHAccount(req: NextRequest) {
 
   const parsed = mobileProfileAccountUpdateBodySchema.safeParse(body);
   if (!parsed.success) {
-    return buildStaffValidationErrorResponse(
-      getStaffFieldErrorsFromZod(parsed.error),
-    );
+    return buildStaffValidationErrorResponse(getStaffFieldErrorsFromZod(parsed.error));
   }
 
   if (!auth.permissions.canManageEmployees) {
     return NextResponse.json(
       {
-        error:
-          "Profile details are changed by admins. Submit a profile change request instead.",
+        error: "Profile details are changed by admins. Submit a profile change request instead.",
       },
       { status: 403 },
     );
@@ -192,9 +178,7 @@ export async function PATCHPhone(req: NextRequest) {
 
   const parsed = mobileProfilePhoneUpdateBodySchema.safeParse(body);
   if (!parsed.success) {
-    return buildStaffValidationErrorResponse(
-      getStaffFieldErrorsFromZod(parsed.error),
-    );
+    return buildStaffValidationErrorResponse(getStaffFieldErrorsFromZod(parsed.error));
   }
 
   let result;

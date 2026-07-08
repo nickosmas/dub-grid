@@ -46,12 +46,14 @@ describe("mobile people route", () => {
     fetchMobilePeople.mockResolvedValue([
       {
         id: "00000000-0000-0000-0000-000000000001",
+        employeeNumber: 1042,
         firstName: "Mina",
         lastName: "Diaz",
         employmentType: "full_time",
         phone: "555-0100",
         email: "mina@dubgrid.com",
         status: "active",
+        orgRole: "admin",
         certificationId: null,
         roleIds: [],
         seniority: 0,
@@ -80,12 +82,14 @@ describe("mobile people route", () => {
     expect(payload.people).toEqual([
       {
         id: "00000000-0000-0000-0000-000000000001",
+        employeeNumber: 1042,
         firstName: "Mina",
         lastName: "Diaz",
         employmentType: "full_time",
         phone: "555-0100",
         email: "mina@dubgrid.com",
         status: "active",
+        orgRole: "admin",
         certificationId: null,
         roleIds: [],
         seniority: 0,
@@ -109,6 +113,9 @@ describe("mobile people route", () => {
       currentOrg: {
         id: "org-1",
       },
+      user: {
+        id: "00000000-0000-0000-0000-00000000009a",
+      },
       permissions: {
         canManageEmployees: false,
         canViewStaff: true,
@@ -118,6 +125,7 @@ describe("mobile people route", () => {
     fetchMobilePeople.mockResolvedValue([
       {
         id: "00000000-0000-0000-0000-000000000001",
+        employeeNumber: 1042,
         firstName: "Mina",
         lastName: "Diaz",
         phone: "555-0100",
@@ -145,11 +153,12 @@ describe("mobile people route", () => {
       },
       {
         id: "00000000-0000-0000-0000-000000000002",
+        employeeNumber: 1043,
         firstName: "Owen",
         lastName: "Lee",
         phone: "555-0101",
         email: "owen@dubgrid.com",
-        status: "benched",
+        status: "inactive",
         certificationId: null,
         roleIds: [],
         seniority: 0,

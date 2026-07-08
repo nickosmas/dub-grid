@@ -1,0 +1,322 @@
+/**
+ * Cross-tenant RLS isolation regression test.
+ *
+ * Anchors the invariant that a user signed into Org A can never read Org B's
+ * data through the authenticated REST API, even when:
+ *   - The user is a legitimate member of both orgs.
+ *   - profiles.org_id still points at the wrong org (signup default that
+ *     switch_org intentionally no longer mutates).
+ *
+ * This is the exact scenario that produced the original cross-tenant leak:
+ * caller_org_id() used to read profiles.org_id, which drifted out of sync
+ * with the JWT after switch_org stopped updating it. The fix made
+ * caller_org_id() read auth.jwt() ->> 'org_id' instead.
+ *
+ * Skipped when LOCAL_SUPABASE_URL is unset (CI without a running Supabase).
+ */
+
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { Client } from "pg";
+
+const SUPABASE_URL = process.env.LOCAL_SUPABASE_URL ?? "http://127.0.0.1:54321";
+const ANON_KEY =
+  process.env.LOCAL_SUPABASE_ANON_KEY ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+
+const TEST_EMAIL = process.env.LOCAL_SUPABASE_SUPER_ADMIN_EMAIL ?? "nicokosmas@outlook.com";
+const TEST_PASSWORD = process.env.LOCAL_SUPABASE_SUPER_ADMIN_PASSWORD ?? "password123";
+
+const DB_URL =
+  process.env.LOCAL_SUPABASE_DB_URL ?? "postgres://postgres:postgres@127.0.0.1:54322/postgres";
+const DB_CONFIG = {
+  connectionString: DB_URL,
+  ssl: DB_URL.includes("supabase.co") ? { rejectUnauthorized: false } : false,
+} as const;
+
+async function probeSupabase(): Promise<boolean> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
+      headers: { apikey: ANON_KEY },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+function decodeJwtClaims(token: string): Record<string, unknown> {
+  const [, payload] = token.split(".");
+  if (!payload) throw new Error("Malformed JWT");
+  const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
+  return JSON.parse(Buffer.from(padded, "base64url").toString("utf8")) as Record<string, unknown>;
+}
+
+async function signIn(): Promise<{ accessToken: string; refreshToken: string }> {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: ANON_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ email: TEST_EMAIL, password: TEST_PASSWORD }),
+  });
+  if (!res.ok) throw new Error(`signIn failed: ${res.status}`);
+  const data = (await res.json()) as {
+    access_token: string;
+    refresh_token: string;
+  };
+  return { accessToken: data.access_token, refreshToken: data.refresh_token };
+}
+
+async function rpc(
+  accessToken: string,
+  name: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: {
+      apikey: ANON_KEY,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    throw new Error(`rpc ${name} failed: ${res.status} ${await res.text()}`);
+  }
+}
+
+async function refreshSession(refreshToken: string): Promise<{ accessToken: string }> {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: "POST",
+    headers: { apikey: ANON_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  if (!res.ok) throw new Error(`refresh failed: ${res.status}`);
+  const data = (await res.json()) as { access_token: string };
+  return { accessToken: data.access_token };
+}
+
+async function listOrgIdsForUser(accessToken: string): Promise<string[]> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/organization_memberships?select=org_id&archived_at=is.null`,
+    {
+      headers: { apikey: ANON_KEY, Authorization: `Bearer ${accessToken}` },
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`memberships fetch failed: ${res.status}`);
+  }
+  const rows = (await res.json()) as Array<{ org_id: string }>;
+  return rows.map((r) => r.org_id);
+}
+
+async function fetchEmployeesViaRls(accessToken: string): Promise<Array<{ org_id: string }>> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/employees?select=org_id`, {
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    throw new Error(`employees fetch failed: ${res.status}`);
+  }
+  return (await res.json()) as Array<{ org_id: string }>;
+}
+
+async function probeDb(): Promise<boolean> {
+  const probe = new Client(DB_CONFIG);
+  try {
+    await probe.connect();
+    await probe.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await probe.end().catch(() => undefined);
+  }
+}
+
+const supabaseReachable = await probeSupabase();
+const dbReachable = await probeDb();
+
+describe.runIf(supabaseReachable)("cross-tenant RLS isolation", () => {
+  it("RLS scopes authenticated reads to the JWT's org_id, even after switch_org leaves profiles.org_id stale", async () => {
+    const { accessToken, refreshToken } = await signIn();
+    const initialClaims = decodeJwtClaims(accessToken);
+    const initialOrgId = initialClaims.org_id as string;
+    expect(typeof initialOrgId).toBe("string");
+
+    // Pick any OTHER org this user is a member of as the switch target.
+    const orgIds = await listOrgIdsForUser(accessToken);
+    const targetOrgId = orgIds.find((id) => id !== initialOrgId);
+    if (!targetOrgId) {
+      // Single-org user — nothing meaningful to test here.
+      return;
+    }
+
+    // Session-scoped switch: queues a pending_org_switch row, consumed by
+    // the next refresh. profiles.org_id is intentionally NOT mutated.
+    await rpc(accessToken, "switch_org", { target_org_id: targetOrgId });
+
+    const { accessToken: refreshed } = await refreshSession(refreshToken);
+    const refreshedClaims = decodeJwtClaims(refreshed);
+    expect(refreshedClaims.org_id).toBe(targetOrgId);
+
+    // The acid test: query an RLS-gated table. Every row must belong to
+    // the JWT's current org (targetOrgId). If caller_org_id() ever drifts
+    // back to reading profiles.org_id, this assertion fails — which is
+    // precisely the regression we're guarding against.
+    const employees = await fetchEmployeesViaRls(refreshed);
+    const distinctOrgIds = new Set(employees.map((e) => e.org_id));
+    expect(distinctOrgIds.size).toBeLessThanOrEqual(1);
+    if (distinctOrgIds.size === 1) {
+      expect([...distinctOrgIds][0]).toBe(targetOrgId);
+    }
+  });
+});
+
+/**
+ * SQL-layer tests for caller_org_id() / caller_org_role(). These probe the
+ * helpers directly by setting request.jwt.claims so we can exercise the two
+ * branches that the HTTP-level test above can't reach:
+ *
+ *   1. Fallback path: legacy/service-role tokens with no org_id claim must
+ *      still return profiles.org_id, otherwise SSR and pre-deploy tokens
+ *      lose every RLS read at once.
+ *
+ *   2. Divergent state: a sibling device's switch_org mutates profiles.org_id
+ *      while THIS session's JWT still carries the original org_id. That is
+ *      the precise shape that made mobile alerts disappear — the helper must
+ *      honor the JWT, not the row.
+ */
+let sqlDb: Client;
+
+beforeAll(async () => {
+  if (!dbReachable) return;
+  sqlDb = new Client(DB_CONFIG);
+  await sqlDb.connect();
+});
+
+afterAll(async () => {
+  if (!dbReachable || !sqlDb) return;
+  await sqlDb.end().catch(() => undefined);
+});
+
+/**
+ * Pick a fresh (userId, profiles.org_id, otherOrgId) tuple at test time. We
+ * read it inside each `it` (not in beforeAll) because the cross-tenant HTTP
+ * test above mutates profiles.org_id via switch_org, so any state captured
+ * at file-load time goes stale. We avoid that user explicitly — TEST_EMAIL —
+ * and prefer a user that exists only in the SQL fixtures.
+ */
+async function pickSqlFixture(): Promise<{
+  userId: string;
+  profileOrgId: string;
+  otherOrgId: string | null;
+}> {
+  const { rows: profileRows } = await sqlDb.query<{
+    id: string;
+    org_id: string;
+  }>(
+    `SELECT p.id, p.org_id
+       FROM public.profiles p
+       JOIN public.organization_memberships m
+         ON m.user_id = p.id AND m.org_id = p.org_id AND m.archived_at IS NULL
+       JOIN auth.users u ON u.id = p.id
+      WHERE p.org_id IS NOT NULL AND u.email <> $1
+      LIMIT 1`,
+    [TEST_EMAIL],
+  );
+  if (profileRows.length === 0) {
+    throw new Error(
+      "No seeded profile with a matching membership — run npm run db:reset && npm run seed first",
+    );
+  }
+  const userId = profileRows[0].id;
+  const profileOrgId = profileRows[0].org_id;
+
+  const { rows: otherOrgRows } = await sqlDb.query<{ id: string }>(
+    `SELECT id FROM public.organizations
+      WHERE archived_at IS NULL AND id <> $1 LIMIT 1`,
+    [profileOrgId],
+  );
+  return {
+    userId,
+    profileOrgId,
+    otherOrgId: otherOrgRows[0]?.id ?? null,
+  };
+}
+
+async function setJwtClaims(claims: Record<string, unknown>): Promise<void> {
+  await sqlDb.query(`SET LOCAL ROLE authenticated`);
+  await sqlDb.query(`SELECT set_config('request.jwt.claims', $1::text, true)`, [
+    JSON.stringify(claims),
+  ]);
+}
+
+async function resetJwt(): Promise<void> {
+  await sqlDb.query(`RESET ROLE`);
+  await sqlDb.query(`RESET request.jwt.claims`);
+}
+
+describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
+  it("falls back to profiles.org_id when the JWT carries no org_id claim", async () => {
+    const { userId, profileOrgId } = await pickSqlFixture();
+    await sqlDb.query("BEGIN");
+    try {
+      // Legacy/SSR-shape JWT: authenticated, no org_id, no org_role. This is
+      // the exact claim shape an old token issued before the hook started
+      // writing org_id would have.
+      await setJwtClaims({ sub: userId, role: "authenticated" });
+
+      const { rows } = await sqlDb.query<{
+        cid: string | null;
+        crole: string | null;
+      }>(
+        `SELECT public.caller_org_id()::text AS cid,
+                public.caller_org_role()::text AS crole`,
+      );
+      expect(rows[0].cid).toBe(profileOrgId);
+      // Membership exists for (userId, profileOrgId) per pickSqlFixture's
+      // join, so caller_org_role resolves the real role, not the bare 'user'
+      // fallback. We don't pin to a specific role here — any non-null value
+      // proves the membership lookup ran through the fallback org.
+      expect(rows[0].crole).not.toBeNull();
+    } finally {
+      await sqlDb.query("ROLLBACK");
+      await resetJwt();
+    }
+  });
+
+  it("honors the JWT org_id even when profiles.org_id has been flipped by a sibling device", async () => {
+    const { userId, profileOrgId, otherOrgId } = await pickSqlFixture();
+    if (!otherOrgId) {
+      // Single-org seed — can't simulate the divergence. Skip rather than
+      // assert against a degenerate case.
+      return;
+    }
+    await sqlDb.query("BEGIN");
+    try {
+      // Simulate the side-effect from switch_org running on another device:
+      // profiles.org_id flips to the OTHER org, while this session's JWT
+      // still carries the original org_id.
+      await sqlDb.query(`UPDATE public.profiles SET org_id = $1 WHERE id = $2`, [
+        otherOrgId,
+        userId,
+      ]);
+
+      await setJwtClaims({
+        sub: userId,
+        role: "authenticated",
+        org_id: profileOrgId,
+        org_role: "user",
+      });
+
+      const { rows } = await sqlDb.query<{ cid: string }>(
+        `SELECT public.caller_org_id()::text AS cid`,
+      );
+      // Must match the JWT, not the row. Before the fix this returned
+      // otherOrgId — which is exactly what made mobile alerts disappear.
+      expect(rows[0].cid).toBe(profileOrgId);
+    } finally {
+      await sqlDb.query("ROLLBACK");
+      await resetJwt();
+    }
+  });
+});

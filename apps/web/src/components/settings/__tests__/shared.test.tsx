@@ -40,9 +40,7 @@ describe("PresetColorPicker", () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.queryByRole("dialog", { name: "Choose color preset" }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Choose color preset" })).not.toBeInTheDocument();
     });
   });
 

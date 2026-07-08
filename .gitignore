@@ -13,6 +13,8 @@ node_modules/
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
 
 # next.js
 /.next/
@@ -24,6 +26,8 @@ node_modules/
 # production
 /build
 apps/mobile/dist/
+apps/mobile/ios/
+apps/mobile/android/
 packages/*/dist/
 
 # misc

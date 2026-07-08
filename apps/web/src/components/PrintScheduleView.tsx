@@ -1,8 +1,23 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import { Employee, ShiftCategory, AssignmentDefinition, FocusArea, JobDefinition, NamedItem, ShiftDisplayMode } from "@/types";
-import { addDays, formatDateKey, formatDate, getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
+import {
+  Employee,
+  ShiftCategory,
+  AssignmentDefinition,
+  FocusArea,
+  JobDefinition,
+  NamedItem,
+  ShiftDisplayMode,
+} from "@/types";
+import {
+  addDays,
+  formatDateKey,
+  formatDate,
+  getCertAbbr,
+  getRoleAbbrs,
+  getEmployeeDisplayName,
+} from "@/lib/utils";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
@@ -16,8 +31,18 @@ import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { MaybeHint } from "@/components/ui/hint";
 
 const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 const BRAND_MUTED = "#4A607F";
@@ -116,9 +141,7 @@ function getFocusAreaInitials(name: string): string {
     .slice(0, 3);
 }
 
-function getCrossFocusBadgePalette(
-  style?: Pick<AssignmentDefinition, "color" | "text"> | null,
-) {
+function getCrossFocusBadgePalette(style?: Pick<AssignmentDefinition, "color" | "text"> | null) {
   return {
     background: style?.color ?? "#FFFFFF",
     color: style?.text ?? "#334155",
@@ -152,7 +175,10 @@ interface PrintSectionProps {
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   focusAreas: FocusArea[];
-  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
+  getCustomShiftTimes?: (
+    empId: string,
+    date: Date,
+  ) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   splitAtIndex?: number;
   fontSize: number;
   shiftDisplayMode?: ShiftDisplayMode;
@@ -192,13 +218,14 @@ function PrintSection({
   }, [assignments]);
 
   const getStyleByIdOrLabel = useMemo(
-    () => (label: string, codeId?: number): AssignmentDefinition => {
-      if (codeId != null) {
-        const byId = assignmentById.get(codeId);
-        if (byId) return byId;
-      }
-      return contextualGetShiftStyle(label);
-    },
+    () =>
+      (label: string, codeId?: number): AssignmentDefinition => {
+        if (codeId != null) {
+          const byId = assignmentById.get(codeId);
+          if (byId) return byId;
+        }
+        return contextualGetShiftStyle(label);
+      },
     [assignmentById, contextualGetShiftStyle],
   );
   const categoryById = useMemo(() => {
@@ -215,12 +242,8 @@ function PrintSection({
     () => (label: string, codeId?: number) => {
       const assignment = getStyleByIdOrLabel(label, codeId);
       const shiftId = assignment.shiftId ?? assignment.categoryId ?? null;
-      const shift =
-        shiftId != null
-          ? (categoryById.get(shiftId) ?? null)
-          : null;
-      const job =
-        assignment.jobId != null ? (jobById.get(assignment.jobId) ?? null) : null;
+      const shift = shiftId != null ? (categoryById.get(shiftId) ?? null) : null;
+      const job = assignment.jobId != null ? (jobById.get(assignment.jobId) ?? null) : null;
       return buildShiftDisplayParts({
         shift,
         job,
@@ -233,23 +256,20 @@ function PrintSection({
 
   // Set of shift code IDs that belong to this section's focus area
   const sectionCodeIds = useMemo(() => {
-    return new Set(
-      assignments.filter((sc) => sc.focusAreaId === focusAreaId).map((sc) => sc.id),
-    );
+    return new Set(assignments.filter((sc) => sc.focusAreaId === focusAreaId).map((sc) => sc.id));
   }, [assignments, focusAreaId]);
 
   const tallyLabelResolver = useMemo(
-    () => isNameMode ? (code: AssignmentDefinition) => code.name || code.label : undefined,
+    () => (isNameMode ? (code: AssignmentDefinition) => code.name || code.label : undefined),
     [isNameMode],
   );
 
-  const dailyTallies = useMemo(
-    () => {
-      const fn = assignmentIdsForKey ?? (() => []);
-      return dates.map((date) => computeDailyTallies(employees, date, fn, assignmentById, sectionCodeIds, tallyLabelResolver));
-    },
-    [dates, employees, assignmentIdsForKey, assignmentById, sectionCodeIds, tallyLabelResolver],
-  );
+  const dailyTallies = useMemo(() => {
+    const fn = assignmentIdsForKey ?? (() => []);
+    return dates.map((date) =>
+      computeDailyTallies(employees, date, fn, assignmentById, sectionCodeIds, tallyLabelResolver),
+    );
+  }, [dates, employees, assignmentIdsForKey, assignmentById, sectionCodeIds, tallyLabelResolver]);
 
   // Derive tally rows from actual data so tallies always show when categorized shifts exist
   const tallyRows = useMemo(() => {
@@ -306,7 +326,17 @@ function PrintSection({
       >
         {/* Header row */}
         <div style={{ ...rowStyle, borderBottom: "2px solid #0F1724" }}>
-          <div style={{ padding: "0.5em 0.8em", fontWeight: 700, fontSize: "0.85em", color:"#4D6080", letterSpacing: "0.08em", borderRight: "1px solid #C8D6EC", background: "#F5F7FA" }}>
+          <div
+            style={{
+              padding: "0.5em 0.8em",
+              fontWeight: 700,
+              fontSize: "0.85em",
+              color: "#4D6080",
+              letterSpacing: "0.08em",
+              borderRight: "1px solid #C8D6EC",
+              background: "#F5F7FA",
+            }}
+          >
             STAFF NAME
           </div>
           {dates.map((date, i) => {
@@ -320,10 +350,25 @@ function PrintSection({
                   borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
                 }}
               >
-                <div style={{ fontSize: "0.8em", fontWeight: 600, color:"#94A3B8", letterSpacing: "0.05em" }}>
+                <div
+                  style={{
+                    fontSize: "0.8em",
+                    fontWeight: 600,
+                    color: "#94A3B8",
+                    letterSpacing: "0.05em",
+                  }}
+                >
                   {DAY_LABELS[date.getDay()]}
                 </div>
-                <div style={{ fontSize: "1.2em", fontWeight: 700, color: "#1A2640", lineHeight: 1.2, marginTop: "0.05em" }}>
+                <div
+                  style={{
+                    fontSize: "1.2em",
+                    fontWeight: 700,
+                    color: "#1A2640",
+                    lineHeight: 1.2,
+                    marginTop: "0.05em",
+                  }}
+                >
                   {date.getDate()}
                 </div>
               </div>
@@ -370,7 +415,12 @@ function PrintSection({
                         whiteSpace: "normal",
                         overflowWrap: "break-word",
                         lineHeight: 1.05,
-                        fontSize: getEmployeeDisplayName(emp).length > 25 ? "0.85em" : getEmployeeDisplayName(emp).length > 18 ? "0.95em" : "1em",
+                        fontSize:
+                          getEmployeeDisplayName(emp).length > 25
+                            ? "0.85em"
+                            : getEmployeeDisplayName(emp).length > 18
+                              ? "0.95em"
+                              : "1em",
                         display: "block",
                         maxWidth: `${nameColEm - 4}em`,
                       }}
@@ -379,7 +429,14 @@ function PrintSection({
                     </span>
                   </div>
                   {emp.roleIds.length > 0 && (
-                    <div style={{ fontSize: "0.8em", color:"#4D6080", marginTop: "0.1em", whiteSpace: "nowrap" }}>
+                    <div
+                      style={{
+                        fontSize: "0.8em",
+                        color: "#4D6080",
+                        marginTop: "0.1em",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
                     </div>
                   )}
@@ -430,22 +487,22 @@ function PrintSection({
                         if (labels.length === 1) {
                           const label = labels[0];
                           const style = getStyleByIdOrLabel(label, cellCodeIds[0]);
-                          const codeEntry0 = cellCodeIds[0] != null ? assignmentById.get(cellCodeIds[0]) : undefined;
+                          const codeEntry0 =
+                            cellCodeIds[0] != null ? assignmentById.get(cellCodeIds[0]) : undefined;
                           const displayParts = getDisplayPartsByIdOrLabel(label, cellCodeIds[0]);
-                          const isCross = label !== "X" && codeEntry0?.focusAreaId != null
-                            && codeEntry0.focusAreaId !== focusAreaId;
+                          const isCross =
+                            label !== "X" &&
+                            codeEntry0?.focusAreaId != null &&
+                            codeEntry0.focusAreaId !== focusAreaId;
                           const crossHomeFa = isCross
                             ? focusAreas.find((fa) => fa.id === codeEntry0!.focusAreaId)
                             : undefined;
-                          const singleCrossFocusPill =
-                            isCross && crossHomeFa ? crossHomeFa : null;
-                          const singleCrossFocusPalette =
-                            getCrossFocusBadgePalette(style);
+                          const singleCrossFocusPill = isCross && crossHomeFa ? crossHomeFa : null;
+                          const singleCrossFocusPalette = getCrossFocusBadgePalette(style);
                           const singleForegroundColor = isCross
                             ? getReadableTextOnSurface(style.color, style.text)
                             : style.text;
-                          const showSingleSecondaryLine =
-                            !!displayParts.secondaryLabel;
+                          const showSingleSecondaryLine = !!displayParts.secondaryLabel;
                           const singleDisplayLabel = displayParts.primaryLabel;
                           return (
                             <div
@@ -511,10 +568,17 @@ function PrintSection({
                                       lineHeight: 1,
                                       ...(isNameMode
                                         ? { textAlign: "center" as const, fontSize: "0.85em" }
-                                        : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }),
+                                        : {
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            maxWidth: "100%",
+                                          }),
                                     }}
                                   >
-                                    {isNameMode ? pillText(singleDisplayLabel, 14) : singleDisplayLabel}
+                                    {isNameMode
+                                      ? pillText(singleDisplayLabel, 14)
+                                      : singleDisplayLabel}
                                   </span>
                                   {showSingleSecondaryLine ? (
                                     <span
@@ -529,20 +593,24 @@ function PrintSection({
                                         maxWidth: "100%",
                                       }}
                                     >
-                                      {isNameMode ? pillText(displayParts.secondaryLabel ?? "", 14) : displayParts.secondaryLabel}
+                                      {isNameMode
+                                        ? pillText(displayParts.secondaryLabel ?? "", 14)
+                                        : displayParts.secondaryLabel}
                                     </span>
                                   ) : null}
                                 </div>
                               </MaybeHint>
                               {customTimes && (
-                                <span style={{
-                                  fontSize: "0.75em",
-                                  fontWeight: 500,
-                                  lineHeight: 1,
-                                  marginTop: "0.3em",
-                                  opacity: 0.7,
-                                  letterSpacing: "0.02em",
-                                }}>
+                                <span
+                                  style={{
+                                    fontSize: "0.75em",
+                                    fontWeight: 500,
+                                    lineHeight: 1,
+                                    marginTop: "0.3em",
+                                    opacity: 0.7,
+                                    letterSpacing: "0.02em",
+                                  }}
+                                >
                                   {fmt12hShort(customTimes.start)}–{fmt12hShort(customTimes.end)}
                                 </span>
                               )}
@@ -566,25 +634,32 @@ function PrintSection({
                           >
                             {labels.map((label, li) => {
                               const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
-                              const codeEntryLi = cellCodeIds[li] != null ? assignmentById.get(cellCodeIds[li]) : undefined;
-                              const displayParts = getDisplayPartsByIdOrLabel(label, cellCodeIds[li]);
-                              const isCross = label !== "X"
-                                && codeEntryLi?.focusAreaId != null
-                                && codeEntryLi.focusAreaId !== focusAreaId;
+                              const codeEntryLi =
+                                cellCodeIds[li] != null
+                                  ? assignmentById.get(cellCodeIds[li])
+                                  : undefined;
+                              const displayParts = getDisplayPartsByIdOrLabel(
+                                label,
+                                cellCodeIds[li],
+                              );
+                              const isCross =
+                                label !== "X" &&
+                                codeEntryLi?.focusAreaId != null &&
+                                codeEntryLi.focusAreaId !== focusAreaId;
                               const crossHomeFaLi = isCross
                                 ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
                                 : undefined;
                               const multiCrossFocusPill =
                                 isCross && crossHomeFaLi ? crossHomeFaLi : null;
-                              const multiCrossFocusPalette =
-                                getCrossFocusBadgePalette(style);
+                              const multiCrossFocusPalette = getCrossFocusBadgePalette(style);
                               const multiForegroundColor = isCross
                                 ? getReadableTextOnSurface(style.color, style.text)
                                 : style.text;
-                              const showMultiSecondaryLine =
-                                !!displayParts.secondaryLabel;
+                              const showMultiSecondaryLine = !!displayParts.secondaryLabel;
                               const multiDisplayLabel = displayParts.primaryLabel;
-                              const pillTime = customTimes?.perPill?.[li] ?? (li === 0 && !customTimes?.perPill ? customTimes : null);
+                              const pillTime =
+                                customTimes?.perPill?.[li] ??
+                                (li === 0 && !customTimes?.perPill ? customTimes : null);
                               const hasTime = pillTime && (pillTime.start || pillTime.end);
 
                               return (
@@ -650,10 +725,17 @@ function PrintSection({
                                         style={
                                           isNameMode
                                             ? { textAlign: "center" as const, fontSize: "0.85em" }
-                                            : { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }
+                                            : {
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                maxWidth: "100%",
+                                              }
                                         }
                                       >
-                                        {isNameMode ? pillText(multiDisplayLabel, 8) : multiDisplayLabel}
+                                        {isNameMode
+                                          ? pillText(multiDisplayLabel, 8)
+                                          : multiDisplayLabel}
                                       </span>
                                       {showMultiSecondaryLine ? (
                                         <span
@@ -668,13 +750,22 @@ function PrintSection({
                                             maxWidth: "100%",
                                           }}
                                         >
-                                          {isNameMode ? pillText(displayParts.secondaryLabel ?? "", 8) : displayParts.secondaryLabel}
+                                          {isNameMode
+                                            ? pillText(displayParts.secondaryLabel ?? "", 8)
+                                            : displayParts.secondaryLabel}
                                         </span>
                                       ) : null}
                                     </div>
                                   </MaybeHint>
                                   {hasTime && (
-                                    <span style={{ fontSize: "0.7em", fontWeight: 500, opacity: 0.7, lineHeight: 1 }}>
+                                    <span
+                                      style={{
+                                        fontSize: "0.7em",
+                                        fontWeight: 500,
+                                        opacity: 0.7,
+                                        lineHeight: 1,
+                                      }}
+                                    >
                                       {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
                                     </span>
                                   )}
@@ -790,8 +881,17 @@ function TallyRow({
               ? "-"
               : entries.map(([lbl, cnt], ei) => (
                   <MaybeHint key={lbl} content={`${lbl}: ${cnt}`} side="top">
-                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isNameMode ? 90 : undefined, display: isNameMode ? "inline-block" : undefined, verticalAlign: isNameMode ? "middle" : undefined }}>
-                      {ei > 0 && <span style={{ color:"#94A3B8", margin: "0 0.3em" }}>|</span>}
+                    <span
+                      style={{
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        maxWidth: isNameMode ? 90 : undefined,
+                        display: isNameMode ? "inline-block" : undefined,
+                        verticalAlign: isNameMode ? "middle" : undefined,
+                      }}
+                    >
+                      {ei > 0 && <span style={{ color: "#94A3B8", margin: "0 0.3em" }}>|</span>}
                       {lbl}: {cnt}
                     </span>
                   </MaybeHint>
@@ -822,7 +922,10 @@ interface PrintScheduleViewProps {
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
-  getCustomShiftTimes?: (empId: string, date: Date) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
+  getCustomShiftTimes?: (
+    empId: string,
+    date: Date,
+  ) => { start: string; end: string; perPill?: { start: string; end: string }[] } | null;
   onClose: () => void;
   focusAreaLabel?: string;
   shiftDisplayMode?: ShiftDisplayMode;
@@ -857,13 +960,9 @@ export default function PrintScheduleView({
       const year = weekStart.getFullYear();
       const month = weekStart.getMonth();
       const daysInMonth = new Date(year, month + 1, 0).getDate();
-      return Array.from({ length: daysInMonth }, (_, i) =>
-        new Date(year, month, i + 1),
-      );
+      return Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1));
     }
-    return Array.from({ length: spanWeeks * 7 }, (_, i) =>
-      addDays(weekStart, i),
-    );
+    return Array.from({ length: spanWeeks * 7 }, (_, i) => addDays(weekStart, i));
   }, [weekStart, spanWeeks]);
 
   const splitAtIndex = spanWeeks === 2 ? 7 : undefined;
@@ -968,7 +1067,14 @@ export default function PrintScheduleView({
             orgFontSize={13}
           />
           <span style={{ width: 0.8, height: 18, background: BRAND_SEPARATOR, display: "block" }} />
-          <span style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color:"#334766", lineHeight: 1 }}>
+          <span
+            style={{
+              fontSize: "var(--dg-fs-label)",
+              fontWeight: 500,
+              color: "#334766",
+              lineHeight: 1,
+            }}
+          >
             {dateRangeLabel}
           </span>
         </div>
@@ -983,10 +1089,14 @@ export default function PrintScheduleView({
           <span
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color:"#4D6080",
+              color: "#4D6080",
             }}
           >
-            {fontSize <= 7 ? "Small" : fontSize >= 9 ? "Large" : "Medium"} · {spanWeeks === "month" ? "Month" : `${spanWeeks}W`} · {selectedWings.length === focusAreas.length ? `All ${focusAreaLabel.toLowerCase()}` : selectedWings.join(", ")}
+            {fontSize <= 7 ? "Small" : fontSize >= 9 ? "Large" : "Medium"} ·{" "}
+            {spanWeeks === "month" ? "Month" : `${spanWeeks}W`} ·{" "}
+            {selectedWings.length === focusAreas.length
+              ? `All ${focusAreaLabel.toLowerCase()}`
+              : selectedWings.join(", ")}
           </span>
           <button
             onClick={handlePrint}
@@ -1064,7 +1174,7 @@ export default function PrintScheduleView({
                 style={{
                   fontSize: "1.1em",
                   fontWeight: 600,
-                  color:"#334766",
+                  color: "#334766",
                 }}
               >
                 Schedule — {dateRangeLabel}
@@ -1073,7 +1183,7 @@ export default function PrintScheduleView({
             <div
               style={{
                 fontSize: "0.9em",
-                color:"#4D6080",
+                color: "#4D6080",
                 textAlign: "right",
               }}
             >
@@ -1083,7 +1193,8 @@ export default function PrintScheduleView({
 
           {/* Focus area sections */}
           {printFocusAreas.map((focusArea) => {
-            const exclusiveCodeIds = exclusiveCodeIdsPerSection[focusArea.name] ?? new Set<number>();
+            const exclusiveCodeIds =
+              exclusiveCodeIdsPerSection[focusArea.name] ?? new Set<number>();
             const homeEmps = employees.filter((e) => e.focusAreaIds.includes(focusArea.id));
             const guestEmps = allEmployees.filter(
               (e) =>
@@ -1148,10 +1259,7 @@ export default function PrintScheduleView({
                 }}
               >
                 {legendItems.map((s) => (
-                  <div
-                    key={s.id}
-                    style={{ display: "flex", alignItems: "center", gap: "0.5em" }}
-                  >
+                  <div key={s.id} style={{ display: "flex", alignItems: "center", gap: "0.5em" }}>
                     <span
                       style={{
                         background: s.color,
@@ -1166,12 +1274,10 @@ export default function PrintScheduleView({
                         textAlign: "center",
                       }}
                     >
-                      {isNameMode ? (s.name || s.label) : s.label}
+                      {isNameMode ? s.name || s.label : s.label}
                     </span>
                     {!isNameMode && (
-                      <span style={{ fontSize: "0.9em", color:"#334766" }}>
-                        {s.name}
-                      </span>
+                      <span style={{ fontSize: "0.9em", color: "#334766" }}>{s.name}</span>
                     )}
                   </div>
                 ))}

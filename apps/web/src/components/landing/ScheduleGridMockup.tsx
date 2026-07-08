@@ -1,501 +1,854 @@
+/* ── Schedule grid mockup ──────────────────────────────────────────────
+   Faithful representation of the live ScheduleGrid for the Skilled Nursing
+   focus area, using Calm Haven seed data (supabase/seed_calm_haven.sql).
+   Modeled on:
+     · apps/web/src/components/ScheduleGrid.tsx
+     · apps/web/src/lib/assignable-shifts.ts (buildShiftDisplayParts)
+   Shifts: Day (D, cyan) and Evening (E, amber) — both in fa_snw.
+   Jobs that show on grid: Supervisor (S), Mentor (M), Office (Ofc),
+     Partial (0.3). The "Default shift job" is `show_on_grid: false` so an
+     employee with no job override just sees the shift abbr alone.
+   ── */
+
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DATES = [22, 23, 24, 25, 26, 27, 28];
-const TODAY_INDEX = 0; // Sun Mar 22
+const TODAY_INDEX = 0; // Sun 22 is "today"
 
-/* ── Assignment labels from Calm Haven seed ── */
-const SHIFT_LABELS = [
-  { label: "D", color: "#FECACA", text: "#991B1B" },
-  { label: "Ds", color: "#FED7AA", text: "#9A3412" },
-  { label: "E", color: "#FECACA", text: "#991B1B" },
-  { label: "Es", color: "#E9D5FF", text: "#6B21A8" },
-  { label: "Dcn", color: "#BFDBFE", text: "#1E40AF" },
-  { label: "X", color: "#C8D6EC", text: "#1A2640" },
-  { label: "Ofc", color: "#C8D6EC", text: "#1A2640" },
-];
+const ROW_HEIGHT = 56; // matches --dg-grid-row-h
+const NAME_COL_WIDTH = 220;
 
-/* ── Certification badge colors — matches DESIGNATION_COLORS in colors.ts ── */
-const CERTS = [
-  { abbr: "JLCSN", bg: "#EDE9FE", text: "#6D28D9" },
-  { abbr: "STAFF", bg: "#EDF1F7", text: "#334766" },
-  { abbr: "CSN III", bg: "#DBEAFE", text: "#1D4ED8" },
-  { abbr: "CSN II", bg: "#CCFBF1", text: "#0E7490" },
-];
+/* ── Shifts (Skilled Nursing focus area) — colors come straight from
+   shift_categories rows in seed_calm_haven.sql lines 143/147. ── */
+const SHIFTS = {
+  D: {
+    name: "Day",
+    bg: "#A5F3FC",
+    text: "#155E75",
+    border: "#155E75",
+  },
+  E: {
+    name: "Evening",
+    bg: "#FDE68A",
+    text: "#92400E",
+    border: "#92400E",
+  },
+} as const;
 
-interface Employee {
+/* ── Jobs (with_shift) — show on grid as the pill's secondaryLabel.
+   Seed lines 351/362. Default shift job is `show_on_grid: false`, so
+   employees with no override render with no secondary label. ── */
+const JOBS = {
+  S: "S", // Supervisor
+  M: "M", // Mentor
+} as const;
+
+/* ── Shiftless jobs — render as their own pill that fills the cell, with
+   the job's own color (seed lines 318/329). No shift, no secondary. ── */
+const SHIFTLESS = {
+  Ofc: { bg: "#E2E8F0", text: "#1E293B", border: "transparent" },
+  "0.3": { bg: "#FDE68A", text: "#92400E", border: "transparent" },
+} as const;
+
+/* ── Absences — seed lines 175–185 (border_color always transparent). ── */
+const ABSENCES = {
+  X: { label: "X", bg: "#E2E8F0", text: "#1E293B", border: "transparent" },
+  PTO: { label: "PTO", bg: "#FDE68A", text: "#92400E", border: "transparent" },
+  Sick: { label: "S", bg: "#FECDD3", text: "#9F1239", border: "transparent" },
+} as const;
+
+/* ── Certifications — DESIGNATION_COLORS subset, names from seed line 236. ── */
+const CERTS = {
+  JLCSN: { bg: "#EDE9FE", text: "#6D28D9" },
+  "CSN III": { bg: "#DBEAFE", text: "#1D4ED8" },
+  "CSN II": { bg: "#CCFBF1", text: "#0E7490" },
+  Nurse: { bg: "#F1F5F9", text: "#475569" },
+} as const;
+
+type ShiftCode = keyof typeof SHIFTS;
+type JobCode = keyof typeof JOBS;
+type ShiftlessCode = keyof typeof SHIFTLESS;
+type AbsenceCode = keyof typeof ABSENCES;
+type CertCode = keyof typeof CERTS;
+
+/* A worked-shift assignment: a shift code plus optional with_shift job. */
+type ShiftAssignment = { shift: ShiftCode; job?: JobCode };
+
+/* A cell value: shift, shiftless job, absence, split shift, or empty. */
+type Cell =
+  | ShiftAssignment
+  | { shiftless: ShiftlessCode }
+  | { absence: AbsenceCode }
+  | [ShiftAssignment, ShiftAssignment]
+  | null;
+
+/* ── Tiny helpers to keep the data arrays readable ── */
+const sh = (shift: ShiftCode, job?: JobCode): ShiftAssignment => ({
+  shift,
+  ...(job ? { job } : {}),
+});
+const sl = (j: ShiftlessCode) => ({ shiftless: j });
+const ab = (a: AbsenceCode) => ({ absence: a });
+
+const STAFF: {
   name: string;
-  cert: number;
   roles: string;
-  shifts: (number | null)[];
-}
-
-const SECTIONS = [
+  cert: CertCode;
+  days: Cell[];
+}[] = [
   {
-    name: "Skilled Nursing",
-    employees: [
-      { name: "Margaret Sullivan", cert: 0, roles: "DCSN", shifts: [5, 6, 6, 5, 6, 5, 5] },
-      { name: "Carol Henderson", cert: 0, roles: "Supv", shifts: [5, 1, 1, 2, 1, 1, 5] },
-      { name: "Kevin Donovan", cert: 1, roles: "", shifts: [5, 0, 0, 0, 0, 0, 5] },
-      { name: "Nancy Thornton", cert: 0, roles: "", shifts: [5, 0, 0, 0, 0, null, 5] },
-      { name: "Barbara Trent", cert: 1, roles: "", shifts: [5, 0, null, 0, 0, 0, 5] },
-    ] as Employee[],
-    coverage: [
-      { label: "D", required: 3, counts: [0, 3, 2, 3, 3, 2, 0] },
-      { label: "Ds", required: 1, counts: [0, 1, 1, 0, 1, 1, 0] },
+    name: "Margaret Sullivan",
+    roles: "DCSN",
+    cert: "JLCSN",
+    // From seed: all weekdays Ofc, weekends off
+    days: [ab("X"), sl("Ofc"), sl("Ofc"), ab("X"), sl("Ofc"), ab("X"), ab("X")],
+  },
+  {
+    name: "Thomas Crawford",
+    roles: "Mentor",
+    cert: "JLCSN",
+    // Mentor jobs on Day shifts (seed renders these as "(D)" → D/M)
+    days: [ab("X"), sh("D", "M"), ab("X"), sh("D", "M"), sh("D", "M"), sh("D", "M"), ab("X")],
+  },
+  {
+    name: "Carol Henderson",
+    roles: "Supv",
+    cert: "CSN III",
+    // Supervisor on Day, split shift Wed (Day-Supv → Evening)
+    days: [
+      ab("X"),
+      sh("D", "S"),
+      sh("D", "S"),
+      [sh("D", "S"), sh("E")],
+      sh("D", "S"),
+      sh("E"),
+      ab("X"),
     ],
   },
   {
-    name: "Sheltered Care",
-    employees: [
-      { name: "Evelyn Hartwell", cert: 0, roles: "SC Mgr", shifts: [5, 4, 4, 6, 4, 4, 5] },
-      { name: "Thomas Crawford", cert: 0, roles: "Mentor", shifts: [5, 0, 0, 0, 0, null, 5] },
-      { name: "Brian Shepherd", cert: 1, roles: "", shifts: [5, 0, null, 0, 0, 0, 5] },
-    ] as Employee[],
-    coverage: [
-      { label: "D", required: 1, counts: [0, 1, 1, 1, 1, 1, 0] },
-      { label: "Dcn", required: 1, counts: [0, 1, 1, 0, 1, 1, 0] },
-    ],
+    name: "Nancy Thornton",
+    roles: "",
+    cert: "JLCSN",
+    // No role override → just "D" on grid
+    days: [ab("X"), sh("D"), sh("D"), sh("D"), sh("D"), null, ab("X")],
+  },
+  {
+    name: "Kevin Donovan",
+    roles: "",
+    cert: "Nurse",
+    // No role override → just "E"; PTO Friday
+    days: [ab("X"), sh("E"), sh("E"), sh("E"), sh("E"), ab("PTO"), ab("X")],
+  },
+  {
+    name: "Barbara Trent",
+    roles: "",
+    cert: "Nurse",
+    // Sick Tuesday — absence "S"
+    days: [ab("X"), sh("D"), ab("Sick"), sh("D"), sh("D"), sh("D"), ab("X")],
   },
 ];
 
-/* ── borderColor() — matches ScheduleGrid.tsx borderColor helper ── */
-function borderColor(textHex: string) {
-  const r = parseInt(textHex.slice(1, 3), 16);
-  const g = parseInt(textHex.slice(3, 5), 16);
-  const b = parseInt(textHex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},0.35)`;
+/* Open shifts row — each entry is a (shift, job?) pair (full
+   ShiftJobSegment). Most open shifts have no job override (default job is
+   hidden on grid), so they render as just the shift abbr. */
+const OPEN_SHIFTS: ShiftAssignment[][] = [
+  [sh("D")], // Sun
+  [], // Mon — fully staffed
+  [sh("D")], // Tue — Barbara sick
+  [], // Wed
+  [], // Thu
+  [sh("E")], // Fri — Kevin PTO
+  [sh("D"), sh("E")], // Sat — short on weekend
+];
+
+const OPEN_TOTAL = OPEN_SHIFTS.reduce((acc, day) => acc + day.length, 0);
+
+/* Per-shift coverage tallies — one row per shift category only. Counts
+   include every assignment of that shift across all jobs (D + Ds + Dm). */
+const COVERAGE: {
+  code: ShiftCode;
+  required: number;
+  scheduled: number[];
+}[] = [
+  // Day = all D / Ds / Dm + Day half of split shifts
+  { code: "D", required: 3, scheduled: [0, 4, 3, 4, 4, 3, 0] },
+  // Evening = all E / Es + Evening half of split shifts
+  { code: "E", required: 1, scheduled: [0, 1, 1, 2, 1, 1, 0] },
+];
+
+const WARNING_BG = "rgba(245, 158, 11, 0.08)";
+const WARNING_BORDER = "#F59E0B";
+const WARNING_TEXT = "#92400E";
+const TODAY_BG = "color-mix(in srgb, var(--color-brand) 4%, transparent)";
+
+function CertPill({ kind }: { kind: CertCode }) {
+  const c = CERTS[kind];
+  return (
+    <span
+      style={{
+        fontSize: 11,
+        fontWeight: 700,
+        background: c.bg,
+        color: c.text,
+        padding: "2px 7px",
+        borderRadius: 20,
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+        letterSpacing: "0.01em",
+      }}
+    >
+      {kind}
+    </span>
+  );
 }
 
-function ShiftCell({ shiftIdx, isToday }: { shiftIdx: number | null; isToday: boolean }) {
-  const shift = shiftIdx !== null ? SHIFT_LABELS[shiftIdx] : null;
+/* Single pill — fills its cell, two-line layout when there's a secondary
+   label (the with_shift job abbr). Matches buildShiftDisplayParts in
+   assignable-shifts.ts: secondaryLabel = jobAbbr in code mode. */
+function SinglePill({
+  primary,
+  secondary,
+  bg,
+  text,
+  border,
+}: {
+  primary: string;
+  secondary?: string | null;
+  bg: string;
+  text: string;
+  border: string;
+}) {
+  return (
+    <span
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        height: "100%",
+        background: bg,
+        color: text,
+        border: `1px solid ${border}`,
+        borderRadius: 8,
+        padding: "2px 6px",
+        lineHeight: 1.1,
+        letterSpacing: "0.01em",
+        gap: 1,
+      }}
+    >
+      <span style={{ fontSize: 13, fontWeight: 800 }}>{primary}</span>
+      {secondary && (
+        <span style={{ fontSize: 11, fontWeight: 600, opacity: 0.78 }}>{secondary}</span>
+      )}
+    </span>
+  );
+}
+
+/* Split-shift row — pills side-by-side horizontally (data-shift-pill="multi"
+   uses flexDirection: "row" + gap: 1 at line 2778 of ScheduleGrid.tsx). */
+function SplitShiftRow({ pair }: { pair: [ShiftAssignment, ShiftAssignment] }) {
   return (
     <div
       style={{
-        borderTop: "1px solid var(--color-border-light)",
-        borderLeft: "1px solid var(--color-border-light)",
-        background: isToday ? "#EFF6FF" : "transparent",
-        position: "relative",
-        height: 52,
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        flexDirection: "row",
+        gap: 1,
+        width: "100%",
+        height: "100%",
       }}
     >
-      {shift ? (
-        <div
-          style={{
-            position: "absolute",
-            top: 4,
-            right: 4,
-            bottom: 4,
-            left: 4,
-            background: shift.color,
-            border: `1px solid ${borderColor(shift.text)}`,
-            borderRadius: 8,
-            color: shift.text,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 16,
-            fontWeight: 800,
-            lineHeight: 1,
-            cursor: "default",
-          }}
-        >
-          {shift.label}
-        </div>
-      ) : (
-        <span
-          style={{
-            width: 16,
-            height: 2,
-            background: "var(--color-border-light)",
-            borderRadius: 2,
-            display: "block",
-          }}
-        />
-      )}
+      {pair.map((seg, i) => {
+        const s = SHIFTS[seg.shift];
+        return (
+          <span
+            key={`${seg.shift}-${seg.job ?? "_"}-${i}`}
+            style={{
+              flex: "1 1 0",
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              background: s.bg,
+              color: s.text,
+              border: `1px solid ${s.border}`,
+              borderRadius: 6,
+              padding: "2px 3px",
+              lineHeight: 1.05,
+              letterSpacing: "0.01em",
+              gap: 1,
+              overflow: "hidden",
+            }}
+          >
+            <span style={{ fontSize: 11, fontWeight: 800 }}>{seg.shift}</span>
+            {seg.job && (
+              <span style={{ fontSize: 9, fontWeight: 600, opacity: 0.78 }}>{seg.job}</span>
+            )}
+          </span>
+        );
+      })}
     </div>
   );
 }
 
-function CoverageCell({ label, actual, required }: { label: string; actual: number; required: number }) {
-  const met = actual >= required;
+/* Open-shift pill — dashed amber border, two-line shift (+ optional job). */
+function OpenShiftPill({ seg }: { seg: ShiftAssignment }) {
+  const s = SHIFTS[seg.shift];
+  return (
+    <span
+      style={{
+        flex: "1 1 0",
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        background: s.bg,
+        color: s.text,
+        border: `1.5px dashed ${WARNING_BORDER}`,
+        borderRadius: 6,
+        padding: "2px 4px",
+        lineHeight: 1.1,
+        letterSpacing: "0.01em",
+        gap: 1,
+      }}
+    >
+      <span style={{ fontSize: 12, fontWeight: 800 }}>{seg.shift}</span>
+      {seg.job && <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.78 }}>{seg.job}</span>}
+    </span>
+  );
+}
+
+function CellContent({ cell }: { cell: Cell }) {
+  if (cell == null) return null;
+  if (Array.isArray(cell)) return <SplitShiftRow pair={cell} />;
+  if ("shift" in cell) {
+    const s = SHIFTS[cell.shift];
+    return (
+      <SinglePill
+        primary={cell.shift}
+        secondary={cell.job ?? null}
+        bg={s.bg}
+        text={s.text}
+        border={s.border}
+      />
+    );
+  }
+  if ("shiftless" in cell) {
+    const j = SHIFTLESS[cell.shiftless];
+    return <SinglePill primary={cell.shiftless} bg={j.bg} text={j.text} border={j.border} />;
+  }
+  // Absence — secondaryLabel is always null for absences (line 2347)
+  const a = ABSENCES[cell.absence];
+  return <SinglePill primary={a.label} bg={a.bg} text={a.text} border={a.border} />;
+}
+
+function TallyCell({ required, scheduled }: { required: number; scheduled: number }) {
+  const hasRequirement = required > 0;
+  const met = scheduled >= required;
+  const displayValue = scheduled > 0 || hasRequirement ? String(scheduled) : "-";
   return (
     <div
       style={{
         textAlign: "center",
-        padding: "8px 4px",
-        fontSize: 10,
-        fontWeight: 700,
-        lineHeight: 1.3,
-        borderLeft: "1px solid var(--color-border)",
-        background: met ? "rgba(22,163,74,0.10)" : "rgba(220,38,38,0.10)",
-        color: met ? "#166534" : "#991B1B",
+        padding: "8px 6px",
+        fontSize: 12,
+        lineHeight: 1.4,
+        fontWeight: 600,
+        fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+        color: hasRequirement
+          ? met
+            ? "var(--color-success-text)"
+            : "var(--color-danger-dark)"
+          : "var(--color-text-muted)",
+        background: hasRequirement
+          ? met
+            ? "rgba(22, 163, 74, 0.12)"
+            : "rgba(220, 38, 38, 0.12)"
+          : "var(--color-surface)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        whiteSpace: "nowrap",
-        gap: 3,
+        height: "100%",
       }}
     >
-      {met ? (
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z" /></svg>
-      ) : (
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" /></svg>
-      )}
-      {label}: {actual}/{required}
+      {displayValue}
     </div>
   );
 }
 
 export default function ScheduleGridMockup() {
+  const gridTemplate = `${NAME_COL_WIDTH}px repeat(7, minmax(0, 1fr))`;
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 20,
-      }}
-    >
-      {/* ── Toolbar ── */}
+    <div style={{ maxWidth: 1080, margin: "0 auto" }}>
+      {/* Focus area section heading — sits ABOVE the grid card with a 3px
+          brand-colored accent bar (ScheduleGrid.tsx lines 1188–1212). */}
       <div
         style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "6px 10px 6px 8px",
+          marginBottom: 10,
+          borderRadius: 6,
+          background: "var(--color-bg-secondary)",
+          color: "var(--color-text-secondary)",
+          fontSize: 16,
+          fontWeight: 800,
+          letterSpacing: "-0.005em",
+        }}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            display: "block",
+            width: 3,
+            height: 18,
+            borderRadius: 2,
+            background: "var(--color-brand)",
+            flexShrink: 0,
+          }}
+        />
+        Skilled Nursing
+      </div>
+
+      <div
+        style={{
+          background: "var(--color-surface)",
+          borderRadius: 14,
+          border: "1px solid var(--color-border)",
+          overflow: "hidden",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+        }}
+      >
+        {/* Toolbar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "12px 16px",
+            borderBottom: "1px solid var(--color-border-light)",
+            background: "var(--color-bg)",
+          }}
+        >
+          <button
+            type="button"
+            aria-label="Previous week"
+            style={{
+              width: 32,
+              height: 32,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              background: "var(--color-surface)",
+              color: "var(--color-text-secondary)",
+              cursor: "default",
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <div
+            style={{
+              padding: "6px 14px",
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              background: "var(--color-surface)",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Mar 22 – Mar 28
+          </div>
+          <button
+            type="button"
+            aria-label="Next week"
+            style={{
+              width: 32,
+              height: 32,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              background: "var(--color-surface)",
+              color: "var(--color-text-secondary)",
+              cursor: "default",
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            style={{
+              padding: "6px 12px",
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              background: "var(--color-surface)",
+              fontSize: 13,
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+              cursor: "default",
+            }}
+          >
+            Today
+          </button>
+
+          <div style={{ flex: 1 }} />
+
+          <button
+            type="button"
+            style={{
+              padding: "6px 14px",
+              border: "1px solid var(--color-brand)",
+              borderRadius: 8,
+              background: "var(--color-brand)",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "default",
+            }}
+          >
+            Publish
+          </button>
+        </div>
+
+        {/* Grid */}
+        <div
+          role="grid"
+          aria-label="Skilled Nursing schedule grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: gridTemplate,
+          }}
+        >
+          {/* Header row */}
+          <div
+            role="columnheader"
+            style={{
+              position: "sticky",
+              left: 0,
+              zIndex: 4,
+              background: "var(--color-bg)",
+              padding: "10px 14px",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "var(--color-text-subtle)",
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              borderRight: "1px solid var(--color-border-light)",
+              borderBottom: "1px solid var(--color-text-secondary)",
+              display: "flex",
+              alignItems: "flex-end",
+            }}
+          >
+            Staff
+          </div>
+          {DAYS.map((day, idx) => {
+            const isToday = idx === TODAY_INDEX;
+            return (
+              <div
+                key={day}
+                role="columnheader"
+                style={{
+                  position: "relative",
+                  textAlign: "center",
+                  padding: "8px 0",
+                  background: isToday ? TODAY_BG : "var(--color-bg)",
+                  borderLeft: idx === 0 ? undefined : "1px solid var(--color-border-light)",
+                  borderBottom: "1px solid var(--color-text-secondary)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: isToday ? "var(--color-brand)" : "var(--color-text-subtle)",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  {day}
+                </div>
+                <div
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: isToday ? "var(--color-brand)" : "var(--color-text-secondary)",
+                    lineHeight: 1.1,
+                    marginTop: 2,
+                  }}
+                >
+                  {DATES[idx]}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Open shifts row — matches the real grid: briefcase glyph + label + count badge,
+              warning bg, 2px dashed bottom border in warning color. */}
+          <div
+            style={{
+              position: "sticky",
+              left: 0,
+              zIndex: 3,
+              background: WARNING_BG,
+              padding: "0 10px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              minHeight: ROW_HEIGHT,
+              borderRight: "1px solid var(--color-border-light)",
+              borderBottom: `2px dashed ${WARNING_BORDER}`,
+              color: WARNING_TEXT,
+              whiteSpace: "nowrap" as const,
+            }}
+          >
+            {/* Briefcase glyph */}
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+            </svg>
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.01em",
+              }}
+            >
+              Open Shifts
+            </span>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: 18,
+                height: 18,
+                padding: "0 5px",
+                borderRadius: 9,
+                background: WARNING_BORDER,
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 700,
+                lineHeight: 1,
+              }}
+            >
+              {OPEN_TOTAL}
+            </span>
+          </div>
+          {OPEN_SHIFTS.map((openList, idx) => {
+            const isToday = idx === TODAY_INDEX;
+            return (
+              <div
+                key={`open-${idx}`}
+                style={{
+                  display: "flex",
+                  alignItems: "stretch",
+                  gap: 4,
+                  padding: 6,
+                  minHeight: ROW_HEIGHT,
+                  background: isToday
+                    ? `linear-gradient(${TODAY_BG}, ${TODAY_BG}), ${WARNING_BG}`
+                    : WARNING_BG,
+                  borderLeft: idx === 0 ? undefined : "1px solid var(--color-border-light)",
+                  borderBottom: `2px dashed ${WARNING_BORDER}`,
+                }}
+              >
+                {openList.map((seg, i) => (
+                  <OpenShiftPill key={`${seg.shift}-${seg.job ?? "_"}-${i}`} seg={seg} />
+                ))}
+              </div>
+            );
+          })}
+
+          {/* Employee rows */}
+          {STAFF.map((emp) => (
+            <EmployeeRow key={emp.name} emp={emp} todayIndex={TODAY_INDEX} />
+          ))}
+
+          {/* Coverage tally rows — one per shift category (Day, Evening) */}
+          {COVERAGE.map((row, rowIdx) => (
+            <CoverageRow
+              key={row.code}
+              row={row}
+              isLast={rowIdx === COVERAGE.length - 1}
+              todayIndex={TODAY_INDEX}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmployeeRow({ emp, todayIndex }: { emp: (typeof STAFF)[number]; todayIndex: number }) {
+  return (
+    <>
+      <div
+        role="rowheader"
+        style={{
+          position: "sticky",
+          left: 0,
+          zIndex: 3,
+          background: "var(--color-surface)",
+          padding: "8px 14px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          paddingBottom: 12,
+          gap: 8,
+          minWidth: 0,
+          minHeight: ROW_HEIGHT,
+          borderTop: "1px solid var(--color-border-light)",
+          borderRight: "1px solid var(--color-border-light)",
         }}
       >
-        {/* Week nav group */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {/* Prev */}
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              border: "1px solid var(--color-border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "default",
-              flexShrink: 0,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-          </div>
-          {/* Date label */}
+        <div
+          style={{
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
           <span
             style={{
               fontSize: 13,
               fontWeight: 600,
               color: "var(--color-text-secondary)",
-              minWidth: 120,
-              textAlign: "center",
-              userSelect: "none",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              lineHeight: 1.2,
             }}
           >
-            Mar 22 &ndash; Mar 28
+            {emp.name}
           </span>
-          {/* Next */}
-          <div
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              border: "1px solid var(--color-border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "default",
-              flexShrink: 0,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-          </div>
-          {/* Today button */}
-          <div
-            style={{
-              height: 34,
-              padding: "0 14px",
-              borderRadius: 10,
-              border: "1px solid var(--color-border)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--color-text-muted)",
-              cursor: "default",
-            }}
-          >
-            Today
-          </div>
-        </div>
-
-        {/* Focus area filter tabs — .dg-span-tabs--light style */}
-        <div
-          className="hidden sm:flex"
-          style={{
-            display: "inline-flex",
-            height: 34,
-            background: "#fff",
-            border: "1px solid var(--color-border)",
-            borderRadius: 10,
-            padding: 3,
-            gap: 2,
-            alignItems: "center",
-          }}
-        >
-          {["All", "Skilled Nursing", "Sheltered Care"].map((label, i) => (
+          {emp.roles && (
             <span
-              key={label}
               style={{
-                padding: "6px 16px",
-                fontSize: 12,
-                fontWeight: 600,
-                color: i === 0 ? "#fff" : "var(--color-text-muted)",
-                background: i === 0 ? "var(--color-text-primary)" : "transparent",
-                borderRadius: 8,
-                cursor: "default",
+                fontSize: 11,
+                color: "var(--color-text-subtle)",
                 whiteSpace: "nowrap",
-                lineHeight: 1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                lineHeight: 1.2,
+                marginTop: 1,
               }}
             >
-              {label}
+              {emp.roles}
             </span>
-          ))}
+          )}
         </div>
+        <CertPill kind={emp.cert} />
       </div>
 
-      {/* ── Focus area sections ── */}
-      {SECTIONS.map((section) => (
-        <div key={section.name}>
-          {/* Section header — matches ScheduleGrid section heading */}
+      {emp.days.map((cell, idx) => {
+        const isToday = idx === todayIndex;
+        return (
           <div
+            key={`${emp.name}-${idx}`}
             style={{
-              fontSize: 18,
-              fontWeight: 800,
-              color: "var(--color-text-secondary)",
-              marginBottom: 10,
-              paddingLeft: 4,
               display: "flex",
-              alignItems: "center",
-              gap: 8,
+              alignItems: "stretch",
+              padding: 4,
+              minHeight: ROW_HEIGHT,
+              background: isToday ? TODAY_BG : "var(--color-surface)",
+              borderTop: "1px solid var(--color-border-light)",
+              borderLeft: idx === 0 ? undefined : "1px solid var(--color-border-light)",
             }}
           >
-            {/* Accent bar */}
-            <span
-              style={{
-                width: 3,
-                height: 18,
-                borderRadius: 2,
-                background: "linear-gradient(135deg, var(--color-border-focus), #93C5FD)",
-                flexShrink: 0,
-              }}
-            />
-            {section.name}
+            <CellContent cell={cell} />
           </div>
+        );
+      })}
+    </>
+  );
+}
 
-          {/* Section card */}
+function CoverageRow({
+  row,
+  isLast,
+  todayIndex,
+}: {
+  row: (typeof COVERAGE)[number];
+  isLast: boolean;
+  todayIndex: number;
+}) {
+  return (
+    <>
+      <div
+        style={{
+          position: "sticky",
+          left: 0,
+          zIndex: 3,
+          background: "var(--color-surface)",
+          padding: "6px 14px",
+          fontSize: 12,
+          fontWeight: 700,
+          color: "var(--color-text-muted)",
+          letterSpacing: "0.04em",
+          borderTop: "1px solid var(--color-border-light)",
+          borderRight: "1px solid var(--color-border-light)",
+          borderBottom: isLast ? undefined : "1px solid var(--color-border-light)",
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        {SHIFTS[row.code].name}
+      </div>
+      {row.scheduled.map((scheduled, idx) => {
+        const isToday = idx === todayIndex;
+        return (
           <div
+            key={idx}
             style={{
-              background: "#fff",
-              borderRadius: 12,
-              border: "1px solid var(--color-border)",
-              overflow: "hidden",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+              position: "relative",
+              borderTop: "1px solid var(--color-border-light)",
+              borderLeft: idx === 0 ? undefined : "1px solid var(--color-border-light)",
+              borderBottom: isLast ? undefined : "1px solid var(--color-border-light)",
+              background: isToday ? TODAY_BG : undefined,
             }}
           >
-            <div style={{ overflowX: "auto" }}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "220px repeat(7, minmax(72px, 1fr))",
-                  minWidth: 640,
-                }}
-              >
-                {/* ── Header row ── */}
-                <div
-                  style={{
-                    position: "sticky",
-                    left: 0,
-                    zIndex: 4,
-                    background: "#F8FAFC",
-                    borderRight: "1px solid var(--color-border-light)",
-                    borderBottom: "2px solid var(--color-text-primary)",
-                    padding: "10px 12px",
-                    boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "var(--color-text-subtle)",
-                    letterSpacing: "0.04em",
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  Staff
-                </div>
-                {DAYS.map((day, i) => {
-                  const isToday = i === TODAY_INDEX;
-                  return (
-                    <div
-                      key={day}
-                      style={{
-                        textAlign: "center",
-                        padding: "8px 0",
-                        borderBottom: "2px solid var(--color-text-primary)",
-                        borderLeft: "1px solid var(--color-border-light)",
-                        background: isToday ? "#EFF6FF" : "transparent",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: isToday ? "#1D4ED8" :"var(--color-text-subtle)",
-                          letterSpacing: "0.04em",
-                        }}
-                      >
-                        {day}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 16,
-                          fontWeight: 700,
-                          color: isToday ? "#1D4ED8" :"var(--color-text-secondary)",
-                          lineHeight: 1.1,
-                          marginTop: 1,
-                        }}
-                      >
-                        {DATES[i]}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {/* ── Employee rows ── */}
-                {section.employees.map((emp, ri) => {
-                  const cert = CERTS[emp.cert];
-                  return [
-                    <div
-                      key={`name-${emp.name}`}
-                      style={{
-                        position: "sticky",
-                        left: 0,
-                        zIndex: 3,
-                        background: "#fff",
-                        padding: "7px 12px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 8,
-                        borderRight: "1px solid var(--color-border-light)",
-                        borderTop: ri > 0 ? "1px solid var(--color-border-light)" : undefined,
-                        boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
-                        minWidth: 0,
-                      }}
-                    >
-                      <div style={{ minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                        <div
-                          style={{
-                            fontSize: 13,
-                            fontWeight: 600,
-                            color: "var(--color-text-secondary)",
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            lineHeight: 1.1,
-                          }}
-                        >
-                          {emp.name}
-                        </div>
-                        {emp.roles && (
-                          <div
-                            style={{
-                              fontSize: 10,
-                              color: "var(--color-text-subtle)",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              lineHeight: 1.1,
-                            }}
-                          >
-                            {emp.roles}
-                          </div>
-                        )}
-                      </div>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          background: cert.bg,
-                          color: cert.text,
-                          padding: "2px 7px",
-                          borderRadius: 20,
-                          whiteSpace: "nowrap",
-                          flexShrink: 0,
-                          letterSpacing: "0.01em",
-                        }}
-                      >
-                        {cert.abbr}
-                      </span>
-                    </div>,
-                    ...emp.shifts.map((shiftIdx, dayI) => (
-                      <ShiftCell
-                        key={`${emp.name}-${dayI}`}
-                        shiftIdx={shiftIdx}
-                        isToday={dayI === TODAY_INDEX}
-                      />
-                    )),
-                  ];
-                })}
-
-                {/* ── Coverage rows ── */}
-                {section.coverage.map((cov, covIdx) => [
-                  <div
-                    key={`cov-name-${cov.label}`}
-                    style={{
-                      position: "sticky",
-                      left: 0,
-                      zIndex: 1,
-                      background: "#fff",
-                      padding: "6px 14px",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "var(--color-text-secondary)",
-                      letterSpacing: "0.05em",
-                      borderRight: "1px solid var(--color-border)",
-                      borderTop: covIdx === 0 ? "2px solid var(--color-text-primary)" : undefined,
-                      borderBottom: covIdx < section.coverage.length - 1 ? "1px solid var(--color-border)" : undefined,
-                      boxShadow: "2px 0 4px rgba(0,0,0,0.02)",
-                      display: "flex",
-                      alignItems: "center",
-                    }}
-                  >
-                    {cov.label} Shift
-                  </div>,
-                  ...cov.counts.map((actual, dayI) => (
-                    <div
-                      key={`cov-${cov.label}-${dayI}`}
-                      style={{
-                        borderTop: covIdx === 0 ? "2px solid var(--color-text-primary)" : undefined,
-                        borderBottom: covIdx < section.coverage.length - 1 ? "1px solid var(--color-border)" : undefined,
-                      }}
-                    >
-                      <CoverageCell
-                        label={cov.label}
-                        actual={actual}
-                        required={cov.required}
-                      />
-                    </div>
-                  )),
-                ])}
-              </div>
-            </div>
+            <TallyCell required={row.required} scheduled={scheduled} />
           </div>
-        </div>
-      ))}
-    </div>
+        );
+      })}
+    </>
   );
 }

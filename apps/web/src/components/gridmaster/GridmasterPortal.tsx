@@ -30,6 +30,20 @@ import {
 import GridmasterDashboard from "@/components/gridmaster/GridmasterDashboard";
 import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
 import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
+import {
+  DashboardIcon,
+  PeopleIcon,
+  BillingIcon,
+  ComplianceIcon,
+  AuditLogIcon,
+  NewOrgIcon,
+  ShieldIcon,
+  UserGroupIcon,
+  BellIcon,
+  ImpersonateIcon,
+  HistoryIcon,
+  type NavIconProps,
+} from "@/components/icons/NavIcons";
 
 import AllUsersView from "@/components/gridmaster/AllUsersView";
 import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
@@ -39,6 +53,9 @@ import GridmasterSecurityView from "@/components/gridmaster/GridmasterSecurityVi
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation";
 import ImpersonationHistory from "@/components/gridmaster/ImpersonationHistory";
+import NotificationBell from "@/components/NotificationBell";
+import ProgressBar from "@/components/ProgressBar";
+import { InboxView as AlertsInboxView } from "@/app/alerts/AlertsInboxPage";
 import {
   fetchGridmasterDashboardData,
   type GridmasterDashboardData,
@@ -59,57 +76,15 @@ type GridmasterView =
   | "organization"
   | "impersonation"
   | "impersonation-history"
-  | "create-organization";
+  | "create-organization"
+  | "notifications";
 
 // ── Sidebar nav items ────────────────────────────────────────────────────────
 
-const SIDEBAR_MENU_BTN_CLASS = "h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150";
-const SIDEBAR_GROUP_LABEL_CLASS = "text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--color-text-faint)] px-3 pb-0";
-
-// ── Icons (inline SVGs) ──────────────────────────────────────────────────────
-
-const DashboardIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-    <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-  </svg>
-);
-
-
-const AuditIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" />
-  </svg>
-);
-
-const ImpersonateIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
-
-const PlusIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-  </svg>
-);
-
-const UsersIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-
-const HistoryIcon = (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
+const SIDEBAR_MENU_BTN_CLASS =
+  "h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150";
+const SIDEBAR_GROUP_LABEL_CLASS =
+  "text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--color-text-faint)] px-3 pb-0";
 
 // ── Organization search combobox (header) ────────────────────────────────────
 
@@ -130,8 +105,8 @@ function OrgSearchCombobox({
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
-    return organizations.filter((c) =>
-      !q || c.name.toLowerCase().includes(q) || (c.slug ?? "").toLowerCase().includes(q)
+    return organizations.filter(
+      (c) => !q || c.name.toLowerCase().includes(q) || (c.slug ?? "").toLowerCase().includes(q),
     );
   }, [organizations, query]);
 
@@ -168,9 +143,17 @@ function OrgSearchCombobox({
           type="text"
           placeholder="Search organizations…"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
           onFocus={() => setOpen(true)}
-          onKeyDown={(e) => { if (e.key === "Escape") { setOpen(false); (e.target as HTMLInputElement).blur(); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setOpen(false);
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
           className="dg-input"
           style={{ width: "100%", maxWidth: 280, fontSize: "var(--dg-fs-label)" }}
         />
@@ -192,20 +175,31 @@ function OrgSearchCombobox({
             flexDirection: "column",
           }}
         >
-          <div style={{
-            padding: "8px 14px",
-            fontSize: "var(--dg-fs-footnote)",
-            fontWeight: 700,
-            color: "var(--color-text-subtle)",
-            textTransform: "uppercase",
-            letterSpacing: "0.05em",
-            borderBottom: "1px solid var(--color-border-light)",
-          }}>
-            {query ? `${filtered.length} result${filtered.length !== 1 ? "s" : ""}` : `All Organizations (${organizations.length})`}
+          <div
+            style={{
+              padding: "8px 14px",
+              fontSize: "var(--dg-fs-footnote)",
+              fontWeight: 700,
+              color: "var(--color-text-subtle)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              borderBottom: "1px solid var(--color-border-light)",
+            }}
+          >
+            {query
+              ? `${filtered.length} result${filtered.length !== 1 ? "s" : ""}`
+              : `All Organizations (${organizations.length})`}
           </div>
           <div style={{ maxHeight: 400, overflowY: "auto" }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: "20px 14px", fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)", textAlign: "center" }}>
+              <div
+                style={{
+                  padding: "20px 14px",
+                  fontSize: "var(--dg-fs-label)",
+                  color: "var(--color-text-muted)",
+                  textAlign: "center",
+                }}
+              >
                 No matching organizations
               </div>
             ) : (
@@ -216,7 +210,11 @@ function OrgSearchCombobox({
                 return (
                   <button
                     key={c.id}
-                    onClick={() => { onSelect(c.id); setOpen(false); setQuery(""); }}
+                    onClick={() => {
+                      onSelect(c.id);
+                      setOpen(false);
+                      setQuery("");
+                    }}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -231,26 +229,75 @@ function OrgSearchCombobox({
                       opacity: isArchived ? 0.5 : 1,
                       transition: "background 150ms ease",
                     }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = "var(--color-bg-secondary)"; }}
-                    onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLElement).style.background =
+                        "var(--color-bg-secondary)";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive)
+                        (e.currentTarget as HTMLElement).style.background = "transparent";
+                    }}
                   >
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                          color: "var(--color-text-primary)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {c.name}
                       </div>
                       {c.slug && (
-                        <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", fontFamily: "var(--font-dm-mono), monospace", marginTop: 1 }}>
+                        <div
+                          style={{
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--color-text-muted)",
+                            fontFamily: "var(--font-dm-mono), monospace",
+                            marginTop: 1,
+                          }}
+                        >
                           {c.slug}
                         </div>
                       )}
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, marginLeft: 10 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        flexShrink: 0,
+                        marginLeft: 10,
+                      }}
+                    >
                       {isArchived && (
-                        <span style={{ fontSize: "var(--dg-fs-badge)", fontWeight: 600, color: "var(--color-text-subtle)", background: "var(--color-bg-secondary)", padding: "1px 6px", borderRadius: 4, textTransform: "uppercase" }}>
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-badge)",
+                            fontWeight: 600,
+                            color: "var(--color-text-subtle)",
+                            background: "var(--color-bg-secondary)",
+                            padding: "1px 6px",
+                            borderRadius: 4,
+                            textTransform: "uppercase",
+                          }}
+                        >
                           Archived
                         </span>
                       )}
-                      <span style={{ fontSize: "var(--dg-fs-footnote)", fontWeight: 600, color: "var(--color-text-subtle)", background: "var(--color-bg-secondary)", padding: "1px 8px", borderRadius: 4 }}>
+                      <span
+                        style={{
+                          fontSize: "var(--dg-fs-footnote)",
+                          fontWeight: 600,
+                          color: "var(--color-text-subtle)",
+                          background: "var(--color-bg-secondary)",
+                          padding: "1px 8px",
+                          borderRadius: 4,
+                        }}
+                      >
                         {empCount}
                       </span>
                     </div>
@@ -269,7 +316,7 @@ function OrgSearchCombobox({
 
 export default function GridmasterPortal() {
   const { isGridmaster, isLoading: permLoading } = usePermissions();
-  const { signOutLocal } = useLogout();
+  const { signOut } = useLogout();
   const { user: authUser } = useAuth();
   const isMobile = useMediaQuery(MOBILE);
   const [signingOut, setSigningOut] = useState(false);
@@ -280,7 +327,10 @@ export default function GridmasterPortal() {
   useEffect(() => {
     if (!authUser) return;
     const cached = sessionStorage.getItem("dg_user_name");
-    if (cached) { setUserName(cached); return; }
+    if (cached) {
+      setUserName(cached);
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {
@@ -295,19 +345,25 @@ export default function GridmasterPortal() {
         setUserName(fallbackName);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [authUser]);
 
   const displayName = userName || "Gridmaster";
   const initials = getAvatarInitials(userName, "GM");
 
-  const handleSignOut = useCallback(async () => {
+  const handleSignOut = useCallback(() => {
     setSigningOut(true);
-    await signOutLocal("/login");
-  }, [signOutLocal]);
+    // /goodbye handles the actual teardown; navigation is synchronous so the
+    // button stays in its loading state until the page navigates away.
+    signOut();
+  }, [signOut]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedOrgInitialTab, setSelectedOrgInitialTab] = useState<OrganizationDetailTab | undefined>();
+  const [selectedOrgInitialTab, setSelectedOrgInitialTab] = useState<
+    OrganizationDetailTab | undefined
+  >();
   const [view, setView] = useState<GridmasterView>("dashboard");
   const [impersonateTargetId, setImpersonateTargetId] = useState<string | undefined>();
   const [impersonateOrgId, setImpersonateOrgId] = useState<string | undefined>();
@@ -344,43 +400,158 @@ export default function GridmasterPortal() {
     }
     return map;
   }, [dashboardQuery.data?.stats]);
-  const error =
-    dashboardQuery.error
-      ? formatClientErrorMessage(dashboardQuery.error, "Failed to load gridmaster dashboard")
-      : null;
+  const error = dashboardQuery.error
+    ? formatClientErrorMessage(dashboardQuery.error, "Failed to load gridmaster dashboard")
+    : null;
 
   // ── Nav item config (must be before early returns to satisfy Rules of Hooks) ──
 
-  const navGroups = useMemo(() => [
-    {
-      id: "navigation",
-      label: "Navigation",
-      items: [
-        { key: "dashboard" as GridmasterView, label: "Dashboard", icon: DashboardIcon, onClick: () => { setView("dashboard"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "all-users" as GridmasterView, label: "All Users", icon: UsersIcon, onClick: () => { setView("all-users"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "billing" as GridmasterView, label: "Billing", icon: AuditIcon, onClick: () => { setView("billing"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "compliance" as GridmasterView, label: "Compliance", icon: AuditIcon, onClick: () => { setView("compliance"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "audit-log" as GridmasterView, label: "Audit Log", icon: AuditIcon, onClick: () => { setView("audit-log"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-      ],
-    },
-    {
-      id: "actions",
-      label: "Actions",
-      items: [
-        { key: "create-organization" as GridmasterView, label: "New Organization", icon: PlusIcon, onClick: () => { setView("create-organization"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "security" as GridmasterView, label: "Security", icon: UsersIcon, onClick: () => { setView("security"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-        { key: "gridmaster-accounts" as GridmasterView, label: "Gridmaster Accounts", icon: UsersIcon, onClick: () => { setView("gridmaster-accounts"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-      ],
-    },
-    {
-      id: "tools",
-      label: "Tools",
-      items: [
-        { key: "impersonation" as GridmasterView, label: "Impersonation", icon: ImpersonateIcon, onClick: () => { setView("impersonation"); setSelectedId(null); setSelectedOrgInitialTab(undefined); setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } },
-        { key: "impersonation-history" as GridmasterView, label: "History", icon: HistoryIcon, onClick: () => { setView("impersonation-history"); setSelectedId(null); setSelectedOrgInitialTab(undefined); } },
-      ],
-    },
-  ], []);
+  const navGroups = useMemo<
+    Array<{
+      id: string;
+      label: string;
+      items: Array<{
+        key: GridmasterView;
+        label: string;
+        Icon: React.ComponentType<NavIconProps>;
+        onClick: () => void;
+      }>;
+    }>
+  >(
+    () => [
+      {
+        id: "navigation",
+        label: "Navigation",
+        items: [
+          {
+            key: "dashboard",
+            label: "Dashboard",
+            Icon: DashboardIcon,
+            onClick: () => {
+              setView("dashboard");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+          {
+            key: "all-users",
+            label: "All Users",
+            Icon: PeopleIcon,
+            onClick: () => {
+              setView("all-users");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+          {
+            key: "billing",
+            label: "Billing",
+            Icon: BillingIcon,
+            onClick: () => {
+              setView("billing");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+          {
+            key: "compliance",
+            label: "Compliance",
+            Icon: ComplianceIcon,
+            onClick: () => {
+              setView("compliance");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+          {
+            key: "audit-log",
+            label: "Audit Log",
+            Icon: AuditLogIcon,
+            onClick: () => {
+              setView("audit-log");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+        ],
+      },
+      {
+        id: "actions",
+        label: "Actions",
+        items: [
+          {
+            key: "create-organization",
+            label: "New Organization",
+            Icon: NewOrgIcon,
+            onClick: () => {
+              setView("create-organization");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+          {
+            key: "security",
+            label: "Security",
+            Icon: ShieldIcon,
+            onClick: () => {
+              setView("security");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+          {
+            key: "gridmaster-accounts",
+            label: "Gridmaster Accounts",
+            Icon: UserGroupIcon,
+            onClick: () => {
+              setView("gridmaster-accounts");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+        ],
+      },
+      {
+        id: "tools",
+        label: "Tools",
+        items: [
+          {
+            key: "notifications",
+            label: "Alerts",
+            Icon: BellIcon,
+            onClick: () => {
+              setView("notifications");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+          {
+            key: "impersonation",
+            label: "Impersonation",
+            Icon: ImpersonateIcon,
+            onClick: () => {
+              setView("impersonation");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+              setImpersonateTargetId(undefined);
+              setImpersonateOrgId(undefined);
+            },
+          },
+          {
+            key: "impersonation-history",
+            label: "History",
+            Icon: HistoryIcon,
+            onClick: () => {
+              setView("impersonation-history");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+        ],
+      },
+    ],
+    [],
+  );
   const primaryNavGroups = useMemo(
     () => navGroups.filter((group) => group.id === "navigation" || group.id === "tools"),
     [navGroups],
@@ -394,17 +565,33 @@ export default function GridmasterPortal() {
 
   if (permLoading || signingOut || (isGridmaster && dashboardQuery.isLoading)) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "grid", placeItems: "center" }}>
-        <span style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-body-sm)" }}>Loading…</span>
+      <div style={{ minHeight: "100vh", background: "var(--color-bg)" }}>
+        <ProgressBar loading />
       </div>
     );
   }
 
   if (!isGridmaster) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "grid", placeItems: "center", padding: 24 }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--color-bg)",
+          display: "grid",
+          placeItems: "center",
+          padding: 24,
+        }}
+      >
         <div style={{ textAlign: "center", maxWidth: 520 }}>
-          <h1 style={{ marginBottom: 8, fontSize: "var(--dg-fs-section-title)", color: "var(--color-danger)" }}>Access denied</h1>
+          <h1
+            style={{
+              marginBottom: 8,
+              fontSize: "var(--dg-fs-section-title)",
+              color: "var(--color-danger)",
+            }}
+          >
+            Access denied
+          </h1>
           <p style={{ margin: 0, color: "var(--color-text-muted)" }}>
             The gridmaster portal is restricted to gridmaster accounts.
           </p>
@@ -420,7 +607,7 @@ export default function GridmasterPortal() {
     Array.from(stats.values()).reduce((n, s) => n + s.userCount, 0);
   const totalEmployees = Array.from(stats.values()).reduce((n, s) => n + s.employeeCount, 0);
 
-  const selectedOrg = selectedId ? organizations.find((c) => c.id === selectedId) ?? null : null;
+  const selectedOrg = selectedId ? (organizations.find((c) => c.id === selectedId) ?? null) : null;
 
   function selectOrg(id: string, initialTab?: OrganizationDetailTab) {
     setSelectedId(id);
@@ -438,10 +625,9 @@ export default function GridmasterPortal() {
     queryClient.setQueryData<GridmasterDashboardData>(
       queryKeys.gridmaster.dashboard(),
       (current) => ({
-        organizations: [
-          ...(current?.organizations ?? []),
-          org,
-        ].sort((a, b) => a.name.localeCompare(b.name)),
+        organizations: [...(current?.organizations ?? []), org].sort((a, b) =>
+          a.name.localeCompare(b.name),
+        ),
         platformUserCount: current?.platformUserCount ?? 0,
         stats: current?.stats ?? [],
       }),
@@ -471,7 +657,14 @@ export default function GridmasterPortal() {
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--color-bg)", display: "flex", flexDirection: "column" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--color-bg)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       {/* Header */}
       <header
         style={{
@@ -490,16 +683,46 @@ export default function GridmasterPortal() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flexShrink: 0 }}>
           <DubGridLogo size={28} />
-          <span style={{ fontSize: "var(--dg-fs-body)", fontWeight: 700, color: "var(--color-text-primary)" }}>
+          <span
+            style={{
+              fontSize: "var(--dg-fs-body)",
+              fontWeight: 700,
+              color: "var(--color-text-primary)",
+            }}
+          >
             Gridmaster
           </span>
         </div>
-        <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: isMobile ? "flex-end" : "center", marginLeft: isMobile ? 8 : 0 }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            justifyContent: isMobile ? "flex-end" : "center",
+            marginLeft: isMobile ? 8 : 0,
+          }}
+        >
           <OrgSearchCombobox
             organizations={organizations}
             stats={stats}
             selectedOrg={selectedOrg}
             onSelect={selectOrg}
+          />
+        </div>
+        <div
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            marginRight: isMobile ? 0 : 4,
+          }}
+        >
+          <NotificationBell
+            onViewAll={() => {
+              setView("notifications");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            }}
           />
         </div>
         {!isMobile && (
@@ -532,41 +755,89 @@ export default function GridmasterPortal() {
                 }
               }}
             >
-              <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                background: "var(--color-brand)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "var(--dg-fs-footnote)",
-                fontWeight: 700,
-                color: "var(--color-text-inverse)",
-                flexShrink: 0,
-              }}>
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  background: "var(--color-brand)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "var(--dg-fs-footnote)",
+                  fontWeight: 700,
+                  color: "var(--color-text-inverse)",
+                  flexShrink: 0,
+                }}
+              >
                 {initials}
               </div>
               <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-primary)", lineHeight: 1.2, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-caption)",
+                    fontWeight: 600,
+                    color: "var(--color-text-primary)",
+                    lineHeight: 1.2,
+                    maxWidth: 120,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {displayName}
                 </div>
-                <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", lineHeight: 1.2 }}>
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--color-text-muted)",
+                    lineHeight: 1.2,
+                  }}
+                >
                   Gridmaster
                 </div>
               </div>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, transition: "transform 150ms ease", transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--color-text-muted)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  flexShrink: 0,
+                  transition: "transform 150ms ease",
+                  transform: menuOpen ? "rotate(180deg)" : "rotate(0deg)",
+                }}
+              >
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
 
             {menuOpen && (
-              <div className="dg-menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200 }}>
+              <div
+                className="dg-menu"
+                style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200 }}
+              >
                 <button
                   className="dg-menu-item"
-                  onClick={() => { setMenuOpen(false); window.location.href = "/profile"; }}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    window.location.href = "/profile";
+                  }}
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                     <circle cx="12" cy="7" r="4" />
                   </svg>
@@ -575,9 +846,21 @@ export default function GridmasterPortal() {
                 <div className="dg-menu-divider" />
                 <button
                   className="dg-menu-item dg-menu-item--danger"
-                  onClick={() => { setMenuOpen(false); handleSignOut(); }}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    handleSignOut();
+                  }}
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                     <polyline points="16 17 21 12 16 7" />
                     <line x1="21" y1="12" x2="9" y2="12" />
@@ -593,22 +876,33 @@ export default function GridmasterPortal() {
       {/* Mobile section chips */}
       {isMobile && (
         <nav className="dg-mobile-section-bar" aria-label="Gridmaster navigation">
-          {([
-            { key: "dashboard", label: "Dashboard" },
-            { key: "all-users", label: "Users" },
-            { key: "billing", label: "Billing" },
-            { key: "compliance", label: "Compliance" },
-            { key: "security", label: "Security" },
-            { key: "gridmaster-accounts", label: "GM Accounts" },
-            { key: "audit-log", label: "Audit" },
-            { key: "create-organization", label: "New Org" },
-            { key: "impersonation", label: "Impersonate" },
-            { key: "impersonation-history", label: "History" },
-          ] as { key: GridmasterView; label: string }[]).map((item) => (
+          {(
+            [
+              { key: "dashboard", label: "Dashboard" },
+              { key: "all-users", label: "Users" },
+              { key: "billing", label: "Billing" },
+              { key: "compliance", label: "Compliance" },
+              { key: "security", label: "Security" },
+              { key: "gridmaster-accounts", label: "GM Accounts" },
+              { key: "audit-log", label: "Audit" },
+              { key: "create-organization", label: "New Org" },
+              { key: "notifications", label: "Alerts" },
+              { key: "impersonation", label: "Impersonate" },
+              { key: "impersonation-history", label: "History" },
+            ] as { key: GridmasterView; label: string }[]
+          ).map((item) => (
             <button
               key={item.key}
               className={`dg-mobile-section-chip${view === item.key ? " active" : ""}`}
-              onClick={() => { setView(item.key); setSelectedId(null); setSelectedOrgInitialTab(undefined); if (item.key === "impersonation") { setImpersonateTargetId(undefined); setImpersonateOrgId(undefined); } }}
+              onClick={() => {
+                setView(item.key);
+                setSelectedId(null);
+                setSelectedOrgInitialTab(undefined);
+                if (item.key === "impersonation") {
+                  setImpersonateTargetId(undefined);
+                  setImpersonateOrgId(undefined);
+                }
+              }}
             >
               {item.label}
             </button>
@@ -620,7 +914,11 @@ export default function GridmasterPortal() {
       <SidebarProvider defaultOpen={true} style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Sidebar (desktop only) */}
         {!isMobile && (
-          <Sidebar collapsible="icon" className="border-r border-[var(--color-border)] bg-[var(--color-surface)]" style={{ top: 56, height: "calc(100dvh - 56px)" }}>
+          <Sidebar
+            collapsible="icon"
+            className="border-r border-[var(--color-border)] bg-[var(--color-surface)]"
+            style={{ top: 56, height: "calc(100dvh - 56px)" }}
+          >
             <SidebarContent className="pt-2 overscroll-contain">
               {primaryNavGroups.map((group) => (
                 <SidebarGroup key={group.id}>
@@ -637,8 +935,14 @@ export default function GridmasterPortal() {
                             onClick={item.onClick}
                             className={SIDEBAR_MENU_BTN_CLASS}
                           >
-                            <span className={view === item.key ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
-                              {item.icon}
+                            <span
+                              className={
+                                view === item.key
+                                  ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors"
+                                  : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
+                              }
+                            >
+                              <item.Icon active={view === item.key} />
                             </span>
                             <span className="font-semibold">{item.label}</span>
                           </SidebarMenuButton>
@@ -668,8 +972,14 @@ export default function GridmasterPortal() {
                             onClick={item.onClick}
                             className={SIDEBAR_MENU_BTN_CLASS}
                           >
-                            <span className={view === item.key ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors" : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"}>
-                              {item.icon}
+                            <span
+                              className={
+                                view === item.key
+                                  ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors"
+                                  : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
+                              }
+                            >
+                              <item.Icon active={view === item.key} />
                             </span>
                             <span className="font-semibold">{item.label}</span>
                           </SidebarMenuButton>
@@ -689,7 +999,10 @@ export default function GridmasterPortal() {
         )}
 
         {/* Main content */}
-        <main aria-label="Gridmaster content" style={{ flex: 1, overflow: "auto", padding: isMobile ? 16 : 24 }}>
+        <main
+          aria-label="Gridmaster content"
+          style={{ flex: 1, overflow: "auto", padding: isMobile ? 16 : 24 }}
+        >
           {error && (
             <div
               style={{
@@ -713,7 +1026,10 @@ export default function GridmasterPortal() {
               totalUsers={totalUsers}
               totalEmployees={totalEmployees}
               onSelectOrg={selectOrg}
-              onCreateOrg={() => { setView("create-organization"); setSelectedId(null); }}
+              onCreateOrg={() => {
+                setView("create-organization");
+                setSelectedId(null);
+              }}
             />
           )}
 
@@ -725,31 +1041,19 @@ export default function GridmasterPortal() {
             />
           )}
 
-          {view === "billing" && (
-            <GridmasterBillingView onSelectOrg={selectOrg} />
-          )}
+          {view === "billing" && <GridmasterBillingView onSelectOrg={selectOrg} />}
 
-          {view === "compliance" && (
-            <GridmasterComplianceView onSelectOrg={selectOrg} />
-          )}
+          {view === "compliance" && <GridmasterComplianceView onSelectOrg={selectOrg} />}
 
           {view === "security" && (
-            <GridmasterSecurityView
-              organizations={organizations}
-              currentUserId={authUser?.id}
-            />
+            <GridmasterSecurityView organizations={organizations} currentUserId={authUser?.id} />
           )}
 
           {view === "gridmaster-accounts" && (
-            <GridmasterAccountsView
-              organizations={organizations}
-              currentUserId={authUser?.id}
-            />
+            <GridmasterAccountsView organizations={organizations} currentUserId={authUser?.id} />
           )}
 
-          {view === "audit-log" && (
-            <AuditLogView />
-          )}
+          {view === "audit-log" && <AuditLogView />}
 
           {view === "create-organization" && (
             <OrganizationSetupWizard
@@ -761,7 +1065,10 @@ export default function GridmasterPortal() {
           {view === "organization" && selectedOrg && (
             <>
               <button
-                onClick={() => { setView("dashboard"); setSelectedId(null); }}
+                onClick={() => {
+                  setView("dashboard");
+                  setSelectedId(null);
+                }}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -775,10 +1082,23 @@ export default function GridmasterPortal() {
                   padding: "0 0 12px",
                   transition: "color 150ms ease",
                 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)"; }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)";
+                }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
                 All Organizations
@@ -801,9 +1121,9 @@ export default function GridmasterPortal() {
             />
           )}
 
-          {view === "impersonation-history" && (
-            <ImpersonationHistory />
-          )}
+          {view === "impersonation-history" && <ImpersonationHistory />}
+
+          {view === "notifications" && <AlertsInboxView />}
         </main>
       </SidebarProvider>
     </div>
@@ -820,7 +1140,13 @@ function GridmasterSidebarCollapseButton() {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "b" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const tag = (e.target as HTMLElement).tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (e.target as HTMLElement).isContentEditable) return;
+        if (
+          tag === "INPUT" ||
+          tag === "TEXTAREA" ||
+          tag === "SELECT" ||
+          (e.target as HTMLElement).isContentEditable
+        )
+          return;
         toggleSidebar();
       }
     }
@@ -835,12 +1161,25 @@ function GridmasterSidebarCollapseButton() {
       className="h-9 text-[var(--color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
     >
       <span className="flex shrink-0 items-center justify-center">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 150ms ease" }}>
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            transform: open ? "rotate(180deg)" : "none",
+            transition: "transform 150ms ease",
+          }}
+        >
           <polyline points="13 17 18 12 13 7" />
           <polyline points="6 17 11 12 6 7" />
         </svg>
       </span>
-      <span className="font-semibold ml-2">Collapse Menu</span>
+      <span className="font-semibold">Collapse Menu</span>
     </SidebarMenuButton>
   );
 }

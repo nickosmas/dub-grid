@@ -55,25 +55,18 @@ export function buildRealtimeDraftDiff(
   const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
   const noteUpdates: RealtimeDraftNotesMap = {};
 
-  const shiftKeys = new Set([
-    ...Object.keys(previousShifts),
-    ...Object.keys(nextShifts),
-  ]);
+  const shiftKeys = new Set([...Object.keys(previousShifts), ...Object.keys(nextShifts)]);
   for (const key of shiftKeys) {
     const previous = previousShifts[key] ?? null;
     const next = nextShifts[key] ?? null;
     if (
-      JSON.stringify(normalizeShiftEntry(previous)) !==
-      JSON.stringify(normalizeShiftEntry(next))
+      JSON.stringify(normalizeShiftEntry(previous)) !== JSON.stringify(normalizeShiftEntry(next))
     ) {
       shiftUpdates[key] = next;
     }
   }
 
-  const noteKeys = new Set([
-    ...Object.keys(previousNotes),
-    ...Object.keys(nextNotes),
-  ]);
+  const noteKeys = new Set([...Object.keys(previousNotes), ...Object.keys(nextNotes)]);
   for (const key of noteKeys) {
     const previous = normalizeNoteList(previousNotes[key]);
     const next = normalizeNoteList(nextNotes[key]);
@@ -82,10 +75,7 @@ export function buildRealtimeDraftDiff(
     }
   }
 
-  if (
-    Object.keys(shiftUpdates).length === 0 &&
-    Object.keys(noteUpdates).length === 0
-  ) {
+  if (Object.keys(shiftUpdates).length === 0 && Object.keys(noteUpdates).length === 0) {
     return null;
   }
 

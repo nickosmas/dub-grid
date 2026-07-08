@@ -142,8 +142,7 @@ export default function DraftReviewSummary({
                 justifyContent: "space-between",
                 gap: 12,
                 padding: "9px 0",
-                borderTop:
-                  index === 0 ? undefined : "1px solid var(--color-border-light)",
+                borderTop: index === 0 ? undefined : "1px solid var(--color-border-light)",
               }}
             >
               <dt

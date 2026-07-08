@@ -23,16 +23,14 @@ export async function saveNotificationPreferences(
   userId: string,
   prefs: NotificationPreferenceMap,
 ): Promise<NotificationPreferenceMap> {
-  const { error } = await getServiceClient()
-    .from("notification_preferences")
-    .upsert(
-      {
-        user_id: userId,
-        prefs,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
+  const { error } = await getServiceClient().from("notification_preferences").upsert(
+    {
+      user_id: userId,
+      prefs,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
 
   if (error) {
     throw error;

@@ -1,25 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
 import type { DbOrganization } from "@dubgrid/db-types";
-import {
-  createRequestSupabaseClient,
-  requireGridmasterSession,
-} from "@/lib/api-auth";
+import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { rowToOrganization } from "@/lib/db/mappers";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { getServiceClient } from "@/lib/supabase-service";
+import { cacheDel, CacheKey } from "@/lib/cache";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import { apiErrorResponse } from "@/lib/error-handling";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export const dynamic = "force-dynamic";
-
-function trialEndFrom(date: Date): string {
-  return new Date(
-    date.getTime() + DEFAULT_TRIAL_DAYS * 86_400_000,
-  ).toISOString();
-}
 
 const createSetupSchema = z.object({
   name: z.string().trim().min(1),
@@ -101,12 +94,20 @@ export async function POST(req: NextRequest) {
   try {
     switch (parsed.data.action) {
       case "archiveOrganization": {
-        const { error } = await serviceClient
+        const { data: archived, error } = await serviceClient
           .from("organizations")
           .update({ archived_at: new Date().toISOString() })
-          .eq("id", parsed.data.orgId);
+          .eq("id", parsed.data.orgId)
+          .select("slug")
+          .maybeSingle();
         if (error) {
           throw error;
+        }
+        // The public subdomain lookup caches {id, name} by slug with a long
+        // TTL — invalidate immediately so this org's subdomain stops
+        // resolving right away instead of appearing valid until it expires.
+        if (archived?.slug) {
+          void cacheDel(CacheKey.orgBySlug(archived.slug));
         }
         await writeGridmasterAuditLog({
           serviceClient,
@@ -245,7 +246,10 @@ export async function POST(req: NextRequest) {
             timezone: input.timezone || null,
             pay_period_start_date: null,
             subscription_status: "trialing",
-            trial_ends_at: trialEndFrom(new Date()),
+            // trial_ends_at intentionally left NULL: the trial is "pending" until
+            // the first super_admin logs in (the start_trial_for_org RPC, called
+            // from the login flow, then starts the 14-day clock). See
+            // packages/domain/src/billing.ts trial_pending.
             enforce_conflict_prevention: false,
             data_retention_days: 365,
             feature_overrides: {},
@@ -300,14 +304,11 @@ export async function POST(req: NextRequest) {
           }
 
           const displayName = `${firstName} ${lastName}`.trim();
-          const assignResult = await requestClient.rpc(
-            "assign_org_role_by_email",
-            {
-              p_email: email,
-              p_org_id: org.id,
-              p_org_role: "super_admin",
-            },
-          );
+          const assignResult = await requestClient.rpc("assign_org_role_by_email", {
+            p_email: email,
+            p_org_id: org.id,
+            p_org_role: "super_admin",
+          });
 
           if (!assignResult.error) {
             superAdmin = {
@@ -341,7 +342,10 @@ export async function POST(req: NextRequest) {
               superAdmin = {
                 kind: "invite-error",
                 displayName,
-                message: inviteResult.error.message,
+                message: formatClientErrorMessage(
+                  inviteResult.error,
+                  "We couldn't send that invitation.",
+                ),
               };
             }
           }
@@ -370,8 +374,6 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Gridmaster organization request failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiErrorResponse(error, "Gridmaster organization request failed");
   }
 }

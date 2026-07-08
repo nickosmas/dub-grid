@@ -29,67 +29,85 @@ function makeEmployee(overrides: Partial<Employee> = {}): Employee {
 }
 
 describe("EmployeeStatusActions", () => {
-  it("confirms benching with a trimmed note", async () => {
+  it("defaults Deactivate to inactive + calls onDeactivate with a trimmed note", async () => {
     const user = userEvent.setup();
-    const onBench = vi.fn();
+    const onDeactivate = vi.fn();
 
     render(
       <EmployeeStatusActions
         employee={makeEmployee()}
         canEdit
-        onBench={onBench}
+        onDeactivate={onDeactivate}
         onActivate={vi.fn()}
-        onTerminate={vi.fn()}
+        onRemove={vi.fn()}
         variant="panel"
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Bench" }));
+    // Single combined entry point: "Deactivate"
+    await user.click(screen.getByRole("button", { name: "Deactivate" }));
+
+    // Modal opens with "Mark inactive" selected by default → primary button
+    // reads "Mark Inactive" (not "Remove").
+    const dialog = screen.getByRole("dialog", { name: /Deactivate Alice Smith/i });
+    expect(within(dialog).getByRole("radio", { name: /Mark inactive/i })).toBeChecked();
+    expect(within(dialog).getByRole("radio", { name: /Remove from staff/i })).not.toBeChecked();
+
     await user.type(
-      screen.getByPlaceholderText(/Reason \(optional\)/),
+      within(dialog).getByPlaceholderText(/Reason \(optional\)/),
       "  On leave until June  ",
     );
-    await user.click(screen.getByRole("button", { name: "Bench" }));
+    await user.click(within(dialog).getByRole("button", { name: "Mark Inactive" }));
 
-    expect(onBench).toHaveBeenCalledWith("emp-1", "On leave until June");
+    expect(onDeactivate).toHaveBeenCalledWith("emp-1", "On leave until June");
   });
 
-  it("confirms termination and optionally revokes app access", async () => {
+  it("switches the modal to Remove, keeps the note field, and calls onRemove with the trimmed note", async () => {
     const user = userEvent.setup();
-    const onTerminate = vi.fn();
+    const onRemove = vi.fn();
     const onRevokeAccess = vi.fn();
 
     render(
       <EmployeeStatusActions
         employee={makeEmployee({ userId: "user-1" })}
         canEdit
-        onBench={vi.fn()}
+        onDeactivate={vi.fn()}
         onActivate={vi.fn()}
-        onTerminate={onTerminate}
+        onRemove={onRemove}
         onRevokeAccess={onRevokeAccess}
         variant="panel"
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Terminate" }));
-    await user.click(screen.getByRole("checkbox", { name: /also revoke app access/i }));
-    await user.click(screen.getByRole("button", { name: "Terminate" }));
+    await user.click(screen.getByRole("button", { name: "Deactivate" }));
+    const dialog = screen.getByRole("dialog", { name: /Deactivate Alice Smith/i });
 
-    expect(onTerminate).toHaveBeenCalledWith("emp-1");
+    await user.click(within(dialog).getByRole("radio", { name: /Remove from staff/i }));
+
+    // Primary button verb flips with the radio.
+    expect(within(dialog).getByRole("button", { name: "Remove" })).toBeInTheDocument();
+    // Note field is shown for Remove too, alongside the revoke-access checkbox.
+    const noteInput = within(dialog).getByPlaceholderText(/Reason \(optional\)/);
+    await user.type(noteInput, "  Left the company  ");
+
+    await user.click(within(dialog).getByRole("checkbox", { name: /also revoke app access/i }));
+    await user.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+    expect(onRemove).toHaveBeenCalledWith("emp-1", "Left the company");
     expect(onRevokeAccess).toHaveBeenCalledWith("user-1");
   });
 
-  it("activates benched employees from the shared action area", async () => {
+  it("activates inactive employees from the shared action area", async () => {
     const user = userEvent.setup();
     const onActivate = vi.fn();
 
     render(
       <EmployeeStatusActions
-        employee={makeEmployee({ status: "benched" })}
+        employee={makeEmployee({ status: "inactive" })}
         canEdit
-        onBench={vi.fn()}
+        onDeactivate={vi.fn()}
         onActivate={onActivate}
-        onTerminate={vi.fn()}
+        onRemove={vi.fn()}
         variant="page"
       />,
     );
@@ -102,28 +120,24 @@ describe("EmployeeStatusActions", () => {
     expect(onActivate).toHaveBeenCalledWith("emp-1");
   });
 
-  it("uses the shared filled warning and danger button treatments for status actions", () => {
+  it("uses the shared filled warning treatment for the Deactivate entry point", () => {
     render(
       <EmployeeStatusActions
         employee={makeEmployee()}
         canEdit
-        onBench={vi.fn()}
+        onDeactivate={vi.fn()}
         onActivate={vi.fn()}
-        onTerminate={vi.fn()}
+        onRemove={vi.fn()}
         variant="page"
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Bench" })).toHaveClass(
+    expect(screen.getByRole("button", { name: "Deactivate" })).toHaveClass(
       "dg-btn",
       "dg-btn-warning-filled",
     );
-    expect(screen.getByRole("button", { name: "Terminate" })).toHaveClass(
-      "dg-btn",
-      "dg-btn-danger-filled",
-    );
-    expect(screen.getByRole("button", { name: "Bench" })).toHaveStyle({
-      minWidth: "132px",
+    expect(screen.getByRole("button", { name: "Deactivate" })).toHaveStyle({
+      minWidth: "160px",
     });
   });
 });

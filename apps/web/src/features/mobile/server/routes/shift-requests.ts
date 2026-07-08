@@ -6,10 +6,7 @@ import {
   mobileShiftRequestsResponseSchema,
   normalizeMobileScheduleRange,
 } from "@dubgrid/contracts";
-import {
-  createMobileShiftRequest,
-  loadMobileShiftRequestsPayload,
-} from "@dubgrid/mobile-api-core";
+import { createMobileShiftRequest, loadMobileShiftRequestsPayload } from "@dubgrid/mobile-api-core";
 import { dispatchNotificationEvent } from "@/features/notifications/server";
 import {
   fetchLinkedEmployeeForUser,
@@ -45,20 +42,14 @@ export async function GET(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid query" }, { status: 400 });
   }
-  const payload = await loadMobileShiftRequestsPayload(
-    auth,
-    range,
-    {
-      fetchLinkedEmployeeForUser,
-      fetchMobileOpenShifts,
-      fetchMobileScheduleEntries,
-      fetchMobileShiftRequests,
-    },
-  );
+  const payload = await loadMobileShiftRequestsPayload(auth, range, {
+    fetchLinkedEmployeeForUser,
+    fetchMobileOpenShifts,
+    fetchMobileScheduleEntries,
+    fetchMobileShiftRequests,
+  });
 
-  return NextResponse.json(
-    mobileShiftRequestsResponseSchema.parse(payload),
-  );
+  return NextResponse.json(mobileShiftRequestsResponseSchema.parse(payload));
 }
 
 export async function POST(req: NextRequest) {
@@ -88,10 +79,9 @@ export async function POST(req: NextRequest) {
       dispatchNotificationEvent,
     });
 
-    return NextResponse.json(
-      mobileCreateShiftRequestResponseSchema.parse(payload),
-      { status: 201 },
-    );
+    return NextResponse.json(mobileCreateShiftRequestResponseSchema.parse(payload), {
+      status: 201,
+    });
   } catch (err) {
     return NextResponse.json({ error: errorMessage(err) }, { status: 400 });
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useMemo, useCallback } from "react";
+import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { NamedItem, Department } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
@@ -18,6 +18,8 @@ import {
   normalizeLineText,
 } from "@/lib/form-validation";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { toast } from "sonner";
+import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 
 export default function StringListSettings({
   label,
@@ -37,7 +39,12 @@ export default function StringListSettings({
 }: {
   label: string;
   items: NamedItem[];
-  onSave: (items: NamedItem[]) => Promise<void>;
+  /**
+   * Persist the edited list. `hardDeleteIds` lists IDs the user confirmed for
+   * permanent deletion (no archived row left behind). The server always
+   * re-verifies before performing a hard delete.
+   */
+  onSave: (items: NamedItem[], hardDeleteIds: number[]) => Promise<void>;
   placeholder: string;
   canEdit?: boolean;
   hideAbbr?: boolean;
@@ -58,20 +65,36 @@ export default function StringListSettings({
   wideTable?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
-  const [isEditing, setIsEditing] = useState(initialEditing ?? false);
+  const isWizardMode = useWizardMode();
+  const [isEditing, setIsEditing] = useState(isWizardMode ? true : (initialEditing ?? false));
   const [local, setLocal] = useState<NamedItem[]>(items);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ idx: number; item: NamedItem; deps: DependencyInfo | null } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    idx: number;
+    item: NamedItem;
+    deps: DependencyInfo | null;
+  } | null>(null);
+  const [pendingHardDeleteIds, setPendingHardDeleteIds] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Wizard mode: when the persisted `items` prop changes (typically because we
+  // just saved this list), resync the local draft so its IDs match the server.
+  // Without this, the next saveAll would see negative temp IDs vs real IDs and
+  // report isDirty=true, causing a retry-after-failure to re-run the save with
+  // a stale snapshot that hard-deletes the rows we just created.
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    if (!isWizardMode) return;
+    if (itemsRef.current === items) return;
+    itemsRef.current = items;
+    setLocal(items);
+  }, [isWizardMode, items]);
   const nextTmpId = useRef(-1);
   const nameRefs = useRef<Map<number, HTMLInputElement>>(new Map());
   const abbrRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   // Clean comparison: ignore empty uncommitted rows
-  const nonEmpty = useCallback(
-    (list: NamedItem[]) => list.filter((it) => it.name.trim()),
-    [],
-  );
+  const nonEmpty = useCallback((list: NamedItem[]) => list.filter((it) => it.name.trim()), []);
   const rowErrors = useMemo(
     () =>
       local.map((item) => ({
@@ -108,9 +131,8 @@ export default function StringListSettings({
     );
     return duplicate ? `Duplicate name: "${duplicate}"` : null;
   }, [local, rowErrors]);
-  const hasValidationErrors = rowErrors.some(
-    (row) => row.name || row.abbr,
-  ) || Boolean(duplicateName);
+  const hasValidationErrors =
+    rowErrors.some((row) => row.name || row.abbr) || Boolean(duplicateName);
   const isDirty = useMemo(
     () => JSON.stringify(nonEmpty(local)) !== JSON.stringify(items),
     [local, items, nonEmpty],
@@ -122,12 +144,7 @@ export default function StringListSettings({
     if (sourceIdx === dropIdx) return;
 
     setLocal((current) => {
-      if (
-        sourceIdx < 0 ||
-        sourceIdx >= current.length ||
-        dropIdx < 0 ||
-        dropIdx > current.length
-      ) {
+      if (sourceIdx < 0 || sourceIdx >= current.length || dropIdx < 0 || dropIdx > current.length) {
         return current;
       }
 
@@ -157,6 +174,7 @@ export default function StringListSettings({
     setLocal([...items]);
     setError(null);
     setDeleteConfirm(null);
+    setPendingHardDeleteIds(new Set());
   }, [items]);
 
   const handleDiscard = () => {
@@ -168,8 +186,12 @@ export default function StringListSettings({
     setIsEditing(false);
   };
 
+  const lastSaveErrorRef = useRef<unknown>(null);
+
   const handleSave = async () => {
+    lastSaveErrorRef.current = null;
     if (hasValidationErrors) {
+      lastSaveErrorRef.current = new Error("Validation errors prevent save.");
       setError(
         rowErrors.find((row) => row.name || row.abbr)?.name ??
           rowErrors.find((row) => row.name || row.abbr)?.abbr ??
@@ -206,6 +228,7 @@ export default function StringListSettings({
     const dupes = keys.filter((k, i) => k && keys.indexOf(k) !== i);
     if (dupes.length > 0) {
       const dupeName = dupes[0].split("::")[0];
+      lastSaveErrorRef.current = new Error(`Duplicate name: "${dupeName}"`);
       setError(`Duplicate name: "${dupeName}"`);
       return;
     }
@@ -213,14 +236,32 @@ export default function StringListSettings({
     setSaving(true);
     setError(null);
     try {
-      await onSave(cleaned);
-      setIsEditing(false);
+      await onSave(cleaned, Array.from(pendingHardDeleteIds));
+      setPendingHardDeleteIds(new Set());
+      // Wizard mode stays editable so the user can keep refining if the broader
+      // saveAll fails on a later section. Non-wizard usage collapses back to
+      // read-only after a successful save.
+      if (!isWizardMode) setIsEditing(false);
     } catch (err) {
-      setError(formatClientErrorMessage(err, `We couldn't save ${label.toLowerCase()}.`));
+      lastSaveErrorRef.current = err;
+      toast.error(formatClientErrorMessage(err, `We couldn't save ${label.toLowerCase()}.`));
     } finally {
       setSaving(false);
     }
   };
+
+  useRegisterWizardEditor(
+    `string-list:${label}`,
+    {
+      isDirty: () => isDirty,
+      hasErrors: () => hasValidationErrors,
+      save: async () => {
+        await handleSave();
+        if (lastSaveErrorRef.current) throw lastSaveErrorRef.current;
+      },
+    },
+    isWizardMode && canEdit,
+  );
 
   const addRow = useCallback(() => {
     const id = nextTmpId.current--;
@@ -241,21 +282,32 @@ export default function StringListSettings({
     });
   }, [showScheduleRoleToggle]);
 
-  const handleRemove = (i: number) => {
+  const handleRemove = (i: number, hard: boolean) => {
+    const item = local[i];
     setLocal((prev) => prev.filter((_, idx) => idx !== i));
+    if (hard && item && item.id > 0) {
+      setPendingHardDeleteIds((prev) => {
+        const next = new Set(prev);
+        next.add(item.id);
+        return next;
+      });
+    }
   };
 
   const handleDeleteClick = async (i: number) => {
     const item = local[i];
     // New unsaved items (negative ID) — remove immediately without confirmation
-    if (item.id <= 0) { handleRemove(i); return; }
+    if (item.id <= 0) {
+      handleRemove(i, false);
+      return;
+    }
     // Existing items — check dependencies
     if (onCheckDependencies) {
       const deps = await onCheckDependencies(item.id);
       setDeleteConfirm({ idx: i, item, deps });
     } else {
-      // No dependency checker provided — remove immediately
-      handleRemove(i);
+      // No dependency checker provided — fall back to archive on save
+      handleRemove(i, false);
     }
   };
 
@@ -263,10 +315,7 @@ export default function StringListSettings({
     () => (departments ?? []).filter((d) => !d.archivedAt && d.type === "scheduled"),
     [departments],
   );
-  const deptMap = useMemo(
-    () => new Map(activeDepts.map((d) => [d.id, d])),
-    [activeDepts],
-  );
+  const deptMap = useMemo(() => new Map(activeDepts.map((d) => [d.id, d])), [activeDepts]);
   const showDept = activeDepts.length > 0;
 
   const handleItemChange = (i: number, field: "name" | "abbr", value: string) => {
@@ -278,7 +327,11 @@ export default function StringListSettings({
     setLocal((prev) => prev.map((item, idx) => (idx === i ? { ...item, departmentId } : item)));
   };
 
-  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, item: NamedItem, idx: number) => {
+  const handleNameKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    item: NamedItem,
+    idx: number,
+  ) => {
     if (e.key === "Enter") {
       e.preventDefault();
       if (hideAbbr) {
@@ -294,7 +347,11 @@ export default function StringListSettings({
     }
   };
 
-  const handleAbbrKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, item: NamedItem, idx: number) => {
+  const handleAbbrKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    item: NamedItem,
+    idx: number,
+  ) => {
     if (e.key === "Enter") {
       e.preventDefault();
       if (!item.name.trim() && !item.abbr.trim()) return;
@@ -306,10 +363,14 @@ export default function StringListSettings({
     }
   };
 
-  const handleNameBackspace = (e: React.KeyboardEvent<HTMLInputElement>, item: NamedItem, idx: number) => {
+  const handleNameBackspace = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    item: NamedItem,
+    idx: number,
+  ) => {
     if (e.key === "Backspace" && !item.name && !item.abbr && item.id < 0) {
       e.preventDefault();
-      handleRemove(idx);
+      handleRemove(idx, false);
       if (idx > 0) {
         const prevId = local[idx - 1].id;
         requestAnimationFrame(() => {
@@ -359,18 +420,25 @@ export default function StringListSettings({
       ? `24px 2fr 1fr${scheduleRoleCol}${deptCol} auto`
       : `2fr 1fr${scheduleRoleCol}${deptCol}`;
 
-  const footerActions = isEditing ? (
+  const footerActions = isWizardMode ? null : isEditing ? (
     <EditorActionRow
-      secondaryAction={(
-        <button onClick={isDirty ? handleDiscard : handleClose} className="dg-btn dg-btn-secondary dg-btn-sm">
-          {getEditorDismissLabel(isDirty)}
+      secondaryAction={
+        <button
+          onClick={isDirty ? handleDiscard : handleClose}
+          className="dg-btn dg-btn-secondary dg-btn-sm"
+        >
+          {getEditorDismissLabel({ hasUnsavedChanges: isDirty })}
         </button>
-      )}
-      primaryAction={(
-        <button onClick={handleSave} disabled={saving || !isDirty || hasValidationErrors} className="dg-btn dg-btn-primary dg-btn-sm">
+      }
+      primaryAction={
+        <button
+          onClick={handleSave}
+          disabled={saving || !isDirty || hasValidationErrors}
+          className="dg-btn dg-btn-primary dg-btn-sm"
+        >
           {getEditorSaveLabel(saving)}
         </button>
-      )}
+      }
       style={{
         marginTop: 12,
         padding: sectionTitle ? "12px 16px" : undefined,
@@ -379,14 +447,11 @@ export default function StringListSettings({
     />
   ) : canEdit && displayList.length > 0 ? (
     <EditorActionRow
-      primaryAction={(
-        <button
-          onClick={handleEnterEdit}
-          className="dg-btn dg-btn-secondary dg-btn-sm"
-        >
+      primaryAction={
+        <button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
           Edit
         </button>
-      )}
+      }
       style={{
         marginTop: 12,
         padding: sectionTitle ? "12px 16px" : undefined,
@@ -400,13 +465,15 @@ export default function StringListSettings({
       {/* Table */}
       {displayList.length === 0 && !isEditing ? (
         <EmptyState
-          compact
+          size="compact"
           title={`No ${label.toLowerCase()} defined yet`}
-          action={canEdit ? (
-            <button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
-              + Add {label.replace(/s$/, "")}
-            </button>
-          ) : undefined}
+          action={
+            canEdit ? (
+              <button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
+                + Add {label.replace(/s$/, "")}
+              </button>
+            ) : undefined
+          }
         />
       ) : (
         <div>
@@ -423,11 +490,33 @@ export default function StringListSettings({
           >
             {(isEditing
               ? hideAbbr
-                ? ["", "Name", ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []), ...(showDept ? ["Department"] : []), ""]
-                : ["", "Full Name", "Abbreviation", ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []), ...(showDept ? ["Department"] : []), ""]
+                ? [
+                    "",
+                    "Name",
+                    ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
+                    ...(showDept ? ["Department"] : []),
+                    "",
+                  ]
+                : [
+                    "",
+                    "Full Name",
+                    "Abbreviation",
+                    ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
+                    ...(showDept ? ["Department"] : []),
+                    "",
+                  ]
               : hideAbbr
-                ? ["Name", ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []), ...(showDept ? ["Department"] : [])]
-                : ["Full Name", "Abbreviation", ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []), ...(showDept ? ["Department"] : [])]
+                ? [
+                    "Name",
+                    ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
+                    ...(showDept ? ["Department"] : []),
+                  ]
+                : [
+                    "Full Name",
+                    "Abbreviation",
+                    ...(showScheduleRoleToggle ? ["Schedule Eligibility"] : []),
+                    ...(showDept ? ["Department"] : []),
+                  ]
             ).map((h, i) => (
               <div
                 key={i}
@@ -442,7 +531,16 @@ export default function StringListSettings({
                 {h === "Schedule Eligibility" && scheduleEligibilityHelpText ? (
                   <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     <span>{h}</span>
-                    <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "normal", textTransform: "none", color: "var(--color-text-muted)", lineHeight: 1.35 }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 500,
+                        letterSpacing: "normal",
+                        textTransform: "none",
+                        color: "var(--color-text-muted)",
+                        lineHeight: 1.35,
+                      }}
+                    >
                       {scheduleEligibilityHelpText}
                     </span>
                   </span>
@@ -465,17 +563,20 @@ export default function StringListSettings({
                 data-dragging={motion.isDragging ? "true" : undefined}
                 data-drag-phase={motion.dragPhase ?? undefined}
                 data-moving={motion.isMoving ? "true" : undefined}
-                style={{
-                  "--dg-settings-reorder-offset": `${motion.offsetY}px`,
-                  display: "grid",
-                  gridTemplateColumns: gridCols,
-                  padding: isEditing ? "10px 16px" : "11px 16px",
-                  gap: 16,
-                  alignItems: isEditing ? "start" : undefined,
-                  borderBottom: i < displayList.length - 1 ? "1px solid var(--color-border-light)" : "none",
-                  cursor: isEditing ? "grab" : "default",
-                  userSelect: isEditing ? "none" : undefined,
-                } as React.CSSProperties}
+                style={
+                  {
+                    "--dg-settings-reorder-offset": `${motion.offsetY}px`,
+                    display: "grid",
+                    gridTemplateColumns: gridCols,
+                    padding: isEditing ? "10px 16px" : "11px 16px",
+                    gap: 16,
+                    alignItems: isEditing ? "start" : undefined,
+                    borderBottom:
+                      i < displayList.length - 1 ? "1px solid var(--color-border-light)" : "none",
+                    cursor: isEditing ? "grab" : "default",
+                    userSelect: isEditing ? "none" : undefined,
+                  } as React.CSSProperties
+                }
               >
                 {isEditing && (
                   <div
@@ -498,19 +599,23 @@ export default function StringListSettings({
                 {isEditing ? (
                   <div>
                     <input
-                      ref={(el) => { if (el) nameRefs.current.set(item.id, el); else nameRefs.current.delete(item.id); }}
+                      ref={(el) => {
+                        if (el) nameRefs.current.set(item.id, el);
+                        else nameRefs.current.delete(item.id);
+                      }}
                       value={item.name}
                       onChange={(e) => handleItemChange(i, "name", e.target.value)}
-                      onKeyDown={(e) => { handleNameBackspace(e, item, i); handleNameKeyDown(e, item, i); }}
+                      onKeyDown={(e) => {
+                        handleNameBackspace(e, item, i);
+                        handleNameKeyDown(e, item, i);
+                      }}
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       draggable={false}
                       placeholder="Full name"
                       style={{
                         ...fieldStyle,
-                        ...(currentErrors.name
-                          ? { borderColor: "var(--color-danger)" }
-                          : {}),
+                        ...(currentErrors.name ? { borderColor: "var(--color-danger)" } : {}),
                       }}
                     />
                     {currentErrors.name ? (
@@ -527,51 +632,75 @@ export default function StringListSettings({
                     ) : null}
                   </div>
                 ) : (
-                  <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 600, color: "var(--color-text-primary)" }}>
-                    {item.name || <span style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}>Unnamed</span>}
+                  <div
+                    style={{
+                      fontSize: "var(--dg-fs-label)",
+                      fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
+                    {item.name || (
+                      <span
+                        style={{
+                          color: "var(--color-text-muted)",
+                          fontStyle: "italic",
+                          fontWeight: 400,
+                        }}
+                      >
+                        Unnamed
+                      </span>
+                    )}
                   </div>
                 )}
 
-                {!hideAbbr && (isEditing ? (
-                  <div>
-                    <input
-                      ref={(el) => { if (el) abbrRefs.current.set(item.id, el); else abbrRefs.current.delete(item.id); }}
-                      value={item.abbr}
-                      onChange={(e) => handleItemChange(i, "abbr", e.target.value)}
-                      onKeyDown={(e) => handleAbbrKeyDown(e, item, i)}
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                      draggable={false}
-                      placeholder="Abbreviation"
-                      style={{
-                        ...fieldStyle,
-                        fontWeight: 600,
-                        ...(currentErrors.abbr
-                          ? { borderColor: "var(--color-danger)" }
-                          : {}),
-                      }}
-                    />
-                    {currentErrors.abbr ? (
-                      <div
-                        role="alert"
-                        style={{
-                          marginTop: 4,
-                          fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--color-danger)",
+                {!hideAbbr &&
+                  (isEditing ? (
+                    <div>
+                      <input
+                        ref={(el) => {
+                          if (el) abbrRefs.current.set(item.id, el);
+                          else abbrRefs.current.delete(item.id);
                         }}
-                      >
-                        {currentErrors.abbr}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: "var(--dg-fs-label)", fontWeight: 500, color: "var(--color-text-muted)" }}>
-                    {item.abbr}
-                  </div>
-                ))}
+                        value={item.abbr}
+                        onChange={(e) => handleItemChange(i, "abbr", e.target.value)}
+                        onKeyDown={(e) => handleAbbrKeyDown(e, item, i)}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        draggable={false}
+                        placeholder="Abbreviation"
+                        style={{
+                          ...fieldStyle,
+                          fontWeight: 600,
+                          ...(currentErrors.abbr ? { borderColor: "var(--color-danger)" } : {}),
+                        }}
+                      />
+                      {currentErrors.abbr ? (
+                        <div
+                          role="alert"
+                          style={{
+                            marginTop: 4,
+                            fontSize: "var(--dg-fs-footnote)",
+                            color: "var(--color-danger)",
+                          }}
+                        >
+                          {currentErrors.abbr}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: "var(--dg-fs-label)",
+                        fontWeight: 500,
+                        color: "var(--color-text-muted)",
+                      }}
+                    >
+                      {item.abbr}
+                    </div>
+                  ))}
 
-                {showScheduleRoleToggle && (
-                  isEditing ? (
+                {showScheduleRoleToggle &&
+                  (isEditing ? (
                     <label
                       style={{
                         display: "inline-flex",
@@ -593,9 +722,7 @@ export default function StringListSettings({
                           const checked = event.target.checked;
                           setLocal((prev) =>
                             prev.map((candidate, idx) =>
-                              idx === i
-                                ? { ...candidate, isScheduleRole: checked }
-                                : candidate,
+                              idx === i ? { ...candidate, isScheduleRole: checked } : candidate,
                             ),
                           );
                         }}
@@ -631,34 +758,38 @@ export default function StringListSettings({
                         {item.isScheduleRole === false ? "Cosmetic only" : "Schedule eligible"}
                       </span>
                     </div>
-                  )
-                )}
+                  ))}
 
-                {showDept && (isEditing ? (
-                  <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} draggable={false}>
-                    <CustomSelect
-                      value={item.departmentId != null ? String(item.departmentId) : ""}
-                      options={[
-                        { value: "", label: "Org-wide" },
-                        ...activeDepts.map((d) => ({ value: String(d.id), label: d.name })),
-                      ]}
-                      onChange={(val) => handleDeptChange(i, val)}
-                      fontSize="var(--dg-fs-label)"
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    {item.departmentId ? (
-                      <span
-                        style={{
-                          fontSize: "var(--dg-fs-label)",
-                          fontWeight: 500,
-                          color: "var(--color-text-secondary)",
-                        }}
-                      >
-                        {deptMap.get(item.departmentId)?.name ?? "—"}
-                      </span>
-                    ) : (
+                {showDept &&
+                  (isEditing ? (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      draggable={false}
+                    >
+                      <CustomSelect
+                        value={item.departmentId != null ? String(item.departmentId) : ""}
+                        options={[
+                          { value: "", label: "Org-wide" },
+                          ...activeDepts.map((d) => ({ value: String(d.id), label: d.name })),
+                        ]}
+                        onChange={(val) => handleDeptChange(i, val)}
+                        fontSize="var(--dg-fs-label)"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      {item.departmentId ? (
+                        <span
+                          style={{
+                            fontSize: "var(--dg-fs-label)",
+                            fontWeight: 500,
+                            color: "var(--color-text-secondary)",
+                          }}
+                        >
+                          {deptMap.get(item.departmentId)?.name ?? "—"}
+                        </span>
+                      ) : (
                         <span
                           style={{
                             display: "inline-flex",
@@ -673,16 +804,19 @@ export default function StringListSettings({
                             whiteSpace: "nowrap",
                           }}
                         >
-                        Org-wide
-                      </span>
-                    )}
-                  </div>
-                ))}
+                          Org-wide
+                        </span>
+                      )}
+                    </div>
+                  ))}
 
                 {isEditing && (
                   <button
                     onMouseDown={(e) => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); handleDeleteClick(i); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteClick(i);
+                    }}
                     style={{
                       background: "none",
                       border: "1px solid var(--color-danger-border, #FECACA)",
@@ -696,8 +830,12 @@ export default function StringListSettings({
                       flexShrink: 0,
                       transition: "background 150ms, color 150ms",
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "none";
+                    }}
                   >
                     Delete
                   </button>
@@ -718,7 +856,20 @@ export default function StringListSettings({
       )}
 
       {(duplicateName || error) && (
-        <div style={{ marginTop: 12, padding: 12, background: "var(--color-danger-bg)", border: "1px solid var(--color-danger-border)", borderRadius: "var(--dg-radius-md)", color: "var(--color-danger-text)", fontSize: "var(--dg-fs-label)", fontWeight: 500, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        <div
+          style={{
+            marginTop: 12,
+            padding: 12,
+            background: "var(--color-danger-bg)",
+            border: "1px solid var(--color-danger-border)",
+            borderRadius: "var(--dg-radius-md)",
+            color: "var(--color-danger-text)",
+            fontSize: "var(--dg-fs-label)",
+            fontWeight: 500,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
           <strong>{duplicateName ? "Validation Error:" : "Save Error:"}</strong>{" "}
           {duplicateName ?? error}
         </div>
@@ -726,41 +877,83 @@ export default function StringListSettings({
 
       {footerActions}
 
-      {deleteConfirm && (
-        deleteConfirm.deps?.hasDependencies ? (
-          <ConfirmDialog
-            title={`Archive "${deleteConfirm.item.name}"?`}
-            message={<>
-              <strong>{deleteConfirm.item.name}</strong> is currently {deleteConfirm.deps.summary.toLowerCase()}.
-              <br /><br />
-              Archiving will preserve historical records but remove it from dropdowns and new assignments.
-              Consider renaming instead if this item is still needed under a different name.
-            </>}
-            confirmLabel="Archive"
-            variant="warning"
-            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
-            onCancel={() => setDeleteConfirm(null)}
-            secondaryConfirmLabel="Rename Instead"
-            onSecondaryConfirm={() => {
-              setDeleteConfirm(null);
-              // Focus the name input for renaming
-              requestAnimationFrame(() => {
-                nameRefs.current.get(deleteConfirm.item.id)?.focus();
-                nameRefs.current.get(deleteConfirm.item.id)?.select();
-              });
-            }}
-          />
-        ) : (
-          <ConfirmDialog
-            title={`Delete "${deleteConfirm.item.name}"?`}
-            message={<>This will archive <strong>{deleteConfirm.item.name}</strong>. Historical records will be preserved.</>}
-            confirmLabel="Delete"
-            variant="danger"
-            onConfirm={() => { handleRemove(deleteConfirm.idx); setDeleteConfirm(null); }}
-            onCancel={() => setDeleteConfirm(null)}
-          />
-        )
-      )}
+      {deleteConfirm &&
+        (() => {
+          const deps = deleteConfirm.deps;
+          const hasActive = deps?.hasDependencies ?? false;
+          const hasAny = deps?.hasAnyReferences ?? true;
+          if (hasActive) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${deleteConfirm.item.name}"?`}
+                message={
+                  <>
+                    <strong>{deleteConfirm.item.name}</strong> is currently{" "}
+                    {deps!.summary.toLowerCase()}.
+                    <br />
+                    <br />
+                    Archiving will preserve historical records but remove it from dropdowns and new
+                    assignments. Consider renaming instead if this item is still needed under a
+                    different name.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                onConfirm={() => {
+                  handleRemove(deleteConfirm.idx, false);
+                  setDeleteConfirm(null);
+                }}
+                onCancel={() => setDeleteConfirm(null)}
+                secondaryConfirmLabel="Rename Instead"
+                onSecondaryConfirm={() => {
+                  setDeleteConfirm(null);
+                  requestAnimationFrame(() => {
+                    nameRefs.current.get(deleteConfirm.item.id)?.focus();
+                    nameRefs.current.get(deleteConfirm.item.id)?.select();
+                  });
+                }}
+              />
+            );
+          }
+          if (hasAny) {
+            return (
+              <ConfirmDialog
+                title={`Archive "${deleteConfirm.item.name}"?`}
+                message={
+                  <>
+                    This will archive <strong>{deleteConfirm.item.name}</strong>. Historical records
+                    will be preserved.
+                  </>
+                }
+                confirmLabel="Archive"
+                variant="warning"
+                onConfirm={() => {
+                  handleRemove(deleteConfirm.idx, false);
+                  setDeleteConfirm(null);
+                }}
+                onCancel={() => setDeleteConfirm(null)}
+              />
+            );
+          }
+          return (
+            <ConfirmDialog
+              title={`Delete "${deleteConfirm.item.name}"?`}
+              message={
+                <>
+                  This will permanently delete <strong>{deleteConfirm.item.name}</strong>. Nothing
+                  references it.
+                </>
+              }
+              confirmLabel="Delete"
+              variant="danger"
+              onConfirm={() => {
+                handleRemove(deleteConfirm.idx, true);
+                setDeleteConfirm(null);
+              }}
+              onCancel={() => setDeleteConfirm(null)}
+            />
+          );
+        })()}
     </div>
   );
 

@@ -431,7 +431,7 @@ BEGIN
 END $$;
 
 -- =============================================================================
--- Seed: shifts + absences  (April 19 – May 2, 2026)
+-- Seed: shifts + absences  (Jul 5 – Jul 18, 2026)
 -- Organization: Calm Haven (b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90)
 -- =============================================================================
 
@@ -439,7 +439,7 @@ DO $$
 DECLARE
   org  uuid := 'b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90';
   schedule_source_start date := DATE '2026-03-22';
-  schedule_target_start date := DATE '2026-04-19';
+  schedule_target_start date := DATE '2026-07-05';
   -- Focus area IDs
   snw  bigint;
   sc   bigint;

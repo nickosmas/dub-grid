@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
-import { Monitor, Smartphone, Trash2 } from "lucide-react";
+import { Monitor, Smartphone } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import {
   fetchAccountSessions,
   getBrowserAuthSession,
   revokeAccountSession,
 } from "@/features/account/client";
+import { useLogout } from "@/hooks/useLogout";
+import { queryKeys } from "@/lib/query-keys";
 
 interface UserSession {
   id: string;
@@ -55,13 +58,8 @@ function extractSupabaseSessionId(accessToken: string): string | null {
     if (!encodedPayload) return null;
 
     const normalized = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
-    const padding =
-      normalized.length % 4 === 0
-        ? ""
-        : "=".repeat(4 - (normalized.length % 4));
-    const payload = JSON.parse(
-      atob(`${normalized}${padding}`),
-    ) as Record<string, unknown>;
+    const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+    const payload = JSON.parse(atob(`${normalized}${padding}`)) as Record<string, unknown>;
     return typeof payload.session_id === "string" ? payload.session_id : null;
   } catch {
     return null;
@@ -70,71 +68,77 @@ function extractSupabaseSessionId(accessToken: string): string | null {
 
 export function SessionList() {
   const { user, isLoading: authLoading } = useAuth();
-  const [sessions, setSessions] = useState<UserSession[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { signOut } = useLogout();
 
-  const loadSessions = useCallback(async () => {
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      if (!user) {
-        setSessions([]);
-        return;
-      }
-
+  const sessionsQuery = useQuery({
+    queryKey: user ? queryKeys.account.sessions(user.id) : ["account", "anon", "sessions"],
+    queryFn: async () => {
       const rows = (await fetchAccountSessions()).sessions;
       const currentSession = await getBrowserAuthSession();
       const currentSupabaseSessionId = currentSession?.access_token
         ? extractSupabaseSessionId(currentSession.access_token)
         : null;
 
-      setSessions(
-        rows.map((row) => ({
-          id: row.id,
-          supabaseSessionId: row.supabaseSessionId,
-          platform: row.platform,
-          deviceLabel: row.deviceLabel ?? "Unknown device",
-          ipAddress: row.ipAddress,
-          lastActiveAt: row.lastActiveAt,
-          refreshTokenHash: row.refreshTokenHash,
-          isCurrent:
-            currentSupabaseSessionId != null &&
-            row.supabaseSessionId === currentSupabaseSessionId,
-        })),
-      );
-    } catch {
-      toast.error("Failed to load sessions");
-    } finally {
-      setLoading(false);
-    }
-  }, [authLoading, user]);
+      return rows.map<UserSession>((row) => ({
+        id: row.id,
+        supabaseSessionId: row.supabaseSessionId,
+        platform: row.platform,
+        deviceLabel: row.deviceLabel ?? "Unknown device",
+        ipAddress: row.ipAddress,
+        lastActiveAt: row.lastActiveAt,
+        refreshTokenHash: row.refreshTokenHash,
+        isCurrent:
+          currentSupabaseSessionId != null && row.supabaseSessionId === currentSupabaseSessionId,
+      }));
+    },
+    enabled: !authLoading && !!user,
+  });
 
   useEffect(() => {
-    void loadSessions();
-  }, [loadSessions]);
-
-  async function handleRevoke(session: UserSession) {
-    setRevokingId(session.id);
-    try {
-      await revokeAccountSession(session.refreshTokenHash);
-      setSessions((prev) => prev.filter((s) => s.id !== session.id));
-      toast.success("Session revoked");
-    } catch {
-      toast.error("Failed to revoke session");
-    } finally {
-      setRevokingId(null);
+    if (sessionsQuery.isError) {
+      toast.error("Failed to load sessions");
     }
+  }, [sessionsQuery.isError]);
+
+  const sessions = sessionsQuery.data ?? [];
+  const loading = authLoading || sessionsQuery.isPending;
+
+  const revokeMutation = useMutation({
+    mutationFn: (session: UserSession) =>
+      revokeAccountSession(session.refreshTokenHash).then(() => session),
+    onSuccess: (session) => {
+      if (user) {
+        queryClient.setQueryData<UserSession[]>(queryKeys.account.sessions(user.id), (prev) =>
+          (prev ?? []).filter((s) => s.id !== session.id),
+        );
+      }
+      toast.success("Session revoked");
+    },
+    onError: () => {
+      toast.error("Failed to revoke session");
+    },
+  });
+  const revokingId = revokeMutation.isPending ? (revokeMutation.variables?.id ?? null) : null;
+
+  function handleRevoke(session: UserSession) {
+    if (session.isCurrent) {
+      signOut({ scope: "local" });
+      return;
+    }
+    revokeMutation.mutate(session);
   }
 
   if (loading) {
     return (
-      <div style={{ padding: 24, textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+      <div
+        style={{
+          padding: 24,
+          textAlign: "center",
+          color: "var(--color-text-muted)",
+          fontSize: "var(--dg-fs-label)",
+        }}
+      >
         Loading sessions...
       </div>
     );
@@ -142,7 +146,14 @@ export function SessionList() {
 
   if (sessions.length === 0) {
     return (
-      <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}>
+      <div
+        style={{
+          padding: "24px 16px",
+          textAlign: "center",
+          color: "var(--color-text-muted)",
+          fontSize: "var(--dg-fs-label)",
+        }}
+      >
         No active sessions
       </div>
     );
@@ -168,39 +179,51 @@ export function SessionList() {
               {device.icon === "mobile" ? <Smartphone size={18} /> : <Monitor size={18} />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: "var(--dg-fs-caption)", fontWeight: 600, color: "var(--color-text-primary)" }}>
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-caption)",
+                  fontWeight: 600,
+                  color: "var(--color-text-primary)",
+                }}
+              >
                 {device.label}
                 {s.isCurrent && (
-                  <span style={{
-                    marginLeft: 8,
-                    fontSize: "var(--dg-fs-footnote)",
-                    fontWeight: 700,
-                    color: "var(--color-brand)",
-                    background: "var(--color-brand-bg)",
-                    padding: "1px 6px",
-                    borderRadius: 4,
-                  }}>
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      fontSize: "var(--dg-fs-footnote)",
+                      fontWeight: 700,
+                      color: "var(--color-brand)",
+                      background: "var(--color-brand-bg)",
+                      padding: "1px 6px",
+                      borderRadius: 4,
+                    }}
+                  >
                     Current
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", marginTop: 2 }}>
-                {s.ipAddress === "::1" ? "localhost" : s.ipAddress ?? "Unknown IP"} &middot; {formatRelative(s.lastActiveAt)}
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  color: "var(--color-text-muted)",
+                  marginTop: 2,
+                }}
+              >
+                {s.ipAddress === "::1" ? "localhost" : (s.ipAddress ?? "Unknown IP")} &middot;{" "}
+                {formatRelative(s.lastActiveAt)}
               </div>
             </div>
-            {!s.isCurrent && (
-              <button
-                onClick={() => handleRevoke(s)}
-                disabled={revokingId === s.id}
-                className="dg-btn dg-btn-ghost dg-btn-xs"
-                style={{ color: "var(--color-danger)" }}
-                aria-label="Revoke session"
-              >
-                <ButtonLoading loading={revokingId === s.id} spinnerSize={14}>
-                  <Trash2 size={14} />
-                </ButtonLoading>
-              </button>
-            )}
+            <button
+              onClick={() => handleRevoke(s)}
+              disabled={revokingId === s.id}
+              className="dg-btn dg-btn-ghost dg-btn-xs"
+              style={{ color: "var(--color-danger)" }}
+            >
+              <ButtonLoading loading={revokingId === s.id} spinnerSize={14}>
+                Sign out
+              </ButtonLoading>
+            </button>
           </div>
         );
       })}

@@ -1,19 +1,26 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createNetworkErrorToast,
   getClientFriendlyErrorMessage,
   getInlineErrorMessageOrToast,
-  getWorkspaceUnavailableMessage,
+  getOrgUnavailableMessage,
   isNetworkConnectionError,
 } from "./errors";
 
 describe("mobile error helpers", () => {
+  beforeEach(() => {
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://example-project.supabase.co");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "https://app.dubgrid.com");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("maps auth messages to client-friendly copy", () => {
     expect(
-      getClientFriendlyErrorMessage(
-        new Error("Invalid login credentials"),
-        "Fallback message",
-      ),
+      getClientFriendlyErrorMessage(new Error("Invalid login credentials"), "Fallback message"),
     ).toBe("Check your email and password and try again.");
   });
 
@@ -43,17 +50,17 @@ describe("mobile error helpers", () => {
     ).toBe(true);
   });
 
-  it("preserves workspace unavailable messages for mobile gates and login errors", () => {
+  it("preserves organization unavailable messages for mobile gates and login errors", () => {
     const error = new Error(
-      "Workspace unavailable. Sign in on the web to finish workspace setup.",
+      "Organization unavailable. Sign in on the web to finish organization setup.",
     );
 
-    expect(getWorkspaceUnavailableMessage(error)).toBe(
-      "Workspace unavailable. Sign in on the web to finish workspace setup.",
+    expect(getOrgUnavailableMessage(error)).toBe(
+      "Organization unavailable. Sign in on the web to finish organization setup.",
     );
-    expect(
-      getClientFriendlyErrorMessage(error, "Fallback message"),
-    ).toBe("Workspace unavailable. Sign in on the web to finish workspace setup.");
+    expect(getClientFriendlyErrorMessage(error, "Fallback message")).toBe(
+      "Organization unavailable. Sign in on the web to finish organization setup.",
+    );
   });
 
   it("uses a persistent network toast instead of inline copy", () => {
@@ -81,6 +88,22 @@ describe("mobile error helpers", () => {
 
     expect(result).toBe(
       "We couldn't connect to DubGrid from this device. Check your internet connection and try again.",
+    );
+    expect(pushToast).not.toHaveBeenCalled();
+  });
+
+  it("hints at the same-Wi-Fi requirement when the API base URL is a LAN IP", () => {
+    vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "http://192.168.1.181:3000");
+    const pushToast = vi.fn();
+
+    const result = getInlineErrorMessageOrToast(pushToast, {
+      error: new Error("Network request failed"),
+      fallbackMessage: "Fallback message",
+      preferInlineNetworkError: true,
+    });
+
+    expect(result).toBe(
+      "We couldn't reach DubGrid from this device. Make sure your phone is on the same Wi-Fi network as the laptop running the dev server, then try again.",
     );
     expect(pushToast).not.toHaveBeenCalled();
   });

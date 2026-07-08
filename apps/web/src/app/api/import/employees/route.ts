@@ -6,6 +6,7 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 
 export const dynamic = "force-dynamic";
 
@@ -64,9 +65,7 @@ export async function POST(req: NextRequest) {
       req,
       orgId,
       (permissions) =>
-        permissions.isGridmaster ||
-        permissions.isSuperAdmin ||
-        permissions.canManageEmployees,
+        permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees,
       { allowDuringSetup: true },
     );
     if ("response" in orgAuth) {
@@ -76,14 +75,41 @@ export async function POST(req: NextRequest) {
 
     // Fetch org's focus areas, certifications, and roles for name matching
     const [{ data: focusAreas }, { data: certs }, { data: orgRoles }] = await Promise.all([
-      serviceClient.from("focus_areas").select("id, name").eq("org_id", orgId).is("archived_at", null),
-      serviceClient.from("certifications").select("id, name").eq("org_id", orgId).is("archived_at", null),
-      serviceClient.from("organization_roles").select("id, name").eq("org_id", orgId).is("archived_at", null),
+      serviceClient
+        .from("focus_areas")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+      serviceClient
+        .from("certifications")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .is("archived_at", null),
+      serviceClient
+        .from("organization_roles")
+        .select("id, name")
+        .eq("org_id", orgId)
+        .is("archived_at", null),
     ]);
 
-    const faNameMap = new Map((focusAreas ?? []).map((fa: Record<string, unknown>) => [(fa.name as string).toLowerCase(), fa.id as number]));
-    const certNameMap = new Map((certs ?? []).map((c: Record<string, unknown>) => [(c.name as string).toLowerCase(), c.id as number]));
-    const roleNameMap = new Map((orgRoles ?? []).map((r: Record<string, unknown>) => [(r.name as string).toLowerCase(), r.id as number]));
+    const faNameMap = new Map(
+      (focusAreas ?? []).map((fa: Record<string, unknown>) => [
+        (fa.name as string).toLowerCase(),
+        fa.id as number,
+      ]),
+    );
+    const certNameMap = new Map(
+      (certs ?? []).map((c: Record<string, unknown>) => [
+        (c.name as string).toLowerCase(),
+        c.id as number,
+      ]),
+    );
+    const roleNameMap = new Map(
+      (orgRoles ?? []).map((r: Record<string, unknown>) => [
+        (r.name as string).toLowerCase(),
+        r.id as number,
+      ]),
+    );
 
     // Resolve names to IDs and build insert records
     const errors: { row: number; error: string }[] = [];
@@ -95,7 +121,10 @@ export async function POST(req: NextRequest) {
       // Resolve focus area names to IDs
       const faIds: number[] = [];
       if (row.focusAreaNames) {
-        for (const name of row.focusAreaNames.split(";").map((s) => s.trim()).filter(Boolean)) {
+        for (const name of row.focusAreaNames
+          .split(";")
+          .map((s) => s.trim())
+          .filter(Boolean)) {
           const id = faNameMap.get(name.toLowerCase());
           if (id) faIds.push(id);
           else errors.push({ row: i + 1, error: `Unknown focus area: "${name}"` });
@@ -114,7 +143,10 @@ export async function POST(req: NextRequest) {
       // Resolve role names
       const roleIds: number[] = [];
       if (row.roleNames) {
-        for (const name of row.roleNames.split(";").map((s) => s.trim()).filter(Boolean)) {
+        for (const name of row.roleNames
+          .split(";")
+          .map((s) => s.trim())
+          .filter(Boolean)) {
           const id = roleNameMap.get(name.toLowerCase());
           if (id) roleIds.push(id);
           else errors.push({ row: i + 1, error: `Unknown role: "${name}"` });
@@ -151,19 +183,29 @@ export async function POST(req: NextRequest) {
       if (batchError) {
         // If batch fails, fall back to individual inserts for this batch
         for (const item of batch) {
-          const { error: insertError } = await serviceClient
-            .from("employees")
-            .insert(item.record);
+          const { error: insertError } = await serviceClient.from("employees").insert(item.record);
           if (insertError) {
+            // Surface the real reason — contact-uniqueness conflicts
+            // (duplicate email/phone, or email belongs to a different
+            // user account) come back via getEmployeeContactConflict so
+            // the admin sees WHICH CSV rows were skipped and why.
+            const contactConflict = getEmployeeContactConflict(insertError);
+            const message = contactConflict?.message ?? "Failed to import this employee";
             logger.error({ error: insertError, row: item.index + 1 }, "Employee insert failed");
-            errors.push({ row: item.index + 1, error: "Failed to import this employee" });
+            errors.push({ row: item.index + 1, error: message });
           } else {
-            inserted.push({ row: item.index + 1, name: `${item.record.first_name} ${item.record.last_name}` });
+            inserted.push({
+              row: item.index + 1,
+              name: `${item.record.first_name} ${item.record.last_name}`,
+            });
           }
         }
       } else {
         for (const item of batch) {
-          inserted.push({ row: item.index + 1, name: `${item.record.first_name} ${item.record.last_name}` });
+          inserted.push({
+            row: item.index + 1,
+            name: `${item.record.first_name} ${item.record.last_name}`,
+          });
         }
       }
     }
@@ -176,7 +218,12 @@ export async function POST(req: NextRequest) {
       action: "employee.created",
       resource_type: "employee",
       resource_id: null,
-      details: { bulkImport: true, total: rows.length, inserted: inserted.length, errors: errors.length },
+      details: {
+        bulkImport: true,
+        total: rows.length,
+        inserted: inserted.length,
+        errors: errors.length,
+      },
     });
 
     return NextResponse.json({

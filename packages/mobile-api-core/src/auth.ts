@@ -1,31 +1,22 @@
-import type {
-  MobileAuthLoginBody,
-  MobileAuthLoginResponse,
-} from "@dubgrid/contracts";
-import {
-  buildPermissionContext,
-  type PermissionContext,
-} from "@dubgrid/authz";
+import type { MobileAuthLoginBody, MobileAuthLoginResponse } from "@dubgrid/contracts";
+import { buildPermissionContext, type PermissionContext } from "@dubgrid/authz";
 import type {
   BillingAccessResult,
   AdminPermissions,
   Organization,
   PlatformRole,
 } from "@dubgrid/domain";
-import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import {
-  createClient,
-  type Factor,
-  type SupabaseClient,
-  type User,
-} from "@supabase/supabase-js";
-import {
-  findMobileWorkspaceBySlug,
-  type MobileWorkspaceLookup,
-} from "./workspace";
-import { isMobileWorkspaceSetupComplete } from "./setup";
+  ACCOUNT_DISABLED_CODE,
+  ACCOUNT_DISABLED_MESSAGE,
+  evaluateOrganizationBillingAccess,
+  isAccountDisabledMessage,
+} from "@dubgrid/domain";
+import { createClient, type Factor, type SupabaseClient, type User } from "@supabase/supabase-js";
+import { findMobileOrganizationBySlug, type MobileOrganizationLookup } from "./organization";
+import { isMobileOrgSetupComplete } from "./setup";
 
-type WorkspaceMembership = {
+type OrgMembership = {
   org_id: string;
   org_name: string;
   org_slug: string | null;
@@ -89,11 +80,13 @@ export interface ResolvedMobileAuthContext<
 
 export class MobileApiRequestError extends Error {
   readonly status: number;
+  readonly code: string | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code: string | null = null) {
     super(message);
     this.name = "MobileApiRequestError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -102,75 +95,78 @@ function getMobileUserName(user: User): {
   lastName: string | null;
 } {
   return {
-    firstName:
-      (user.user_metadata?.first_name as string | undefined) ?? null,
-    lastName:
-      (user.user_metadata?.last_name as string | undefined) ?? null,
+    firstName: (user.user_metadata?.first_name as string | undefined) ?? null,
+    lastName: (user.user_metadata?.last_name as string | undefined) ?? null,
   };
 }
 
-function getLockedWorkspaceMessage(
-  orgRole: string,
-  billingAccess: BillingAccessResult,
-): string {
+function getLockedOrgMessage(orgRole: string, billingAccess: BillingAccessResult): string {
   if (billingAccess.reason === "suspended") {
-    return "Workspace unavailable. Contact your organization administrator.";
+    return "Organization unavailable. Contact your organization administrator.";
   }
 
   if (orgRole === "super_admin") {
-    return "Workspace unavailable. Sign in on the web to manage billing.";
+    return "Organization unavailable. Sign in on the web to manage billing.";
   }
 
-  return "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.";
+  return "Organization unavailable. Your organization will be available once your organization administrator finishes setup.";
 }
 
 function getIncompleteSetupMessage(orgRole: string): string {
   if (orgRole === "super_admin" || orgRole === "admin") {
-    return "Workspace unavailable. Sign in on the web to finish workspace setup.";
+    return "Organization unavailable. Sign in on the web to finish organization setup.";
   }
 
-  return "Workspace unavailable. Your workspace will be available once your organization administrator finishes setup.";
+  return "Organization unavailable. Your organization will be available once your organization administrator finishes setup.";
 }
 
-async function requireMobileWorkspace(
+async function requireMobileOrganization(
   serviceClient: SupabaseClient,
   slug: string,
-): Promise<MobileWorkspaceLookup> {
+): Promise<MobileOrganizationLookup> {
   try {
-    const workspace = await findMobileWorkspaceBySlug(serviceClient, slug);
-    if (!workspace) {
-      throw new MobileApiRequestError(
-        404,
-        "No workspace matched that slug.",
-      );
+    const organization = await findMobileOrganizationBySlug(serviceClient, slug);
+    if (!organization) {
+      throw new MobileApiRequestError(404, "No organization matched that slug.");
     }
 
-    return workspace;
+    return organization;
   } catch (error) {
     if (error instanceof MobileApiRequestError) {
       throw error;
     }
 
-    throw new MobileApiRequestError(
-      503,
-      "We could not verify that workspace right now.",
-    );
+    throw new MobileApiRequestError(503, "We could not verify that organization right now.");
   }
 }
 
 async function signInMobileUser(
-  serviceClient: SupabaseClient,
+  authClient: SupabaseClient,
   input: MobileAuthLoginBody,
 ): Promise<{
   session: SignedInSession;
   user: User;
   mfaFactor: Factor<"totp", "verified"> | null;
 }> {
-  const { data: authData, error: authError } =
-    await serviceClient.auth.signInWithPassword({
-      email: input.email,
-      password: input.password,
-    });
+  // Sign in on the per-request ephemeral client, never the shared service
+  // client. signInWithPassword sets a session on whatever client it runs on,
+  // which rewrites that client's PostgREST Authorization header to the user's
+  // token. The service client is a process-wide singleton reused for
+  // service-role reads/writes; signing in on it would silently downgrade every
+  // later service-role query to the last-logged-in user's RLS scope.
+  const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
+    email: input.email,
+    password: input.password,
+  });
+
+  // The JWT hook refuses removed employees with a sentinel message. Surface
+  // it as a structured ACCOUNT_DISABLED error so the mobile UI can render a
+  // friendly disabled-account message instead of a generic invalid-credentials
+  // toast. The hook returns http_code 403; Supabase surfaces it on
+  // authError.status / authError.message.
+  if (authError && isAccountDisabledMessage(authError.message)) {
+    throw new MobileApiRequestError(403, ACCOUNT_DISABLED_MESSAGE, ACCOUNT_DISABLED_CODE);
+  }
 
   if (
     authError ||
@@ -183,10 +179,7 @@ async function signInMobileUser(
   }
 
   if (!authData.user.email_confirmed_at) {
-    throw new MobileApiRequestError(
-      403,
-      "Verify your email on the web before using mobile.",
-    );
+    throw new MobileApiRequestError(403, "Verify your email on the web before using mobile.");
   }
 
   const verifiedTotpFactors = (authData.user.factors ?? []).filter(
@@ -211,10 +204,7 @@ async function assertMobileProfileSupported(
     .maybeSingle();
 
   if (profileError) {
-    throw new MobileApiRequestError(
-      503,
-      "We could not finish signing you in right now.",
-    );
+    throw new MobileApiRequestError(503, "We could not finish signing you in right now.");
   }
 
   if ((profile?.platform_role as string | null) === "gridmaster") {
@@ -225,25 +215,20 @@ async function assertMobileProfileSupported(
   }
 }
 
-async function loadMobileMemberships(
-  sessionClient: SupabaseClient,
-): Promise<WorkspaceMembership[]> {
+async function loadMobileMemberships(sessionClient: SupabaseClient): Promise<OrgMembership[]> {
   const membershipsResult = await sessionClient.rpc("get_my_organizations");
 
   if (membershipsResult.error) {
-    throw new MobileApiRequestError(
-      403,
-      "We could not verify your workspace access.",
-    );
+    throw new MobileApiRequestError(403, "We could not verify your organization access.");
   }
 
-  return (membershipsResult.data ?? []) as WorkspaceMembership[];
+  return (membershipsResult.data ?? []) as OrgMembership[];
 }
 
-async function switchMobileWorkspaceIfNeeded(
+async function switchMobileOrgIfNeeded(
   sessionClient: SupabaseClient,
   session: SignedInSession,
-  membership: WorkspaceMembership,
+  membership: OrgMembership,
 ): Promise<SignedInSession> {
   if (membership.is_active) {
     return session;
@@ -254,27 +239,21 @@ async function switchMobileWorkspaceIfNeeded(
   });
 
   if (switchResult.error) {
-    throw new MobileApiRequestError(
-      400,
-      "We could not switch your workspace right now.",
-    );
+    throw new MobileApiRequestError(400, "We could not switch your organization right now.");
   }
 
   const refreshResult = await sessionClient.auth.refreshSession();
   if (refreshResult.error || !refreshResult.data.session) {
     throw new MobileApiRequestError(
       503,
-      "We could not refresh your session after switching workspaces.",
+      "We could not refresh your session after switching organizations.",
     );
   }
 
   return refreshResult.data.session as SignedInSession;
 }
 
-export function createMobileEphemeralAuthClient(
-  url: string,
-  anonKey: string,
-): SupabaseClient {
+export function createMobileEphemeralAuthClient(url: string, anonKey: string): SupabaseClient {
   return createClient(url, anonKey, {
     auth: {
       autoRefreshToken: false,
@@ -284,9 +263,7 @@ export function createMobileEphemeralAuthClient(
   });
 }
 
-export function extractMobileBearerToken(
-  authorizationHeader: string | null,
-): string | null {
+export function extractMobileBearerToken(authorizationHeader: string | null): string | null {
   if (!authorizationHeader?.startsWith("Bearer ")) {
     return null;
   }
@@ -334,31 +311,22 @@ export async function resolveMobileAuthContext<
     (factor) => factor.factor_type === "totp" && factor.status === "verified",
   );
   if (hasVerifiedTotpFactor && claims.aal !== "aal2") {
-    throw new MobileApiRequestError(
-      401,
-      "Two-factor authentication required",
-    );
+    throw new MobileApiRequestError(401, "Two-factor authentication required");
   }
 
   if (claims.platform_role === "gridmaster") {
-    throw new MobileApiRequestError(
-      403,
-      "Gridmaster mobile access is not supported",
-    );
+    throw new MobileApiRequestError(403, "Gridmaster mobile access is not supported");
   }
 
   const membershipRows = await input.fetchMemberships(input.serviceClient, user.id);
   if (membershipRows.length === 0) {
-    throw new MobileApiRequestError(
-      403,
-      "No active organization membership found",
-    );
+    throw new MobileApiRequestError(403, "No active organization membership found");
   }
 
   const currentOrgId =
     typeof claims.org_id === "string" && claims.org_id.length > 0
       ? claims.org_id
-      : membershipRows[0]?.organization.id ?? null;
+      : (membershipRows[0]?.organization.id ?? null);
 
   if (!currentOrgId) {
     throw new MobileApiRequestError(403, "Missing organization context");
@@ -368,22 +336,15 @@ export async function resolveMobileAuthContext<
     (membership) => membership.organization.id === currentOrgId,
   );
   if (!currentMembership) {
-    throw new MobileApiRequestError(
-      403,
-      "Organization context does not match this user",
-    );
+    throw new MobileApiRequestError(403, "Organization context does not match this user");
   }
 
-  const currentOrgRow = await input.fetchOrganization(
-    input.serviceClient,
-    currentOrgId,
-  );
+  const currentOrgRow = await input.fetchOrganization(input.serviceClient, currentOrgId);
   if (!currentOrgRow) {
     throw new MobileApiRequestError(404, "Organization not found");
   }
 
-  const platformRole =
-    (await input.fetchPlatformRole(input.serviceClient, user.id)) ?? "none";
+  const platformRole = (await input.fetchPlatformRole(input.serviceClient, user.id)) ?? "none";
   const adminPermissions = currentMembership.admin_permissions ?? null;
   const orgRole = currentMembership.org_role ?? "user";
   const currentOrg = input.mapOrganization(currentOrgRow);
@@ -394,29 +355,33 @@ export async function resolveMobileAuthContext<
   });
 
   if (billingAccess.isLocked) {
-    throw new MobileApiRequestError(
-      403,
-      getLockedWorkspaceMessage(orgRole, billingAccess),
-    );
+    throw new MobileApiRequestError(403, getLockedOrgMessage(orgRole, billingAccess));
   }
 
-  const setupComplete = await isMobileWorkspaceSetupComplete(
-    input.serviceClient,
-    currentOrgId,
-  );
+  const setupComplete = await isMobileOrgSetupComplete(input.serviceClient, currentOrgId);
   if (!setupComplete) {
-    throw new MobileApiRequestError(
-      403,
-      getIncompleteSetupMessage(orgRole),
-    );
+    throw new MobileApiRequestError(403, getIncompleteSetupMessage(orgRole));
   }
+
+  // Inactive employees keep their session but lose every manage capability —
+  // mirror the web behavior. Gridmaster mobile login is blocked earlier, so the
+  // only callers with no employees row are unlinked super_admins (kept as-is).
+  const { data: employeeRow } = await input.serviceClient
+    .from("employees")
+    .select("status")
+    .eq("user_id", user.id)
+    .eq("org_id", currentOrgId)
+    .maybeSingle();
+  const isInactive = (employeeRow?.status as string | null) === "inactive";
 
   return {
     accessToken: input.accessToken,
     user,
     claims,
     currentOrg,
-    permissions: buildPermissionContext(orgRole, currentOrgId, adminPermissions),
+    permissions: buildPermissionContext(orgRole, currentOrgId, adminPermissions, {
+      isInactive,
+    }),
     membership: {
       orgRole,
       adminPermissions,
@@ -438,61 +403,48 @@ export async function loginMobileUser(
   sessionClient: SupabaseClient,
   input: MobileAuthLoginBody,
 ): Promise<MobileAuthLoginResponse> {
-  const workspace = await requireMobileWorkspace(
-    serviceClient,
-    input.workspaceSlug,
-  );
-  const { session, user, mfaFactor } = await signInMobileUser(
-    serviceClient,
-    input,
-  );
+  const organization = await requireMobileOrganization(serviceClient, input.orgSlug);
+  const { session, user, mfaFactor } = await signInMobileUser(sessionClient, input);
   await assertMobileProfileSupported(serviceClient, user.id);
-
-  const { error: setSessionError } = await sessionClient.auth.setSession({
-    access_token: session.access_token,
-    refresh_token: session.refresh_token,
-  });
-
-  if (setSessionError) {
-    throw new MobileApiRequestError(
-      503,
-      "We could not finish signing you in right now.",
-    );
-  }
 
   const memberships = await loadMobileMemberships(sessionClient);
   const targetMembership = memberships.find(
-    (membership) => membership.org_slug === workspace.slug,
+    (membership) => membership.org_slug === organization.slug,
   );
 
   if (!targetMembership) {
-    throw new MobileApiRequestError(
-      403,
-      "Your account is not associated with that workspace.",
-    );
+    throw new MobileApiRequestError(403, "Your account is not associated with that organization.");
   }
 
   const loginBillingAccess = evaluateOrganizationBillingAccess({
-    suspendedAt: workspace.suspendedAt,
-    subscriptionStatus: workspace.subscriptionStatus,
-    trialEndsAt: workspace.trialEndsAt,
+    suspendedAt: organization.suspendedAt,
+    subscriptionStatus: organization.subscriptionStatus,
+    trialEndsAt: organization.trialEndsAt,
   });
 
   if (loginBillingAccess.isLocked) {
     throw new MobileApiRequestError(
       403,
-      getLockedWorkspaceMessage(
-        targetMembership.org_role ?? "user",
-        loginBillingAccess,
-      ),
+      getLockedOrgMessage(targetMembership.org_role ?? "user", loginBillingAccess),
     );
   }
 
-  const currentSession = await switchMobileWorkspaceIfNeeded(
-    sessionClient,
-    session,
-    targetMembership,
-  );
+  const currentSession = await switchMobileOrgIfNeeded(sessionClient, session, targetMembership);
+
+  // First super_admin login starts the org's 14-day trial. This is a genuine
+  // credential login (not automatic reconciliation like switchMobileOrgIfNeeded),
+  // so it is a safe activation point. The RPC self-gates to super_admins and is
+  // idempotent; we still guard on role to skip a needless call for members, and
+  // never let a failure block sign-in.
+  if (targetMembership.org_role === "super_admin") {
+    const trialResult = await sessionClient.rpc("start_trial_for_org", {
+      p_org_id: organization.id,
+    });
+    if (trialResult.error) {
+      // Non-fatal: sign-in proceeds even if trial activation fails.
+    }
+  }
+
   const { firstName, lastName } = getMobileUserName(user);
 
   return {
@@ -502,10 +454,10 @@ export async function loginMobileUser(
       expiresIn: currentSession.expires_in,
       tokenType: currentSession.token_type,
     },
-    workspace: {
-      id: workspace.id,
-      name: workspace.name,
-      slug: workspace.slug,
+    organization: {
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
     },
     user: {
       id: user.id,

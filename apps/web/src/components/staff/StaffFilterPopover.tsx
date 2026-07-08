@@ -180,10 +180,7 @@ export function StaffFilterPopover({
 
           {roles.length > 0 && (
             <FilterGroup label={roleLabel}>
-              <FilterChip
-                active={filterRole === null}
-                onClick={() => onFilterRoleChange(null)}
-              >
+              <FilterChip active={filterRole === null} onClick={() => onFilterRoleChange(null)}>
                 All
               </FilterChip>
               {roles.map((role) => (
@@ -291,8 +288,17 @@ export function StaffFilterPopover({
 
   if (isMobile) {
     return (
-      <Sheet open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
-        <SheetContent side="bottom" showCloseButton={false} className="max-h-[75vh] gap-0 rounded-t-2xl p-0">
+      <Sheet
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) onClose();
+        }}
+      >
+        <SheetContent
+          side="bottom"
+          showCloseButton={false}
+          className="max-h-[75vh] gap-0 rounded-t-2xl p-0"
+        >
           <SheetHeader className="sr-only">
             <SheetTitle>Filters</SheetTitle>
           </SheetHeader>
@@ -306,7 +312,12 @@ export function StaffFilterPopover({
   }
 
   return (
-    <PopoverPrimitive.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+    <PopoverPrimitive.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+    >
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Positioner
           anchor={anchorRef}
@@ -315,9 +326,7 @@ export function StaffFilterPopover({
           sideOffset={4}
           className="isolate z-50"
         >
-          <PopoverPrimitive.Popup
-            className="flex max-h-[70vh] w-[560px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--color-border)] bg-white shadow-[var(--shadow-float)] outline-hidden"
-          >
+          <PopoverPrimitive.Popup className="flex max-h-[70vh] w-[560px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--color-border)] bg-white shadow-[var(--shadow-float)] outline-hidden">
             {content}
           </PopoverPrimitive.Popup>
         </PopoverPrimitive.Positioner>
@@ -326,13 +335,7 @@ export function StaffFilterPopover({
   );
 }
 
-function FilterSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
+function FilterSection({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="border-b border-[var(--color-border-light)] py-4 first:pt-1 last:border-b-0">
       <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[var(--color-text-subtle)]">
@@ -343,23 +346,16 @@ function FilterSection({
   );
 }
 
-function FilterGroup({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="mb-3 w-full last:mb-0">
-      <div className="mb-1.5 text-[11px] font-semibold text-[var(--color-text-muted)]">
-        {label}
-      </div>
+      <div className="mb-1.5 text-[11px] font-semibold text-[var(--color-text-muted)]">{label}</div>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   );
 }
 
+// Interactive sibling of <StatusPill>: same tonal language, but a toggleable button.
 function FilterChip({
   active,
   onClick,
@@ -373,10 +369,10 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-[var(--dg-radius-sm)] border-[1.5px] border-transparent px-3 py-1 text-xs font-semibold transition-all duration-150 ${
+      className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-medium transition-colors duration-150 ${
         active
-          ? "bg-[var(--color-brand)] text-[var(--color-text-inverse)]"
-          : "bg-[var(--color-bg-secondary)] text-[var(--color-text-faint)] hover:bg-[var(--color-border-light)]"
+          ? "border-[var(--color-brand-border)] bg-[var(--color-brand-bg)] text-[var(--color-brand)]"
+          : "border-[var(--color-border-light)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-light)]"
       }`}
     >
       {children}

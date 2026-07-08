@@ -6,7 +6,6 @@ import {
 } from "./schedule";
 import {
   optionalStaffEmailSchema,
-  requiredStaffEmailSchema,
   optionalUsPhoneSchema,
   staffNameSchema,
   staffNotesSchema,
@@ -14,16 +13,12 @@ import {
 
 export const mobilePlatformSchema = z.enum(["ios", "android"]);
 export const mobileRoleSchema = z.enum(["super_admin", "admin", "user"]);
-export const mobileWorkspaceSlugSchema = z
+export const mobileOrgSlugSchema = z
   .string()
   .trim()
   .toLowerCase()
   .regex(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/);
-export const mobileShiftRequestTypeSchema = z.enum([
-  "pickup",
-  "swap",
-  "calloff",
-]);
+export const mobileShiftRequestTypeSchema = z.enum(["pickup", "swap", "calloff"]);
 export const mobileShiftRequestStatusSchema = z.enum([
   "open",
   "pending_approval",
@@ -40,14 +35,14 @@ export const mobileUserSchema = z.object({
   lastName: z.string().nullable(),
 });
 
-export const mobileWorkspaceSchema = z.object({
+export const mobileOrganizationSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
-  slug: mobileWorkspaceSlugSchema,
+  slug: mobileOrgSlugSchema,
 });
 
-export const mobileWorkspaceLookupResponseSchema = z.object({
-  workspace: mobileWorkspaceSchema,
+export const mobileOrganizationLookupResponseSchema = z.object({
+  organization: mobileOrganizationSchema,
 });
 
 export const mobileAuthSessionSchema = z.object({
@@ -58,14 +53,14 @@ export const mobileAuthSessionSchema = z.object({
 });
 
 export const mobileAuthLoginBodySchema = z.object({
-  workspaceSlug: mobileWorkspaceSlugSchema,
+  orgSlug: mobileOrgSlugSchema,
   email: z.string().email(),
   password: z.string().min(1),
 });
 
 export const mobileAuthLoginResponseSchema = z.object({
   session: mobileAuthSessionSchema,
-  workspace: mobileWorkspaceSchema,
+  organization: mobileOrganizationSchema,
   user: mobileUserSchema,
   mfaRequired: z.boolean().default(false),
   mfa: z
@@ -92,6 +87,7 @@ export const mobilePermissionsSchema = z.object({
   canPublishSchedule: z.boolean(),
   canApplyRecurringSchedule: z.boolean(),
   canEditNotes: z.boolean(),
+  canEditScheduleIndicators: z.boolean(),
   canViewRecurringShifts: z.boolean(),
   canManageRecurringShifts: z.boolean(),
   canManageShiftSeries: z.boolean(),
@@ -125,6 +121,12 @@ export const mobileOrgConfigSchema = z.object({
     role: z.string(),
     department: z.string(),
   }),
+  openShiftVisibility: z
+    .object({
+      coverageGap: z.enum(["hidden", "matched", "always"]),
+      calloff: z.enum(["hidden", "matched", "always"]),
+    })
+    .default({ coverageGap: "matched", calloff: "matched" }),
   featureFlags: z.record(z.boolean()),
 });
 
@@ -133,7 +135,7 @@ export const mobileLinkedEmployeeSchema = z
     id: z.string().uuid(),
     firstName: z.string(),
     lastName: z.string(),
-    status: z.enum(["active", "benched", "terminated"]),
+    status: z.enum(["active", "inactive", "removed"]),
     focusAreaIds: z.array(z.number().int()).default([]),
   })
   .nullable();
@@ -231,10 +233,7 @@ export const mobileProfilePhoneUpdateResponseSchema = z.object({
   linkedEmployee: mobileProfileLinkedEmployeeSchema,
 });
 
-export const mobileProfileChangeRequestTypeSchema = z.enum([
-  "profile_update",
-  "account_deletion",
-]);
+export const mobileProfileChangeRequestTypeSchema = z.enum(["profile_update", "account_deletion"]);
 
 export const mobileProfileChangeRequestStatusSchema = z.enum([
   "pending",
@@ -287,10 +286,7 @@ export const mobileProfileChangeRequestCreateBodySchema = z
     requestNote: z.string().trim().max(1000).optional(),
   })
   .superRefine((value, ctx) => {
-    if (
-      value.type === "profile_update" &&
-      Object.keys(value.requestedChanges ?? {}).length === 0
-    ) {
+    if (value.type === "profile_update" && Object.keys(value.requestedChanges ?? {}).length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Profile update requests must include at least one change",
@@ -303,31 +299,24 @@ export const mobileProfileChangeRequestCreateResponseSchema = z.object({
   request: mobileProfileChangeRequestSchema,
 });
 
-export const mobileProfileChangeRequestActionBodySchema = z.discriminatedUnion(
-  "action",
-  [
-    z.object({ action: z.literal("cancel") }),
-    z.object({
-      action: z.literal("approve"),
-      resolverNote: z.string().trim().max(1000).optional(),
-    }),
-    z.object({
-      action: z.literal("reject"),
-      resolverNote: z.string().trim().max(1000).optional(),
-    }),
-  ],
-);
+export const mobileProfileChangeRequestActionBodySchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("cancel") }),
+  z.object({
+    action: z.literal("approve"),
+    resolverNote: z.string().trim().max(1000).optional(),
+  }),
+  z.object({
+    action: z.literal("reject"),
+    resolverNote: z.string().trim().max(1000).optional(),
+  }),
+]);
 
 export const mobileProfileChangeRequestActionResponseSchema = z.object({
   success: z.literal(true),
   request: mobileProfileChangeRequestSchema,
 });
 
-export const mobileNotificationCategorySchema = z.enum([
-  "schedule",
-  "shift_requests",
-  "system",
-]);
+export const mobileNotificationCategorySchema = z.enum(["schedule", "shift_requests", "system"]);
 
 export const mobileNotificationPreferenceChannelsSchema = z.object({
   in_app: z.boolean(),
@@ -378,14 +367,10 @@ function parseMobileIsoDate(value: string): Date {
   return new Date(`${value}T00:00:00`);
 }
 
-function countInclusiveMobileRangeDays(
-  startDate: string,
-  endDate: string,
-): number {
+function countInclusiveMobileRangeDays(startDate: string, endDate: string): number {
   return (
     Math.floor(
-      (parseMobileIsoDate(endDate).getTime() -
-        parseMobileIsoDate(startDate).getTime()) /
+      (parseMobileIsoDate(endDate).getTime() - parseMobileIsoDate(startDate).getTime()) /
         MS_PER_DAY,
     ) + 1
   );
@@ -401,10 +386,7 @@ export const mobileScheduleQuerySchema = z
       return;
     }
 
-    const dayCount = countInclusiveMobileRangeDays(
-      query.startDate,
-      query.endDate,
-    );
+    const dayCount = countInclusiveMobileRangeDays(query.startDate, query.endDate);
     if (dayCount <= 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -440,25 +422,19 @@ export function normalizeMobileScheduleRange(input?: MobileScheduleQuery): {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
   };
-  const dayCount = countInclusiveMobileRangeDays(
-    range.startDate,
-    range.endDate,
-  );
+  const dayCount = countInclusiveMobileRangeDays(range.startDate, range.endDate);
 
   if (dayCount <= 0) {
     throw new RangeError("startDate must be on or before endDate");
   }
   if (dayCount > MAX_MOBILE_SCHEDULE_RANGE_DAYS) {
-    throw new RangeError(
-      `Date range cannot exceed ${MAX_MOBILE_SCHEDULE_RANGE_DAYS} days`,
-    );
+    throw new RangeError(`Date range cannot exceed ${MAX_MOBILE_SCHEDULE_RANGE_DAYS} days`);
   }
 
   return range;
 }
 
-export const mobileScheduleEntrySegmentSchema =
-  resolvedSchedulePresentationSegmentSchema;
+export const mobileScheduleEntrySegmentSchema = resolvedSchedulePresentationSegmentSchema;
 
 export const mobileScheduleEntrySchema = z.object({
   employeeId: z.string().uuid(),
@@ -558,23 +534,15 @@ export const mobileCreateShiftRequestBodySchema = z
     absenceTypeId: z.number().int().optional(),
   })
   .superRefine((value, ctx) => {
-    const isTargetedPickup =
-      value.type === "pickup" && value.targetEmpId && value.targetShiftDate;
+    const isTargetedPickup = value.type === "pickup" && value.targetEmpId && value.targetShiftDate;
     const hasTargetedPickupField =
       value.type === "pickup" &&
-      (value.targetEmpId != null ||
-        value.targetShiftDate != null ||
-        value.absenceTypeId != null);
+      (value.targetEmpId != null || value.targetShiftDate != null || value.absenceTypeId != null);
 
-    if (
-      value.absenceTypeId != null &&
-      value.type !== "calloff" &&
-      value.type !== "pickup"
-    ) {
+    if (value.absenceTypeId != null && value.type !== "calloff" && value.type !== "pickup") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          "Only calloff and targeted pickup requests can include an absence type",
+        message: "Only calloff and targeted pickup requests can include an absence type",
         path: ["absenceTypeId"],
       });
     }
@@ -596,14 +564,10 @@ export const mobileCreateShiftRequestBodySchema = z
       });
     }
 
-    if (
-      isTargetedPickup &&
-      value.targetShiftDate !== value.requesterShiftDate
-    ) {
+    if (isTargetedPickup && value.targetShiftDate !== value.requesterShiftDate) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          "Targeted pickup requests must target the requester shift date",
+        message: "Targeted pickup requests must target the requester shift date",
         path: ["targetShiftDate"],
       });
     }
@@ -613,36 +577,33 @@ export const mobileCreateShiftRequestResponseSchema = z.object({
   requestId: z.string().uuid(),
 });
 
-export const mobileUpdateShiftRequestBodySchema = z.discriminatedUnion(
-  "action",
-  [
-    z.object({
-      action: z.literal("claim"),
-      claimerEmpId: z.string().uuid(),
-    }),
-    z.object({
-      action: z.literal("respond"),
-      empId: z.string().uuid(),
-      accept: z.boolean(),
-    }),
-    z.object({
-      action: z.literal("resolve"),
-      approved: z.boolean(),
-      note: z.string().max(500).optional(),
-    }),
-    z.object({
-      action: z.literal("cancel"),
-      empId: z.string().uuid(),
-    }),
-    z.object({
-      action: z.literal("volunteer_open_shift"),
-      empId: z.string().uuid(),
-      shiftDate: z.string().date(),
-      focusAreaId: z.number().int(),
-      state: scheduleCellStateSchema,
-    }),
-  ],
-);
+export const mobileUpdateShiftRequestBodySchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("claim"),
+    claimerEmpId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("respond"),
+    empId: z.string().uuid(),
+    accept: z.boolean(),
+  }),
+  z.object({
+    action: z.literal("resolve"),
+    approved: z.boolean(),
+    note: z.string().max(500).optional(),
+  }),
+  z.object({
+    action: z.literal("cancel"),
+    empId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("volunteer_open_shift"),
+    empId: z.string().uuid(),
+    shiftDate: z.string().date(),
+    focusAreaId: z.number().int(),
+    state: scheduleCellStateSchema,
+  }),
+]);
 
 export const mobileUpdateShiftRequestResponseSchema = z.object({
   success: z.literal(true),
@@ -650,12 +611,14 @@ export const mobileUpdateShiftRequestResponseSchema = z.object({
 
 export const mobilePersonSchema = z.object({
   id: z.string().uuid(),
+  employeeNumber: z.number().int(),
   firstName: z.string(),
   lastName: z.string(),
   employmentType: z.enum(["full_time", "part_time"]).default("full_time"),
   phone: z.string(),
   email: z.string(),
-  status: z.enum(["active", "benched", "terminated"]),
+  status: z.enum(["active", "inactive", "removed"]),
+  orgRole: z.enum(["super_admin", "admin", "user"]).nullable().default(null),
   certificationId: z.number().int().nullable().default(null),
   roleIds: z.array(z.number().int()).default([]),
   seniority: z.number().int().default(0),
@@ -693,7 +656,7 @@ export const mobilePersonUpdateBodySchema = z.object({
   firstName: staffNameSchema,
   lastName: staffNameSchema,
   phone: optionalUsPhoneSchema,
-  email: requiredStaffEmailSchema,
+  email: optionalStaffEmailSchema,
   contactNotes: staffNotesSchema,
   employmentType: z.enum(["full_time", "part_time"]).optional(),
   certificationId: z.number().int().nullable(),
@@ -708,7 +671,7 @@ export const mobilePersonUpdateResponseSchema = z.object({
 });
 
 export const mobilePersonStatusUpdateBodySchema = z.object({
-  action: z.enum(["bench", "activate", "terminate"]),
+  action: z.enum(["deactivate", "activate", "remove"]),
   expectedVersion: z.number().int().nonnegative(),
   note: z.string().trim().max(500).optional(),
 });
@@ -732,15 +695,12 @@ export const mobilePersonInvitationActionBodySchema = z.object({
 export const mobilePersonInvitationResponseSchema = z.object({
   success: z.literal(true),
   result: z
-    .enum([
-      "invitation_sent",
-      "invitation_resent",
-      "invitation_revoked",
-      "account_linked",
-    ])
+    .enum(["invitation_sent", "invitation_resent", "invitation_revoked", "account_linked"])
     .optional(),
   person: mobilePersonSchema,
 });
+
+export const mobileNotificationPrioritySchema = z.enum(["low", "normal", "high", "critical"]);
 
 export const mobileNotificationSchema = z.object({
   id: z.string().uuid(),
@@ -753,29 +713,114 @@ export const mobileNotificationSchema = z.object({
     "shift_request_new",
     "shift_request_approved",
     "shift_request_rejected",
+    "shift_request_expired",
+    // schedule (non-publish flows)
+    "recurring_shift_updated",
+    "shift_series_updated",
+    "schedule_note_published",
+    "recurring_schedules_applied",
+    // membership lifecycle
+    "invitation_received",
+    "invitation_accepted",
+    "invitation_revoked",
+    "invitation_resent",
+    "invitation_expired",
+    "membership_removed",
+    "admin_permissions_changed",
+    "member_dept_changed",
+    // employee + org account
+    "employee_created",
+    "employee_status_changed",
+    "employee_profile_changed",
+    "org_settings_changed",
+    "org_suspended",
+    "org_unsuspended",
+    // billing
+    "billing_subscription_changed",
+    "billing_payment_failed",
+    "billing_payment_succeeded",
+    "billing_trial_ending_soon",
+    "billing_trial_expired",
+    // security
+    "security_email_changed",
+    "security_password_changed",
+    "security_mfa_changed",
+    "security_new_device",
+    "security_session_revoked",
+    // platform / gridmaster (org lifecycle events, org_id = NULL; mobile has
+    // no gridmaster role today, kept for schema parity with web)
+    "org_created",
+    "org_trial_started",
+    "org_archived",
+    "org_restored",
+    "org_subscription_converted",
+    "org_subscription_canceled",
+    "org_payment_failed",
   ]),
   channel: z.enum(["in_app", "email"]),
   category: z.string().nullable(),
+  priority: mobileNotificationPrioritySchema,
   title: z.string(),
   message: z.string(),
   metadata: z.record(z.unknown()),
   readAt: z.string().nullable(),
+  archivedAt: z.string().nullable(),
   createdAt: z.string(),
+});
+
+export const mobileNotificationsCursorSchema = z.object({
+  createdAt: z.string(),
+  id: z.string().uuid(),
 });
 
 export const mobileNotificationsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional(),
-  offset: z.coerce.number().int().nonnegative().optional(),
+  cursorCreatedAt: z.string().optional(),
+  cursorId: z.string().uuid().optional(),
+  category: z.string().min(1).max(64).optional(),
+  type: z.string().min(1).max(64).optional(),
+  priority: mobileNotificationPrioritySchema.optional(),
+  read: z.enum(["read", "unread"]).optional(),
+  search: z.string().min(1).max(200).optional(),
+  archived: z.enum(["inbox", "archived", "any"]).optional(),
+  sort: z.enum(["asc", "desc"]).optional(),
 });
 
 export const mobileNotificationsResponseSchema = z.object({
   unreadCount: z.number().int().nonnegative(),
   notifications: z.array(mobileNotificationSchema),
+  nextCursor: mobileNotificationsCursorSchema.nullable(),
 });
 
 export const mobileNotificationReadResponseSchema = z.object({
   success: z.literal(true),
   unreadCount: z.number().int().nonnegative(),
+});
+
+export const mobileNotificationBulkActionSchema = z.enum([
+  "read",
+  "unread",
+  "archive",
+  "unarchive",
+]);
+
+export const mobileNotificationBulkBodySchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(200),
+  action: mobileNotificationBulkActionSchema,
+});
+
+export const mobileNotificationBulkResponseSchema = z.object({
+  success: z.literal(true),
+  unreadCount: z.number().int().nonnegative(),
+  updatedCount: z.number().int().nonnegative(),
+});
+
+export const mobileNotificationFacetsSchema = z.object({
+  totalInbox: z.number().int().nonnegative(),
+  totalUnread: z.number().int().nonnegative(),
+  totalArchived: z.number().int().nonnegative(),
+  byCategory: z.record(z.string(), z.number().int().nonnegative()),
+  byPriority: z.record(z.string(), z.number().int().nonnegative()),
 });
 
 export const mobilePushTokenBodySchema = z.object({
@@ -788,61 +833,45 @@ export const mobilePushTokenResponseSchema = z.object({
   success: z.literal(true),
 });
 
-export type MobileBootstrapResponse = z.infer<
-  typeof mobileBootstrapResponseSchema
->;
+export type MobileBootstrapResponse = z.infer<typeof mobileBootstrapResponseSchema>;
 export type MobileProfileResponse = z.infer<typeof mobileProfileResponseSchema>;
-export type MobileProfileAccountUpdateBody = z.infer<
-  typeof mobileProfileAccountUpdateBodySchema
->;
-export type MobileProfilePhoneUpdateBody = z.infer<
-  typeof mobileProfilePhoneUpdateBodySchema
->;
-export type MobileProfileChangeRequest = z.infer<
-  typeof mobileProfileChangeRequestSchema
->;
+export type MobileProfileAccountUpdateBody = z.infer<typeof mobileProfileAccountUpdateBodySchema>;
+export type MobileProfilePhoneUpdateBody = z.infer<typeof mobileProfilePhoneUpdateBodySchema>;
+export type MobileProfileChangeRequest = z.infer<typeof mobileProfileChangeRequestSchema>;
 export type MobileProfileChangeRequestCreateBody = z.infer<
   typeof mobileProfileChangeRequestCreateBodySchema
 >;
 export type MobileProfileChangeRequestActionBody = z.infer<
   typeof mobileProfileChangeRequestActionBodySchema
 >;
-export type MobileNotificationPreferences = z.infer<
-  typeof mobileNotificationPreferencesSchema
->;
+export type MobileNotificationPreferences = z.infer<typeof mobileNotificationPreferencesSchema>;
 export type MobileProfileSession = z.infer<typeof mobileProfileSessionSchema>;
 export type MobileAuthSession = z.infer<typeof mobileAuthSessionSchema>;
-export type MobileAuthLoginResponse = z.infer<
-  typeof mobileAuthLoginResponseSchema
->;
+export type MobileAuthLoginResponse = z.infer<typeof mobileAuthLoginResponseSchema>;
 export type MobileAuthLoginBody = z.infer<typeof mobileAuthLoginBodySchema>;
 export type MobileAbsenceType = z.infer<typeof mobileAbsenceTypeSchema>;
 export type MobileFocusArea = z.infer<typeof mobileFocusAreaSchema>;
 export type MobileNamedItem = z.infer<typeof mobileNamedItemSchema>;
 export type MobileDepartment = z.infer<typeof mobileDepartmentSchema>;
-export type MobileScheduleRange = z.infer<
-  typeof mobileMeScheduleResponseSchema
->["range"];
-export type MobileScheduleEntrySegment = z.infer<
-  typeof mobileScheduleEntrySegmentSchema
->;
+export type MobileScheduleRange = z.infer<typeof mobileMeScheduleResponseSchema>["range"];
+export type MobileScheduleEntrySegment = z.infer<typeof mobileScheduleEntrySegmentSchema>;
 export type MobileScheduleEntry = z.infer<typeof mobileScheduleEntrySchema>;
 export type MobileShiftRequest = z.infer<typeof mobileShiftRequestSchema>;
 export type MobileOpenShift = z.infer<typeof mobileOpenShiftSchema>;
 export type MobileNotification = z.infer<typeof mobileNotificationSchema>;
+export type MobileNotificationPriority = z.infer<typeof mobileNotificationPrioritySchema>;
+export type MobileNotificationsQuery = z.infer<typeof mobileNotificationsQuerySchema>;
+export type MobileNotificationsCursor = z.infer<typeof mobileNotificationsCursorSchema>;
+export type MobileNotificationsResponse = z.infer<typeof mobileNotificationsResponseSchema>;
+export type MobileNotificationBulkAction = z.infer<typeof mobileNotificationBulkActionSchema>;
+export type MobileNotificationBulkBody = z.infer<typeof mobileNotificationBulkBodySchema>;
+export type MobileNotificationBulkResponse = z.infer<typeof mobileNotificationBulkResponseSchema>;
+export type MobileNotificationFacets = z.infer<typeof mobileNotificationFacetsSchema>;
 export type MobilePerson = z.infer<typeof mobilePersonSchema>;
-export type MobilePersonUpdateBody = z.infer<
-  typeof mobilePersonUpdateBodySchema
->;
-export type MobileCreateShiftRequestBody = z.infer<
-  typeof mobileCreateShiftRequestBodySchema
->;
-export type MobileUpdateShiftRequestBody = z.infer<
-  typeof mobileUpdateShiftRequestBodySchema
->;
-export type MobilePersonStatusUpdateBody = z.infer<
-  typeof mobilePersonStatusUpdateBodySchema
->;
+export type MobilePersonUpdateBody = z.infer<typeof mobilePersonUpdateBodySchema>;
+export type MobileCreateShiftRequestBody = z.infer<typeof mobileCreateShiftRequestBodySchema>;
+export type MobileUpdateShiftRequestBody = z.infer<typeof mobileUpdateShiftRequestBodySchema>;
+export type MobilePersonStatusUpdateBody = z.infer<typeof mobilePersonStatusUpdateBodySchema>;
 export type MobilePersonInvitationCreateBody = z.infer<
   typeof mobilePersonInvitationCreateBodySchema
 >;

@@ -57,6 +57,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
         canPublishSchedule: false,
         canApplyRecurringSchedule: false,
         canEditNotes: false,
+        canEditScheduleIndicators: false,
         canViewRecurringShifts: false,
         canManageRecurringShifts: false,
         canManageShiftSeries: false,
@@ -82,6 +83,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
         isSuperAdmin: false,
         isImpersonating: false,
         isUserViewActive: false,
+        isInactive: false,
         actualLevel: 2,
         canManageOrg: false,
         canAccessSettings: false,
@@ -154,9 +156,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
     });
 
     const { GET } = await import("./route");
-    const response = await GET(
-      new Request("http://localhost/api/mobile/v1/bootstrap") as never,
-    );
+    const response = await GET(new Request("http://localhost/api/mobile/v1/bootstrap") as never);
     const payload = await response.json();
 
     expect(response.status).toBe(200);

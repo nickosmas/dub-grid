@@ -6,6 +6,7 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { syncCheckoutSessionToDb } from "@/lib/stripe";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bodySchema = z.object({
   orgId: z.string().uuid(),
@@ -26,14 +27,14 @@ export async function POST(req: NextRequest) {
 
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     const auth = await requireOrgPermissions(
       req,
       parsed.data.orgId,
       (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
-      { allowLockedWorkspace: true },
+      { allowLockedOrganization: true },
     );
     if ("response" in auth) return auth.response;
 
@@ -42,10 +43,7 @@ export async function POST(req: NextRequest) {
       `billing-checkout-complete:${auth.actor.id}:${parsed.data.orgId}`,
     );
     if (misconfigured) {
-      return NextResponse.json(
-        { error: "Service temporarily unavailable" },
-        { status: 503 },
-      );
+      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -61,25 +59,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await syncCheckoutSessionToDb(
-      auth.serviceClient,
-      parsed.data.sessionId,
-      parsed.data.orgId,
-      {
-        actor: {
-          id: auth.actor.id,
-          email: auth.actor.email,
-        },
+    await syncCheckoutSessionToDb(auth.serviceClient, parsed.data.sessionId, parsed.data.orgId, {
+      actor: {
+        id: auth.actor.id,
+        email: auth.actor.email,
       },
-    );
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
     Sentry.captureException(error, { extra: { context: "checkout-complete" } });
     logger.error({ error }, "Failed to complete checkout billing sync");
-    return NextResponse.json(
-      { error: "Failed to sync checkout" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to sync checkout" }, { status: 500 });
   }
 }

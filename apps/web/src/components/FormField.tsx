@@ -1,6 +1,13 @@
 "use client";
 
-import { useId, type CSSProperties, type ReactNode, type ReactElement, cloneElement, isValidElement } from "react";
+import {
+  useId,
+  type CSSProperties,
+  type ReactNode,
+  type ReactElement,
+  cloneElement,
+  isValidElement,
+} from "react";
 import {
   getRequiredStaffEmailError,
   getOptionalUsPhoneError,
@@ -72,7 +79,17 @@ export function FormField({
       {enhancedChildren}
       {error && (
         <div id={errorId} style={errorStyle} role="alert">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />

@@ -10,7 +10,7 @@
 const SAFE_TITLE_COMPONENTS = new Set([
   "Modal",
   "ConfirmDialog",
-  "title",      // SVG <title>
+  "title", // SVG <title>
   "Helmet",
 ]);
 
@@ -34,8 +34,7 @@ export const noHtmlTitleAttribute = {
 
         // Get the opening element name
         const openingEl = node.parent;
-        const elName =
-          openingEl.name?.name ?? openingEl.name?.property?.name ?? "";
+        const elName = openingEl.name?.name ?? openingEl.name?.property?.name ?? "";
 
         // Only flag intrinsic/lowercase elements. Component `title` props are
         // often structural labels, not browser hover tooltips.

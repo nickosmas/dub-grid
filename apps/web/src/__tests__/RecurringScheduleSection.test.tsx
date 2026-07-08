@@ -1,6 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { renderWithQuery as render } from "@/test-utils/renderWithQuery";
 import { RecurringScheduleSection } from "@/components/staff/RecurringScheduleSection";
 import type {
   Employee,
@@ -193,13 +194,9 @@ describe("RecurringScheduleSection", () => {
   it("renders recurring shifts with split name labels like the main grid", async () => {
     renderSection("name");
 
-    const sundayCell = await screen.findByLabelText(
-      "Alice Smith, Sun: Day / Staff",
-    );
+    const sundayCell = await screen.findByLabelText("Alice Smith, Sun: Day / Staff");
     expect(within(sundayCell).getByText("Day")).toBeInTheDocument();
     expect(within(sundayCell).getByText("Staff")).toBeInTheDocument();
-    expect(
-      within(sundayCell).queryByText(/^Day Staff$/),
-    ).not.toBeInTheDocument();
+    expect(within(sundayCell).queryByText(/^Day Staff$/)).not.toBeInTheDocument();
   });
 });

@@ -122,9 +122,7 @@ describe("GET /api/gridmaster/schedule", () => {
     });
     serviceFrom.mockImplementation((table: string) => {
       if (table === "focus_areas") {
-        return makeQuery([
-          { id: 1, org_id: ORG_ID, name: "Emergency", archived_at: null },
-        ]);
+        return makeQuery([{ id: 1, org_id: ORG_ID, name: "Emergency", archived_at: null }]);
       }
       if (table === "shift_categories") {
         return makeQuery([

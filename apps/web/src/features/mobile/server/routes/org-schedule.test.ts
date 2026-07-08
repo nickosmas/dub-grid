@@ -41,7 +41,7 @@ describe("mobile org-schedule route", () => {
 
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
-      error: "You don't have permission to view the workspace schedule.",
+      error: "You don't have permission to view the organization schedule.",
     });
   });
 
@@ -94,11 +94,14 @@ describe("mobile org-schedule route", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(fetchMobileScheduleEntries).toHaveBeenCalledWith({}, {
-      orgId: "org-1",
-      startDate: "2026-04-16",
-      endDate: "2026-04-22",
-    });
+    expect(fetchMobileScheduleEntries).toHaveBeenCalledWith(
+      {},
+      {
+        orgId: "org-1",
+        startDate: "2026-04-16",
+        endDate: "2026-04-22",
+      },
+    );
     expect(payload.entries).toHaveLength(1);
     expect(payload.range).toEqual({
       startDate: "2026-04-16",
@@ -128,10 +131,13 @@ describe("mobile org-schedule route", () => {
     } as never);
 
     expect(response.status).toBe(200);
-    expect(fetchMobileScheduleEntries).toHaveBeenCalledWith({}, {
-      orgId: "org-1",
-      startDate: "2026-04-16",
-      endDate: "2026-04-22",
-    });
+    expect(fetchMobileScheduleEntries).toHaveBeenCalledWith(
+      {},
+      {
+        orgId: "org-1",
+        startDate: "2026-04-16",
+        endDate: "2026-04-22",
+      },
+    );
   });
 });

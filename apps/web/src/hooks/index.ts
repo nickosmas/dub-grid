@@ -9,13 +9,11 @@ export { getPermissionsFromSession } from "@/features/permissions";
 export type { Permissions } from "@/features/permissions";
 
 export { useRoleChange, generateIdempotencyKey } from "./useRoleChange";
-export type {
-  RoleChangeParams,
-  RoleChangeResult,
-  OrgMember,
-} from "./useRoleChange";
+export type { RoleChangeParams, RoleChangeResult, OrgMember } from "./useRoleChange";
 
 export { useLogout } from "./useLogout";
+
+export { useTermsAcceptanceStatus } from "./useTermsAcceptanceStatus";
 
 export { useOrganizationData } from "./useOrganizationData";
 export type { OrganizationData, SetupStatus } from "./useOrganizationData";
@@ -36,6 +34,8 @@ export type { EmployeesData } from "./useEmployees";
 
 export { useEmployeeCount } from "./useEmployeeCount";
 export type { EmployeeCountData } from "./useEmployeeCount";
+
+export { useIsInSandbox, useSandboxSourceOrgId } from "./useIsInSandbox";
 
 export { useDirectory } from "./useDirectory";
 export type { DirectoryData } from "./useDirectory";
@@ -61,3 +61,8 @@ export type { ShiftRequestsData } from "./useShiftRequests";
 
 export { useSelfProfileData } from "./useSelfProfileData";
 export type { SelfProfileRecord } from "./useSelfProfileData";
+
+export { useOrgClaims } from "./useOrgClaims";
+export type { OrgClaims } from "./useOrgClaims";
+
+export { useDismissibleBanner } from "./useDismissibleBanner";

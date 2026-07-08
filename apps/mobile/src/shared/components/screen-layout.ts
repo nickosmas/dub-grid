@@ -6,8 +6,7 @@ const SCREEN_BOTTOM_PADDING = {
   modal: 16,
 } as const;
 
-export const DEFAULT_SCREEN_BOTTOM_PADDING_MODE: ScreenBottomPaddingMode =
-  "stack";
+export const DEFAULT_SCREEN_BOTTOM_PADDING_MODE: ScreenBottomPaddingMode = "stack";
 
 export function getScreenBottomPadding(
   mode: ScreenBottomPaddingMode,
