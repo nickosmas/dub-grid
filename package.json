@@ -29,7 +29,7 @@
     "type-check": "turbo run type-check",
     "test": "turbo run test",
     "test:web": "turbo run test --filter=@dubgrid/web",
-    "test:mobile": "turbo run test --filter=@dubgrid/mobile --filter=@dubgrid/contracts",
+    "test:mobile": "turbo run test --filter=@dubgrid/mobile --filter=@dubgrid/contracts --filter=@dubgrid/schedule-core",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "seed": "npx tsx --env-file=.env.local seed.ts",
@@ -44,7 +44,7 @@
     "use:mobile:remote": "cp apps/mobile/.env.remote apps/mobile/.env.local && echo 'Switched mobile app to the remote backend in apps/mobile/.env.local'",
     "use:remote": "ln -sf .env.remote .env.local && echo 'Switched to remote Supabase'",
     "gen:types": "npx supabase gen types --lang=typescript --local > apps/web/src/lib/database.types.ts",
-    "build:packages": "turbo run build --filter=@dubgrid/authz --filter=@dubgrid/domain --filter=@dubgrid/schedule-core --filter=@dubgrid/design-tokens --filter=@dubgrid/api-client --filter=@dubgrid/db-types --filter=@dubgrid/data-access --filter=@dubgrid/mobile-api-core --filter=@dubgrid/contracts"
+    "build:packages": "turbo run build --filter=@dubgrid/authz --filter=@dubgrid/domain --filter=@dubgrid/schedule-core --filter=@dubgrid/design-tokens --filter=@dubgrid/api-client --filter=@dubgrid/db-types --filter=@dubgrid/data-access --filter=@dubgrid/mobile-api-core --filter=@dubgrid/contracts --filter=@dubgrid/client-errors"
   },
   "overrides": {
     "@hono/node-server": "1.19.14",
@@ -65,7 +65,7 @@
     },
     "@xmldom/xmldom": "0.8.13",
     "axios": "1.17.0",
-    "dompurify": "3.4.1",
+    "dompurify": "3.4.11",
     "fast-uri": "^3.1.2",
     "follow-redirects": "1.16.0",
     "hono": "4.12.25",

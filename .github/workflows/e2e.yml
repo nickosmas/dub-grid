@@ -67,10 +67,10 @@ jobs:
         run: npm run build
 
       - name: Start server
-        run: npm run start &
+        run: npm run start > server.log 2>&1 &
 
       - name: Wait for server
-        run: timeout 30 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
+        run: timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
 
       - name: Run Playwright tests
         run: |
@@ -94,4 +94,12 @@ jobs:
         with:
           name: playwright-test-results
           path: test-results/
+          retention-days: 7
+
+      - name: Upload server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-log
+          path: server.log
           retention-days: 7

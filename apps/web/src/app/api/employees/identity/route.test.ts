@@ -258,7 +258,13 @@ describe("PATCH /api/employees/identity", () => {
   });
 
   it("writes an audit_log entry with the changed PII fields", async () => {
-    const auditInsert = vi.fn(async () => ({ error: null }));
+    const auditInsert = vi.fn(
+      async (_entry: {
+        action: string;
+        resource_type: string;
+        details: { changedFields: string[] };
+      }) => ({ error: null }),
+    );
     const service = makeServiceClient({
       current: dbEmployee({ first_name: "Old", last_name: "Name", phone: "", email: "old@x.com", version: 3 }),
       updatedRow: dbEmployee({ first_name: "New", last_name: "Name", phone: "", email: "new@x.com", version: 4 }),
@@ -282,14 +288,10 @@ describe("PATCH /api/employees/identity", () => {
 
     expect(res.status).toBe(200);
     expect(auditInsert).toHaveBeenCalledTimes(1);
-    const auditPayload = auditInsert.mock.calls[0]?.[0] as {
-      action: string;
-      resource_type: string;
-      details: { changedFields: string[] };
-    };
-    expect(auditPayload.action).toBe("employee.identity_updated");
-    expect(auditPayload.resource_type).toBe("employee");
-    expect(auditPayload.details.changedFields).toEqual(
+    const auditPayload = auditInsert.mock.calls[0]?.[0];
+    expect(auditPayload?.action).toBe("employee.identity_updated");
+    expect(auditPayload?.resource_type).toBe("employee");
+    expect(auditPayload?.details.changedFields).toEqual(
       expect.arrayContaining(["firstName", "email"]),
     );
   });

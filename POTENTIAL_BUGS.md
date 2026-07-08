@@ -16,13 +16,14 @@ and a fix.
 
 ## CRITICAL
 
-### C-1 — CI is broken: `npm ci` fails against the committed lockfile — OPEN (verify after next clean reinstall)
+### C-1 — CI is broken: `npm ci` fails against the committed lockfile — ✅ Resolved (reconfirmed 2026-07-08)
 
 - **Where:** `package-lock.json` vs `apps/web/package.json` (`pg` dependency pulls in `pg-protocol@1.14.0`); `.npmrc` (`install-strategy=nested`).
 - **Verified at filing (2026-05-23):** `npm ci --dry-run` → `EUSAGE … Missing: pg-protocol@1.14.0 from lock file`.
-- **Current state (2026-05-25):** `npm ci --dry-run` exits without a lockfile error, but adds platform-specific packages (`@sentry/cli-*`, `@rollup/rollup-*`), suggesting the lockfile is missing optional platform entries added since the last clean install. This is normal for cross-platform lockfiles and does not break CI unless those packages are required. The original `pg-protocol` error is not reproduced in the current lockfile state. **Status: likely resolved by a subsequent clean reinstall, but should be re-confirmed on a fresh clone in CI.**
+- **Reconfirmed (2026-07-08):** Bumping the `dompurify` override (3.4.1 → 3.4.11, see SECURITY_AUDIT-adjacent npm-audit cleanup) required regenerating the lockfile, which doubled as a fresh end-to-end test of this item. A full clean reinstall (`rm -rf node_modules apps/*/node_modules packages/*/node_modules package-lock.json && npm install`) followed by `npm ci --dry-run` now exits clean (0 errors) — only normal cross-platform optional packages (`@tailwindcss/oxide-*`, `lightningcss-*`, `fsevents`, etc.) get added, no `EUSAGE`/missing-package errors. **Status: closed.**
+- **New finding while reconfirming:** `install-strategy=nested` also caused the `dompurify` override itself to silently not apply to the nested copy under `apps/web/node_modules/posthog-js/node_modules/dompurify` — even a `--package-lock-only` recompute and a `node_modules`-only wipe left it pinned at the old version. It only resolved to the overridden version after wiping **both** `package-lock.json` and every `node_modules` directory and reinstalling from scratch. This is the same "override-not-applying" behavior flagged below, now reproduced concretely: overrides on nested-strategy installs are only reliably enforced by a **full** clean reinstall, not an incremental one.
 - **Why it was invisible locally:** `apps/web` scripts use `NEXT_IGNORE_INCORRECT_LOCKFILE=1`, which masks drift for `next dev/build`. `npm ci` has no such flag.
-- **Fix:** Run a full clean reinstall whenever `package-lock.json` is regenerated, and gate it with `npm ci --dry-run` (must exit 0) in a pre-push/CI check. Consider dropping `install-strategy=nested` — it is the root cause of both this and the override-not-applying issue; the repo functioned correctly after the last clean reinstall without it.
+- **Fix / standing recommendation:** Run a full clean reinstall (lockfile *and* all `node_modules`, not just one or the other) whenever `package-lock.json` is regenerated or an override is changed, and gate it with `npm ci --dry-run` (must exit 0) in a pre-push/CI check. Consider dropping `install-strategy=nested` — it is the confirmed root cause of both this and the override-not-applying issue; the repo has now been shown to resolve correctly after a full clean reinstall without needing any override-specific workaround beyond that.
 
 ---
 

@@ -897,7 +897,14 @@ function hasPipeParts(value: string | null | undefined): boolean {
 
 function normalizeTimeValue(value: string | null | undefined): string | null {
   const normalized = value?.trim().slice(0, 5) ?? null;
-  return normalized ? normalized : null;
+  if (!normalized) return null;
+
+  // Zero-pad single-digit hours ("7:00" -> "07:00") so lexical comparisons
+  // and sorts against other HH:MM values (always zero-padded) are correct.
+  const match = normalized.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return normalized;
+  const [, hour, minute] = match;
+  return `${hour.padStart(2, "0")}:${minute}`;
 }
 
 function toShiftTimeRange(

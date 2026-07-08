@@ -33,6 +33,7 @@
     "@dubgrid/design-tokens": "*",
     "@dubgrid/domain": "*",
     "@dubgrid/mobile-api-core": "*",
+    "@dubgrid/schedule-core": "*",
     "@heroicons/react": "^2.2.0",
     "@react-email/components": "^1.0.12",
     "@sentry/nextjs": "^10.57.0",
