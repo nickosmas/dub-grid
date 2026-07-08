@@ -16,6 +16,13 @@ export const RESERVED_SUBDOMAINS = new Set([
  */
 const APEX_ALIAS_SUBDOMAINS = new Set(["www", "login", "api", "admin", "status", "app"]);
 
+const SUBDOMAIN_SLUG_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+
+/** Validates a candidate org slug: correct format and not a reserved word. */
+export function isValidOrgSlug(slug: string): boolean {
+  return SUBDOMAIN_SLUG_PATTERN.test(slug) && !RESERVED_SUBDOMAINS.has(slug);
+}
+
 /** Validates a port number and returns the formatted port string (":port") or empty string if invalid. */
 export function getValidPort(portStr: string | number | null | undefined): string {
   if (!portStr) return "";
