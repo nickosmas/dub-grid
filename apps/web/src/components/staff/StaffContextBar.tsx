@@ -271,15 +271,15 @@ export function StaffContextBar({
           <div className="flex items-center gap-3">
             <div
               className="flex items-center justify-center w-8 h-8 rounded-[var(--dg-radius-sm)]"
-              style={{ background: "var(--color-control-primary)" }}
+              style={{ background: "white" }}
             >
-              <svg width="16" height="16" viewBox="0 0 14 14" fill="white">
-                <rect x="3" y="1" width="2.5" height="2.5" rx="1.25" />
-                <rect x="8.5" y="1" width="2.5" height="2.5" rx="1.25" />
-                <rect x="3" y="5.75" width="2.5" height="2.5" rx="1.25" />
-                <rect x="8.5" y="5.75" width="2.5" height="2.5" rx="1.25" />
-                <rect x="3" y="10.5" width="2.5" height="2.5" rx="1.25" />
-                <rect x="8.5" y="10.5" width="2.5" height="2.5" rx="1.25" />
+              <svg width="16" height="16" viewBox="0 0 14 14">
+                <rect x="3" y="1" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
+                <rect x="8.5" y="1" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
+                <rect x="3" y="5.75" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
+                <rect x="8.5" y="5.75" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
+                <rect x="3" y="10.5" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
+                <rect x="8.5" y="10.5" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
               </svg>
             </div>
             <div>
