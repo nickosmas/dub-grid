@@ -25,7 +25,7 @@ export function useStaffFilters({
   inactiveEmployees = [],
   removedEmployees = [],
 }: UseStaffFiltersOptions) {
-  const [activeTab, setActiveTab] = useState<EmployeeTab>("all");
+  const [activeTab, setActiveTab] = useState<EmployeeTab>("active");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: "seniority", dir: "asc" });
   const [filterEmploymentType, setFilterEmploymentType] = useState<EmploymentTypeFilter>("all");
