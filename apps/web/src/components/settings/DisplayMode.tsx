@@ -149,7 +149,7 @@ function DisplayModePreviewPill({
             : {
                 fontSize: "var(--dg-fs-title)",
                 fontWeight: 800,
-                lineHeight: 1,
+                lineHeight: 1.2,
                 maxWidth: "100%",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -164,7 +164,7 @@ function DisplayModePreviewPill({
           style={{
             fontSize: "var(--dg-fs-footnote)",
             fontWeight: 700,
-            lineHeight: 1,
+            lineHeight: 1.3,
             maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",

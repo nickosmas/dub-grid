@@ -1673,7 +1673,7 @@ function ShiftPill({ segment }: { segment: DashboardScheduleSegment }) {
         display: "inline-flex",
         fontSize: 12,
         fontWeight: 750,
-        lineHeight: 1,
+        lineHeight: 1.3,
         maxWidth: "100%",
         padding: "7px 10px",
       }}

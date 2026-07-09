@@ -415,7 +415,7 @@ function AuthorBadge({
           maxWidth: "100%",
           fontSize: "var(--dg-fs-micro)",
           fontWeight: 600,
-          lineHeight: 1,
+          lineHeight: 1.3,
           textAlign: "left",
           color: "var(--color-text-muted)",
           padding: "2px 7px",
@@ -1481,7 +1481,7 @@ const SectionBlock = memo(function SectionBlock({
                                       whiteSpace: "nowrap",
                                       fontSize: "var(--dg-fs-footnote)",
                                       fontWeight: 700,
-                                      lineHeight: 1,
+                                      lineHeight: 1.3,
                                       opacity: 0.78,
                                     }}
                                   >
@@ -2280,7 +2280,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   : {
                                                       fontSize: "var(--dg-fs-title)",
                                                       fontWeight: 800,
-                                                      lineHeight: 1,
+                                                      lineHeight: 1.2,
                                                       whiteSpace: "nowrap",
                                                       overflow: "hidden",
                                                       textOverflow: "ellipsis",
@@ -2307,7 +2307,7 @@ const SectionBlock = memo(function SectionBlock({
                                                 style={{
                                                   fontSize: "var(--dg-fs-footnote)",
                                                   fontWeight: 700,
-                                                  lineHeight: 1,
+                                                  lineHeight: 1.3,
                                                   opacity: 0.78,
                                                   whiteSpace: "nowrap",
                                                   overflow: "hidden",
@@ -2578,7 +2578,7 @@ const SectionBlock = memo(function SectionBlock({
                                                     draftKind === "deleted"
                                                       ? "line-through"
                                                       : "none",
-                                                  lineHeight: isNameMode ? 1.2 : 1,
+                                                  lineHeight: 1.2,
                                                   overflow: pillBadge ? "visible" : "hidden",
                                                   minWidth: 0,
                                                   padding: isNameMode ? "2px 4px" : "2px 3px",
@@ -2679,7 +2679,7 @@ const SectionBlock = memo(function SectionBlock({
                                                         fontSize: "var(--dg-fs-micro)",
                                                         fontWeight: 700,
                                                         opacity: 0.78,
-                                                        lineHeight: 1,
+                                                        lineHeight: 1.3,
                                                         whiteSpace: "nowrap",
                                                         overflow: "hidden",
                                                         textOverflow: "ellipsis",

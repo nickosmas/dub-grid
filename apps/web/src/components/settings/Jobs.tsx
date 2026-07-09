@@ -339,7 +339,7 @@ function ShiftPreviewPill({
             : {
                 fontSize: "var(--dg-fs-title)",
                 fontWeight: 800,
-                lineHeight: 1,
+                lineHeight: 1.2,
                 maxWidth: "100%",
                 overflow: "hidden",
                 textOverflow: "ellipsis",

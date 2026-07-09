@@ -450,7 +450,7 @@ function RecurringShiftPill({
               : {
                   fontSize: "var(--dg-fs-title)",
                   fontWeight: 800,
-                  lineHeight: 1,
+                  lineHeight: 1.2,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -465,7 +465,7 @@ function RecurringShiftPill({
             style={{
               fontSize: "var(--dg-fs-footnote)",
               fontWeight: 700,
-              lineHeight: 1,
+              lineHeight: 1.3,
               opacity: 0.78,
               whiteSpace: "nowrap",
               overflow: "hidden",

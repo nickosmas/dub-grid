@@ -179,7 +179,7 @@ function HeaderBillingNotice({ orgId, compact = false }: { orgId: string; compac
         color: colors.text,
         fontSize: "var(--dg-fs-caption)",
         fontWeight: 800,
-        lineHeight: 1,
+        lineHeight: 1.3,
         textDecoration: "none",
         whiteSpace: "nowrap",
         overflow: "hidden",
