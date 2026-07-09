@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { AdminPermissions, DirectoryPerson, NamedItem, OrganizationRole } from "@/types";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -227,6 +228,13 @@ export function ManagementStaffPanel({
   const isEmployee = person.focusAreaIds.length > 0;
   const isOnSchedule = isEmployee;
   const isExpired = person.invitationStatus === "expired";
+  // Every org member gets an `employees` row now (Flow B + seed backfill), so
+  // this is null only for the rare pending invite that hasn't backfilled yet.
+  const profileHref = person.employeeId
+    ? isSelf
+      ? "/profile"
+      : `/people/${person.employeeId}`
+    : null;
   const fieldErrors = useMemo(
     () => ({
       firstName:
@@ -547,6 +555,35 @@ export function ManagementStaffPanel({
               >
                 {person.email}
               </div>
+              {profileHref && (
+                <Link
+                  href={profileHref}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    marginTop: 4,
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    color: "var(--color-link)",
+                    textDecoration: "none",
+                  }}
+                >
+                  View full profile
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="9 6 15 12 9 18" />
+                  </svg>
+                </Link>
+              )}
             </div>
           </div>
         </div>
