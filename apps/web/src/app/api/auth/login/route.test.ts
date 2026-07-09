@@ -121,6 +121,26 @@ describe("POST /api/auth/login", () => {
     expect(body.error).toBe("Invalid email or password");
   });
 
+  it("returns 403 ACCOUNT_DISABLED when the JWT hook refuses a removed employee", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: null,
+      error: {
+        message: "Your account has been disabled. Contact your organization admin.",
+        status: 403,
+      },
+    });
+
+    const res = await POST(makeRequest("acme.localhost"));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body).toEqual({
+      success: false,
+      code: "ACCOUNT_DISABLED",
+      error: "Your account has been disabled. Contact your organization admin.",
+    });
+  });
+
   it("returns 503 (not a credentials error) when GoTrue fails with a 5xx, e.g. a hook blip", async () => {
     signInWithPassword.mockResolvedValueOnce({
       data: null,
