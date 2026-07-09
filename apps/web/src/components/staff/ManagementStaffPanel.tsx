@@ -558,6 +558,17 @@ export function ManagementStaffPanel({
               {profileHref && (
                 <Link
                   href={profileHref}
+                  onClick={(event) => {
+                    // Close the panel as part of this click instead of
+                    // leaving it for the route swap to yank away — same
+                    // unsaved-changes guard as the X button/Escape.
+                    if (hasChanges) {
+                      event.preventDefault();
+                      handleRequestClose();
+                      return;
+                    }
+                    closePanel();
+                  }}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
