@@ -23,6 +23,7 @@ interface UserSession {
   lastActiveAt: string;
   refreshTokenHash: string;
   isCurrent: boolean;
+  isActive: boolean;
 }
 
 function parseDeviceLabel(
@@ -88,6 +89,7 @@ export function SessionList() {
         ipAddress: row.ipAddress,
         lastActiveAt: row.lastActiveAt,
         refreshTokenHash: row.refreshTokenHash,
+        isActive: row.isActive,
         isCurrent:
           currentSupabaseSessionId != null && row.supabaseSessionId === currentSupabaseSessionId,
       }));
@@ -214,16 +216,18 @@ export function SessionList() {
                 {formatRelative(s.lastActiveAt)}
               </div>
             </div>
-            <button
-              onClick={() => handleRevoke(s)}
-              disabled={revokingId === s.id}
-              className="dg-btn dg-btn-ghost dg-btn-xs"
-              style={{ color: "var(--color-danger)" }}
-            >
-              <ButtonLoading loading={revokingId === s.id} spinnerSize={14}>
-                Sign out
-              </ButtonLoading>
-            </button>
+            {s.isActive && (
+              <button
+                onClick={() => handleRevoke(s)}
+                disabled={revokingId === s.id}
+                className="dg-btn dg-btn-ghost dg-btn-xs"
+                style={{ color: "var(--color-danger)" }}
+              >
+                <ButtonLoading loading={revokingId === s.id} spinnerSize={14}>
+                  Sign out
+                </ButtonLoading>
+              </button>
+            )}
           </div>
         );
       })}

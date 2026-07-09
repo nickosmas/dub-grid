@@ -38,6 +38,7 @@ export interface AccountSessionRecord {
   lastActiveAt: string;
   createdAt: string;
   refreshTokenHash: string;
+  isActive: boolean;
 }
 
 export interface AccountIdentity {

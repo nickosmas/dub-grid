@@ -22,6 +22,7 @@ function mapSession(
     lastActiveAt: session.lastActiveAt,
     createdAt: session.createdAt,
     refreshTokenHash: session.refreshTokenHash,
+    isActive: session.isActive,
   };
 }
 

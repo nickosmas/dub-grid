@@ -95,6 +95,12 @@ function toPlatformGroup(platform: UserSessionPlatform | null): UserSessionPlatf
   return platform === "web" ? "web" : "mobile";
 }
 
+export interface ImportantUserSessionRecord extends UserSessionRecord {
+  // Within the active auth window - only these are revokable client-side,
+  // since revoking an already-quiet session has no real effect.
+  isActive: boolean;
+}
+
 /**
  * Self-service session list: only the sessions a user actually needs to
  * recognize - whatever is currently active, plus the most recent session
@@ -104,7 +110,7 @@ function toPlatformGroup(platform: UserSessionPlatform | null): UserSessionPlatf
 export async function fetchImportantUserSessionsForUser(
   userId: string,
   now: Date = new Date(),
-): Promise<UserSessionRecord[]> {
+): Promise<ImportantUserSessionRecord[]> {
   const sessions = await fetchUserSessionsForUser(userId);
   const cutoffMs = now.getTime() - USER_SESSION_ACTIVE_WINDOW_MS;
 
@@ -116,14 +122,14 @@ export async function fetchImportantUserSessionsForUser(
     byGroup.set(group, list);
   }
 
-  const important: UserSessionRecord[] = [];
+  const important: ImportantUserSessionRecord[] = [];
   for (const group of byGroup.values()) {
     // fetchUserSessionsForUser already orders by last_active_at desc.
     const active = group.filter((s) => new Date(s.lastActiveAt).getTime() >= cutoffMs);
     const lastInactive = group.find((s) => new Date(s.lastActiveAt).getTime() < cutoffMs);
-    important.push(...active);
+    important.push(...active.map((s) => ({ ...s, isActive: true })));
     if (lastInactive) {
-      important.push(lastInactive);
+      important.push({ ...lastInactive, isActive: false });
     }
   }
 

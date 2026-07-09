@@ -683,19 +683,21 @@ export default function ProfileSecurityScreen() {
                         ) : null}
                       </View>
                     </View>
-                    <Button
-                      compact
-                      disabled={revokeMutation.isPending}
-                      label="Revoke"
-                      onPress={() => {
-                        setPendingConfirmation({
-                          kind: "revokeSession",
-                          refreshTokenHash: session.refreshTokenHash,
-                          label: session.deviceLabel || session.platform || "this device",
-                        });
-                      }}
-                      tone="neutral"
-                    />
+                    {session.isActive && (
+                      <Button
+                        compact
+                        disabled={revokeMutation.isPending}
+                        label="Revoke"
+                        onPress={() => {
+                          setPendingConfirmation({
+                            kind: "revokeSession",
+                            refreshTokenHash: session.refreshTokenHash,
+                            label: session.deviceLabel || session.platform || "this device",
+                          });
+                        }}
+                        tone="neutral"
+                      />
+                    )}
                   </View>
                 ))}
               </View>

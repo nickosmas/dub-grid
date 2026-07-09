@@ -76,6 +76,7 @@ describe("account session queries", () => {
 
     expect(builder.eq).toHaveBeenCalledWith("user_id", USER_ID);
     expect(sessions.map((s) => s.id)).toEqual(["web-active", "ios-inactive", "web-old-1"]);
+    expect(sessions.map((s) => s.isActive)).toEqual([true, false, false]);
   });
 
   it("groups ios and android sessions together as mobile", async () => {
@@ -94,5 +95,6 @@ describe("account session queries", () => {
     const sessions = await fetchImportantUserSessionsForUser(USER_ID, now);
 
     expect(sessions.map((s) => s.id)).toEqual(["ios-active", "android-old"]);
+    expect(sessions.map((s) => s.isActive)).toEqual([true, false]);
   });
 });
