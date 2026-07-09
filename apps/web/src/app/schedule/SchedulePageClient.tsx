@@ -380,6 +380,14 @@ function SchedulerContent() {
   }, [payPeriodStartDate, spanWeeks]);
   const [scheduleLoading, setScheduleLoading] = useState(true);
   const [staffSearch, setStaffSearch] = useState("");
+  const [scheduleSortBy, setScheduleSortBy] = useState<"seniority" | "name">(() => {
+    if (typeof window === "undefined") return "seniority";
+    return localStorage.getItem("dg-schedule-sort-by") === "name" ? "name" : "seniority";
+  });
+  const handleSortByChange = useCallback((value: "seniority" | "name") => {
+    setScheduleSortBy(value);
+    localStorage.setItem("dg-schedule-sort-by", value);
+  }, []);
   // My Schedule mode: for regular users, default to showing only their own shifts
   const [isPublishing, setIsPublishing] = useState(false);
   const [cancelingMode, setCancelingMode] = useState<null | "mine" | "all">(null);
@@ -1682,8 +1690,8 @@ function SchedulerContent() {
     !isScheduleEditor && rawPublishedWindowState === "unpublished";
 
   const filteredEmployees = useMemo(
-    () => filterAndSortEmployees(employees, activeFocusArea),
-    [employees, activeFocusArea],
+    () => filterAndSortEmployees(employees, activeFocusArea, scheduleSortBy),
+    [employees, activeFocusArea, scheduleSortBy],
   );
   const normalizedStaffSearch = staffSearch.trim().toLowerCase();
   const searchMatchedEmployeeIds = useMemo(() => {
@@ -5605,6 +5613,8 @@ function SchedulerContent() {
                 spanWeeks={spanWeeks}
                 activeFocusArea={activeFocusArea}
                 staffSearch={staffSearch}
+                sortBy={scheduleSortBy}
+                onSortByChange={handleSortByChange}
                 focusAreas={focusAreas}
                 onPrev={handlePrev}
                 onNext={handleNext}

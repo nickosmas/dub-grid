@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useRef, useCallback, Fragment } from "react";
-import { Import as ImportIcon, Trash2, Upload } from "lucide-react";
+import { ArrowUpDown, Check, Import as ImportIcon, Trash2, Upload } from "lucide-react";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
@@ -10,6 +10,11 @@ import { FocusArea } from "@/types";
 import { useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
 import ScrollableTabs from "@/components/ScrollableTabs";
+
+const SORT_OPTIONS = [
+  { value: "seniority" as const, label: "Seniority" },
+  { value: "name" as const, label: "Alphabetical" },
+];
 
 const SPAN_OPTIONS = [
   { value: "1" as const, label: "1 Week" },
@@ -37,6 +42,7 @@ interface ToolbarProps {
   spanWeeks: 1 | 2 | "month";
   activeFocusArea: number | null;
   staffSearch: string;
+  sortBy: "seniority" | "name";
   focusAreas: FocusArea[];
   onPrev: () => void;
   onNext: () => void;
@@ -44,6 +50,7 @@ interface ToolbarProps {
   onSpanChange: (n: 1 | 2 | "month") => void;
   onFocusAreaChange: (id: number | null) => void;
   onStaffSearchChange: (q: string) => void;
+  onSortByChange: (sortBy: "seniority" | "name") => void;
   canApplyRecurringSchedule?: boolean;
   onApplyRecurring?: () => void;
   isApplyingRecurring?: boolean;
@@ -108,6 +115,88 @@ function ToggleSwitch({ on }: { on: boolean }) {
         }}
       />
     </div>
+  );
+}
+
+/* ── Sort Menu Button ── */
+function SortMenuButton({
+  sortBy,
+  onSortByChange,
+}: {
+  sortBy: "seniority" | "name";
+  onSortByChange: (sortBy: "seniority" | "name") => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  return (
+    <>
+      <Hint content={hint("Sort staff")} side="bottom">
+        <button
+          ref={triggerRef}
+          onClick={() => setOpen((prev) => !prev)}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          className="dg-btn dg-btn-secondary"
+          style={{
+            height: "var(--dg-toolbar-h)",
+            padding: "0 12px",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: "var(--dg-fs-caption)",
+            fontWeight: 600,
+            borderRadius: "var(--dg-btn-radius)",
+            flexShrink: 0,
+            border: open
+              ? "1px solid var(--color-brand-border)"
+              : "1px solid var(--color-border)",
+            background: open ? "var(--color-brand-bg)" : undefined,
+            color: open ? "var(--color-brand)" : undefined,
+          }}
+        >
+          <ArrowUpDown size={13} />
+          Sort
+        </button>
+      </Hint>
+      {open && (
+        <Menu
+          open
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setOpen(false);
+          }}
+        >
+          <MenuContent
+            anchor={triggerRef}
+            side="bottom"
+            align="start"
+            sideOffset={6}
+            positionMethod="fixed"
+            collisionPadding={8}
+            collisionAvoidance={{
+              side: "flip",
+              align: "shift",
+              fallbackAxisSide: "none",
+            }}
+            finalFocus={triggerRef}
+            style={{ minWidth: 160 }}
+          >
+            {SORT_OPTIONS.map((option) => (
+              <MenuItem
+                key={option.value}
+                onClick={() => {
+                  onSortByChange(option.value);
+                  setOpen(false);
+                }}
+              >
+                <span style={{ flex: 1 }}>{option.label}</span>
+                {sortBy === option.value && <Check size={14} />}
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </Menu>
+      )}
+    </>
   );
 }
 
@@ -376,6 +465,7 @@ export default function Toolbar({
   spanWeeks,
   activeFocusArea,
   staffSearch,
+  sortBy,
   focusAreas,
   onPrev,
   onNext,
@@ -383,6 +473,7 @@ export default function Toolbar({
   onSpanChange,
   onFocusAreaChange,
   onStaffSearchChange,
+  onSortByChange,
   canApplyRecurringSchedule,
   onApplyRecurring,
   isApplyingRecurring,
@@ -541,6 +632,7 @@ export default function Toolbar({
             onChange={(val) => onSpanChange(val === "month" ? "month" : (Number(val) as 1 | 2))}
             fontSize="var(--dg-fs-caption)"
           />
+          {hasData && <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />}
           {hasData && (
             <div style={{ position: "relative", flex: 1 }}>
               <svg
@@ -832,6 +924,9 @@ export default function Toolbar({
               </ScrollableTabs>
             </div>
           )}
+
+          {/* Sort order */}
+          <SortMenuButton sortBy={sortBy} onSortByChange={onSortByChange} />
 
           {/* Staff search */}
           <div style={{ position: "relative" }}>

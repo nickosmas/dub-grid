@@ -242,13 +242,14 @@ export function computeDailyTallies(
 }
 
 /**
- * Filters employees by focus area ID and sorts by seniority (ascending).
+ * Filters employees by focus area ID and sorts by seniority (ascending) or name.
  * Employees with empty focus area arrays are always excluded.
  * Pass null for activeFocusAreaId to show all focus areas.
  */
 export function filterAndSortEmployees(
   employees: Employee[],
   activeFocusAreaId: number | null,
+  sortBy: "seniority" | "name" = "seniority",
 ): Employee[] {
   return employees
     .filter(
@@ -256,7 +257,11 @@ export function filterAndSortEmployees(
         e.focusAreaIds.length > 0 &&
         (activeFocusAreaId === null || e.focusAreaIds.includes(activeFocusAreaId)),
     )
-    .sort((a, b) => a.seniority - b.seniority);
+    .sort((a, b) =>
+      sortBy === "name"
+        ? a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName)
+        : a.seniority - b.seniority,
+    );
 }
 
 // ── Coverage Intelligence ─────────────────────────────────────────────────────
