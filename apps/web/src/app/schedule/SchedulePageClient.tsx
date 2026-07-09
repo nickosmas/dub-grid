@@ -997,7 +997,8 @@ function SchedulerContent() {
         lastViewedRef.current = lastViewed;
         setLoadedShiftWindow({ start: defaultShiftFetchStart, end: defaultShiftFetchEnd });
 
-        // Fetch publish history since user's last view (falls back to 24h if null)
+        // Fetch publish history since user's last view; if there's no last
+        // view yet (brand-new user), the API returns no entries.
         const recentPublishes = await fetchRecentPublishHistory(orgId, lastViewed).catch(
           () => [] as PublishHistoryEntry[],
         );

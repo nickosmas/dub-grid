@@ -25,8 +25,15 @@ export async function GET(req: NextRequest) {
     return auth.response;
   }
 
+  if (!parsed.data.since) {
+    // No prior "last viewed" timestamp means there's no baseline to diff
+    // against (e.g. a brand-new user's first visit) — nothing has "changed
+    // since" a visit that never happened.
+    return NextResponse.json({ entries: [] });
+  }
+
   try {
-    const cutoff = parsed.data.since ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const cutoff = parsed.data.since;
 
     const { data: orgRow } = await auth.serviceClient
       .from("organizations")
