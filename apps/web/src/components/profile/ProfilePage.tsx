@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 
+import ProgressBar from "@/components/ProgressBar";
 import { usePermissions, useOrganizationData } from "@/hooks";
 import { useSelfProfileData } from "@/hooks/useSelfProfileData";
 import { SettingsShell } from "@/components/settings/SettingsShell";
@@ -30,7 +31,13 @@ import { DataPrivacyPanel } from "@/components/account/DataPrivacyPanel";
  */
 export function ProfilePage() {
   const searchParams = useSearchParams();
-  const { orgId, canManageEmployees, isSuperAdmin, isGridmaster } = usePermissions();
+  const {
+    orgId,
+    canManageEmployees,
+    isSuperAdmin,
+    isGridmaster,
+    isLoading: permsLoading,
+  } = usePermissions();
   const { org, focusAreas, assignments, shiftCategories, absenceTypes, certifications, orgRoles } =
     useOrganizationData();
   const {
@@ -60,6 +67,13 @@ export function ProfilePage() {
 
   const canEditProfileDirectly =
     Boolean(canManageEmployees) || Boolean(isSuperAdmin) || Boolean(isGridmaster);
+
+  // Wait for real permissions before rendering: canEditProfileDirectly
+  // defaults to false while perms are loading, which would otherwise flash
+  // the non-admin "request a name change" UI at admins for a moment.
+  if (permsLoading) {
+    return <ProgressBar loading />;
+  }
 
   return (
     <SettingsShell<ProfileSectionId>
