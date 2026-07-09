@@ -65,7 +65,6 @@ describe("EmployeeStatusActions", () => {
   it("switches the modal to Remove, keeps the note field, and calls onRemove with the trimmed note", async () => {
     const user = userEvent.setup();
     const onRemove = vi.fn();
-    const onRevokeAccess = vi.fn();
 
     render(
       <EmployeeStatusActions
@@ -74,7 +73,6 @@ describe("EmployeeStatusActions", () => {
         onDeactivate={vi.fn()}
         onActivate={vi.fn()}
         onRemove={onRemove}
-        onRevokeAccess={onRevokeAccess}
         variant="panel"
       />,
     );
@@ -93,7 +91,6 @@ describe("EmployeeStatusActions", () => {
     await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
     expect(onRemove).toHaveBeenCalledWith("emp-1", "Left the company");
-    expect(onRevokeAccess).toHaveBeenCalledWith("user-1");
   });
 
   it("activates inactive employees from the shared action area", async () => {

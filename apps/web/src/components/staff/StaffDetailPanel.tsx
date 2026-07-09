@@ -23,6 +23,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
 
 function statusTone(status: Employee["status"]): StatusPillTone {
   if (status === "inactive") return "warning";
@@ -52,7 +53,7 @@ interface StaffDetailPanelProps {
   orgId?: string;
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onSave: (emp: Employee) => void;
-  onRemove: (empId: string) => void;
+  onRemove: (empId: string, note?: string) => void;
   onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onClose: () => void;
@@ -62,7 +63,6 @@ interface StaffDetailPanelProps {
   hasPendingManagementInvite?: boolean;
   onManageManagementAccess?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
-  onRevokeAccess?: (userId: string) => void;
   orgRole?: OrganizationRole | null;
   adminPermissions?: AdminPermissions | null;
   onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
@@ -93,7 +93,6 @@ export function StaffDetailPanel({
   hasPendingManagementInvite,
   onManageManagementAccess,
   onRevoke,
-  onRevokeAccess,
   orgRole,
   adminPermissions,
   onRoleChange,
@@ -490,6 +489,37 @@ export function StaffDetailPanel({
                 onRoleChange={onRoleChange}
                 onPermissionsChange={onPermissionsChange}
                 isSelf={isSelf}
+              />
+            </div>
+          )}
+          {canManageEmployees && (
+            <div
+              style={{
+                padding: "0 24px 24px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  fontWeight: 700,
+                  color: "var(--color-text-subtle)",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Staff status
+              </div>
+              <EmployeeStatusActions
+                employee={employee}
+                canEdit={canManageEmployees}
+                isSelf={isSelf}
+                onDeactivate={onDeactivate}
+                onActivate={onActivate}
+                onRemove={onRemove}
+                variant="panel"
               />
             </div>
           )}

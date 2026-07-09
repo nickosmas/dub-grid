@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import {
   fetchOrganizationInvitations,
-  removeUserFromOrganization,
   resendInvitation,
   revokeInvitation,
   updateAppOnlyUser,
@@ -90,6 +89,10 @@ export interface MembersSectionProps {
   orgName?: string;
   isSuperAdmin?: boolean;
   isGridmaster?: boolean;
+  // Self signal: the viewer's own employees row has management department
+  // access. Widens visibility (view-only) of the Members/Management list to
+  // non-admin management-only users — see canSeeManagementUsers below.
+  isManagementUser?: boolean;
   departments?: Department[];
   departmentLabel?: string;
   managementDepartmentLabel?: string;
@@ -116,6 +119,7 @@ export function MembersSection({
   orgName,
   isSuperAdmin,
   isGridmaster,
+  isManagementUser,
   departments: departmentItems = [],
   departmentLabel = "Scheduled Departments",
   managementDepartmentLabel = "Management Departments",
@@ -127,7 +131,11 @@ export function MembersSection({
   const currentUserId = currentUser?.id ?? null;
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
-  const directoryOrgId = canViewManagementUsers ? (orgId ?? null) : null;
+  // Broader, view-only gate: lets a non-admin management-only user see the
+  // Members/Management list and open a (read-only) detail panel, without
+  // granting any of the edit affordances that stay on canViewManagementUsers.
+  const canSeeManagementUsers = canViewManagementUsers || !!isManagementUser;
+  const directoryOrgId = canSeeManagementUsers ? (orgId ?? null) : null;
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
@@ -617,10 +625,10 @@ export function MembersSection({
   }, [showManagement]);
 
   useEffect(() => {
-    if (!canViewManagementUsers && showManagement) {
+    if (!canSeeManagementUsers && showManagement) {
       setShowManagement(false);
     }
-  }, [canViewManagementUsers, showManagement]);
+  }, [canSeeManagementUsers, showManagement]);
 
   const [showManagementInvite, setShowManagementInvite] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -731,14 +739,6 @@ export function MembersSection({
       onSave(employee);
     },
     [onSave],
-  );
-
-  const handleRemove = useCallback(
-    (employeeId: string) => {
-      onRemove(employeeId);
-      setExpandedEmpId(null);
-    },
-    [onRemove],
   );
 
   const hasExportableStaffRows = employees.length > 0;
@@ -900,7 +900,7 @@ export function MembersSection({
 
           <div className="flex items-center gap-3 overflow-x-auto">
             <div className="flex min-w-0 items-center gap-2">
-              {canViewManagementUsers && managementDepts.length > 0 && (
+              {canSeeManagementUsers && managementDepts.length > 0 && (
                 <CustomSelect
                   value={showManagement ? "management" : "schedule"}
                   options={[
@@ -1478,7 +1478,7 @@ export function MembersSection({
               />
             ))}
 
-          {canViewManagementUsers &&
+          {canSeeManagementUsers &&
             showManagement &&
             (filteredDeptUsers.length > 0 ? (
               <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-surface)]">
@@ -1821,7 +1821,7 @@ export function MembersSection({
           orgId={orgId}
           pendingInviteByEmployeeId={pendingInviteByEmployeeId}
           onSave={handleSave}
-          onRemove={handleRemove}
+          onRemove={onRemove}
           onDeactivate={(employeeId, note) => onDeactivate(employeeId, note)}
           onActivate={(employeeId) => onActivate(employeeId)}
           onClose={() => setExpandedEmpId(null)}
@@ -1840,21 +1840,6 @@ export function MembersSection({
               : undefined
           }
           onRevoke={handleRevokeInvitation}
-          onRevokeAccess={
-            isSuperAdmin && orgId
-              ? async (userId: string) => {
-                  try {
-                    await removeUserFromOrganization(userId, orgId);
-                    toast.success("App access revoked");
-                    void queryClient.invalidateQueries({
-                      queryKey: queryKeys.org.directory(orgId),
-                    });
-                  } catch {
-                    toast.error("Failed to revoke app access");
-                  }
-                }
-              : undefined
-          }
           orgRole={selectedEmployeeDirectoryPerson?.orgRole ?? null}
           adminPermissions={selectedEmployeeDirectoryPerson?.adminPermissions ?? null}
           onRoleChange={
@@ -1904,7 +1889,7 @@ export function MembersSection({
         />
       )}
 
-      {selectedPerson && canViewManagementUsers && (
+      {selectedPerson && canSeeManagementUsers && (
         <ManagementStaffPanel
           person={selectedPerson}
           departments={managementDepts}

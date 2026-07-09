@@ -1092,6 +1092,73 @@ export async function revokeMobileEmployeeInvitationRow(
   return (data as MobileInvitationRow | null | undefined) ?? null;
 }
 
+export async function fetchMobileActiveMembershipOrgRole(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  userId: string,
+): Promise<string | null> {
+  const { data, error } = await serviceClient
+    .from("organization_memberships")
+    .select("org_role")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  return (data?.org_role as string | null | undefined) ?? null;
+}
+
+export async function countMobileActiveSuperAdmins(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<number> {
+  const { count, error } = await serviceClient
+    .from("organization_memberships")
+    .select("*", { count: "exact", head: true })
+    .eq("org_id", orgId)
+    .eq("org_role", "super_admin")
+    .is("archived_at", null);
+
+  if (error) throw error;
+
+  return count ?? 0;
+}
+
+export async function archiveMobileOrganizationMembership(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    userId: string;
+    archivedByUserId: string;
+    archivedAt: string;
+  },
+): Promise<void> {
+  const { error } = await serviceClient
+    .from("organization_memberships")
+    .update({ archived_at: input.archivedAt, archived_by: input.archivedByUserId })
+    .eq("user_id", input.userId)
+    .eq("org_id", input.orgId)
+    .is("archived_at", null);
+
+  if (error) throw error;
+}
+
+export async function restoreMobileOrganizationMembership(
+  serviceClient: SupabaseClient,
+  input: { orgId: string; userId: string },
+): Promise<void> {
+  const { error } = await serviceClient
+    .from("organization_memberships")
+    .update({ archived_at: null, archived_by: null })
+    .eq("user_id", input.userId)
+    .eq("org_id", input.orgId)
+    .not("archived_at", "is", null);
+
+  if (error) throw error;
+}
+
 export async function insertMobileAuditLogEntry(
   serviceClient: SupabaseClient,
   input: MobileAuditLogInsertInput,

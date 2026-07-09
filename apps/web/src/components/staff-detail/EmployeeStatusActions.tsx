@@ -16,7 +16,6 @@ export interface EmployeeStatusActionsProps {
   onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onRemove: (empId: string, note?: string) => void;
-  onRevokeAccess?: (userId: string) => void;
   onInvite?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   variant: "panel" | "page";
@@ -32,7 +31,6 @@ export function EmployeeStatusActions({
   onDeactivate,
   onActivate,
   onRemove,
-  onRevokeAccess,
   onInvite,
   onRevoke,
   variant,
@@ -195,7 +193,7 @@ export function EmployeeStatusActions({
                     color: "var(--color-text-muted)",
                   }}
                 >
-                  They&apos;ll lose access and won&apos;t appear in active staff. This can&apos;t be undone.
+                  They&apos;ll lose access and won&apos;t appear in active staff. You can reactivate them later.
                 </span>
               </span>
             </label>
@@ -217,10 +215,10 @@ export function EmployeeStatusActions({
         onConfirm={() => {
           const trimmedNote = note.trim() || undefined;
           if (isRemove) {
+            // Revoking any linked org membership happens server-side, atomically
+            // with the status change (see /api/employees/status) — not as a
+            // second client call, so the two can't diverge on partial failure.
             onRemove(employee.id, trimmedNote);
-            if (employee.userId && onRevokeAccess) {
-              onRevokeAccess(employee.userId);
-            }
           } else {
             onDeactivate(employee.id, trimmedNote);
           }
@@ -287,7 +285,7 @@ export function EmployeeStatusActions({
       {showActivateConfirm && (
         <ConfirmDialog
           title="Activate Staff Member?"
-          message={`Activate ${displayName}? They will return to active staff lists and scheduling.`}
+          message={`Activate ${displayName}? They will return to active staff lists.`}
           confirmLabel="Activate"
           variant="warning"
           onConfirm={() => {

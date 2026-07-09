@@ -44,7 +44,7 @@ import {
   fetchScheduleActorNames,
   fetchShiftRequests,
 } from "@/features/schedule/client";
-import { removeUserFromOrganization, revokeInvitation } from "@/features/organization/client";
+import { revokeInvitation } from "@/features/organization/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { StaffDetailHeader } from "./StaffDetailHeader";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
@@ -468,20 +468,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     [orgId, refreshDirectory, refreshInvitations],
   );
 
-  const handleRevokeAccess = useCallback(
-    async (userId: string) => {
-      if (!orgId || !perms.isSuperAdmin) return;
-      try {
-        await removeUserFromOrganization(userId, orgId);
-        refreshDirectory();
-        toast.success("App access revoked");
-      } catch {
-        toast.error("Failed to revoke app access");
-      }
-    },
-    [orgId, perms.isSuperAdmin, refreshDirectory],
-  );
-
   const showQuickActions =
     perms.canManageEmployees ||
     canManageManagementAccess ||
@@ -603,7 +589,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                           onDeactivate={handleDeactivate}
                           onActivate={handleActivate}
                           onRemove={handleRemove}
-                          onRevokeAccess={perms.isSuperAdmin ? handleRevokeAccess : undefined}
                           onInvite={orgId ? () => setShowInviteModal(true) : undefined}
                           onRevoke={handleRevokeInvitation}
                           variant="page"

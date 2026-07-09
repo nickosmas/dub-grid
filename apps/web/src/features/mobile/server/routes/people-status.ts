@@ -5,8 +5,12 @@ import {
 } from "@dubgrid/contracts";
 import { MobileApiAuthorizationError, updateMobilePersonStatus } from "@dubgrid/mobile-api-core";
 import {
+  archiveMobileOrganizationMembership,
+  countMobileActiveSuperAdmins,
+  fetchMobileActiveMembershipOrgRole,
   fetchMobileEmployeeRowById,
   insertMobileAuditLogEntry,
+  restoreMobileOrganizationMembership,
   updateMobileEmployeeStatusRow,
 } from "@dubgrid/data-access";
 import { requireMobileAuth } from "@/features/mobile/server";
@@ -67,6 +71,10 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         },
         insertAuditLog: insertMobileAuditLogEntry,
         mapEmployeeToMobilePerson,
+        fetchActiveMembershipOrgRole: fetchMobileActiveMembershipOrgRole,
+        countActiveSuperAdmins: countMobileActiveSuperAdmins,
+        archiveOrganizationMembership: archiveMobileOrganizationMembership,
+        restoreOrganizationMembership: restoreMobileOrganizationMembership,
       },
     );
 
