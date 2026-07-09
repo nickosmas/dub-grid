@@ -86,11 +86,10 @@ describe("EmployeeStatusActions", () => {
 
     // Primary button verb flips with the radio.
     expect(within(dialog).getByRole("button", { name: "Remove" })).toBeInTheDocument();
-    // Note field is shown for Remove too, alongside the revoke-access checkbox.
+    // Note field is shown for Remove too.
     const noteInput = within(dialog).getByPlaceholderText(/Reason \(optional\)/);
     await user.type(noteInput, "  Left the company  ");
 
-    await user.click(within(dialog).getByRole("checkbox", { name: /also revoke app access/i }));
     await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
     expect(onRemove).toHaveBeenCalledWith("emp-1", "Left the company");
@@ -135,7 +134,7 @@ describe("EmployeeStatusActions", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Deactivate" }));
-    expect(screen.getByText(/temporarily paused/i)).toBeInTheDocument();
+    expect(screen.getByText(/lose management access/i)).toBeInTheDocument();
     expect(screen.queryByText(/off the schedule/i)).not.toBeInTheDocument();
 
     rerender(

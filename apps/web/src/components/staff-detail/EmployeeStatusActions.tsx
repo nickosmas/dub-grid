@@ -40,7 +40,6 @@ export function EmployeeStatusActions({
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [outcome, setOutcome] = useState<DeactivateOutcome>("inactive");
   const [note, setNote] = useState(employee.statusNote || "");
-  const [alsoRevokeAccess, setAlsoRevokeAccess] = useState(false);
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
   const [pendingInvitationAction, setPendingInvitationAction] = useState<
     "reinvite" | "revoke" | null
@@ -75,7 +74,6 @@ export function EmployeeStatusActions({
   function resetDeactivateForm() {
     setShowDeactivateConfirm(false);
     setOutcome("inactive");
-    setAlsoRevokeAccess(false);
   }
 
   if (!canEdit) return null;
@@ -167,8 +165,8 @@ export function EmployeeStatusActions({
                   }}
                 >
                   {isScheduled
-                    ? "They're temporarily off the schedule. You can reactivate them anytime."
-                    : "They're temporarily paused. You can reactivate them anytime."}
+                    ? "They'll be temporarily off the schedule. You can reactivate them anytime."
+                    : "They'll temporarily lose management access. You can reactivate them anytime."}
                 </span>
               </span>
             </label>
@@ -197,7 +195,7 @@ export function EmployeeStatusActions({
                     color: "var(--color-text-muted)",
                   }}
                 >
-                  They lose access and won&apos;t appear in active staff. This can&apos;t be undone.
+                  They&apos;ll lose access and won&apos;t appear in active staff. This can&apos;t be undone.
                 </span>
               </span>
             </label>
@@ -212,26 +210,6 @@ export function EmployeeStatusActions({
               }
               style={{ fontSize: "var(--dg-fs-label)" }}
             />
-            {isRemove && employee.userId && onRevokeAccess && (
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={alsoRevokeAccess}
-                  onChange={(e) => setAlsoRevokeAccess(e.target.checked)}
-                  className="accent-[var(--color-danger)] w-3.5 h-3.5"
-                />
-                Also revoke app access
-              </label>
-            )}
           </div>
         }
         confirmLabel={isRemove ? "Remove" : "Mark Inactive"}
@@ -240,7 +218,7 @@ export function EmployeeStatusActions({
           const trimmedNote = note.trim() || undefined;
           if (isRemove) {
             onRemove(employee.id, trimmedNote);
-            if (alsoRevokeAccess && employee.userId && onRevokeAccess) {
+            if (employee.userId && onRevokeAccess) {
               onRevokeAccess(employee.userId);
             }
           } else {
