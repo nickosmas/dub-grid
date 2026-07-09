@@ -8,7 +8,9 @@ vi.mock("@/lib/supabase-service", () => ({
   }),
 }));
 
-import { fetchActiveUserSessionsForUser, getActiveUserSessionCutoff } from "./sessions";
+import { fetchImportantUserSessionsForUser } from "./sessions";
+
+const USER_ID = "22222222-2222-4222-8222-222222222222";
 
 function makeUserSessionsBuilder(rows: Record<string, unknown>[]) {
   const builder = {
@@ -21,41 +23,76 @@ function makeUserSessionsBuilder(rows: Record<string, unknown>[]) {
   return builder;
 }
 
+function sessionRow(overrides: Record<string, unknown>) {
+  return {
+    id: "row",
+    user_id: USER_ID,
+    org_id: "44444444-4444-4444-8444-444444444444",
+    supabase_session_id: "session",
+    platform: "web",
+    app_version: null,
+    device_label: "Device",
+    ip_address: "127.0.0.1",
+    last_active_at: "2026-05-08T12:00:00.000Z",
+    created_at: "2026-05-08T12:00:00.000Z",
+    refresh_token_hash: "hash",
+    ...overrides,
+  };
+}
+
 describe("account session queries", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("filters client-facing sessions to the active auth window", async () => {
+  it("returns only the active + last-inactive session per platform", async () => {
     const now = new Date("2026-05-08T12:00:00.000Z");
-    const builder = makeUserSessionsBuilder([
-      {
-        id: "11111111-1111-4111-8111-111111111111",
-        user_id: "22222222-2222-4222-8222-222222222222",
-        org_id: "44444444-4444-4444-8444-444444444444",
-        supabase_session_id: "33333333-3333-4333-8333-333333333333",
+    const rows = [
+      sessionRow({
+        id: "web-active",
         platform: "web",
-        app_version: null,
-        device_label: "Safari on macOS",
-        ip_address: "127.0.0.1",
         last_active_at: now.toISOString(),
-        created_at: now.toISOString(),
-        refresh_token_hash: "hash",
-      },
-    ]);
+      }),
+      sessionRow({
+        id: "web-old-1",
+        platform: "web",
+        last_active_at: "2026-05-01T09:00:00.000Z",
+      }),
+      sessionRow({
+        id: "web-old-2",
+        platform: "web",
+        last_active_at: "2026-04-20T09:00:00.000Z",
+      }),
+      sessionRow({
+        id: "ios-inactive",
+        platform: "ios",
+        last_active_at: "2026-05-07T10:00:00.000Z",
+      }),
+    ];
+    const builder = makeUserSessionsBuilder(rows);
     fromMock.mockReturnValue(builder);
 
-    const sessions = await fetchActiveUserSessionsForUser(
-      "22222222-2222-4222-8222-222222222222",
-      now,
-    );
+    const sessions = await fetchImportantUserSessionsForUser(USER_ID, now);
 
-    expect(builder.eq).toHaveBeenCalledWith("user_id", "22222222-2222-4222-8222-222222222222");
-    expect(builder.not).toHaveBeenCalledWith("refresh_token_hash", "is", null);
-    expect(builder.gte).toHaveBeenCalledWith("last_active_at", getActiveUserSessionCutoff(now));
-    expect(builder.order).toHaveBeenCalledWith("last_active_at", {
-      ascending: false,
-    });
-    expect(sessions).toHaveLength(1);
+    expect(builder.eq).toHaveBeenCalledWith("user_id", USER_ID);
+    expect(sessions.map((s) => s.id)).toEqual(["web-active", "ios-inactive", "web-old-1"]);
+  });
+
+  it("groups ios and android sessions together as mobile", async () => {
+    const now = new Date("2026-05-08T12:00:00.000Z");
+    const rows = [
+      sessionRow({ id: "ios-active", platform: "ios", last_active_at: now.toISOString() }),
+      sessionRow({
+        id: "android-old",
+        platform: "android",
+        last_active_at: "2026-05-01T09:00:00.000Z",
+      }),
+    ];
+    const builder = makeUserSessionsBuilder(rows);
+    fromMock.mockReturnValue(builder);
+
+    const sessions = await fetchImportantUserSessionsForUser(USER_ID, now);
+
+    expect(sessions.map((s) => s.id)).toEqual(["ios-active", "android-old"]);
   });
 });

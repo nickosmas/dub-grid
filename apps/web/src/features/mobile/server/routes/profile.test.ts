@@ -10,7 +10,7 @@ const fetchMobileFocusAreas = vi.fn();
 const mapOrganizationToMobileConfig = vi.fn();
 const fetchNotificationPreferences = vi.fn();
 const saveNotificationPreferences = vi.fn();
-const fetchActiveUserSessionsForUser = vi.fn();
+const fetchImportantUserSessionsForUser = vi.fn();
 const revokeUserSessionForUser = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
@@ -27,7 +27,7 @@ vi.mock("@/features/account/server", () => ({
   updateSelfLinkedEmployeePhone,
   fetchNotificationPreferences,
   saveNotificationPreferences,
-  fetchActiveUserSessionsForUser,
+  fetchImportantUserSessionsForUser,
   revokeUserSessionForUser,
 }));
 
@@ -326,7 +326,7 @@ describe("mobile profile preference and session routes", () => {
   });
 
   it("loads and revokes user-scoped sessions", async () => {
-    fetchActiveUserSessionsForUser.mockResolvedValue([
+    fetchImportantUserSessionsForUser.mockResolvedValue([
       {
         id: "44444444-4444-4444-8444-444444444444",
         userId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
@@ -355,7 +355,7 @@ describe("mobile profile preference and session routes", () => {
 
     expect(getResponse.status).toBe(200);
     expect(getPayload.sessions).toHaveLength(1);
-    expect(fetchActiveUserSessionsForUser).toHaveBeenCalledWith(
+    expect(fetchImportantUserSessionsForUser).toHaveBeenCalledWith(
       "8af6f242-c060-4920-a7db-91b4cb66fd26",
     );
     expect(deleteResponse.status).toBe(200);

@@ -5,12 +5,14 @@ import {
   mobileProfileSessionsResponseSchema,
 } from "@dubgrid/contracts";
 import {
-  fetchActiveUserSessionsForUser,
+  fetchImportantUserSessionsForUser,
   revokeUserSessionForUser,
 } from "@/features/account/server";
 import { requireMobileAuth } from "@/features/mobile/server";
 
-function mapSession(session: Awaited<ReturnType<typeof fetchActiveUserSessionsForUser>>[number]) {
+function mapSession(
+  session: Awaited<ReturnType<typeof fetchImportantUserSessionsForUser>>[number],
+) {
   return {
     id: session.id,
     platform: session.platform,
@@ -27,7 +29,7 @@ export async function GET(req: NextRequest) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
 
-  const sessions = await fetchActiveUserSessionsForUser(auth.user.id);
+  const sessions = await fetchImportantUserSessionsForUser(auth.user.id);
 
   return NextResponse.json(
     mobileProfileSessionsResponseSchema.parse({

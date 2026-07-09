@@ -89,17 +89,47 @@ export async function fetchUserSessionsForUser(
   }));
 }
 
-export async function fetchActiveUserSessionsForUser(
+type UserSessionPlatformGroup = "web" | "mobile";
+
+function toPlatformGroup(platform: UserSessionPlatform | null): UserSessionPlatformGroup {
+  return platform === "web" ? "web" : "mobile";
+}
+
+/**
+ * Self-service session list: only the sessions a user actually needs to
+ * recognize - whatever is currently active, plus the most recent session
+ * that's gone quiet, bucketed separately for web and mobile so a stale
+ * browser tab doesn't bury "last used" info for the other platform.
+ */
+export async function fetchImportantUserSessionsForUser(
   userId: string,
   now: Date = new Date(),
 ): Promise<UserSessionRecord[]> {
-  return fetchUserSessionsForUser(userId, {
-    activeSince: getActiveUserSessionCutoff(now),
-  });
-}
+  const sessions = await fetchUserSessionsForUser(userId);
+  const cutoffMs = now.getTime() - USER_SESSION_ACTIVE_WINDOW_MS;
 
-export function getActiveUserSessionCutoff(now: Date = new Date()): string {
-  return new Date(now.getTime() - USER_SESSION_ACTIVE_WINDOW_MS).toISOString();
+  const byGroup = new Map<UserSessionPlatformGroup, UserSessionRecord[]>();
+  for (const session of sessions) {
+    const group = toPlatformGroup(session.platform);
+    const list = byGroup.get(group) ?? [];
+    list.push(session);
+    byGroup.set(group, list);
+  }
+
+  const important: UserSessionRecord[] = [];
+  for (const group of byGroup.values()) {
+    // fetchUserSessionsForUser already orders by last_active_at desc.
+    const active = group.filter((s) => new Date(s.lastActiveAt).getTime() >= cutoffMs);
+    const lastInactive = group.find((s) => new Date(s.lastActiveAt).getTime() < cutoffMs);
+    important.push(...active);
+    if (lastInactive) {
+      important.push(lastInactive);
+    }
+  }
+
+  return important.sort(
+    (a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime(),
+  );
 }
 
 export async function trackUserSessionForUser(input: TrackUserSessionInput): Promise<void> {

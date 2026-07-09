@@ -70,7 +70,8 @@ export const queryKeys = {
     allUsers: () => ["gm", "users"] as const,
     accounts: () => ["gm", "accounts"] as const,
     security: () => ["gm", "security"] as const,
-    sessions: () => ["gm", "security", "sessions"] as const,
+    sessions: (page: number, limit: number, filters = "") =>
+      ["gm", "security", "sessions", page, limit, filters] as const,
     billing: () => ["gm", "billing"] as const,
     compliance: () => ["gm", "compliance"] as const,
     orgHealth: (orgId: string | null) => ["gm", "org-health", orgId ?? "all"] as const,
