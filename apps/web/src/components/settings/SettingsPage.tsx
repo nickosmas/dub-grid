@@ -300,7 +300,6 @@ export default function SettingsPage({
             certificationLabel={certificationLabel}
             onChange={onJobsChange}
             canManageScheduleDefinitions={canManageScheduleDefinitions}
-            shiftDisplayMode={organization.shiftDisplayMode}
           />
         )}
 
@@ -327,7 +326,6 @@ export default function SettingsPage({
             coverageRequirements={coverageRequirements}
             onCoverageRequirementsChange={onCoverageRequirementsChange}
             canEdit={canManageCoverageRequirements}
-            shiftDisplayMode={organization.shiftDisplayMode}
           />
         )}
 

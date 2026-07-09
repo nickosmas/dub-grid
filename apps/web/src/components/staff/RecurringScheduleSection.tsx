@@ -227,7 +227,6 @@ function ShiftCellPopover({
               empRoleIds={empRoleIds}
               multiSelect={false}
               closeOnSelect={true}
-              shiftDisplayMode={shiftDisplayMode}
             />
             {(currentSegments.length > 0 || currentAbsenceTypeId) && (
               <button

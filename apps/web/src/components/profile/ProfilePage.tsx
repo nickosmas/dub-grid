@@ -120,7 +120,6 @@ export function ProfilePage() {
           absenceTypes={absenceTypes}
           certifications={certifications}
           orgRoles={orgRoles}
-          shiftDisplayMode={org?.shiftDisplayMode}
           shifts={shifts}
           recurringShifts={recurringShifts}
           shiftRequests={shiftRequests}
@@ -138,7 +137,6 @@ export function ProfilePage() {
           absenceTypes={absenceTypes}
           certifications={certifications}
           orgRoles={orgRoles}
-          shiftDisplayMode={org?.shiftDisplayMode}
           shifts={shifts}
           recurringShifts={recurringShifts}
           shiftRequests={shiftRequests}

@@ -2284,14 +2284,14 @@ function SchedulerContent() {
         const e = endParts[i] || code?.defaultEndTime || cat?.endTime;
         if (s && e) {
           pillRanges.push({ start: s, end: e });
-          pillLabels.push(assignmentLabelMap.get(entry.assignmentIds[i]) ?? code?.label ?? "?");
+          pillLabels.push(code?.name || code?.label || "?");
         }
       }
       warnings.push(...checkSameDayOverlaps(pillRanges, pillLabels));
     }
 
     return warnings;
-  }, [editPanel, editSessionDraft, shifts, assignmentById, shiftCategories, assignmentLabelMap]);
+  }, [editPanel, editSessionDraft, shifts, assignmentById, shiftCategories]);
 
   const employeesByFocusArea = useMemo(() => {
     const next = new Map<number, Employee[]>();

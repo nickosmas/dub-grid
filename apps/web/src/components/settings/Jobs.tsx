@@ -721,7 +721,6 @@ function JobRow({
   onDeleted,
   canManageScheduleDefinitions,
   allJobs,
-  shiftDisplayMode,
   isLast,
 }: {
   job: JobDefinition & { isNew?: boolean };
@@ -738,7 +737,6 @@ function JobRow({
   onDeleted: (id: number) => void;
   canManageScheduleDefinitions: boolean;
   allJobs: Array<JobDefinition & { isNew?: boolean }>;
-  shiftDisplayMode: ShiftDisplayMode;
   isLast?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
@@ -1296,10 +1294,10 @@ function JobRow({
                       primary={getJobPreviewLabel({
                         jobName: form.name,
                         jobAbbr: form.abbr,
-                        shiftDisplayMode,
+                        shiftDisplayMode: "name",
                       })}
                       bg={form.color}
-                      mode={shiftDisplayMode}
+                      mode="name"
                     />
                   </div>
                 </div>
@@ -1851,14 +1849,14 @@ function JobRow({
                     const previewPrimary = getShiftPreviewPrimaryLabel({
                       shiftName: shift.name,
                       shiftAbbr: shift.abbr,
-                      shiftDisplayMode,
+                      shiftDisplayMode: "name",
                     });
                     const previewSecondary = isDefaultShiftJob
                       ? null
                       : getJobPreviewLabel({
                           jobName: form.name,
                           jobAbbr: form.abbr,
-                          shiftDisplayMode,
+                          shiftDisplayMode: "name",
                         });
                     const resolvedTimes = resolveJobTimesForShift(
                       {
@@ -1918,7 +1916,7 @@ function JobRow({
                             primary={previewPrimary}
                             secondary={previewSecondary}
                             bg={resolvedColor}
-                            mode={shiftDisplayMode}
+                            mode="name"
                             previewId={String(shift.id)}
                           />
                         </div>
@@ -2358,7 +2356,6 @@ export default function JobsSettings({
   certificationLabel,
   onChange,
   canManageScheduleDefinitions,
-  shiftDisplayMode = "code",
 }: {
   jobs: JobDefinition[];
   orgId: string;
@@ -2371,7 +2368,6 @@ export default function JobsSettings({
   certificationLabel: string;
   onChange: (jobs: JobDefinition[]) => void;
   canManageScheduleDefinitions: boolean;
-  shiftDisplayMode?: ShiftDisplayMode;
 }) {
   const [local, setLocal] = useState<Array<JobDefinition & { isNew?: boolean }>>(jobs);
   const nextTmpId = useRef(-1);
@@ -2653,7 +2649,6 @@ export default function JobsSettings({
             onDeleted={handleDeleted}
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             allJobs={visibleRows}
-            shiftDisplayMode={shiftDisplayMode}
             isLast={jobIndex === scheduledRows.length - 1}
           />
         ))}
@@ -2696,7 +2691,6 @@ export default function JobsSettings({
             onDeleted={handleDeleted}
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             allJobs={visibleRows}
-            shiftDisplayMode={shiftDisplayMode}
             isLast={jobIndex === shiftlessRows.length - 1}
           />
         ))}

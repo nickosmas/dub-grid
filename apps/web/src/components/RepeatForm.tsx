@@ -19,7 +19,6 @@ import {
   ShiftCategory,
   JobDefinition,
   ShiftJobSegment,
-  ShiftDisplayMode,
 } from "@/types";
 import { MAX_SERIES_OCCURRENCES } from "@/lib/constants";
 import * as Sentry from "@/lib/sentry";
@@ -61,7 +60,6 @@ interface RepeatFormProps {
   assignments: AssignmentDefinition[];
   shiftCategories?: ShiftCategory[];
   jobs?: JobDefinition[];
-  shiftDisplayMode?: ShiftDisplayMode;
   onConfirm: (
     frequency: SeriesFrequency,
     daysOfWeek: number[] | null,
@@ -347,7 +345,6 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
     assignments,
     shiftCategories = [],
     jobs = [],
-    shiftDisplayMode = "code",
     onConfirm,
     absenceType,
   }: RepeatFormProps,
@@ -379,8 +376,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
   const previewDisplayParts = useMemo(() => {
     if (absenceType) {
       return {
-        primaryLabel:
-          shiftDisplayMode === "name" ? absenceType.name || absenceType.label : absenceType.label,
+        primaryLabel: absenceType.name || absenceType.label,
         secondaryLabel: null,
       };
     }
@@ -390,7 +386,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
         shift: shiftCategory,
         job: shiftJob,
         assignment,
-        shiftDisplayMode,
+        shiftDisplayMode: "name",
       });
     }
 
@@ -398,7 +394,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
       primaryLabel: shiftLabel,
       secondaryLabel: null,
     };
-  }, [absenceType, shiftCategory, assignment, shiftDisplayMode, shiftJob, shiftLabel]);
+  }, [absenceType, shiftCategory, assignment, shiftJob, shiftLabel]);
   const previewBackground = absenceType?.color ?? assignment?.color ?? "var(--color-bg-secondary)";
   const previewText = absenceType?.text ?? assignment?.text ?? "var(--color-text-secondary)";
   const previewBorder = absenceType?.border ?? assignment?.border ?? "var(--color-border)";

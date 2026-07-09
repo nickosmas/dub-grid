@@ -974,7 +974,7 @@ describe("ShiftEditPanel", () => {
       });
 
       expect(container.querySelector('[data-shift-diff-badge="modified"]')?.textContent).toBe(
-        "Was D · SUPV",
+        "Was Day Shift · Supervisor",
       );
     });
   });

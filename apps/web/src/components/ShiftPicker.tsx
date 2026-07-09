@@ -8,7 +8,6 @@ import {
   AbsenceType,
   FocusArea,
   ScheduleCellSegmentInput,
-  ShiftDisplayMode,
   ShiftCategory,
   JobDefinition,
   NamedItem,
@@ -41,7 +40,6 @@ interface ShiftPickerProps {
   /** If true, closes the picker immediately on select (usually for single-select). */
   closeOnSelect?: boolean;
   onClose?: () => void;
-  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 export default function ShiftPicker({
@@ -64,9 +62,7 @@ export default function ShiftPicker({
   multiSelect = false,
   closeOnSelect = true,
   onClose,
-  shiftDisplayMode = "code",
 }: ShiftPickerProps) {
-  const isNameMode = shiftDisplayMode === "name";
   const assignableOptions = buildAssignableShiftOptions({
     assignments,
     shiftCategories,
@@ -567,54 +563,21 @@ export default function ShiftPicker({
                         <Check size={10} color="#fff" strokeWidth={3.5} />
                       </div>
                     )}
-                    {isNameMode ? (
-                      <MaybeHint content={at.name || at.label} side="left">
-                        <div
-                          style={{
-                            ...primaryTextStyle,
-                            color: at.text,
-                            lineHeight: 1.25,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            paddingRight: isActive ? 20 : 0,
-                          }}
-                        >
-                          {at.name || at.label}
-                        </div>
-                      </MaybeHint>
-                    ) : (
-                      <>
-                        <div
-                          style={{
-                            ...primaryTextStyle,
-                            color: at.text,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 3,
-                            paddingRight: isActive ? 20 : 0,
-                          }}
-                        >
-                          {at.label}
-                        </div>
-                        <MaybeHint content={at.name} side="left">
-                          <div
-                            style={{
-                              ...secondaryTextStyle,
-                              color: at.text,
-                              opacity: 0.82,
-                              marginTop: 3,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              paddingRight: isActive ? 20 : 0,
-                            }}
-                          >
-                            {at.name}
-                          </div>
-                        </MaybeHint>
-                      </>
-                    )}
+                    <MaybeHint content={at.name || at.label} side="left">
+                      <div
+                        style={{
+                          ...primaryTextStyle,
+                          color: at.text,
+                          lineHeight: 1.25,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          paddingRight: isActive ? 20 : 0,
+                        }}
+                      >
+                        {at.name || at.label}
+                      </div>
+                    </MaybeHint>
                   </button>
                 );
               })}

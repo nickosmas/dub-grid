@@ -665,7 +665,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   orgRoles={orgRoles}
                   pendingInvite={pendingInvite}
                   thisWeekHours={thisWeekHours}
-                  shiftDisplayMode={org?.shiftDisplayMode}
                 />
               ) : null}
 
@@ -682,7 +681,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                   shiftRequests={shiftRequests}
                   recurringShifts={recurringShifts}
                   canViewRecurringShifts={perms.canViewRecurringShifts}
-                  shiftDisplayMode={org?.shiftDisplayMode}
                 />
               ) : null}
 

@@ -730,7 +730,6 @@ export default function CoverageRequirementsSettings({
   coverageRequirements,
   onCoverageRequirementsChange,
   canEdit,
-  shiftDisplayMode = "code",
 }: {
   orgId: string;
   focusAreas: FocusArea[];
@@ -741,7 +740,6 @@ export default function CoverageRequirementsSettings({
   coverageRequirements: CoverageRequirement[];
   onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
   canEdit: boolean;
-  shiftDisplayMode?: ShiftDisplayMode;
 }) {
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
   const assignableOptions = useMemo(
@@ -752,9 +750,9 @@ export default function CoverageRequirementsSettings({
         focusAreas,
         orgRoles,
         certifications,
-        shiftDisplayMode,
+        shiftDisplayMode: "name",
       }),
-    [certifications, focusAreas, jobs, orgRoles, shiftCategories, shiftDisplayMode],
+    [certifications, focusAreas, jobs, orgRoles, shiftCategories],
   );
   const coverageOptions = useMemo(
     () => assignableOptions.filter(isCoverageTargetOption),

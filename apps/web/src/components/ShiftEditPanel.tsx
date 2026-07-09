@@ -911,9 +911,9 @@ export default function ShiftEditPanel({
         shiftCategories,
         jobs,
         focusAreas: focusAreas ?? [],
-        shiftDisplayMode,
+        shiftDisplayMode: "name",
       }),
-    [focusAreas, jobs, shiftCategories, assignments, shiftDisplayMode],
+    [focusAreas, jobs, shiftCategories, assignments],
   );
   const isMobile = useMediaQuery(MOBILE);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
@@ -1048,7 +1048,7 @@ export default function ShiftEditPanel({
         resolveAbsenceLabel: (absenceTypeId) => {
           const absenceType = absenceTypes.find((item) => item.id === absenceTypeId);
           if (!absenceType) return "?";
-          return isNameMode ? absenceType.name || absenceType.label : absenceType.label;
+          return absenceType.name || absenceType.label;
         },
       }),
     [
@@ -1067,7 +1067,6 @@ export default function ShiftEditPanel({
       customEndTime,
       assignableShiftDisplayMap,
       absenceTypes,
-      isNameMode,
     ],
   );
 
@@ -1114,7 +1113,7 @@ export default function ShiftEditPanel({
         if (absId != null) {
           const at = absenceTypes.find((a) => a.id === absId);
           if (!at) return null;
-          return isNameMode ? at.name || at.label : `${at.name} (${at.label})`;
+          return at.name || at.label;
         }
         return shift && shift !== "OFF" ? shift : null;
       };
@@ -3269,7 +3268,7 @@ export default function ShiftEditPanel({
     if (isAbsence) {
       const at = absenceTypes.find((a) => a.id === currentAbsenceTypeId);
       if (!at) return null;
-      const absenceLabel = isNameMode ? at.name || at.label : at.label;
+      const absenceLabel = at.name || at.label;
       return (
         <div
           style={{
@@ -3318,22 +3317,6 @@ export default function ShiftEditPanel({
               {absenceLabel}
             </span>
           </MaybeHint>
-          {!isNameMode && at.name && (
-            <span
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                color: at.text,
-                opacity: 0.7,
-                lineHeight: 1.3,
-                maxWidth: "90%",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {at.name}
-            </span>
-          )}
         </div>
       );
     }
@@ -4069,7 +4052,6 @@ export default function ShiftEditPanel({
               assignments={assignments}
               shiftCategories={shiftCategories}
               jobs={jobs}
-              shiftDisplayMode={shiftDisplayMode}
               onConfirm={onRepeatConfirm}
               absenceType={
                 isAbsence ? absenceTypes?.find((at) => at.id === currentAbsenceTypeId) : undefined
@@ -4582,7 +4564,6 @@ export default function ShiftEditPanel({
                     initialTab={modal.activeFocusAreaId}
                     multiSelect={true}
                     closeOnSelect={false}
-                    shiftDisplayMode={shiftDisplayMode}
                   />
                 </div>
               )}

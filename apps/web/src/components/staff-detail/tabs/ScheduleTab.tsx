@@ -12,7 +12,6 @@ import type {
   ShiftRequest,
   RecurringShift,
   AbsenceType,
-  ShiftDisplayMode,
 } from "@/types";
 import { fmt12h } from "@/lib/utils";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
@@ -43,7 +42,6 @@ interface ScheduleTabProps {
   shiftRequests: ShiftRequest[];
   recurringShifts: RecurringShift[];
   canViewRecurringShifts: boolean;
-  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 function compactName(fullName: string): string {
@@ -63,9 +61,7 @@ export function ScheduleTab({
   shiftRequests,
   recurringShifts,
   canViewRecurringShifts,
-  shiftDisplayMode = "code",
 }: ScheduleTabProps) {
-  const isNameMode = shiftDisplayMode === "name";
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 20;
 
@@ -279,9 +275,7 @@ export function ScheduleTab({
                                         }}
                                         className="h-5 w-fit px-1.5 py-0 text-[10px]"
                                       >
-                                        {isNameMode
-                                          ? absenceType.name || absenceType.label
-                                          : absenceType.label}
+                                        {absenceType.name || absenceType.label}
                                       </Badge>
                                     ) : (
                                       <Badge
@@ -307,15 +301,8 @@ export function ScheduleTab({
                                             }}
                                             className="h-5 px-1.5 py-0 text-[10px]"
                                           >
-                                            {isNameMode
-                                              ? assignment.name || assignment.label
-                                              : assignment.label}
+                                            {assignment.name || assignment.label}
                                           </Badge>
-                                          {!isNameMode && isSplit && assignment.name && (
-                                            <span className="text-[11px] text-[var(--color-text-muted)]">
-                                              {assignment.name}
-                                            </span>
-                                          )}
                                           {isSplit && entry.isDraft && (
                                             <span
                                               className="text-[10px] font-semibold"

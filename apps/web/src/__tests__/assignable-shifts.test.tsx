@@ -435,7 +435,6 @@ describe("assignable shift resolution", () => {
         onSelect={vi.fn()}
         empFocusAreaIds={[1]}
         empRoleIds={[7]}
-        shiftDisplayMode="name"
       />,
     );
 
@@ -608,7 +607,6 @@ describe("ShiftPicker combined options", () => {
         empFocusAreaIds={[1]}
         empCertificationId={null}
         empRoleIds={[]}
-        shiftDisplayMode="code"
       />,
     );
 
@@ -632,7 +630,6 @@ describe("ShiftPicker combined options", () => {
         empFocusAreaIds={[1]}
         empCertificationId={null}
         empRoleIds={[]}
-        shiftDisplayMode="name"
       />,
     );
 
@@ -682,7 +679,6 @@ describe("ShiftPicker combined options", () => {
         empFocusAreaIds={[1]}
         empCertificationId={null}
         empRoleIds={[]}
-        shiftDisplayMode="name"
       />,
     );
 
@@ -722,7 +718,6 @@ describe("ShiftPicker combined options", () => {
         empFocusAreaIds={[1]}
         empCertificationId={2}
         empRoleIds={[7, 9]}
-        shiftDisplayMode="name"
       />,
     );
 
