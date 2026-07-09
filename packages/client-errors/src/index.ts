@@ -62,6 +62,24 @@ export const NETWORK_ERROR_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * Matches any raw error shape (Supabase's own strings, or this app's own 401
+ * body text like "Your session expired. Please sign in again.") that means the
+ * caller needs a fresh sign-in. Single source of truth — callers that need to
+ * react to session expiry (e.g. by signing out and redirecting) should test
+ * against this instead of hand-rolling their own substring list, which drifts
+ * from the copy below and misses cases silently.
+ */
+export const SESSION_EXPIRED_PATTERN =
+  /jwt expired|refresh token not found|invalid refresh token|invalid session|unauthenticated|session expired/i;
+
+/** True when the raw error message indicates the session needs a fresh sign-in. */
+export function isSessionExpiredError(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  if (!message) return false;
+  return SESSION_EXPIRED_PATTERN.test(message);
+}
+
+/**
  * Raw error messages rewritten into friendly, user-facing copy. The union of
  * the web and mobile pattern tables, with overlapping auth/session patterns
  * reconciled to a single canonical message each. Evaluated in order — the first
@@ -76,8 +94,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
     message: "Check your email and password and try again.",
   },
   {
-    pattern:
-      /jwt expired|refresh token not found|invalid refresh token|invalid session|unauthenticated|session expired/i,
+    pattern: SESSION_EXPIRED_PATTERN,
     message: "Your session expired. Sign in again to continue.",
   },
   {
