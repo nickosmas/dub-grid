@@ -13,7 +13,7 @@ export function PageShell({
    * pages instead of the bare links shown everywhere else. */
   signInDisclaimer?: boolean;
 }) {
-  const linkStyle = { color: "inherit", textDecoration: "underline" };
+  const sentenceLinkStyle = { color: "inherit", textDecoration: "underline" };
 
   return (
     <div className="dg-auth-shell">
@@ -44,11 +44,21 @@ export function PageShell({
           {signInDisclaimer ? (
             <span>
               By continuing, I agree to DubGrid&apos;s{" "}
-              <Link href="/terms" target="_blank" rel="noopener noreferrer" style={linkStyle}>
+              <Link
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={sentenceLinkStyle}
+              >
                 Terms of Service
               </Link>
               ,{" "}
-              <Link href="/privacy" target="_blank" rel="noopener noreferrer" style={linkStyle}>
+              <Link
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={sentenceLinkStyle}
+              >
                 Privacy Policy
               </Link>
               , and{" "}
@@ -56,7 +66,7 @@ export function PageShell({
                 href="/cookie-policy"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={linkStyle}
+                style={sentenceLinkStyle}
               >
                 Cookie Policy
               </Link>
@@ -64,20 +74,30 @@ export function PageShell({
             </span>
           ) : (
             <>
-              <Link href="/privacy" target="_blank" rel="noopener noreferrer" style={linkStyle}>
+              <Link
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="dg-auth-footer-link"
+              >
                 Privacy Policy
               </Link>
               <span style={{ margin: "0 4px" }}>·</span>
-              <Link href="/terms" target="_blank" rel="noopener noreferrer" style={linkStyle}>
+              <Link
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="dg-auth-footer-link"
+              >
                 Terms of Service
               </Link>
               <span style={{ margin: "0 4px" }}>·</span>
               <button
                 type="button"
                 onClick={openConsentPreferences}
+                className="dg-auth-footer-link"
                 style={{
                   color: "var(--color-text-faint)",
-                  textDecoration: "none",
                   background: "none",
                   border: "none",
                   padding: 0,

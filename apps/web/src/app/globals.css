@@ -2487,6 +2487,16 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   text-decoration: underline;
 }
 
+/* Bare (non-sentence) auth footer links — underline only on hover */
+.dg-auth-footer-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.dg-auth-footer-link:hover {
+  text-decoration: underline;
+}
+
 /* ── Auth card (responsive padding) ────────────────────── */
 .dg-auth-card {
   padding: 48px 44px 44px;
