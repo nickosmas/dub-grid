@@ -120,6 +120,38 @@ describe("EmployeeStatusActions", () => {
     expect(onActivate).toHaveBeenCalledWith("emp-1");
   });
 
+  it("only mentions the schedule when the employee has a focus area (management-only employees don't)", async () => {
+    const user = userEvent.setup();
+
+    const { rerender } = render(
+      <EmployeeStatusActions
+        employee={makeEmployee({ focusAreaIds: [] })}
+        canEdit
+        onDeactivate={vi.fn()}
+        onActivate={vi.fn()}
+        onRemove={vi.fn()}
+        variant="panel"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Deactivate" }));
+    expect(screen.getByText(/temporarily paused/i)).toBeInTheDocument();
+    expect(screen.queryByText(/off the schedule/i)).not.toBeInTheDocument();
+
+    rerender(
+      <EmployeeStatusActions
+        employee={makeEmployee({ focusAreaIds: [1] })}
+        canEdit
+        onDeactivate={vi.fn()}
+        onActivate={vi.fn()}
+        onRemove={vi.fn()}
+        variant="panel"
+      />,
+    );
+
+    expect(screen.getByText(/temporarily off the schedule/i)).toBeInTheDocument();
+  });
+
   it("uses the shared filled warning treatment for the Deactivate entry point", () => {
     render(
       <EmployeeStatusActions

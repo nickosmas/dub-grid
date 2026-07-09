@@ -25,6 +25,7 @@ type MockAccessRow = {
     subscription_status: string | null;
     trial_ends_at: string | null;
   } | null;
+  employee?: { status: string | null } | null;
   setup?: Partial<MockSetupRows>;
 };
 
@@ -124,7 +125,9 @@ function createServiceClientMock(rows: MockAccessRow) {
                     ? (rows.profile ?? null)
                     : table === "organizations"
                       ? (rows.organization ?? null)
-                      : null,
+                      : table === "employees"
+                        ? (rows.employee ?? null)
+                        : null,
               error: null,
             }),
             then<TResult1 = unknown, TResult2 = never>(
@@ -380,5 +383,116 @@ describe("requireOrgPermissions", () => {
     );
 
     expect("response" in result).toBe(false);
+  });
+
+  it("strips an inactive admin's manage capability even though admin_permissions grants it", async () => {
+    getServiceClient.mockReturnValue(
+      createServiceClientMock({
+        membership: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
+        profile: { platform_role: "none" },
+        organization: {
+          suspended_at: null,
+          subscription_status: "active",
+          trial_ends_at: null,
+        },
+        employee: { status: "inactive" },
+      }),
+    );
+
+    const { requireOrgPermissions } = await import("./permissions");
+    const result = await requireOrgPermissions(
+      makeRequest(),
+      "11111111-1111-4111-8111-111111111111",
+      (permissions) => permissions.canManageEmployees,
+    );
+
+    expect("response" in result).toBe(true);
+    if ("response" in result) {
+      expect(result.response.status).toBe(403);
+    }
+  });
+
+  it("leaves an active admin's manage capability intact", async () => {
+    getServiceClient.mockReturnValue(
+      createServiceClientMock({
+        membership: { org_role: "admin", admin_permissions: { canManageEmployees: true } },
+        profile: { platform_role: "none" },
+        organization: {
+          suspended_at: null,
+          subscription_status: "active",
+          trial_ends_at: null,
+        },
+        employee: { status: "active" },
+      }),
+    );
+
+    const { requireOrgPermissions } = await import("./permissions");
+    const result = await requireOrgPermissions(
+      makeRequest(),
+      "11111111-1111-4111-8111-111111111111",
+      (permissions) => permissions.canManageEmployees,
+    );
+
+    expect("response" in result).toBe(false);
+    if (!("response" in result)) {
+      expect(result.permissions.canManageEmployees).toBe(true);
+      expect(result.permissions.isInactive).toBe(false);
+    }
+  });
+
+  it("does not strip a super_admin's permissions even if their employees row is inactive", async () => {
+    getServiceClient.mockReturnValue(
+      createServiceClientMock({
+        membership: { org_role: "super_admin", admin_permissions: null },
+        profile: { platform_role: "none" },
+        organization: {
+          suspended_at: null,
+          subscription_status: "active",
+          trial_ends_at: null,
+        },
+        employee: { status: "inactive" },
+      }),
+    );
+
+    const { requireOrgPermissions } = await import("./permissions");
+    const result = await requireOrgPermissions(
+      makeRequest(),
+      "11111111-1111-4111-8111-111111111111",
+      (permissions) => permissions.isSuperAdmin,
+    );
+
+    expect("response" in result).toBe(false);
+    if (!("response" in result)) {
+      expect(result.permissions.isSuperAdmin).toBe(true);
+      expect(result.permissions.isInactive).toBe(false);
+    }
+  });
+
+  it("does not strip a gridmaster's permissions even if they have a stale inactive employees row", async () => {
+    getServiceClient.mockReturnValue(
+      createServiceClientMock({
+        membership: null,
+        profile: { platform_role: "gridmaster" },
+        organization: {
+          suspended_at: null,
+          subscription_status: "active",
+          trial_ends_at: null,
+        },
+        employee: { status: "inactive" },
+      }),
+    );
+
+    const { requireOrgPermissions } = await import("./permissions");
+    const result = await requireOrgPermissions(
+      makeRequest(),
+      "11111111-1111-4111-8111-111111111111",
+      (permissions) => permissions.isGridmaster,
+    );
+
+    expect("response" in result).toBe(false);
+    if (!("response" in result)) {
+      expect(result.permissions.isGridmaster).toBe(true);
+      expect(result.permissions.isInactive).toBe(false);
+    }
   });
 });

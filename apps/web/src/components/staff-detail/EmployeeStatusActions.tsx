@@ -49,6 +49,9 @@ export function EmployeeStatusActions({
 
   const isActive = employee.status === "active";
   const displayName = getEmployeeDisplayName(employee);
+  // Management-only employees have an `employees` row but no focus areas —
+  // they're not on the schedule grid (see ProfilePage's isOnSchedule).
+  const isScheduled = employee.focusAreaIds.length > 0;
 
   async function handleConfirmInvitationAction() {
     if (!pendingInvitation || !pendingInvitationAction) return;
@@ -163,7 +166,9 @@ export function EmployeeStatusActions({
                     color: "var(--color-text-muted)",
                   }}
                 >
-                  They&apos;re temporarily off the schedule. You can reactivate them anytime.
+                  {isScheduled
+                    ? "They're temporarily off the schedule. You can reactivate them anytime."
+                    : "They're temporarily paused. You can reactivate them anytime."}
                 </span>
               </span>
             </label>

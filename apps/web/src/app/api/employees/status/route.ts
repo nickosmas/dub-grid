@@ -4,7 +4,7 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
-import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import { isCallerInactive, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { rowToEmployee } from "@/lib/db/mappers";
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
     // ── Permission check ──────────────────────────────────────────────
     const serviceClient = getServiceClient();
-    const [{ data: membership }, { data: profile }] = await Promise.all([
+    const [{ data: membership }, { data: profile }, inactive] = await Promise.all([
       serviceClient
         .from("organization_memberships")
         .select("org_role, admin_permissions")
@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
         .eq("org_id", orgId)
         .maybeSingle(),
       serviceClient.from("profiles").select("platform_role").eq("id", user.id).single(),
+      isCallerInactive(serviceClient, user.id, orgId),
     ]);
 
     const isGridmaster = profile?.platform_role === "gridmaster";
@@ -107,8 +108,13 @@ export async function POST(req: NextRequest) {
     const isAdmin = membership?.org_role === "admin";
     const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
 
+    // Inactive employees keep their session but lose every manage capability —
+    // mirrors requireOrgPermissions / resolveMobileAuthContext. Gridmaster/super_admin
+    // bypass: those tiers aren't meant to be sidelined by a stale employees.status row.
     const hasPermission =
-      isGridmaster || isSuperAdmin || (isAdmin && adminPerms?.canManageEmployees === true);
+      isGridmaster ||
+      isSuperAdmin ||
+      (isAdmin && !inactive && adminPerms?.canManageEmployees === true);
 
     if (!hasPermission) {
       return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });

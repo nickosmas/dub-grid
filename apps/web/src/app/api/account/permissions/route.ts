@@ -4,30 +4,12 @@ import { buildPerms, extractJwtClaims } from "@/features/permissions/shared";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { isCallerInactive } from "@/app/api/shared/permissions";
 
 export const dynamic = "force-dynamic";
 
 function jsonError(message: string, status = 500) {
   return NextResponse.json({ error: message }, { status });
-}
-
-// True when the caller's employees row in the effective org has status='inactive'.
-// Gridmaster + unlinked super_admin users have no employees row → returns false.
-// Removed users would normally have status='removed', but the JWT hook refuses
-// them at sign-in/refresh — they can't reach this endpoint.
-async function isCallerInactive(
-  serviceClient: SupabaseClient,
-  userId: string,
-  orgId: string,
-): Promise<boolean> {
-  const { data } = await serviceClient
-    .from("employees")
-    .select("status")
-    .eq("user_id", userId)
-    .eq("org_id", orgId)
-    .maybeSingle();
-  return (data?.status as string | null) === "inactive";
 }
 
 export async function GET(req: NextRequest) {
