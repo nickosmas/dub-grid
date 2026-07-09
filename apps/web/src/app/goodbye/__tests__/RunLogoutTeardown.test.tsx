@@ -1,5 +1,4 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RunLogoutTeardown } from "../RunLogoutTeardown";
@@ -12,6 +11,11 @@ const mockGetChannels = vi.fn();
 const mockUntrackChannel = vi.fn();
 const mockRemoveChannel = vi.fn();
 const mockHistoryReplaceState = vi.fn();
+const mockToastInfo = vi.fn();
+
+vi.mock("sonner", () => ({
+  toast: { info: (...args: unknown[]) => mockToastInfo(...args) },
+}));
 
 vi.mock("@/features/account/client", () => ({
   signOutFromBrowser: (...args: unknown[]) => mockSignOutFromBrowser(...args),
@@ -185,25 +189,19 @@ describe("RunLogoutTeardown", () => {
     expect(mockSignOutFromBrowser).toHaveBeenCalledTimes(1);
   });
 
-  it("shows a dismissible inactivity notice when reason='inactivity', and hides it once dismissed", async () => {
-    const user = userEvent.setup();
+  it("fires a persistent inactivity toast when reason='inactivity'", async () => {
     renderWithClient(<RunLogoutTeardown scope={null} reason="inactivity" />);
 
-    expect(
-      screen.getByText(/you were signed out after 30 minutes of inactivity/i),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /dismiss/i }));
-
-    expect(
-      screen.queryByText(/you were signed out after 30 minutes of inactivity/i),
-    ).not.toBeInTheDocument();
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      "You were signed out after 30 minutes of inactivity.",
+      { duration: Infinity },
+    );
   });
 
-  it("omits the inactivity notice and links straight to /login when reason is absent", async () => {
+  it("omits the inactivity toast and links straight to /login when reason is absent", async () => {
     renderWithClient(<RunLogoutTeardown scope={null} />);
 
-    expect(screen.queryByText(/inactivity/i)).not.toBeInTheDocument();
+    expect(mockToastInfo).not.toHaveBeenCalled();
     expect(screen.getByRole("link", { name: /sign back in/i })).toHaveAttribute(
       "href",
       "/login",

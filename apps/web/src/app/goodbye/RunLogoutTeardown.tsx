@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import * as Sentry from "@/lib/sentry";
@@ -27,7 +27,8 @@ interface RunLogoutTeardownProps {
   scope: LogoutScope | null;
   /**
    * Why the sign-out happened, from `?reason=` on the URL. When "inactivity",
-   * this page shows a dismissible explanatory notice.
+   * this page surfaces a persistent explanatory toast (dismissed only by the
+   * user, via AppToaster's global close button).
    */
   reason?: "inactivity" | null;
 }
@@ -55,7 +56,14 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
   // exists to avoid.
   const ranRef = useRef(false);
   const [done, setDone] = useState(scope === null);
-  const [noticeDismissed, setNoticeDismissed] = useState(false);
+
+  useEffect(() => {
+    if (reason === "inactivity") {
+      toast.info("You were signed out after 30 minutes of inactivity.", {
+        duration: Infinity,
+      });
+    }
+  }, [reason]);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -112,79 +120,29 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
   };
 
   return (
-    <>
-      {reason === "inactivity" && !noticeDismissed && (
-        <div
-          role="status"
-          style={{
-            position: "fixed",
-            top: 20,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 100,
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            width: "max-content",
-            maxWidth: "calc(100vw - 32px)",
-            padding: "12px 16px",
-            borderRadius: 10,
-            background: "var(--color-info-bg)",
-            border: "1px solid var(--color-info-border)",
-            boxShadow: "var(--dg-shadow-auth-card)",
-            color: "var(--color-info-text)",
-            fontSize: "var(--dg-fs-body)",
-            fontWeight: 600,
-            lineHeight: 1.5,
-          }}
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+      }}
+    >
+      {done ? (
+        <Link href="/login" className="dg-auth-submit" style={primaryStyle}>
+          Sign back in
+        </Link>
+      ) : (
+        <button
+          type="button"
+          className="dg-auth-submit"
+          disabled
+          aria-busy="true"
+          style={primaryStyle}
         >
-          <span>You were signed out after 30 minutes of inactivity.</span>
-          <button
-            type="button"
-            onClick={() => setNoticeDismissed(true)}
-            aria-label="Dismiss"
-            style={{
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "transparent",
-              border: "none",
-              padding: 2,
-              margin: 0,
-              color: "inherit",
-              cursor: "pointer",
-              opacity: 0.7,
-            }}
-          >
-            <X size={18} />
-          </button>
-        </div>
+          Sign back in
+        </button>
       )}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
-        {done ? (
-          <Link href="/login" className="dg-auth-submit" style={primaryStyle}>
-            Sign back in
-          </Link>
-        ) : (
-          <button
-            type="button"
-            className="dg-auth-submit"
-            disabled
-            aria-busy="true"
-            style={primaryStyle}
-          >
-            Sign back in
-          </button>
-        )}
-      </div>
-    </>
+    </div>
   );
 }
 
