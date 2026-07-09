@@ -290,18 +290,12 @@ function PrintSection({
 
   // em-based name column; day columns fill the rest equally
   const nameColEm = 16;
-  const gridTemplate = `${nameColEm}em repeat(${dates.length}, 1fr)`;
-
-  const rowStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: gridTemplate,
-  };
 
   const cellH = `${fontSize * 3.4}px`;
   const tallyH = `${fontSize * 2.8}px`;
 
   return (
-    <div style={{ marginBottom: "1.4em" }}>
+    <div style={{ marginBottom: "1.4em", breakInside: "avoid", pageBreakInside: "avoid" }}>
       <div
         style={{
           fontSize: "1.3em",
@@ -315,8 +309,12 @@ function PrintSection({
         {sectionName}
       </div>
 
-      <div
+      <table
         style={{
+          width: "100%",
+          tableLayout: "fixed",
+          borderCollapse: "separate",
+          borderSpacing: 0,
           background: "#fff",
           border: "1px solid #9EB4D4",
           borderRadius: "var(--dg-radius-md)",
@@ -324,141 +322,159 @@ function PrintSection({
           boxShadow: BOX_SHADOW_CARD,
         }}
       >
+        <colgroup>
+          <col style={{ width: `${nameColEm}em` }} />
+          {dates.map((date) => (
+            <col key={formatDateKey(date)} />
+          ))}
+        </colgroup>
+
         {/* Header row */}
-        <div style={{ ...rowStyle, borderBottom: "2px solid #0F1724" }}>
-          <div
-            style={{
-              padding: "0.5em 0.8em",
-              fontWeight: 700,
-              fontSize: "0.85em",
-              color: "#4D6080",
-              letterSpacing: "0.08em",
-              borderRight: "1px solid #C8D6EC",
-              background: "#F5F7FA",
-            }}
-          >
-            STAFF NAME
-          </div>
-          {dates.map((date, i) => {
-            const isSplit = splitAtIndex !== undefined && i === splitAtIndex;
-            return (
-              <div
-                key={formatDateKey(date)}
-                style={{
-                  textAlign: "center",
-                  padding: "0.4em 0",
-                  borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
-                }}
-              >
-                <div
+        <thead>
+          <tr>
+            <th
+              style={{
+                textAlign: "left",
+                padding: "0.5em 0.8em",
+                fontWeight: 700,
+                fontSize: "0.85em",
+                color: "#4D6080",
+                letterSpacing: "0.08em",
+                borderRight: "1px solid #C8D6EC",
+                borderBottom: "2px solid #0F1724",
+                background: "#F5F7FA",
+              }}
+            >
+              STAFF NAME
+            </th>
+            {dates.map((date, i) => {
+              const isSplit = splitAtIndex !== undefined && i === splitAtIndex;
+              return (
+                <th
+                  key={formatDateKey(date)}
                   style={{
-                    fontSize: "0.8em",
-                    fontWeight: 600,
-                    color: "#94A3B8",
-                    letterSpacing: "0.05em",
+                    textAlign: "center",
+                    padding: "0.4em 0",
+                    fontWeight: 400,
+                    borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
+                    borderBottom: "2px solid #0F1724",
                   }}
                 >
-                  {DAY_LABELS[date.getDay()]}
-                </div>
-                <div
-                  style={{
-                    fontSize: "1.2em",
-                    fontWeight: 700,
-                    color: "#1A2640",
-                    lineHeight: 1.2,
-                    marginTop: "0.05em",
-                  }}
-                >
-                  {date.getDate()}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                  <div
+                    style={{
+                      fontSize: "0.8em",
+                      fontWeight: 600,
+                      color: "#94A3B8",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    {DAY_LABELS[date.getDay()]}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "1.2em",
+                      fontWeight: 700,
+                      color: "#1A2640",
+                      lineHeight: 1.2,
+                      marginTop: "0.05em",
+                    }}
+                  >
+                    {date.getDate()}
+                  </div>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
 
         {/* Employee rows */}
+        <tbody>
         {employees.map((emp, ri) => {
           const certAbbr = getCertAbbr(emp.certificationId, certifications);
           const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
 
           return (
-            <div
+            <tr
               key={emp.id}
               style={{
-                ...rowStyle,
                 background: "#fff",
-                alignItems: "stretch",
                 breakInside: "avoid",
                 pageBreakInside: "avoid",
               }}
             >
               {/* Name cell */}
-              <div
+              <td
                 style={{
-                  padding: "0.3em 0.6em 0.3em 0.8em",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "0.4em",
-                  minWidth: 0,
-                  height: cellH,
+                  padding: 0,
                   borderTop: ri > 0 ? "1px solid #C8D6EC" : undefined,
                   borderRight: "1px solid #C8D6EC",
                 }}
               >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.3em" }}>
+                <div
+                  style={{
+                    padding: "0.3em 0.6em 0.3em 0.8em",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "0.4em",
+                    minWidth: 0,
+                    height: cellH,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.3em" }}>
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          color: "#1A2640",
+                          whiteSpace: "normal",
+                          overflowWrap: "break-word",
+                          lineHeight: 1.05,
+                          fontSize:
+                            getEmployeeDisplayName(emp).length > 25
+                              ? "0.85em"
+                              : getEmployeeDisplayName(emp).length > 18
+                                ? "0.95em"
+                                : "1em",
+                          display: "block",
+                          maxWidth: `${nameColEm - 4}em`,
+                        }}
+                      >
+                        {getEmployeeDisplayName(emp)}
+                      </span>
+                    </div>
+                    {emp.roleIds.length > 0 && (
+                      <div
+                        style={{
+                          fontSize: "0.8em",
+                          color: "#4D6080",
+                          marginTop: "0.1em",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
+                      </div>
+                    )}
+                  </div>
+                  {certAbbr && certAbbr !== "—" && (
                     <span
                       style={{
-                        fontWeight: 600,
-                        color: "#1A2640",
-                        whiteSpace: "normal",
-                        overflowWrap: "break-word",
-                        lineHeight: 1.05,
-                        fontSize:
-                          getEmployeeDisplayName(emp).length > 25
-                            ? "0.85em"
-                            : getEmployeeDisplayName(emp).length > 18
-                              ? "0.95em"
-                              : "1em",
-                        display: "block",
-                        maxWidth: `${nameColEm - 4}em`,
-                      }}
-                    >
-                      {getEmployeeDisplayName(emp)}
-                    </span>
-                  </div>
-                  {emp.roleIds.length > 0 && (
-                    <div
-                      style={{
                         fontSize: "0.8em",
-                        color: "#4D6080",
-                        marginTop: "0.1em",
+                        fontWeight: 700,
+                        background: dc.bg,
+                        color: dc.text,
+                        padding: "0.15em 0.5em",
+                        borderRadius: 20,
                         whiteSpace: "nowrap",
+                        flexShrink: 0,
+                        letterSpacing: "0.01em",
                       }}
                     >
-                      {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
-                    </div>
+                      {certAbbr}
+                    </span>
                   )}
                 </div>
-                {certAbbr && certAbbr !== "—" && (
-                  <span
-                    style={{
-                      fontSize: "0.8em",
-                      fontWeight: 700,
-                      background: dc.bg,
-                      color: dc.text,
-                      padding: "0.15em 0.5em",
-                      borderRadius: 20,
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                      letterSpacing: "0.01em",
-                    }}
-                  >
-                    {certAbbr}
-                  </span>
-                )}
-              </div>
+              </td>
 
               {/* Shift cells */}
               {dates.map((date, di) => {
@@ -468,17 +484,22 @@ function PrintSection({
                 const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
 
                 return (
-                  <div
+                  <td
                     key={formatDateKey(date)}
+                    style={{
+                      padding: 0,
+                      borderTop: ri > 0 && !isSplit ? "1px solid #C8D6EC" : undefined,
+                      boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 #C8D6EC" : undefined,
+                      borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
+                    }}
+                  >
+                  <div
                     style={{
                       height: cellH,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       position: "relative",
-                      borderTop: ri > 0 && !isSplit ? "1px solid #C8D6EC" : undefined,
-                      boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 #C8D6EC" : undefined,
-                      borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
                     }}
                   >
                     {assignment && assignment !== "OFF" ? (
@@ -565,7 +586,7 @@ function PrintSection({
                                   <span
                                     style={{
                                       fontWeight: 800,
-                                      lineHeight: 1,
+                                      lineHeight: 1.2,
                                       ...(isNameMode
                                         ? { textAlign: "center" as const, fontSize: "0.85em" }
                                         : {
@@ -585,7 +606,7 @@ function PrintSection({
                                       style={{
                                         fontSize: "0.7em",
                                         fontWeight: 700,
-                                        lineHeight: 1,
+                                        lineHeight: 1.3,
                                         opacity: 0.78,
                                         whiteSpace: "nowrap",
                                         overflow: "hidden",
@@ -678,7 +699,7 @@ function PrintSection({
                                     gap: 0,
                                     fontWeight: 800,
                                     position: "relative",
-                                    lineHeight: 1,
+                                    lineHeight: 1.2,
                                     overflow: "hidden",
                                     padding: isNameMode ? "1px 3px" : "1px 2px",
                                     paddingLeft: multiCrossFocusPill
@@ -742,7 +763,7 @@ function PrintSection({
                                           style={{
                                             fontSize: "0.68em",
                                             fontWeight: 700,
-                                            lineHeight: 1,
+                                            lineHeight: 1.3,
                                             opacity: 0.78,
                                             whiteSpace: "nowrap",
                                             overflow: "hidden",
@@ -786,9 +807,10 @@ function PrintSection({
                       />
                     )}
                   </div>
+                  </td>
                 );
               })}
-            </div>
+            </tr>
           );
         })}
 
@@ -798,7 +820,6 @@ function PrintSection({
             key={row.id}
             label={row.name}
             bgColor="#fff"
-            gridTemplate={gridTemplate}
             height={tallyH}
             splitAtIndex={splitAtIndex}
             dailyTallies={dailyTallies.map((t) => t[row.id] ?? {})}
@@ -806,7 +827,8 @@ function PrintSection({
             isNameMode={isNameMode}
           />
         ))}
-      </div>
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -814,7 +836,6 @@ function PrintSection({
 function TallyRow({
   label,
   bgColor,
-  gridTemplate,
   height,
   splitAtIndex,
   dailyTallies,
@@ -823,7 +844,6 @@ function TallyRow({
 }: {
   label: string;
   bgColor: string;
-  gridTemplate: string;
   height: string;
   splitAtIndex?: number;
   dailyTallies: Record<string, number>[];
@@ -831,48 +851,35 @@ function TallyRow({
   isNameMode?: boolean;
 }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: gridTemplate,
-        background: bgColor,
-        borderTop: isFirst ? "2px solid #0F1724" : undefined,
-      }}
-    >
-      <div
+    <tr style={{ background: bgColor }}>
+      <td
         style={{
           padding: "0.3em 0.8em",
           fontSize: "0.8em",
           fontWeight: 700,
           color: "#1A2640",
           letterSpacing: "0.04em",
-          display: "flex",
-          alignItems: "center",
           height,
           borderRight: "1px solid #9EB4D4",
-          borderTop: !isFirst ? "1px solid #9EB4D4" : undefined,
+          borderTop: isFirst ? "2px solid #0F1724" : "1px solid #9EB4D4",
         }}
       >
         {label}
-      </div>
+      </td>
       {dailyTallies.map((tally, i) => {
         const entries = Object.entries(tally);
         const isSplit = splitAtIndex !== undefined && i === splitAtIndex;
         return (
-          <div
+          <td
             key={i}
             style={{
               textAlign: "center",
               padding: "0.2em 0.2em",
               borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #9EB4D4",
-              borderTop: !isFirst ? "1px solid #9EB4D4" : undefined,
+              borderTop: isFirst ? "2px solid #0F1724" : "1px solid #9EB4D4",
               fontSize: "0.8em",
               fontWeight: 700,
               color: entries.length > 0 ? "#1A2640" : "#94A3B8",
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
               lineHeight: 1.3,
               height,
             }}
@@ -896,10 +903,10 @@ function TallyRow({
                     </span>
                   </MaybeHint>
                 ))}
-          </div>
+          </td>
         );
       })}
-    </div>
+    </tr>
   );
 }
 
