@@ -183,4 +183,50 @@ describe("GET /api/account/permissions", () => {
     // No employees table read for privileged roles
     expect(serviceFrom).not.toHaveBeenCalledWith("employees");
   });
+
+  it("reports isOnSchedule for a scheduled employee", async () => {
+    extractJwtClaims.mockReturnValue({ effectiveRole: "user", orgId: ORG_ID });
+    enqueue(
+      "employees",
+      { data: { status: "active", focus_area_ids: [5], department_ids: [] } },
+      { data: { status: "active", focus_area_ids: [5], department_ids: [] } },
+    );
+    enqueue("profiles", { data: { org_id: null, platform_role: "none" } });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.isOnSchedule).toBe(true);
+    expect(body.isManagementUser).toBe(false);
+  });
+
+  it("reports isManagementUser for a management-only employee", async () => {
+    extractJwtClaims.mockReturnValue({ effectiveRole: "user", orgId: ORG_ID });
+    enqueue(
+      "employees",
+      { data: { status: "active", focus_area_ids: [], department_ids: [9] } },
+      { data: { status: "active", focus_area_ids: [], department_ids: [9] } },
+    );
+    enqueue("profiles", { data: { org_id: null, platform_role: "none" } });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.isOnSchedule).toBe(false);
+    expect(body.isManagementUser).toBe(true);
+  });
+
+  it("reports both flags false when the caller has no employees row", async () => {
+    extractJwtClaims.mockReturnValue({ effectiveRole: "user", orgId: ORG_ID });
+    enqueue("profiles", { data: { org_id: null, platform_role: "none" } });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.isOnSchedule).toBe(false);
+    expect(body.isManagementUser).toBe(false);
+  });
 });

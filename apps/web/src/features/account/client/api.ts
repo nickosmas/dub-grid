@@ -87,6 +87,12 @@ export interface AccountOrgContext {
 
 export interface AccountPermissionsResponse {
   permissions: Permissions;
+  // Self-employment shape, used by web nav (Header.tsx) to detect
+  // "management-only, non-admin" accounts that should only see Schedule +
+  // People, never Dashboard. Defaults to false when the caller has no
+  // employees row for the effective org (gridmaster, unlinked super_admin).
+  isOnSchedule?: boolean;
+  isManagementUser?: boolean;
 }
 
 export interface AccessibleOrganization {

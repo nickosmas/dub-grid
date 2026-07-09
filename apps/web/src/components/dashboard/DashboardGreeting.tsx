@@ -225,16 +225,19 @@ export default function DashboardGreeting({
   const userClock = formatTimeInZone(now, userTz);
   const orgClock = formatTimeInZone(now, effectiveOrgTz);
 
-  // Pick once per tab session, scoped to bucket + date. Cached in sessionStorage so:
+  // Pick once per tab session, scoped to bucket + date + userId. Cached in
+  // sessionStorage so:
   //   - StrictMode / Turbopack dev double-mount doesn't reshuffle the headline
   //     between the first and second paint;
   //   - Re-navigating to /dashboard mid-session keeps the same greeting.
   // The cache is wiped by clearDubgridSessionState on sign-out, so the next
   // sign-in produces a fresh pick. We also invalidate on bucket/date drift so
   // a tab left open overnight doesn't surface yesterday-evening's "Good
-  // evening" at 10am. DashboardGreeting is always rendered inside
-  // ProtectedRoute (which returns null SSR-side), so this runs client-only
-  // and storage access is safe.
+  // evening" at 10am, AND on userId drift — impersonation, sandbox/org
+  // switching, or any other same-tab identity change without a full sign-out
+  // must not reuse a previous identity's cached (and name-baked-in) headline.
+  // DashboardGreeting is always rendered inside ProtectedRoute (which returns
+  // null SSR-side), so this runs client-only and storage access is safe.
   const [headline] = useState<string>(() => {
     if (typeof window === "undefined") return "";
     const bucket = getBucket(now.getHours());
@@ -245,11 +248,13 @@ export default function DashboardGreeting({
         const cached = JSON.parse(raw) as {
           bucket?: Bucket;
           date?: string;
+          userId?: string | null;
           headline?: string;
         };
         if (
           cached.bucket === bucket &&
           cached.date === date &&
+          cached.userId === userId &&
           typeof cached.headline === "string"
         ) {
           return cached.headline;
@@ -264,7 +269,7 @@ export default function DashboardGreeting({
     try {
       window.sessionStorage.setItem(
         GREETING_CACHE_KEY,
-        JSON.stringify({ bucket, date, headline: picked }),
+        JSON.stringify({ bucket, date, userId, headline: picked }),
       );
     } catch {
       // Same as above — non-fatal.

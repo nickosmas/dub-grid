@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { buildPerms, extractJwtClaims } from "@/features/permissions/shared";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
@@ -10,6 +11,43 @@ export const dynamic = "force-dynamic";
 
 function jsonError(message: string, status = 500) {
   return NextResponse.json({ error: message }, { status });
+}
+
+interface SelfEmploymentFlags {
+  // True when the caller's own employees row (in the effective org) has a
+  // scheduled focus area — i.e. they appear on the schedule grid.
+  isOnSchedule: boolean;
+  // True when the caller's own employees row has management department
+  // access. Combined with isOnSchedule, this is how the web nav (Header.tsx)
+  // detects "management-only, non-admin" accounts that should only see
+  // Schedule + People, never Dashboard. Matches the naming already used by
+  // ProfilePage.tsx's isOnSchedule and DirectoryPerson.isManagementUser.
+  isManagementUser: boolean;
+}
+
+const NO_SELF_EMPLOYMENT_FLAGS: SelfEmploymentFlags = {
+  isOnSchedule: false,
+  isManagementUser: false,
+};
+
+async function getSelfEmploymentFlags(
+  serviceClient: SupabaseClient,
+  userId: string,
+  orgId: string | null,
+): Promise<SelfEmploymentFlags> {
+  if (!orgId) return NO_SELF_EMPLOYMENT_FLAGS;
+  const { data } = await serviceClient
+    .from("employees")
+    .select("focus_area_ids, department_ids")
+    .eq("user_id", userId)
+    .eq("org_id", orgId)
+    .maybeSingle();
+  const focusAreaIds = (data?.focus_area_ids as number[] | null) ?? [];
+  const departmentIds = (data?.department_ids as number[] | null) ?? [];
+  return {
+    isOnSchedule: focusAreaIds.length > 0,
+    isManagementUser: departmentIds.length > 0,
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -58,7 +96,10 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const inactive = orgId ? await isCallerInactive(serviceClient, auth.user.id, orgId) : false;
+    const [inactive, employmentFlags] = await Promise.all([
+      orgId ? isCallerInactive(serviceClient, auth.user.id, orgId) : Promise.resolve(false),
+      getSelfEmploymentFlags(serviceClient, auth.user.id, orgId),
+    ]);
 
     if (effectiveRole === "admin" && orgId) {
       const { data } = await serviceClient
@@ -78,6 +119,7 @@ export async function GET(req: NextRequest) {
           false,
           inactive,
         ),
+        ...employmentFlags,
       });
     }
 
@@ -102,10 +144,13 @@ export async function GET(req: NextRequest) {
         .single();
 
       if (membership) {
-        const profileInactive =
+        const [profileInactive, profileEmploymentFlags] =
           profile.org_id === orgId
-            ? inactive
-            : await isCallerInactive(serviceClient, auth.user.id, profile.org_id);
+            ? [inactive, employmentFlags]
+            : await Promise.all([
+                isCallerInactive(serviceClient, auth.user.id, profile.org_id),
+                getSelfEmploymentFlags(serviceClient, auth.user.id, profile.org_id),
+              ]);
         return NextResponse.json({
           permissions: buildPerms(
             membership.org_role as OrganizationRole,
@@ -115,12 +160,14 @@ export async function GET(req: NextRequest) {
             false,
             profileInactive,
           ),
+          ...profileEmploymentFlags,
         });
       }
     }
 
     return NextResponse.json({
       permissions: buildPerms(effectiveRole, orgId, false, null, false, inactive),
+      ...employmentFlags,
     });
   } catch (error) {
     console.error("account permissions GET failed", error);

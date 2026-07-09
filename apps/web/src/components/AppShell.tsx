@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
+import InactiveAccountBanner from "@/components/InactiveAccountBanner";
 import TrialWelcomeModal from "@/components/TrialWelcomeModal";
 import InactivityGuard from "@/components/InactivityGuard";
 import { fetchOrganizationBilling } from "@/features/billing/client";
@@ -140,6 +141,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       >
         <ImpersonationBanner />
         <UserViewBanner />
+        <InactiveAccountBanner />
         {showHeader && <AppHeader />}
       </div>
       <div key={effectiveOrgKey} style={{ display: "contents" }}>

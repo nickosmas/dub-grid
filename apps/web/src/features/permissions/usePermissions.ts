@@ -12,17 +12,35 @@ import { READ_ONLY_PERMS, ROLE_LEVEL } from "./core";
 import { buildPerms, extractJwtClaims } from "./shared";
 import type { Permissions } from "./shared";
 
-const LOADING_PERMS: Permissions = buildPerms("user", null, true);
+// Self-employment shape (own employees row), used by web nav (Header.tsx) to
+// detect "management-only, non-admin" accounts that should only see
+// Schedule + People, never Dashboard. Not part of the shared @dubgrid/authz
+// Permissions type — it's a web-only nav concern, resolved alongside
+// permissions by /api/account/permissions.
+export interface WebPermissions extends Permissions {
+  isOnSchedule: boolean;
+  isManagementUser: boolean;
+}
+
+const LOADING_PERMS: WebPermissions = {
+  ...buildPerms("user", null, true),
+  isOnSchedule: false,
+  isManagementUser: false,
+};
 LOADING_PERMS.isLoading = true;
 
-const NO_PERMS: Permissions = buildPerms("user", null, false);
+const NO_PERMS: WebPermissions = {
+  ...buildPerms("user", null, false),
+  isOnSchedule: false,
+  isManagementUser: false,
+};
 
 // ── Module-level cache ──────────────────────────────────────────────────────
 // Same pattern as org/employee caches — survives across route navigations.
 // Permissions rarely change within a session, so cached value is safe to show
 // instantly while a background re-resolve happens.
 
-let permsCache: Permissions | null = null;
+let permsCache: WebPermissions | null = null;
 let permsCacheTimestamp = 0;
 let permsCacheUserId: string | null = null;
 
@@ -76,14 +94,14 @@ export function getUserViewActive(): boolean {
   return readUserView();
 }
 
-export function usePermissions(): Permissions {
+export function usePermissions(): WebPermissions {
   // AuthProvider is the single source of truth for browser auth. usePermissions
   // used to call supabase.auth.getSession() + getUser() itself (up to 4 times
   // per mount), which raced AuthProvider's calls for the Web Locks API auth
   // lock and produced "Lock stolen" errors. Reading from context eliminates
   // that race entirely.
   const { user, session, isLoading: authLoading } = useAuth();
-  const [perms, setPerms] = useState<Permissions>(() => permsCache ?? { ...LOADING_PERMS });
+  const [perms, setPerms] = useState<WebPermissions>(() => permsCache ?? { ...LOADING_PERMS });
 
   // Reactively subscribe to user view toggle — reads sessionStorage directly,
   // re-renders all hook instances when setUserViewActive() is called.
@@ -140,15 +158,24 @@ export function usePermissions(): Permissions {
 
     void (async () => {
       try {
-        const { permissions } = await fetchAccountPermissions();
+        const {
+          permissions,
+          isOnSchedule = false,
+          isManagementUser = false,
+        } = await fetchAccountPermissions();
         if (!mounted) return;
-        permsCache = permissions;
+        const merged: WebPermissions = { ...permissions, isOnSchedule, isManagementUser };
+        permsCache = merged;
         permsCacheTimestamp = Date.now();
         permsCacheUserId = userId;
-        setPerms(permissions);
+        setPerms(merged);
       } catch {
         if (!mounted) return;
-        const fallback = buildPerms(effectiveRole, orgId, false);
+        const fallback: WebPermissions = {
+          ...buildPerms(effectiveRole, orgId, false),
+          isOnSchedule: false,
+          isManagementUser: false,
+        };
         permsCache = fallback;
         permsCacheTimestamp = Date.now();
         permsCacheUserId = userId;
@@ -187,16 +214,21 @@ export function usePermissions(): Permissions {
       clearPermsCache();
       void (async () => {
         try {
-          const { permissions } = await fetchAccountPermissions();
+          const {
+            permissions,
+            isOnSchedule = false,
+            isManagementUser = false,
+          } = await fetchAccountPermissions();
           // Guard against an event firing in the gap between the channel
           // emitting and our cleanup completing — and against the user
           // changing while the fetch was in flight (don't write the new
           // user's perms under the old user's cache key).
           if (!mounted) return;
-          permsCache = permissions;
+          const merged: WebPermissions = { ...permissions, isOnSchedule, isManagementUser };
+          permsCache = merged;
           permsCacheTimestamp = Date.now();
           permsCacheUserId = userId;
-          setPerms(permissions);
+          setPerms(merged);
         } catch {
           // Leave the stale perms in place rather than dropping the user to
           // NO_PERMS on a transient network blip.
@@ -257,6 +289,8 @@ export function usePermissions(): Permissions {
       canAccessSettings: false,
       canManageUsers: false,
       canConfigureAdminPermissions: false,
+      isOnSchedule: perms.isOnSchedule,
+      isManagementUser: perms.isManagementUser,
       atLeast: (r: string) => 0 >= (ROLE_LEVEL[r] ?? 0),
     };
   }

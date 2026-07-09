@@ -26,6 +26,8 @@ const mockPermissions = {
   canEditShifts: true,
   canEditNotes: true,
   canViewStaff: true,
+  isOnSchedule: true,
+  isManagementUser: false,
   atLeast: (r: string) => {
     const levels: Record<string, number> = {
       gridmaster: 4,
@@ -154,6 +156,8 @@ beforeEach(() => {
   mockPermissions.canViewStaff = true;
   mockPermissions.canManageOrg = true;
   mockPermissions.canAccessSettings = true;
+  mockPermissions.isOnSchedule = true;
+  mockPermissions.isManagementUser = false;
 });
 
 describe("Header rendering", () => {
@@ -292,6 +296,32 @@ describe("Header permission-based tab visibility", () => {
     mockPermissions.isUserViewActive = true;
     renderHeader(<Header />);
     expect(screen.queryByRole("link", { name: /Reports/i })).not.toBeInTheDocument();
+  });
+
+  it("hides Dashboard tab for management-only, non-admin users", () => {
+    mockPermissions.role = "user";
+    mockPermissions.isOnSchedule = false;
+    mockPermissions.isManagementUser = true;
+    renderHeader(<Header />);
+    expect(screen.queryByRole("link", { name: /Dashboard/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Schedule/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /People/i })).toBeInTheDocument();
+  });
+
+  it("shows Dashboard tab for scheduled regular users", () => {
+    mockPermissions.role = "user";
+    mockPermissions.isOnSchedule = true;
+    mockPermissions.isManagementUser = true;
+    renderHeader(<Header />);
+    expect(screen.getByRole("link", { name: /Dashboard/i })).toBeInTheDocument();
+  });
+
+  it("shows Dashboard tab for management-only admins", () => {
+    mockPermissions.role = "admin";
+    mockPermissions.isOnSchedule = false;
+    mockPermissions.isManagementUser = true;
+    renderHeader(<Header />);
+    expect(screen.getByRole("link", { name: /Dashboard/i })).toBeInTheDocument();
   });
 
   it("shows trial time left to super admins in the app header", async () => {

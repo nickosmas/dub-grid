@@ -19,6 +19,7 @@ function PeopleContent() {
     canManageEmployees,
     isSuperAdmin,
     isGridmaster,
+    isManagementUser,
     isLoading: permsLoading,
     orgId,
   } = usePermissions();
@@ -124,6 +125,7 @@ function PeopleContent() {
             canManageEmployees={canManageEmployees}
             isSuperAdmin={isSuperAdmin}
             isGridmaster={isGridmaster}
+            isManagementUser={isManagementUser}
             focusAreaLabel={org?.focusAreaLabel}
             certificationLabel={org?.certificationLabel}
             roleLabel={org?.roleLabel}

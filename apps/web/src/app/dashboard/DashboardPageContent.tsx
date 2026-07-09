@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
@@ -13,7 +14,21 @@ const GridmasterPortal = dynamic(() => import("@/components/gridmaster/Gridmaste
 });
 
 function DashboardContent() {
+  const router = useRouter();
   const perms = usePermissions();
+  // Management-only, non-admin accounts (management department access, no
+  // scheduled focus area) only get Schedule + People — mirrors the nav
+  // gating in Header.tsx. Bounce them off Dashboard entirely rather than
+  // just hiding the nav link.
+  const isManagementOnlyUser =
+    !perms.isLoading && perms.role === "user" && perms.isManagementUser && !perms.isOnSchedule;
+
+  useEffect(() => {
+    if (isManagementOnlyUser) {
+      router.replace("/schedule");
+    }
+  }, [isManagementOnlyUser, router]);
+
   const {
     org,
     focusAreas,
@@ -38,6 +53,10 @@ function DashboardContent() {
     for (const preset of assignments) map.set(preset.id, preset);
     return map;
   }, [assignments]);
+
+  if (isManagementOnlyUser) {
+    return <ProgressBar loading />;
+  }
 
   if (loadError && !org) {
     return (

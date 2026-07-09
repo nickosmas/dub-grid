@@ -246,7 +246,13 @@ export default function Header({ orgName }: HeaderProps) {
     isImpersonating,
     isUserViewActive,
     actualLevel,
+    isOnSchedule,
+    isManagementUser,
   } = usePermissions();
+  // Management-only, non-admin accounts (management department access, no
+  // scheduled focus area) only get Schedule + People — see DashboardPageContent
+  // for the matching redirect if they land on /dashboard directly.
+  const isManagementOnlyUser = role === "user" && isManagementUser && !isOnSchedule;
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
 
@@ -266,7 +272,7 @@ export default function Header({ orgName }: HeaderProps) {
             : "";
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
-    if (item.id === "dashboard") return true;
+    if (item.id === "dashboard") return !isManagementOnlyUser;
     if (item.id === "schedule") return true;
     if (item.id === "people") return canViewStaff;
     if (item.id === "reports") {
