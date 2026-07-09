@@ -583,7 +583,7 @@ function ScheduleScreen() {
                 color: C.textPrimary,
               }}
             >
-              My Week
+              Your Week
             </span>
             {/* upcomingHoursBadge */}
             <div

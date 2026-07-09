@@ -450,7 +450,7 @@ describe("UserDashboard", () => {
         name: "Volunteer",
       }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("My Week")).toBeInTheDocument();
+    expect(screen.getByText("Your Week")).toBeInTheDocument();
     const myWeek = screen.getByTestId("user-dashboard-my-week");
     const todayDateTile = screen.getByTestId("user-dashboard-date-tile-today");
     const weekPills = within(myWeek).getAllByTestId("user-dashboard-week-pills");
@@ -1221,7 +1221,7 @@ describe("UserDashboard", () => {
     expect(screen.queryByText(/^D$/)).not.toBeInTheDocument();
   });
 
-  it("does not repeat general or absence labels in My Week rows", () => {
+  it("does not repeat general or absence labels in Your Week rows", () => {
     const periodStart = getWeekStart(new Date());
     const periodDates = getDatesInRange(periodStart, 7);
     const generalDate = formatDateKey(periodDates[0] ?? new Date());
@@ -1305,7 +1305,7 @@ describe("UserDashboard", () => {
     expect(within(myWeek).queryAllByTestId("user-dashboard-week-pills")).toHaveLength(1);
   });
 
-  it("uses one empty-week message without repeating a blank My Week card", () => {
+  it("uses one empty-week message without repeating a blank Your Week card", () => {
     const props = makeProps();
 
     render(
@@ -1342,7 +1342,7 @@ describe("UserDashboard", () => {
     expect(emptyState).not.toHaveTextContent("No Shift");
     expect(emptyState).not.toHaveTextContent("No shift scheduled");
     expect(emptyState).not.toHaveTextContent("Published shifts for this week will appear here.");
-    expect(screen.queryByText("My Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
     expect(screen.queryByText("No shifts this week")).not.toBeInTheDocument();
     expect(screen.queryByText("Published shifts will appear here.")).not.toBeInTheDocument();
   });

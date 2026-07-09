@@ -2162,7 +2162,7 @@ function MyWeekSection({
     <section className="dg-card" data-testid="user-dashboard-my-week" style={style}>
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">{isTwoWeekView ? "My Schedule" : "My Week"}</div>
+          <div className="dg-card-title">{isTwoWeekView ? "Your Schedule" : "Your Week"}</div>
           <div className="dg-card-subtitle">
             {hoursLabel ?? `Your published shifts for ${periodLabel}`}
           </div>

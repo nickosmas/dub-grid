@@ -37,7 +37,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
     : isSuperAdmin
       ? "Go to People"
       : isUser
-        ? "View My Schedule"
+        ? "View Your Schedule"
         : "Go to Dashboard";
 
   const destination = isSaOrientation

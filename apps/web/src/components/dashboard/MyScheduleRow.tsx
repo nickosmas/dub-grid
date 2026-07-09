@@ -401,7 +401,7 @@ export default function MyScheduleRow({
     <div className="dg-card" data-testid="my-schedule-row">
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">My schedule</div>
+          <div className="dg-card-title">Your schedule</div>
           <div className="dg-card-subtitle">{periodLabel}</div>
         </div>
       </div>

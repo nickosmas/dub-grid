@@ -3161,7 +3161,7 @@ function UpcomingShiftsSection({
   return (
     <View style={styles.upcomingSectionBlock}>
       <View style={styles.upcomingSectionHeader}>
-        <Text style={styles.upcomingSectionTitle}>My Week</Text>
+        <Text style={styles.upcomingSectionTitle}>Your Week</Text>
         {hoursLabel ? (
           <View style={styles.upcomingHoursBadge}>
             <Text style={styles.upcomingHoursBadgeText}>{hoursLabel}</Text>

@@ -521,7 +521,7 @@ describe("ScheduleScreen", () => {
       openShiftCarouselText.indexOf("Nurse"),
     );
 
-    expect(screen.getByText("My Week")).toBeInTheDocument();
+    expect(screen.getByText("Your Week")).toBeInTheDocument();
     expect(screen.getByText("24h this week")).toBeInTheDocument();
     expect(screen.getByTestId("upcoming-today-date-dot-2026-04-16")).toBeInTheDocument();
     expect(screen.getByTestId("upcoming-today-row-2026-04-16")).toBeInTheDocument();
@@ -580,7 +580,7 @@ describe("ScheduleScreen", () => {
     expect(emptyState).not.toHaveTextContent(
       "Published jobs for this selected week will appear here.",
     );
-    expect(screen.queryByText("My Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
   });
 
   it("shows a success toast after a schedule request action completes", async () => {
@@ -610,7 +610,7 @@ describe("ScheduleScreen", () => {
     });
   });
 
-  it("makes multiple shifts visible in the Me hero and My Week rows", () => {
+  it("makes multiple shifts visible in the Me hero and Your Week rows", () => {
     meScheduleEntries = [
       createScheduleEntry({
         shiftName: "Day Shift / Evening Shift",
