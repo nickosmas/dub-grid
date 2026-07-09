@@ -229,6 +229,10 @@ type NamedRow = {
   abbr?: string | null;
 };
 
+type FocusAreaRow = NamedRow & {
+  department_id?: number | null;
+};
+
 type OrganizationRow = {
   id: string;
   name: string;
@@ -300,7 +304,7 @@ type ResolvedEntry = {
 export interface OperationsReportSourceData {
   org: OrganizationRow;
   employees: EmployeeReportRow[];
-  focusAreas: NamedRow[];
+  focusAreas: FocusAreaRow[];
   roles: NamedRow[];
   certifications: NamedRow[];
   departments: NamedRow[];
@@ -377,6 +381,25 @@ function formatList(
     .map((id) => map.get(id) ?? fallbackLabel)
     .filter(Boolean)
     .join("; ");
+}
+
+function resolveEmployeeDepartmentIds(
+  employee: EmployeeReportRow,
+  focusAreaDepartmentIdById: Map<number, number>,
+): number[] {
+  // department_ids can carry a department-admin permission grant unrelated to where an
+  // employee actually works (e.g. a nurse also granted admin access to Administration),
+  // so the scheduled department (where they're actually assigned to work) takes priority.
+  // Fall back to department_ids only for management-only staff with no focus area at all.
+  const scheduledDepartmentIds = new Set<number>();
+  for (const focusAreaId of employee.focus_area_ids ?? []) {
+    const departmentId = focusAreaDepartmentIdById.get(focusAreaId);
+    if (departmentId != null) scheduledDepartmentIds.add(departmentId);
+  }
+  if (scheduledDepartmentIds.size > 0) {
+    return Array.from(scheduledDepartmentIds);
+  }
+  return employee.department_ids ?? [];
 }
 
 function roundHours(value: number): number {
@@ -501,6 +524,11 @@ export function buildOperationsReportPayload(
   const roleById = buildMap(source.roles);
   const certificationById = buildMap(source.certifications);
   const departmentById = buildMap(source.departments);
+  const focusAreaDepartmentIdById = new Map(
+    source.focusAreas
+      .filter((row) => row.department_id != null)
+      .map((row) => [row.id, row.department_id as number]),
+  );
   const absenceTypeById = buildMap(source.absenceTypes);
   const jobById = buildMap(source.jobs);
   const shiftById = new Map(source.shiftCategories.map((row) => [row.id, row]));
@@ -559,7 +587,11 @@ export function buildOperationsReportPayload(
       employee.certification_id == null
         ? ""
         : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
-    departments: formatList(employee.department_ids, departmentById, "Unknown department"),
+    departments: formatList(
+      resolveEmployeeDepartmentIds(employee, focusAreaDepartmentIdById),
+      departmentById,
+      "Unknown department",
+    ),
   }));
 
   const staffHours = reportEmployees.map((employee) => {
@@ -753,7 +785,11 @@ export function buildOperationsReportPayload(
       employee.certification_id == null
         ? ""
         : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
-    departments: formatList(employee.department_ids, departmentById, "Unknown department"),
+    departments: formatList(
+      resolveEmployeeDepartmentIds(employee, focusAreaDepartmentIdById),
+      departmentById,
+      "Unknown department",
+    ),
     linkedAccount: Boolean(employee.user_id),
     pendingInvitation: pendingInvitationByEmployeeId.get(employee.id) ?? "",
   }));
@@ -768,7 +804,11 @@ export function buildOperationsReportPayload(
         : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
     roles: formatList(employee.role_ids, roleById, "Unknown role"),
     focusAreas: formatList(employee.focus_area_ids, focusAreaById, "Unknown focus area"),
-    departments: formatList(employee.department_ids, departmentById, "Unknown department"),
+    departments: formatList(
+      resolveEmployeeDepartmentIds(employee, focusAreaDepartmentIdById),
+      departmentById,
+      "Unknown department",
+    ),
     missingCertification: employee.certification_id == null,
     missingRole: (employee.role_ids ?? []).length === 0,
   }));
@@ -1603,10 +1643,10 @@ export async function loadOperationsReport(
         .is("archived_at", null)
         .order("seniority", { ascending: true }),
     ),
-    fetchTableRows<NamedRow>(
+    fetchTableRows<FocusAreaRow>(
       serviceClient
         .from("focus_areas")
-        .select("id, name")
+        .select("id, name, department_id")
         .eq("org_id", input.orgId)
         .is("archived_at", null),
     ),

@@ -364,6 +364,70 @@ describe("operations reports", () => {
     });
   });
 
+  it("resolves a scheduled department from the employee's focus area, not just department_ids", () => {
+    const source = buildSource({
+      focusAreas: [{ id: 10, name: "North", department_id: 41 }],
+      departments: [
+        { id: 40, name: "Care", abbr: "CAR" },
+        { id: 41, name: "Nursing", abbr: "NUR" },
+      ],
+      employees: buildSource().employees.map((employee) =>
+        employee.id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+          ? { ...employee, department_ids: [] }
+          : employee,
+      ),
+    });
+
+    const payload = buildOperationsReportPayload(source, {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+
+    expect(payload.reports.employeeDirectory[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+    expect(payload.reports.rosterStatus[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+    expect(payload.reports.certificationRoleMatrix[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+  });
+
+  it("shows the scheduled department, not a department-admin grant, when an employee has both", () => {
+    const source = buildSource({
+      focusAreas: [{ id: 10, name: "North", department_id: 41 }],
+      departments: [
+        { id: 40, name: "Care", abbr: "CAR" },
+        { id: 41, name: "Nursing", abbr: "NUR" },
+      ],
+      // employees[0] already has department_ids: [40] ("Care" — a department-admin
+      // permission grant unrelated to where they work) and focus_area_ids: [10]
+      // (scheduled "Nursing" via the focus area above, where they actually work).
+    });
+
+    const payload = buildOperationsReportPayload(source, {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+
+    expect(payload.reports.employeeDirectory[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+    expect(payload.reports.rosterStatus[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+    expect(payload.reports.certificationRoleMatrix[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+  });
+
   it("computes segmented hours and coverage from matching schedule segments", () => {
     const source = buildSource({
       focusAreas: [
