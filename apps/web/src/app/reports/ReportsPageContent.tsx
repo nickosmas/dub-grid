@@ -10,6 +10,7 @@ import {
   FileUp,
   RefreshCw,
   Upload,
+  X,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -35,6 +36,7 @@ import {
   type OperationsReportType,
 } from "@/features/reports/server/operations";
 import {
+  buildOperationsReportMetrics,
   buildOperationsReportPreviewTable,
   formatReportCellForDisplay,
 } from "@/features/reports/shared/table";
@@ -642,6 +644,13 @@ function ReportsContent() {
         : null,
     [appliedRequest, report, reportsQuery.data],
   );
+  const metrics = useMemo(
+    () =>
+      appliedRequest && reportsQuery.data
+        ? buildOperationsReportMetrics(reportsQuery.data, report)
+        : [],
+    [appliedRequest, report, reportsQuery.data],
+  );
   const visibleRows = preview?.rows ?? [];
   const hasExportableRows = visibleRows.length > 0;
   const isLoading =
@@ -908,6 +917,15 @@ function ReportsContent() {
               <RefreshCw size={16} />
               Refresh
             </button>
+            <button
+              className="dg-btn dg-btn-secondary"
+              disabled={!appliedRequest}
+              onClick={resetAppliedReport}
+              type="button"
+            >
+              <X size={16} />
+              Close
+            </button>
             <button className="dg-btn dg-btn-primary" onClick={handleGenerateReport} type="button">
               Generate report
             </button>
@@ -929,7 +947,7 @@ function ReportsContent() {
               marginBottom: 18,
             }}
           >
-            {reportsQuery.data.metrics.map((metric) => (
+            {metrics.map((metric) => (
               <div key={metric.label} style={metricStyle}>
                 <div style={metricLabelStyle}>{metric.label}</div>
                 <div style={metricValueStyle}>{metric.value}</div>

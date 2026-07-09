@@ -10,6 +10,7 @@ import {
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
 import {
+  buildOperationsReportMetrics,
   buildOperationsReportPreviewTable,
   formatReportDateForDisplay,
   formatReportCellForDisplay,
@@ -68,6 +69,7 @@ export interface StaffHoursReportRow {
 
 export interface EmployeeDirectoryReportRow {
   employeeId: string;
+  employeeNumber: number | null;
   employeeName: string;
   status: string;
   employmentType: string;
@@ -128,6 +130,7 @@ export interface AbsenceCalloffReportRow {
 
 export interface RosterStatusReportRow {
   employeeId: string;
+  employeeNumber: number | null;
   employeeName: string;
   status: string;
   employmentType: string;
@@ -141,6 +144,7 @@ export interface RosterStatusReportRow {
 
 export interface CertificationRoleMatrixReportRow {
   employeeId: string;
+  employeeNumber: number | null;
   employeeName: string;
   status: string;
   certification: string;
@@ -153,6 +157,7 @@ export interface CertificationRoleMatrixReportRow {
 
 export interface AccountAccessReportRow {
   employeeId: string;
+  employeeNumber: number | null;
   employeeName: string;
   status: string;
   email: string;
@@ -200,7 +205,6 @@ export interface OperationsReportPayload {
     focusAreas: OperationsReportFilterOption[];
     dates: string[];
   };
-  metrics: ReportMetric[];
   reports: {
     employeeDirectory: EmployeeDirectoryReportRow[];
     staffHours: StaffHoursReportRow[];
@@ -506,6 +510,12 @@ export function buildOperationsReportPayload(
     return hasAnyNumber(employee.focus_area_ids, focusAreaIdSet);
   });
   const reportEmployeeIdSet = new Set(reportEmployees.map((employee) => employee.id));
+  const rosterEmployees = source.employees.filter((employee) => {
+    if (employeeIdSet.size > 0 && !employeeIdSet.has(employee.id)) return false;
+    const focusAreaIds = employee.focus_area_ids ?? [];
+    if (focusAreaIds.length === 0) return true;
+    return hasAnyNumber(focusAreaIds, focusAreaIdSet);
+  });
   const entries = resolveEntries(source.publishedRows, absenceTypeById).filter((item) => {
     if (!reportDateSet.has(item.entry.date)) return false;
     if (!reportEmployeeIdSet.has(item.entry.empId)) return false;
@@ -535,8 +545,9 @@ export function buildOperationsReportPayload(
     dates: rangeDates,
   };
 
-  const employeeDirectory = reportEmployees.map((employee) => ({
+  const employeeDirectory = rosterEmployees.map((employee) => ({
     employeeId: employee.id,
+    employeeNumber: employee.employee_number,
     employeeName: formatName(employee),
     status: employee.status ?? "unknown",
     employmentType: employee.employment_type ?? "full_time",
@@ -730,8 +741,9 @@ export function buildOperationsReportPayload(
       status: request.status,
     }));
 
-  const rosterStatus = reportEmployees.map((employee) => ({
+  const rosterStatus = rosterEmployees.map((employee) => ({
     employeeId: employee.id,
+    employeeNumber: employee.employee_number,
     employeeName: formatName(employee),
     status: employee.status ?? "unknown",
     employmentType: employee.employment_type ?? "full_time",
@@ -745,8 +757,9 @@ export function buildOperationsReportPayload(
     linkedAccount: Boolean(employee.user_id),
     pendingInvitation: pendingInvitationByEmployeeId.get(employee.id) ?? "",
   }));
-  const certificationRoleMatrix = reportEmployees.map((employee) => ({
+  const certificationRoleMatrix = rosterEmployees.map((employee) => ({
     employeeId: employee.id,
+    employeeNumber: employee.employee_number,
     employeeName: formatName(employee),
     status: employee.status ?? "unknown",
     certification:
@@ -759,11 +772,12 @@ export function buildOperationsReportPayload(
     missingCertification: employee.certification_id == null,
     missingRole: (employee.role_ids ?? []).length === 0,
   }));
-  const accountAccess = reportEmployees.map((employee) => {
+  const accountAccess = rosterEmployees.map((employee) => {
     const pendingInvitation = pendingInvitationByEmployeeId.get(employee.id) ?? "";
     const linkedAccount = Boolean(employee.user_id);
     return {
       employeeId: employee.id,
+      employeeNumber: employee.employee_number,
       employeeName: formatName(employee),
       status: employee.status ?? "unknown",
       email: employee.email ?? "",
@@ -826,24 +840,6 @@ export function buildOperationsReportPayload(
       dates: dates.length > 0 ? dates : [],
     },
     filterOptions,
-    metrics: [
-      { label: "Scheduled hours", value: String(totalScheduledHours) },
-      { label: "Shifts", value: String(shiftEntries.length) },
-      {
-        label: "Coverage",
-        value: coveragePct == null ? "Not available" : `${coveragePct}%`,
-      },
-      { label: "Open slots", value: String(totalOpenSlots) },
-      { label: "Requests", value: String(shiftRequests.length) },
-      {
-        label: "Overtime alerts",
-        value: String(staffHours.filter((row) => row.overtime).length),
-      },
-      {
-        label: "Unlinked staff",
-        value: String(accountAccess.filter((row) => !row.linkedAccount).length),
-      },
-    ],
     reports: {
       employeeDirectory,
       staffHours,
@@ -1228,98 +1224,6 @@ function formatPdfPrintedDate(value: string, timeZone: string | null): string {
   }
 }
 
-function buildPdfReportDetails(
-  payload: OperationsReportPayload,
-  report: OperationsReportType,
-): ReportMetric[] {
-  const summary = payload.reports.shiftPeriodSummary;
-
-  switch (report) {
-    case "employee-directory":
-      return [
-        { label: "Staff records", value: String(payload.reports.employeeDirectory.length) },
-        { label: "Active staff", value: String(summary.activeStaffCount) },
-      ];
-    case "staff-hours":
-      return [
-        { label: "Scheduled hours", value: String(summary.totalScheduledHours) },
-        { label: "Shifts", value: String(summary.totalShifts) },
-        { label: "Overtime alerts", value: String(summary.overtimeAlertCount) },
-      ];
-    case "coverage":
-      return [
-        {
-          label: "Coverage",
-          value: summary.coveragePct == null ? "Not available" : `${summary.coveragePct}%`,
-        },
-        { label: "Open slots", value: String(summary.openSlotCount) },
-      ];
-    case "shift-period-summary":
-      return [
-        { label: "Scheduled hours", value: String(summary.totalScheduledHours) },
-        { label: "Shifts", value: String(summary.totalShifts) },
-        {
-          label: "Coverage",
-          value: summary.coveragePct == null ? "Not available" : `${summary.coveragePct}%`,
-        },
-        { label: "Open slots", value: String(summary.openSlotCount) },
-        { label: "Requests", value: String(summary.requestCount) },
-        { label: "Overtime alerts", value: String(summary.overtimeAlertCount) },
-      ];
-    case "shift-requests":
-      return [{ label: "Requests", value: String(payload.reports.shiftRequests.length) }];
-    case "absences-calloffs":
-      return [
-        {
-          label: "Absences and call-offs",
-          value: String(payload.reports.absencesCalloffs.length),
-        },
-      ];
-    case "roster-status":
-      return [
-        { label: "Staff records", value: String(payload.reports.rosterStatus.length) },
-        {
-          label: "Pending invitations",
-          value: String(payload.reports.rosterStatus.filter((row) => row.pendingInvitation).length),
-        },
-      ];
-    case "certification-role-matrix":
-      return [
-        {
-          label: "Missing certifications",
-          value: String(
-            payload.reports.certificationRoleMatrix.filter((row) => row.missingCertification)
-              .length,
-          ),
-        },
-        {
-          label: "Missing roles",
-          value: String(
-            payload.reports.certificationRoleMatrix.filter((row) => row.missingRole).length,
-          ),
-        },
-      ];
-    case "account-access":
-      return [
-        {
-          label: "Unlinked staff",
-          value: String(payload.reports.accountAccess.filter((row) => !row.linkedAccount).length),
-        },
-        {
-          label: "Pending invitations",
-          value: String(
-            payload.reports.accountAccess.filter((row) => row.pendingInvitation).length,
-          ),
-        },
-      ];
-    case "schedule-matrix":
-      return [
-        { label: "Scheduled staff", value: String(summary.scheduledStaffCount) },
-        { label: "Schedule dates", value: String(payload.reports.scheduleMatrix.dates.length) },
-      ];
-  }
-}
-
 function addOperationsPdfHeader(
   commands: string[],
   payload: OperationsReportPayload,
@@ -1576,7 +1480,7 @@ export function buildOperationsReportPdf(
     wordmark != null,
   );
 
-  const details = buildPdfReportDetails(payload, report);
+  const details = buildOperationsReportMetrics(payload, report);
   if (details.length > 0) {
     addLine(details.map((metric) => `${metric.label}: ${metric.value}`).join(" | "), 8, 16);
   }
