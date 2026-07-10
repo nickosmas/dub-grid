@@ -614,6 +614,96 @@ describe("mobile contracts", () => {
 
     expect(result.success).toBe(true);
     expect(result.data?.linkedEmployee?.focusAreaIds).toEqual([]);
+    expect(result.data?.linkedEmployee?.departmentIds).toEqual([]);
+  });
+
+  it("parses a linked employee's departmentIds when present", () => {
+    const result = mobileBootstrapResponseSchema.safeParse({
+      user: {
+        id: "11111111-1111-4111-8111-111111111111",
+        email: "alex@example.com",
+        firstName: "Alex",
+        lastName: "North",
+      },
+      currentOrg: {
+        id: "22222222-2222-4222-8222-222222222222",
+        name: "Acme Care",
+        slug: "acme",
+        timezone: "America/Los_Angeles",
+        shiftDisplayMode: "code",
+        labels: {
+          focusArea: "Focus Areas",
+          certification: "Certifications",
+          role: "Roles",
+          department: "Departments",
+        },
+        featureFlags: {
+          disable_realtime: true,
+        },
+      },
+      memberships: [
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          name: "Acme Care",
+          slug: "acme",
+          orgRole: "admin",
+          platformRole: "none",
+          isCurrent: true,
+        },
+      ],
+      effectiveRole: "admin",
+      permissions: {
+        canViewSchedule: true,
+        canEditShifts: false,
+        canPublishSchedule: false,
+        canApplyRecurringSchedule: false,
+        canEditNotes: false,
+        canEditScheduleIndicators: false,
+        canViewRecurringShifts: false,
+        canManageRecurringShifts: false,
+        canManageShiftSeries: false,
+        canViewStaff: true,
+        canViewEmployeeDetails: true,
+        canManageEmployees: false,
+        canViewFocusAreas: false,
+        canManageFocusAreas: false,
+        canViewScheduleDefinitions: false,
+        canManageScheduleDefinitions: false,
+        canViewIndicatorTypes: false,
+        canManageIndicatorTypes: false,
+        canManageOrgSettings: false,
+        canViewOrgLabels: false,
+        canManageOrgLabels: false,
+        canViewCoverageRequirements: false,
+        canManageCoverageRequirements: false,
+        canApproveShiftRequests: true,
+        canViewDashboardAnalytics: true,
+      },
+      linkedEmployee: {
+        id: "33333333-3333-4333-8333-333333333333",
+        firstName: "Alex",
+        lastName: "North",
+        status: "active",
+        focusAreaIds: [],
+        departmentIds: [9],
+      },
+      absenceTypes: [
+        {
+          id: 1,
+          label: "Sick",
+        },
+      ],
+      focusAreas: [
+        {
+          id: 1,
+          name: "Emergency",
+        },
+      ],
+      unreadNotificationCount: 3,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.linkedEmployee?.departmentIds).toEqual([9]);
   });
 
   it("accepts notification types that mobile already receives pushes for but previously had no schema entry", () => {

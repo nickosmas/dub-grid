@@ -31,6 +31,7 @@ export function OrganizationLockedScreen({
             paddingBottom: getScreenBottomPadding("stack", insets.bottom),
           },
         ]}
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.copy}>
           <Text style={styles.eyebrow}>DubGrid</Text>

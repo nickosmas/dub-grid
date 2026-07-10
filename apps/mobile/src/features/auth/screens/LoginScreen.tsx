@@ -332,6 +332,7 @@ export default function LoginScreen() {
           ]}
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           <View style={styles.column}>
             {stage === "organization" ? (

@@ -91,8 +91,10 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.role).toBe("super_admin");
     expect(body.permissions.orgId).toBe(ORG_ID);
     expect(body.permissions.isSuperAdmin).toBe(true);
-    // Privileged roles are trusted from the JWT; no membership lookup.
-    expect(serviceFrom).not.toHaveBeenCalled();
+    // Permissions are trusted from the JWT; no membership lookup. Self-employment
+    // flags (isOnSchedule/isManagementUser) still require an employees read.
+    expect(serviceFrom).not.toHaveBeenCalledWith("organization_memberships");
+    expect(serviceFrom).toHaveBeenCalledWith("employees");
   });
 
   it("uses the JWT org claim, not the profile default, when they diverge", async () => {
@@ -171,8 +173,21 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.orgId).toBe(ORG_ID);
   });
 
-  it("does not consult employee status for super_admin or gridmaster", async () => {
+  it("does not consult employee status for gridmaster", async () => {
+    extractJwtClaims.mockReturnValue({ effectiveRole: "gridmaster", orgId: ORG_ID });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.permissions.isInactive).toBe(false);
+    // Gridmasters don't have an employees row in the org they're viewing.
+    expect(serviceFrom).not.toHaveBeenCalledWith("employees");
+  });
+
+  it("reports self-employment flags for a management-only super_admin", async () => {
     extractJwtClaims.mockReturnValue({ effectiveRole: "super_admin", orgId: ORG_ID });
+    enqueue("employees", { data: { focus_area_ids: [], department_ids: [9] } });
 
     const response = await request();
 
@@ -180,8 +195,20 @@ describe("GET /api/account/permissions", () => {
     const body = await response.json();
     expect(body.permissions.isInactive).toBe(false);
     expect(body.permissions.canManageEmployees).toBe(true);
-    // No employees table read for privileged roles
-    expect(serviceFrom).not.toHaveBeenCalledWith("employees");
+    expect(body.isOnSchedule).toBe(false);
+    expect(body.isManagementUser).toBe(true);
+  });
+
+  it("reports isOnSchedule for a super_admin who is also scheduled", async () => {
+    extractJwtClaims.mockReturnValue({ effectiveRole: "super_admin", orgId: ORG_ID });
+    enqueue("employees", { data: { focus_area_ids: [5], department_ids: [9] } });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.isOnSchedule).toBe(true);
+    expect(body.isManagementUser).toBe(true);
   });
 
   it("reports isOnSchedule for a scheduled employee", async () => {

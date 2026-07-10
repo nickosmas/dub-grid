@@ -9,7 +9,7 @@ export default function TabsLayoutAndroid() {
     return gate.element;
   }
 
-  const { canViewTeamSchedule } = gate;
+  const { canViewTeamSchedule, canViewRequestsTab, canViewHomeTab } = gate;
 
   return (
     <Tabs
@@ -23,7 +23,13 @@ export default function TabsLayoutAndroid() {
       }}
       tabBar={(props) => <FloatingTabBar {...props} />}
     >
-      <Tabs.Screen name="home" options={{ title: "Home" }} />
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: "Home",
+          href: canViewHomeTab ? "/home" : null,
+        }}
+      />
       <Tabs.Screen
         name="team"
         options={{
@@ -31,7 +37,13 @@ export default function TabsLayoutAndroid() {
           href: canViewTeamSchedule ? "/team" : null,
         }}
       />
-      <Tabs.Screen name="requests" options={{ title: "Requests" }} />
+      <Tabs.Screen
+        name="requests"
+        options={{
+          title: "Requests",
+          href: canViewRequestsTab ? "/requests" : null,
+        }}
+      />
       <Tabs.Screen name="people" options={{ title: "People" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>

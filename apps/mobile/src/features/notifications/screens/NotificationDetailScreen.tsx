@@ -205,7 +205,7 @@ export default function NotificationDetailScreen() {
 
   return (
     <Screen title="Alert">
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.iconFrame}>
             <Ionicons

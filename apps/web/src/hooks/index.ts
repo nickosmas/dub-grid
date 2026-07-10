@@ -7,6 +7,7 @@ export {
 } from "@/features/permissions/client";
 export { getPermissionsFromSession } from "@/features/permissions";
 export type { Permissions } from "@/features/permissions";
+export type { WebPermissions } from "@/features/permissions/client";
 
 export { useRoleChange, generateIdempotencyKey } from "./useRoleChange";
 export type { RoleChangeParams, RoleChangeResult, OrgMember } from "./useRoleChange";

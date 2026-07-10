@@ -87,12 +87,22 @@ export async function GET(req: NextRequest) {
     const { effectiveRole, orgId } = extractJwtClaims(auth.session.access_token);
 
     // Gridmasters always have full access — they don't have an employees row in
-    // the org they're viewing. Super_admins likewise bypass the inactive check
-    // (they're the ones who'd be doing the deactivating, and the people page UI
-    // already prevents deactivating admin/super_admin roles).
-    if (effectiveRole === "gridmaster" || effectiveRole === "super_admin") {
+    // the org they're viewing.
+    if (effectiveRole === "gridmaster") {
       return NextResponse.json({
         permissions: buildPerms(effectiveRole, orgId, false),
+      });
+    }
+
+    // Super_admins bypass the inactive check (they're the ones who'd be doing
+    // the deactivating, and the people page UI already prevents deactivating
+    // admin/super_admin roles) but still need employment flags — a super_admin
+    // can have a management-only employees row, and dashboard widgets like
+    // MyScheduleRow need isOnSchedule/isManagementUser to gate accordingly.
+    if (effectiveRole === "super_admin") {
+      return NextResponse.json({
+        permissions: buildPerms(effectiveRole, orgId, false),
+        ...(await getSelfEmploymentFlags(serviceClient, auth.user.id, orgId)),
       });
     }
 

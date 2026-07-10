@@ -2,6 +2,7 @@ import {
   mobileAuthLoginResponseSchema,
   mobileBootstrapResponseSchema,
   mobileCreateShiftRequestResponseSchema,
+  mobileDashboardResponseSchema,
   mobileMeScheduleResponseSchema,
   mobileNotificationPreferencesResponseSchema,
   mobileProfileChangeRequestActionResponseSchema,
@@ -542,6 +543,15 @@ export function getOrgSchedule(accessToken: string, query?: MobileScheduleRange)
     accessToken,
     { method: "GET" },
     (value) => mobileOrgScheduleResponseSchema.parse(value),
+  );
+}
+
+export function getDashboard(accessToken: string, query?: MobileScheduleRange) {
+  return mobileApiRequest(
+    withQuery("/api/mobile/v1/dashboard", query),
+    accessToken,
+    { method: "GET" },
+    (value) => mobileDashboardResponseSchema.parse(value),
   );
 }
 

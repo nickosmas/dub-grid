@@ -43,4 +43,36 @@ describe("SuperAdminDashboard", () => {
 
     expect(screen.queryByTestId("my-schedule-row")).not.toBeInTheDocument();
   });
+
+  it("hides the schedule card for a management-only super admin", () => {
+    render(
+      <SuperAdminDashboard
+        {...makeProps({
+          permissions: {
+            canManageCoverageRequirements: true,
+            isManagementUser: true,
+            isOnSchedule: false,
+          } as unknown as DashboardContentProps["permissions"],
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId("my-schedule-row")).not.toBeInTheDocument();
+  });
+
+  it("still shows the schedule card for a management super admin who is also scheduled", () => {
+    render(
+      <SuperAdminDashboard
+        {...makeProps({
+          permissions: {
+            canManageCoverageRequirements: true,
+            isManagementUser: true,
+            isOnSchedule: true,
+          } as unknown as DashboardContentProps["permissions"],
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("my-schedule-row")).toBeInTheDocument();
+  });
 });

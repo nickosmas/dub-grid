@@ -53,6 +53,7 @@ export function ConfigurationScreen({
             paddingBottom: getScreenBottomPadding("stack", insets.bottom),
           },
         ]}
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
           <Text style={styles.eyebrow}>DubGrid Mobile Setup</Text>

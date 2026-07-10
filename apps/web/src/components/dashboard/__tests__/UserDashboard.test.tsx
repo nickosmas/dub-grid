@@ -319,7 +319,11 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
       staffScheduled: { delta: 0, prevScheduled: 0, scheduled: 1, total: 2 },
       totalShifts: { delta: 0, prevValue: 0, value: 1 },
     },
-    permissions: buildPerms("user", "org-1", false),
+    permissions: {
+      ...buildPerms("user", "org-1", false),
+      isOnSchedule: true,
+      isManagementUser: false,
+    },
     prevHours: [],
     prevPeriodLabel: "last week",
     publishHistory: null,

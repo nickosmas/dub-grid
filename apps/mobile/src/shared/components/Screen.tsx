@@ -16,7 +16,36 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { mobileColors, mobileRadii, mobileSpacing, mobileText } from "../theme/tokens";
+
+export type CardIconTone = "brand" | "warning" | "danger" | "success";
+
+const CARD_ICON_TONE: Record<
+  CardIconTone,
+  { backgroundColor: string; borderColor: string; iconColor: string }
+> = {
+  brand: {
+    backgroundColor: mobileColors.brandSoft,
+    borderColor: mobileColors.brandBorder,
+    iconColor: mobileColors.brand,
+  },
+  warning: {
+    backgroundColor: mobileColors.warningSoft,
+    borderColor: mobileColors.warningBorder,
+    iconColor: mobileColors.warningText,
+  },
+  danger: {
+    backgroundColor: mobileColors.dangerSoft,
+    borderColor: mobileColors.dangerBorder,
+    iconColor: mobileColors.dangerText,
+  },
+  success: {
+    backgroundColor: mobileColors.successSoft,
+    borderColor: mobileColors.successBorder,
+    iconColor: mobileColors.successText,
+  },
+};
 import {
   DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
   getScreenBottomPadding,
@@ -84,6 +113,8 @@ export function Screen({
         ) : undefined
       }
       scrollEventThrottle={scrollEventThrottle}
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
       style={styles.scrollView}
     >
       <View
@@ -137,15 +168,31 @@ export function Card({
   body,
   detail,
   headerAccessory,
+  icon,
+  iconTone = "brand",
 }: {
   title: string;
   body?: string;
   detail?: ReactNode;
   headerAccessory?: ReactNode;
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconTone?: CardIconTone;
 }) {
+  const tone = CARD_ICON_TONE[iconTone];
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
+        {icon ? (
+          <View
+            style={[
+              styles.cardIconFrame,
+              { backgroundColor: tone.backgroundColor, borderColor: tone.borderColor },
+            ]}
+          >
+            <Ionicons color={tone.iconColor} name={icon} size={16} />
+          </View>
+        ) : null}
         <View style={styles.cardHeaderCopy}>
           <Text style={styles.cardTitle}>{title}</Text>
         </View>
@@ -223,6 +270,14 @@ const styles = StyleSheet.create({
   },
   cardHeaderAccessory: {
     alignSelf: "flex-start",
+  },
+  cardIconFrame: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cardTitle: {
     ...mobileText.sectionTitle,

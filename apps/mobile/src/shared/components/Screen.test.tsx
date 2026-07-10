@@ -149,9 +149,12 @@ vi.mock("react-native-safe-area-context", async () => {
 });
 
 let Screen: (typeof import("./Screen"))["Screen"];
+let Card: (typeof import("./Screen"))["Card"];
 
 beforeAll(async () => {
-  Screen = (await import("./Screen")).Screen;
+  const screenModule = await import("./Screen");
+  Screen = screenModule.Screen;
+  Card = screenModule.Card;
 });
 
 describe("Screen", () => {
@@ -226,5 +229,29 @@ describe("Screen", () => {
     );
 
     expect(screen.getByText("Overlay 100")).toBeInTheDocument();
+  });
+});
+
+describe("Card", () => {
+  it("renders without an icon by default", () => {
+    render(<Card title="Plain card" body="Some body text" />);
+
+    expect(screen.getByText("Plain card")).toBeInTheDocument();
+    expect(screen.getByText("Some body text")).toBeInTheDocument();
+  });
+
+  it("renders a leading icon chip when an icon is provided", () => {
+    const { container } = render(
+      <Card title="With icon" icon="alert-circle-outline" iconTone="warning" />,
+    );
+
+    expect(screen.getByText("With icon")).toBeInTheDocument();
+    expect(container.querySelector('[data-icon-name="alert-circle-outline"]')).toBeTruthy();
+  });
+
+  it("renders header accessory content", () => {
+    render(<Card title="With accessory" headerAccessory={<span>Badge</span>} />);
+
+    expect(screen.getByText("Badge")).toBeInTheDocument();
   });
 });

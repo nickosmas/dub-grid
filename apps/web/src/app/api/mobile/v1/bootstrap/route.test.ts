@@ -99,6 +99,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
       lastName: "Diaz",
       status: "active",
       focusAreaIds: [2],
+      departmentIds: [5],
     });
     fetchMobileAbsenceTypes.mockResolvedValue([
       {
@@ -180,6 +181,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
       linkedEmployee: {
         id: "d660d308-4e0d-4daf-84fd-6753405e6740",
         focusAreaIds: [2],
+        departmentIds: [5],
       },
       absenceTypes: [
         {

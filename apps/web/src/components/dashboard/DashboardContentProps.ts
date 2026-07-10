@@ -1,4 +1,4 @@
-import type { Permissions } from "@/hooks";
+import type { WebPermissions } from "@/hooks";
 import type { ShiftRequestsData } from "@/hooks/useShiftRequests";
 import type {
   Organization,
@@ -37,7 +37,7 @@ export interface DashboardContentProps {
   activeEmployees: Employee[];
 
   // Permissions
-  permissions: Permissions;
+  permissions: WebPermissions;
 
   // Period
   viewMode: ViewMode;

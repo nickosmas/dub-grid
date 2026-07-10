@@ -82,6 +82,33 @@ describe("MyScheduleRow", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it("renders nothing for a management-only viewer, even with real shift data", () => {
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+    };
+
+    const { container } = render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+        isManagementOnly
+      />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("shows the empty state when the employee has nothing scheduled all period", () => {
     render(
       <MyScheduleRow

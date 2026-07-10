@@ -30,7 +30,12 @@ type MyScheduleRowProps = Pick<
   | "absenceTypeById"
   | "periodDates"
   | "periodLabel"
->;
+> & {
+  // True for a management-only viewer (management department access, no
+  // scheduled focus area) — they're never actually scheduled, so this card
+  // should stay hidden even though they have an employees row.
+  isManagementOnly?: boolean;
+};
 
 type MyScheduleShift = {
   label: string;
@@ -376,6 +381,7 @@ export default function MyScheduleRow({
   absenceTypeById,
   periodDates,
   periodLabel,
+  isManagementOnly = false,
 }: MyScheduleRowProps) {
   const days = useMemo(
     () =>
@@ -395,7 +401,7 @@ export default function MyScheduleRow({
     days.length,
   );
 
-  if (!currentEmpId) return null;
+  if (!currentEmpId || isManagementOnly) return null;
 
   return (
     <div className="dg-card" data-testid="my-schedule-row">

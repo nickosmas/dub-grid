@@ -137,6 +137,7 @@ export const mobileLinkedEmployeeSchema = z
     lastName: z.string(),
     status: z.enum(["active", "inactive", "removed"]),
     focusAreaIds: z.array(z.number().int()).default([]),
+    departmentIds: z.array(z.number().int()).default([]),
   })
   .nullable();
 
@@ -148,7 +149,6 @@ export const mobileProfileLinkedEmployeeSchema = mobileLinkedEmployeeSchema
     email: z.string().default(""),
     certificationId: z.number().int().nullable().default(null),
     roleIds: z.array(z.number().int()).default([]),
-    departmentIds: z.array(z.number().int()).default([]),
     contactNotes: z.string().default(""),
     version: z.number().int().nonnegative().default(0),
   })
@@ -524,6 +524,65 @@ export const mobileShiftRequestsResponseSchema = z.object({
   openShifts: z.array(mobileOpenShiftSchema).default([]),
 });
 
+// ── Admin/super_admin dashboard (mobile home view) ──────────────────────────
+// Deliberately leaner than web's SuperAdminDashboard/AdminDashboard: coverage
+// is summarized as open-slot counts per section rather than a full
+// required-vs-filled daily grid, and activity is publish events only (no
+// shift-request/invitation events yet). See dashboard-stats.ts on web for the
+// full reference implementation this is a scoped-down mobile port of.
+
+export const mobileDashboardCoverageSectionSchema = z.object({
+  focusAreaId: z.number().int(),
+  focusAreaName: z.string(),
+  openSlots: z.number().int(),
+});
+
+export const mobileDashboardActivityItemSchema = z.object({
+  id: z.string(),
+  description: z.string(),
+  timestamp: z.string(),
+});
+
+export const mobileDashboardStaffHoursEntrySchema = z.object({
+  employeeId: z.string().uuid(),
+  employeeName: z.string(),
+  totalHours: z.number(),
+  overtimeHours: z.number(),
+});
+
+// Simplified port of web's DashboardHero: a headline/description summary plus
+// a handful of top-line metrics. Coverage % is derived from coverage_requirements
+// vs. open-shift gaps (day-of-week matched, no coverage-rule-config credit
+// resolution) — a reasonable approximation, not the exact engine computation
+// web's schedule-logic.ts uses. There is no "draft shifts" metric yet: that
+// needs draft-vs-published schedule diffing, which mobile doesn't fetch.
+export const mobileDashboardHeroSummarySchema = z.object({
+  statusLabel: z.string(),
+  title: z.string(),
+  description: z.string(),
+});
+
+export const mobileDashboardMetricsSchema = z.object({
+  coveragePct: z.number().int().nullable(),
+  openGapCount: z.number().int(),
+  pendingApprovalsCount: z.number().int(),
+});
+
+export const mobileDashboardResponseSchema = z.object({
+  range: z.object({
+    startDate: z.string().date(),
+    endDate: z.string().date(),
+  }),
+  overtimeThresholdHours: z.number().int().positive(),
+  heroSummary: mobileDashboardHeroSummarySchema,
+  metrics: mobileDashboardMetricsSchema,
+  coverageBySection: z.array(mobileDashboardCoverageSectionSchema),
+  openShifts: z.array(mobileOpenShiftSchema),
+  activity: z.array(mobileDashboardActivityItemSchema),
+  staffHours: z.array(mobileDashboardStaffHoursEntrySchema),
+  actionQueue: z.array(mobileShiftRequestSchema),
+});
+
 export const mobileCreateShiftRequestBodySchema = z
   .object({
     type: mobileShiftRequestTypeSchema,
@@ -860,6 +919,7 @@ export type MobileScheduleEntrySegment = z.infer<typeof mobileScheduleEntrySegme
 export type MobileScheduleEntry = z.infer<typeof mobileScheduleEntrySchema>;
 export type MobileShiftRequest = z.infer<typeof mobileShiftRequestSchema>;
 export type MobileOpenShift = z.infer<typeof mobileOpenShiftSchema>;
+export type MobileDashboardResponse = z.infer<typeof mobileDashboardResponseSchema>;
 export type MobileNotification = z.infer<typeof mobileNotificationSchema>;
 export type MobileNotificationPriority = z.infer<typeof mobileNotificationPrioritySchema>;
 export type MobileNotificationsQuery = z.infer<typeof mobileNotificationsQuerySchema>;

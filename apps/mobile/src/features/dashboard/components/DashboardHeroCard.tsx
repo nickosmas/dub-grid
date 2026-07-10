@@ -1,0 +1,226 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { MobileDashboardResponse } from "@dubgrid/contracts";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import type { CardIconTone } from "../../../shared/components/Screen";
+
+const TONE_STYLES: Record<CardIconTone, { backgroundColor: string; borderColor: string; iconColor: string }> = {
+  brand: {
+    backgroundColor: mobileColors.brandSoft,
+    borderColor: mobileColors.brandBorder,
+    iconColor: mobileColors.brand,
+  },
+  warning: {
+    backgroundColor: mobileColors.warningSoft,
+    borderColor: mobileColors.warningBorder,
+    iconColor: mobileColors.warningText,
+  },
+  danger: {
+    backgroundColor: mobileColors.dangerSoft,
+    borderColor: mobileColors.dangerBorder,
+    iconColor: mobileColors.dangerText,
+  },
+  success: {
+    backgroundColor: mobileColors.successSoft,
+    borderColor: mobileColors.successBorder,
+    iconColor: mobileColors.successText,
+  },
+};
+
+function MetricTile({
+  label,
+  value,
+  detail,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  tone: CardIconTone;
+}) {
+  const toneStyle = TONE_STYLES[tone];
+
+  return (
+    <View style={styles.tile}>
+      <View style={styles.tileHeader}>
+        <Text style={styles.tileLabel}>{label}</Text>
+        <View
+          style={[
+            styles.tileIconFrame,
+            { backgroundColor: toneStyle.backgroundColor, borderColor: toneStyle.borderColor },
+          ]}
+        >
+          <Ionicons name={icon} size={16} color={toneStyle.iconColor} />
+        </View>
+      </View>
+      <Text style={styles.tileValue}>{value}</Text>
+      <Text style={styles.tileDetail}>{detail}</Text>
+    </View>
+  );
+}
+
+const STATUS_TONE: Record<string, CardIconTone> = {
+  Attention: "danger",
+  Approval: "warning",
+  Setup: "warning",
+  Healthy: "success",
+};
+
+export function DashboardHeroCard({
+  summary,
+  metrics,
+}: {
+  summary: MobileDashboardResponse["heroSummary"];
+  metrics: MobileDashboardResponse["metrics"];
+}) {
+  const tone = STATUS_TONE[summary.statusLabel] ?? "brand";
+  const toneStyle = TONE_STYLES[tone];
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.headerRow}>
+        <View style={styles.headerCopy}>
+          <View style={[styles.statusPill, { backgroundColor: toneStyle.backgroundColor, borderColor: toneStyle.borderColor }]}>
+            <Text style={[styles.statusPillLabel, { color: toneStyle.iconColor }]}>{summary.statusLabel}</Text>
+          </View>
+          <Text style={styles.title}>{summary.title}</Text>
+          <Text style={styles.description}>{summary.description}</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          style={styles.actionButton}
+          onPress={() => router.push("/(tabs)/team")}
+        >
+          <Text style={styles.actionButtonLabel}>Review schedule</Text>
+        </Pressable>
+      </View>
+      <View style={styles.tileRow}>
+        <MetricTile
+          label="Coverage"
+          value={metrics.coveragePct != null ? `${metrics.coveragePct}%` : "—"}
+          detail={metrics.coveragePct != null ? "Current staffing coverage" : "Not configured"}
+          icon="shield-checkmark-outline"
+          tone="brand"
+        />
+        <MetricTile
+          label="Open gaps"
+          value={String(metrics.openGapCount)}
+          detail="Staffing gaps this period"
+          icon="alert-circle-outline"
+          tone={metrics.openGapCount > 0 ? "danger" : "success"}
+        />
+        <MetricTile
+          label="Pending approvals"
+          value={String(metrics.pendingApprovalsCount)}
+          detail="Requests waiting for review"
+          icon="checkmark-done-outline"
+          tone={metrics.pendingApprovalsCount > 0 ? "warning" : "success"}
+        />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: mobileColors.surface,
+    borderRadius: mobileRadii.card,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    padding: 18,
+    gap: 16,
+    shadowColor: mobileColors.shadowStrong,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 1,
+    shadowRadius: 20,
+    elevation: 2,
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  headerCopy: {
+    flexShrink: 1,
+    gap: 6,
+  },
+  statusPill: {
+    alignSelf: "flex-start",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  statusPillLabel: {
+    ...mobileText.badge,
+  },
+  title: {
+    ...mobileText.sectionTitle,
+    color: mobileColors.textPrimary,
+  },
+  description: {
+    ...mobileText.body,
+    color: mobileColors.textMuted,
+  },
+  actionButton: {
+    backgroundColor: mobileColors.brand,
+    borderRadius: mobileRadii.control,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  actionButtonLabel: {
+    ...mobileText.bodyStrong,
+    color: mobileColors.textInverse,
+  },
+  tileRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  tile: {
+    flexGrow: 1,
+    flexBasis: "30%",
+    minWidth: 0,
+    overflow: "hidden",
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderRadius: mobileRadii.control,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    padding: 12,
+    gap: 6,
+  },
+  tileHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 6,
+  },
+  tileLabel: {
+    ...mobileText.caption,
+    color: mobileColors.textMuted,
+    flex: 1,
+    flexShrink: 1,
+    flexWrap: "wrap",
+  },
+  tileIconFrame: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  tileValue: {
+    ...mobileText.heroMetric,
+    color: mobileColors.textPrimary,
+  },
+  tileDetail: {
+    ...mobileText.caption,
+    color: mobileColors.textMuted,
+  },
+});
