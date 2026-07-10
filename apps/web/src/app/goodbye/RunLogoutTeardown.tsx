@@ -27,8 +27,9 @@ interface RunLogoutTeardownProps {
   scope: LogoutScope | null;
   /**
    * Why the sign-out happened, from `?reason=` on the URL. When "inactivity",
-   * this page surfaces a persistent explanatory toast (dismissed only by the
-   * user, via AppToaster's global close button).
+   * this page surfaces a persistent explanatory toast that stays up until the
+   * user dismisses it, clicks "Sign back in", or navigates elsewhere (any of
+   * which unmounts this component and clears the toast).
    */
   reason?: "inactivity" | null;
 }
@@ -58,11 +59,15 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
   const [done, setDone] = useState(scope === null);
 
   useEffect(() => {
-    if (reason === "inactivity") {
-      toast.info("You were signed out after 30 minutes of inactivity.", {
-        duration: Infinity,
-      });
-    }
+    if (reason !== "inactivity") return;
+    const id = toast.info("You were signed out after 30 minutes of inactivity.", {
+      duration: Infinity,
+    });
+    // Clear it the moment the user leaves /goodbye — clicking "Sign back in"
+    // or navigating anywhere else unmounts this component.
+    return () => {
+      toast.dismiss(id);
+    };
   }, [reason]);
 
   useEffect(() => {
