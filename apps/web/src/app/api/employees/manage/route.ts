@@ -27,6 +27,10 @@ import {
   staffNameSchema,
   staffNotesSchema,
 } from "@dubgrid/contracts";
+import {
+  fetchMobileManagementMembershipRowsByUserIds,
+  fetchMobilePendingInvitationRowByEmployeeId,
+} from "@dubgrid/data-access";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 
 export const dynamic = "force-dynamic";
@@ -135,6 +139,39 @@ function isEmployeeDetailViewer(permissions: {
     permissions.canViewEmployeeDetails ||
     permissions.canManageEmployees
   );
+}
+
+// Management users appear in everyone's directory, but their profile data is
+// reserved for staff managers (mirrors the mobile person endpoint and the
+// Members/Management list gate).
+function canViewManagementProfiles(permissions: {
+  isGridmaster: boolean;
+  isSuperAdmin: boolean;
+  canManageEmployees: boolean;
+}): boolean {
+  return permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageEmployees;
+}
+
+async function isManagementEmployee(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  employee: Pick<Employee, "id" | "userId">,
+): Promise<boolean> {
+  if (employee.userId) {
+    const memberships = await fetchMobileManagementMembershipRowsByUserIds(serviceClient, orgId, [
+      employee.userId,
+    ]);
+    if (memberships.some((membership) => membership.department_ids.length > 0)) {
+      return true;
+    }
+  }
+
+  const pendingInvitation = await fetchMobilePendingInvitationRowByEmployeeId(
+    serviceClient,
+    orgId,
+    employee.id,
+  );
+  return (pendingInvitation?.department_ids ?? []).length > 0;
 }
 
 function maskEmployeeForViewer(employee: Employee, callerUserId: string): Employee {
@@ -508,6 +545,15 @@ export async function POST(req: NextRequest) {
 
         const employee = await fetchLatestEmployee(auth.serviceClient, data.orgId, data.employeeId);
 
+        if (
+          employee &&
+          employee.userId !== auth.actor.id &&
+          !canViewManagementProfiles(auth.permissions) &&
+          (await isManagementEmployee(auth.serviceClient, data.orgId, employee))
+        ) {
+          return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+        }
+
         if (!isEmployeeDetailViewer(auth.permissions)) {
           // Mirror the mobile person endpoint: view-only callers only see
           // active staff, with sensitive fields stripped.
@@ -547,9 +593,18 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        return NextResponse.json({
-          employee: row ? rowToEmployee(row as DbEmployee) : null,
-        });
+        const employee = row ? rowToEmployee(row as DbEmployee) : null;
+
+        if (
+          employee &&
+          auth.actor.id !== data.userId &&
+          !canViewManagementProfiles(auth.permissions) &&
+          (await isManagementEmployee(auth.serviceClient, data.orgId, employee))
+        ) {
+          return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+        }
+
+        return NextResponse.json({ employee });
       }
 
       case "fetchEmployeeShifts": {

@@ -78,6 +78,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
     () => currentHours.filter((entry) => entry.isOvertime),
     [currentHours],
   );
+  const isManagementOnly = Boolean(permissions.isManagementUser) && !permissions.isOnSchedule;
 
   return (
     <>
@@ -90,6 +91,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
         absenceTypeById={absenceTypeById}
         periodDates={periodDates}
         periodLabel={periodLabel}
+        isManagementOnly={isManagementOnly}
       />
 
       <div
@@ -136,6 +138,7 @@ export default function AdminDashboard(props: DashboardContentProps) {
           employeeHours={overtimeHours}
           employees={activeEmployees}
           focusAreas={focusAreas}
+          canNavigateToDetailsPage={permissions.canManageEmployees}
           maxVisible={5}
           heading="Overtime watch"
           subtitle={`Staff over ${overtimeThreshold}h ${periodLabel}`}

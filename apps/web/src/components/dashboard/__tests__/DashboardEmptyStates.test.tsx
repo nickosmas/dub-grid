@@ -59,6 +59,7 @@ describe("dashboard empty states", () => {
         employeeHours={[]}
         employees={employees}
         focusAreas={focusAreas}
+        canNavigateToDetailsPage
         emptyMessage="No overtime alerts this period"
       />,
     );

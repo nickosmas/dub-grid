@@ -22,10 +22,16 @@ vi.mock("@/lib/db/mappers", () => ({
   rowToEmployee,
 }));
 
+const VIEWER_USER_ID = "3f1c5b7e-90ab-4c3d-8e2f-6a5b4c3d2e1f";
+const PERSON_USER_ID = "8af6f242-c060-4920-a7db-91b4cb66fd26";
+
 function makeAuth(overrides?: { canManageEmployees?: boolean; canViewStaff?: boolean }) {
   return {
     currentOrg: {
       id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+    },
+    user: {
+      id: VIEWER_USER_ID,
     },
     permissions: {
       canManageEmployees: overrides?.canManageEmployees ?? true,
@@ -33,6 +39,17 @@ function makeAuth(overrides?: { canManageEmployees?: boolean; canViewStaff?: boo
     },
     serviceClient: {},
   };
+}
+
+function mockManagementMemberships(rows: Array<{ user_id: string; department_ids: number[] }>) {
+  fetchMobileManagementMembershipRowsByUserIds.mockImplementation(
+    (_client: unknown, _orgId: string, userIds: string[]) =>
+      Promise.resolve(
+        rows
+          .filter((row) => userIds.includes(row.user_id))
+          .map((row) => ({ ...row, dept_admin_ids: row.department_ids })),
+      ),
+  );
 }
 
 function makeEmployee(overrides: Record<string, unknown> = {}) {
@@ -54,7 +71,7 @@ function makeEmployee(overrides: Record<string, unknown> = {}) {
     contactNotes: "Weekend availability",
     statusChangedAt: "2026-04-24T12:00:00.000Z",
     statusNote: "Coverage hold",
-    userId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+    userId: PERSON_USER_ID,
     version: 7,
     ...overrides,
   };
@@ -65,16 +82,10 @@ describe("mobile person route", () => {
     vi.clearAllMocks();
     fetchMobileEmployeeRowById.mockResolvedValue({
       id: "row-1",
-      user_id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      user_id: PERSON_USER_ID,
     });
     rowToEmployee.mockReturnValue(makeEmployee());
-    fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([
-      {
-        user_id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
-        department_ids: [8],
-        dept_admin_ids: [8],
-      },
-    ]);
+    mockManagementMemberships([{ user_id: PERSON_USER_ID, department_ids: [8] }]);
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(null);
   });
 
@@ -141,10 +152,34 @@ describe("mobile person route", () => {
     });
   });
 
+  it("rejects management profiles for viewers without manage rights", async () => {
+    requireMobileAuth.mockResolvedValue(
+      makeAuth({ canManageEmployees: false, canViewStaff: true }),
+    );
+
+    const { GET } = await import("./person");
+    const response = await GET(
+      new Request(
+        "http://localhost/api/mobile/v1/people/d660d308-4e0d-4daf-84fd-6753405e6740",
+      ) as never,
+      {
+        params: Promise.resolve({
+          id: "d660d308-4e0d-4daf-84fd-6753405e6740",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: "You don't have permission to view that staff profile.",
+    });
+  });
+
   it("sanitizes the person payload for regular users", async () => {
     requireMobileAuth.mockResolvedValue(
       makeAuth({ canManageEmployees: false, canViewStaff: true }),
     );
+    mockManagementMemberships([]);
     fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue({
       id: "11111111-1111-4111-8111-111111111111",
       email: "mina@dubgrid.com",
@@ -179,4 +214,5 @@ describe("mobile person route", () => {
       userId: null,
     });
   });
+
 });

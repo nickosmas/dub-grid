@@ -24,6 +24,7 @@ import {
   fetchEmployeeShifts,
   updateEmployee,
   removeEmployee,
+  EmployeeAccessDeniedError,
   EmployeeContactConflictError,
   EmployeeStatusConflictError,
   OptimisticLockError,
@@ -187,6 +188,13 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         }
       } catch (err: unknown) {
         if (!cancelled) {
+          if (err instanceof EmployeeAccessDeniedError) {
+            // Same treatment as the canViewEmployeeDetails gate above:
+            // there's nothing to show here, so bounce back to People.
+            toast.info("You don't have access to that profile.");
+            router.replace("/people");
+            return;
+          }
           setError(formatClientErrorMessage(err, "We couldn't load this employee right now."));
         }
       } finally {
@@ -207,6 +215,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     perms.canViewRecurringShifts,
     perms.isGridmaster,
     perms.isLoading,
+    router,
   ]);
 
   useEffect(() => {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { getEmployeeProfileHref } from "@/lib/profile-links";
+import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import { useQueryClient } from "@tanstack/react-query";
 import { Import as ImportIcon, SlidersHorizontal, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -1592,13 +1592,15 @@ export function MembersSection({
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   {/* Match the on-schedule roster: the name
-                                      links to the full profile page when an
-                                      employees row exists. Without an
-                                      employeeId (rare legacy data), fall back
-                                      to plain text. Stop row-click propagation
-                                      so the link doesn't also toggle the
-                                      expanded popover. */}
-                                  {person.employeeId ? (
+                                      links to the full profile page only for
+                                      staff managers (the /people/[id] page is
+                                      manager-only for management users); the
+                                      self link just goes to /profile. Stop
+                                      row-click propagation so the link doesn't
+                                      also toggle the expanded popover. */}
+                                  {person.employeeId &&
+                                  (canManageEmployees ||
+                                    isCurrentUsersEmployee(person.userId, currentUserId)) ? (
                                     <Link
                                       href={getEmployeeProfileHref(
                                         person.employeeId,

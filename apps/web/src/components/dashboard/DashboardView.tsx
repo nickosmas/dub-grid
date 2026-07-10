@@ -7,7 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useShiftRequests, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 
-import type { Permissions } from "@/hooks";
+import type { Permissions, WebPermissions } from "@/hooks";
 import type {
   Organization,
   FocusArea,
@@ -106,7 +106,7 @@ interface DashboardViewProps {
   orgRoles: NamedItem[];
   departments: Department[];
   employees: Employee[];
-  permissions: Permissions;
+  permissions: WebPermissions;
 }
 
 export function hasDashboardAdminCapability(permissions: Pick<Permissions, "level">): boolean {
@@ -1125,6 +1125,7 @@ export default function DashboardView({
             prevHours={prevHours}
             employees={activeEmployees}
             focusAreas={focusAreas}
+            canNavigateToDetailsPage={permissions.canManageEmployees}
             otThreshold={overtimeThreshold}
             onClose={closeExpanded}
           />

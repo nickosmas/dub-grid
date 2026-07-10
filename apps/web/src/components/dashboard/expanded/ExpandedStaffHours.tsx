@@ -14,6 +14,9 @@ interface ExpandedStaffHoursProps {
   prevHours: EmployeeHours[];
   employees: Employee[];
   focusAreas: FocusArea[];
+  /** Whether rows link to the full /people/[id] details page. Mirrors the
+   * People table: only staff managers can navigate. */
+  canNavigateToDetailsPage: boolean;
   otThreshold?: number;
   onClose: () => void;
 }
@@ -23,6 +26,7 @@ export default function ExpandedStaffHours({
   prevHours,
   employees,
   focusAreas,
+  canNavigateToDetailsPage,
   otThreshold = 40,
   onClose,
 }: ExpandedStaffHoursProps) {
@@ -148,16 +152,7 @@ export default function ExpandedStaffHours({
               const prev = prevMap.get(h.empId);
               const delta = prev ? h.totalHours - prev.totalHours : 0;
 
-              return (
-                <Link
-                  key={h.empId}
-                  href={`/people/${emp.id}`}
-                  style={{
-                    display: "block",
-                    textDecoration: "none",
-                    color: "inherit",
-                  }}
-                >
+              const row = (
                   <div
                     style={{
                       display: "flex",
@@ -242,7 +237,22 @@ export default function ExpandedStaffHours({
                       </div>
                     </div>
                   </div>
+              );
+
+              return canNavigateToDetailsPage ? (
+                <Link
+                  key={h.empId}
+                  href={`/people/${emp.id}`}
+                  style={{
+                    display: "block",
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
+                >
+                  {row}
                 </Link>
+              ) : (
+                <div key={h.empId}>{row}</div>
               );
             })
           )}

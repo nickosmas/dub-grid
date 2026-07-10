@@ -433,6 +433,15 @@ export default function PeopleScreen() {
                 : person.userId
                   ? "App access"
                   : "No app access";
+              const isSelf =
+                (currentEmployeeId !== null && person.id === currentEmployeeId) ||
+                (currentUserId !== null &&
+                  person.userId !== null &&
+                  person.userId === currentUserId);
+              // Management users' profile view is manager-only; their rows stay
+              // visible but don't navigate for everyone else.
+              const navigable =
+                isSelf || canManageEmployees || !person.managementDepartmentIds?.length;
 
               return (
                 <PersonRow
@@ -442,13 +451,9 @@ export default function PeopleScreen() {
                   employmentType={person.employmentType}
                   isLast={index === filteredPeople.length - 1}
                   name={getFullName(person)}
+                  navigable={navigable}
                   orgRole={person.orgRole}
                   onPress={() => {
-                    const isSelf =
-                      (currentEmployeeId !== null && person.id === currentEmployeeId) ||
-                      (currentUserId !== null &&
-                        person.userId !== null &&
-                        person.userId === currentUserId);
                     if (isSelf) {
                       router.push("/(tabs)/profile");
                       return;
@@ -550,6 +555,7 @@ function PersonRow({
   id,
   employmentType,
   name,
+  navigable,
   orgRole,
   subtitle,
   status,
@@ -561,6 +567,7 @@ function PersonRow({
   id: string;
   employmentType: MobilePerson["employmentType"];
   name: string;
+  navigable: boolean;
   orgRole: MobileOrgRole;
   subtitle: string;
   status: MobilePerson["status"];
@@ -590,12 +597,14 @@ function PersonRow({
     <Pressable
       accessibilityLabel={name}
       accessibilityRole="button"
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+      accessibilityState={{ disabled: !navigable }}
+      android_ripple={navigable ? { color: "rgba(15, 23, 42, 0.08)" } : undefined}
+      disabled={!navigable}
       onPress={onPress}
       style={({ pressed }) => [
         styles.personRow,
         !isLast && styles.personRowDivider,
-        pressed && styles.personRowPressed,
+        navigable && pressed && styles.personRowPressed,
       ]}
     >
       <View
@@ -629,7 +638,9 @@ function PersonRow({
           </Text>
         ) : null}
       </View>
-      <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+      {navigable ? (
+        <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+      ) : null}
     </Pressable>
   );
 }

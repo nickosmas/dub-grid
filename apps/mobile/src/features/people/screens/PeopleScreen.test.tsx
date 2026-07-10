@@ -406,6 +406,89 @@ describe("PeopleScreen", () => {
     expect(screen.queryByText("No app access")).not.toBeInTheDocument();
   });
 
+  it("shows management users to regular users without opening their profile", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+        permissions: {
+          canManageEmployees: false,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          {
+            id: "emp-1",
+            firstName: "Mina",
+            lastName: "Diaz",
+            phone: "555-0100",
+            email: "mina@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [2],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            managementDepartmentIds: [],
+            managementDeptAdminIds: [],
+            seniority: 1,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 7,
+          },
+          {
+            id: "emp-2",
+            firstName: "Ava",
+            lastName: "Cole",
+            orgRole: "admin",
+            phone: "555-0102",
+            email: "ava@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            managementDepartmentIds: [10],
+            managementDeptAdminIds: [],
+            seniority: 2,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 3,
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    expect(screen.getByText("Ava Cole")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Ava Cole"));
+    expect(routerPush).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("Mina Diaz"));
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/people/[id]",
+      params: { id: "emp-1" },
+    });
+  });
+
   it("filters the directory by focus area from the filter button", () => {
     useQuery.mockReturnValue({
       data: {

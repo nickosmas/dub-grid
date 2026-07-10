@@ -33,6 +33,9 @@ export async function GET(req: NextRequest) {
     // permission matrix; redact it for everyone else even though the directory
     // itself is visible to canViewStaff.
     const canSeePermissions = orgAuth.permissions.isSuperAdmin || orgAuth.permissions.isGridmaster;
+    // Sign-in activity is admin telemetry: staff managers see it, view-only
+    // directory callers don't.
+    const canSeeActivity = canSeePermissions || orgAuth.permissions.canManageEmployees;
     const { data, error } = await serviceClient.rpc("get_org_directory", {
       // Use the auth-effective orgId — when the caller is in sandbox
       // mode, this is the sandbox id, not the body's real-org id.
@@ -84,7 +87,7 @@ export async function GET(req: NextRequest) {
         certificationId: (row.certification_id as number | null) ?? null,
         roleIds: (row.role_ids as number[]) ?? [],
         seniority: (row.seniority as number | null) ?? null,
-        lastSignInAt: (row.last_sign_in_at as string | null) ?? null,
+        lastSignInAt: canSeeActivity ? ((row.last_sign_in_at as string | null) ?? null) : null,
         invitationStatus: (row.invitation_status as "pending" | "expired" | null) ?? null,
         scheduledDepartmentIds,
         scheduledDeptAdminIds,

@@ -14,7 +14,7 @@ import {
 import { isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
-import { getEmployeeProfileHref } from "@/lib/profile-links";
+import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import InlineEditEmployee, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
@@ -128,6 +128,10 @@ export function StaffDetailPanel({
   );
   const showAccountAccessActions = showInviteActions || showManagementAccessAction;
   const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
+  // Only staff managers can open the full /people/[id] page (mirrors the
+  // table's name-link gate); the self link just goes to /profile.
+  const showProfileLink =
+    canManageEmployees || isCurrentUsersEmployee(employee.userId, currentUser?.id ?? null);
 
   const closePanel = useCallback(() => {
     setClosing(true);
@@ -288,44 +292,46 @@ export function StaffDetailPanel({
                   </span>
                 )}
               </div>
-              <Link
-                href={profileHref}
-                onClick={(event) => {
-                  // Close the panel as part of this click instead of
-                  // leaving it for the route swap to yank away — same
-                  // unsaved-changes guard as the X button/Escape.
-                  if (hasUnsavedChanges) {
-                    event.preventDefault();
-                    handleRequestClose();
-                    return;
-                  }
-                  closePanel();
-                }}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  marginTop: 4,
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 600,
-                  color: "var(--color-link)",
-                  textDecoration: "none",
-                }}
-              >
-                View full profile
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              {showProfileLink && (
+                <Link
+                  href={profileHref}
+                  onClick={(event) => {
+                    // Close the panel as part of this click instead of
+                    // leaving it for the route swap to yank away — same
+                    // unsaved-changes guard as the X button/Escape.
+                    if (hasUnsavedChanges) {
+                      event.preventDefault();
+                      handleRequestClose();
+                      return;
+                    }
+                    closePanel();
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    marginTop: 4,
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    color: "var(--color-link)",
+                    textDecoration: "none",
+                  }}
                 >
-                  <polyline points="9 6 15 12 9 18" />
-                </svg>
-              </Link>
+                  View full profile
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="9 6 15 12 9 18" />
+                  </svg>
+                </Link>
+              )}
             </div>
           </div>
         </div>

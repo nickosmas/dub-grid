@@ -98,6 +98,15 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       return NextResponse.json({ error: "Employee not found" }, { status: 404 });
     }
 
+    // Management users appear in everyone's directory, but their profile
+    // view stays manager-only.
+    if (person.managementDepartmentIds.length > 0) {
+      return NextResponse.json(
+        { error: "You don't have permission to view that staff profile." },
+        { status: 403 },
+      );
+    }
+
     return NextResponse.json(
       mobilePersonResponseSchema.parse({
         person: {

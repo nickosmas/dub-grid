@@ -218,6 +218,10 @@ export function ManagementStaffPanel({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleRequestClose]);
   const isPending = person.invitationStatus !== null && !person.hasAppAccess;
+  // Sign-in activity is admin telemetry: staff managers and access managers
+  // see it, view-only members don't (the directory API redacts it for them
+  // anyway; hiding the block avoids a misleading "Never signed in").
+  const showLastActive = canManageManagementAccess || canManageScheduleEmployees;
   // `isEmployee` here means "this person already shows up on the schedule
   // grid and edits their identity from the on-schedule profile." It's NOT
   // "has an employees row" — every org member has one of those now (Flow B
@@ -230,10 +234,14 @@ export function ManagementStaffPanel({
   const isExpired = person.invitationStatus === "expired";
   // Every org member gets an `employees` row now (Flow B + seed backfill), so
   // this is null only for the rare pending invite that hasn't backfilled yet.
+  // Only staff managers can open the full /people/[id] page (mirrors the
+  // People table's name-link gate); the self link just goes to /profile.
   const profileHref = person.employeeId
     ? isSelf
       ? "/profile"
-      : `/people/${person.employeeId}`
+      : canManageScheduleEmployees
+        ? `/people/${person.employeeId}`
+        : null
     : null;
   const fieldErrors = useMemo(
     () => ({
@@ -1031,7 +1039,7 @@ export function ManagementStaffPanel({
               {/* Details section */}
               {(person.orgRole ||
                 personDepts.length > 0 ||
-                (!isPending && person.lastSignInAt !== null)) && (
+                (showLastActive && !isPending && person.lastSignInAt !== null)) && (
                 <div>
                   <div
                     style={{
@@ -1117,7 +1125,7 @@ export function ManagementStaffPanel({
                       </div>
                     )}
 
-                    {!isPending && (
+                    {showLastActive && !isPending && (
                       <div>
                         <div
                           style={{

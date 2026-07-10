@@ -9,6 +9,9 @@ interface StaffHoursCardProps {
   employeeHours: EmployeeHours[];
   employees: Employee[];
   focusAreas: FocusArea[];
+  /** Whether names link to the full /people/[id] details page. Mirrors the
+   * People table: only staff managers can navigate. */
+  canNavigateToDetailsPage: boolean;
   otThreshold?: number;
   maxVisible?: number;
   heading?: string;
@@ -21,6 +24,7 @@ export default function StaffHoursCard({
   employeeHours,
   employees,
   focusAreas,
+  canNavigateToDetailsPage,
   otThreshold = 40,
   maxVisible = 5,
   heading = "Staff hours",
@@ -64,16 +68,7 @@ export default function StaffHoursCard({
             const fa = faId != null ? faMap.get(faId) : undefined;
             const initials = getAvatarInitials(`${emp.firstName} ${emp.lastName}`);
 
-            return (
-              <Link
-                key={h.empId}
-                href={`/people/${emp.id}`}
-                style={{
-                  display: "block",
-                  textDecoration: "none",
-                  color: "inherit",
-                }}
-              >
+            const row = (
                 <div
                   style={{
                     display: "flex",
@@ -146,7 +141,22 @@ export default function StaffHoursCard({
                     </div>
                   </div>
                 </div>
+            );
+
+            return canNavigateToDetailsPage ? (
+              <Link
+                key={h.empId}
+                href={`/people/${emp.id}`}
+                style={{
+                  display: "block",
+                  textDecoration: "none",
+                  color: "inherit",
+                }}
+              >
+                {row}
               </Link>
+            ) : (
+              <div key={h.empId}>{row}</div>
             );
           })}
           {remainingCount > 0 && (
