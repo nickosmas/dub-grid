@@ -38,7 +38,6 @@ export interface AccountSessionRecord {
   lastActiveAt: string;
   createdAt: string;
   refreshTokenHash: string;
-  isActive: boolean;
 }
 
 export interface AccountIdentity {
@@ -268,7 +267,8 @@ export function updateMfaStatus(enabled: boolean): Promise<{
 }
 
 export function fetchAccountSessions(): Promise<{
-  sessions: AccountSessionRecord[];
+  active: AccountSessionRecord[];
+  stale: AccountSessionRecord[];
 }> {
   return requestJson("/api/account/sessions");
 }

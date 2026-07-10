@@ -8,7 +8,7 @@ vi.mock("@/lib/supabase-service", () => ({
   }),
 }));
 
-import { fetchImportantUserSessionsForUser } from "./sessions";
+import { fetchUserSessionOverviewForUser } from "./sessions";
 
 const USER_ID = "22222222-2222-4222-8222-222222222222";
 
@@ -45,7 +45,7 @@ describe("account session queries", () => {
     vi.clearAllMocks();
   });
 
-  it("returns only the active + last-inactive session per platform", async () => {
+  it("returns the active session per platform plus stale history", async () => {
     const now = new Date("2026-05-08T12:00:00.000Z");
     const rows = [
       sessionRow({
@@ -72,11 +72,15 @@ describe("account session queries", () => {
     const builder = makeUserSessionsBuilder(rows);
     fromMock.mockReturnValue(builder);
 
-    const sessions = await fetchImportantUserSessionsForUser(USER_ID, now);
+    const overview = await fetchUserSessionOverviewForUser(USER_ID, now);
 
     expect(builder.eq).toHaveBeenCalledWith("user_id", USER_ID);
-    expect(sessions.map((s) => s.id)).toEqual(["web-active", "ios-inactive", "web-old-1"]);
-    expect(sessions.map((s) => s.isActive)).toEqual([true, false, false]);
+    expect(overview.active.map((s) => s.id)).toEqual(["web-active"]);
+    expect(overview.stale.map((s) => s.id)).toEqual([
+      "ios-inactive",
+      "web-old-1",
+      "web-old-2",
+    ]);
   });
 
   it("groups ios and android sessions together as mobile", async () => {
@@ -92,10 +96,10 @@ describe("account session queries", () => {
     const builder = makeUserSessionsBuilder(rows);
     fromMock.mockReturnValue(builder);
 
-    const sessions = await fetchImportantUserSessionsForUser(USER_ID, now);
+    const overview = await fetchUserSessionOverviewForUser(USER_ID, now);
 
-    expect(sessions.map((s) => s.id)).toEqual(["ios-active", "android-old"]);
-    expect(sessions.map((s) => s.isActive)).toEqual([true, false]);
+    expect(overview.active.map((s) => s.id)).toEqual(["ios-active"]);
+    expect(overview.stale.map((s) => s.id)).toEqual(["android-old"]);
   });
 
   it("marks only the single most recent same-platform session as active", async () => {
@@ -111,9 +115,36 @@ describe("account session queries", () => {
     const builder = makeUserSessionsBuilder(rows);
     fromMock.mockReturnValue(builder);
 
-    const sessions = await fetchImportantUserSessionsForUser(USER_ID, now);
+    const overview = await fetchUserSessionOverviewForUser(USER_ID, now);
 
-    expect(sessions.map((s) => s.id)).toEqual(["safari-now", "chrome-1m-ago"]);
-    expect(sessions.map((s) => s.isActive)).toEqual([true, false]);
+    expect(overview.active.map((s) => s.id)).toEqual(["safari-now"]);
+    expect(overview.stale.map((s) => s.id)).toEqual(["chrome-1m-ago"]);
+  });
+
+  it("caps stale sessions at the 5 most recently used", async () => {
+    const now = new Date("2026-05-08T12:00:00.000Z");
+    const rows = [
+      sessionRow({ id: "web-active", platform: "web", last_active_at: now.toISOString() }),
+      ...Array.from({ length: 7 }, (_, i) =>
+        sessionRow({
+          id: `stale-${i}`,
+          platform: "web",
+          last_active_at: new Date(now.getTime() - (i + 1) * 86_400_000).toISOString(),
+        }),
+      ),
+    ];
+    const builder = makeUserSessionsBuilder(rows);
+    fromMock.mockReturnValue(builder);
+
+    const overview = await fetchUserSessionOverviewForUser(USER_ID, now);
+
+    expect(overview.stale).toHaveLength(5);
+    expect(overview.stale.map((s) => s.id)).toEqual([
+      "stale-0",
+      "stale-1",
+      "stale-2",
+      "stale-3",
+      "stale-4",
+    ]);
   });
 });

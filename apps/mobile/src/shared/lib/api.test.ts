@@ -435,7 +435,7 @@ describe("mobileApiRequest", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          sessions: [
+          active: [
             {
               id: "44444444-4444-4444-8444-444444444444",
               platform: "ios",
@@ -445,9 +445,9 @@ describe("mobileApiRequest", () => {
               lastActiveAt: "2024-01-03T00:00:00.000Z",
               createdAt: "2024-01-01T00:00:00.000Z",
               refreshTokenHash: "hash",
-              isActive: true,
             },
           ],
+          stale: [],
         }),
       })
       .mockResolvedValueOnce({
@@ -461,7 +461,8 @@ describe("mobileApiRequest", () => {
     const result = await getProfileSessions("token-123");
     await revokeProfileSession("token-123", "hash");
 
-    expect(result.sessions).toHaveLength(1);
+    expect(result.active).toHaveLength(1);
+    expect(result.stale).toHaveLength(0);
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       "https://app.dubgrid.com/api/mobile/v1/profile/sessions",

@@ -466,6 +466,52 @@ export default function ProfileSecurityScreen() {
             ? "Sign Out"
             : "Revoke";
 
+  function renderSessionRow(
+    session: NonNullable<typeof sessionsQuery.data>["active"][number],
+    options: { isLast: boolean; showRevoke: boolean },
+  ) {
+    return (
+      <View
+        key={session.id}
+        style={[styles.sessionItem, !options.isLast && styles.sessionItemDivider]}
+      >
+        <View style={styles.sessionRow}>
+          <View style={styles.sessionIcon}>
+            <Text style={styles.sessionIconText}>{formatSessionPlatform(session.platform)}</Text>
+          </View>
+          <View style={styles.sessionCopy}>
+            <Text style={styles.sessionTitle}>
+              {session.deviceLabel || session.platform || "Unknown device"}
+            </Text>
+            <Text style={styles.sessionBody}>
+              Last active {new Date(session.lastActiveAt).toLocaleString()}
+            </Text>
+            {session.appVersion || session.ipAddress ? (
+              <Text style={styles.sessionMeta}>
+                {[session.appVersion, session.ipAddress].filter(Boolean).join(" - ")}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        {options.showRevoke && (
+          <Button
+            compact
+            disabled={revokeMutation.isPending}
+            label="Revoke"
+            onPress={() => {
+              setPendingConfirmation({
+                kind: "revokeSession",
+                refreshTokenHash: session.refreshTokenHash,
+                label: session.deviceLabel || session.platform || "this device",
+              });
+            }}
+            tone="neutral"
+          />
+        )}
+      </View>
+    );
+  }
+
   return (
     <Screen refreshing={manualRefresh.isRefreshing} onRefresh={manualRefresh.refresh}>
       {contentState.kind === "loading" ? (
@@ -654,53 +700,28 @@ export default function ProfileSecurityScreen() {
                 }}
               />
             ) : (
-              <View style={styles.sessionList}>
-                {(sessionsQuery.data?.sessions ?? []).map((session, index, sessions) => (
-                  <View
-                    key={session.id}
-                    style={[
-                      styles.sessionItem,
-                      index < sessions.length - 1 && styles.sessionItemDivider,
-                    ]}
-                  >
-                    <View style={styles.sessionRow}>
-                      <View style={styles.sessionIcon}>
-                        <Text style={styles.sessionIconText}>
-                          {formatSessionPlatform(session.platform)}
-                        </Text>
-                      </View>
-                      <View style={styles.sessionCopy}>
-                        <Text style={styles.sessionTitle}>
-                          {session.deviceLabel || session.platform || "Unknown device"}
-                        </Text>
-                        <Text style={styles.sessionBody}>
-                          Last active {new Date(session.lastActiveAt).toLocaleString()}
-                        </Text>
-                        {session.appVersion || session.ipAddress ? (
-                          <Text style={styles.sessionMeta}>
-                            {[session.appVersion, session.ipAddress].filter(Boolean).join(" - ")}
-                          </Text>
-                        ) : null}
-                      </View>
-                    </View>
-                    {session.isActive && (
-                      <Button
-                        compact
-                        disabled={revokeMutation.isPending}
-                        label="Revoke"
-                        onPress={() => {
-                          setPendingConfirmation({
-                            kind: "revokeSession",
-                            refreshTokenHash: session.refreshTokenHash,
-                            label: session.deviceLabel || session.platform || "this device",
-                          });
-                        }}
-                        tone="neutral"
-                      />
+              <>
+                <View style={styles.sessionList}>
+                  <Text style={styles.sessionGroupHeading}>Active sessions</Text>
+                  {(sessionsQuery.data?.active ?? []).map((session, index, sessions) =>
+                    renderSessionRow(session, {
+                      isLast: index === sessions.length - 1,
+                      showRevoke: true,
+                    }),
+                  )}
+                </View>
+                {(sessionsQuery.data?.stale.length ?? 0) > 0 ? (
+                  <View style={styles.sessionList}>
+                    <Text style={styles.sessionGroupHeading}>Stale sessions</Text>
+                    {(sessionsQuery.data?.stale ?? []).map((session, index, sessions) =>
+                      renderSessionRow(session, {
+                        isLast: index === sessions.length - 1,
+                        showRevoke: false,
+                      }),
                     )}
                   </View>
-                ))}
-              </View>
+                ) : null}
+              </>
             )}
           </ProfileSection>
         </>
@@ -857,5 +878,17 @@ const styles = StyleSheet.create({
   sessionMeta: {
     ...mobileText.caption,
     color: mobileColors.textSubtle,
+  },
+  sessionGroupHeading: {
+    ...mobileText.caption,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderBottomColor: mobileColors.borderSubtle,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    color: mobileColors.textMuted,
+    fontWeight: "600",
+    letterSpacing: 0.4,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    textTransform: "uppercase",
   },
 });

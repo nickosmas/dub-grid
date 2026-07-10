@@ -10,7 +10,7 @@ const fetchMobileFocusAreas = vi.fn();
 const mapOrganizationToMobileConfig = vi.fn();
 const fetchNotificationPreferences = vi.fn();
 const saveNotificationPreferences = vi.fn();
-const fetchImportantUserSessionsForUser = vi.fn();
+const fetchUserSessionOverviewForUser = vi.fn();
 const revokeUserSessionForUser = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
@@ -27,7 +27,7 @@ vi.mock("@/features/account/server", () => ({
   updateSelfLinkedEmployeePhone,
   fetchNotificationPreferences,
   saveNotificationPreferences,
-  fetchImportantUserSessionsForUser,
+  fetchUserSessionOverviewForUser,
   revokeUserSessionForUser,
 }));
 
@@ -326,21 +326,23 @@ describe("mobile profile preference and session routes", () => {
   });
 
   it("loads and revokes user-scoped sessions", async () => {
-    fetchImportantUserSessionsForUser.mockResolvedValue([
-      {
-        id: "44444444-4444-4444-8444-444444444444",
-        userId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
-        supabaseSessionId: null,
-        platform: "ios",
-        appVersion: null,
-        deviceLabel: "DubGrid Mobile on iOS",
-        ipAddress: null,
-        lastActiveAt: "2024-01-03T00:00:00.000Z",
-        createdAt: "2024-01-01T00:00:00.000Z",
-        refreshTokenHash: "hash",
-        isActive: true,
-      },
-    ]);
+    fetchUserSessionOverviewForUser.mockResolvedValue({
+      active: [
+        {
+          id: "44444444-4444-4444-8444-444444444444",
+          userId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+          supabaseSessionId: null,
+          platform: "ios",
+          appVersion: null,
+          deviceLabel: "DubGrid Mobile on iOS",
+          ipAddress: null,
+          lastActiveAt: "2024-01-03T00:00:00.000Z",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          refreshTokenHash: "hash",
+        },
+      ],
+      stale: [],
+    });
 
     const { DELETE, GET } = await import("./profile-sessions");
     const getResponse = await GET(
@@ -355,8 +357,9 @@ describe("mobile profile preference and session routes", () => {
     );
 
     expect(getResponse.status).toBe(200);
-    expect(getPayload.sessions).toHaveLength(1);
-    expect(fetchImportantUserSessionsForUser).toHaveBeenCalledWith(
+    expect(getPayload.active).toHaveLength(1);
+    expect(getPayload.stale).toHaveLength(0);
+    expect(fetchUserSessionOverviewForUser).toHaveBeenCalledWith(
       "8af6f242-c060-4920-a7db-91b4cb66fd26",
     );
     expect(deleteResponse.status).toBe(200);

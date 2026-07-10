@@ -23,7 +23,11 @@ interface UserSession {
   lastActiveAt: string;
   refreshTokenHash: string;
   isCurrent: boolean;
-  isActive: boolean;
+}
+
+interface SessionOverview {
+  active: UserSession[];
+  stale: UserSession[];
 }
 
 function parseDeviceLabel(
@@ -67,6 +71,103 @@ function extractSupabaseSessionId(accessToken: string): string | null {
   }
 }
 
+function SessionRow({
+  session,
+  onRevoke,
+  revoking,
+  showRevoke,
+}: {
+  session: UserSession;
+  onRevoke: (session: UserSession) => void;
+  revoking: boolean;
+  showRevoke: boolean;
+}) {
+  const device = parseDeviceLabel(session.deviceLabel, session.platform);
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "12px 16px",
+        background: session.isCurrent ? "var(--color-brand-bg)" : "transparent",
+        borderBottom: "1px solid var(--color-border-light)",
+      }}
+    >
+      <div style={{ color: "var(--color-text-muted)", flexShrink: 0 }}>
+        {device.icon === "mobile" ? <Smartphone size={18} /> : <Monitor size={18} />}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-caption)",
+            fontWeight: 600,
+            color: "var(--color-text-primary)",
+          }}
+        >
+          {device.label}
+          {session.isCurrent && (
+            <span
+              style={{
+                marginLeft: 8,
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 700,
+                color: "var(--color-brand)",
+                background: "var(--color-brand-bg)",
+                padding: "1px 6px",
+                borderRadius: 4,
+              }}
+            >
+              Current
+            </span>
+          )}
+        </div>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--color-text-muted)",
+            marginTop: 2,
+          }}
+        >
+          {session.ipAddress === "::1" ? "localhost" : (session.ipAddress ?? "Unknown IP")}{" "}
+          &middot; {formatRelative(session.lastActiveAt)}
+        </div>
+      </div>
+      {showRevoke && (
+        <button
+          onClick={() => onRevoke(session)}
+          disabled={revoking}
+          className="dg-btn dg-btn-ghost dg-btn-xs"
+          style={{ color: "var(--color-danger)" }}
+        >
+          <ButtonLoading loading={revoking} spinnerSize={14}>
+            Sign out
+          </ButtonLoading>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        padding: "10px 16px",
+        fontSize: "var(--dg-fs-footnote)",
+        fontWeight: 700,
+        color: "var(--color-text-muted)",
+        textTransform: "uppercase",
+        letterSpacing: "0.04em",
+        background: "var(--color-bg-secondary)",
+        borderBottom: "1px solid var(--color-border-light)",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function SessionList() {
   const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -74,14 +175,14 @@ export function SessionList() {
 
   const sessionsQuery = useQuery({
     queryKey: user ? queryKeys.account.sessions(user.id) : ["account", "anon", "sessions"],
-    queryFn: async () => {
-      const rows = (await fetchAccountSessions()).sessions;
+    queryFn: async (): Promise<SessionOverview> => {
+      const { active, stale } = await fetchAccountSessions();
       const currentSession = await getBrowserAuthSession();
       const currentSupabaseSessionId = currentSession?.access_token
         ? extractSupabaseSessionId(currentSession.access_token)
         : null;
 
-      return rows.map<UserSession>((row) => ({
+      const toUserSession = (row: (typeof active)[number]): UserSession => ({
         id: row.id,
         supabaseSessionId: row.supabaseSessionId,
         platform: row.platform,
@@ -89,10 +190,14 @@ export function SessionList() {
         ipAddress: row.ipAddress,
         lastActiveAt: row.lastActiveAt,
         refreshTokenHash: row.refreshTokenHash,
-        isActive: row.isActive,
         isCurrent:
           currentSupabaseSessionId != null && row.supabaseSessionId === currentSupabaseSessionId,
-      }));
+      });
+
+      return {
+        active: active.map(toUserSession),
+        stale: stale.map(toUserSession),
+      };
     },
     enabled: !authLoading && !!user,
   });
@@ -103,7 +208,8 @@ export function SessionList() {
     }
   }, [sessionsQuery.isError]);
 
-  const sessions = sessionsQuery.data ?? [];
+  const active = sessionsQuery.data?.active ?? [];
+  const stale = sessionsQuery.data?.stale ?? [];
   const loading = authLoading || sessionsQuery.isPending;
 
   const revokeMutation = useMutation({
@@ -111,8 +217,8 @@ export function SessionList() {
       revokeAccountSession(session.refreshTokenHash).then(() => session),
     onSuccess: (session) => {
       if (user) {
-        queryClient.setQueryData<UserSession[]>(queryKeys.account.sessions(user.id), (prev) =>
-          (prev ?? []).filter((s) => s.id !== session.id),
+        queryClient.setQueryData<SessionOverview>(queryKeys.account.sessions(user.id), (prev) =>
+          prev ? { ...prev, active: prev.active.filter((s) => s.id !== session.id) } : prev,
         );
       }
       toast.success("Session revoked");
@@ -146,7 +252,7 @@ export function SessionList() {
     );
   }
 
-  if (sessions.length === 0) {
+  if (active.length === 0 && stale.length === 0) {
     return (
       <div
         style={{
@@ -162,75 +268,35 @@ export function SessionList() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      {sessions.map((s) => {
-        const device = parseDeviceLabel(s.deviceLabel, s.platform);
-        return (
-          <div
-            key={s.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "12px 16px",
-              background: s.isCurrent ? "var(--color-brand-bg)" : "transparent",
-              borderBottom: "1px solid var(--color-border-light)",
-            }}
-          >
-            <div style={{ color: "var(--color-text-muted)", flexShrink: 0 }}>
-              {device.icon === "mobile" ? <Smartphone size={18} /> : <Monitor size={18} />}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  fontWeight: 600,
-                  color: "var(--color-text-primary)",
-                }}
-              >
-                {device.label}
-                {s.isCurrent && (
-                  <span
-                    style={{
-                      marginLeft: 8,
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 700,
-                      color: "var(--color-brand)",
-                      background: "var(--color-brand-bg)",
-                      padding: "1px 6px",
-                      borderRadius: 4,
-                    }}
-                  >
-                    Current
-                  </span>
-                )}
-              </div>
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-text-muted)",
-                  marginTop: 2,
-                }}
-              >
-                {s.ipAddress === "::1" ? "localhost" : (s.ipAddress ?? "Unknown IP")} &middot;{" "}
-                {formatRelative(s.lastActiveAt)}
-              </div>
-            </div>
-            {s.isActive && (
-              <button
-                onClick={() => handleRevoke(s)}
-                disabled={revokingId === s.id}
-                className="dg-btn dg-btn-ghost dg-btn-xs"
-                style={{ color: "var(--color-danger)" }}
-              >
-                <ButtonLoading loading={revokingId === s.id} spinnerSize={14}>
-                  Sign out
-                </ButtonLoading>
-              </button>
-            )}
-          </div>
-        );
-      })}
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {active.length > 0 && (
+        <>
+          <SectionHeading>Active sessions</SectionHeading>
+          {active.map((session) => (
+            <SessionRow
+              key={session.id}
+              session={session}
+              onRevoke={handleRevoke}
+              revoking={revokingId === session.id}
+              showRevoke
+            />
+          ))}
+        </>
+      )}
+      {stale.length > 0 && (
+        <>
+          <SectionHeading>Stale sessions</SectionHeading>
+          {stale.map((session) => (
+            <SessionRow
+              key={session.id}
+              session={session}
+              onRevoke={handleRevoke}
+              revoking={false}
+              showRevoke={false}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 }

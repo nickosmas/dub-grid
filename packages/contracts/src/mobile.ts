@@ -346,11 +346,11 @@ export const mobileProfileSessionSchema = z.object({
   lastActiveAt: z.string(),
   createdAt: z.string(),
   refreshTokenHash: z.string().min(1),
-  isActive: z.boolean(),
 });
 
 export const mobileProfileSessionsResponseSchema = z.object({
-  sessions: z.array(mobileProfileSessionSchema),
+  active: z.array(mobileProfileSessionSchema),
+  stale: z.array(mobileProfileSessionSchema),
 });
 
 export const mobileProfileSessionRevokeBodySchema = z.object({

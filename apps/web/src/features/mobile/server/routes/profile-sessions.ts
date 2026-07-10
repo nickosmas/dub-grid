@@ -5,13 +5,13 @@ import {
   mobileProfileSessionsResponseSchema,
 } from "@dubgrid/contracts";
 import {
-  fetchImportantUserSessionsForUser,
+  fetchUserSessionOverviewForUser,
   revokeUserSessionForUser,
 } from "@/features/account/server";
 import { requireMobileAuth } from "@/features/mobile/server";
 
 function mapSession(
-  session: Awaited<ReturnType<typeof fetchImportantUserSessionsForUser>>[number],
+  session: Awaited<ReturnType<typeof fetchUserSessionOverviewForUser>>["active"][number],
 ) {
   return {
     id: session.id,
@@ -22,7 +22,6 @@ function mapSession(
     lastActiveAt: session.lastActiveAt,
     createdAt: session.createdAt,
     refreshTokenHash: session.refreshTokenHash,
-    isActive: session.isActive,
   };
 }
 
@@ -30,11 +29,12 @@ export async function GET(req: NextRequest) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
 
-  const sessions = await fetchImportantUserSessionsForUser(auth.user.id);
+  const overview = await fetchUserSessionOverviewForUser(auth.user.id);
 
   return NextResponse.json(
     mobileProfileSessionsResponseSchema.parse({
-      sessions: sessions.map(mapSession),
+      active: overview.active.map(mapSession),
+      stale: overview.stale.map(mapSession),
     }),
   );
 }

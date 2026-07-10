@@ -299,7 +299,7 @@ describe("mobile contracts", () => {
       },
     });
     const sessionsResult = mobileProfileSessionsResponseSchema.safeParse({
-      sessions: [
+      active: [
         {
           id: "44444444-4444-4444-8444-444444444444",
           platform: "ios",
@@ -309,9 +309,9 @@ describe("mobile contracts", () => {
           lastActiveAt: "2024-01-03T00:00:00.000Z",
           createdAt: "2024-01-01T00:00:00.000Z",
           refreshTokenHash: "hash",
-          isActive: true,
         },
       ],
+      stale: [],
     });
 
     expect(prefsResult.success).toBe(true);

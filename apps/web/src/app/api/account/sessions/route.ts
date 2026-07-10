@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import {
-  fetchImportantUserSessionsForUser,
+  fetchUserSessionOverviewForUser,
   revokeUserSessionForUser,
 } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
@@ -21,9 +21,7 @@ export async function GET(req: NextRequest) {
       return auth.response;
     }
 
-    return NextResponse.json({
-      sessions: await fetchImportantUserSessionsForUser(auth.user.id),
-    });
+    return NextResponse.json(await fetchUserSessionOverviewForUser(auth.user.id));
   } catch (error) {
     console.error("account sessions GET failed", error);
     return NextResponse.json({ error: "Failed to load sessions" }, { status: 500 });

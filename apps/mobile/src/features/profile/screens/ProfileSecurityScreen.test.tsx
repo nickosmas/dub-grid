@@ -102,7 +102,7 @@ describe("ProfileSecurityScreen", () => {
       const key = queryKey.join(":");
       if (key.includes("sessions")) {
         return {
-          data: { sessions: [] },
+          data: { active: [], stale: [] },
           error: null,
           isLoading: false,
           refetch: vi.fn(),

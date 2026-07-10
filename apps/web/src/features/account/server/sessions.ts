@@ -95,24 +95,30 @@ function toPlatformGroup(platform: UserSessionPlatform | null): UserSessionPlatf
   return platform === "web" ? "web" : "mobile";
 }
 
-export interface ImportantUserSessionRecord extends UserSessionRecord {
-  // Within the active auth window - only these are revokable client-side,
-  // since revoking an already-quiet session has no real effect.
-  isActive: boolean;
+export interface UserSessionOverview {
+  active: UserSessionRecord[];
+  stale: UserSessionRecord[];
 }
 
+const STALE_SESSIONS_LIMIT = 5;
+
 /**
- * Self-service session list: only the sessions a user actually needs to
- * recognize - whatever is currently active, plus the most recent session
- * that's gone quiet, bucketed separately for web and mobile so a stale
- * browser tab doesn't bury "last used" info for the other platform.
+ * Self-service session list: the active session per platform (web/mobile -
+ * only the single most recent one per platform counts, so two browser tabs
+ * both pinged in the last few minutes don't each show as "active"), plus
+ * the 5 most recently used sessions that have since gone quiet.
  */
-export async function fetchImportantUserSessionsForUser(
+export async function fetchUserSessionOverviewForUser(
   userId: string,
   now: Date = new Date(),
-): Promise<ImportantUserSessionRecord[]> {
-  const sessions = await fetchUserSessionsForUser(userId);
+): Promise<UserSessionOverview> {
   const cutoffMs = now.getTime() - USER_SESSION_ACTIVE_WINDOW_MS;
+  // Sort explicitly rather than trust the caller's ordering, since every
+  // grouping decision below (most-recent-per-platform, most-recent-overall)
+  // depends on it.
+  const sessions = (await fetchUserSessionsForUser(userId)).sort(
+    (a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime(),
+  );
 
   const byGroup = new Map<UserSessionPlatformGroup, UserSessionRecord[]>();
   for (const session of sessions) {
@@ -122,24 +128,21 @@ export async function fetchImportantUserSessionsForUser(
     byGroup.set(group, list);
   }
 
-  const important: ImportantUserSessionRecord[] = [];
+  const active: UserSessionRecord[] = [];
+  const activeIds = new Set<string>();
   for (const group of byGroup.values()) {
-    // fetchUserSessionsForUser already orders by last_active_at desc, so
-    // only the single most recent session per platform can be "active" -
-    // otherwise every browser tab that pinged within the window would show
-    // as its own revokable session.
-    const [mostRecent, nextMostRecent] = group;
-    if (!mostRecent) continue;
-    const isActive = new Date(mostRecent.lastActiveAt).getTime() >= cutoffMs;
-    important.push({ ...mostRecent, isActive });
-    if (isActive && nextMostRecent) {
-      important.push({ ...nextMostRecent, isActive: false });
+    const mostRecent = group[0];
+    if (mostRecent && new Date(mostRecent.lastActiveAt).getTime() >= cutoffMs) {
+      active.push(mostRecent);
+      activeIds.add(mostRecent.id);
     }
   }
+  active.sort((a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime());
 
-  return important.sort(
-    (a, b) => new Date(b.lastActiveAt).getTime() - new Date(a.lastActiveAt).getTime(),
-  );
+  // 5 most recently used sessions among whatever wasn't picked as active.
+  const stale = sessions.filter((s) => !activeIds.has(s.id)).slice(0, STALE_SESSIONS_LIMIT);
+
+  return { active, stale };
 }
 
 export async function trackUserSessionForUser(input: TrackUserSessionInput): Promise<void> {

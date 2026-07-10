@@ -310,10 +310,10 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           <div className="border-t border-[var(--color-border-light)] pt-4">
             <div className="mb-3">
               <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
-                Active sessions
+                Devices
               </div>
               <div className="mt-1 text-[13px] text-[var(--color-text-muted)]">
-                Inspect authenticated devices that are still active.
+                Inspect authenticated devices and recent sign-in history.
               </div>
             </div>
             <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-surface)]">
