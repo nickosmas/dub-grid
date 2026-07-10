@@ -125,7 +125,10 @@ export function ProfilePage() {
       )}
 
       {activeSection === "notifications" && (
-        <NotificationsPanel isGridmaster={Boolean(isGridmaster)} />
+        <NotificationsPanel
+          isGridmaster={Boolean(isGridmaster)}
+          isSuperAdmin={Boolean(isSuperAdmin)}
+        />
       )}
 
       {activeSection === "data-privacy" && <DataPrivacyPanel />}

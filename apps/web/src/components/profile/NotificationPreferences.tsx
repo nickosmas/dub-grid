@@ -46,9 +46,27 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   membership: "Invitations, role changes, and removal from organizations",
   account: "Employee record updates and organization settings",
   billing: "Subscription changes, payment failures, receipts",
-  security: "Password, email, MFA, and new-device alerts",
-  system: "Impersonation notices and system updates",
+  security: "Password, email, MFA, new-device, and account-access alerts",
+  system: "Role changes and system updates",
 };
+
+/**
+ * Which preference categories a user can actually receive notifications for.
+ * Billing events fan out to super_admins only (see
+ * features/notifications/server/events.ts), so the billing row is hidden for
+ * everyone else. Gridmasters only receive platform/system notifications.
+ */
+export function notificationCategoriesForRole({
+  isGridmaster,
+  isSuperAdmin,
+}: {
+  isGridmaster: boolean;
+  isSuperAdmin: boolean;
+}): string[] {
+  if (isGridmaster) return ["system"];
+  const categories = Object.keys(CATEGORY_LABELS);
+  return isSuperAdmin ? categories : categories.filter((category) => category !== "billing");
+}
 
 const preferenceGridTemplate = "minmax(0, 1fr) 60px 60px";
 

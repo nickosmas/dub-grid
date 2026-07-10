@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NotificationPreferences } from "@/components/profile/NotificationPreferences";
+import { NotificationsPanel } from "@/components/account/NotificationsPanel";
 
 const mockFetchNotificationPreferences = vi.fn();
 const mockSaveNotificationPreferences = vi.fn();
@@ -81,5 +82,29 @@ describe("NotificationPreferences", () => {
       justifyContent: "center",
       width: "100%",
     });
+  });
+
+  it("hides Billing & Payments from non-super-admins", async () => {
+    render(<NotificationsPanel isGridmaster={false} isSuperAdmin={false} />);
+
+    await screen.findByText("Schedule Changes");
+    expect(screen.queryByText("Billing & Payments")).not.toBeInTheDocument();
+    expect(screen.getByText("Security Alerts")).toBeInTheDocument();
+    expect(screen.getByText("System Notifications")).toBeInTheDocument();
+  });
+
+  it("shows Billing & Payments to super_admins", async () => {
+    render(<NotificationsPanel isGridmaster={false} isSuperAdmin={true} />);
+
+    await screen.findByText("Schedule Changes");
+    expect(screen.getByText("Billing & Payments")).toBeInTheDocument();
+  });
+
+  it("shows only the system category to gridmasters", async () => {
+    render(<NotificationsPanel isGridmaster={true} isSuperAdmin={false} />);
+
+    await screen.findByText("System Notifications");
+    expect(screen.queryByText("Schedule Changes")).not.toBeInTheDocument();
+    expect(screen.queryByText("Billing & Payments")).not.toBeInTheDocument();
   });
 });
