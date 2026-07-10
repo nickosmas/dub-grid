@@ -10,6 +10,8 @@ import ProgressBar from "@/components/ProgressBar";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmployeeManagementAccessModal } from "@/components/staff/EmployeeManagementAccessModal";
+import { MemberAccessControls } from "@/components/staff/MemberAccessControls";
+import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
 import { isSelfAction, SelfActionForbiddenError } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
@@ -31,6 +33,7 @@ import { mergeEmployeeIntoDirectoryPerson, upsertEmployeeInList } from "@/lib/st
 import { computeEmployeeWeeklyHours, getWeekDates, getWeekStart } from "@/lib/dashboard-stats";
 import { formatDateKey } from "@/lib/utils";
 import type {
+  AdminPermissions,
   DirectoryPerson,
   Employee,
   RecurringShift,
@@ -44,7 +47,7 @@ import {
   fetchScheduleActorNames,
   fetchShiftRequests,
 } from "@/features/schedule/client";
-import { revokeInvitation } from "@/features/organization/client";
+import { revokeInvitation, updateOrganizationMembershipGuarded } from "@/features/organization/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { StaffDetailHeader } from "./StaffDetailHeader";
 import EditEmployeePanel from "@/components/EditEmployeePanel";
@@ -89,6 +92,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [showManagementPanel, setShowManagementPanel] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showManagementAccessModal, setShowManagementAccessModal] = useState(false);
+  const [showAddToScheduleModal, setShowAddToScheduleModal] = useState(false);
   const [quickRevokeInviteConfirm, setQuickRevokeInviteConfirm] = useState<Invitation | null>(null);
   const [quickRevokingInvite, setQuickRevokingInvite] = useState(false);
 
@@ -210,6 +214,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     setShowManagementPanel(false);
     setShowInviteModal(false);
     setShowManagementAccessModal(false);
+    setShowAddToScheduleModal(false);
   }, [employeeId]);
 
   const refreshInvitations = useCallback(async () => {
@@ -445,6 +450,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     () => directory.find((person) => person.employeeId === employee?.id) ?? null,
     [directory, employee?.id],
   );
+  // Management-only people have an `employees` row but no focus areas — they
+  // have no schedule of their own, so hide the Schedule tab (see ProfilePage's
+  // identical isOnSchedule check).
+  const isOnSchedule = Boolean(employee && employee.focusAreaIds.length > 0);
   const hasPendingManagementInvite =
     !!directoryPerson &&
     directoryPerson.managementDepartmentIds.length > 0 &&
@@ -466,6 +475,21 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       }
     },
     [orgId, refreshDirectory, refreshInvitations],
+  );
+
+  const handlePermissionsChange = useCallback(
+    async (perms: AdminPermissions) => {
+      if (!orgId || !directoryPerson?.userId || !directoryPerson?.membershipUpdatedAt) return;
+      await updateOrganizationMembershipGuarded({
+        orgId,
+        userId: directoryPerson.userId,
+        expectedUpdatedAt: directoryPerson.membershipUpdatedAt,
+        adminPermissions: perms,
+      });
+      refreshDirectory();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.org.users(orgId) });
+    },
+    [orgId, directoryPerson, refreshDirectory, queryClient],
   );
 
   const showQuickActions =
@@ -574,6 +598,19 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                             : "Add to Management"}
                         </button>
                       )}
+
+                      {perms.canManageEmployees &&
+                        !isOnSchedule &&
+                        directoryPerson?.isManagementUser &&
+                        employee.userId && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAddToScheduleModal(true)}
+                            className="dg-btn dg-btn-secondary dg-btn-sm"
+                          >
+                            Add to Schedule
+                          </button>
+                        )}
                     </div>
 
                     {perms.canManageEmployees && (
@@ -595,6 +632,28 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                         />
                       </div>
                     )}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {canManageManagementAccess && directoryPerson?.orgRole === "admin" && (
+              <section>
+                <div className="dg-card">
+                  <div className="dg-card-header">
+                    <div>
+                      <div className="dg-card-title">Access &amp; permissions</div>
+                      <div className="dg-card-subtitle">
+                        Manage what this admin can view and manage across the organization.
+                      </div>
+                    </div>
+                  </div>
+                  <div className="dg-card-body">
+                    <MemberAccessControls
+                      orgRole={directoryPerson.orgRole}
+                      adminPermissions={directoryPerson.adminPermissions}
+                      onPermissionsChange={handlePermissionsChange}
+                    />
                   </div>
                 </div>
               </section>
@@ -642,7 +701,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 <ProfileSectionTabs
                   tabs={[
                     { id: "overview", label: "Overview" },
-                    { id: "schedule", label: "Schedule" },
+                    ...(isOnSchedule ? [{ id: "schedule", label: "Schedule" }] : []),
                     { id: "activity", label: "Activity" },
                   ]}
                   activeTab={activeSection}
@@ -668,7 +727,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                 />
               ) : null}
 
-              {activeSection === "schedule" ? (
+              {activeSection === "schedule" && isOnSchedule ? (
                 <ScheduleTab
                   employee={employee}
                   shifts={shifts}
@@ -728,6 +787,26 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
             await refreshInvitations();
             refreshDirectory();
             void queryClient.invalidateQueries({ queryKey: queryKeys.employees.all(orgId) });
+          }}
+        />
+      )}
+
+      {showAddToScheduleModal && employee && orgId && (
+        <AddManagementUserToScheduleModal
+          orgId={orgId}
+          person={employee}
+          employee={employee}
+          focusAreas={focusAreas}
+          certifications={certifications}
+          roles={orgRoles}
+          focusAreaLabel={org?.focusAreaLabel}
+          certificationLabel={org?.certificationLabel}
+          roleLabel={org?.roleLabel}
+          onClose={() => setShowAddToScheduleModal(false)}
+          onAdded={(updatedEmployee) => {
+            syncEmployeeCaches(updatedEmployee);
+            refreshDirectory();
+            setShowAddToScheduleModal(false);
           }}
         />
       )}

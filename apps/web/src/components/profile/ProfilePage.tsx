@@ -33,13 +33,22 @@ export function ProfilePage() {
   const searchParams = useSearchParams();
   const {
     orgId,
+    role,
     canManageEmployees,
     isSuperAdmin,
     isGridmaster,
     isLoading: permsLoading,
   } = usePermissions();
-  const { org, focusAreas, assignments, shiftCategories, absenceTypes, certifications, orgRoles } =
-    useOrganizationData();
+  const {
+    org,
+    focusAreas,
+    assignments,
+    shiftCategories,
+    absenceTypes,
+    certifications,
+    orgRoles,
+    departments,
+  } = useOrganizationData();
   const {
     user,
     profile,
@@ -67,6 +76,8 @@ export function ProfilePage() {
 
   const canEditProfileDirectly =
     Boolean(canManageEmployees) || Boolean(isSuperAdmin) || Boolean(isGridmaster);
+  const canManageManagementAccess = Boolean(isSuperAdmin) || Boolean(isGridmaster);
+  const canManageScheduleEmployees = Boolean(canManageEmployees);
 
   // Wait for real permissions before rendering: canEditProfileDirectly
   // defaults to false while perms are loading, which would otherwise flash
@@ -93,6 +104,17 @@ export function ProfilePage() {
           orgId={orgId}
           canEditProfileDirectly={canEditProfileDirectly}
           isGridmaster={Boolean(isGridmaster)}
+          role={role}
+          departments={departments}
+          isOnSchedule={isOnSchedule}
+          canManageManagementAccess={canManageManagementAccess}
+          canManageScheduleEmployees={canManageScheduleEmployees}
+          focusAreas={focusAreas}
+          certifications={certifications}
+          roles={orgRoles}
+          focusAreaLabel={org?.focusAreaLabel}
+          certificationLabel={org?.certificationLabel}
+          roleLabel={org?.roleLabel}
           setProfile={setProfile}
           setEmployee={setEmployee}
         />
