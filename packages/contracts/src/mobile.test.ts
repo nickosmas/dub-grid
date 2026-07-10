@@ -309,6 +309,7 @@ describe("mobile contracts", () => {
           lastActiveAt: "2024-01-03T00:00:00.000Z",
           createdAt: "2024-01-01T00:00:00.000Z",
           refreshTokenHash: "hash",
+          isCurrent: true,
         },
       ],
       stale: [],

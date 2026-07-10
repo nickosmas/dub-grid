@@ -316,9 +316,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                 Inspect authenticated devices and recent sign-in history.
               </div>
             </div>
-            <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-surface)]">
-              <SessionList />
-            </div>
+            <SessionList />
           </div>
         </div>
       </SectionCard>

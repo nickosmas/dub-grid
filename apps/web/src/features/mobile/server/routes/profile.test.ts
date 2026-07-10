@@ -43,6 +43,9 @@ function mockAuth() {
         last_name: "Diaz",
       },
     },
+    claims: {
+      session_id: "77777777-7777-4777-8777-777777777777",
+    },
     currentOrg: {
       id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
       name: "DubGrid Health",
@@ -325,13 +328,13 @@ describe("mobile profile preference and session routes", () => {
     );
   });
 
-  it("loads and revokes user-scoped sessions", async () => {
+  it("loads and revokes user-scoped sessions, marking the caller's own session current", async () => {
     fetchUserSessionOverviewForUser.mockResolvedValue({
       active: [
         {
           id: "44444444-4444-4444-8444-444444444444",
           userId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
-          supabaseSessionId: null,
+          supabaseSessionId: "77777777-7777-4777-8777-777777777777",
           platform: "ios",
           appVersion: null,
           deviceLabel: "DubGrid Mobile on iOS",
@@ -341,7 +344,20 @@ describe("mobile profile preference and session routes", () => {
           refreshTokenHash: "hash",
         },
       ],
-      stale: [],
+      stale: [
+        {
+          id: "55555555-5555-4555-8555-555555555555",
+          userId: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+          supabaseSessionId: "88888888-8888-4888-8888-888888888888",
+          platform: "android",
+          appVersion: null,
+          deviceLabel: "DubGrid Mobile on Android",
+          ipAddress: null,
+          lastActiveAt: "2024-01-02T00:00:00.000Z",
+          createdAt: "2024-01-01T00:00:00.000Z",
+          refreshTokenHash: "other-hash",
+        },
+      ],
     });
 
     const { DELETE, GET } = await import("./profile-sessions");
@@ -358,7 +374,9 @@ describe("mobile profile preference and session routes", () => {
 
     expect(getResponse.status).toBe(200);
     expect(getPayload.active).toHaveLength(1);
-    expect(getPayload.stale).toHaveLength(0);
+    expect(getPayload.active[0].isCurrent).toBe(true);
+    expect(getPayload.stale).toHaveLength(1);
+    expect(getPayload.stale[0].isCurrent).toBe(false);
     expect(fetchUserSessionOverviewForUser).toHaveBeenCalledWith(
       "8af6f242-c060-4920-a7db-91b4cb66fd26",
     );

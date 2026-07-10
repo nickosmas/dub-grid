@@ -480,9 +480,16 @@ export default function ProfileSecurityScreen() {
             <Text style={styles.sessionIconText}>{formatSessionPlatform(session.platform)}</Text>
           </View>
           <View style={styles.sessionCopy}>
-            <Text style={styles.sessionTitle}>
-              {session.deviceLabel || session.platform || "Unknown device"}
-            </Text>
+            <View style={styles.sessionTitleRow}>
+              <Text style={styles.sessionTitle}>
+                {session.deviceLabel || session.platform || "Unknown device"}
+              </Text>
+              {session.isCurrent && (
+                <View style={styles.sessionCurrentBadge}>
+                  <Text style={styles.sessionCurrentBadgeText}>Current</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.sessionBody}>
               Last active {new Date(session.lastActiveAt).toLocaleString()}
             </Text>
@@ -866,10 +873,26 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
+  sessionTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
   sessionTitle: {
     ...mobileText.rowTitle,
     color: mobileColors.textPrimary,
     fontWeight: "500",
+  },
+  sessionCurrentBadge: {
+    backgroundColor: mobileColors.brand,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+  },
+  sessionCurrentBadgeText: {
+    ...mobileText.micro,
+    color: mobileColors.textInverse,
+    fontWeight: "700",
   },
   sessionBody: {
     ...mobileText.body,

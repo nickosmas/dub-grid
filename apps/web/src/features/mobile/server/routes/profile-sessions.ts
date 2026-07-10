@@ -12,6 +12,7 @@ import { requireMobileAuth } from "@/features/mobile/server";
 
 function mapSession(
   session: Awaited<ReturnType<typeof fetchUserSessionOverviewForUser>>["active"][number],
+  currentSupabaseSessionId: string | undefined,
 ) {
   return {
     id: session.id,
@@ -22,6 +23,8 @@ function mapSession(
     lastActiveAt: session.lastActiveAt,
     createdAt: session.createdAt,
     refreshTokenHash: session.refreshTokenHash,
+    isCurrent:
+      currentSupabaseSessionId != null && session.supabaseSessionId === currentSupabaseSessionId,
   };
 }
 
@@ -30,11 +33,12 @@ export async function GET(req: NextRequest) {
   if ("response" in auth) return auth.response;
 
   const overview = await fetchUserSessionOverviewForUser(auth.user.id);
+  const currentSupabaseSessionId = auth.claims.session_id;
 
   return NextResponse.json(
     mobileProfileSessionsResponseSchema.parse({
-      active: overview.active.map(mapSession),
-      stale: overview.stale.map(mapSession),
+      active: overview.active.map((session) => mapSession(session, currentSupabaseSessionId)),
+      stale: overview.stale.map((session) => mapSession(session, currentSupabaseSessionId)),
     }),
   );
 }

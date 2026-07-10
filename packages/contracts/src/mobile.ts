@@ -346,6 +346,7 @@ export const mobileProfileSessionSchema = z.object({
   lastActiveAt: z.string(),
   createdAt: z.string(),
   refreshTokenHash: z.string().min(1),
+  isCurrent: z.boolean(),
 });
 
 export const mobileProfileSessionsResponseSchema = z.object({
