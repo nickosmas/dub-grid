@@ -80,7 +80,7 @@ describe("Toolbar — Sort menu", () => {
   it("opens a dropdown with Seniority and Alphabetical options", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} />);
-    await user.click(screen.getByRole("button", { name: "Sort" }));
+    await user.click(screen.getByRole("button", { name: "Sort Staff" }));
     expect(screen.getByRole("menuitem", { name: /Seniority/i })).toBeInTheDocument();
     expect(screen.getByRole("menuitem", { name: /Alphabetical/i })).toBeInTheDocument();
   });
@@ -88,7 +88,7 @@ describe("Toolbar — Sort menu", () => {
   it("marks the active sort option with a checkmark", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} sortBy="name" />);
-    await user.click(screen.getByRole("button", { name: "Sort" }));
+    await user.click(screen.getByRole("button", { name: "Sort Staff" }));
     const seniorityItem = screen.getByRole("menuitem", { name: /Seniority/i });
     const alphabeticalItem = screen.getByRole("menuitem", { name: /Alphabetical/i });
     expect(alphabeticalItem.querySelector(".lucide-check")).toBeInTheDocument();
@@ -99,7 +99,7 @@ describe("Toolbar — Sort menu", () => {
     const user = userEvent.setup();
     const onSortByChange = vi.fn();
     render(<Toolbar {...defaultProps} sortBy="seniority" onSortByChange={onSortByChange} />);
-    await user.click(screen.getByRole("button", { name: "Sort" }));
+    await user.click(screen.getByRole("button", { name: "Sort Staff" }));
     await user.click(screen.getByRole("menuitem", { name: /Alphabetical/i }));
     expect(onSortByChange).toHaveBeenCalledExactlyOnceWith("name");
     expect(screen.queryByRole("menuitem", { name: /Alphabetical/i })).not.toBeInTheDocument();

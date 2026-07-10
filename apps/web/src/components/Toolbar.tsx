@@ -156,7 +156,7 @@ function SortMenuButton({
           }}
         >
           <ArrowUpDown size={13} />
-          Sort
+          Sort Staff
         </button>
       </Hint>
       {open && (
