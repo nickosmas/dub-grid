@@ -97,4 +97,23 @@ describe("account session queries", () => {
     expect(sessions.map((s) => s.id)).toEqual(["ios-active", "android-old"]);
     expect(sessions.map((s) => s.isActive)).toEqual([true, false]);
   });
+
+  it("marks only the single most recent same-platform session as active", async () => {
+    const now = new Date("2026-05-08T12:00:00.000Z");
+    const rows = [
+      sessionRow({ id: "safari-now", platform: "web", last_active_at: now.toISOString() }),
+      sessionRow({
+        id: "chrome-1m-ago",
+        platform: "web",
+        last_active_at: "2026-05-08T11:59:00.000Z",
+      }),
+    ];
+    const builder = makeUserSessionsBuilder(rows);
+    fromMock.mockReturnValue(builder);
+
+    const sessions = await fetchImportantUserSessionsForUser(USER_ID, now);
+
+    expect(sessions.map((s) => s.id)).toEqual(["safari-now", "chrome-1m-ago"]);
+    expect(sessions.map((s) => s.isActive)).toEqual([true, false]);
+  });
 });

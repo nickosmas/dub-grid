@@ -124,12 +124,16 @@ export async function fetchImportantUserSessionsForUser(
 
   const important: ImportantUserSessionRecord[] = [];
   for (const group of byGroup.values()) {
-    // fetchUserSessionsForUser already orders by last_active_at desc.
-    const active = group.filter((s) => new Date(s.lastActiveAt).getTime() >= cutoffMs);
-    const lastInactive = group.find((s) => new Date(s.lastActiveAt).getTime() < cutoffMs);
-    important.push(...active.map((s) => ({ ...s, isActive: true })));
-    if (lastInactive) {
-      important.push({ ...lastInactive, isActive: false });
+    // fetchUserSessionsForUser already orders by last_active_at desc, so
+    // only the single most recent session per platform can be "active" -
+    // otherwise every browser tab that pinged within the window would show
+    // as its own revokable session.
+    const [mostRecent, nextMostRecent] = group;
+    if (!mostRecent) continue;
+    const isActive = new Date(mostRecent.lastActiveAt).getTime() >= cutoffMs;
+    important.push({ ...mostRecent, isActive });
+    if (isActive && nextMostRecent) {
+      important.push({ ...nextMostRecent, isActive: false });
     }
   }
 
