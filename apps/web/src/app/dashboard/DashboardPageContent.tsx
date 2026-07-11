@@ -34,6 +34,7 @@ function DashboardContent() {
     focusAreas,
     assignments: assignments,
     shiftCategories,
+    jobs,
     coverageRequirements,
     assignmentLabelMap: assignmentLabelMap,
     absenceTypeMap,
@@ -83,6 +84,7 @@ function DashboardContent() {
           focusAreas={focusAreas}
           assignments={assignments}
           shiftCategories={shiftCategories}
+          jobs={jobs}
           coverageRequirements={coverageRequirements}
           assignmentLabelMap={assignmentLabelMap}
           assignmentById={assignmentById}

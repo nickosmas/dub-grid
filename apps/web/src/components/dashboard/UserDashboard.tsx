@@ -10,13 +10,16 @@ import {
   hasShiftStartedAtTimeRanges,
 } from "@dubgrid/schedule-core";
 import type { OpenShiftVisibility } from "@dubgrid/domain";
+import { isEmployeeEligibleForOpenShift } from "@/app/schedule/_lib/open-shifts";
 import type {
   AbsenceType,
   AssignmentDefinition,
   Employee,
   FocusArea,
+  JobDefinition,
   ScheduleCellInput,
   ScheduleCellStateEntry,
+  ShiftCategory,
   ShiftJobSegment,
   ShiftMap,
   ShiftRequest,
@@ -138,6 +141,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     focusAreas,
     isMobile,
     isTablet,
+    jobs,
     openShifts,
     org,
     periodDates,
@@ -251,13 +255,16 @@ export default function UserDashboard(props: DashboardContentProps) {
       buildAvailableShiftItems({
         assignmentById,
         currentEmpId,
+        currentEmployee,
         currentPeriodShifts,
+        jobs,
         openPickups: shiftRequests.openPickups,
         openShifts,
         now,
         periodEndKey,
         periodStartKey,
         shiftById,
+        shiftCategories,
         todayKey,
         timeZone: org.timezone ?? null,
         visibility: org.openShiftVisibility,
@@ -265,7 +272,9 @@ export default function UserDashboard(props: DashboardContentProps) {
     [
       assignmentById,
       currentEmpId,
+      currentEmployee,
       currentPeriodShifts,
+      jobs,
       now,
       openShifts,
       org.openShiftVisibility,
@@ -273,6 +282,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       periodEndKey,
       periodStartKey,
       shiftById,
+      shiftCategories,
       shiftRequests.openPickups,
       todayKey,
     ],
@@ -1115,13 +1125,16 @@ function segmentsShareShiftAndFocusArea(
 function buildAvailableShiftItems(input: {
   assignmentById: Map<number, AssignmentDefinition>;
   currentEmpId: string | null;
+  currentEmployee: Employee | undefined;
   currentPeriodShifts: ShiftMap;
+  jobs: JobDefinition[];
   now: Date;
   openPickups: ShiftRequest[];
   openShifts: DashboardContentProps["openShifts"];
   periodEndKey: string;
   periodStartKey: string;
   shiftById: Map<number, { abbr?: string | null; name: string }>;
+  shiftCategories: ShiftCategory[];
   todayKey: string;
   timeZone?: string | null;
   visibility?: OpenShiftVisibility;
@@ -1131,10 +1144,20 @@ function buildAvailableShiftItems(input: {
     return [];
   }
 
+  const eligibilityContext = {
+    assignmentById: input.assignmentById,
+    shiftCategories: input.shiftCategories,
+    jobs: input.jobs,
+  };
+  const isEligible = (candidateAssignmentIds: number[]) =>
+    isEmployeeEligibleForOpenShift(candidateAssignmentIds, input.currentEmployee ?? null, eligibilityContext);
+
   // Visibility governs the staff view only; this dashboard is never the
   // scheduler tool. `always` shows every open shift regardless of the viewer's
   // own schedule; `hidden` drops the source entirely; `matched` (default)
   // keeps the conflict filter so a user only sees shifts they could take.
+  // Either way, a shift the viewer isn't personally qualified for (focus
+  // area / role / certification) is never shown — they could never claim it.
   const coverageGapVisibility = input.visibility?.coverageGap ?? "matched";
   const calloffVisibility = input.visibility?.calloff ?? "matched";
 
@@ -1149,7 +1172,9 @@ function buildAvailableShiftItems(input: {
                 input.periodStartKey,
                 input.periodEndKey,
                 input.todayKey,
-              ) && !hasShiftRequestStarted(request, input.now, input.timeZone ?? null),
+              ) &&
+              !hasShiftRequestStarted(request, input.now, input.timeZone ?? null) &&
+              isEligible(request.requesterAssignmentDefinitionIds),
           )
           .map((request) => ({
             date: new Date(`${request.requesterShiftDate}T00:00:00`),
@@ -1186,6 +1211,12 @@ function buildAvailableShiftItems(input: {
                 timeZone: input.timeZone ?? null,
               })
             ) {
+              return false;
+            }
+            const candidateAssignmentIds = openShift.eligibleAssignmentDefinitionIds?.length
+              ? openShift.eligibleAssignmentDefinitionIds
+              : [openShift.preferredOpenAssignmentDefinitionId];
+            if (!isEligible(candidateAssignmentIds)) {
               return false;
             }
             if (coverageGapVisibility === "always") {

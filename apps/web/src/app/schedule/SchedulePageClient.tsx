@@ -27,6 +27,7 @@ import {
   buildGridCalloffOpenShiftsFromRequests,
   countPendingVolunteerRequestsForCoverageGap,
   hasPendingVolunteerRequestForCoverageGap,
+  isEmployeeEligibleForOpenShift,
   selectVisibleCoverageGaps,
 } from "./_lib/open-shifts";
 import { Hint } from "@/components/ui/hint";
@@ -264,10 +265,16 @@ function SchedulerContent() {
     canManageShiftSeries,
     canPublishSchedule,
     canApproveShiftRequests,
+    canManageEmployees,
     isSuperAdmin,
+    isGridmaster,
     isLoading: permsLoading,
     orgId,
   } = usePermissions();
+  // Schedulers/staff managers always see every open shift, as a filling
+  // tool, regardless of the org's openShiftVisibility setting or their own
+  // personal eligibility for a given shift (see openShifts memo below).
+  const canSeeAllOpenShifts = canEditShifts || canManageEmployees || isSuperAdmin || isGridmaster;
   const {
     org,
     focusAreas,
@@ -814,6 +821,9 @@ function SchedulerContent() {
   } | null>(null);
   const [pendingClaimShift, setPendingClaimShift] = useState<GridOpenShift | null>(null);
   const [isClaimShiftPending, setIsClaimShiftPending] = useState(false);
+  // Read-only info view for scheduler/admin viewers who can see every open
+  // shift but aren't personally eligible to claim a given one for themselves.
+  const [openShiftDetails, setOpenShiftDetails] = useState<GridOpenShift | null>(null);
   const [pendingCoverageGapVolunteer, setPendingCoverageGapVolunteer] = useState<{
     assignmentLabel: string;
     date: string;
@@ -2442,34 +2452,68 @@ function SchedulerContent() {
       });
       return items;
     }, []);
-    return [...resolvedCalloffOpenShifts, ...gapShifts].filter((openShift) => {
-      if (isOpenShiftStarted(openShift)) return false;
-      // Schedulers always see every open shift as a filling tool. The
-      // org-level visibility setting only governs the regular-staff view.
-      if (canEditShifts) return true;
-      const mode =
-        openShift.source === "calloff"
-          ? (org?.openShiftVisibility?.calloff ?? "matched")
-          : (org?.openShiftVisibility?.coverageGap ?? "matched");
-      if (mode === "hidden") return false;
-      if (mode === "always") return true;
-      // matched: only show open shifts that fit the viewer's own schedule.
-      return !hasOpenShiftConflict(
-        openShift.assignmentIds ?? [],
-        new Date(`${openShift.date}T00:00:00`),
-        openShift.customStartTime ?? null,
-        openShift.customEndTime ?? null,
-      );
-    });
+    return [...resolvedCalloffOpenShifts, ...gapShifts].reduce<GridOpenShift[]>(
+      (visible, openShift) => {
+        if (isOpenShiftStarted(openShift)) return visible;
+
+        const candidateAssignmentIds = openShift.eligibleAssignmentDefinitionIds?.length
+          ? openShift.eligibleAssignmentDefinitionIds
+          : openShift.assignmentIds;
+        const viewerEligible = isEmployeeEligibleForOpenShift(candidateAssignmentIds, currentEmployee, {
+          assignmentById,
+          shiftCategories,
+          jobs,
+          orgRoles,
+        });
+
+        // Schedulers/staff managers always see every open shift as a filling
+        // tool, regardless of the org-level visibility setting or their own
+        // personal eligibility for a given shift — click routing (see
+        // handleOpenShiftClick) handles the "can't claim this one for
+        // myself" case instead of hiding it from them.
+        if (canSeeAllOpenShifts) {
+          visible.push({ ...openShift, viewerEligible });
+          return visible;
+        }
+
+        // Plain staff only ever see shifts they're personally eligible for.
+        if (!viewerEligible) return visible;
+
+        const mode =
+          openShift.source === "calloff"
+            ? (org?.openShiftVisibility?.calloff ?? "matched")
+            : (org?.openShiftVisibility?.coverageGap ?? "matched");
+        if (mode === "hidden") return visible;
+        if (
+          mode !== "always" &&
+          hasOpenShiftConflict(
+            openShift.assignmentIds ?? [],
+            new Date(`${openShift.date}T00:00:00`),
+            openShift.customStartTime ?? null,
+            openShift.customEndTime ?? null,
+          )
+        ) {
+          return visible;
+        }
+
+        visible.push({ ...openShift, viewerEligible: true });
+        return visible;
+      },
+      [],
+    );
   }, [
     assignmentById,
-    canEditShifts,
+    canSeeAllOpenShifts,
     currentEmpId,
+    currentEmployee,
     getActionableCoverageGapAssignmentIds,
     hasOpenShiftConflict,
     isOpenShiftStarted,
+    jobs,
     org?.openShiftVisibility,
+    orgRoles,
     resolvedCalloffOpenShifts,
+    shiftCategories,
     shiftRequests.requests,
     visibleCoverageGaps,
   ]);
@@ -4622,6 +4666,38 @@ function SchedulerContent() {
     [assignments, jobs, shiftCategories],
   );
 
+  // Why the viewer currently looking at openShiftDetails can't personally
+  // claim it — shown in the read-only details modal below.
+  const openShiftDetailsReasons = useMemo(() => {
+    if (!openShiftDetails) return [];
+    if (!currentEmployee) return ["a linked staff profile"];
+    const representativeId =
+      openShiftDetails.assignmentIds[0] ??
+      openShiftDetails.eligibleAssignmentDefinitionIds?.[0] ??
+      null;
+    const assignment = representativeId != null ? assignmentById.get(representativeId) : undefined;
+    if (!assignment) return [];
+    return getAssignmentDisqualificationReasons(currentEmployee, {
+      assignment,
+      shiftCategories,
+      jobs,
+      focusAreaNames: focusAreaNameMap,
+      roleNames: roleNameMap,
+      certificationNames: certificationNameMap,
+      orgRoles,
+    });
+  }, [
+    openShiftDetails,
+    currentEmployee,
+    assignmentById,
+    shiftCategories,
+    jobs,
+    focusAreaNameMap,
+    roleNameMap,
+    certificationNameMap,
+    orgRoles,
+  ]);
+
   const handleClaimOpenShift = useMemo<ScheduleGridHandlers["onClaimOpenShift"]>(
     () =>
       currentEmpId
@@ -4735,6 +4811,23 @@ function SchedulerContent() {
       shiftCategories,
       assignmentById,
     ],
+  );
+
+  // Routes an open-shift click to the claim/volunteer flow when the viewer is
+  // personally eligible, or to a read-only details view when they aren't
+  // (only reachable by canSeeAllOpenShifts viewers — everyone else never sees
+  // an ineligible shift in the first place, per the openShifts memo above).
+  const handleOpenShiftClick = useCallback(
+    (openShift: GridOpenShift) => {
+      if (openShift.viewerEligible === false) {
+        if (canSeeAllOpenShifts) {
+          setOpenShiftDetails(openShift);
+        }
+        return;
+      }
+      handleClaimOpenShift?.(openShift);
+    },
+    [canSeeAllOpenShifts, handleClaimOpenShift],
   );
 
   const scheduleGridModel = useMemo(
@@ -5076,7 +5169,7 @@ function SchedulerContent() {
           ? (cellId) => handleClearShift(cellId.empId, getDateFromCellId(cellId))
           : undefined,
       onToggleBulkDeleteCell: isBulkDeleteMode ? handleToggleBulkDeleteCell : undefined,
-      onClaimOpenShift: handleClaimOpenShift,
+      onClaimOpenShift: handleOpenShiftClick,
     }),
     [
       handleGridCellActivate,
@@ -5089,7 +5182,7 @@ function SchedulerContent() {
       handleClearShift,
       getDateFromCellId,
       handleToggleBulkDeleteCell,
-      handleClaimOpenShift,
+      handleOpenShiftClick,
     ],
   );
 
@@ -6063,6 +6156,29 @@ function SchedulerContent() {
                   }
                 }}
               />
+            )}
+
+            {/* Read-only info view for scheduler/admin viewers who see every
+                open shift but aren't personally eligible to claim this one. */}
+            {openShiftDetails && (
+              <Modal title="Open Shift Details" onClose={() => setOpenShiftDetails(null)}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div>
+                    <strong>
+                      {spellOutAssignment(openShiftDetails.assignmentIds[0]) ??
+                        openShiftDetails.assignmentLabel}
+                    </strong>{" "}
+                    on <strong>{openShiftDetails.date}</strong>
+                  </div>
+                  {openShiftDetails.calledOffBy && <div>Called off by {openShiftDetails.calledOffBy}</div>}
+                  <div>{openShiftDetails.needed ?? 1} needed</div>
+                  <div style={{ color: "var(--color-text-muted)" }}>
+                    {openShiftDetailsReasons.length > 0
+                      ? `You can't personally claim this shift: it requires ${openShiftDetailsReasons.join(", ")}.`
+                      : "You aren't personally eligible to claim this shift."}
+                  </div>
+                </div>
+              </Modal>
             )}
 
             {/* Confirm dialog for pasting over an existing shift */}

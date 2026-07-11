@@ -5,6 +5,7 @@ import type {
   FocusArea,
   AssignmentDefinition,
   ShiftCategory,
+  JobDefinition,
   CoverageRequirement,
   Employee,
   ShiftMap,
@@ -30,6 +31,7 @@ export interface DashboardContentProps {
   focusAreas: FocusArea[];
   assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
   coverageRequirements: CoverageRequirement[];
   assignmentLabelMap: Map<number, string>;
   assignmentById: Map<number, AssignmentDefinition>;

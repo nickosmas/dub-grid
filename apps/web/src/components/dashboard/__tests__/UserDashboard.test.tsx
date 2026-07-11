@@ -305,6 +305,7 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
     focusAreas: [focusArea],
     isMobile: false,
     isTablet: false,
+    jobs: [],
     onExpandPanel: vi.fn(),
     openShifts: [openShift],
     org,

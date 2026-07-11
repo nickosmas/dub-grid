@@ -1265,4 +1265,10 @@ export interface GridOpenShift {
   requestId?: string;
   /** Number of staff still needed for this open shift. */
   needed?: number;
+  /**
+   * Whether the viewer is personally qualified (focus area + role + cert) to
+   * claim this shift for themselves. Computed per-viewer when the grid's
+   * open-shifts list is built; absent means "not yet computed."
+   */
+  viewerEligible?: boolean;
 }

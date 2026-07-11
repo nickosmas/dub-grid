@@ -3,9 +3,10 @@ import {
   buildGridCalloffOpenShiftsFromRequests,
   countPendingVolunteerRequestsForCoverageGap,
   hasPendingVolunteerRequestForCoverageGap,
+  isEmployeeEligibleForOpenShift,
   selectVisibleCoverageGaps,
 } from "./open-shifts";
-import type { CoverageGap, Employee, ShiftRequest } from "@/types";
+import type { AssignmentDefinition, CoverageGap, Employee, ShiftCategory, ShiftRequest } from "@/types";
 
 function buildEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -91,6 +92,36 @@ function buildShiftRequest(overrides: Partial<ShiftRequest> = {}): ShiftRequest 
     resolvedAt: null,
     createdAt: "2026-04-20T12:00:00.000Z",
     updatedAt: "2026-04-20T12:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function buildShiftCategory(overrides: Partial<ShiftCategory> = {}): ShiftCategory {
+  return {
+    id: 5,
+    orgId: "org-1",
+    name: "Days",
+    sortOrder: 0,
+    focusAreaId: 11,
+    ...overrides,
+  };
+}
+
+function buildAssignmentDefinition(overrides: Partial<AssignmentDefinition> = {}): AssignmentDefinition {
+  return {
+    id: 21,
+    orgId: "org-1",
+    label: "D",
+    name: "Day Shift",
+    color: "#fff",
+    border: "#000",
+    text: "#000",
+    categoryId: 5,
+    shiftId: 5,
+    jobId: 8,
+    focusAreaId: 11,
+    sortOrder: 0,
+    requiredCertificationIds: [],
     ...overrides,
   };
 }
@@ -343,6 +374,89 @@ describe("buildGridCalloffOpenShiftsFromRequests", () => {
             requesterFocusAreaId: null,
           }),
         ],
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("isEmployeeEligibleForOpenShift", () => {
+  const assignment = buildAssignmentDefinition();
+  const assignmentById = new Map([[assignment.id, assignment]]);
+  const shiftCategories = [buildShiftCategory()];
+
+  it("returns false when there is no employee to check against", () => {
+    expect(
+      isEmployeeEligibleForOpenShift([21], null, {
+        assignmentById,
+        shiftCategories,
+        jobs: [],
+      }),
+    ).toBe(false);
+  });
+
+  it("returns true when the employee's focus area matches and the shift has no other requirements", () => {
+    expect(
+      isEmployeeEligibleForOpenShift([21], buildEmployee({ focusAreaIds: [11] }), {
+        assignmentById,
+        shiftCategories,
+        jobs: [],
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when the employee is not assigned to the shift's focus area", () => {
+    expect(
+      isEmployeeEligibleForOpenShift([21], buildEmployee({ focusAreaIds: [99] }), {
+        assignmentById,
+        shiftCategories,
+        jobs: [],
+      }),
+    ).toBe(false);
+  });
+
+  it("returns false when the employee lacks a required certification", () => {
+    const certifiedAssignment = buildAssignmentDefinition({ requiredCertificationIds: [3] });
+    const byId = new Map([[certifiedAssignment.id, certifiedAssignment]]);
+
+    expect(
+      isEmployeeEligibleForOpenShift([21], buildEmployee({ focusAreaIds: [11], certificationId: null }), {
+        assignmentById: byId,
+        shiftCategories,
+        jobs: [],
+      }),
+    ).toBe(false);
+
+    expect(
+      isEmployeeEligibleForOpenShift([21], buildEmployee({ focusAreaIds: [11], certificationId: 3 }), {
+        assignmentById: byId,
+        shiftCategories,
+        jobs: [],
+      }),
+    ).toBe(true);
+  });
+
+  it("returns true if the employee qualifies for at least one candidate assignment", () => {
+    const otherAssignment = buildAssignmentDefinition({ id: 22, focusAreaId: 99 });
+    const byId = new Map([
+      [assignment.id, assignment],
+      [otherAssignment.id, otherAssignment],
+    ]);
+
+    expect(
+      isEmployeeEligibleForOpenShift([22, 21], buildEmployee({ focusAreaIds: [11] }), {
+        assignmentById: byId,
+        shiftCategories: [buildShiftCategory(), buildShiftCategory({ id: 6, focusAreaId: 99 })],
+        jobs: [],
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false when a candidate assignment id isn't in the lookup map", () => {
+    expect(
+      isEmployeeEligibleForOpenShift([999], buildEmployee({ focusAreaIds: [11] }), {
+        assignmentById,
+        shiftCategories,
+        jobs: [],
       }),
     ).toBe(false);
   });

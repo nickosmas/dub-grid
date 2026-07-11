@@ -13,6 +13,7 @@ import type {
   FocusArea,
   AssignmentDefinition,
   ShiftCategory,
+  JobDefinition,
   CoverageRequirement,
   Employee,
   AbsenceType,
@@ -97,6 +98,7 @@ interface DashboardViewProps {
   focusAreas: FocusArea[];
   assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
   coverageRequirements: CoverageRequirement[];
   assignmentLabelMap: Map<number, string>;
   assignmentById: Map<number, AssignmentDefinition>;
@@ -185,6 +187,7 @@ export default function DashboardView({
   focusAreas,
   assignments,
   shiftCategories,
+  jobs,
   coverageRequirements,
   assignmentLabelMap,
   assignmentById,
@@ -921,6 +924,7 @@ export default function DashboardView({
     focusAreas,
     assignments,
     shiftCategories,
+    jobs,
     coverageRequirements,
     assignmentLabelMap,
     assignmentById,
