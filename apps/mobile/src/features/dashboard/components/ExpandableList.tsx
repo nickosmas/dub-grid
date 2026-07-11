@@ -4,7 +4,7 @@ import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { mobileColors, mobileText } from "../../../shared/theme/tokens";
 
-const DEFAULT_COLLAPSED_COUNT = 3;
+const DEFAULT_COLLAPSED_COUNT = 5;
 
 export function ExpandableList<T>({
   title,
@@ -13,6 +13,7 @@ export function ExpandableList<T>({
   renderItem,
   renderDivider,
   collapsedCount = DEFAULT_COLLAPSED_COUNT,
+  onSeeAll,
 }: {
   title: string;
   items: T[];
@@ -20,6 +21,11 @@ export function ExpandableList<T>({
   renderItem: (item: T) => ReactNode;
   renderDivider?: () => ReactNode;
   collapsedCount?: number;
+  /**
+   * When provided, "See all N" navigates via this callback (e.g. to a
+   * full-page expanded route) instead of opening the built-in bottom sheet.
+   */
+  onSeeAll?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasMore = items.length > collapsedCount;
@@ -41,18 +47,20 @@ export function ExpandableList<T>({
           compact
           tone="link"
           label={`See all ${items.length}`}
-          onPress={() => setExpanded(true)}
+          onPress={onSeeAll ?? (() => setExpanded(true))}
         />
       ) : null}
-      <BottomSheetModal
-        visible={expanded}
-        onDismiss={() => setExpanded(false)}
-        scrollable
-        footer={<Button label="Done" onPress={() => setExpanded(false)} />}
-      >
-        <Text style={styles.sheetTitle}>{title}</Text>
-        <View style={styles.list}>{renderRows(items)}</View>
-      </BottomSheetModal>
+      {onSeeAll ? null : (
+        <BottomSheetModal
+          visible={expanded}
+          onDismiss={() => setExpanded(false)}
+          scrollable
+          footer={<Button label="Done" onPress={() => setExpanded(false)} />}
+        >
+          <Text style={styles.sheetTitle}>{title}</Text>
+          <View style={styles.list}>{renderRows(items)}</View>
+        </BottomSheetModal>
+      )}
     </View>
   );
 }

@@ -73,4 +73,27 @@ describe("DashboardHeader", () => {
 
     expect(screen.getByText(/Acme Care/)).toBeInTheDocument();
   });
+
+  it("shows the period date range separated from the time by a |", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    render(
+      <DashboardHeader
+        firstName="Jordan"
+        orgName="Acme Care"
+        timezone="America/Los_Angeles"
+        periodLabel="Jul 5–11, 2026"
+      />,
+    );
+
+    expect(screen.getByText(/Acme Care · .* \| Jul 5–11, 2026/)).toBeInTheDocument();
+  });
+
+  it("omits the | separator entirely when no period label is given", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    render(<DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />);
+
+    expect(screen.queryByText(/\|/)).not.toBeInTheDocument();
+  });
 });

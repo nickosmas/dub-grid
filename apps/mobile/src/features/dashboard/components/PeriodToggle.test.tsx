@@ -14,7 +14,7 @@ describe("PeriodToggle", () => {
   it("marks the active mode as selected", () => {
     render(<PeriodToggle mode="week" onChange={vi.fn()} />);
 
-    expect(screen.getByText("1 Week").closest("button")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Week").closest("button")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("2 Weeks").closest("button")).toHaveAttribute("aria-selected", "false");
   });
 
@@ -25,5 +25,14 @@ describe("PeriodToggle", () => {
     fireEvent.click(screen.getByText("2 Weeks"));
 
     expect(onChange).toHaveBeenCalledWith("2weeks");
+  });
+
+  it("disables presses while loading", () => {
+    const onChange = vi.fn();
+    render(<PeriodToggle mode="week" onChange={onChange} loading />);
+
+    fireEvent.click(screen.getByText("2 Weeks"));
+
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

@@ -4,6 +4,7 @@ import type {
   MobileScheduleRange,
   MobileShiftRequest,
 } from "@dubgrid/contracts";
+import type { CoverageByFocusAreaEntry, CoverageTotals } from "@dubgrid/schedule-core";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { MobileApiAuthorizationError } from "./read";
 
@@ -28,7 +29,24 @@ export type MobileDashboardContext = {
 // fetchMobileOpenShifts/fetchMobileShiftRequests wrappers already return —
 // injected rather than imported so this package stays DB/app agnostic.
 
-type FetchMobileOpenShifts = (
+export type MobileCoverageSummary = {
+  openShifts: MobileOpenShift[];
+  totals: CoverageTotals;
+  byFocusArea: CoverageByFocusAreaEntry[];
+  hasCoverageRequirements: boolean;
+  // Draft-preferred ("effective") schedule rows for the same org/date range,
+  // fetched once as part of the coverage-engine pass. Reused for
+  // computeStaffHoursForPeriod below instead of a second, redundant fetch.
+  scheduleRows: DashboardScheduleCellRow[];
+};
+
+// Both the dashboard's coverage totals and its open-shifts list are built
+// from one shared coverage-engine pass (see fetchMobileCoverageSummary in
+// apps/web/src/features/mobile/server/data.ts), so the numbers here can
+// never disagree with each other — and because the underlying engine now
+// lives in @dubgrid/schedule-core, they can't silently diverge from web's
+// dashboard numbers either.
+type FetchMobileCoverageSummary = (
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
@@ -37,7 +55,7 @@ type FetchMobileOpenShifts = (
     startDate: string;
     endDate: string;
   },
-) => Promise<MobileOpenShift[]>;
+) => Promise<MobileCoverageSummary>;
 
 type FetchMobileShiftRequests = (
   serviceClient: SupabaseClient,
@@ -64,17 +82,24 @@ export type DashboardCoverageRequirementRow = {
   min_staff: number;
 };
 
+export type DashboardFocusAreaRow = {
+  id: number;
+  name: string;
+};
+
 type FetchMobileOpenShiftContext = (
   serviceClient: SupabaseClient,
   orgId: string,
 ) => Promise<{
   shiftCategoryRows: DashboardShiftCategoryRow[];
   coverageRequirementRows: DashboardCoverageRequirementRow[];
+  focusAreaRows: DashboardFocusAreaRow[];
 }>;
 
 export type DashboardScheduleCellRow = {
   emp_id: string;
   date: string;
+  focus_area_id: number | null;
   state: {
     kind: string;
     segments: Array<{ shiftId: number | null }>;
@@ -84,16 +109,19 @@ export type DashboardScheduleCellRow = {
   employees: { id: string; first_name: string; last_name: string };
 };
 
-type FetchPublishedMobileScheduleRows = (
-  serviceClient: SupabaseClient,
-  input: { orgId: string; startDate: string; endDate: string },
-) => Promise<DashboardScheduleCellRow[]>;
+export type DashboardPublishChange = {
+  empId: string;
+  date: string;
+  kind: "new" | "modified" | "deleted";
+};
 
 export type DashboardPublishHistoryRow = {
   published_by: string | null;
   start_date: string;
   end_date: string;
   published_at: string;
+  change_count: number;
+  changes: DashboardPublishChange[];
 };
 
 type FetchMobilePublishHistoryRows = (
@@ -101,6 +129,18 @@ type FetchMobilePublishHistoryRows = (
   orgId: string,
   input?: { startDate?: string; endDate?: string },
 ) => Promise<DashboardPublishHistoryRow[]>;
+
+export type DashboardAcceptedInvitationRow = {
+  email: string;
+  role_to_assign: string;
+  accepted_at: string;
+};
+
+type FetchMobileAcceptedInvitationRows = (
+  serviceClient: SupabaseClient,
+  orgId: string,
+  input: { startDate: string; endDate: string },
+) => Promise<DashboardAcceptedInvitationRow[]>;
 
 export type DashboardProfileNameRow = {
   id: string;
@@ -147,33 +187,6 @@ function getDateKeysInRange(startDate: string, endDate: string): string[] {
   return keys;
 }
 
-export function computeTotalRequiredSlots(
-  requirements: DashboardCoverageRequirementRow[],
-  dateKeys: string[],
-): number {
-  // Group by (focusAreaId, jobId, preferredShiftId); within each group,
-  // a day-specific row takes precedence over the "every day" (day_of_week:
-  // null) fallback — mirrors resolveCoverageRequirement's precedence
-  // (apps/web/src/lib/schedule-logic.ts).
-  const byCombo = new Map<string, DashboardCoverageRequirementRow[]>();
-  for (const req of requirements) {
-    const key = `${req.focus_area_id}_${req.job_id ?? "any"}_${req.preferred_shift_id ?? "any"}`;
-    const list = byCombo.get(key) ?? [];
-    list.push(req);
-    byCombo.set(key, list);
-  }
-
-  let total = 0;
-  for (const dateKey of dateKeys) {
-    const dayOfWeek = new Date(`${dateKey}T00:00:00`).getDay();
-    for (const group of byCombo.values()) {
-      const match = group.find((r) => r.day_of_week === dayOfWeek) ?? group.find((r) => r.day_of_week === null);
-      if (match) total += match.min_staff;
-    }
-  }
-  return total;
-}
-
 export function buildHeroSummary(input: {
   openGapCount: number;
   pendingApprovalsCount: number;
@@ -207,39 +220,51 @@ export function buildHeroSummary(input: {
   };
 }
 
-export function groupOpenShiftsBySection(
-  openShifts: MobileOpenShift[],
+// Required-vs-filled per focus area — the mobile analog of web's
+// "Coverage by wing" card (apps/web/src/components/dashboard/
+// CoverageBySectionCard.tsx). `byFocusArea` comes straight from
+// @dubgrid/schedule-core's summarizeCoverageByFocusArea, the same
+// aggregation web's dashboard uses, so filled/required here are real
+// per-employee-assignment counts — not an open-slot approximation.
+export function buildCoverageSectionsResponse(
+  byFocusArea: CoverageByFocusAreaEntry[],
 ): MobileDashboardResponse["coverageBySection"] {
-  const bySection = new Map<
-    number,
-    { focusAreaId: number; focusAreaName: string; openSlots: number }
-  >();
+  return byFocusArea
+    .map((entry) => ({
+      focusAreaId: entry.focusAreaId,
+      focusAreaName: entry.focusAreaName,
+      requiredTotal: entry.requiredTotal,
+      filledTotal: entry.filledTotal,
+      pct: entry.pct,
+      openSlots: Math.max(0, entry.requiredTotal - entry.filledTotal),
+    }))
+    .sort((a, b) => a.pct - b.pct || b.openSlots - a.openSlots)
+    .slice(0, MAX_COVERAGE_SECTIONS);
+}
 
-  for (const shift of openShifts) {
-    const existing = bySection.get(shift.focusAreaId);
-    if (existing) {
-      existing.openSlots += shift.needed;
-    } else {
-      bySection.set(shift.focusAreaId, {
-        focusAreaId: shift.focusAreaId,
-        focusAreaName: shift.focusAreaName ?? "Unassigned",
-        openSlots: shift.needed,
-      });
+function getPrimaryFocusAreaId(hoursByFocusArea: Map<number, number>): number | null {
+  let best: number | null = null;
+  let bestHours = -1;
+  for (const [focusAreaId, hours] of hoursByFocusArea) {
+    if (hours > bestHours) {
+      best = focusAreaId;
+      bestHours = hours;
     }
   }
-
-  return Array.from(bySection.values())
-    .sort((a, b) => b.openSlots - a.openSlots)
-    .slice(0, MAX_COVERAGE_SECTIONS);
+  return best;
 }
 
 export function computeStaffHoursForPeriod(
   scheduleRows: DashboardScheduleCellRow[],
   shiftCategoriesById: Map<number, DashboardShiftCategoryRow>,
+  focusAreaNameById: Map<number, string>,
   range: MobileScheduleRange,
   otThreshold = OVERTIME_THRESHOLD_HOURS,
 ): MobileDashboardResponse["staffHours"] {
-  const byEmployee = new Map<string, { name: string; dailyHours: Map<string, number> }>();
+  const byEmployee = new Map<
+    string,
+    { name: string; dailyHours: Map<string, number>; hoursByFocusArea: Map<number, number> }
+  >();
 
   for (const row of scheduleRows) {
     if (row.state.kind !== "worked") continue;
@@ -267,8 +292,18 @@ export function computeStaffHoursForPeriod(
     if (hours <= 0) continue;
 
     const name = `${row.employees.first_name} ${row.employees.last_name}`.trim();
-    const entry = byEmployee.get(row.emp_id) ?? { name, dailyHours: new Map<string, number>() };
+    const entry = byEmployee.get(row.emp_id) ?? {
+      name,
+      dailyHours: new Map<string, number>(),
+      hoursByFocusArea: new Map<number, number>(),
+    };
     entry.dailyHours.set(row.date, (entry.dailyHours.get(row.date) ?? 0) + hours);
+    if (row.focus_area_id != null) {
+      entry.hoursByFocusArea.set(
+        row.focus_area_id,
+        (entry.hoursByFocusArea.get(row.focus_area_id) ?? 0) + hours,
+      );
+    }
     byEmployee.set(row.emp_id, entry);
   }
 
@@ -278,7 +313,7 @@ export function computeStaffHoursForPeriod(
   const dateKeys = getDateKeysInRange(range.startDate, range.endDate);
   const results: MobileDashboardResponse["staffHours"] = [];
 
-  for (const [employeeId, { name, dailyHours }] of byEmployee) {
+  for (const [employeeId, { name, dailyHours, hoursByFocusArea }] of byEmployee) {
     let totalHours = 0;
     let overtimeHours = 0;
     for (let i = 0; i < dateKeys.length; i += 7) {
@@ -290,11 +325,20 @@ export function computeStaffHoursForPeriod(
       overtimeHours += Math.max(0, weekTotal - otThreshold);
     }
     if (overtimeHours > 0) {
+      // An employee can work across multiple focus areas in a period — filter
+      // by whichever one they logged the most hours in, matching how web
+      // attributes a single-employee overtime alert to one focus area
+      // (apps/web/src/lib/dashboard-stats.ts's computeOTAlerts, which uses
+      // the employee's first/home focus area).
+      const primaryFocusAreaId = getPrimaryFocusAreaId(hoursByFocusArea);
       results.push({
         employeeId,
         employeeName: name,
         totalHours: Math.round(totalHours * 10) / 10,
         overtimeHours: Math.round(overtimeHours * 10) / 10,
+        focusAreaId: primaryFocusAreaId,
+        focusAreaName:
+          primaryFocusAreaId != null ? (focusAreaNameById.get(primaryFocusAreaId) ?? null) : null,
       });
     }
   }
@@ -302,24 +346,82 @@ export function computeStaffHoursForPeriod(
   return results.sort((a, b) => b.overtimeHours - a.overtimeHours).slice(0, MAX_STAFF_HOURS_ENTRIES);
 }
 
-export function buildActivityFeedFromPublishHistory(
-  rows: DashboardPublishHistoryRow[],
+const SHIFT_CHANGE_DESCRIPTION: Record<DashboardPublishChange["kind"], string> = {
+  new: "Shift added",
+  modified: "Shift updated",
+  deleted: "Shift removed",
+};
+
+function getShiftRequestStatusLabel(status: string): string {
+  if (status === "open") return "Open";
+  if (status === "pending_approval") return "Pending";
+  return status;
+}
+
+// Same 4 event types as web's buildActivityFeed (apps/web/src/lib/
+// dashboard-stats.ts): publish, shift_change (per-shift diff from the same
+// publish_history.changes JSONB column web reads), request (any shift
+// request, no status/type filter — matches web's unfiltered fetch), and
+// user_signup (any invitation with a non-null acceptedAt). Mobile's activity
+// item is pre-composed text (no separate highlight/href fields like web's),
+// so per-type detail that web puts in `highlight` is folded into
+// `description` here instead.
+export function buildActivityFeed(
+  publishHistoryRows: DashboardPublishHistoryRow[],
+  shiftRequests: MobileShiftRequest[],
+  acceptedInvitations: DashboardAcceptedInvitationRow[],
   nameByProfileId: Map<string, string>,
+  maxItems = MAX_ACTIVITY_ITEMS,
 ): MobileDashboardResponse["activity"] {
-  return rows
-    .slice()
-    .sort((a, b) => (a.published_at < b.published_at ? 1 : -1))
-    .slice(0, MAX_ACTIVITY_ITEMS)
-    .map((row, index) => {
-      const publisherName = row.published_by
-        ? (nameByProfileId.get(row.published_by) ?? "Someone")
-        : "Someone";
-      return {
-        id: `${row.published_at}-${index}`,
-        description: `${publisherName} published the schedule for ${formatUsDateForActivity(row.start_date)} to ${formatUsDateForActivity(row.end_date)}`,
-        timestamp: row.published_at,
-      };
+  const items: MobileDashboardResponse["activity"] = [];
+
+  for (const row of publishHistoryRows) {
+    const publisherName = row.published_by
+      ? (nameByProfileId.get(row.published_by) ?? "Someone")
+      : "Someone";
+    items.push({
+      id: `pub_${row.published_at}`,
+      type: "publish",
+      description: `${publisherName} published the schedule for ${formatUsDateForActivity(row.start_date)} to ${formatUsDateForActivity(row.end_date)}`,
+      timestamp: row.published_at,
     });
+
+    for (const change of row.changes.slice(0, 12)) {
+      items.push({
+        id: `chg_${row.published_at}_${change.empId}_${change.date}_${change.kind}`,
+        type: "shift_change",
+        description: `${SHIFT_CHANGE_DESCRIPTION[change.kind]} · ${formatUsDateForActivity(change.date)}`,
+        timestamp: row.published_at,
+      });
+    }
+  }
+
+  for (const request of shiftRequests) {
+    const isPickup = request.type === "pickup";
+    const shiftName = request.requesterPresentation.shiftName || request.requesterPresentation.label;
+    const statusLabel = getShiftRequestStatusLabel(request.status);
+    items.push({
+      id: `req_${request.id}`,
+      type: "request",
+      description: isPickup
+        ? `Pickup request · ${shiftName} · ${statusLabel}`
+        : `Swap request · ${request.requesterName} · ${statusLabel}`,
+      timestamp: request.createdAt,
+    });
+  }
+
+  for (const invitation of acceptedInvitations) {
+    items.push({
+      id: `signup_${invitation.accepted_at}_${invitation.email}`,
+      type: "user_signup",
+      description: `User sign-up completed · ${invitation.email} (${invitation.role_to_assign})`,
+      timestamp: invitation.accepted_at,
+    });
+  }
+
+  return items
+    .sort((a, b) => (a.timestamp === b.timestamp ? 0 : a.timestamp < b.timestamp ? 1 : -1))
+    .slice(0, maxItems);
 }
 
 // ── Payload loader ───────────────────────────────────────────────────────
@@ -328,11 +430,11 @@ export async function loadMobileDashboardPayload(
   auth: MobileDashboardContext,
   range: MobileScheduleRange,
   deps: {
-    fetchMobileOpenShifts: FetchMobileOpenShifts;
+    fetchMobileCoverageSummary: FetchMobileCoverageSummary;
     fetchMobileShiftRequests: FetchMobileShiftRequests;
     fetchMobileOpenShiftContext: FetchMobileOpenShiftContext;
-    fetchPublishedMobileScheduleRows: FetchPublishedMobileScheduleRows;
     fetchMobilePublishHistoryRows: FetchMobilePublishHistoryRows;
+    fetchMobileAcceptedInvitationRows: FetchMobileAcceptedInvitationRows;
     fetchProfileNameRowsByIds: FetchProfileNameRowsByIds;
   },
 ): Promise<MobileDashboardResponse> {
@@ -345,9 +447,9 @@ export async function loadMobileDashboardPayload(
 
   const isAdmin = auth.effectiveRole === "admin";
 
-  const [openShifts, shiftRequests, openShiftContext, scheduleRows, publishHistoryRows] =
+  const [coverageSummary, shiftRequests, openShiftContext, publishHistoryRows, acceptedInvitations] =
     await Promise.all([
-      deps.fetchMobileOpenShifts(auth.serviceClient, {
+      deps.fetchMobileCoverageSummary(auth.serviceClient, {
         orgId: auth.currentOrg.id,
         showAll: true,
         timeZone: auth.currentOrg.timezone ?? null,
@@ -357,7 +459,10 @@ export async function loadMobileDashboardPayload(
       // Both admin and super_admin can approve requests (canApproveShiftRequests
       // is true for both by default), so the pending-approvals count on the
       // hero summary reflects both — only the ActionQueueCard list itself
-      // stays admin-only on the client, matching web's AdminDashboard.
+      // stays admin-only on the client, matching web's AdminDashboard. This
+      // also doubles as the activity feed's "request" events (no employeeId
+      // set here, so the underlying query is unfiltered by status/type —
+      // matches web's unfiltered shift-request fetch for its own feed).
       deps.fetchMobileShiftRequests(auth.serviceClient, {
         orgId: auth.currentOrg.id,
         includeOpenPickupRequests: false,
@@ -365,12 +470,11 @@ export async function loadMobileDashboardPayload(
         endDate: range.endDate,
       }),
       deps.fetchMobileOpenShiftContext(auth.serviceClient, auth.currentOrg.id),
-      deps.fetchPublishedMobileScheduleRows(auth.serviceClient, {
-        orgId: auth.currentOrg.id,
+      deps.fetchMobilePublishHistoryRows(auth.serviceClient, auth.currentOrg.id, {
         startDate: range.startDate,
         endDate: range.endDate,
       }),
-      deps.fetchMobilePublishHistoryRows(auth.serviceClient, auth.currentOrg.id, {
+      deps.fetchMobileAcceptedInvitationRows(auth.serviceClient, auth.currentOrg.id, {
         startDate: range.startDate,
         endDate: range.endDate,
       }),
@@ -379,6 +483,7 @@ export async function loadMobileDashboardPayload(
   const shiftCategoriesById = new Map(
     openShiftContext.shiftCategoryRows.map((row) => [row.id, row]),
   );
+  const focusAreaNameById = new Map(openShiftContext.focusAreaRows.map((row) => [row.id, row.name]));
 
   const publisherIds = Array.from(
     new Set(
@@ -401,15 +506,9 @@ export async function loadMobileDashboardPayload(
   const pendingApprovalRequests = shiftRequests.filter(
     (request) => request.status === "pending_approval",
   );
+  const { openShifts, totals, byFocusArea, hasCoverageRequirements, scheduleRows } = coverageSummary;
   const openGapCount = openShifts.reduce((sum, shift) => sum + shift.needed, 0);
-  const hasCoverageRequirements = openShiftContext.coverageRequirementRows.length > 0;
-  const totalRequiredSlots = computeTotalRequiredSlots(
-    openShiftContext.coverageRequirementRows,
-    getDateKeysInRange(range.startDate, range.endDate),
-  );
-  const coveragePct = hasCoverageRequirements
-    ? Math.max(0, Math.min(100, Math.round(((totalRequiredSlots - openGapCount) / Math.max(totalRequiredSlots, 1)) * 100)))
-    : null;
+  const coveragePct = hasCoverageRequirements ? totals.pct : null;
 
   return {
     range,
@@ -424,13 +523,13 @@ export async function loadMobileDashboardPayload(
       openGapCount,
       pendingApprovalsCount: pendingApprovalRequests.length,
     },
-    coverageBySection: groupOpenShiftsBySection(openShifts),
+    coverageBySection: buildCoverageSectionsResponse(byFocusArea),
     openShifts: openShifts
       .slice()
       .sort((a, b) => (a.date < b.date ? -1 : 1))
       .slice(0, MAX_OPEN_SHIFTS),
-    activity: buildActivityFeedFromPublishHistory(publishHistoryRows, nameByProfileId),
-    staffHours: computeStaffHoursForPeriod(scheduleRows, shiftCategoriesById, range),
+    activity: buildActivityFeed(publishHistoryRows, shiftRequests, acceptedInvitations, nameByProfileId),
+    staffHours: computeStaffHoursForPeriod(scheduleRows, shiftCategoriesById, focusAreaNameById, range),
     actionQueue: isAdmin ? pendingApprovalRequests.slice(0, MAX_ACTION_QUEUE_ITEMS) : [],
   };
 }

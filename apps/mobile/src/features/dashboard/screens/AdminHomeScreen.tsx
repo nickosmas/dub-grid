@@ -1,11 +1,18 @@
 import { useMemo, useState } from "react";
+import { router } from "expo-router";
 import { Screen } from "../../../shared/components/Screen";
 import { LoadingScreen } from "../../../shared/components/LoadingScreen";
 import { QueryStateCard } from "../../../shared/components/QueryStateCard";
+import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { queryClient } from "../../../shared/lib/query-client";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { isManagementOnly } from "../../auth/hooks/employmentStatus";
-import { getDashboardPeriodRange, type DashboardPeriodMode } from "../../../shared/lib/dates";
+import {
+  formatDashboardDateRange,
+  getDashboardPeriodRange,
+  type DashboardPeriodMode,
+} from "../../../shared/lib/dates";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
 import { DashboardHeader } from "../components/DashboardHeader";
 import { DashboardHeroCard } from "../components/DashboardHeroCard";
@@ -19,12 +26,26 @@ import { StaffHoursCard } from "../components/StaffHoursCard";
 export function AdminHomeScreen() {
   const { accessToken } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
-  // Shared across the coverage-gaps, open-shifts, and overtime-watch cards —
-  // one fetch, one consistent period, rather than each card independently
-  // choosing its own range.
+  // One global toggle (in the hero card) drives the whole dashboard — a
+  // single fetch, one consistent period across every card.
   const [periodMode, setPeriodMode] = useState<DashboardPeriodMode>("week");
-  const range = useMemo(() => getDashboardPeriodRange(periodMode), [periodMode]);
+  const payPeriodStartDate = bootstrapQuery.data?.currentOrg?.payPeriodStartDate ?? null;
+  const range = useMemo(
+    () => getDashboardPeriodRange(periodMode, new Date(), payPeriodStartDate),
+    [periodMode, payPeriodStartDate],
+  );
   const dashboardQuery = useAdminDashboard(accessToken, range);
+  // MyScheduleCard owns its own query (["mobile", "dashboard", "my-schedule",
+  // accessToken]) rather than being lifted here, so a manual pull-to-refresh
+  // reaches it via the shared ["mobile", "dashboard"] key prefix — the same
+  // mechanism the realtime invalidation path uses.
+  const manualRefresh = useManualRefresh(() =>
+    Promise.all([
+      dashboardQuery.refetch(),
+      bootstrapQuery.refetch(),
+      queryClient.invalidateQueries({ queryKey: ["mobile", "dashboard"] }),
+    ]),
+  );
 
   if (bootstrapQuery.isLoading || dashboardQuery.isLoading) {
     return (
@@ -37,7 +58,12 @@ export function AdminHomeScreen() {
 
   if (dashboardQuery.isError || !dashboardQuery.data) {
     return (
-      <Screen title="Home" bottomPaddingMode="tabbed">
+      <Screen
+        title="Home"
+        bottomPaddingMode="tabbed"
+        refreshing={manualRefresh.isRefreshing}
+        onRefresh={manualRefresh.refresh}
+      >
         <QueryStateCard
           title="Couldn't load your dashboard"
           body="Check your connection and try again."
@@ -72,33 +98,54 @@ export function AdminHomeScreen() {
       title="Home"
       subtitle="Organization overview"
       bottomPaddingMode="tabbed"
+      refreshing={manualRefresh.isRefreshing}
+      onRefresh={manualRefresh.refresh}
       stickyHeader={
         <DashboardHeader
           firstName={firstName}
           orgName={bootstrapQuery.data?.currentOrg.name ?? ""}
           timezone={bootstrapQuery.data?.currentOrg.timezone ?? null}
+          periodLabel={formatDashboardDateRange(data.range.startDate, data.range.endDate, periodMode)}
         />
       }
     >
-      <DashboardHeroCard summary={data.heroSummary} metrics={data.metrics} />
-      {role === "admin" ? <ActionQueueCard requests={data.actionQueue} /> : null}
+      <DashboardHeroCard
+        summary={data.heroSummary}
+        metrics={data.metrics}
+        periodMode={periodMode}
+        onPeriodModeChange={setPeriodMode}
+        isFetching={dashboardQuery.isFetching}
+      />
+      {role === "admin" ? (
+        <ActionQueueCard
+          requests={data.actionQueue}
+          onSeeAll={() =>
+            router.push({ pathname: "/(tabs)/home/pending-approvals", params: { periodMode } })
+          }
+        />
+      ) : null}
       {!managementOnly ? <MyScheduleCard accessToken={accessToken} /> : null}
       <CoverageBySectionCard
         sections={data.coverageBySection}
-        periodMode={periodMode}
-        onPeriodModeChange={setPeriodMode}
+        focusAreaLabel={bootstrapQuery.data?.currentOrg.labels?.focusArea ?? "Wings"}
+        onSeeAll={() => router.push({ pathname: "/(tabs)/home/coverage", params: { periodMode } })}
       />
       <OpenShiftsCard
         openShifts={data.openShifts}
-        periodMode={periodMode}
-        onPeriodModeChange={setPeriodMode}
+        onSeeAll={() =>
+          router.push({ pathname: "/(tabs)/home/open-shifts", params: { periodMode } })
+        }
       />
-      <ActivityFeedCard items={data.activity} />
       <StaffHoursCard
         entries={data.staffHours}
         thresholdHours={data.overtimeThresholdHours}
-        periodMode={periodMode}
-        onPeriodModeChange={setPeriodMode}
+        onSeeAll={() =>
+          router.push({ pathname: "/(tabs)/home/staff-hours", params: { periodMode } })
+        }
+      />
+      <ActivityFeedCard
+        items={data.activity}
+        onSeeAll={() => router.push({ pathname: "/(tabs)/home/activity", params: { periodMode } })}
       />
     </Screen>
   );

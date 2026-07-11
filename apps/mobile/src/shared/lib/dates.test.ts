@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatUsDate, formatUsTime, getDashboardPeriodRange } from "./dates";
+import { formatDashboardDateRange, formatUsDate, formatUsTime, getDashboardPeriodRange } from "./dates";
 
 describe("formatUsDate", () => {
   it("formats an ISO date key as a short US date", () => {
@@ -44,5 +44,56 @@ describe("getDashboardPeriodRange", () => {
       startDate: "2026-05-10",
       endDate: "2026-05-23",
     });
+  });
+
+  it("returns just today for 'day' mode", () => {
+    expect(getDashboardPeriodRange("day", wednesday)).toEqual({
+      startDate: "2026-05-13",
+      endDate: "2026-05-13",
+    });
+  });
+
+  it("anchors '2weeks' to the org's pay-period start when configured", () => {
+    // Anchor 2026-05-03 (Sunday) + 14 days lands the containing period at
+    // 2026-05-03..05-16, which does NOT match the plain Sunday-start window
+    // (2026-05-10..05-23) — proves the anchor, not the fallback, was used.
+    expect(getDashboardPeriodRange("2weeks", wednesday, "2026-05-03")).toEqual({
+      startDate: "2026-05-03",
+      endDate: "2026-05-16",
+    });
+  });
+
+  it("ignores the pay-period anchor for 'week' mode", () => {
+    expect(getDashboardPeriodRange("week", wednesday, "2026-05-03")).toEqual({
+      startDate: "2026-05-10",
+      endDate: "2026-05-16",
+    });
+  });
+
+  it("falls back to Sunday-start '2weeks' when no anchor is configured", () => {
+    expect(getDashboardPeriodRange("2weeks", wednesday, null)).toEqual({
+      startDate: "2026-05-10",
+      endDate: "2026-05-23",
+    });
+  });
+});
+
+describe("formatDashboardDateRange", () => {
+  it("formats a single day with the weekday name", () => {
+    expect(formatDashboardDateRange("2026-07-10", "2026-07-10", "day")).toBe("Fri, Jul 10, 2026");
+  });
+
+  it("formats a week within the same month as a compact dash range", () => {
+    expect(formatDashboardDateRange("2026-07-05", "2026-07-11", "week")).toBe("Jul 5–11, 2026");
+  });
+
+  it("formats a range spanning two months in the same year", () => {
+    expect(formatDashboardDateRange("2026-07-26", "2026-08-01", "week")).toBe("Jul 26 – Aug 1, 2026");
+  });
+
+  it("formats a range spanning a year boundary", () => {
+    expect(formatDashboardDateRange("2026-12-21", "2027-01-03", "2weeks")).toBe(
+      "Dec 21, 2026 – Jan 3, 2027",
+    );
   });
 });

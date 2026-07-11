@@ -1,11 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { addDaysToIsoDate, getDaysBetweenIsoDates } from "@dubgrid/schedule-core";
+import type { MobileScheduleEntry } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
-import { formatUsDate, formatUsTime } from "../../../shared/lib/dates";
+import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { formatUsTime } from "../../../shared/lib/dates";
 import { getMySchedule } from "../../../shared/lib/api";
 
+const DAY_CARD_WIDTH = 132;
+const DAY_CARD_GAP = 10;
+
+function formatDayHeader(dateIso: string): { weekday: string; dayNumber: string } {
+  const date = new Date(`${dateIso}T00:00:00`);
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(date).toUpperCase();
+  const dayNumber = new Intl.DateTimeFormat("en-US", { day: "numeric" }).format(date);
+  return { weekday, dayNumber };
+}
+
+function buildDateList(startDate: string, endDate: string): string[] {
+  const dayCount = getDaysBetweenIsoDates(startDate, endDate) + 1;
+  return Array.from({ length: Math.max(dayCount, 0) }, (_, index) =>
+    addDaysToIsoDate(startDate, index),
+  );
+}
+
+// One card per day in the period, matching web's MyScheduleRow.tsx DayBox
+// strip (apps/web/src/components/dashboard/MyScheduleRow.tsx) — spelled-out
+// shift names, swipeable, empty days shown as their own placeholder card
+// rather than dropped entirely.
 export function MyScheduleCard({ accessToken }: { accessToken: string | null }) {
   const query = useQuery({
     queryKey: ["mobile", "dashboard", "my-schedule", accessToken],
@@ -13,11 +36,14 @@ export function MyScheduleCard({ accessToken }: { accessToken: string | null }) 
     enabled: Boolean(accessToken),
   });
 
-  const workedEntries = (query.data?.entries ?? []).filter((entry) => entry.state.kind === "worked");
-
   if (query.isLoading) {
     return null;
   }
+
+  const range = query.data?.range;
+  const entries = query.data?.entries ?? [];
+  const entryByDate = new Map<string, MobileScheduleEntry>(entries.map((entry) => [entry.date, entry]));
+  const dates = range ? buildDateList(range.startDate, range.endDate) : [];
 
   return (
     <Card
@@ -25,20 +51,47 @@ export function MyScheduleCard({ accessToken }: { accessToken: string | null }) 
       icon="calendar-outline"
       iconTone="brand"
       detail={
-        workedEntries.length > 0 ? (
-          <View style={styles.list}>
-            {workedEntries.map((entry) => (
-              <View key={`${entry.date}-${entry.employeeId}`} style={styles.row}>
-                <Text style={styles.label}>{formatUsDate(entry.date)}</Text>
-                <Text style={styles.value}>
-                  {entry.presentation.label}
-                  {entry.presentation.startTime && entry.presentation.endTime
-                    ? ` · ${formatUsTime(entry.presentation.startTime)}–${formatUsTime(entry.presentation.endTime)}`
-                    : ""}
-                </Text>
-              </View>
-            ))}
-          </View>
+        dates.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            snapToInterval={DAY_CARD_WIDTH + DAY_CARD_GAP}
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {dates.map((dateIso) => {
+              const entry = entryByDate.get(dateIso);
+              const { weekday, dayNumber } = formatDayHeader(dateIso);
+              const isWorked = entry?.state.kind === "worked";
+              const isAbsence = entry?.state.kind === "absence";
+
+              return (
+                <View key={dateIso} style={styles.dayCard}>
+                  <Text style={styles.dayHeader}>
+                    {weekday} {dayNumber}
+                  </Text>
+                  {isWorked && entry ? (
+                    <View style={styles.shiftPill}>
+                      <Text numberOfLines={2} style={styles.shiftName}>
+                        {entry.presentation.shiftName || entry.presentation.label}
+                      </Text>
+                      {entry.presentation.startTime && entry.presentation.endTime ? (
+                        <Text style={styles.shiftTime}>
+                          {formatUsTime(entry.presentation.startTime)}–
+                          {formatUsTime(entry.presentation.endTime)}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : (
+                    <View style={styles.emptyPill}>
+                      <Text style={styles.emptyText}>{isAbsence ? "Off" : "—"}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
         ) : (
           <EmptyStateCard compact iconName="calendar-outline" title="You're not scheduled this week" />
         )
@@ -48,20 +101,45 @@ export function MyScheduleCard({ accessToken }: { accessToken: string | null }) 
 }
 
 const styles = StyleSheet.create({
-  list: {
-    gap: 10,
+  // Cancels Card's own 18px horizontal padding (Screen.tsx's `card` style)
+  // so the day-card row bleeds edge-to-edge instead of sitting inset —
+  // everything else in the card (title, icon) keeps the normal padding.
+  scrollView: {
+    marginHorizontal: -18,
   },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  scrollContent: {
+    gap: DAY_CARD_GAP,
   },
-  label: {
-    ...mobileText.body,
+  dayCard: {
+    width: DAY_CARD_WIDTH,
+    gap: 8,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderRadius: mobileRadii.control,
+    borderWidth: 1,
+    borderColor: mobileColors.borderSubtle,
+    padding: 12,
+  },
+  dayHeader: {
+    ...mobileText.label,
+    color: mobileColors.textMuted,
+  },
+  shiftPill: {
+    gap: 2,
+  },
+  shiftName: {
+    ...mobileText.bodyStrong,
     color: mobileColors.textPrimary,
   },
-  value: {
+  shiftTime: {
     ...mobileText.caption,
     color: mobileColors.textMuted,
+  },
+  emptyPill: {
+    minHeight: 36,
+    justifyContent: "center",
+  },
+  emptyText: {
+    ...mobileText.body,
+    color: mobileColors.textSubtle,
   },
 });

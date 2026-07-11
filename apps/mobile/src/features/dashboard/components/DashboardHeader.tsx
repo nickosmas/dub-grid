@@ -79,10 +79,12 @@ export function DashboardHeader({
   firstName,
   orgName,
   timezone,
+  periodLabel,
 }: {
   firstName: string | null;
   orgName: string;
   timezone: string | null;
+  periodLabel?: string;
 }) {
   const [now, setNow] = useState(() => new Date());
 
@@ -103,6 +105,7 @@ export function DashboardHeader({
       <Text style={styles.greeting}>{greeting}</Text>
       <Text style={styles.meta}>
         {orgName} · {orgTime}
+        {periodLabel ? ` | ${periodLabel}` : ""}
       </Text>
     </View>
   );

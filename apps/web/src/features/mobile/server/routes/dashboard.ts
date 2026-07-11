@@ -6,13 +6,13 @@ import {
   MobileApiAuthorizationError,
 } from "@dubgrid/mobile-api-core";
 import {
+  fetchMobileAcceptedInvitationRows,
   fetchMobileOpenShiftContextRows,
   fetchMobilePublishHistoryRows,
   fetchProfileNameRowsByIds,
-  fetchPublishedMobileScheduleRows,
 } from "@dubgrid/data-access";
 import {
-  fetchMobileOpenShifts,
+  fetchMobileCoverageSummary,
   fetchMobileShiftRequests,
   requireMobileAuth,
   resolveMobileDateRange,
@@ -75,11 +75,11 @@ export async function GET(req: NextRequest) {
       },
       range,
       {
-        fetchMobileOpenShifts,
+        fetchMobileCoverageSummary,
         fetchMobileShiftRequests,
         fetchMobileOpenShiftContext: fetchMobileOpenShiftContextRows,
-        fetchPublishedMobileScheduleRows,
         fetchMobilePublishHistoryRows,
+        fetchMobileAcceptedInvitationRows,
         fetchProfileNameRowsByIds,
       },
     );

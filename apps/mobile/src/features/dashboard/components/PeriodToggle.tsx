@@ -3,26 +3,31 @@ import { mobileColors, mobileText } from "../../../shared/theme/tokens";
 import type { DashboardPeriodMode } from "../../../shared/lib/dates";
 
 const OPTIONS: Array<{ mode: DashboardPeriodMode; label: string }> = [
-  { mode: "week", label: "1 Week" },
+  { mode: "day", label: "Day" },
+  { mode: "week", label: "Week" },
   { mode: "2weeks", label: "2 Weeks" },
 ];
 
 export function PeriodToggle({
   mode,
   onChange,
+  loading = false,
 }: {
   mode: DashboardPeriodMode;
   onChange: (mode: DashboardPeriodMode) => void;
+  loading?: boolean;
 }) {
   return (
-    <View style={styles.track}>
+    <View style={[styles.track, loading ? styles.trackLoading : null]}>
       {OPTIONS.map((option) => {
         const selected = option.mode === mode;
         return (
           <Pressable
             key={option.mode}
             accessibilityRole="button"
-            accessibilityState={{ selected }}
+            accessibilityState={{ selected, disabled: loading }}
+            disabled={loading}
+            hitSlop={4}
             onPress={() => onChange(option.mode)}
             style={[styles.segment, selected ? styles.segmentSelected : null]}
           >
@@ -39,15 +44,19 @@ export function PeriodToggle({
 const styles = StyleSheet.create({
   track: {
     flexDirection: "row",
+    alignSelf: "flex-start",
     backgroundColor: mobileColors.surfaceSecondary,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: mobileColors.borderSubtle,
     padding: 2,
   },
+  trackLoading: {
+    opacity: 0.5,
+  },
   segment: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
     borderRadius: 999,
   },
   segmentSelected: {
@@ -59,5 +68,6 @@ const styles = StyleSheet.create({
   },
   segmentLabelSelected: {
     color: mobileColors.textInverse,
+    fontWeight: "700",
   },
 });

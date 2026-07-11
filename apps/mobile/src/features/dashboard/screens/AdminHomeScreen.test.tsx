@@ -5,6 +5,8 @@ import { createReactNativeModule, createSafeAreaContextModule } from "../../../t
 const useSessionState = vi.fn();
 const useBootstrap = vi.fn();
 const useAdminDashboard = vi.fn();
+const invalidateQueries = vi.fn();
+let capturedOnRefresh: (() => Promise<unknown>) | undefined;
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -32,6 +34,21 @@ vi.mock("../hooks/useAdminDashboard", () => ({
 
 vi.mock("../components/MyScheduleCard", () => ({
   MyScheduleCard: () => <div>my-schedule-card</div>,
+}));
+
+// useManualRefresh is exercised by its own unit tests — here we only need
+// to capture the callback AdminHomeScreen builds, to prove the refresh
+// wiring (dashboard + bootstrap refetch, plus the dashboard cache-prefix
+// invalidation that also reaches MyScheduleCard's own query) is correct.
+vi.mock("../../../shared/hooks/useManualRefresh", () => ({
+  useManualRefresh: (onRefresh: () => Promise<unknown>) => {
+    capturedOnRefresh = onRefresh;
+    return { isRefreshing: false, refresh: onRefresh };
+  },
+}));
+
+vi.mock("../../../shared/lib/query-client", () => ({
+  queryClient: { invalidateQueries },
 }));
 
 let AdminHomeScreen: (typeof import("./AdminHomeScreen"))["AdminHomeScreen"];
@@ -100,6 +117,8 @@ describe("AdminHomeScreen", () => {
     useSessionState.mockReset();
     useBootstrap.mockReset();
     useAdminDashboard.mockReset();
+    invalidateQueries.mockReset();
+    capturedOnRefresh = undefined;
     useSessionState.mockReturnValue({ accessToken: "token-1" });
   });
 
@@ -224,7 +243,7 @@ describe("AdminHomeScreen", () => {
     expect(screen.getByText(/casey/)).toBeInTheDocument();
   });
 
-  it("refetches with a 14-day range when the shared period toggle switches to 2 weeks", () => {
+  it("refetches with a 14-day range when the global period toggle switches to 2 weeks", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
@@ -243,9 +262,8 @@ describe("AdminHomeScreen", () => {
       (24 * 60 * 60 * 1000);
     expect(initialSpanDays).toBe(6);
 
-    // Coverage gaps, Open shifts, and Overtime watch all render the same
-    // shared toggle — pressing any of them should switch the whole page.
-    fireEvent.click(screen.getAllByText("2 Weeks")[0]);
+    // One global toggle, in the hero card, drives every card on the page.
+    fireEvent.click(screen.getByText("2 Weeks"));
 
     const latestRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {
       startDate: string;
@@ -256,5 +274,53 @@ describe("AdminHomeScreen", () => {
         new Date(`${latestRange.startDate}T00:00:00`).getTime()) /
       (24 * 60 * 60 * 1000);
     expect(latestSpanDays).toBe(13);
+  });
+
+  it("refetches with a single-day range when the global period toggle switches to Day", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+
+    render(<AdminHomeScreen />);
+
+    fireEvent.click(screen.getByText("Day"));
+
+    const latestRange = useAdminDashboard.mock.calls.at(-1)?.[1] as {
+      startDate: string;
+      endDate: string;
+    };
+    expect(latestRange.startDate).toBe(latestRange.endDate);
+  });
+
+  it("pull-to-refresh refetches the dashboard and bootstrap queries and invalidates the shared dashboard cache prefix", async () => {
+    const dashboardRefetch = vi.fn().mockResolvedValue(undefined);
+    const bootstrapRefetch = vi.fn().mockResolvedValue(undefined);
+    invalidateQueries.mockResolvedValue(undefined);
+
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+      refetch: bootstrapRefetch,
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      data: EMPTY_DASHBOARD_DATA,
+      refetch: dashboardRefetch,
+    });
+
+    render(<AdminHomeScreen />);
+
+    expect(capturedOnRefresh).toBeDefined();
+    await capturedOnRefresh?.();
+
+    expect(dashboardRefetch).toHaveBeenCalledTimes(1);
+    expect(bootstrapRefetch).toHaveBeenCalledTimes(1);
+    // The dashboard-prefix invalidation is what also reaches
+    // MyScheduleCard's independently-owned query.
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["mobile", "dashboard"] });
   });
 });

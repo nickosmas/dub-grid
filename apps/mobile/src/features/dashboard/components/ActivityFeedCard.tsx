@@ -3,9 +3,28 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { CountBadge, type CountBadgeTone } from "./CountBadge";
 import { ExpandableList } from "./ExpandableList";
 
-function formatRelativeTime(isoTimestamp: string): string {
+export type ActivityItem = MobileDashboardResponse["activity"][number];
+export type ActivityType = ActivityItem["type"];
+
+// Same 4 event types as web's dashboard activity feed.
+export const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
+  publish: "Published",
+  shift_change: "Shift change",
+  request: "Request",
+  user_signup: "Sign-up",
+};
+
+export const ACTIVITY_TYPE_TONE: Record<ActivityType, CountBadgeTone> = {
+  publish: "brand",
+  shift_change: "warning",
+  request: "success",
+  user_signup: "success",
+};
+
+export function formatRelativeTime(isoTimestamp: string): string {
   const then = new Date(isoTimestamp).getTime();
   if (Number.isNaN(then)) return "";
   const diffMs = Date.now() - then;
@@ -18,7 +37,27 @@ function formatRelativeTime(isoTimestamp: string): string {
   return `${diffDays}d ago`;
 }
 
-export function ActivityFeedCard({ items }: { items: MobileDashboardResponse["activity"] }) {
+// Shared with the full-page expanded activity screen
+// (apps/mobile/app/(tabs)/home/activity.tsx).
+export function ActivityRow({ item }: { item: ActivityItem }) {
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowHeader}>
+        <CountBadge label={ACTIVITY_TYPE_LABEL[item.type]} tone={ACTIVITY_TYPE_TONE[item.type]} />
+        <Text style={styles.value}>{formatRelativeTime(item.timestamp)}</Text>
+      </View>
+      <Text style={styles.label}>{item.description}</Text>
+    </View>
+  );
+}
+
+export function ActivityFeedCard({
+  items,
+  onSeeAll,
+}: {
+  items: MobileDashboardResponse["activity"];
+  onSeeAll?: () => void;
+}) {
   return (
     <Card
       title="Recent activity"
@@ -30,13 +69,9 @@ export function ActivityFeedCard({ items }: { items: MobileDashboardResponse["ac
             title="Recent activity"
             items={items}
             keyExtractor={(item) => item.id}
+            onSeeAll={onSeeAll}
             renderDivider={() => <View style={styles.divider} />}
-            renderItem={(item) => (
-              <View style={styles.row}>
-                <Text style={styles.label}>{item.description}</Text>
-                <Text style={styles.value}>{formatRelativeTime(item.timestamp)}</Text>
-              </View>
-            )}
+            renderItem={(item) => <ActivityRow item={item} />}
           />
         ) : (
           <EmptyStateCard compact iconName="sparkles-outline" title="No recent activity" />
@@ -52,7 +87,13 @@ const styles = StyleSheet.create({
     backgroundColor: mobileColors.borderSubtle,
   },
   row: {
-    gap: 2,
+    gap: 4,
+  },
+  rowHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
   },
   label: {
     ...mobileText.body,

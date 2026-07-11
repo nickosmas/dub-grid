@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
@@ -8,10 +8,10 @@ import type {
   MobilePerson,
   MobileProfileChangeRequest,
 } from "@dubgrid/contracts";
-import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { FilterButton, FilterSheet, SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { SearchBar } from "../../../shared/components/SearchBar";
 import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
@@ -208,31 +208,14 @@ export default function PeopleScreen() {
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
-      <BottomSheetModal
-        footer={
-          <>
-            <Button
-              compact
-              disabled={activeFilterCount === 0}
-              label="Clear all"
-              tone="neutral"
-              onPress={clearFilters}
-            />
-            <View style={styles.filterFooterSpacer} />
-            <Button
-              compact
-              label="Done"
-              tone="primary"
-              onPress={() => setIsFilterModalVisible(false)}
-            />
-          </>
-        }
+      <FilterSheet
+        clearDisabled={activeFilterCount === 0}
+        title="Filter directory"
+        onClearAll={clearFilters}
         onDismiss={() => setIsFilterModalVisible(false)}
-        scrollable
+        onDone={() => setIsFilterModalVisible(false)}
         visible={isFilterModalVisible}
       >
-        <Text style={styles.sheetTitle}>Filter directory</Text>
-
         <SelectionSection label="Focus area">
           <SelectionRow
             label="All focus areas"
@@ -297,7 +280,7 @@ export default function PeopleScreen() {
             selected={sortMode === "alphabetical"}
           />
         </SelectionSection>
-      </BottomSheetModal>
+      </FilterSheet>
 
       <View style={styles.section}>
         <View style={styles.searchBarRow}>
@@ -307,29 +290,12 @@ export default function PeopleScreen() {
             placeholder="Search people"
             value={searchValue}
           />
-          <Pressable
+          <FilterButton
             accessibilityLabel="Open people filters and sort"
-            accessibilityRole="button"
-            accessibilityState={{ expanded: isFilterModalVisible }}
-            android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+            activeCount={activeFilterCount}
+            expanded={isFilterModalVisible}
             onPress={() => setIsFilterModalVisible(true)}
-            style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]}
-          >
-            <Ionicons
-              color={activeFilterCount > 0 ? mobileColors.textInverse : mobileColors.textSecondary}
-              name="options-outline"
-              size={16}
-            />
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.filterButtonText,
-                activeFilterCount > 0 && styles.filterButtonTextActive,
-              ]}
-            >
-              Filter
-            </Text>
-          </Pressable>
+          />
         </View>
       </View>
 
@@ -514,43 +480,6 @@ function countPeopleInManagementDepartment(
     .length;
 }
 
-function SelectionSection({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{label}</Text>
-      <View style={styles.selectionList}>{children}</View>
-    </View>
-  );
-}
-
-function SelectionRow({
-  label,
-  detail,
-  selected,
-  onPress,
-}: {
-  label: string;
-  detail?: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.selectionRow, pressed && styles.selectionRowPressed]}
-    >
-      <View style={styles.selectionRowCopy}>
-        <Text style={styles.selectionRowTitle}>{label}</Text>
-        {detail ? <Text style={styles.selectionRowDetail}>{detail}</Text> : null}
-      </View>
-      {selected ? <Ionicons color={mobileColors.brand} name="checkmark" size={20} /> : null}
-    </Pressable>
-  );
-}
-
 function PersonRow({
   id,
   employmentType,
@@ -661,73 +590,10 @@ const styles = StyleSheet.create({
     color: mobileColors.textSubtle,
     textTransform: "uppercase",
   },
-  sheetTitle: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-  },
-  filterFooterSpacer: {
-    flex: 1,
-  },
   searchBarRow: {
     alignItems: "center",
     flexDirection: "row",
     gap: 10,
-  },
-  filterButton: {
-    minHeight: 46,
-    alignItems: "center",
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  filterButtonActive: {
-    backgroundColor: mobileColors.brand,
-    borderColor: mobileColors.brand,
-  },
-  filterButtonText: {
-    color: mobileColors.textSecondary,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  filterButtonTextActive: {
-    color: mobileColors.textInverse,
-  },
-  selectionList: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    overflow: "hidden",
-  },
-  selectionRow: {
-    minHeight: 58,
-    alignItems: "center",
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  selectionRowPressed: {
-    opacity: 0.64,
-  },
-  selectionRowCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  selectionRowTitle: {
-    ...mobileText.body,
-    color: mobileColors.textPrimary,
-  },
-  selectionRowDetail: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
   },
   linkList: {
     backgroundColor: mobileColors.surface,

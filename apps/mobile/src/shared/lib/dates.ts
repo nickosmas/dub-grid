@@ -1,3 +1,5 @@
+import { getDashboardPeriodStartIso } from "@dubgrid/schedule-core";
+
 // Formats an ISO "YYYY-MM-DD" date key using US conventions (short month
 // name first, e.g. "May 12") — never the raw ISO/YYYY-MM-DD string, which
 // reads as day-first to US users.
@@ -19,7 +21,7 @@ export function formatUsTime(time: string): string {
   return `${hour12}:${String(minute).padStart(2, "0")} ${period}`;
 }
 
-export type DashboardPeriodMode = "week" | "2weeks";
+export type DashboardPeriodMode = "day" | "week" | "2weeks";
 
 // Local Y-M-D formatting — deliberately not toISOString(), which converts to
 // UTC and can shift the calendar day on a device whose local timezone isn't
@@ -31,17 +33,66 @@ function formatIsoDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-// Sunday-start current week (1 or 2 weeks), matching web's dashboard default
-// (apps/web/src/lib/dashboard-stats.ts getWeekStart) and the server-side
-// default in apps/web/src/features/mobile/server/routes/dashboard.ts.
+// "day" = today only; "week" = Sunday-start current week; "2weeks" = the
+// org's actual 14-day pay period containing today when `payPeriodStartDate`
+// is configured (via @dubgrid/schedule-core's getDashboardPeriodStartIso —
+// the same anchor math web's schedule-view.ts uses), otherwise a plain
+// Sunday-start 2-week window. Passing no anchor matches web's dashboard
+// default (apps/web/src/lib/dashboard-stats.ts getWeekStart) and the
+// server-side default in apps/web/src/features/mobile/server/routes/dashboard.ts.
 export function getDashboardPeriodRange(
   mode: DashboardPeriodMode,
   reference = new Date(),
+  payPeriodStartDate?: string | null,
 ): { startDate: string; endDate: string } {
-  const start = new Date(reference);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - start.getDay());
+  const today = new Date(reference);
+  today.setHours(0, 0, 0, 0);
+  const todayKey = formatIsoDateKey(today);
+
+  if (mode === "day") {
+    return { startDate: todayKey, endDate: todayKey };
+  }
+
+  const startKey = getDashboardPeriodStartIso(todayKey, mode === "2weeks" ? 2 : 1, payPeriodStartDate);
+  const start = new Date(`${startKey}T00:00:00`);
   const end = new Date(start);
   end.setDate(start.getDate() + (mode === "2weeks" ? 13 : 6));
-  return { startDate: formatIsoDateKey(start), endDate: formatIsoDateKey(end) };
+  return { startDate: startKey, endDate: formatIsoDateKey(end) };
+}
+
+const MONTH_NAMES = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Human-readable label for the active period, e.g. "Fri, Jul 10, 2026" (day),
+// "Jul 5–11, 2026" (week), or "Jul 26 – Aug 8, 2026" (span crossing months) —
+// matches web's DashboardHeader.tsx formatDateRange.
+export function formatDashboardDateRange(
+  startDate: string,
+  endDate: string,
+  mode: DashboardPeriodMode,
+): string {
+  const start = new Date(`${startDate}T00:00:00`);
+  const year = start.getFullYear();
+  const sMonth = MONTH_NAMES[start.getMonth()];
+  const sDay = start.getDate();
+
+  if (mode === "day") {
+    return `${DAY_NAMES[start.getDay()]}, ${sMonth} ${sDay}, ${year}`;
+  }
+
+  const end = new Date(`${endDate}T00:00:00`);
+  const eYear = end.getFullYear();
+  const eMonth = MONTH_NAMES[end.getMonth()];
+  const eDay = end.getDate();
+
+  if (sMonth === eMonth && year === eYear) {
+    return `${sMonth} ${sDay}–${eDay}, ${year}`;
+  }
+  if (year === eYear) {
+    return `${sMonth} ${sDay} – ${eMonth} ${eDay}, ${year}`;
+  }
+  return `${sMonth} ${sDay}, ${year} – ${eMonth} ${eDay}, ${eYear}`;
 }

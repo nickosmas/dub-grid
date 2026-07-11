@@ -109,6 +109,8 @@ export function Screen({
             refreshing={refreshing}
             onRefresh={onRefresh}
             progressViewOffset={stickyHeader ? stickyHeaderHeight : 0}
+            tintColor={mobileColors.brand}
+            colors={[mobileColors.brand]}
           />
         ) : undefined
       }

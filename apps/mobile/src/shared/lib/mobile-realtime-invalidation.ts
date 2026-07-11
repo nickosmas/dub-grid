@@ -40,6 +40,9 @@ export function getMobileRealtimeInvalidationKeys(
   const profileChangeRequests = ["mobile", "profile-change-requests"] as const;
   const notifications = ["mobile", "notifications-infinite"] as const;
   const notificationFacets = ["mobile", "notification-facets", accessToken] as const;
+  // Prefix-matches both useAdminDashboard's query key and MyScheduleCard's
+  // own ["mobile", "dashboard", "my-schedule", accessToken] query.
+  const dashboard = ["mobile", "dashboard"] as const;
 
   switch (table) {
     case "organizations":
@@ -52,19 +55,20 @@ export function getMobileRealtimeInvalidationKeys(
     case "certifications":
     case "organization_roles":
     case "indicator_types":
-      return [bootstrap, profile, schedule, requests, person];
+      return [bootstrap, profile, schedule, requests, person, dashboard];
     case "organization_memberships":
     case "subscriptions":
-    case "invitations":
       return [bootstrap, profile, people, person];
+    case "invitations":
+      return [bootstrap, profile, people, person, dashboard];
     case "employees":
-      return [bootstrap, profile, people, person, schedule, requests];
+      return [bootstrap, profile, people, person, schedule, requests, dashboard];
     case "shift_requests":
-      return [requests, schedule];
+      return [requests, schedule, dashboard];
     case "schedule_cells":
     case "schedule_cell_snapshots":
     case "schedule_cell_segments":
-      return [schedule, requests];
+      return [schedule, requests, dashboard];
     case "schedule_notes":
       return [schedule];
     case "profile_change_requests":
@@ -72,9 +76,9 @@ export function getMobileRealtimeInvalidationKeys(
     case "notifications":
       return [notifications, bootstrap, notificationFacets];
     case "recurring_shifts":
-      return [schedule, requests];
+      return [schedule, requests, dashboard];
     case "publish_history":
-      return [schedule];
+      return [schedule, dashboard];
     case "audit_log":
     case "impersonation_sessions":
       return [bootstrap, profile];

@@ -3,21 +3,35 @@ import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { mobileColors, mobileText } from "../../../shared/theme/tokens";
-import type { DashboardPeriodMode } from "../../../shared/lib/dates";
 import { CountBadge } from "./CountBadge";
 import { ExpandableList } from "./ExpandableList";
-import { PeriodToggle } from "./PeriodToggle";
+
+export type StaffHoursEntry = MobileDashboardResponse["staffHours"][number];
+
+// Shared with the full-page expanded staff-hours screen
+// (apps/mobile/app/(tabs)/home/staff-hours.tsx).
+export function StaffHoursRow({ entry }: { entry: StaffHoursEntry }) {
+  return (
+    <View style={styles.row}>
+      <View style={styles.copy}>
+        <Text style={styles.label}>{entry.employeeName}</Text>
+        <Text style={styles.value}>
+          {entry.totalHours}h total{entry.focusAreaName ? ` · ${entry.focusAreaName}` : ""}
+        </Text>
+      </View>
+      <CountBadge label={`+${entry.overtimeHours}h OT`} tone="danger" />
+    </View>
+  );
+}
 
 export function StaffHoursCard({
   entries,
   thresholdHours,
-  periodMode,
-  onPeriodModeChange,
+  onSeeAll,
 }: {
   entries: MobileDashboardResponse["staffHours"];
   thresholdHours: number;
-  periodMode: DashboardPeriodMode;
-  onPeriodModeChange: (mode: DashboardPeriodMode) => void;
+  onSeeAll?: () => void;
 }) {
   return (
     <Card
@@ -28,40 +42,27 @@ export function StaffHoursCard({
         entries.length > 0 ? <CountBadge label={String(entries.length)} tone="danger" /> : undefined
       }
       detail={
-        <View style={styles.wrapper}>
-          <PeriodToggle mode={periodMode} onChange={onPeriodModeChange} />
-          {entries.length > 0 ? (
-            <ExpandableList
-              title="Overtime watch"
-              items={entries}
-              keyExtractor={(entry) => entry.employeeId}
-              renderItem={(entry) => (
-                <View style={styles.row}>
-                  <View style={styles.copy}>
-                    <Text style={styles.label}>{entry.employeeName}</Text>
-                    <Text style={styles.value}>{entry.totalHours}h total</Text>
-                  </View>
-                  <CountBadge label={`+${entry.overtimeHours}h OT`} tone="danger" />
-                </View>
-              )}
-            />
-          ) : (
-            <EmptyStateCard
-              compact
-              iconName="checkmark-circle-outline"
-              title={`No one is over ${thresholdHours}h this period`}
-            />
-          )}
-        </View>
+        entries.length > 0 ? (
+          <ExpandableList
+            title="Overtime watch"
+            items={entries}
+            keyExtractor={(entry) => entry.employeeId}
+            onSeeAll={onSeeAll}
+            renderItem={(entry) => <StaffHoursRow entry={entry} />}
+          />
+        ) : (
+          <EmptyStateCard
+            compact
+            iconName="checkmark-circle-outline"
+            title={`No one is over ${thresholdHours}h this period`}
+          />
+        )
       }
     />
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    gap: 12,
-  },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",

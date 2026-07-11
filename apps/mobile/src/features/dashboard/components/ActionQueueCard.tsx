@@ -7,19 +7,41 @@ import { formatUsDate } from "../../../shared/lib/dates";
 import { CountBadge, type CountBadgeTone } from "./CountBadge";
 import { ExpandableList } from "./ExpandableList";
 
-const REQUEST_TYPE_LABEL: Record<MobileShiftRequest["type"], string> = {
+export const REQUEST_TYPE_LABEL: Record<MobileShiftRequest["type"], string> = {
   pickup: "Pickup",
   swap: "Swap",
   calloff: "Time off",
 };
 
-const REQUEST_TYPE_TONE: Record<MobileShiftRequest["type"], CountBadgeTone> = {
+export const REQUEST_TYPE_TONE: Record<MobileShiftRequest["type"], CountBadgeTone> = {
   pickup: "brand",
   swap: "success",
   calloff: "warning",
 };
 
-export function ActionQueueCard({ requests }: { requests: MobileShiftRequest[] }) {
+// Shared with the full-page expanded pending-approvals screen
+// (apps/mobile/app/(tabs)/home/pending-approvals.tsx).
+export function ActionQueueRow({ request }: { request: MobileShiftRequest }) {
+  return (
+    <View style={styles.row}>
+      <CountBadge label={REQUEST_TYPE_LABEL[request.type]} tone={REQUEST_TYPE_TONE[request.type]} />
+      <View style={styles.copy}>
+        <Text style={styles.label}>{request.requesterName}</Text>
+        <Text style={styles.meta}>
+          {request.requesterPresentation.label} shift · {formatUsDate(request.requesterShiftDate)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+export function ActionQueueCard({
+  requests,
+  onSeeAll,
+}: {
+  requests: MobileShiftRequest[];
+  onSeeAll?: () => void;
+}) {
   return (
     <Card
       title="Pending approvals"
@@ -34,17 +56,8 @@ export function ActionQueueCard({ requests }: { requests: MobileShiftRequest[] }
             title="Pending approvals"
             items={requests}
             keyExtractor={(request) => request.id}
-            renderItem={(request) => (
-              <View style={styles.row}>
-                <CountBadge label={REQUEST_TYPE_LABEL[request.type]} tone={REQUEST_TYPE_TONE[request.type]} />
-                <View style={styles.copy}>
-                  <Text style={styles.label}>{request.requesterName}</Text>
-                  <Text style={styles.meta}>
-                    {request.requesterPresentation.label} shift · {formatUsDate(request.requesterShiftDate)}
-                  </Text>
-                </View>
-              </View>
-            )}
+            onSeeAll={onSeeAll}
+            renderItem={(request) => <ActionQueueRow request={request} />}
           />
         ) : (
           <EmptyStateCard compact iconName="checkmark-circle-outline" title="No requests are waiting on you" />

@@ -7,24 +7,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireMobileAuth = vi.fn();
 const resolveMobileDateRange = vi.fn();
-const fetchMobileOpenShifts = vi.fn();
+const fetchMobileCoverageSummary = vi.fn();
 const fetchMobileShiftRequests = vi.fn();
 const fetchMobileOpenShiftContextRows = vi.fn();
-const fetchPublishedMobileScheduleRows = vi.fn();
 const fetchMobilePublishHistoryRows = vi.fn();
+const fetchMobileAcceptedInvitationRows = vi.fn();
 const fetchProfileNameRowsByIds = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
   resolveMobileDateRange,
-  fetchMobileOpenShifts,
+  fetchMobileCoverageSummary,
   fetchMobileShiftRequests,
 }));
 
 vi.mock("@dubgrid/data-access", () => ({
   fetchMobileOpenShiftContextRows,
-  fetchPublishedMobileScheduleRows,
   fetchMobilePublishHistoryRows,
+  fetchMobileAcceptedInvitationRows,
   fetchProfileNameRowsByIds,
 }));
 
@@ -43,14 +43,21 @@ describe("mobile dashboard route", () => {
       startDate: "2026-05-11",
       endDate: "2026-05-17",
     });
-    fetchMobileOpenShifts.mockResolvedValue([]);
+    fetchMobileCoverageSummary.mockResolvedValue({
+      openShifts: [],
+      totals: { totalRequired: 0, totalFilled: 0, pct: 100, openSlots: 0 },
+      byFocusArea: [],
+      hasCoverageRequirements: false,
+      scheduleRows: [],
+    });
     fetchMobileShiftRequests.mockResolvedValue([]);
     fetchMobileOpenShiftContextRows.mockResolvedValue({
       shiftCategoryRows: [],
       coverageRequirementRows: [],
+      focusAreaRows: [{ id: 1, name: "ICU" }],
     });
-    fetchPublishedMobileScheduleRows.mockResolvedValue([]);
     fetchMobilePublishHistoryRows.mockResolvedValue([]);
+    fetchMobileAcceptedInvitationRows.mockResolvedValue([]);
     fetchProfileNameRowsByIds.mockResolvedValue([]);
   });
 
@@ -70,35 +77,43 @@ describe("mobile dashboard route", () => {
 
   it("returns a dashboard payload for an admin", async () => {
     mockAuth({ role: "admin" });
-    fetchMobileOpenShifts.mockResolvedValue([
-      {
-        id: "shift-1",
-        date: "2026-05-12",
-        focusAreaId: 1,
-        focusAreaName: "ICU",
-        needed: 2,
-        state: {
-          kind: "worked",
-          segments: [{ shiftId: 1, jobId: 1, position: 0 }],
-          absenceTypeId: null,
-          customStartTime: null,
-          customEndTime: null,
-          seriesId: null,
-          fromRecurring: false,
-        },
-        presentation: {
-          label: "D",
-          shiftName: "Day Shift",
+    fetchMobileCoverageSummary.mockResolvedValue({
+      openShifts: [
+        {
+          id: "shift-1",
+          date: "2026-05-12",
           focusAreaId: 1,
           focusAreaName: "ICU",
-          startTime: "07:00:00",
-          endTime: "15:00:00",
-          segments: [],
+          needed: 2,
+          state: {
+            kind: "worked",
+            segments: [{ shiftId: 1, jobId: 1, position: 0 }],
+            absenceTypeId: null,
+            customStartTime: null,
+            customEndTime: null,
+            seriesId: null,
+            fromRecurring: false,
+          },
+          presentation: {
+            label: "D",
+            shiftName: "Day Shift",
+            focusAreaId: 1,
+            focusAreaName: "ICU",
+            startTime: "07:00:00",
+            endTime: "15:00:00",
+            segments: [],
+          },
+          canVolunteer: true,
+          volunteerBlockReason: null,
         },
-        canVolunteer: true,
-        volunteerBlockReason: null,
-      },
-    ]);
+      ],
+      // No coverage requirements configured in this fixture — the real
+      // engine reports the section purely from its (unmet) open shifts.
+      totals: { totalRequired: 2, totalFilled: 0, pct: 0, openSlots: 2 },
+      byFocusArea: [{ focusAreaId: 1, focusAreaName: "ICU", requiredTotal: 2, filledTotal: 0, pct: 0 }],
+      hasCoverageRequirements: false,
+      scheduleRows: [],
+    });
 
     const { GET } = await import("./dashboard");
     const response = await GET({
@@ -112,10 +127,10 @@ describe("mobile dashboard route", () => {
     expect(payload.range).toEqual({ startDate: "2026-05-11", endDate: "2026-05-17" });
     expect(payload.overtimeThresholdHours).toBe(40);
     expect(payload.coverageBySection).toEqual([
-      { focusAreaId: 1, focusAreaName: "ICU", openSlots: 2 },
+      { focusAreaId: 1, focusAreaName: "ICU", requiredTotal: 2, filledTotal: 0, pct: 0, openSlots: 2 },
     ]);
     expect(payload.openShifts).toHaveLength(1);
-    expect(fetchMobileOpenShifts).toHaveBeenCalledWith(
+    expect(fetchMobileCoverageSummary).toHaveBeenCalledWith(
       {},
       {
         orgId: "org-1",
@@ -153,7 +168,15 @@ describe("mobile dashboard route", () => {
   it("fetches shift requests for a super_admin (for the pending-approvals metric) but omits them from actionQueue", async () => {
     mockAuth({ role: "super_admin" });
     fetchMobileShiftRequests.mockResolvedValue([
-      { id: "req-1", status: "pending_approval" },
+      {
+        id: "req-1",
+        type: "pickup",
+        status: "pending_approval",
+        requesterName: "Alex Rivera",
+        requesterShiftDate: "2026-05-12",
+        requesterPresentation: { label: "D", shiftName: "Day Shift", segments: [] },
+        createdAt: "2026-05-10T09:00:00.000Z",
+      },
     ]);
 
     const { GET } = await import("./dashboard");

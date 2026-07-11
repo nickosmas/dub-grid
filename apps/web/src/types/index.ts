@@ -116,47 +116,9 @@ export interface CoverageRequirement {
   minStaff: number;
 }
 
-/**
- * Computed coverage status for a single (focus_area, assignment, date) cell.
- */
-export interface CoverageStatus {
-  /** Actual headcount assigned on this date in this section. */
-  actual: number;
-  /** Required headcount from coverage_requirements. */
-  required: number;
-  /** True when actual >= required. */
-  isMet: boolean;
-  /** True when there is a requirement defined (required > 0). */
-  hasRequirement: boolean;
-}
-
-export interface CoverageShortageDetail {
-  assignmentId: number;
-  assignmentLabel: string;
-  required: number;
-  actual: number;
-  shortage: number;
-}
-
-/**
- * A coverage gap: a (focus_area, shift_category, date) tuple where category
- * staffing totals are not met. Exact-code shortages are carried as detail.
- */
-export interface CoverageGap {
-  focusAreaId: number;
-  focusAreaName: string;
-  requirementAssignmentDefinitionId: number;
-  assignmentId: number;
-  ruleLabel: string;
-  assignmentLabel: string;
-  eligibleAssignmentDefinitionIds: number[];
-  preferredOpenAssignmentDefinitionId: number;
-  shiftCategoryId: number;
-  shiftCategoryName: string;
-  date: Date;
-  status: CoverageStatus;
-  shortageDetails: CoverageShortageDetail[];
-}
+// Coverage status/gap types now live in @dubgrid/schedule-core alongside the
+// engine that produces them (see packages/schedule-core/src/coverage.ts).
+export type { CoverageStatus, CoverageShortageDetail, CoverageGap } from "@dubgrid/schedule-core";
 
 /** In-memory schedule option projected from canonical shift + job definitions. */
 export interface AssignmentDefinition {

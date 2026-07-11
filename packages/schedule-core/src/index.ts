@@ -6,6 +6,9 @@ import type {
   MobileShiftRequest,
 } from "@dubgrid/contracts";
 
+export * from "./coverage";
+export * from "./pay-period";
+
 export type ScheduleEntryLike = {
   employeeId: string;
   employeeName: string;

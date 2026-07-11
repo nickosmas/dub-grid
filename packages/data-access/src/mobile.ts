@@ -85,11 +85,28 @@ export interface MobileProfileNameRow {
   last_name: string | null;
 }
 
+// Matches web's PublishChange (apps/web/src/types/index.ts) — stored verbatim
+// as JSONB on publish_history.changes, written camelCase by web's publish
+// action, so the shape carries over as-is.
+export interface MobilePublishChange {
+  empId: string;
+  date: string;
+  kind: "new" | "modified" | "deleted";
+}
+
 export interface MobilePublishHistoryRow {
   published_by: string | null;
   start_date: string;
   end_date: string;
   published_at: string;
+  change_count: number;
+  changes: MobilePublishChange[];
+}
+
+export interface MobileAcceptedInvitationRow {
+  email: string;
+  role_to_assign: string;
+  accepted_at: string;
 }
 
 export interface MobileOrganizationMembershipRow extends Pick<
@@ -289,6 +306,37 @@ function normalizeEmbeddedEmployee(value: unknown): MobileEmbeddedEmployeeRow | 
   };
 }
 
+function buildStateFromSnapshot(snapshot: DbScheduleCellSnapshot): MobilePublishedScheduleRow["state"] {
+  const orderedSegments = [...(snapshot.segments ?? [])].sort(
+    (left, right) => left.position - right.position,
+  );
+
+  return snapshot.state_kind === "absence"
+    ? {
+        kind: "absence",
+        segments: [],
+        absenceTypeId: snapshot.absence_type_id ?? null,
+        customStartTime: null,
+        customEndTime: null,
+        seriesId: null,
+        fromRecurring: false,
+      }
+    : {
+        kind: "worked",
+        segments: orderedSegments.map((segment) => ({
+          shiftId: segment.shift_id ?? null,
+          jobId: segment.job_id,
+          position: segment.position,
+          isMentored: segment.is_mentored ?? false,
+        })),
+        absenceTypeId: null,
+        customStartTime: snapshot.custom_start_time ?? null,
+        customEndTime: snapshot.custom_end_time ?? null,
+        seriesId: null,
+        fromRecurring: false,
+      };
+}
+
 function normalizePublishedScheduleRow(
   row: MobileScheduleCellQueryRow,
 ): MobilePublishedScheduleRow | null {
@@ -299,9 +347,6 @@ function normalizePublishedScheduleRow(
     return null;
   }
 
-  const orderedSegments = [...(publishedSnapshot.segments ?? [])].sort(
-    (left, right) => left.position - right.position,
-  );
   const employee = normalizeEmbeddedEmployee(row.employees);
   if (!employee) {
     return null;
@@ -311,31 +356,38 @@ function normalizePublishedScheduleRow(
     emp_id: row.emp_id,
     date: row.date,
     focus_area_id: row.focus_area_id ?? null,
-    state:
-      publishedSnapshot.state_kind === "absence"
-        ? {
-            kind: "absence",
-            segments: [],
-            absenceTypeId: publishedSnapshot.absence_type_id ?? null,
-            customStartTime: null,
-            customEndTime: null,
-            seriesId: null,
-            fromRecurring: false,
-          }
-        : {
-            kind: "worked",
-            segments: orderedSegments.map((segment) => ({
-              shiftId: segment.shift_id ?? null,
-              jobId: segment.job_id,
-              position: segment.position,
-              isMentored: segment.is_mentored ?? false,
-            })),
-            absenceTypeId: null,
-            customStartTime: publishedSnapshot.custom_start_time ?? null,
-            customEndTime: publishedSnapshot.custom_end_time ?? null,
-            seriesId: null,
-            fromRecurring: false,
-          },
+    state: buildStateFromSnapshot(publishedSnapshot),
+    employees: employee,
+  };
+}
+
+// Same shape as normalizePublishedScheduleRow, but prefers the draft
+// snapshot when one exists — mirrors web's scheduler-effective resolution
+// (buildScheduleCellEntry in apps/web/src/lib/schedule-cells.ts: `draft ??
+// published`), so callers that need "what a scheduler currently sees,
+// including unpublished edits" (e.g. the mobile overtime-watch computation)
+// match web instead of silently only counting published hours.
+function normalizeEffectiveScheduleRow(
+  row: MobileScheduleCellQueryRow,
+): MobilePublishedScheduleRow | null {
+  const snapshots = row.snapshots ?? [];
+  const effectiveSnapshot =
+    snapshots.find((snapshot: DbScheduleCellSnapshot) => snapshot.snapshot_kind === "draft") ??
+    snapshots.find((snapshot: DbScheduleCellSnapshot) => snapshot.snapshot_kind === "published");
+  if (!effectiveSnapshot) {
+    return null;
+  }
+
+  const employee = normalizeEmbeddedEmployee(row.employees);
+  if (!employee) {
+    return null;
+  }
+
+  return {
+    emp_id: row.emp_id,
+    date: row.date,
+    focus_area_id: row.focus_area_id ?? null,
+    state: buildStateFromSnapshot(effectiveSnapshot),
     employees: employee,
   };
 }
@@ -643,7 +695,7 @@ export async function fetchMobilePublishHistoryRows(
 ): Promise<MobilePublishHistoryRow[]> {
   let query = serviceClient
     .from("publish_history")
-    .select("published_by, start_date, end_date, published_at")
+    .select("published_by, start_date, end_date, published_at, change_count, changes")
     .eq("org_id", orgId)
     .order("published_at", { ascending: false });
 
@@ -679,7 +731,7 @@ export async function fetchProfileNameRowsByIds(
   return (data ?? []) as MobileProfileNameRow[];
 }
 
-export async function fetchPublishedMobileScheduleRows(
+async function fetchScheduleCellQueryRows(
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
@@ -687,7 +739,7 @@ export async function fetchPublishedMobileScheduleRows(
     endDate: string;
     employeeId?: string;
   },
-): Promise<MobilePublishedScheduleRow[]> {
+): Promise<MobileScheduleCellQueryRow[]> {
   let query = serviceClient
     .from("schedule_cells")
     .select(
@@ -738,8 +790,40 @@ export async function fetchPublishedMobileScheduleRows(
   const { data, error } = await query;
   if (error) throw error;
 
-  return ((data ?? []) as MobileScheduleCellQueryRow[])
+  return (data ?? []) as MobileScheduleCellQueryRow[];
+}
+
+export async function fetchPublishedMobileScheduleRows(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    startDate: string;
+    endDate: string;
+    employeeId?: string;
+  },
+): Promise<MobilePublishedScheduleRow[]> {
+  const rows = await fetchScheduleCellQueryRows(serviceClient, input);
+
+  return rows
     .map((row) => normalizePublishedScheduleRow(row))
+    .filter((row): row is MobilePublishedScheduleRow => row != null);
+}
+
+// Draft-preferred variant of fetchPublishedMobileScheduleRows — see
+// normalizeEffectiveScheduleRow for why this exists.
+export async function fetchMobileEffectiveScheduleRows(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    startDate: string;
+    endDate: string;
+    employeeId?: string;
+  },
+): Promise<MobilePublishedScheduleRow[]> {
+  const rows = await fetchScheduleCellQueryRows(serviceClient, input);
+
+  return rows
+    .map((row) => normalizeEffectiveScheduleRow(row))
     .filter((row): row is MobilePublishedScheduleRow => row != null);
 }
 
@@ -876,6 +960,29 @@ export async function fetchMobilePendingInvitationRows(
   if (error) throw error;
 
   return (data ?? []) as MobileInvitationRow[];
+}
+
+// Accepted (not pending) invitations within a date range — powers the
+// dashboard activity feed's "user_signup" events, matching web's
+// buildActivityFeed (apps/web/src/lib/dashboard-stats.ts), which surfaces
+// every invitation with a non-null acceptedAt.
+export async function fetchMobileAcceptedInvitationRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+  input: { startDate: string; endDate: string },
+): Promise<MobileAcceptedInvitationRow[]> {
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .select("email, role_to_assign, accepted_at")
+    .eq("org_id", orgId)
+    .not("accepted_at", "is", null)
+    .gte("accepted_at", `${input.startDate}T00:00:00.000Z`)
+    .lte("accepted_at", `${input.endDate}T23:59:59.999Z`)
+    .order("accepted_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data ?? []) as MobileAcceptedInvitationRow[];
 }
 
 export async function fetchMobileEmployeeRowById(

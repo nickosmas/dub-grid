@@ -1,9 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 import type { CardIconTone } from "../../../shared/components/Screen";
+import type { DashboardPeriodMode } from "../../../shared/lib/dates";
+import { PeriodToggle } from "./PeriodToggle";
 
 const TONE_STYLES: Record<CardIconTone, { backgroundColor: string; borderColor: string; iconColor: string }> = {
   brand: {
@@ -72,9 +73,15 @@ const STATUS_TONE: Record<string, CardIconTone> = {
 export function DashboardHeroCard({
   summary,
   metrics,
+  periodMode,
+  onPeriodModeChange,
+  isFetching = false,
 }: {
   summary: MobileDashboardResponse["heroSummary"];
   metrics: MobileDashboardResponse["metrics"];
+  periodMode: DashboardPeriodMode;
+  onPeriodModeChange: (mode: DashboardPeriodMode) => void;
+  isFetching?: boolean;
 }) {
   const tone = STATUS_TONE[summary.statusLabel] ?? "brand";
   const toneStyle = TONE_STYLES[tone];
@@ -87,15 +94,8 @@ export function DashboardHeroCard({
             <Text style={[styles.statusPillLabel, { color: toneStyle.iconColor }]}>{summary.statusLabel}</Text>
           </View>
           <Text style={styles.title}>{summary.title}</Text>
-          <Text style={styles.description}>{summary.description}</Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          style={styles.actionButton}
-          onPress={() => router.push("/(tabs)/team")}
-        >
-          <Text style={styles.actionButtonLabel}>Review schedule</Text>
-        </Pressable>
+        <PeriodToggle mode={periodMode} onChange={onPeriodModeChange} loading={isFetching} />
       </View>
       <View style={styles.tileRow}>
         <MetricTile
@@ -162,20 +162,6 @@ const styles = StyleSheet.create({
     ...mobileText.sectionTitle,
     color: mobileColors.textPrimary,
   },
-  description: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  actionButton: {
-    backgroundColor: mobileColors.brand,
-    borderRadius: mobileRadii.control,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  actionButtonLabel: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textInverse,
-  },
   tileRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -214,6 +200,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
+    // Nudge into the tile's top-right corner, matching the shared Card
+    // component's icon treatment. Kept smaller than the tile's own padding
+    // (12) so it stays inside the tile's overflow:hidden bounds.
+    marginTop: -4,
+    marginRight: -4,
   },
   tileValue: {
     ...mobileText.heroMetric,
