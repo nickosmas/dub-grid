@@ -114,6 +114,10 @@ export const mobileOrgConfigSchema = z.object({
   name: z.string(),
   slug: z.string().nullable(),
   timezone: z.string().nullable(),
+  // Anchors the "2 weeks" dashboard period to the org's actual pay-period
+  // boundary (see @dubgrid/schedule-core's getDashboardPeriodStartIso) —
+  // null falls back to a plain Sunday-aligned window.
+  payPeriodStartDate: z.string().nullable().default(null),
   shiftDisplayMode: z.enum(["code", "name"]),
   labels: z.object({
     focusArea: z.string(),
@@ -366,7 +370,7 @@ export const MAX_MOBILE_SCHEDULE_RANGE_DAYS = 31;
 const MS_PER_DAY = 86_400_000;
 
 function parseMobileIsoDate(value: string): Date {
-  return new Date(`${value}T00:00:00`);
+  return new Date(`${value}T00:00:00Z`);
 }
 
 function countInclusiveMobileRangeDays(startDate: string, endDate: string): number {
@@ -416,7 +420,7 @@ export function normalizeMobileScheduleRange(input?: MobileScheduleQuery): {
   const today = new Date();
   const start = input?.startDate
     ? parseMobileIsoDate(input.startDate)
-    : new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    : new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
   const end = input?.endDate
     ? parseMobileIsoDate(input.endDate)
     : new Date(start.getTime() + 13 * MS_PER_DAY);
@@ -507,12 +511,20 @@ export const mobileShiftRequestSchema = z.object({
   updatedAt: z.string(),
 });
 
+// Same thresholds as web's computeOpenShifts (apps/web/src/lib/
+// dashboard-stats.ts, via @dubgrid/schedule-core's classifyOpenShiftUrgency):
+// "high" -> today/tomorrow, "medium" -> within 3 days, else "low". Nullable/
+// defaulted so this stays additive against an older shipped mobile client
+// during a staged rollout.
+export const mobileOpenShiftUrgencySchema = z.enum(["high", "medium", "low"]);
+
 export const mobileOpenShiftSchema = z.object({
   id: z.string(),
   date: z.string().date(),
   focusAreaId: z.number().int(),
   focusAreaName: z.string().nullable(),
   needed: z.number().int().positive(),
+  urgency: mobileOpenShiftUrgencySchema.nullable().default(null),
   state: scheduleCellStateSchema,
   presentation: resolvedSchedulePresentationSchema,
   canVolunteer: z.boolean().default(true),
@@ -534,11 +546,25 @@ export const mobileShiftRequestsResponseSchema = z.object({
 export const mobileDashboardCoverageSectionSchema = z.object({
   focusAreaId: z.number().int(),
   focusAreaName: z.string(),
+  requiredTotal: z.number().int(),
+  filledTotal: z.number().int(),
+  pct: z.number().int(),
   openSlots: z.number().int(),
 });
 
+// Same 4 event types as web's dashboard activity feed (apps/web/src/lib/
+// dashboard-stats.ts's buildActivityFeed) — powers the mobile expanded
+// activity screen's type filter.
+export const mobileDashboardActivityTypeSchema = z.enum([
+  "publish",
+  "shift_change",
+  "request",
+  "user_signup",
+]);
+
 export const mobileDashboardActivityItemSchema = z.object({
   id: z.string(),
+  type: mobileDashboardActivityTypeSchema,
   description: z.string(),
   timestamp: z.string(),
 });
@@ -548,6 +574,11 @@ export const mobileDashboardStaffHoursEntrySchema = z.object({
   employeeName: z.string(),
   totalHours: z.number(),
   overtimeHours: z.number(),
+  // The focus area the employee logged the most hours in this period —
+  // powers the mobile expanded "Overtime watch" screen's focus-area filter,
+  // matching web's ExpandedStaffHours.tsx.
+  focusAreaId: z.number().int().nullable().default(null),
+  focusAreaName: z.string().nullable().default(null),
 });
 
 // Simplified port of web's DashboardHero: a headline/description summary plus

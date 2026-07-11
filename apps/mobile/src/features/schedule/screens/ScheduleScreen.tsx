@@ -206,35 +206,6 @@ type TeamScheduleShiftGroup = {
   title: string;
 };
 
-function getFirstDateForFocusArea(
-  entries: MobileScheduleEntry[],
-  focusAreaKey: string,
-): string | null {
-  const matchingEntries = filterTeamScheduleEntriesByFocusArea(entries, focusAreaKey);
-
-  if (matchingEntries.length === 0) {
-    return null;
-  }
-
-  return (
-    [...matchingEntries].sort((left, right) => {
-      if (left.date !== right.date) {
-        return left.date.localeCompare(right.date);
-      }
-
-      const leftTime =
-        getScheduleEntryStartTime(left) ?? getScheduleEntryCustomStartTime(left) ?? "99:99:99";
-      const rightTime =
-        getScheduleEntryStartTime(right) ?? getScheduleEntryCustomStartTime(right) ?? "99:99:99";
-      if (leftTime !== rightTime) {
-        return leftTime.localeCompare(rightTime);
-      }
-
-      return left.employeeName.localeCompare(right.employeeName);
-    })[0]?.date ?? null
-  );
-}
-
 function formatScheduleHeaderDate(date: string): string {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -1648,23 +1619,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   function handleSelectFocusArea(nextFocusAreaKey: string) {
     setSelectedTeamFocusAreaKey(nextFocusAreaKey);
-
-    const nextSelectedDayEntries = filterTeamScheduleEntriesByFocusArea(
-      selectedDayTeamEntries,
-      nextFocusAreaKey,
-    );
-
-    if (nextSelectedDayEntries.length === 0) {
-      const firstMatchingDate = getFirstDateForFocusArea(scheduleEntries, nextFocusAreaKey);
-
-      if (firstMatchingDate && firstMatchingDate !== selectedDate) {
-        commitSelectedDate(firstMatchingDate);
-        // See the matching comment in handleSelectDate: not redundant with
-        // closeCalendarExpansion's reset, which no-ops while collapsed.
-        setCalendarMonthAnchor(getScheduleMonthStartDate(firstMatchingDate));
-      }
-    }
-
     closeCalendarExpansion();
   }
 

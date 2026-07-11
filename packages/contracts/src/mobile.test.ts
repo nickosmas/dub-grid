@@ -76,6 +76,24 @@ describe("mobile contracts", () => {
     });
   });
 
+  it("normalizes mobile schedule ranges the same regardless of server timezone", () => {
+    const originalTz = process.env.TZ;
+    try {
+      process.env.TZ = "Etc/GMT-3"; // UTC+3, e.g. Africa/Nairobi
+      expect(
+        normalizeMobileScheduleRange({
+          startDate: "2026-07-05",
+          endDate: "2026-07-11",
+        }),
+      ).toEqual({
+        startDate: "2026-07-05",
+        endDate: "2026-07-11",
+      });
+    } finally {
+      process.env.TZ = originalTz;
+    }
+  });
+
   it("accepts a valid organization lookup response", () => {
     const result = mobileOrganizationLookupResponseSchema.safeParse({
       organization: {
