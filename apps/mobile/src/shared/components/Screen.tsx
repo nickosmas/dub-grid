@@ -1,4 +1,5 @@
 import {
+  useMemo,
   useState,
   type ComponentProps,
   type PropsWithChildren,
@@ -90,15 +91,33 @@ export function Screen({
   const useNativeContentInsets = !stickyHeader;
   const shouldExposeNativeScrollRoot = !stickyHeader && !renderOverlay;
   const resolvedStickyHeaderTopPadding = stickyHeaderTopPadding ?? Math.max(insets.top, 8);
+  // Android's RefreshControl has progressViewOffset to push the pull-to-
+  // refresh spinner below the floating sticky header; iOS has no such prop.
+  // A JS-level paddingTop doesn't move the ScrollView's own frame origin
+  // (what the native pull reveal is anchored to), so without this the
+  // spinner renders directly behind the header instead of below it. Using a
+  // native contentInset/contentOffset moves that origin for real.
+  const isIosStickyHeader = Platform.OS === "ios" && Boolean(stickyHeader);
+  const iosContentInset = useMemo(
+    () =>
+      isIosStickyHeader ? { top: stickyHeaderHeight, left: 0, bottom: 0, right: 0 } : undefined,
+    [isIosStickyHeader, stickyHeaderHeight],
+  );
+  const iosContentOffset = useMemo(
+    () => (isIosStickyHeader ? { x: 0, y: -stickyHeaderHeight } : undefined),
+    [isIosStickyHeader, stickyHeaderHeight],
+  );
   const scrollView = (
     <ScrollView
       ref={scrollViewRef}
       automaticallyAdjustContentInsets={useNativeContentInsets}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={{
-        paddingTop: stickyHeader ? stickyHeaderHeight : 0,
+        paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,
         paddingBottom: getScreenBottomPadding(bottomPaddingMode, insets.bottom),
       }}
+      contentInset={iosContentInset}
+      contentOffset={iosContentOffset}
       contentInsetAdjustmentBehavior={useNativeContentInsets ? "automatic" : "never"}
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       keyboardShouldPersistTaps="handled"

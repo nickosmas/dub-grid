@@ -16,7 +16,9 @@ function pickDomProps(input: Record<string, any>) {
       key === "automaticallyAdjustsScrollIndicatorInsets" ||
       key === "keyboardDismissMode" ||
       key === "scrollEventThrottle" ||
-      key === "onLayout"
+      key === "onLayout" ||
+      key === "contentInset" ||
+      key === "contentOffset"
     ) {
       continue;
     }
@@ -85,7 +87,7 @@ vi.mock("react-native", async () => {
     React.createElement("span", pickDomProps(props), children as React.ReactNode);
 
   const ScrollView = React.forwardRef<{ scrollTo: () => void }, Record<string, any>>(
-    ({ children, contentContainerStyle, ...props }, ref) => {
+    ({ children, contentContainerStyle, contentInset, contentOffset, ...props }, ref) => {
       React.useImperativeHandle(
         ref,
         () => ({
@@ -99,6 +101,8 @@ vi.mock("react-native", async () => {
         {
           ...pickDomProps(props),
           "data-content-container-style": JSON.stringify(contentContainerStyle),
+          "data-content-inset": JSON.stringify(contentInset ?? null),
+          "data-content-offset": JSON.stringify(contentOffset ?? null),
           "data-content-inset-adjustment-behavior": props.contentInsetAdjustmentBehavior,
           "data-automatically-adjust-content-insets": props.automaticallyAdjustContentInsets
             ? "true"
@@ -229,6 +233,35 @@ describe("Screen", () => {
     );
 
     expect(screen.getByText("Overlay 100")).toBeInTheDocument();
+  });
+
+  it("uses a native content inset/offset instead of padding to clear the sticky header on iOS, so pull-to-refresh isn't hidden behind it", () => {
+    render(
+      <Screen refreshing={false} onRefresh={() => undefined} stickyHeader={<span>Header</span>}>
+        <div>Body</div>
+      </Screen>,
+    );
+
+    const scrollView = screen.getByTestId("screen-scroll-view");
+    const contentStyle = JSON.parse(
+      scrollView.getAttribute("data-content-container-style") ?? "{}",
+    );
+
+    // The mocked header's onLayout reports height: 100 (see the View mock
+    // above) — that value should drive a native inset/offset, not a JS
+    // paddingTop, since paddingTop doesn't move the ScrollView's own frame
+    // origin that the RefreshControl's pull reveal is anchored to.
+    expect(JSON.parse(scrollView.getAttribute("data-content-inset") ?? "null")).toEqual({
+      top: 100,
+      left: 0,
+      bottom: 0,
+      right: 0,
+    });
+    expect(JSON.parse(scrollView.getAttribute("data-content-offset") ?? "null")).toEqual({
+      x: 0,
+      y: -100,
+    });
+    expect(contentStyle.paddingTop).toBe(0);
   });
 });
 
