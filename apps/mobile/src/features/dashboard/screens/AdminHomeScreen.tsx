@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { router } from "expo-router";
 import { Screen } from "../../../shared/components/Screen";
-import { LoadingScreen } from "../../../shared/components/LoadingScreen";
+import { HeroSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
 import { QueryStateCard } from "../../../shared/components/QueryStateCard";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { queryClient } from "../../../shared/lib/query-client";
@@ -49,10 +49,12 @@ export function AdminHomeScreen() {
 
   if (bootstrapQuery.isLoading || dashboardQuery.isLoading) {
     return (
-      <LoadingScreen
-        title="Loading your dashboard"
-        body="Getting the latest for your organization."
-      />
+      <Screen title="Home" subtitle="Organization overview" bottomPaddingMode="tabbed">
+        <HeroSkeleton />
+        <ListSkeleton rows={2} />
+        <ListSkeleton rows={3} />
+        <ListSkeleton rows={2} showSectionHeader={false} />
+      </Screen>
     );
   }
 

@@ -122,13 +122,14 @@ describe("AdminHomeScreen", () => {
     useSessionState.mockReturnValue({ accessToken: "token-1" });
   });
 
-  it("shows a loading state while either query is loading", () => {
+  it("shows skeleton placeholders while either query is loading", () => {
     useBootstrap.mockReturnValue({ isLoading: true, data: undefined });
     useAdminDashboard.mockReturnValue({ isLoading: true, isError: false, data: undefined });
 
     render(<AdminHomeScreen />);
 
-    expect(screen.getByText("Loading your dashboard")).toBeInTheDocument();
+    expect(screen.getByTestId("hero-skeleton")).toBeInTheDocument();
+    expect(screen.getAllByTestId("list-skeleton").length).toBeGreaterThan(0);
   });
 
   it("shows a retry state when the dashboard query fails", () => {

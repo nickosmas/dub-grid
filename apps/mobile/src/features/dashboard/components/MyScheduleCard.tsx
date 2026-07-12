@@ -102,13 +102,17 @@ export function MyScheduleCard({ accessToken }: { accessToken: string | null }) 
 
 const styles = StyleSheet.create({
   // Cancels Card's own 18px horizontal padding (Screen.tsx's `card` style)
-  // so the day-card row bleeds edge-to-edge instead of sitting inset —
-  // everything else in the card (title, icon) keeps the normal padding.
+  // so the scroll track itself bleeds edge-to-edge instead of sitting inset —
+  // everything else in the card (title, icon) keeps the normal padding. The
+  // same 18px comes back as contentContainerStyle padding below, so the
+  // first/last day cards still sit inset at rest; only the track between
+  // them (visible while actively scrolling) is truly edge-to-edge.
   scrollView: {
     marginHorizontal: -18,
   },
   scrollContent: {
     gap: DAY_CARD_GAP,
+    paddingHorizontal: 18,
   },
   dayCard: {
     width: DAY_CARD_WIDTH,
