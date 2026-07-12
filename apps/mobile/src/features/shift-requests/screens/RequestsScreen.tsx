@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileOpenShift,
@@ -317,6 +318,61 @@ function formatRequestStatus(status: MobileShiftRequest["status"]): string {
   return status === "pending_approval"
     ? "Pending approval"
     : status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+type StatusChipTone = {
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+};
+
+const STATUS_CHIP_TONES: Record<MobileShiftRequest["status"], StatusChipTone> = {
+  open: {
+    backgroundColor: mobileColors.brandSoft,
+    borderColor: mobileColors.brandBorder,
+    textColor: mobileColors.brand,
+  },
+  pending_approval: {
+    backgroundColor: mobileColors.warningSoft,
+    borderColor: mobileColors.warningBorder,
+    textColor: mobileColors.warningText,
+  },
+  approved: {
+    backgroundColor: mobileColors.successSoft,
+    borderColor: mobileColors.successBorder,
+    textColor: mobileColors.successText,
+  },
+  rejected: {
+    backgroundColor: mobileColors.dangerSoft,
+    borderColor: mobileColors.dangerBorder,
+    textColor: mobileColors.dangerText,
+  },
+  cancelled: {
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textSubtle,
+  },
+  expired: {
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textSubtle,
+  },
+};
+
+const OPEN_SHIFT_CHIP_TONE = STATUS_CHIP_TONES.open;
+
+function CardIcon({
+  name,
+  muted = false,
+}: {
+  name: keyof typeof Ionicons.glyphMap;
+  muted?: boolean;
+}) {
+  return (
+    <View style={[styles.cardIconFrame, muted && styles.cardIconFrameMuted]}>
+      <Ionicons color={mobileColors.brand} name={name} size={18} />
+    </View>
+  );
 }
 
 export default function RequestsScreen() {
@@ -648,11 +704,13 @@ export default function RequestsScreen() {
               <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
                 {tab.label}
               </Text>
-              <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
-                <Text style={[styles.tabBadgeText, isActive && styles.tabBadgeTextActive]}>
-                  {tab.count}
-                </Text>
-              </View>
+              {tab.count > 0 ? (
+                <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
+                  <Text style={[styles.tabBadgeText, isActive && styles.tabBadgeTextActive]}>
+                    {tab.count}
+                  </Text>
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
@@ -866,215 +924,244 @@ function RequestCard({
     request.targetPresentation,
     request.targetState ?? null,
   );
+  const typeLabel =
+    request.type === "pickup"
+      ? "Pickup request"
+      : request.type === "swap"
+        ? "Swap request"
+        : "Calloff request";
+  const statusTone = STATUS_CHIP_TONES[request.status];
+
+  const canCancel =
+    Boolean(linkedEmployeeId) &&
+    request.requesterEmpId === linkedEmployeeId &&
+    (request.status === "open" || request.status === "pending_approval");
+  const canClaim =
+    Boolean(linkedEmployeeId) &&
+    request.type === "pickup" &&
+    request.status === "open" &&
+    request.targetEmpId == null &&
+    request.requesterEmpId !== linkedEmployeeId;
+  const canRespond =
+    Boolean(linkedEmployeeId) &&
+    request.targetEmpId === linkedEmployeeId &&
+    request.status === "open";
+  const canResolve = canApprove && request.status === "pending_approval";
+  const hasActions = canCancel || canClaim || canRespond || canResolve;
 
   return (
     <View style={[styles.requestCard, highlighted && styles.requestCardHighlighted]}>
-      <View style={styles.requestHeaderRow}>
-        <Text style={styles.requestTitle}>
-          {showDate
-            ? `${request.requesterName} • ${request.requesterShiftDate}`
-            : request.requesterName}
-        </Text>
-        <View style={styles.statusChip}>
-          <Text style={styles.statusChipText}>{formatRequestStatus(request.status)}</Text>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardTitleRow}>
+          <CardIcon muted={highlighted} name="swap-horizontal-outline" />
+          <View style={styles.titleColumn}>
+            <Text style={styles.requestTitle}>{request.requesterName}</Text>
+            <Text style={styles.metaText}>
+              {typeLabel}
+              {showDate ? ` • ${request.requesterShiftDate}` : ""}
+            </Text>
+            {requesterSplitSegments.length > 1 ? (
+              <View style={styles.splitShiftPanel}>
+                <SplitShiftBadge count={requesterSplitSegments.length} compact />
+                <SplitShiftSegmentList
+                  renderSegmentChip={(segment) => (
+                    <JobPill
+                      chip={getSegmentJobChip(segment)}
+                      compact
+                      isMentored={segment.isMentored === true}
+                    />
+                  )}
+                  segments={requesterSplitSegments}
+                  variant="compact"
+                />
+              </View>
+            ) : (
+              <View style={styles.shiftPillRow}>
+                <ShiftPill
+                  colors={getShiftPillColors(request.requesterPresentation)}
+                  label={shiftLabel}
+                />
+                {timeRange ? <Text style={styles.shiftTitleTimeText}>{timeRange}</Text> : null}
+                {isMentored ? <MentoredPill /> : null}
+              </View>
+            )}
+            {request.targetName ? (
+              <Text style={styles.metaText}>Target: {request.targetName}</Text>
+            ) : null}
+            {targetSplitSegments.length > 1 ? (
+              <View style={styles.splitShiftPanel}>
+                <Text style={styles.splitShiftPanelLabel}>Target shift</Text>
+                <SplitShiftBadge count={targetSplitSegments.length} compact />
+                <SplitShiftSegmentList
+                  renderSegmentChip={(segment) => (
+                    <JobPill
+                      chip={getSegmentJobChip(segment)}
+                      compact
+                      isMentored={segment.isMentored === true}
+                    />
+                  )}
+                  segments={targetSplitSegments}
+                  variant="compact"
+                />
+              </View>
+            ) : null}
+            {request.adminNote ? (
+              <Text style={styles.metaText}>Manager note: {request.adminNote}</Text>
+            ) : null}
+          </View>
+        </View>
+        <View
+          style={[
+            styles.statusChip,
+            { backgroundColor: statusTone.backgroundColor, borderColor: statusTone.borderColor },
+          ]}
+        >
+          <Text style={[styles.statusChipText, { color: statusTone.textColor }]}>
+            {formatRequestStatus(request.status)}
+          </Text>
         </View>
       </View>
-      <Text style={styles.metaText}>
-        {request.type === "pickup"
-          ? "Pickup request"
-          : request.type === "swap"
-            ? "Swap request"
-            : "Calloff request"}
-      </Text>
-      {requesterSplitSegments.length > 1 ? (
-        <View style={styles.splitShiftPanel}>
-          <SplitShiftBadge count={requesterSplitSegments.length} compact />
-          <SplitShiftSegmentList
-            renderSegmentChip={(segment) => (
-              <JobPill
-                chip={getSegmentJobChip(segment)}
-                compact
-                isMentored={segment.isMentored === true}
-              />
-            )}
-            segments={requesterSplitSegments}
-            variant="compact"
-          />
+      {hasActions ? (
+        <View style={styles.cardActions}>
+          {canCancel
+            ? (() => {
+                const body: RequestActionBody = {
+                  action: "cancel",
+                  empId: linkedEmployeeId!,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Cancel"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                    tone="neutral"
+                  />
+                );
+              })()
+            : null}
+          {canClaim
+            ? (() => {
+                const body: RequestActionBody = {
+                  action: "claim",
+                  claimerEmpId: linkedEmployeeId!,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Claim"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                  />
+                );
+              })()
+            : null}
+          {canRespond ? (
+            <>
+              {(() => {
+                const body: RequestActionBody = {
+                  action: "respond",
+                  empId: linkedEmployeeId!,
+                  accept: true,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Accept"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                  />
+                );
+              })()}
+              {(() => {
+                const body: RequestActionBody = {
+                  action: "respond",
+                  empId: linkedEmployeeId!,
+                  accept: false,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Decline"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                    tone="neutral"
+                  />
+                );
+              })()}
+            </>
+          ) : null}
+          {canResolve ? (
+            <>
+              {(() => {
+                const body: RequestActionBody = {
+                  action: "resolve",
+                  approved: true,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Approve"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                  />
+                );
+              })()}
+              {(() => {
+                const body: RequestActionBody = {
+                  action: "resolve",
+                  approved: false,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Reject"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                    tone="danger"
+                  />
+                );
+              })()}
+            </>
+          ) : null}
         </View>
-      ) : (
-        <View style={styles.shiftPillRow}>
-          <ShiftPill
-            colors={getShiftPillColors(request.requesterPresentation)}
-            label={shiftLabel}
-          />
-          {timeRange ? <Text style={styles.shiftTitleTimeText}>{timeRange}</Text> : null}
-          {isMentored ? <MentoredPill /> : null}
-        </View>
-      )}
-      {request.targetName ? (
-        <Text style={styles.metaText}>Target: {request.targetName}</Text>
       ) : null}
-      {targetSplitSegments.length > 1 ? (
-        <View style={styles.splitShiftPanel}>
-          <Text style={styles.splitShiftPanelLabel}>Target shift</Text>
-          <SplitShiftBadge count={targetSplitSegments.length} compact />
-          <SplitShiftSegmentList
-            renderSegmentChip={(segment) => (
-              <JobPill
-                chip={getSegmentJobChip(segment)}
-                compact
-                isMentored={segment.isMentored === true}
-              />
-            )}
-            segments={targetSplitSegments}
-            variant="compact"
-          />
-        </View>
-      ) : null}
-      {request.adminNote ? (
-        <Text style={styles.metaText}>Manager note: {request.adminNote}</Text>
-      ) : null}
-      <View style={styles.actions}>
-        {linkedEmployeeId &&
-        request.requesterEmpId === linkedEmployeeId &&
-        (request.status === "open" || request.status === "pending_approval")
-          ? (() => {
-              const body: RequestActionBody = {
-                action: "cancel",
-                empId: linkedEmployeeId,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Cancel"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                  tone="neutral"
-                />
-              );
-            })()
-          : null}
-        {linkedEmployeeId &&
-        request.type === "pickup" &&
-        request.status === "open" &&
-        request.targetEmpId == null &&
-        request.requesterEmpId !== linkedEmployeeId
-          ? (() => {
-              const body: RequestActionBody = {
-                action: "claim",
-                claimerEmpId: linkedEmployeeId,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Claim"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                />
-              );
-            })()
-          : null}
-        {linkedEmployeeId &&
-        request.targetEmpId === linkedEmployeeId &&
-        request.status === "open" ? (
-          <>
-            {(() => {
-              const body: RequestActionBody = {
-                action: "respond",
-                empId: linkedEmployeeId,
-                accept: true,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Accept"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                />
-              );
-            })()}
-            {(() => {
-              const body: RequestActionBody = {
-                action: "respond",
-                empId: linkedEmployeeId,
-                accept: false,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Decline"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                  tone="neutral"
-                />
-              );
-            })()}
-          </>
-        ) : null}
-        {canApprove && request.status === "pending_approval" ? (
-          <>
-            {(() => {
-              const body: RequestActionBody = {
-                action: "resolve",
-                approved: true,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Approve"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                />
-              );
-            })()}
-            {(() => {
-              const body: RequestActionBody = {
-                action: "resolve",
-                approved: false,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Reject"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                  tone="danger"
-                />
-              );
-            })()}
-          </>
-        ) : null}
-      </View>
     </View>
   );
 }
@@ -1105,18 +1192,29 @@ function OpenShiftCard({
     openShift.canVolunteer === false
       ? (openShift.volunteerBlockReason ?? "You can't volunteer for this shift right now.")
       : null;
+  const hasActions = Boolean(linkedEmployeeId);
 
   return (
     <View style={[styles.requestCard, styles.openShiftCard]}>
-      <View style={styles.requestHeaderRow}>
+      <View style={styles.openShiftTitleRow}>
         <View style={styles.shiftTitleTimeRow}>
           <Text style={styles.openShiftTitle}>{shiftLabel}</Text>
           {splitSegments.length <= 1 && timeRange ? (
             <Text style={styles.shiftTitleTimeText}>{timeRange}</Text>
           ) : null}
         </View>
-        <View style={styles.statusChip}>
-          <Text style={styles.statusChipText}>Open shift</Text>
+        <View
+          style={[
+            styles.statusChip,
+            {
+              backgroundColor: OPEN_SHIFT_CHIP_TONE.backgroundColor,
+              borderColor: OPEN_SHIFT_CHIP_TONE.borderColor,
+            },
+          ]}
+        >
+          <Text style={[styles.statusChipText, { color: OPEN_SHIFT_CHIP_TONE.textColor }]}>
+            Open shift
+          </Text>
         </View>
       </View>
       {showDate ? <Text style={styles.metaText}>{openShift.date}</Text> : null}
@@ -1149,38 +1247,37 @@ function OpenShiftCard({
         {openShift.needed} teammate{openShift.needed === 1 ? "" : "s"} needed
       </Text>
       {volunteerBlockReason ? <Text style={styles.metaText}>{volunteerBlockReason}</Text> : null}
-      <View style={styles.actions}>
-        {linkedEmployeeId
-          ? (() => {
-              const body: RequestActionBody = {
-                action: "volunteer_open_shift",
-                empId: linkedEmployeeId,
-                shiftDate: openShift.date,
-                focusAreaId: openShift.focusAreaId,
-                state: openShift.state,
-              };
-              const isLoading =
-                pendingAction?.key === getMobileRequestActionKey(openShift.id, body);
+      {hasActions ? (
+        <View style={[styles.cardActions, styles.cardActionsFlush]}>
+          {(() => {
+            const body: RequestActionBody = {
+              action: "volunteer_open_shift",
+              empId: linkedEmployeeId!,
+              shiftDate: openShift.date,
+              focusAreaId: openShift.focusAreaId,
+              state: openShift.state,
+            };
+            const isLoading = pendingAction?.key === getMobileRequestActionKey(openShift.id, body);
 
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
-                  label={isLoading ? pendingAction.label : "Volunteer"}
-                  loading={isLoading}
-                  onPress={() => {
-                    if (openShift.canVolunteer === false) {
-                      return;
-                    }
+            return (
+              <Button
+                compact
+                disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
+                label={isLoading ? pendingAction.label : "Volunteer"}
+                loading={isLoading}
+                onPress={() => {
+                  if (openShift.canVolunteer === false) {
+                    return;
+                  }
 
-                    onAction(body);
-                  }}
-                  tone="secondary"
-                />
-              );
-            })()
-          : null}
-      </View>
+                  onAction(body);
+                }}
+                tone="secondary"
+              />
+            );
+          })()}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1341,6 +1438,7 @@ const styles = StyleSheet.create({
     ...mobileText.badge,
     color: mobileColors.textMuted,
     textAlign: "center",
+    includeFontPadding: false,
   },
   tabBadgeTextActive: {
     color: mobileColors.textInverse,
@@ -1369,31 +1467,62 @@ const styles = StyleSheet.create({
   openShiftCard: {
     gap: 12,
     padding: 18,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 2,
   },
   requestCardHighlighted: {
     borderColor: mobileColors.brand,
     backgroundColor: mobileColors.brandSoft,
   },
-  requestHeaderRow: {
+  cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: 12,
   },
-  requestHeaderContent: {
+  openShiftTitleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  cardTitleRow: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 10,
+  },
+  cardIconFrame: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: mobileColors.brandSoft,
+  },
+  cardIconFrameMuted: {
+    backgroundColor: mobileColors.surface,
+  },
+  titleColumn: {
+    flex: 1,
+    minWidth: 0,
+    gap: 10,
+  },
+  cardActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    gap: 8,
+    marginLeft: 42,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: mobileColors.borderSubtle,
+  },
+  cardActionsFlush: {
+    marginLeft: 0,
   },
   requestTitle: {
     ...mobileText.cardTitle,
+    flex: 1,
+    minWidth: 0,
     color: mobileColors.textPrimary,
   },
   openShiftTitle: {
@@ -1414,6 +1543,9 @@ const styles = StyleSheet.create({
     ...mobileText.rowTitle,
     color: mobileColors.textMuted,
     fontWeight: "500",
+    // Matches the pill's text below: Android's default font padding throws
+    // off vertical centering against the bordered/padded pill next to it.
+    includeFontPadding: false,
   },
   shiftPillRow: {
     flexDirection: "row",
@@ -1438,6 +1570,7 @@ const styles = StyleSheet.create({
   shiftPillText: {
     ...mobileText.meta,
     fontWeight: "600",
+    includeFontPadding: false,
   },
   statusChip: {
     borderRadius: mobileRadii.pill,
@@ -1452,6 +1585,7 @@ const styles = StyleSheet.create({
     ...mobileText.caption,
     color: mobileColors.textSecondary,
     fontWeight: "600",
+    includeFontPadding: false,
   },
   metaText: {
     ...mobileText.body,
@@ -1486,6 +1620,7 @@ const styles = StyleSheet.create({
   },
   jobPillEyebrowText: {
     ...mobileText.micro,
+    includeFontPadding: false,
   },
   jobPillEyebrowTextCompact: {
     fontSize: 9,
@@ -1493,6 +1628,7 @@ const styles = StyleSheet.create({
   jobPillText: {
     ...mobileText.badge,
     textTransform: "uppercase",
+    includeFontPadding: false,
   },
   jobPillMentoredText: {
     textTransform: "none",
@@ -1503,6 +1639,7 @@ const styles = StyleSheet.create({
   jobPillValueText: {
     ...mobileText.meta,
     fontWeight: "600",
+    includeFontPadding: false,
   },
   jobPillValueTextCompact: {
     fontSize: 12,
@@ -1521,10 +1658,6 @@ const styles = StyleSheet.create({
   mentoredPillText: {
     ...mobileText.badge,
     color: mobileColors.textSecondary,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    includeFontPadding: false,
   },
 });
