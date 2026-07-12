@@ -336,8 +336,8 @@ function AcceptInviteContent() {
               <button
                 type="submit"
                 disabled={loading || !termsAccepted}
-                className="dg-auth-submit"
-                style={{ marginTop: "4px" }}
+                className="dg-btn dg-btn-primary dg-btn-lg"
+                style={{ marginTop: "4px", width: "100%" }}
               >
                 <ButtonLoading
                   loading={loading}

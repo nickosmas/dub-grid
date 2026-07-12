@@ -280,6 +280,21 @@ textarea {
   background: color-mix(in srgb, var(--color-text-inverse) 28%, transparent);
 }
 
+/* Buttons that sit ON a solid brand surface (e.g. the landing page closing CTA). */
+.dg-btn-on-brand-solid {
+  background: var(--color-surface);
+  color: var(--color-brand);
+  border: 1px solid var(--color-surface);
+}
+
+.dg-btn-on-brand-solid:hover {
+  filter: brightness(0.92);
+}
+
+.dg-btn-on-brand-solid:active {
+  filter: brightness(0.85);
+}
+
 /* Warning filled (bench/attention CTA) */
 .dg-btn-warning-filled {
   background: var(--color-warning);
@@ -305,6 +320,20 @@ textarea {
 .dg-btn-dashed:hover {
   background: var(--color-bg-secondary);
   border-color: var(--color-text-muted);
+}
+
+/* Large variant (marketing/auth CTAs — landing page, login/auth submit buttons) */
+.dg-btn-lg {
+  font-size: var(--dg-fs-body);
+  height: var(--dg-btn-h-lg);
+  min-height: var(--dg-btn-h-lg);
+  padding: 0 28px;
+  gap: 10px;
+}
+
+.dg-btn-lg > svg {
+  width: 18px;
+  height: 18px;
 }
 
 /* Small variant */
@@ -2443,38 +2472,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   font-size: var(--dg-fs-label);
   font-weight: 600;
   letter-spacing: 0.01em;
-}
-
-.dg-auth-submit {
-  width: 100%;
-  padding: 13px;
-  background: var(--color-brand);
-  color: var(--color-text-inverse);
-  border: none;
-  border-radius: 999px;
-  font-size: var(--dg-fs-body);
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-family: inherit;
-}
-
-.dg-auth-submit:disabled {
-  opacity: 0.85;
-  cursor: not-allowed;
-}
-
-/* Secondary auth button — same shape, low-emphasis fill */
-.dg-auth-submit--secondary {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-muted);
-}
-
-.dg-auth-submit--secondary:disabled {
-  opacity: 0.6;
 }
 
 .dg-auth-link {

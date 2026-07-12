@@ -262,7 +262,7 @@ export default function RootPage() {
           <div className="flex items-center gap-4">
             <Link
               href="/login"
-              className="hidden sm:inline-flex px-5 py-2 rounded-full bg-[var(--color-brand)] text-white text-sm font-semibold hover:bg-[var(--color-brand-light)] transition-colors"
+              className="hidden sm:inline-flex dg-btn dg-btn-primary dg-btn-lg"
             >
               Sign In
             </Link>
@@ -311,7 +311,7 @@ export default function RootPage() {
             </a>
             <Link
               href="/login"
-              className="mt-4 px-8 py-3 rounded-full bg-[var(--color-brand)] text-white text-lg font-semibold hover:bg-[var(--color-brand-light)] transition-colors"
+              className="mt-4 dg-btn dg-btn-primary dg-btn-lg"
             >
               Sign In
             </Link>
@@ -361,15 +361,12 @@ export default function RootPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
             <Link
               href="/request-demo"
-              className="inline-flex items-center justify-center px-8 py-3.5 rounded-full bg-[var(--color-brand)] text-white font-semibold text-base hover:-translate-y-0.5 hover:shadow-xl transition-all duration-200"
+              className="dg-btn dg-btn-primary dg-btn-lg"
             >
               Request Demo
-              <ArrowRight size={18} className="ml-2" />
+              <ArrowRight size={18} />
             </Link>
-            <a
-              href="#features"
-              className="inline-flex items-center justify-center px-8 py-3.5 rounded-full border border-[var(--color-border)] text-[var(--color-text-secondary)] font-semibold text-base hover:border-[var(--color-border)] transition-colors duration-200"
-            >
+            <a href="#features" className="dg-btn dg-btn-secondary dg-btn-lg">
               See Features
             </a>
           </div>
@@ -579,7 +576,7 @@ export default function RootPage() {
           </p>
           <Link
             href="/request-demo"
-            className="inline-flex items-center gap-2 mt-8 px-8 py-3.5 rounded-full bg-[var(--color-surface)] text-[var(--color-brand)] font-semibold text-base hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
+            className="mt-8 dg-btn dg-btn-on-brand-solid dg-btn-lg"
           >
             Request Demo
             <ArrowRight size={18} />

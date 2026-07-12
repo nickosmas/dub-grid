@@ -113,17 +113,6 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
   // Keep the same label throughout — text-swapping from "Signing you out…"
   // to "Sign back in" reads as a flash. The disabled button shares the same
   // visual footprint as the Link so there's no layout shift either.
-  const primaryStyle = {
-    padding: "16px 36px",
-    width: "auto",
-    whiteSpace: "nowrap" as const,
-    display: "inline-flex" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    textDecoration: "none" as const,
-    fontSize: "var(--dg-fs-body)",
-  };
-
   return (
     <div
       style={{
@@ -133,16 +122,15 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
       }}
     >
       {done ? (
-        <Link href="/login" className="dg-auth-submit" style={primaryStyle}>
+        <Link href="/login" className="dg-btn dg-btn-primary dg-btn-lg">
           Sign back in
         </Link>
       ) : (
         <button
           type="button"
-          className="dg-auth-submit"
+          className="dg-btn dg-btn-primary dg-btn-lg"
           disabled
           aria-busy="true"
-          style={primaryStyle}
         >
           Sign back in
         </button>
