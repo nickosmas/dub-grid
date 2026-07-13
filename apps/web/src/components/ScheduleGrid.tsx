@@ -1247,9 +1247,16 @@ const SectionBlock = memo(function SectionBlock({
                   fontWeight: 600,
                   color: "var(--color-text-subtle)",
                   letterSpacing: "0.04em",
+                  // The bottom divider is a background-image, not a box-shadow
+                  // line, because Chromium clips box-shadow/border decorations
+                  // on position:sticky elements at sub-100% browser zoom (see
+                  // the same fix on the Open Shifts label cell below).
+                  backgroundImage: "linear-gradient(var(--color-dark), var(--color-dark))",
+                  backgroundPosition: "0 100%",
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: "100% 1px",
                   boxShadow: joinBoxShadows(
                     "1px 0 0 0 var(--color-border-light)",
-                    "0 1px 0 0 var(--color-dark)",
                     "2px 0 4px rgba(0,0,0,0.02)",
                   ),
                 }}
@@ -1274,7 +1281,15 @@ const SectionBlock = memo(function SectionBlock({
                       zIndex: 2,
                       textAlign: "center",
                       padding: "8px 0",
-                      boxShadow: "0 1px 0 0 var(--color-dark)",
+                      // background-image (not box-shadow) so this lines up
+                      // exactly with the Staff cell's bottom divider — a
+                      // "0 1px 0 0" box-shadow draws 1px below the box's own
+                      // edge, while this draws flush at it, so mixing the two
+                      // techniques put them a pixel apart vertically.
+                      backgroundImage: "linear-gradient(var(--color-dark), var(--color-dark))",
+                      backgroundPosition: "0 100%",
+                      backgroundRepeat: "no-repeat",
+                      backgroundSize: "100% 1px",
                     }}
                   >
                     <div className="dg-grid-slot__chrome" aria-hidden="true" />
@@ -1330,7 +1345,15 @@ const SectionBlock = memo(function SectionBlock({
                     color: "var(--color-warning-text, #92400E)",
                     gap: 6,
                     whiteSpace: "nowrap",
-                    borderBottom: "2px dashed var(--color-warning-border, #F59E0B)",
+                    // A real border-bottom on this sticky cell gets clipped by
+                    // Chromium at fractional browser zoom (90%, 110%, etc.) —
+                    // match the day cells' background-image divider technique
+                    // instead, which renders correctly at every zoom level.
+                    backgroundImage:
+                      "repeating-linear-gradient(to right, var(--color-warning-border, #F59E0B) 0 6px, transparent 6px 10px)",
+                    backgroundPosition: "0 100%",
+                    backgroundRepeat: "no-repeat",
+                    backgroundSize: "100% 2px",
                     boxShadow: "1px 0 0 0 var(--color-border)",
                   }}
                 >
