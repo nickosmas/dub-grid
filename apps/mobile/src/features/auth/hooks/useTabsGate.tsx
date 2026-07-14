@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { Redirect } from "expo-router";
 import { AppState } from "react-native";
-import { LoadingScreen } from "../../../shared/components/LoadingScreen";
+import { AppSplashScreen } from "../../../shared/components/AppSplashScreen";
 import { useBootstrap } from "./useBootstrap";
 import { OrganizationLockedScreen } from "../screens/OrganizationLockedScreen";
 import { usePushRegistration } from "../../notifications/hooks/usePushRegistration";
@@ -50,12 +50,7 @@ export function useTabsGate(): TabsGateResult {
   if (isLoading) {
     return {
       kind: "blocked",
-      element: (
-        <LoadingScreen
-          title="Loading your organization"
-          body="Getting your schedule and mobile tools ready."
-        />
-      ),
+      element: <AppSplashScreen />,
     };
   }
 

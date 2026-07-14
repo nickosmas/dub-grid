@@ -1,5 +1,5 @@
 import { Redirect, Tabs } from "expo-router";
-import { LoadingScreen } from "../../src/shared/components/LoadingScreen";
+import { AppSplashScreen } from "../../src/shared/components/AppSplashScreen";
 import { useBootstrap } from "../../src/features/auth/hooks/useBootstrap";
 import { OrganizationLockedScreen } from "../../src/features/auth/screens/OrganizationLockedScreen";
 import { handleExpiredMobileSession } from "../../src/shared/lib/auth-reset";
@@ -31,12 +31,7 @@ export default function TabsLayoutWeb() {
       : true;
 
   if (isLoading) {
-    return (
-      <LoadingScreen
-        title="Loading your organization"
-        body="Getting your schedule and mobile tools ready."
-      />
-    );
+    return <AppSplashScreen />;
   }
 
   if (!accessToken) {

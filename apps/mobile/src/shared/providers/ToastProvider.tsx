@@ -9,6 +9,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { NETWORK_ERROR_MESSAGE, NETWORK_ERROR_TITLE } from "@dubgrid/client-errors";
 import { StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetworkStatus } from "./NetworkStateProvider";
@@ -29,8 +30,6 @@ type ToastDescriptor = ToastInput & {
 };
 
 const DEFAULT_TOAST_DURATION_MS = 4500;
-const OFFLINE_TOAST_TITLE = "Network connection issue";
-const OFFLINE_TOAST_MESSAGE = "Check your internet connection and try again.";
 const TOAST_MESSAGE_COLOR = "rgba(255, 255, 255, 0.82)";
 const TOAST_SWIPE_DISMISS_THRESHOLD = 32;
 
@@ -96,6 +95,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
   const swipeStartYRef = useRef<number | null>(null);
   const [queue, setQueue] = useState<ToastDescriptor[]>([]);
   const [activeToast, setActiveToast] = useState<ToastDescriptor | null>(null);
+  const [isOfflineBannerDismissed, setIsOfflineBannerDismissed] = useState(false);
 
   const dismissToast = useCallback((targetToastId?: number) => {
     setActiveToast((current) => {
@@ -165,7 +165,20 @@ export function ToastProvider({ children }: PropsWithChildren) {
     swipeStartYRef.current = null;
     setActiveToast(null);
     setQueue([]);
+    setIsOfflineBannerDismissed(false);
   }, [isOffline]);
+
+  useEffect(() => {
+    if (!isOffline || isOfflineBannerDismissed) {
+      return;
+    }
+
+    const timeout = setTimeout(() => setIsOfflineBannerDismissed(true), DEFAULT_TOAST_DURATION_MS);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [isOffline, isOfflineBannerDismissed]);
 
   function handleToastTouchStart(event: GestureResponderEvent) {
     swipeStartYRef.current = getTouchEventY(event);
@@ -193,6 +206,32 @@ export function ToastProvider({ children }: PropsWithChildren) {
     }
   }
 
+  function handleOfflineBannerTouchStart(event: GestureResponderEvent) {
+    swipeStartYRef.current = getTouchEventY(event);
+  }
+
+  function handleOfflineBannerTouchCancel() {
+    swipeStartYRef.current = null;
+  }
+
+  function handleOfflineBannerTouchEnd(event: GestureResponderEvent) {
+    const startY = swipeStartYRef.current;
+    swipeStartYRef.current = null;
+
+    if (startY == null) {
+      return;
+    }
+
+    const endY = getTouchEventY(event);
+    if (endY == null) {
+      return;
+    }
+
+    if (endY - startY <= -TOAST_SWIPE_DISMISS_THRESHOLD) {
+      setIsOfflineBannerDismissed(true);
+    }
+  }
+
   const value = useMemo(
     () => ({
       pushToast,
@@ -206,9 +245,13 @@ export function ToastProvider({ children }: PropsWithChildren) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {isOffline ? (
-        <View pointerEvents="none" style={styles.host}>
+      {isOffline && !isOfflineBannerDismissed ? (
+        <View pointerEvents="box-none" style={styles.host}>
           <View
+            testID="offline-toast"
+            onTouchCancel={handleOfflineBannerTouchCancel}
+            onTouchEnd={handleOfflineBannerTouchEnd}
+            onTouchStart={handleOfflineBannerTouchStart}
             style={[
               styles.toast,
               {
@@ -221,8 +264,8 @@ export function ToastProvider({ children }: PropsWithChildren) {
             <View style={styles.toastMain}>
               <Ionicons color={offlinePalette.iconColor} name={offlinePalette.iconName} size={20} />
               <View style={styles.toastCopy}>
-                <Text style={styles.toastTitle}>{OFFLINE_TOAST_TITLE}</Text>
-                <Text style={styles.toastMessage}>{OFFLINE_TOAST_MESSAGE}</Text>
+                <Text style={styles.toastTitle}>{NETWORK_ERROR_TITLE}</Text>
+                <Text style={styles.toastMessage}>{NETWORK_ERROR_MESSAGE}</Text>
               </View>
             </View>
           </View>

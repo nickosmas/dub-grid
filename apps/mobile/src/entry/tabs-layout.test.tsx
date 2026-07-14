@@ -70,11 +70,11 @@ vi.mock("expo-router/unstable-native-tabs", async () => {
   return { Icon, Label, NativeTabs, VectorIcon };
 });
 
-vi.mock("../shared/components/LoadingScreen", async () => {
+vi.mock("../shared/components/AppSplashScreen", async () => {
   const React = await import("react");
 
   return {
-    LoadingScreen: ({ title }: { title: string }) => React.createElement("div", {}, title),
+    AppSplashScreen: () => React.createElement("div", {}, "app-splash-screen"),
   };
 });
 
@@ -167,6 +167,14 @@ describe("TabsLayout", () => {
       isFetching: false,
       refetch: vi.fn(),
     });
+  });
+
+  it("shows the app splash screen instead of a spinner while the session is restoring", () => {
+    useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
+
+    render(<TabsLayout />);
+
+    expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
   });
 
   it("uses SF symbols on iOS and Android vector icon sources for the native tabs", () => {

@@ -399,34 +399,3 @@ export function createScreenModule(React: ReactModule) {
   };
 }
 
-export function createQueryStateCardModule(React: ReactModule) {
-  return {
-    QueryStateCard: ({
-      title,
-      body,
-      actionLabel,
-      onAction,
-    }: {
-      title: string;
-      body: string;
-      actionLabel?: string;
-      onAction?: () => void;
-    }) =>
-      React.createElement(
-        "article",
-        {},
-        React.createElement("h2", {}, title),
-        React.createElement("p", {}, body),
-        actionLabel && onAction
-          ? React.createElement(
-              "button",
-              {
-                type: "button",
-                onClick: onAction,
-              },
-              actionLabel,
-            )
-          : null,
-      ),
-  };
-}

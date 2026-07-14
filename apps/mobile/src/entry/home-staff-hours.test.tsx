@@ -50,13 +50,19 @@ describe("StaffHoursExpandedScreen", () => {
 
   it("shows a retry state when the dashboard query fails", () => {
     useExpandedDashboardQuery.mockReturnValue({
-      dashboardQuery: { isLoading: false, isError: true, data: undefined, refetch: vi.fn() },
+      dashboardQuery: {
+        isLoading: false,
+        isError: true,
+        error: new Error("network down"),
+        data: undefined,
+        refetch: vi.fn(),
+      },
       bootstrapQuery: { isLoading: false, data: {} },
     });
 
     render(<StaffHoursExpandedScreen />);
 
-    expect(screen.getByText("Couldn't load overtime watch")).toBeInTheDocument();
+    expect(screen.getByText("Could not load overtime watch")).toBeInTheDocument();
   });
 
   it("shows the threshold-aware empty state when no one is over the limit", () => {

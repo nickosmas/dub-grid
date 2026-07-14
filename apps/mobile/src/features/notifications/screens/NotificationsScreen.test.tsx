@@ -1,10 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createQueryStateCardModule,
-  createReactNativeModule,
-  createScreenModule,
-} from "../../../test/native";
+import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
 const useInfiniteQuery = vi.fn();
 const useQuery = vi.fn();
@@ -38,10 +34,6 @@ vi.mock("expo-router", () => ({
 }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
-
-vi.mock("../../../shared/components/QueryStateCard", async () =>
-  createQueryStateCardModule(await import("react")),
-);
 
 vi.mock("../../../shared/lib/api", () => ({
   bulkUpdateNotifications,

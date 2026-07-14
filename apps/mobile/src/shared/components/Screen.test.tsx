@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const nativeScrollTo = vi.fn();
 
 function pickDomProps(input: Record<string, any>) {
   const output: Record<string, any> = {};
@@ -91,7 +93,7 @@ vi.mock("react-native", async () => {
       React.useImperativeHandle(
         ref,
         () => ({
-          scrollTo: () => undefined,
+          scrollTo: nativeScrollTo,
         }),
         [],
       );
@@ -162,6 +164,10 @@ beforeAll(async () => {
 });
 
 describe("Screen", () => {
+  beforeEach(() => {
+    nativeScrollTo.mockClear();
+  });
+
   it("exposes the scroll view as the top-level element for native header scroll tracking", () => {
     const { container } = render(
       <Screen>
@@ -262,6 +268,45 @@ describe("Screen", () => {
       y: -100,
     });
     expect(contentStyle.paddingTop).toBe(0);
+  });
+
+  it("translates an imperative scrollTo(y: 0) via scrollViewRef to sit below the sticky header on iOS", () => {
+    const scrollViewRef: {
+      current: { scrollTo: (opts: { y?: number; animated?: boolean }) => void } | null;
+    } = { current: null };
+
+    render(
+      <Screen scrollViewRef={scrollViewRef as any} stickyHeader={<span>Header</span>}>
+        <div>Body</div>
+      </Screen>,
+    );
+
+    // A caller scrolling "to the top" (y: 0) — e.g. ScheduleScreen resetting
+    // position when the visible date range changes — must not land content
+    // behind the floating header: on iOS the header is implemented via
+    // contentInset, so the true top of content is native y: -headerHeight,
+    // not y: 0. The mocked header's onLayout reports height: 100.
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+
+    expect(nativeScrollTo).toHaveBeenCalledWith({ y: -100, animated: true });
+  });
+
+  it("self-corrects position the moment the sticky header's height is first measured, with no caller involved", () => {
+    // Regression for a race where a caller's scrollTo(y: 0) fires before the
+    // header's onLayout has reported a height (e.g. on a warm cache, where
+    // data — and so a caller's own "scroll to top" effect — can resolve in
+    // the same tick as mount, ahead of this native layout callback). At that
+    // moment there's nothing yet to subtract, so the translated call is a
+    // no-op, leaving content under the header with no visible correction.
+    // Screen itself must self-correct once the real height becomes known,
+    // regardless of whether any caller already (ineffectively) tried.
+    render(
+      <Screen stickyHeader={<span>Header</span>}>
+        <div>Body</div>
+      </Screen>,
+    );
+
+    expect(nativeScrollTo).toHaveBeenCalledWith({ x: 0, y: -100, animated: false });
   });
 });
 

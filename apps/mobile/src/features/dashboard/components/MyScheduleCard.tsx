@@ -7,6 +7,7 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
 import { formatUsTime } from "../../../shared/lib/dates";
 import { getMySchedule } from "../../../shared/lib/api";
+import { ExpandButton } from "./ExpandButton";
 
 const DAY_CARD_WIDTH = 132;
 const DAY_CARD_GAP = 10;
@@ -29,7 +30,13 @@ function buildDateList(startDate: string, endDate: string): string[] {
 // strip (apps/web/src/components/dashboard/MyScheduleRow.tsx) — spelled-out
 // shift names, swipeable, empty days shown as their own placeholder card
 // rather than dropped entirely.
-export function MyScheduleCard({ accessToken }: { accessToken: string | null }) {
+export function MyScheduleCard({
+  accessToken,
+  onExpand,
+}: {
+  accessToken: string | null;
+  onExpand?: () => void;
+}) {
   const query = useQuery({
     queryKey: ["mobile", "dashboard", "my-schedule", accessToken],
     queryFn: () => getMySchedule(accessToken!),
@@ -50,6 +57,11 @@ export function MyScheduleCard({ accessToken }: { accessToken: string | null }) 
       title="Your schedule"
       icon="calendar-outline"
       iconTone="brand"
+      headerAccessory={
+        onExpand ? (
+          <ExpandButton accessibilityLabel="Expand your schedule" onPress={onExpand} />
+        ) : undefined
+      }
       detail={
         dates.length > 0 ? (
           <ScrollView

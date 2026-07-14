@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../../src/shared/components/Screen";
-import { LoadingScreen } from "../../../src/shared/components/LoadingScreen";
-import { QueryStateCard } from "../../../src/shared/components/QueryStateCard";
+import { ListSkeleton } from "../../../src/shared/components/Skeleton";
+import { StatusBanner } from "../../../src/shared/components/StatusBanner";
 import { EmptyStateCard } from "../../../src/shared/components/EmptyStateCard";
 import {
   FilterButton,
@@ -12,7 +12,8 @@ import {
 } from "../../../src/shared/components/FilterSheet";
 import { StaffHoursRow } from "../../../src/features/dashboard/components/StaffHoursCard";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
-import { mobileText } from "../../../src/shared/theme/tokens";
+import { getMobileQueryContentState } from "../../../src/shared/lib/query-state";
+import { mobileColors, mobileText } from "../../../src/shared/theme/tokens";
 
 type SortMode = "overtime" | "alphabetical";
 const UNASSIGNED_LABEL = "Unassigned";
@@ -28,26 +29,42 @@ export default function StaffHoursExpandedScreen() {
     () => [...new Set(entries.map((entry) => entry.focusAreaName ?? UNASSIGNED_LABEL))].sort(),
     [entries],
   );
+  const contentState = getMobileQueryContentState({
+    hasData: dashboardQuery.data !== undefined,
+    isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading,
+    error: dashboardQuery.error ?? bootstrapQuery.error,
+  });
 
-  if (dashboardQuery.isLoading || bootstrapQuery.isLoading) {
+  if (contentState.kind === "loading") {
     return (
-      <LoadingScreen title="Loading overtime watch" body="Getting the latest for your organization." />
+      <Screen title="Overtime watch" bottomPaddingMode="tabbed">
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingTitle}>Loading overtime watch</Text>
+          <ListSkeleton rows={4} showSectionHeader={false} />
+        </View>
+      </Screen>
     );
   }
 
-  if (dashboardQuery.isError || !dashboardQuery.data) {
+  if (contentState.kind === "error") {
     return (
       <Screen title="Overtime watch" bottomPaddingMode="tabbed">
-        <QueryStateCard
-          title="Couldn't load overtime watch"
-          body="Check your connection and try again."
-          actionLabel="Retry"
+        <StatusBanner
+          actionLabel="Try again"
+          body={contentState.message}
+          fillScreen
+          title="Could not load overtime watch"
+          variant="centered"
           onAction={() => {
             void dashboardQuery.refetch();
           }}
         />
       </Screen>
     );
+  }
+
+  if (!dashboardQuery.data) {
+    return null;
   }
 
   const filtered = entries.filter(
@@ -132,6 +149,13 @@ export default function StaffHoursExpandedScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingState: {
+    gap: 14,
+  },
+  loadingTitle: {
+    ...mobileText.screenTitle,
+    color: mobileColors.textPrimary,
+  },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",

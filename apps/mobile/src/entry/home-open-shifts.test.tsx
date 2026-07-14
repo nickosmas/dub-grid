@@ -54,13 +54,19 @@ describe("OpenShiftsExpandedScreen", () => {
 
   it("shows a retry state when the dashboard query fails", () => {
     useExpandedDashboardQuery.mockReturnValue({
-      dashboardQuery: { isLoading: false, isError: true, data: undefined, refetch: vi.fn() },
+      dashboardQuery: {
+        isLoading: false,
+        isError: true,
+        error: new Error("network down"),
+        data: undefined,
+        refetch: vi.fn(),
+      },
       bootstrapQuery: { isLoading: false, data: {} },
     });
 
     render(<OpenShiftsExpandedScreen />);
 
-    expect(screen.getByText("Couldn't load open shifts")).toBeInTheDocument();
+    expect(screen.getByText("Could not load open shifts")).toBeInTheDocument();
   });
 
   it("shows the empty state when there are no open shifts", () => {

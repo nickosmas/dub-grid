@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
@@ -103,5 +103,29 @@ describe("MyScheduleCard", () => {
     const { container } = render(<MyScheduleCard accessToken="token" />);
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("shows an expand button when onExpand is provided, and calls it on press", () => {
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: { range: { startDate: "2026-05-11", endDate: "2026-05-11" }, entries: [] },
+    });
+    const onExpand = vi.fn();
+
+    render(<MyScheduleCard accessToken="token" onExpand={onExpand} />);
+
+    fireEvent.click(screen.getByLabelText("Expand your schedule"));
+    expect(onExpand).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits the expand button when onExpand isn't provided", () => {
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: { range: { startDate: "2026-05-11", endDate: "2026-05-11" }, entries: [] },
+    });
+
+    render(<MyScheduleCard accessToken="token" />);
+
+    expect(screen.queryByLabelText("Expand your schedule")).not.toBeInTheDocument();
   });
 });

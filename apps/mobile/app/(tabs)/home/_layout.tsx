@@ -24,6 +24,7 @@ export default function HomeLayout() {
         name="pending-approvals"
         options={{ presentation: "modal", headerShown: true, title: "Pending approvals" }}
       />
+      <Stack.Screen name="my-schedule" options={{ headerShown: false }} />
     </Stack>
   );
 }

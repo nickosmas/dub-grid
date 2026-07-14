@@ -20,11 +20,11 @@ vi.mock("expo-router", async () => {
   };
 });
 
-vi.mock("../shared/components/LoadingScreen", async () => {
+vi.mock("../shared/components/AppSplashScreen", async () => {
   const React = await import("react");
 
   return {
-    LoadingScreen: ({ title }: { title: string }) => React.createElement("div", {}, title),
+    AppSplashScreen: () => React.createElement("div", {}, "app-splash-screen"),
   };
 });
 
@@ -94,6 +94,14 @@ describe("TabsLayoutWeb", () => {
       isFetching: false,
       refetch: vi.fn(),
     });
+  });
+
+  it("shows the app splash screen instead of a spinner while the session is restoring", () => {
+    useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
+
+    render(<TabsLayoutWeb />);
+
+    expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
   });
 
   it("renders the Home and Schedule tab set without an Alerts tab", () => {

@@ -55,12 +55,12 @@ describe("Home tab role branching", () => {
     useSessionState.mockReturnValue({ accessToken: "token-1" });
   });
 
-  it("shows a loading state while bootstrap is loading", () => {
+  it("renders the personal schedule screen while bootstrap is loading, deferring to its own skeleton", () => {
     useBootstrap.mockReturnValue({ isLoading: true, data: undefined });
 
     render(<HomeTabScreen />);
 
-    expect(screen.getByText("Loading your organization")).toBeInTheDocument();
+    expect(screen.getByText("personal-schedule-screen")).toBeInTheDocument();
   });
 
   it("renders AdminHomeScreen for an admin", () => {

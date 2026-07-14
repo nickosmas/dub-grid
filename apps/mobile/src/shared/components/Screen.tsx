@@ -1,7 +1,10 @@
 import {
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
+  type MutableRefObject,
   type PropsWithChildren,
   type ReactNode,
   type RefObject,
@@ -86,6 +89,11 @@ export function Screen({
   bottomPaddingMode?: ScreenBottomPaddingMode;
 }>) {
   const insets = useSafeAreaInsets();
+  const internalScrollViewRef = useRef<ScrollView>(null);
+  // Mirrors stickyHeaderHeight so the translating scroll handle below can
+  // always read the *current* height at call time, not whatever it was
+  // when the handle was created.
+  const stickyHeaderHeightRef = useRef(0);
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
   const overlay = renderOverlay?.({ stickyHeaderHeight });
   const useNativeContentInsets = !stickyHeader;
@@ -107,9 +115,40 @@ export function Screen({
     () => (isIosStickyHeader ? { x: 0, y: -stickyHeaderHeight } : undefined),
     [isIosStickyHeader, stickyHeaderHeight],
   );
+  // `scrollViewRef` hands callers a *logical* content coordinate space —
+  // y: 0 always means "the true top of my content" — rather than the raw
+  // native ScrollView's contentOffset space. On iOS the floating sticky
+  // header is implemented via contentInset (not padding), so native y: 0
+  // actually sits behind the header, not below it; on Android the header's
+  // height is already baked into contentContainerStyle's paddingTop, so
+  // native y: 0 is already correct there. Without this translation, any
+  // caller scrolling "to the top" (e.g. ScheduleScreen resetting scroll
+  // position when the visible date range changes) would land content under
+  // the header on iOS specifically.
+  const scrollHandle = useMemo<ScreenScrollHandle>(
+    () =>
+      ({
+        scrollTo: (
+          options?: { x?: number; y?: number; animated?: boolean } | number,
+        ) => {
+          const target = typeof options === "number" ? { y: options } : (options ?? {});
+          const y =
+            isIosStickyHeader && typeof target.y === "number"
+              ? target.y - stickyHeaderHeightRef.current
+              : target.y;
+          internalScrollViewRef.current?.scrollTo({ ...target, y });
+        },
+      }) as unknown as ScreenScrollHandle,
+    [isIosStickyHeader],
+  );
+  useEffect(() => {
+    if (scrollViewRef) {
+      (scrollViewRef as MutableRefObject<ScreenScrollHandle | null>).current = scrollHandle;
+    }
+  }, [scrollViewRef, scrollHandle]);
   const scrollView = (
     <ScrollView
-      ref={scrollViewRef}
+      ref={internalScrollViewRef}
       automaticallyAdjustContentInsets={useNativeContentInsets}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={{
@@ -171,6 +210,19 @@ export function Screen({
             const nextHeight = event.nativeEvent.layout.height;
 
             if (nextHeight !== stickyHeaderHeight) {
+              // The header's height is unknown (0) until this very first
+              // measurement lands. If a caller scrolled "to the top" via
+              // scrollViewRef before this fires (e.g. on a warm cache, where
+              // data — and so that scroll — can resolve in the same tick as
+              // mount, ahead of this native layout callback), the translation
+              // above had nothing to subtract yet and was a no-op, leaving
+              // content sitting under the header with no visible correction.
+              // Self-correct once, right here, the moment the real height is
+              // known, regardless of what any caller already tried.
+              if (isIosStickyHeader && stickyHeaderHeight === 0) {
+                internalScrollViewRef.current?.scrollTo({ x: 0, y: -nextHeight, animated: false });
+              }
+              stickyHeaderHeightRef.current = nextHeight;
               setStickyHeaderHeight(nextHeight);
             }
           }}

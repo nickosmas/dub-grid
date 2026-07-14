@@ -1,5 +1,4 @@
 import { Redirect } from "expo-router";
-import { LoadingScreen } from "../../../src/shared/components/LoadingScreen";
 import { useSessionState } from "../../../src/shared/providers/AuthSessionProvider";
 import { useBootstrap } from "../../../src/features/auth/hooks/useBootstrap";
 import { isAdminHomeRole } from "../../../src/features/auth/hooks/useTabsGate";
@@ -11,15 +10,10 @@ export default function HomeTabScreen() {
   const { accessToken } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
 
-  if (bootstrapQuery.isLoading) {
-    return (
-      <LoadingScreen
-        title="Loading your organization"
-        body="Getting your schedule and mobile tools ready."
-      />
-    );
-  }
-
+  // While bootstrap is loading, effectiveRole is undefined and isAdminHomeRole
+  // returns false — AdminHomeScreen never mounts before we know the role.
+  // HomeScheduleScreen already folds bootstrapQuery.isLoading into its own
+  // skeleton-based contentState, so it's a safe interim render either way.
   if (isAdminHomeRole(bootstrapQuery.data?.effectiveRole)) {
     return <AdminHomeScreen />;
   }

@@ -17,9 +17,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppSplashScreen } from "../../../shared/components/AppSplashScreen";
 import { Button } from "../../../shared/components/Button";
 import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
-import { LoadingScreen } from "../../../shared/components/LoadingScreen";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
 import {
   loginToOrganization,
@@ -152,12 +152,7 @@ export default function LoginScreen() {
   }, []);
 
   if (isLoading) {
-    return (
-      <LoadingScreen
-        title="Checking your session"
-        body="Hang tight while we check if you're already signed in."
-      />
-    );
+    return <AppSplashScreen />;
   }
 
   if (accessToken) {

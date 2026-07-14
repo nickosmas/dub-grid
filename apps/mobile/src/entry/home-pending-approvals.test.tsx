@@ -64,13 +64,19 @@ describe("PendingApprovalsExpandedScreen", () => {
 
   it("shows a retry state when the dashboard query fails", () => {
     useExpandedDashboardQuery.mockReturnValue({
-      dashboardQuery: { isLoading: false, isError: true, data: undefined, refetch: vi.fn() },
+      dashboardQuery: {
+        isLoading: false,
+        isError: true,
+        error: new Error("network down"),
+        data: undefined,
+        refetch: vi.fn(),
+      },
       bootstrapQuery: { isLoading: false, data: {} },
     });
 
     render(<PendingApprovalsExpandedScreen />);
 
-    expect(screen.getByText("Couldn't load pending approvals")).toBeInTheDocument();
+    expect(screen.getByText("Could not load pending approvals")).toBeInTheDocument();
   });
 
   it("shows the empty state when nothing is waiting", () => {

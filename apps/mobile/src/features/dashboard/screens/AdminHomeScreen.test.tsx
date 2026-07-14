@@ -33,7 +33,16 @@ vi.mock("../hooks/useAdminDashboard", () => ({
 }));
 
 vi.mock("../components/MyScheduleCard", () => ({
-  MyScheduleCard: () => <div>my-schedule-card</div>,
+  MyScheduleCard: ({ onExpand }: { onExpand?: () => void }) => (
+    <div>
+      my-schedule-card
+      {onExpand ? (
+        <button onClick={onExpand} type="button">
+          expand
+        </button>
+      ) : null}
+    </div>
+  ),
 }));
 
 // useManualRefresh is exercised by its own unit tests — here we only need
@@ -118,6 +127,7 @@ describe("AdminHomeScreen", () => {
     useBootstrap.mockReset();
     useAdminDashboard.mockReset();
     invalidateQueries.mockReset();
+    routerPush.mockReset();
     capturedOnRefresh = undefined;
     useSessionState.mockReturnValue({ accessToken: "token-1" });
   });
@@ -134,11 +144,17 @@ describe("AdminHomeScreen", () => {
 
   it("shows a retry state when the dashboard query fails", () => {
     useBootstrap.mockReturnValue({ isLoading: false, data: { effectiveRole: "admin" } });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: true, data: undefined, refetch: vi.fn() });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: true,
+      error: new Error("network down"),
+      data: undefined,
+      refetch: vi.fn(),
+    });
 
     render(<AdminHomeScreen />);
 
-    expect(screen.getByText("Couldn't load your dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Could not load dashboard")).toBeInTheDocument();
   });
 
   it("shows the pending-approvals queue and personal schedule for an admin", () => {
@@ -193,6 +209,20 @@ describe("AdminHomeScreen", () => {
     render(<AdminHomeScreen />);
 
     expect(screen.getByText("my-schedule-card")).toBeInTheDocument();
+  });
+
+  it("navigates to the full personal schedule page when Your schedule is expanded", () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
+    });
+    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+
+    render(<AdminHomeScreen />);
+
+    fireEvent.click(screen.getByText("expand"));
+
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/home/my-schedule");
   });
 
   it("renders the greeting header with the org name", () => {

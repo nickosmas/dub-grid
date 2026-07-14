@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { router } from "expo-router";
 import { Screen } from "../../../shared/components/Screen";
 import { HeroSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
-import { QueryStateCard } from "../../../shared/components/QueryStateCard";
+import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { queryClient } from "../../../shared/lib/query-client";
+import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { isManagementOnly } from "../../auth/hooks/employmentStatus";
@@ -47,7 +48,13 @@ export function AdminHomeScreen() {
     ]),
   );
 
-  if (bootstrapQuery.isLoading || dashboardQuery.isLoading) {
+  const contentState = getMobileQueryContentState({
+    hasData: dashboardQuery.data !== undefined,
+    isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading,
+    error: dashboardQuery.error ?? bootstrapQuery.error,
+  });
+
+  if (contentState.kind === "loading") {
     return (
       <Screen title="Home" subtitle="Organization overview" bottomPaddingMode="tabbed">
         <HeroSkeleton />
@@ -58,7 +65,7 @@ export function AdminHomeScreen() {
     );
   }
 
-  if (dashboardQuery.isError || !dashboardQuery.data) {
+  if (contentState.kind === "error") {
     return (
       <Screen
         title="Home"
@@ -66,16 +73,22 @@ export function AdminHomeScreen() {
         refreshing={manualRefresh.isRefreshing}
         onRefresh={manualRefresh.refresh}
       >
-        <QueryStateCard
-          title="Couldn't load your dashboard"
-          body="Check your connection and try again."
-          actionLabel="Retry"
+        <StatusBanner
+          actionLabel="Try again"
+          body={contentState.message}
+          fillScreen
+          title="Could not load dashboard"
+          variant="centered"
           onAction={() => {
             void dashboardQuery.refetch();
           }}
         />
       </Screen>
     );
+  }
+
+  if (!dashboardQuery.data) {
+    return null;
   }
 
   const data = dashboardQuery.data;
@@ -126,7 +139,12 @@ export function AdminHomeScreen() {
           }
         />
       ) : null}
-      {!managementOnly ? <MyScheduleCard accessToken={accessToken} /> : null}
+      {!managementOnly ? (
+        <MyScheduleCard
+          accessToken={accessToken}
+          onExpand={() => router.push("/(tabs)/home/my-schedule")}
+        />
+      ) : null}
       <CoverageBySectionCard
         sections={data.coverageBySection}
         focusAreaLabel={bootstrapQuery.data?.currentOrg.labels?.focusArea ?? "Wings"}

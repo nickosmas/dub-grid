@@ -1,8 +1,8 @@
 import { Fragment, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../../src/shared/components/Screen";
-import { LoadingScreen } from "../../../src/shared/components/LoadingScreen";
-import { QueryStateCard } from "../../../src/shared/components/QueryStateCard";
+import { ListSkeleton } from "../../../src/shared/components/Skeleton";
+import { StatusBanner } from "../../../src/shared/components/StatusBanner";
 import { EmptyStateCard } from "../../../src/shared/components/EmptyStateCard";
 import {
   FilterButton,
@@ -16,6 +16,7 @@ import {
   type ActivityType,
 } from "../../../src/features/dashboard/components/ActivityFeedCard";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
+import { getMobileQueryContentState } from "../../../src/shared/lib/query-state";
 import { mobileColors, mobileText } from "../../../src/shared/theme/tokens";
 
 const ACTIVITY_TYPES: ActivityType[] = ["publish", "shift_change", "request", "user_signup"];
@@ -26,25 +27,42 @@ export default function ActivityExpandedScreen() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
-  if (dashboardQuery.isLoading || bootstrapQuery.isLoading) {
+  const contentState = getMobileQueryContentState({
+    hasData: dashboardQuery.data !== undefined,
+    isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading,
+    error: dashboardQuery.error ?? bootstrapQuery.error,
+  });
+
+  if (contentState.kind === "loading") {
     return (
-      <LoadingScreen title="Loading activity" body="Getting the latest for your organization." />
+      <Screen title="Recent activity" bottomPaddingMode="tabbed">
+        <View style={styles.loadingState}>
+          <Text style={styles.loadingTitle}>Loading activity</Text>
+          <ListSkeleton rows={4} showSectionHeader={false} />
+        </View>
+      </Screen>
     );
   }
 
-  if (dashboardQuery.isError || !dashboardQuery.data) {
+  if (contentState.kind === "error") {
     return (
       <Screen title="Recent activity" bottomPaddingMode="tabbed">
-        <QueryStateCard
-          title="Couldn't load activity"
-          body="Check your connection and try again."
-          actionLabel="Retry"
+        <StatusBanner
+          actionLabel="Try again"
+          body={contentState.message}
+          fillScreen
+          title="Could not load activity"
+          variant="centered"
           onAction={() => {
             void dashboardQuery.refetch();
           }}
         />
       </Screen>
     );
+  }
+
+  if (!dashboardQuery.data) {
+    return null;
   }
 
   const items = dashboardQuery.data.activity;
@@ -107,6 +125,13 @@ export default function ActivityExpandedScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingState: {
+    gap: 14,
+  },
+  loadingTitle: {
+    ...mobileText.screenTitle,
+    color: mobileColors.textPrimary,
+  },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",

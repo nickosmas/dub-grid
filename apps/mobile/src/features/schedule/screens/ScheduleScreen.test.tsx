@@ -1,7 +1,6 @@
 import { act, createEvent, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  createQueryStateCardModule,
   createReactNativeModule,
   createSafeAreaContextModule,
   createScreenModule,
@@ -46,10 +45,6 @@ vi.mock("expo-router", () => ({
 }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
-
-vi.mock("../../../shared/components/QueryStateCard", async () =>
-  createQueryStateCardModule(await import("react")),
-);
 
 vi.mock("../../auth/hooks/useAccessToken", () => ({
   useAccessToken,
