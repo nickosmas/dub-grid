@@ -524,7 +524,7 @@ export default function PersonDetailScreen() {
           borderColor: avatarTone.borderColor,
           borderWidth: 1,
         }}
-        avatarTextStyle={{ color: avatarTone.color }}
+        avatarTextStyle={{ color: avatarTone.textColor }}
         badge={orgRoleBadge?.label ?? formatStatusLabel(person.status)}
         badgeTone={orgRoleBadge?.tone}
         initials={getInitials(person)}

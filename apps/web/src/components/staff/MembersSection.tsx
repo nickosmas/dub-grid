@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import Link from "next/link";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import { useQueryClient } from "@tanstack/react-query";
-import { Import as ImportIcon, SlidersHorizontal, Upload } from "lucide-react";
+import { ChevronDown, Import as ImportIcon, SlidersHorizontal, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -16,6 +16,7 @@ import {
 } from "@/features/organization/client";
 import { updateEmployeeIdentity } from "@/features/employees/client";
 import { isSelfAction } from "@dubgrid/domain";
+import { getAvatarTone } from "@dubgrid/design-tokens";
 import { useAuth } from "@/components/AuthProvider";
 import * as Sentry from "@/lib/sentry";
 import {
@@ -35,6 +36,7 @@ import { useDirectory, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
+import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { EmptyState } from "@/components/EmptyState";
 import { getAvatarInitials } from "@/lib/utils";
 import {
@@ -144,6 +146,7 @@ export function MembersSection({
     employees,
     inactiveEmployees,
     removedEmployees,
+    focusAreas,
   });
   const {
     activeTab,
@@ -617,6 +620,14 @@ export function MembersSection({
     [departmentItems],
   );
 
+  const scheduledDepts = useMemo(
+    () => departmentItems.filter((department) => department.type === "scheduled"),
+    [departmentItems],
+  );
+
+  const canAddScheduled = canManageEmployees;
+  const canAddManagement = canManageManagementAccess && managementDepts.length > 0;
+
   useEffect(() => {
     if (!showManagement) {
       setDeptFilterId(null);
@@ -632,6 +643,8 @@ export function MembersSection({
 
   const [showManagementInvite, setShowManagementInvite] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
 
   function handleExport() {
     if (!orgId) return;
@@ -1153,10 +1166,66 @@ export function MembersSection({
                 </button>
               )}
 
-              {((showManagement && canManageManagementAccess) ||
-                (!showManagement && canManageEmployees)) && (
+              {canAddScheduled && canAddManagement && (
+                <>
+                  <button
+                    ref={addBtnRef}
+                    onClick={() => setAddMenuOpen((open) => !open)}
+                    aria-expanded={addMenuOpen}
+                    aria-haspopup="menu"
+                    className="dg-btn dg-btn-primary dg-btn-sm"
+                  >
+                    + Add
+                    <ChevronDown size={14} />
+                  </button>
+                  {addMenuOpen && (
+                    <Menu
+                      open
+                      onOpenChange={(nextOpen) => {
+                        if (!nextOpen) setAddMenuOpen(false);
+                      }}
+                    >
+                      <MenuContent
+                        anchor={addBtnRef}
+                        side="bottom"
+                        align="end"
+                        sideOffset={6}
+                        positionMethod="fixed"
+                        collisionPadding={8}
+                        finalFocus={addBtnRef}
+                        style={{ minWidth: 180 }}
+                      >
+                        <MenuItem
+                          onClick={() => {
+                            setAddMenuOpen(false);
+                            onAdd();
+                          }}
+                        >
+                          Scheduled staff
+                        </MenuItem>
+                        <MenuItem
+                          onClick={() => {
+                            setAddMenuOpen(false);
+                            setShowManagementInvite(true);
+                          }}
+                        >
+                          Management staff
+                        </MenuItem>
+                      </MenuContent>
+                    </Menu>
+                  )}
+                </>
+              )}
+
+              {canAddScheduled && !canAddManagement && (
+                <button onClick={onAdd} className="dg-btn dg-btn-primary dg-btn-sm">
+                  + Add
+                </button>
+              )}
+
+              {!canAddScheduled && canAddManagement && (
                 <button
-                  onClick={showManagement ? () => setShowManagementInvite(true) : onAdd}
+                  onClick={() => setShowManagementInvite(true)}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
                   + Add
@@ -1190,7 +1259,7 @@ export function MembersSection({
               focusAreas={focusAreas}
               certifications={certifications}
               roles={roles}
-              departments={departmentItems}
+              departments={scheduledDepts}
               focusAreaLabel={focusAreaLabel}
               certificationLabel={certificationLabel}
               roleLabel={roleLabel}
@@ -1244,7 +1313,7 @@ export function MembersSection({
               focusAreas={focusAreas}
               certifications={certifications}
               roles={roles}
-              departments={departmentItems}
+              departments={scheduledDepts}
               focusAreaLabel={focusAreaLabel}
               certificationLabel={certificationLabel}
               roleLabel={roleLabel}
@@ -1554,6 +1623,8 @@ export function MembersSection({
                           ? `${person.firstName} ${person.lastName}`.trim()
                           : person.email;
                       const initials = getAvatarInitials(displayName);
+                      const avatarTone = getAvatarTone(person.personId);
+                      const isYou = isSelfAction(currentUserId, person.userId);
 
                       return (
                         <UITableRow
@@ -1581,10 +1652,11 @@ export function MembersSection({
                                 style={{
                                   background: isPending
                                     ? "var(--color-surface)"
-                                    : "var(--color-control-active-bg)",
-                                  color: isPending
-                                    ? "var(--color-text-muted)"
-                                    : "var(--color-control-active-text)",
+                                    : avatarTone.backgroundColor,
+                                  color: isPending ? "var(--color-text-muted)" : avatarTone.textColor,
+                                  border: isPending
+                                    ? "1px solid var(--color-border-light)"
+                                    : `1px solid ${avatarTone.borderColor}`,
                                 }}
                               >
                                 {initials}
@@ -1615,6 +1687,11 @@ export function MembersSection({
                                   ) : (
                                     <span className="truncate text-[14px] font-medium text-[var(--color-text-primary)]">
                                       {displayName}
+                                    </span>
+                                  )}
+                                  {isYou && (
+                                    <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">
+                                      You
                                     </span>
                                   )}
                                   {/* "On Schedule" reflects whether the person

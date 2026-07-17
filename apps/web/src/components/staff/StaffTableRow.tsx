@@ -16,19 +16,12 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { InlineRoleSelect } from "./InlineRoleSelect";
+import { getAvatarTone } from "@dubgrid/design-tokens";
 
 function statusTone(status: Employee["status"]): StatusPillTone {
   if (status === "inactive") return "warning";
   if (status === "removed") return "danger";
   return "success";
-}
-
-function hashCode(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
 }
 
 interface StaffRowSharedProps {
@@ -113,7 +106,7 @@ function StaffRowCells({
   variant,
 }: StaffRowCellsProps) {
   const { user: currentUser } = useAuth();
-  const hue = hashCode(emp.id) % 360;
+  const avatarTone = getAvatarTone(emp.id);
   const displayName = getEmployeeDisplayName(emp);
   const initials = getInitials(displayName);
   const isYou = !!(emp.userId && currentUser && emp.userId === currentUser.id);
@@ -184,9 +177,9 @@ function StaffRowCells({
             <AvatarFallback
               className="text-[11px] font-bold"
               style={{
-                background: `hsl(${hue}, 70%, 92%)`,
-                color: `hsl(${hue}, 70%, 35%)`,
-                border: `1px solid hsl(${hue}, 70%, 85%)`,
+                background: avatarTone.backgroundColor,
+                color: avatarTone.textColor,
+                border: `1px solid ${avatarTone.borderColor}`,
               }}
             >
               {initials}

@@ -24,19 +24,12 @@ import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-pro
 import { MemberAccessControls } from "./MemberAccessControls";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
+import { getAvatarTone } from "@dubgrid/design-tokens";
 
 function statusTone(status: Employee["status"]): StatusPillTone {
   if (status === "inactive") return "warning";
   if (status === "removed") return "danger";
   return "success";
-}
-
-function hashCode(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
 }
 
 interface StaffDetailPanelProps {
@@ -100,7 +93,7 @@ export function StaffDetailPanel({
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
   const isSelf = isSelfAction(currentUser?.id, employee.userId);
-  const hue = hashCode(employee.id) % 360;
+  const avatarTone = getAvatarTone(employee.id);
   const scrollRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [closing, setClosing] = useState(false);
@@ -230,15 +223,15 @@ export function StaffDetailPanel({
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
-                background: `hsl(${hue}, 65%, 94%)`,
+                background: avatarTone.backgroundColor,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 800,
-                color: `hsl(${hue}, 60%, 38%)`,
+                color: avatarTone.textColor,
                 flexShrink: 0,
-                border: `2px solid hsl(${hue}, 55%, 86%)`,
+                border: `2px solid ${avatarTone.borderColor}`,
               }}
             >
               {getInitials(getEmployeeDisplayName(employee))}

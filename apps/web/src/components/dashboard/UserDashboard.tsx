@@ -10,6 +10,7 @@ import {
   hasShiftStartedAtTimeRanges,
 } from "@dubgrid/schedule-core";
 import type { OpenShiftVisibility } from "@dubgrid/domain";
+import { getAvatarTone } from "@dubgrid/design-tokens";
 import { isEmployeeEligibleForOpenShift } from "@/app/schedule/_lib/open-shifts";
 import type {
   AbsenceType,
@@ -66,12 +67,6 @@ type HeroStatus = "active" | "upcoming" | "scheduled" | "away" | "empty";
 type HeroTiming = {
   label: string;
   progress: number | null;
-};
-
-type AvatarTone = {
-  backgroundColor: string;
-  borderColor: string;
-  textColor: string;
 };
 
 type AvailableShiftItem =
@@ -2927,26 +2922,6 @@ function getHeroStatusLabel(status: HeroStatus): string {
 
 function formatEmployeeName(employee: Employee): string {
   return `${employee.firstName} ${employee.lastName}`.trim() || "Staff";
-}
-
-function hashCode(value: string): number {
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
-  }
-
-  return Math.abs(hash);
-}
-
-function getAvatarTone(seed: string): AvatarTone {
-  const hue = hashCode(seed) % 360;
-
-  return {
-    backgroundColor: `hsl(${hue}, 70%, 92%)`,
-    borderColor: `hsl(${hue}, 70%, 85%)`,
-    textColor: `hsl(${hue}, 70%, 35%)`,
-  };
 }
 
 function formatHoursValue(hours: number): string {

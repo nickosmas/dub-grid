@@ -545,7 +545,7 @@ function PersonRow({
           },
         ]}
       >
-        <Text style={[styles.personAvatarText, { color: avatarTone.color }]}>{initials}</Text>
+        <Text style={[styles.personAvatarText, { color: avatarTone.textColor }]}>{initials}</Text>
       </View>
       <View style={styles.personCopy}>
         <View style={styles.personNameRow}>

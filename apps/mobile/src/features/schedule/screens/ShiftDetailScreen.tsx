@@ -10,6 +10,7 @@ import {
   type MobileShiftRequest,
 } from "@dubgrid/contracts";
 import { indefiniteArticle } from "@dubgrid/domain";
+import { getAvatarTone } from "@dubgrid/design-tokens";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -676,26 +677,6 @@ function getInitials(name: string): string {
   const last = parts.length > 1 ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "") : "";
 
   return `${first}${last}` || "?";
-}
-
-function hashCode(value: string): number {
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
-  }
-
-  return Math.abs(hash);
-}
-
-function getAvatarTone(seed: string): ChipTone {
-  const hue = hashCode(seed) % 360;
-
-  return {
-    backgroundColor: `hsl(${hue}, 70%, 92%)`,
-    borderColor: `hsl(${hue}, 70%, 85%)`,
-    textColor: `hsl(${hue}, 70%, 35%)`,
-  };
 }
 
 function buildDetailJobChip(

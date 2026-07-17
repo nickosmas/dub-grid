@@ -19,14 +19,7 @@ import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
-
-function hashCode(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
+import { getAvatarTone } from "@dubgrid/design-tokens";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -366,7 +359,7 @@ export function ManagementStaffPanel({
       ? `${person.firstName} ${person.lastName}`.trim()
       : person.email;
   const initials = getInitials(displayName);
-  const hue = hashCode(person.personId) % 360;
+  const avatarTone = getAvatarTone(person.personId);
 
   const statusConfig = isPending
     ? isExpired
@@ -477,8 +470,8 @@ export function ManagementStaffPanel({
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
-                background: isPending ? "var(--color-surface)" : `hsl(${hue}, 65%, 94%)`,
-                color: isPending ? "var(--color-text-muted)" : `hsl(${hue}, 60%, 38%)`,
+                background: isPending ? "var(--color-surface)" : avatarTone.backgroundColor,
+                color: isPending ? "var(--color-text-muted)" : avatarTone.textColor,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -487,7 +480,7 @@ export function ManagementStaffPanel({
                 flexShrink: 0,
                 border: isPending
                   ? "1px solid var(--color-border-light)"
-                  : `2px solid hsl(${hue}, 55%, 86%)`,
+                  : `2px solid ${avatarTone.borderColor}`,
               }}
             >
               {initials}

@@ -51,6 +51,7 @@ import {
   getShiftRequests,
   updateShiftRequest,
 } from "../../../shared/lib/api";
+import { getAvatarTone, type AvatarTone } from "@dubgrid/design-tokens";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
@@ -166,11 +167,6 @@ type ScheduleScope = "mine" | "team";
 type ShiftTimeRange = {
   start: string;
   end: string;
-};
-type AvatarTone = {
-  backgroundColor: string;
-  borderColor: string;
-  textColor: string;
 };
 type RequestActionBody =
   | { action: "claim"; claimerEmpId: string }
@@ -3885,26 +3881,6 @@ function getInitials(name: string): string {
   const last = parts.length > 1 ? (parts[parts.length - 1]?.charAt(0).toUpperCase() ?? "") : "";
 
   return `${first}${last}` || "?";
-}
-
-function hashCode(value: string): number {
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
-  }
-
-  return Math.abs(hash);
-}
-
-function getAvatarTone(seed: string): AvatarTone {
-  const hue = hashCode(seed) % 360;
-
-  return {
-    backgroundColor: `hsl(${hue}, 70%, 92%)`,
-    borderColor: `hsl(${hue}, 70%, 85%)`,
-    textColor: `hsl(${hue}, 70%, 35%)`,
-  };
 }
 
 const styles = StyleSheet.create({

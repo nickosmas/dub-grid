@@ -330,7 +330,7 @@ export default function ProfileScreen() {
                   }
                 : undefined
             }
-            avatarTextStyle={avatarTone ? { color: avatarTone.color } : undefined}
+            avatarTextStyle={avatarTone ? { color: avatarTone.textColor } : undefined}
             badge={roleLabel}
             badgeTone={orgRoleBadge?.tone}
             initials={getProfileInitials(displayName)}

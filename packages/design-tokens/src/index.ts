@@ -9,6 +9,13 @@ export {
   type AnimatedLogoTiming,
 } from "./animated-logo";
 
+export {
+  getAvatarTone,
+  getAvatarGradientTone,
+  type AvatarTone,
+  type AvatarGradientTone,
+} from "./avatar-tone";
+
 export const colorTokens = {
   background: "#F8FAFC",
   surface: "#FFFFFF",

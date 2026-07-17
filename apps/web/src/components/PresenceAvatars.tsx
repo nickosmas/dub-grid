@@ -4,24 +4,13 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import type { OnlineUser } from "@/hooks/useCellLocks";
 import { getAvatarInitials } from "@/lib/utils";
+import { getAvatarGradientTone } from "@dubgrid/design-tokens";
 
 const MAX_VISIBLE = 4;
 
-const AVATAR_GRADIENTS = [
-  "linear-gradient(135deg, #66B3FF, #0052E0)",
-  "linear-gradient(135deg, #3B82F6, #06B6D4)",
-  "linear-gradient(135deg, #F472B6, #0066FF)",
-  "linear-gradient(135deg, #FB923C, #F472B6)",
-  "linear-gradient(135deg, #0066FF, #66B3FF)",
-  "linear-gradient(135deg, #FBBF24, #F97316)",
-];
-
 function avatarGradient(userId: string): string {
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = ((hash << 5) - hash + userId.charCodeAt(i)) | 0;
-  }
-  return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
+  const tone = getAvatarGradientTone(userId);
+  return `linear-gradient(135deg, ${tone.gradientFrom}, ${tone.gradientTo})`;
 }
 
 interface PresenceAvatarsProps {
