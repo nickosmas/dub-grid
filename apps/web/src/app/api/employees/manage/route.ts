@@ -11,9 +11,10 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 import { employeeToRow, rowToEmployee, rowToInvitation } from "@/lib/db/mappers";
-import { EMPLOYEE_COLS } from "@/lib/db/shared";
+import { EMPLOYEE_COLS, fetchAllRows } from "@/lib/db/shared";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import { apiErrorResponse } from "@/lib/error-handling";
+import logger from "@/lib/logger";
 import {
   buildStaffValidationErrorResponse,
   employeeEmploymentTypeSchema,
@@ -34,6 +35,12 @@ import {
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 
 export const dynamic = "force-dynamic";
+
+function getRequestIp(req: NextRequest): string | null {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (!forwarded) return null;
+  return forwarded.split(",")[0]?.trim() || null;
+}
 
 type OrgPermissionPredicate = Parameters<typeof requireOrgPermissions>[2];
 
@@ -342,30 +349,37 @@ export async function POST(req: NextRequest) {
         }
 
         const isManager = isEmployeeDetailViewer(auth.permissions);
-
-        let query = auth.serviceClient
-          .from("employees")
-          .select(EMPLOYEE_COLS)
-          .eq("org_id", data.orgId);
         const includesTerminated = data.statuses?.includes("removed");
-        if (!includesTerminated) {
-          query = query.is("archived_at", null);
-        }
-        if (data.statuses && data.statuses.length > 0) {
-          query = query.in("status", data.statuses);
-        }
-        // View-only callers see active staff only, matching the mobile
-        // /people endpoint.
-        if (!isManager) {
-          query = query.eq("status", "active");
-        }
 
-        const { data: rows, error } = await query.order("seniority");
-        if (error) {
-          throw error;
-        }
+        // A single unpaged query here would silently truncate at PostgREST's
+        // max_rows cap (200 OK, rows just missing) once an org has more
+        // employees than the configured limit — "removed" (terminated) rows
+        // accumulate forever and never get deleted, so a long-running org can
+        // realistically cross that cap. fetchAllRows paginates past it
+        // regardless of what the cap is set to. Each page must build a FRESH
+        // query (Supabase builders are single-use once awaited).
+        const buildPage = (from: number, to: number) => {
+          let query = auth.serviceClient
+            .from("employees")
+            .select(EMPLOYEE_COLS)
+            .eq("org_id", data.orgId);
+          if (!includesTerminated) {
+            query = query.is("archived_at", null);
+          }
+          if (data.statuses && data.statuses.length > 0) {
+            query = query.in("status", data.statuses);
+          }
+          // View-only callers see active staff only, matching the mobile
+          // /people endpoint.
+          if (!isManager) {
+            query = query.eq("status", "active");
+          }
+          return query.order("seniority").range(from, to);
+        };
 
-        const mapped = ((rows ?? []) as DbEmployee[]).map(rowToEmployee);
+        const rows = await fetchAllRows<DbEmployee>(buildPage);
+
+        const mapped = rows.map(rowToEmployee);
         return NextResponse.json({
           employees: isManager
             ? mapped
@@ -411,6 +425,27 @@ export async function POST(req: NextRequest) {
           orgId: data.orgId,
           empId: insertedRow.id,
         });
+
+        const { error: createAuditError } = await auth.serviceClient.from("audit_log").insert({
+          org_id: data.orgId,
+          actor_id: auth.actor.id,
+          actor_email: auth.actor.email ?? null,
+          action: "employee.created",
+          resource_type: "employee",
+          resource_id: insertedRow.id,
+          details: {
+            firstName: data.employee.firstName,
+            lastName: data.employee.lastName,
+          },
+          ip_address: getRequestIp(req),
+          user_agent: req.headers.get("user-agent"),
+        });
+        if (createAuditError) {
+          logger.error(
+            { error: createAuditError, orgId: data.orgId, empId: insertedRow.id },
+            "Employee create audit log write failed",
+          );
+        }
 
         return NextResponse.json({
           employee: rowToEmployee(insertedRow),
@@ -520,6 +555,72 @@ export async function POST(req: NextRequest) {
               empId: nextEmployee.id,
               fields: changedProfileFields,
             });
+          }
+
+          const statusChanged = previousRow.status !== nextEmployee.status;
+          const changedFields = statusChanged
+            ? [...changedProfileFields, "status"]
+            : changedProfileFields;
+
+          if (changedFields.length > 0) {
+            const from: Record<string, unknown> = {};
+            const to: Record<string, unknown> = {};
+            if (changedFields.includes("firstName")) {
+              from.firstName = previousRow.firstName;
+              to.firstName = nextEmployee.firstName;
+            }
+            if (changedFields.includes("lastName")) {
+              from.lastName = previousRow.lastName;
+              to.lastName = nextEmployee.lastName;
+            }
+            if (changedFields.includes("email")) {
+              from.email = previousRow.email;
+              to.email = nextEmployee.email;
+            }
+            if (changedFields.includes("phone")) {
+              from.phone = previousRow.phone;
+              to.phone = nextEmployee.phone;
+            }
+            if (changedFields.includes("contactNotes")) {
+              from.contactNotes = previousRow.contactNotes;
+              to.contactNotes = nextEmployee.contactNotes;
+            }
+            if (changedFields.includes("employmentType")) {
+              from.employmentType = previousRow.employmentType;
+              to.employmentType = nextEmployee.employmentType;
+            }
+            if (changedFields.includes("seniority")) {
+              from.seniority = previousRow.seniority;
+              to.seniority = nextEmployee.seniority;
+            }
+            if (statusChanged) {
+              from.status = previousRow.status;
+              to.status = nextEmployee.status;
+            }
+
+            const { error: updateAuditError } = await auth.serviceClient.from("audit_log").insert({
+              org_id: data.orgId,
+              actor_id: auth.actor.id,
+              actor_email: auth.actor.email ?? null,
+              action: "employee.updated",
+              resource_type: "employee",
+              resource_id: nextEmployee.id,
+              details: {
+                firstName: nextEmployee.firstName,
+                lastName: nextEmployee.lastName,
+                changedFields,
+                from,
+                to,
+              },
+              ip_address: getRequestIp(req),
+              user_agent: req.headers.get("user-agent"),
+            });
+            if (updateAuditError) {
+              logger.error(
+                { error: updateAuditError, orgId: data.orgId, empId: nextEmployee.id },
+                "Employee update audit log write failed",
+              );
+            }
           }
         }
 
