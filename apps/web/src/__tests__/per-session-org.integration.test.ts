@@ -23,7 +23,7 @@ const ANON_KEY =
   process.env.LOCAL_SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
 
-const TEST_EMAIL = process.env.LOCAL_SUPABASE_SUPER_ADMIN_EMAIL ?? "nicokosmas@outlook.com";
+const TEST_EMAIL = process.env.LOCAL_SUPABASE_SUPER_ADMIN_EMAIL ?? "qa-super-admin@dubgrid.test";
 const TEST_PASSWORD = process.env.LOCAL_SUPABASE_SUPER_ADMIN_PASSWORD ?? "password123";
 
 async function probeSupabase(): Promise<boolean> {

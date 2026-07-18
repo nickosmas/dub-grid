@@ -2815,7 +2815,7 @@ async function main() {
   );
 
   // ── Auth Users & Profiles ──────────────────────────────────────────────
-  // Create 3 test users, all assigned to a seeded organization.
+  // Create the test users below, all assigned to a seeded organization.
   // Uses a DO $$ block (same pattern as seed_calm_haven.sql) to avoid
   // pg driver prepared-statement type inference issues.
 
@@ -2856,6 +2856,18 @@ async function main() {
       first_name: "Nick",
       last_name: "Kosmas",
       preferred_org: "calmhaven",
+    },
+    {
+      // Dedicated to automated integration tests (see LOCAL_SUPABASE_SUPER_ADMIN_EMAIL
+      // fallback in org-isolation.integration.test.ts / per-session-org.integration.test.ts)
+      // so test runs never touch the personal dev-login accounts above.
+      email: "qa-super-admin@dubgrid.test",
+      platform_role: "none",
+      org_role: "super_admin",
+      label: "qa-super_admin (integration tests)",
+      first_name: "QA",
+      last_name: "SuperAdmin",
+      preferred_org: "ardenwood",
     },
   ];
 
@@ -3132,7 +3144,9 @@ async function main() {
   );
   console.log(`    ✓ ${publishHistoryCount} organizations marked as published`);
 
-  console.log("\n✅ All 7 tenants + 3 test users + memberships seeded successfully!");
+  console.log(
+    `\n✅ All 7 tenants + ${TEST_USERS.length} test users + memberships seeded successfully!`,
+  );
   await db.end();
   process.exit(0);
 }
