@@ -17,17 +17,22 @@ const rowSchema = z.object({
   lastName: z.string().trim().min(1, "Last name is required"),
   email: z.string().trim().email().or(z.literal("")).optional().default(""),
   phone: z.string().trim().optional().default(""),
-  seniority: z.coerce.number().int().min(0).optional().default(0),
   focusAreaNames: z.string().trim().optional().default(""),
   certificationName: z.string().trim().optional().default(""),
   roleNames: z.string().trim().optional().default(""),
   contactNotes: z.string().trim().optional().default(""),
 });
 
+// `rows` is validated as an array of unknown, unvalidated shapes here — each
+// element is validated individually against `rowSchema` further down, so one
+// malformed row (e.g. a bad email) surfaces as a per-row error instead of
+// failing Zod's whole-array parse and rejecting the entire batch.
 const bodySchema = z.object({
   orgId: z.string().uuid(),
-  rows: z.array(rowSchema).min(1).max(MAX_ROWS),
+  rows: z.array(z.unknown()).min(1).max(MAX_ROWS),
 });
+
+type ImportRow = z.infer<typeof rowSchema>;
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,7 +64,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { orgId, rows } = parsed.data;
+    const { orgId, rows: rawRows } = parsed.data;
+
+    // Validate each row individually — one malformed row (e.g. an invalid
+    // email) shouldn't fail the whole batch. Its error joins the same
+    // per-row `errors` array used below for name-resolution failures, and
+    // the remaining valid rows still get imported.
+    const errors: { row: number; error: string }[] = [];
+    const parsedRows: { originalIndex: number; row: ImportRow }[] = [];
+    for (let i = 0; i < rawRows.length; i++) {
+      const rowResult = rowSchema.safeParse(rawRows[i]);
+      if (!rowResult.success) {
+        const firstIssue = rowResult.error.issues[0];
+        errors.push({ row: i + 1, error: firstIssue?.message ?? "Invalid row data" });
+        continue;
+      }
+      parsedRows.push({ originalIndex: i, row: rowResult.data });
+    }
 
     const orgAuth = await requireOrgPermissions(
       req,
@@ -73,24 +94,37 @@ export async function POST(req: NextRequest) {
     }
     const serviceClient = orgAuth.serviceClient;
 
-    // Fetch org's focus areas, certifications, and roles for name matching
-    const [{ data: focusAreas }, { data: certs }, { data: orgRoles }] = await Promise.all([
-      serviceClient
-        .from("focus_areas")
-        .select("id, name")
-        .eq("org_id", orgId)
-        .is("archived_at", null),
-      serviceClient
-        .from("certifications")
-        .select("id, name")
-        .eq("org_id", orgId)
-        .is("archived_at", null),
-      serviceClient
-        .from("organization_roles")
-        .select("id, name")
-        .eq("org_id", orgId)
-        .is("archived_at", null),
-    ]);
+    // Fetch org's focus areas, certifications, and roles for name matching,
+    // plus the current max seniority so imported rows can be appended to the
+    // end of the seniority order (in CSV row order) — seniority isn't part
+    // of the CSV and can be adjusted afterward via the People table reorder.
+    const [{ data: focusAreas }, { data: certs }, { data: orgRoles }, { data: maxSeniorityRow }] =
+      await Promise.all([
+        serviceClient
+          .from("focus_areas")
+          .select("id, name")
+          .eq("org_id", orgId)
+          .is("archived_at", null),
+        serviceClient
+          .from("certifications")
+          .select("id, name")
+          .eq("org_id", orgId)
+          .is("archived_at", null),
+        serviceClient
+          .from("organization_roles")
+          .select("id, name")
+          .eq("org_id", orgId)
+          .is("archived_at", null),
+        serviceClient
+          .from("employees")
+          .select("seniority")
+          .eq("org_id", orgId)
+          .order("seniority", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+    const baseSeniority = (maxSeniorityRow as { seniority: number } | null)?.seniority ?? 0;
 
     const faNameMap = new Map(
       (focusAreas ?? []).map((fa: Record<string, unknown>) => [
@@ -112,12 +146,9 @@ export async function POST(req: NextRequest) {
     );
 
     // Resolve names to IDs and build insert records
-    const errors: { row: number; error: string }[] = [];
     const insertRecords: { index: number; record: Record<string, unknown> }[] = [];
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-
+    for (const { originalIndex, row } of parsedRows) {
       // Resolve focus area names to IDs
       const faIds: number[] = [];
       if (row.focusAreaNames) {
@@ -127,7 +158,7 @@ export async function POST(req: NextRequest) {
           .filter(Boolean)) {
           const id = faNameMap.get(name.toLowerCase());
           if (id) faIds.push(id);
-          else errors.push({ row: i + 1, error: `Unknown focus area: "${name}"` });
+          else errors.push({ row: originalIndex + 1, error: `Unknown focus area: "${name}"` });
         }
       }
 
@@ -136,7 +167,10 @@ export async function POST(req: NextRequest) {
       if (row.certificationName) {
         certId = certNameMap.get(row.certificationName.toLowerCase()) ?? null;
         if (!certId) {
-          errors.push({ row: i + 1, error: `Unknown certification: "${row.certificationName}"` });
+          errors.push({
+            row: originalIndex + 1,
+            error: `Unknown certification: "${row.certificationName}"`,
+          });
         }
       }
 
@@ -149,19 +183,19 @@ export async function POST(req: NextRequest) {
           .filter(Boolean)) {
           const id = roleNameMap.get(name.toLowerCase());
           if (id) roleIds.push(id);
-          else errors.push({ row: i + 1, error: `Unknown role: "${name}"` });
+          else errors.push({ row: originalIndex + 1, error: `Unknown role: "${name}"` });
         }
       }
 
       insertRecords.push({
-        index: i,
+        index: originalIndex,
         record: {
           org_id: orgId,
           first_name: row.firstName,
           last_name: row.lastName,
           email: row.email || "",
           phone: row.phone || "",
-          seniority: row.seniority,
+          seniority: baseSeniority + originalIndex + 1,
           focus_area_ids: faIds,
           certification_id: certId,
           role_ids: roleIds,
@@ -210,27 +244,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Audit log
-    await serviceClient.from("audit_log").insert({
-      org_id: orgId,
-      actor_id: user.id,
-      actor_email: user.email,
-      action: "employee.created",
-      resource_type: "employee",
-      resource_id: null,
-      details: {
-        bulkImport: true,
-        total: rows.length,
-        inserted: inserted.length,
-        errors: errors.length,
-      },
-    });
+    // Audit log — only when the import actually created someone.
+    if (inserted.length > 0) {
+      const { error: auditError } = await serviceClient.from("audit_log").insert({
+        org_id: orgId,
+        actor_id: user.id,
+        actor_email: user.email,
+        action: "employee.created",
+        resource_type: "employee",
+        resource_id: null,
+        details: {
+          bulkImport: true,
+          total: rawRows.length,
+          inserted: inserted.length,
+          errors: errors.length,
+        },
+      });
+      if (auditError) {
+        logger.error({ error: auditError, orgId }, "Bulk import audit log write failed");
+      }
+    }
 
     return NextResponse.json({
       success: true,
       inserted: inserted.length,
       errors,
-      total: rows.length,
+      total: rawRows.length,
     });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "import-employees" } });
