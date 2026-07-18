@@ -149,6 +149,8 @@ describe("POST /api/schedule/manage", () => {
     const firstEmployeeId = "22222222-2222-4222-8222-222222222222";
     const secondEmployeeId = "33333333-3333-4333-8333-333333333333";
 
+    serviceFrom.mockReturnValue({ insert: vi.fn(async () => ({ error: null })) });
+
     const response = await POST(
       makeRequest({
         action: "deleteShifts",
@@ -376,6 +378,7 @@ describe("POST /api/schedule/manage", () => {
         if (table === "recurring_shifts") return recurringQuery;
         if (table === "schedule_cells") return cellsQuery;
         if (table === "absence_types") return absenceQuery;
+        if (table === "audit_log") return { insert: vi.fn(async () => ({ error: null })) };
         throw new Error(`unexpected table ${table}`);
       });
       return { recurringQuery, cellsQuery, absenceQuery };

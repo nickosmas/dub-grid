@@ -178,10 +178,12 @@ export async function PATCH(req: NextRequest) {
         org_id: orgId,
         actor_id: user.id,
         actor_email: user.email ?? null,
-        action: "employee.identity_updated",
+        action: "employee.updated",
         resource_type: "employee",
         resource_id: employeeId,
         details: {
+          firstName,
+          lastName,
           changedFields,
           from: {
             firstName: currentEmployee.firstName,

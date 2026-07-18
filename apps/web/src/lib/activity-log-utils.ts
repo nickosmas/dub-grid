@@ -517,7 +517,6 @@ export function formatDetails(entry: FullAuditLogEntry): DetailItem[] {
     "schedule.published", // dates in description
     "invitation.sent", // email + role in description
     "employee.created", // name in description
-    "employee.updated", // name in description
     "employee.removed", // name in description
     "employee.archived", // historical alias — name in description
     "employee.deactivated", // name + note in description
@@ -539,6 +538,23 @@ export function formatDetails(entry: FullAuditLogEntry): DetailItem[] {
   if (DESCRIBED_ACTIONS.has(action)) return [];
 
   const items: DetailItem[] = [];
+
+  if (action === "employee.updated") {
+    const changedFields = Array.isArray(details.changedFields)
+      ? (details.changedFields as unknown[]).map(String)
+      : [];
+    const from = (details.from ?? {}) as Record<string, unknown>;
+    const to = (details.to ?? {}) as Record<string, unknown>;
+    return changedFields.map((field) => {
+      if (field in from || field in to) {
+        return {
+          label: friendlyLabel(field),
+          value: `${friendlyValue(field, from[field])} → ${friendlyValue(field, to[field])}`,
+        };
+      }
+      return { label: friendlyLabel(field), value: "Updated" };
+    });
+  }
 
   if (action === "role.changed") {
     const fromRole = details.fromRole ?? details.from_role;

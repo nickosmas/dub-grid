@@ -261,7 +261,7 @@ describe("PATCH /api/employees/identity", () => {
       async (_entry: {
         action: string;
         resource_type: string;
-        details: { changedFields: string[] };
+        details: { firstName: string; lastName: string; changedFields: string[] };
       }) => ({ error: null }),
     );
     const service = makeServiceClient({
@@ -300,8 +300,10 @@ describe("PATCH /api/employees/identity", () => {
     expect(res.status).toBe(200);
     expect(auditInsert).toHaveBeenCalledTimes(1);
     const auditPayload = auditInsert.mock.calls[0]?.[0];
-    expect(auditPayload?.action).toBe("employee.identity_updated");
+    expect(auditPayload?.action).toBe("employee.updated");
     expect(auditPayload?.resource_type).toBe("employee");
+    expect(auditPayload?.details.firstName).toBe("New");
+    expect(auditPayload?.details.lastName).toBe("Name");
     expect(auditPayload?.details.changedFields).toEqual(
       expect.arrayContaining(["firstName", "email"]),
     );

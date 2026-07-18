@@ -41,20 +41,6 @@ export type NotificationEvent =
     }
   // ── Schedule (non-publish flows) ────────────────────────────────────────
   | {
-      action: "recurring_shift_updated";
-      orgId: string;
-      empId: string;
-      mode: "upsert" | "delete";
-    }
-  | {
-      action: "shift_series_changed";
-      orgId: string;
-      seriesId: string;
-      mode: "create" | "update_all" | "delete";
-      /** Pre-resolved affected employees. If omitted, looked up from shifts in series. */
-      empIds?: string[];
-    }
-  | {
       action: "schedule_note_changed";
       orgId: string;
       empId: string;
@@ -62,13 +48,6 @@ export type NotificationEvent =
       mode: "upsert" | "delete";
       /** Resulting note status — only notifies when 'published'. */
       status: "draft" | "published" | "draft_deleted";
-    }
-  | {
-      action: "recurring_schedules_applied";
-      orgId: string;
-      startDate: string;
-      endDate: string;
-      affectedEmpIds: string[];
     }
   // ── Membership lifecycle ────────────────────────────────────────────────
   | {
@@ -344,38 +323,6 @@ async function getEmployeeName(empId: string): Promise<string> {
     .maybeSingle();
   if (!data) return "An employee";
   return `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim() || "An employee";
-}
-
-async function getSeriesAffectedUserIds(seriesId: string): Promise<string[]> {
-  const db = getServiceClient();
-  const { data: shifts } = await db
-    .from("schedule_cell_snapshots")
-    .select("cell:schedule_cells(emp_id)")
-    .eq("series_id", seriesId);
-  if (!shifts) return [];
-  const empIds = new Set<string>();
-  for (const row of shifts as Array<{ cell: { emp_id?: string } | null }>) {
-    const empId = row.cell?.emp_id;
-    if (empId) empIds.add(empId);
-  }
-  if (empIds.size === 0) return [];
-  const { data: emps } = await db
-    .from("employees")
-    .select("user_id")
-    .in("id", [...empIds])
-    .not("user_id", "is", null);
-  return (emps ?? []).map((emp) => emp.user_id as string).filter(Boolean);
-}
-
-async function getAffectedUserIdsForEmpIds(empIds: string[]): Promise<string[]> {
-  if (empIds.length === 0) return [];
-  const db = getServiceClient();
-  const { data } = await db
-    .from("employees")
-    .select("user_id")
-    .in("id", empIds)
-    .not("user_id", "is", null);
-  return (data ?? []).map((row) => row.user_id as string).filter(Boolean);
 }
 
 async function getInvitation(invitationId: string): Promise<{
@@ -697,52 +644,6 @@ async function dispatchNotificationEventInternal(
 
     // ── Schedule (non-publish flows) ────────────────────────────────────
 
-    case "recurring_shift_updated": {
-      const userId = await getEmployeeUserId(event.empId);
-      if (!userId || userId === actorUserId) return;
-      const message =
-        event.mode === "upsert"
-          ? "Your recurring shift was updated."
-          : "Your recurring shift was removed.";
-      await sendNotification(
-        userId,
-        event.orgId,
-        "recurring_shift_updated" as NotificationType,
-        "Recurring shift updated",
-        message,
-        { empId: event.empId, mode: event.mode },
-      );
-      return;
-    }
-
-    case "shift_series_changed": {
-      const userIds =
-        event.empIds && event.empIds.length > 0
-          ? await getAffectedUserIdsForEmpIds(event.empIds)
-          : await getSeriesAffectedUserIds(event.seriesId);
-      const message =
-        event.mode === "create"
-          ? "A recurring shift series was created for you."
-          : event.mode === "update_all"
-            ? "A recurring shift series you're on was updated."
-            : "A recurring shift series you're on was removed.";
-      await Promise.all(
-        userIds
-          .filter((id) => id !== actorUserId)
-          .map((userId) =>
-            sendNotification(
-              userId,
-              event.orgId,
-              "shift_series_updated" as NotificationType,
-              "Shift series updated",
-              message,
-              { seriesId: event.seriesId, mode: event.mode },
-            ),
-          ),
-      );
-      return;
-    }
-
     case "schedule_note_changed": {
       // Only notify when the resulting note is published — drafts are
       // editor-only state and shouldn't surface in user inboxes.
@@ -758,28 +659,6 @@ async function dispatchNotificationEventInternal(
         title,
         message,
         { empId: event.empId, date: event.date, mode: event.mode },
-      );
-      return;
-    }
-
-    case "recurring_schedules_applied": {
-      const userIds = await getAffectedUserIdsForEmpIds(event.affectedEmpIds);
-      await Promise.all(
-        userIds
-          .filter((id) => id !== actorUserId)
-          .map((userId) =>
-            sendNotification(
-              userId,
-              event.orgId,
-              "recurring_schedules_applied" as NotificationType,
-              "Recurring shifts applied",
-              `Recurring shifts have been applied to your schedule for ${event.startDate} to ${event.endDate}.`,
-              {
-                startDate: event.startDate,
-                endDate: event.endDate,
-              },
-            ),
-          ),
       );
       return;
     }

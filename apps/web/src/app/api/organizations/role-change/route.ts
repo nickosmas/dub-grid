@@ -9,6 +9,13 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
+
+function getRequestIp(req: NextRequest): string | null {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (!forwarded) return null;
+  return forwarded.split(",")[0]?.trim() || null;
+}
 
 const roleChangeSchema = z.object({
   targetUserId: z.string().uuid(),
@@ -101,9 +108,41 @@ export async function POST(req: NextRequest) {
       return apiErrorResponse(result.error, "Failed to change role", 400);
     }
 
-    return NextResponse.json({
-      result: (result.data ?? { status: "success" }) as Record<string, unknown>,
-    });
+    const resultData = (result.data ?? { status: "success" }) as Record<string, unknown>;
+
+    if (resultData.status === "success") {
+      const serviceClient = getServiceClient();
+      const { data: targetProfile } = await serviceClient
+        .from("profiles")
+        .select("email")
+        .eq("id", parsed.data.targetUserId)
+        .maybeSingle();
+
+      const { error: auditError } = await serviceClient.from("audit_log").insert({
+        org_id: effectiveOrgId,
+        actor_id: auth.user.id,
+        actor_email: auth.user.email ?? null,
+        action: "role.changed",
+        resource_type: "role",
+        resource_id: parsed.data.targetUserId,
+        details: {
+          targetEmail: (targetProfile as { email?: string } | null)?.email ?? null,
+          newRole: parsed.data.newRole,
+          fromRole: resultData.from_role ?? null,
+          toRole: resultData.to_role ?? null,
+        },
+        ip_address: getRequestIp(req),
+        user_agent: req.headers.get("user-agent"),
+      });
+      if (auditError) {
+        logger.error(
+          { error: auditError, targetUserId: parsed.data.targetUserId, effectiveOrgId },
+          "Role change audit log write failed",
+        );
+      }
+    }
+
+    return NextResponse.json({ result: resultData });
   } catch (error) {
     console.error("organization role change POST failed", error);
     return NextResponse.json({ error: "Failed to change role" }, { status: 500 });

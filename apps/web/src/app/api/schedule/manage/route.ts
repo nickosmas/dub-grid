@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   DbRecurringShift,
   DbScheduleCell,
@@ -18,6 +19,8 @@ import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cell
 import { formatDateKey, iterateDateRange } from "@/lib/utils";
 import { RECURRING_SHIFT_COLS, fetchAllRows } from "@/lib/db/shared";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import type { AuditAction, AuditResourceType } from "@/lib/audit";
+import logger from "@/lib/logger";
 import type {
   GridOpenShift,
   ScheduleCellInput,
@@ -29,6 +32,41 @@ import type {
 } from "@/types";
 
 export const dynamic = "force-dynamic";
+
+/** Fire-and-forget audit log write — never blocks or throws on the hot schedule-edit path. */
+function logScheduleAudit(
+  serviceClient: SupabaseClient,
+  entry: {
+    orgId: string;
+    actorId: string;
+    actorEmail: string | null;
+    action: AuditAction;
+    resourceType: AuditResourceType;
+    resourceId: string | null;
+    details: Record<string, unknown>;
+  },
+): void {
+  try {
+    void serviceClient
+      .from("audit_log")
+      .insert({
+        org_id: entry.orgId,
+        actor_id: entry.actorId,
+        actor_email: entry.actorEmail,
+        action: entry.action,
+        resource_type: entry.resourceType,
+        resource_id: entry.resourceId,
+        details: entry.details,
+      })
+      .then(({ error }) => {
+        if (error) {
+          logger.error({ error, action: entry.action }, "Schedule audit log write failed");
+        }
+      });
+  } catch (error) {
+    logger.error({ error, action: entry.action }, "Schedule audit log write failed");
+  }
+}
 
 const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 const noteStatusSchema = z.enum(["published", "draft", "draft_deleted"]);
@@ -724,6 +762,15 @@ export async function POST(req: NextRequest) {
           state: data.input,
           expectedVersion: data.expectedVersion,
         });
+        logScheduleAudit(auth.serviceClient, {
+          orgId: data.orgId,
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: data.expectedVersion !== undefined ? "shift.updated" : "shift.created",
+          resourceType: "shift",
+          resourceId: `${data.employeeId}:${data.date}`,
+          details: { input: data.input },
+        });
         return NextResponse.json({ success: true });
       }
 
@@ -789,6 +836,15 @@ export async function POST(req: NextRequest) {
           date: data.date,
           expectedVersion: data.expectedVersion,
         });
+        logScheduleAudit(auth.serviceClient, {
+          orgId: data.orgId,
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "shift.deleted",
+          resourceType: "shift",
+          resourceId: `${data.employeeId}:${data.date}`,
+          details: {},
+        });
         return NextResponse.json({ success: true });
       }
 
@@ -809,6 +865,15 @@ export async function POST(req: NextRequest) {
             employeeId: shift.employeeId,
             date: shift.date,
             expectedVersion: shift.expectedVersion,
+          });
+          logScheduleAudit(auth.serviceClient, {
+            orgId: data.orgId,
+            actorId: auth.actor.id,
+            actorEmail: auth.actor.email ?? null,
+            action: "shift.deleted",
+            resourceType: "shift",
+            resourceId: `${shift.employeeId}:${shift.date}`,
+            details: {},
           });
         }
         return NextResponse.json({ success: true, count: data.shifts.length });
@@ -882,6 +947,15 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
+        logScheduleAudit(auth.serviceClient, {
+          orgId: data.orgId,
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "shift.updated",
+          resourceType: "shift",
+          resourceId: `${data.employeeId}:${data.date}`,
+          details: { customStartTime: data.customStartTime, customEndTime: data.customEndTime },
+        });
         return NextResponse.json({ success: true });
       }
 
@@ -927,6 +1001,19 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
+        logScheduleAudit(auth.serviceClient, {
+          orgId: data.orgId,
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "shift.moved",
+          resourceType: "shift",
+          resourceId: `${data.sourceEmpId}:${data.sourceDate}`,
+          details: {
+            targetEmpId: data.targetEmpId,
+            targetDate: data.targetDate,
+            dragMode: data.dragMode ?? "move",
+          },
+        });
         return NextResponse.json({ success: true });
       }
 
@@ -1003,12 +1090,19 @@ export async function POST(req: NextRequest) {
           updatedAt: now,
         };
 
-        void dispatchNotificationEvent(auth.actor.id, {
-          action: "shift_series_changed",
+        logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
-          seriesId: id,
-          mode: "create",
-          empIds: [data.employeeId],
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "shift_series.created",
+          resourceType: "shift_series",
+          resourceId: id,
+          details: {
+            empId: data.employeeId,
+            frequency: data.frequency,
+            startDate: data.startDate,
+            endDate: data.endDate,
+          },
         });
 
         return NextResponse.json({ series });
@@ -1047,13 +1141,15 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        void dispatchNotificationEvent(auth.actor.id, {
-          action: "shift_series_changed",
+        logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
-          seriesId: data.seriesId,
-          mode: "update_all",
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "shift_series.updated",
+          resourceType: "shift_series",
+          resourceId: data.seriesId,
+          details: { input: normalizedInput },
         });
-
         return NextResponse.json({ success: true });
       }
 
@@ -1078,13 +1174,15 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        void dispatchNotificationEvent(auth.actor.id, {
-          action: "shift_series_changed",
+        logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
-          seriesId: data.seriesId,
-          mode: "delete",
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "shift_series.archived",
+          resourceType: "shift_series",
+          resourceId: data.seriesId,
+          details: { shiftsAffected: Number(deletedCount ?? 0) },
         });
-
         return NextResponse.json({
           deletedCount: Number(deletedCount ?? 0),
         });
@@ -1244,14 +1342,19 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        const affectedEmpIds = Array.from(new Set(generated.map((entry) => entry.empId)));
-        if (affectedEmpIds.length > 0) {
-          void dispatchNotificationEvent(auth.actor.id, {
-            action: "recurring_schedules_applied",
+        if (generated.length > 0) {
+          logScheduleAudit(auth.serviceClient, {
             orgId: data.orgId,
-            startDate: data.startDate,
-            endDate: data.endDate,
-            affectedEmpIds,
+            actorId: auth.actor.id,
+            actorEmail: auth.actor.email ?? null,
+            action: "recurring_schedule.applied",
+            resourceType: "schedule",
+            resourceId: null,
+            details: {
+              startDate: data.startDate,
+              endDate: data.endDate,
+              generatedCount: generated.length,
+            },
           });
         }
 
@@ -1292,6 +1395,19 @@ export async function POST(req: NextRequest) {
           date: data.date,
           mode: "upsert",
           status,
+        });
+        logScheduleAudit(auth.serviceClient, {
+          orgId: data.orgId,
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "schedule_note.upserted",
+          resourceType: "schedule_note",
+          resourceId: `${data.employeeId}_${data.date}`,
+          details: {
+            indicatorTypeId: data.indicatorTypeId,
+            focusAreaId: data.focusAreaId,
+            status,
+          },
         });
 
         return NextResponse.json({ success: true });
@@ -1343,6 +1459,19 @@ export async function POST(req: NextRequest) {
           date: data.date,
           mode: "delete",
           status: data.existingStatus === "draft" ? "draft" : "published",
+        });
+        logScheduleAudit(auth.serviceClient, {
+          orgId: data.orgId,
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "schedule_note.deleted",
+          resourceType: "schedule_note",
+          resourceId: `${data.employeeId}_${data.date}`,
+          details: {
+            indicatorTypeId: data.indicatorTypeId,
+            focusAreaId: data.focusAreaId,
+            existingStatus: data.existingStatus,
+          },
         });
 
         return NextResponse.json({ success: true });
