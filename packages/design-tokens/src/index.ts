@@ -317,7 +317,7 @@ export const shadcnTokens = {
   chart4: "oklch(0.371 0 0)",
   chart5: "oklch(0.269 0 0)",
   radius: "0.625rem",
-  sidebar: "oklch(0.985 0 0)",
+  sidebar: "oklch(1 0 0)",
   sidebarForeground: "oklch(0.145 0 0)",
   sidebarPrimary: colorTokens.brand,
   sidebarPrimaryForeground: colorTokens.textInverse,

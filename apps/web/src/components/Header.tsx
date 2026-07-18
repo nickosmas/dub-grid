@@ -506,7 +506,7 @@ export default function Header({ orgName }: HeaderProps) {
       <div
         style={{
           background: "var(--color-surface)",
-          padding: isTablet ? "0 16px" : "0 24px",
+          padding: "0 16px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",

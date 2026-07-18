@@ -677,7 +677,7 @@ export default function GridmasterPortal() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: isMobile ? "0 12px" : "0 20px",
+          padding: isMobile ? "0 12px" : "0 16px",
           flexShrink: 0,
         }}
       >

@@ -72,7 +72,6 @@ function AppHeader() {
     <div
       style={{
         background: "var(--color-bg)",
-        boxShadow: "var(--shadow-raised)",
       }}
     >
       <Header orgName={org?.name} />
