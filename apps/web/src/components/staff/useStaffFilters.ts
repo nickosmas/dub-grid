@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Employee } from "@/types";
+import { Employee, FocusArea } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 
 export type EmployeeTab = "all" | "active" | "inactive" | "removed";
@@ -18,12 +18,14 @@ interface UseStaffFiltersOptions {
   employees: Employee[];
   inactiveEmployees?: Employee[];
   removedEmployees?: Employee[];
+  focusAreas: FocusArea[];
 }
 
 export function useStaffFilters({
   employees,
   inactiveEmployees = [],
   removedEmployees = [],
+  focusAreas,
 }: UseStaffFiltersOptions) {
   const [activeTab, setActiveTab] = useState<EmployeeTab>("active");
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,6 +100,17 @@ export function useStaffFilters({
     [employees.length, inactiveEmployees.length, removedEmployees.length],
   );
 
+  // employees.departmentIds is rarely populated (no UI writes it) — derive an
+  // employee's effective scheduled department(s) from their focus areas instead,
+  // same as the read-only precedent in StaffReadOnlyDetailPanel.tsx.
+  const focusAreaDepartmentById = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const fa of focusAreas) {
+      if (fa.departmentId != null) map.set(fa.id, fa.departmentId);
+    }
+    return map;
+  }, [focusAreas]);
+
   const rawList = useMemo(() => {
     const list =
       activeTab === "all"
@@ -117,7 +130,9 @@ export function useStaffFilters({
 
       const matchesEmploymentType =
         filterEmploymentType === "all" || emp.employmentType === filterEmploymentType;
-      const matchesDepartment = !filterDepartment || emp.departmentIds.includes(filterDepartment);
+      const matchesDepartment =
+        !filterDepartment ||
+        emp.focusAreaIds.some((id) => focusAreaDepartmentById.get(id) === filterDepartment);
       const matchesDepartmentAdmin =
         !filterDepartmentAdminOnly ||
         (filterDepartment
@@ -159,6 +174,7 @@ export function useStaffFilters({
     filterEmploymentType,
     filterDepartment,
     filterDepartmentAdminOnly,
+    focusAreaDepartmentById,
     filterFocusArea,
     filterCertification,
     filterRole,
