@@ -731,7 +731,7 @@ function ReportsContent() {
         minHeight: "calc(100vh - var(--app-shell-header-h, 56px))",
         background: "var(--color-bg)",
         color: "var(--color-text-primary)",
-        padding: "28px clamp(16px, 3vw, 32px)",
+        padding: "28px clamp(16px, 3vw, 40px)",
       }}
     >
       <ProgressBar loading={isLoading || reportsQuery.isFetching} />

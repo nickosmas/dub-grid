@@ -272,6 +272,22 @@ export default function Header({ orgName }: HeaderProps) {
             ? "settings"
             : "";
 
+  // Schedule owns the full viewport for grid space and always uses a flat
+  // 16px, not the wider clamp. Dashboard matches Schedule's padding rather
+  // than the wider Reports/Alerts clamp so the two calendar-style pages
+  // (and their in-page toolbars) share the same horizontal rhythm.
+  const isFlatPaddingRoute = pathname.startsWith("/schedule") || pathname.startsWith("/dashboard");
+
+  // Routes with their own collapsible sidebar (People/Settings/Profile all
+  // share the same `SettingsShell` or sidebar chrome) keep the logo centered
+  // over the collapsed icon rail (9px). Everywhere else, the logo aligns with
+  // that page's own content edge instead — see PageContainer's padding.
+  const hasSidebarChrome =
+    pathname.startsWith("/people") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/account");
+
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.id === "dashboard") return !isManagementOnlyUser;
     if (item.id === "schedule") return true;
@@ -405,12 +421,7 @@ export default function Header({ orgName }: HeaderProps) {
         <div
           style={{
             background: "var(--color-surface)",
-            // Left padding matches the schedule toolbar's 16px left
-            // padding (see `data-tour="schedule-toolbar"` in
-            // SchedulePageClient) so the logo lines up with the first
-            // toolbar button below it.
-            paddingLeft: 16,
-            paddingRight: 12,
+            padding: "0 12px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -513,11 +524,14 @@ export default function Header({ orgName }: HeaderProps) {
       <div
         style={{
           background: "var(--color-surface)",
-          // Left padding centers the logo over the collapsed (icon-only)
-          // sidebar rail on pages that render one (--sidebar-width-icon
-          // is 3rem in components/ui/sidebar.tsx), so the logo stays
-          // perfectly aligned with it when the sidebar collapses.
-          paddingLeft: 9,
+          // On pages with a collapsible sidebar (People/Settings/Profile),
+          // 9px centers the logo over the collapsed (icon-only) rail
+          // (--sidebar-width-icon is 3rem in components/ui/sidebar.tsx), so
+          // it stays aligned with it when the sidebar collapses. Schedule and
+          // Dashboard stay flat 16px to match their own toolbar padding.
+          // Everywhere else, the logo aligns with that page's own content
+          // edge, which uses the same clamp(16px, 3vw, 40px) as PageContainer.
+          paddingLeft: hasSidebarChrome ? 9 : isFlatPaddingRoute ? 16 : "clamp(16px, 3vw, 40px)",
           paddingRight: 16,
           display: "flex",
           alignItems: "center",

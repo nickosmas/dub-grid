@@ -5698,6 +5698,11 @@ function SchedulerContent() {
             <div
               data-tour="schedule-toolbar"
               style={{
+                // Flat 16px on both sides — the schedule grid owns the full
+                // viewport and needs the room, so it doesn't grow with the
+                // wider clamp(16px, 3vw, 40px) used elsewhere. The header
+                // logo matches this flat 16px specifically on /schedule
+                // (see Header.tsx) to stay aligned.
                 padding: "12px 16px 0",
                 borderBottom: "1px solid var(--color-border)",
               }}
