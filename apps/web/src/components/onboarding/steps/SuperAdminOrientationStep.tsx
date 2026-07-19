@@ -57,7 +57,7 @@ export default function SuperAdminOrientationStep({
               alignItems: "flex-start",
               gap: 16,
               padding: "16px 20px",
-              background: "var(--color-bg-card, white)",
+              background: "var(--color-surface)",
               borderRadius: "var(--dg-radius-md)",
               border: "1px solid var(--color-border)",
             }}

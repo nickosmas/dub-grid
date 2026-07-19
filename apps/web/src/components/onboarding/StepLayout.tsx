@@ -89,7 +89,7 @@ export default function StepLayout({
               padding: "10px 20px",
               borderRadius: 10,
               border: "1px solid var(--color-border)",
-              background: "var(--color-bg-card, white)",
+              background: "var(--color-surface)",
               color: "var(--color-text-secondary)",
               fontSize: 14,
               fontWeight: 600,
