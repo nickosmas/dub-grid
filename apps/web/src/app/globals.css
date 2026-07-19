@@ -1750,7 +1750,7 @@ table tbody > tr:last-child > th {
 
 .dg-grid-slot[data-leading-divider="split"] .dg-grid-slot__chrome::before,
 .dg-grid-cell[data-leading-divider="split"] .dg-grid-cell__chrome::before {
-  border-left: 1px solid var(--color-dark);
+  border-left: 1px solid var(--color-grid-divider-strong);
 }
 
 .dg-grid-cell[data-top-divider]::before,

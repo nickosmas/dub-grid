@@ -63,11 +63,7 @@ export const lightColorTokens = {
   controlPrimary: "#0F172A",
   controlPrimaryHover: "#1E293B",
   // Text/icon color for content placed on a --color-brand or --color-brand-light
-  // fill (e.g. .dg-btn-primary). Kept distinct from textInverse because dark
-  // mode's lightened brand blue contrasts better with near-black text than
-  // white (5.7:1 vs 3.7:1) — light mode's brand blue is dark enough that white
-  // stays correct here, unlike textInverse's other consumers (danger/success
-  // fills), which keep white in both themes.
+  // fill (e.g. .dg-btn-primary).
   onBrandText: "#FFFFFF",
 } as const;
 
@@ -122,9 +118,7 @@ export const darkColorTokens: ColorTokens = {
   // here, so this stays a fixed dark neutral rather than following textPrimary.
   controlPrimary: "#26262B",
   controlPrimaryHover: "#323238",
-  // Dark mode's vivid brand blue contrasts better with black than white
-  // (5:1+ vs ~4:1) — see lightColorTokens.onBrandText.
-  onBrandText: "#000000",
+  onBrandText: "#FFFFFF",
 } as const;
 
 /** @deprecated Use `lightColorTokens` (or the theme-aware helpers) directly — this alias exists only for back-compat with existing static imports. */
@@ -643,6 +637,12 @@ function themedWebCssVariables(theme: WebTheme): Record<string, string> {
     "--dg-color-today-bg": tokens.brandSoft,
     "--dg-color-today-text": todayText,
     "--dg-color-today-border": todayBorder,
+    // Strong grid dividers (schedule header's bottom rule, week-split line):
+    // need to read as a heavier line than the regular day dividers in both
+    // themes, but `--color-dark` (fixed near-black chrome) is invisible
+    // against dark mode's near-black surfaces, so this tracks the theme
+    // instead.
+    "--dg-color-grid-divider-strong": theme === "dark" ? tokens.textMuted : tokens.textPrimary,
   };
 
   const colorAliasVars: Record<string, string> = {};

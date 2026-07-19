@@ -1258,7 +1258,8 @@ const SectionBlock = memo(function SectionBlock({
                   // line, because Chromium clips box-shadow/border decorations
                   // on position:sticky elements at sub-100% browser zoom (see
                   // the same fix on the Open Shifts label cell below).
-                  backgroundImage: "linear-gradient(var(--color-dark), var(--color-dark))",
+                  backgroundImage:
+                    "linear-gradient(var(--color-grid-divider-strong), var(--color-grid-divider-strong))",
                   backgroundPosition: "0 100%",
                   backgroundRepeat: "no-repeat",
                   backgroundSize: "100% 1px",
@@ -1293,7 +1294,8 @@ const SectionBlock = memo(function SectionBlock({
                       // "0 1px 0 0" box-shadow draws 1px below the box's own
                       // edge, while this draws flush at it, so mixing the two
                       // techniques put them a pixel apart vertically.
-                      backgroundImage: "linear-gradient(var(--color-dark), var(--color-dark))",
+                      backgroundImage:
+                        "linear-gradient(var(--color-grid-divider-strong), var(--color-grid-divider-strong))",
                       backgroundPosition: "0 100%",
                       backgroundRepeat: "no-repeat",
                       backgroundSize: "100% 1px",
@@ -2588,10 +2590,11 @@ const SectionBlock = memo(function SectionBlock({
                                             );
                                             const multiCrossFocusPill =
                                               isCross && crossHomeFaLi ? crossHomeFaLi : null;
-                                            const multiCrossFocusPalette = getCrossFocusBadgePalette({
-                                              color: effectiveColorLi,
-                                              text: effectiveTextLi,
-                                            });
+                                            const multiCrossFocusPalette =
+                                              getCrossFocusBadgePalette({
+                                                color: effectiveColorLi,
+                                                text: effectiveTextLi,
+                                              });
                                             const showMultiSecondaryLine =
                                               !!displayParts.secondaryLabel;
                                             const multiDisplayLabel = displayParts.primaryLabel;

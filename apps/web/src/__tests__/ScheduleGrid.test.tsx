@@ -2559,7 +2559,7 @@ describe("ScheduleGrid", () => {
     expect(splitTallyCell.dataset.weekSplitStart).toBe("true");
   });
 
-  it("renders the 2-week header boundary as a black divider", () => {
+  it("renders the 2-week header boundary as a strong divider", () => {
     observedWidth = 1600;
     renderGrid();
 
@@ -2572,12 +2572,12 @@ describe("ScheduleGrid", () => {
     // it lands on the same y-position regardless of sticky-column rendering
     // quirks — see ScheduleGrid.tsx.
     expect(staffHeader.style.backgroundImage).toContain(
-      "linear-gradient(var(--color-dark), var(--color-dark))",
+      "linear-gradient(var(--color-grid-divider-strong), var(--color-grid-divider-strong))",
     );
     expect(staffHeader.style.backgroundPosition).toBe("0px 100%");
     expect(staffHeader.style.backgroundSize).toBe("100% 1px");
     expect(splitHeader.style.backgroundImage).toBe(
-      "linear-gradient(var(--color-dark), var(--color-dark))",
+      "linear-gradient(var(--color-grid-divider-strong), var(--color-grid-divider-strong))",
     );
     expect(splitHeader.style.backgroundPosition).toBe("0px 100%");
     expect(splitHeader.style.backgroundSize).toBe("100% 1px");
