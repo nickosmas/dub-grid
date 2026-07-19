@@ -11,7 +11,8 @@ import * as Sentry from "@/lib/sentry";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { resolveJobColorsForShift } from "@/lib/job-placement";
-import { borderColor } from "@/lib/colors";
+import { useTheme } from "next-themes";
+import { borderColor, resolveShiftPillColors } from "@/lib/colors";
 
 const PREVIEW_DAYS = [
   { shortLabel: "Mon", dateNumber: "21" },
@@ -111,15 +112,20 @@ function DisplayModePreviewPill({
   sample: PreviewShift;
 }) {
   const showSecondaryLine = !!sample.secondaryLabel;
+  const { resolvedTheme } = useTheme();
+  const resolved = resolveShiftPillColors(
+    { color: sample.color, text: sample.text, border: sample.border },
+    resolvedTheme === "dark",
+  );
 
   return (
     <div
       data-shift-pill="single"
       style={{
-        background: sample.color,
-        border: `1px solid ${borderColor(sample.text)}`,
+        background: resolved.color,
+        border: `1px solid ${borderColor(resolved.text)}`,
         borderRadius: 8,
-        color: sample.text,
+        color: resolved.text,
         display: "flex",
         flex: 1,
         flexDirection: "column",

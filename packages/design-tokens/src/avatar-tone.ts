@@ -36,6 +36,26 @@ const AVATAR_PALETTE: AvatarPaletteEntry[] = [
   { background: "#F0E2D6", border: "#E0C4AC", text: "#7A4A24", gradientTo: "#4C2E16" },
 ];
 
+// Dark-mode counterpart, same hue order as `AVATAR_PALETTE`. Derived from
+// each light entry's already-saturated `text` hue (not the pale background)
+// so the dark chip reads as a rich, vivid jewel tone rather than a muted
+// gray — same "vibrant, not washed out" treatment as shift pills, with a
+// bright tint of the same hue for text. Each pairing is WCAG AA-verified
+// (>=4.5:1).
+const DARK_AVATAR_PALETTE: Omit<AvatarPaletteEntry, "gradientTo">[] = [
+  { background: "#0C2A80", border: "#24449F", text: "#AABDF2" },
+  { background: "#2E2280", border: "#483C9F", text: "#B3AAF2" },
+  { background: "#4C1080", border: "#68299F", text: "#D0AAF2" },
+  { background: "#800A52", border: "#9F226E", text: "#F2AAD6" },
+  { background: "#800E30", border: "#9F274A", text: "#F2AABF" },
+  { background: "#803406", border: "#9F4F1E", text: "#F2C5AA" },
+  { background: "#0B803B", border: "#239F56", text: "#D4FFE5" },
+  { background: "#0B8076", border: "#239F94", text: "#E6FFFD" },
+  { background: "#076080", border: "#1F7D9F", text: "#AADFF2" },
+  { background: "#365280", border: "#516E9F", text: "#ABC8F5" },
+  { background: "#804B21", border: "#9F673B", text: "#F2CAAA" },
+];
+
 function hashSeed(value: string): number {
   let hash = 0;
   for (let index = 0; index < value.length; index += 1) {
@@ -48,8 +68,9 @@ function paletteEntryFor(seed: string): AvatarPaletteEntry {
   return AVATAR_PALETTE[hashSeed(seed) % AVATAR_PALETTE.length];
 }
 
-export function getAvatarTone(seed: string): AvatarTone {
-  const entry = paletteEntryFor(seed);
+export function getAvatarTone(seed: string, isDark = false): AvatarTone {
+  const index = hashSeed(seed) % AVATAR_PALETTE.length;
+  const entry = isDark ? DARK_AVATAR_PALETTE[index] : AVATAR_PALETTE[index];
   return {
     backgroundColor: entry.background,
     borderColor: entry.border,

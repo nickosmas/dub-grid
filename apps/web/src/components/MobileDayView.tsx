@@ -16,7 +16,8 @@ import {
   AbsenceType,
 } from "@/types";
 import { getCertAbbr, getEmployeeDisplayName } from "@/lib/utils";
-import { borderColor, DRAFT_BORDER_COLORS } from "@/lib/colors";
+import { borderColor, DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
+import { useTheme } from "next-themes";
 import { MaybeHint } from "@/components/ui/hint";
 import { CalendarOff } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
@@ -86,6 +87,8 @@ export default function MobileDayView({
   const todayKey = formatDateKey(today);
   const hasHighlightedSearch = !!(highlightEmpIds && highlightEmpIds.size > 0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
 
   // Always show exactly 7 dates (navigation handled by parent chevrons)
   const visibleDates = useMemo(() => dates.slice(0, 7), [dates]);
@@ -430,17 +433,27 @@ export default function MobileDayView({
                     // For absence cells, synthesize a single pill from the absence type
                     const pills = absenceType
                       ? [
-                          {
-                            label: isNameMode
-                              ? absenceType.name || absenceType.label
-                              : absenceType.label,
-                            bg: absenceType.color,
-                            text: absenceType.text,
-                            border: absenceType.border,
-                            foreignInitials: null,
-                            foreignBg: null,
-                            foreignText: null,
-                          },
+                          (() => {
+                            const resolved = resolveShiftPillColors(
+                              {
+                                color: absenceType.color,
+                                text: absenceType.text,
+                                border: absenceType.border,
+                              },
+                              isDarkTheme,
+                            );
+                            return {
+                              label: isNameMode
+                                ? absenceType.name || absenceType.label
+                                : absenceType.label,
+                              bg: resolved.color,
+                              text: resolved.text,
+                              border: resolved.border,
+                              foreignInitials: null,
+                              foreignBg: null,
+                              foreignText: null,
+                            };
+                          })(),
                         ]
                       : codeIds.map((id, idx) => {
                           const sc = assignmentById.get(id);
@@ -456,11 +469,19 @@ export default function MobileDayView({
                               : null;
                             const foreignBg = isForeign ? "var(--color-bg-secondary)" : null;
                             const foreignText = isForeign ? "var(--color-text-secondary)" : null;
+                            const resolved = resolveShiftPillColors(
+                              {
+                                color: style.color,
+                                text: style.text || borderColor(style.color),
+                                border: style.border || borderColor(style.color),
+                              },
+                              isDarkTheme,
+                            );
                             return {
                               label: isNameMode ? style.name || style.label : style.label,
-                              bg: style.color,
-                              text: style.text || borderColor(style.color),
-                              border: style.border || borderColor(style.color),
+                              bg: resolved.color,
+                              text: resolved.text,
+                              border: resolved.border,
                               foreignInitials,
                               foreignBg,
                               foreignText,
@@ -478,11 +499,19 @@ export default function MobileDayView({
                           // Use the shift code's own color as the home area identifier
                           const foreignBg = isForeign ? "var(--color-bg-secondary)" : null;
                           const foreignText = isForeign ? "var(--color-text-secondary)" : null;
+                          const resolved = resolveShiftPillColors(
+                            {
+                              color: sc.color,
+                              text: sc.text || borderColor(sc.color),
+                              border: sc.border || borderColor(sc.color),
+                            },
+                            isDarkTheme,
+                          );
                           return {
                             label: isNameMode ? sc.name || sc.label : sc.label,
-                            bg: sc.color,
-                            text: sc.text || borderColor(sc.color),
-                            border: sc.border || borderColor(sc.color),
+                            bg: resolved.color,
+                            text: resolved.text,
+                            border: resolved.border,
                             foreignInitials,
                             foreignBg,
                             foreignText,

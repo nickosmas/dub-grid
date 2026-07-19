@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
 import { formatDateKey } from "@/lib/utils";
+import { resolveShiftPillColors } from "@/lib/colors";
 import type {
   AbsenceType,
   AssignmentDefinition,
@@ -79,6 +81,7 @@ function getDelimitedValue(
 function buildWorkedShifts(input: {
   entry: ScheduleCellStateEntry;
   assignmentById: Map<number, AssignmentDefinition>;
+  isDarkTheme: boolean;
 }): MyScheduleShift[] {
   const { entry } = input;
 
@@ -107,13 +110,19 @@ function buildWorkedShifts(input: {
     const startTime = customStartTime ?? segment.startTime ?? assignment?.defaultStartTime ?? null;
     const endTime = customEndTime ?? segment.endTime ?? assignment?.defaultEndTime ?? null;
 
+    const resolved = assignment
+      ? resolveShiftPillColors(
+          { color: assignment.color, text: assignment.text, border: assignment.border },
+          input.isDarkTheme,
+        )
+      : null;
     shifts.push({
       label: assignment?.name || assignment?.label || segment.label || entry.label || "Shift",
       timeRange:
         startTime && endTime ? `${formatTime12h(startTime)} - ${formatTime12h(endTime)}` : null,
-      background: assignment?.color ?? "var(--color-bg-secondary)",
-      border: assignment?.border ?? "var(--color-border)",
-      textColor: assignment?.text ?? "var(--color-text-primary)",
+      background: resolved?.color ?? "var(--color-bg-secondary)",
+      border: resolved?.border ?? "var(--color-border)",
+      textColor: resolved?.text ?? "var(--color-text-primary)",
     });
   });
 
@@ -125,6 +134,7 @@ function buildMyScheduleDay(input: {
   entry: ShiftMap[string] | undefined;
   assignmentById: Map<number, AssignmentDefinition>;
   absenceTypeById: Map<number, AbsenceType>;
+  isDarkTheme: boolean;
 }): MyScheduleDay {
   const dateKey = formatDateKey(input.date);
   const { entry } = input;
@@ -135,6 +145,12 @@ function buildMyScheduleDay(input: {
 
   if (entry.absenceTypeId != null) {
     const absence = input.absenceTypeById.get(entry.absenceTypeId) ?? null;
+    const resolved = absence
+      ? resolveShiftPillColors(
+          { color: absence.color, text: absence.text, border: absence.border },
+          input.isDarkTheme,
+        )
+      : null;
     return {
       key: dateKey,
       dateKey,
@@ -143,9 +159,9 @@ function buildMyScheduleDay(input: {
         {
           label: absence?.name ?? entry.label ?? "Away",
           timeRange: null,
-          background: absence?.color ?? "var(--color-bg-secondary)",
-          border: absence?.border ?? "var(--color-border)",
-          textColor: absence?.text ?? "var(--color-text-secondary)",
+          background: resolved?.color ?? "var(--color-bg-secondary)",
+          border: resolved?.border ?? "var(--color-border)",
+          textColor: resolved?.text ?? "var(--color-text-secondary)",
         },
       ],
     };
@@ -155,7 +171,11 @@ function buildMyScheduleDay(input: {
     key: dateKey,
     dateKey,
     date: input.date,
-    shifts: buildWorkedShifts({ entry, assignmentById: input.assignmentById }),
+    shifts: buildWorkedShifts({
+      entry,
+      assignmentById: input.assignmentById,
+      isDarkTheme: input.isDarkTheme,
+    }),
   };
 }
 
@@ -165,6 +185,7 @@ function buildMyScheduleDays(input: {
   assignmentById: Map<number, AssignmentDefinition>;
   absenceTypeById: Map<number, AbsenceType>;
   periodDates: Date[];
+  isDarkTheme: boolean;
 }): MyScheduleDay[] {
   return input.periodDates.map((date) =>
     buildMyScheduleDay({
@@ -172,6 +193,7 @@ function buildMyScheduleDays(input: {
       entry: input.currentPeriodShifts[`${input.currentEmpId}_${formatDateKey(date)}`],
       assignmentById: input.assignmentById,
       absenceTypeById: input.absenceTypeById,
+      isDarkTheme: input.isDarkTheme,
     }),
   );
 }
@@ -237,7 +259,7 @@ function ScrollChevron({
         border: "1px solid var(--color-border)",
         background: "var(--color-bg)",
         color: "var(--color-text-secondary)",
-        boxShadow: "var(--dg-shadow-sm, 0 1px 3px rgba(0,0,0,0.1))",
+        boxShadow: "var(--shadow-raised)",
         cursor: "pointer",
         zIndex: 1,
       }}
@@ -383,6 +405,8 @@ export default function MyScheduleRow({
   periodLabel,
   isManagementOnly = false,
 }: MyScheduleRowProps) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const days = useMemo(
     () =>
       currentEmpId
@@ -392,9 +416,10 @@ export default function MyScheduleRow({
             assignmentById,
             absenceTypeById,
             periodDates,
+            isDarkTheme,
           })
         : [],
-    [currentEmpId, currentPeriodShifts, assignmentById, absenceTypeById, periodDates],
+    [currentEmpId, currentPeriodShifts, assignmentById, absenceTypeById, periodDates, isDarkTheme],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);
   const { scrollRef, canScrollLeft, canScrollRight, scrollByPage } = useHorizontalScrollState(

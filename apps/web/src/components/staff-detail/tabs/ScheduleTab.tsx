@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, Fragment } from "react";
+import { useTheme } from "next-themes";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import type {
@@ -15,6 +16,7 @@ import type {
 } from "@/types";
 import { fmt12h } from "@/lib/utils";
 import { computeShiftDurationHours } from "@/lib/dashboard-stats";
+import { resolveShiftPillColors } from "@/lib/colors";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatShiftRequestStatusLabel, formatShiftRequestTypeLabel } from "@/lib/client-facing";
@@ -62,6 +64,8 @@ export function ScheduleTab({
   recurringShifts,
   canViewRecurringShifts,
 }: ScheduleTabProps) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 20;
 
@@ -268,11 +272,21 @@ export function ScheduleTab({
                                     absenceType ? (
                                       <Badge
                                         variant="outline"
-                                        style={{
-                                          backgroundColor: absenceType.color,
-                                          color: absenceType.text,
-                                          borderColor: absenceType.border,
-                                        }}
+                                        style={(() => {
+                                          const resolved = resolveShiftPillColors(
+                                            {
+                                              color: absenceType.color,
+                                              text: absenceType.text,
+                                              border: absenceType.border,
+                                            },
+                                            isDarkTheme,
+                                          );
+                                          return {
+                                            backgroundColor: resolved.color,
+                                            color: resolved.text,
+                                            borderColor: resolved.border,
+                                          };
+                                        })()}
                                         className="h-5 w-fit px-1.5 py-0 text-[10px]"
                                       >
                                         {absenceType.name || absenceType.label}
@@ -294,11 +308,21 @@ export function ScheduleTab({
                                         >
                                           <Badge
                                             variant="outline"
-                                            style={{
-                                              backgroundColor: assignment.color,
-                                              color: assignment.text,
-                                              borderColor: assignment.border,
-                                            }}
+                                            style={(() => {
+                                              const resolved = resolveShiftPillColors(
+                                                {
+                                                  color: assignment.color,
+                                                  text: assignment.text,
+                                                  border: assignment.border,
+                                                },
+                                                isDarkTheme,
+                                              );
+                                              return {
+                                                backgroundColor: resolved.color,
+                                                color: resolved.text,
+                                                borderColor: resolved.border,
+                                              };
+                                            })()}
                                             className="h-5 px-1.5 py-0 text-[10px]"
                                           >
                                             {assignment.name || assignment.label}

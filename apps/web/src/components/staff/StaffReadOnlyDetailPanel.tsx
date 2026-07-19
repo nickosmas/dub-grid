@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import {
   Award,
@@ -60,7 +61,8 @@ export function StaffReadOnlyDetailPanel({
   departmentLabel,
   onClose,
 }: StaffReadOnlyDetailPanelProps) {
-  const avatarTone = getAvatarTone(employee.id);
+  const { resolvedTheme } = useTheme();
+  const avatarTone = getAvatarTone(employee.id, resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
   const onCloseRef = useRef(onClose);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, type CSSProperties, type ReactNode } from "react";
+import { useTheme } from "next-themes";
 import Link from "next/link";
 import { Employee, FocusArea, NamedItem, Invitation, OrganizationRole } from "@/types";
 import { getEmployeeProfileHref } from "@/lib/profile-links";
@@ -106,7 +107,8 @@ function StaffRowCells({
   variant,
 }: StaffRowCellsProps) {
   const { user: currentUser } = useAuth();
-  const avatarTone = getAvatarTone(emp.id);
+  const { resolvedTheme } = useTheme();
+  const avatarTone = getAvatarTone(emp.id, resolvedTheme === "dark");
   const displayName = getEmployeeDisplayName(emp);
   const initials = getInitials(displayName);
   const isYou = !!(emp.userId && currentUser && emp.userId === currentUser.id);

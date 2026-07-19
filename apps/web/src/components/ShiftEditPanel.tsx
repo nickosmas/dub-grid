@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useTheme } from "next-themes";
 import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@/lib/utils";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
+import { toDarkPillColors, resolveShiftPillColors } from "@/lib/colors";
 import { indefiniteArticle } from "@dubgrid/domain";
 import type { TimeRange } from "@/lib/schedule-logic";
 import {
@@ -162,6 +164,8 @@ interface ShiftEditPanelProps {
   overlapWarnings?: string[];
   /** When true, overlap warnings block saving (admin can override). */
   enforceConflicts?: boolean;
+  /** Whether the org allows shift-only ("default shift") assignments in the picker. */
+  defaultShiftEnabled?: boolean;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
 }
@@ -902,8 +906,11 @@ export default function ShiftEditPanel({
   overlapWarnings = [],
   enforceConflicts = false,
   shiftDisplayMode = "code",
+  defaultShiftEnabled = true,
 }: ShiftEditPanelProps) {
   const isNameMode = shiftDisplayMode === "name";
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const assignableShiftDisplayMap = useMemo(
     () =>
       buildAssignableShiftDisplayMap({
@@ -3218,7 +3225,7 @@ export default function ShiftEditPanel({
                 width: 8,
                 height: 8,
                 borderRadius: "50%",
-                background: ind.color,
+                background: isDarkTheme ? toDarkPillColors(ind.color).bg : ind.color,
                 border: "1px solid rgba(255,255,255,0.8)",
                 flexShrink: 0,
               }}
@@ -3269,16 +3276,20 @@ export default function ShiftEditPanel({
       const at = absenceTypes.find((a) => a.id === currentAbsenceTypeId);
       if (!at) return null;
       const absenceLabel = at.name || at.label;
+      const atResolved = resolveShiftPillColors(
+        { color: at.color, text: at.text, border: at.border },
+        isDarkTheme,
+      );
       return (
         <div
           style={{
-            background: at.color,
+            background: atResolved.color,
             border: getPanelDiffBorder({
               diffKind: cellBorderKind,
               fallback:
-                at.border === "transparent"
-                  ? `1.5px solid ${darkenColor(at.color, 0.25)}`
-                  : `1.5px solid ${at.border}`,
+                atResolved.border === "transparent"
+                  ? `1.5px solid ${darkenColor(atResolved.color, 0.25)}`
+                  : `1.5px solid ${atResolved.border}`,
             }),
             borderRadius: "var(--dg-radius-md)",
             minHeight: 56,
@@ -3298,7 +3309,7 @@ export default function ShiftEditPanel({
               style={{
                 fontWeight: 800,
                 fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
-                color: at.text,
+                color: atResolved.text,
                 lineHeight: isNameMode ? 1.3 : 1.2,
                 maxWidth: "90%",
                 overflow: "hidden",
@@ -3323,9 +3334,11 @@ export default function ShiftEditPanel({
 
     if (currentLabels.length === 1) {
       const preview = resolveShiftPreview(currentAssignmentIds[0], currentLabels[0], "name");
-      const s =
+      const s0 =
         preview.assignment ??
         getAssignmentDefinitionStyle(currentLabels[0], currentAssignmentIds[0]);
+      const darkS = isDarkTheme ? toDarkPillColors(s0.color) : null;
+      const s = { color: darkS?.bg ?? s0.color, text: darkS?.text ?? s0.text };
       const previewLabel = formatPreviewLabel(preview.displayParts);
       const focusAreaLabel =
         preview.assignment?.focusAreaId != null
@@ -3420,8 +3433,10 @@ export default function ShiftEditPanel({
       <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 14 }}>
         {currentLabels.map((label, i) => {
           const preview = resolveShiftPreview(currentAssignmentIds[i], label, "name");
-          const s =
+          const s0 =
             preview.assignment ?? getAssignmentDefinitionStyle(label, currentAssignmentIds[i]);
+          const darkS = isDarkTheme ? toDarkPillColors(s0.color) : null;
+          const s = { color: darkS?.bg ?? s0.color, text: darkS?.text ?? s0.text };
           const previewLabel = formatPreviewLabel(preview.displayParts);
           const assignment =
             preview.assignment ??
@@ -4534,6 +4549,7 @@ export default function ShiftEditPanel({
                       isMentored: segment.isMentored ?? false,
                     }))}
                     currentAbsenceTypeId={currentAbsenceTypeId}
+                    defaultShiftEnabled={defaultShiftEnabled}
                     onSelect={(segments) => {
                       onSelect(
                         buildPanelInput({

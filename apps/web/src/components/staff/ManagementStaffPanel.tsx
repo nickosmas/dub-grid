@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AdminPermissions, DirectoryPerson, NamedItem, OrganizationRole } from "@/types";
@@ -105,6 +106,7 @@ export function ManagementStaffPanel({
   onAddToSchedule,
   isSelf = false,
 }: ManagementStaffPanelProps) {
+  const { resolvedTheme } = useTheme();
   const [closing, setClosing] = useState(false);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -359,7 +361,7 @@ export function ManagementStaffPanel({
       ? `${person.firstName} ${person.lastName}`.trim()
       : person.email;
   const initials = getInitials(displayName);
-  const avatarTone = getAvatarTone(person.personId);
+  const avatarTone = getAvatarTone(person.personId, resolvedTheme === "dark");
 
   const statusConfig = isPending
     ? isExpired

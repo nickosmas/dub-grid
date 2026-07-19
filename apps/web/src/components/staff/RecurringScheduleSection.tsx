@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
@@ -12,7 +13,7 @@ import ProgressBar from "@/components/ProgressBar";
 import ShiftPicker from "@/components/ShiftPicker";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
-import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
+import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR, toDarkPillColors } from "@/lib/colors";
 import {
   deleteRecurringDraft,
   deleteRecurringShift,
@@ -58,6 +59,7 @@ type ShiftCellPopoverProps = {
   onAbsenceSelect?: (absenceType: AbsenceType) => void;
   currentAbsenceTypeId?: number | null;
   shiftDisplayMode?: ShiftDisplayMode;
+  defaultShiftEnabled?: boolean;
 };
 
 function ShiftCellPopover({
@@ -78,6 +80,7 @@ function ShiftCellPopover({
   onAbsenceSelect,
   currentAbsenceTypeId,
   shiftDisplayMode,
+  defaultShiftEnabled = true,
 }: ShiftCellPopoverProps) {
   const isMobileView = useMediaQuery(MOBILE);
   const {
@@ -198,6 +201,7 @@ function ShiftCellPopover({
                 position: segment.position ?? index,
               }))}
               currentAbsenceTypeId={currentAbsenceTypeId}
+              defaultShiftEnabled={defaultShiftEnabled}
               onSelect={(segments) => {
                 onSelect(
                   segments.length > 0
@@ -354,6 +358,9 @@ function RecurringShiftPill({
   isDirty,
   shiftDisplayMode,
 }: RecurringShiftPillProps) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
+
   if (!assignment && !absenceType) {
     return (
       <div
@@ -382,11 +389,16 @@ function RecurringShiftPill({
   }
 
   const isNameMode = shiftDisplayMode === "name";
-  const pillBackground = assignment?.color ?? absenceType!.color;
-  const pillText = assignment?.text ?? absenceType!.text;
-  const fallbackBorder = absenceType
-    ? `1px solid ${absenceType.border}`
-    : `1px solid ${borderColor(pillText)}`;
+  const rawPillBackground = assignment?.color ?? absenceType!.color;
+  const rawPillText = assignment?.text ?? absenceType!.text;
+  const darkPill = isDarkTheme ? toDarkPillColors(rawPillBackground) : null;
+  const pillBackground = darkPill?.bg ?? rawPillBackground;
+  const pillText = darkPill?.text ?? rawPillText;
+  const fallbackBorder = darkPill
+    ? `1px solid ${borderColor(pillText)}`
+    : absenceType
+      ? `1px solid ${absenceType.border}`
+      : `1px solid ${borderColor(pillText)}`;
   const displayParts = assignment
     ? buildShiftDisplayParts({
         shift: shiftCategory,
@@ -494,6 +506,7 @@ export interface RecurringScheduleSectionProps {
   certifications: NamedItem[];
   absenceTypes?: AbsenceType[];
   shiftDisplayMode?: ShiftDisplayMode;
+  defaultShiftEnabled?: boolean;
 }
 
 export function RecurringScheduleSection({
@@ -510,6 +523,7 @@ export function RecurringScheduleSection({
   certifications,
   absenceTypes = [],
   shiftDisplayMode = "code",
+  defaultShiftEnabled = true,
 }: RecurringScheduleSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isNameMode = shiftDisplayMode === "name";
@@ -1356,6 +1370,7 @@ export function RecurringScheduleSection({
               empCertificationId={activeCellEmp.certificationId}
               empRoleIds={activeCellEmp.roleIds}
               shiftDisplayMode={shiftDisplayMode}
+              defaultShiftEnabled={defaultShiftEnabled}
             />
           );
         })()}

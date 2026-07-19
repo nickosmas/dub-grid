@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -10,6 +11,7 @@ import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ProgressBar from "@/components/ProgressBar";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
+import { resolveShiftPillColors } from "@/lib/colors";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -111,6 +113,8 @@ export default function ShiftRequestBoard({
   absenceTypeMap,
 }: ShiftRequestBoardProps) {
   const isMobile = useMediaQuery(MOBILE);
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const [activeTab, setActiveTab] = useState<Tab>("available");
   const [rejectNotes, setRejectNotes] = useState<Record<string, string>>({});
   const [showRejectInput, setShowRejectInput] = useState<Record<string, boolean>>({});
@@ -232,6 +236,12 @@ export default function ShiftRequestBoard({
     const isTarget = currentEmpId === req.targetEmpId;
     const absenceType =
       isCalloff && req.absenceTypeId ? absenceTypeMap?.get(req.absenceTypeId) : null;
+    const absenceTypeColors = absenceType
+      ? resolveShiftPillColors(
+          { color: absenceType.color, text: absenceType.text, border: absenceType.border },
+          isDarkTheme,
+        )
+      : null;
     const requesterLabel = req.requesterSegments?.length
       ? joinShiftJobSegmentNames(req.requesterSegments)
       : req.requesterShiftLabel;
@@ -326,9 +336,9 @@ export default function ShiftRequestBoard({
                 fontWeight: 600,
                 padding: "2px 8px",
                 borderRadius: 6,
-                background: absenceType.color || "var(--color-surface-alt)",
-                color: absenceType.text || "var(--color-text-primary)",
-                border: `1px solid ${absenceType.border || "var(--color-border)"}`,
+                background: absenceTypeColors?.color || "var(--color-surface-alt)",
+                color: absenceTypeColors?.text || "var(--color-text-primary)",
+                border: `1px solid ${absenceTypeColors?.border || "var(--color-border)"}`,
               }}
             >
               {absenceType.label} — {absenceType.name}

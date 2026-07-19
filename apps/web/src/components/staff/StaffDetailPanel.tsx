@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -92,8 +93,9 @@ export function StaffDetailPanel({
   onPermissionsChange,
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
+  const { resolvedTheme } = useTheme();
   const isSelf = isSelfAction(currentUser?.id, employee.userId);
-  const avatarTone = getAvatarTone(employee.id);
+  const avatarTone = getAvatarTone(employee.id, resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [closing, setClosing] = useState(false);

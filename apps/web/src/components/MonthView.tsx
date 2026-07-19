@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import { useTheme } from "next-themes";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatDateKey, getEmployeeDisplayName } from "@/lib/utils";
@@ -12,7 +13,7 @@ import {
   DraftKind,
   ShiftDisplayMode,
 } from "@/types";
-import { borderColor, DRAFT_BORDER_COLORS } from "@/lib/colors";
+import { borderColor, DRAFT_BORDER_COLORS, resolveShiftPillColors } from "@/lib/colors";
 
 function pillText(label: string, max: number): string {
   if (label.length <= max) return label;
@@ -95,6 +96,8 @@ function DayPopover({
   hasHighlightedSearch?: boolean;
 }) {
   const { date, focusAreaSections, byFocusArea } = data;
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
 
   return (
     <Popover
@@ -186,7 +189,12 @@ function DayPopover({
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                       {workers.map(
-                        ({ name, shift, style: s, draftKind: dk, isHighlighted }, ni) => (
+                        ({ name, shift, style: s0, draftKind: dk, isHighlighted }, ni) => {
+                          const s = resolveShiftPillColors(
+                            { color: s0.color, text: s0.text, border: s0.border },
+                            isDarkTheme,
+                          );
+                          return (
                           <div
                             key={`${name}-${shift}-${ni}`}
                             style={{
@@ -244,7 +252,8 @@ function DayPopover({
                               {shortName(name)}
                             </span>
                           </div>
-                        ),
+                          );
+                        },
                       )}
                     </div>
                   </div>

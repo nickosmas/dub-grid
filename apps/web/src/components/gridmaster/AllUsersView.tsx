@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useTheme } from "next-themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { PlatformUser, Organization } from "@/types";
@@ -8,6 +9,7 @@ import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { sectionStyle, thStyle, tdStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
+import { toDarkPillColors } from "@/lib/colors";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
 import { MaybeHint } from "@/components/ui/hint";
 import {
@@ -19,7 +21,15 @@ import {
 import { queryKeys } from "@/lib/query-keys";
 
 function RoleBadge({ role }: { role: string }) {
-  const c = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
+  const { resolvedTheme } = useTheme();
+  const c0 = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
+  // Only the "gridmaster" entry is a literal hex triple (others are already
+  // var(--color-*) tokens, which toDarkPillColors can't parse as hex).
+  const isDarkTheme = resolvedTheme === "dark";
+  const c =
+    isDarkTheme && c0.bg.startsWith("#")
+      ? { bg: toDarkPillColors(c0.bg).bg, text: toDarkPillColors(c0.bg).text, border: c0.border }
+      : c0;
   return (
     <span
       style={{

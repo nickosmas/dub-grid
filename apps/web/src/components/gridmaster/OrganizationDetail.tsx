@@ -23,6 +23,8 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useTheme } from "next-themes";
+import { resolveShiftPillColors, toDarkPillColors } from "@/lib/colors";
 import { toast } from "sonner";
 import {
   fetchAbsenceTypes,
@@ -2544,6 +2546,8 @@ function ConfigTab({
   indicatorTypes: IndicatorType[];
   organization: Organization;
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const activeFocusAreas = focusAreas.filter((fa) => !fa.archivedAt);
   const archivedFocusAreas = focusAreas.filter((fa) => fa.archivedAt);
   const activeShiftCategories = shiftCategories.filter((shift) => !shift.archivedAt);
@@ -2890,8 +2894,16 @@ function ConfigTab({
                 </tr>
               </thead>
               <tbody>
-                {activeAbsenceTypes.map((at) => (
-                  <tr key={at.id}>
+                {activeAbsenceTypes.map((at0) => {
+                  const at = {
+                    ...at0,
+                    ...resolveShiftPillColors(
+                      { color: at0.color, text: at0.text, border: at0.border },
+                      isDarkTheme,
+                    ),
+                  };
+                  return (
+                  <tr key={at0.id}>
                     <td
                       style={{
                         padding: "8px 14px",
@@ -2947,7 +2959,8 @@ function ConfigTab({
                       />
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -3050,7 +3063,7 @@ function ConfigTab({
                       width: 8,
                       height: 8,
                       borderRadius: "50%",
-                      background: ind.color,
+                      background: isDarkTheme ? toDarkPillColors(ind.color).bg : ind.color,
                       flexShrink: 0,
                     }}
                   />

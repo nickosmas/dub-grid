@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useTheme } from "next-themes";
 import { CalendarDays, Check, Clock3, MapPin, UserRound, Users } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
 import { formatDateKey, getAvatarInitials } from "@/lib/utils";
+import { resolveShiftPillColors } from "@/lib/colors";
 import {
   getCurrentTimeValueInTimeZone,
   getIsoDateInTimeZone,
@@ -125,6 +127,8 @@ const DASHBOARD_HERO_COLLABORATOR_BG = "rgba(255, 255, 255, 0.16)";
 const DASHBOARD_HERO_AVATAR_OVERLAP = -10;
 
 export default function UserDashboard(props: DashboardContentProps) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const {
     allShifts,
     assignmentById,
@@ -178,8 +182,17 @@ export default function UserDashboard(props: DashboardContentProps) {
         employeeById,
         focusAreaById,
         shiftById,
+        isDarkTheme,
       }),
-    [absenceTypeById, assignmentById, currentPeriodShifts, employeeById, focusAreaById, shiftById],
+    [
+      absenceTypeById,
+      assignmentById,
+      currentPeriodShifts,
+      employeeById,
+      focusAreaById,
+      shiftById,
+      isDarkTheme,
+    ],
   );
   const myScheduleItems = useMemo(
     () => (currentEmpId ? allScheduleItems.filter((item) => item.employeeId === currentEmpId) : []),
@@ -198,8 +211,18 @@ export default function UserDashboard(props: DashboardContentProps) {
         employeeById,
         focusAreaById,
         shiftById,
+        isDarkTheme,
       }).filter((item) => item.dateKey >= todayKey),
-    [absenceTypeById, allShifts, assignmentById, employeeById, focusAreaById, shiftById, todayKey],
+    [
+      absenceTypeById,
+      allShifts,
+      assignmentById,
+      employeeById,
+      focusAreaById,
+      shiftById,
+      todayKey,
+      isDarkTheme,
+    ],
   );
   const heroItems = useMemo(
     () => (currentEmpId ? upcomingAllItems.filter((item) => item.employeeId === currentEmpId) : []),
@@ -520,6 +543,7 @@ function buildScheduleItemsFromShiftMap(input: {
   employeeById: Map<string, Employee>;
   focusAreaById: Map<number, FocusArea>;
   shiftById: Map<number, { abbr?: string | null; name: string }>;
+  isDarkTheme: boolean;
 }): DashboardScheduleItem[] {
   const items: DashboardScheduleItem[] = [];
 
@@ -547,7 +571,7 @@ function buildScheduleItemsFromShiftMap(input: {
         employeeName,
         entry,
         key: `${key}:absence`,
-        segment: buildAbsenceSegment(entry, absence, parsedKey.dateKey),
+        segment: buildAbsenceSegment(entry, absence, parsedKey.dateKey, input.isDarkTheme),
         segmentIndex: 0,
       });
       continue;
@@ -564,6 +588,7 @@ function buildScheduleItemsFromShiftMap(input: {
         segmentCount: rawSegments.length,
         segmentIndex,
         shiftById: input.shiftById,
+        isDarkTheme: input.isDarkTheme,
       });
 
       if (!segment) {
@@ -617,12 +642,19 @@ function buildAbsenceSegment(
   entry: ScheduleCellStateEntry,
   absence: AbsenceType | null,
   dateKey: string,
+  isDarkTheme: boolean,
 ): DashboardScheduleSegment {
   const label = absence?.name ?? absence?.label ?? entry.label ?? "Away";
+  const resolved = absence
+    ? resolveShiftPillColors(
+        { color: absence.color, text: absence.text, border: absence.border },
+        isDarkTheme,
+      )
+    : null;
   return {
     assignment: null,
-    backgroundColor: absence?.color ?? "var(--color-bg-secondary)",
-    borderColor: absence?.border ?? "var(--color-border)",
+    backgroundColor: resolved?.color ?? "var(--color-bg-secondary)",
+    borderColor: resolved?.border ?? "var(--color-border)",
     chipLabel: label,
     dateKey,
     endTime: null,
@@ -639,7 +671,7 @@ function buildAbsenceSegment(
     shiftName: null,
     sortTime: "99:99:99",
     startTime: null,
-    textColor: absence?.text ?? "var(--color-text-secondary)",
+    textColor: resolved?.text ?? "var(--color-text-secondary)",
     title: label,
     typeLabel: "Absence",
   };
@@ -654,6 +686,7 @@ function buildWorkedSegment(input: {
   segmentCount: number;
   segmentIndex: number;
   shiftById: Map<number, { abbr?: string | null; name: string }>;
+  isDarkTheme: boolean;
 }): DashboardScheduleSegment | null {
   const assignmentId =
     input.rawSegment.assignmentId ?? input.entry.assignmentIds[input.segmentIndex];
@@ -719,11 +752,17 @@ function buildWorkedSegment(input: {
   const startTime =
     customStartTime ?? input.rawSegment.startTime ?? assignment?.defaultStartTime ?? null;
   const endTime = customEndTime ?? input.rawSegment.endTime ?? assignment?.defaultEndTime ?? null;
+  const resolved = assignment
+    ? resolveShiftPillColors(
+        { color: assignment.color, text: assignment.text, border: assignment.border },
+        input.isDarkTheme,
+      )
+    : null;
 
   return {
     assignment,
-    backgroundColor: assignment?.color ?? "var(--color-bg-secondary)",
-    borderColor: assignment?.border ?? "var(--color-border)",
+    backgroundColor: resolved?.color ?? "var(--color-bg-secondary)",
+    borderColor: resolved?.border ?? "var(--color-border)",
     chipLabel: isGeneral ? chipLabel : chipLabel || title,
     dateKey: input.dateKey,
     endTime,
@@ -740,7 +779,7 @@ function buildWorkedSegment(input: {
     shiftName,
     sortTime: startTime ?? "99:99:99",
     startTime,
-    textColor: assignment?.text ?? "var(--color-text-primary)",
+    textColor: resolved?.text ?? "var(--color-text-primary)",
     title,
     typeLabel: isGeneral ? "General shift" : null,
   };
@@ -1805,6 +1844,9 @@ function ShiftmatesRow({
   inverse?: boolean;
   items: DashboardScheduleItem[];
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
+
   if (items.length === 0) {
     return null;
   }
@@ -1861,7 +1903,7 @@ function ShiftmatesRow({
         }}
       >
         {visibleItems.map((item, index) => {
-          const avatarTone = getAvatarTone(item.employeeId);
+          const avatarTone = getAvatarTone(item.employeeId, isDarkTheme);
 
           return (
             <span

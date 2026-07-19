@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import type { AbsenceType, ShiftDisplayMode } from "@/types";
 import {
   checkAbsenceTypeDependencies,
@@ -23,7 +24,12 @@ import {
   normalizeLineText,
 } from "@/lib/form-validation";
 import { PresetColorPicker, labelStyle } from "./shared";
-import { PREDEFINED_COLORS, TRANSPARENT_BORDER, borderColor } from "@/lib/colors";
+import {
+  PREDEFINED_COLORS,
+  TRANSPARENT_BORDER,
+  borderColor,
+  resolveShiftPillColors,
+} from "@/lib/colors";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
 type AbsenceTypeFormState = {
@@ -75,6 +81,8 @@ function AbsenceTypeRow({
 }) {
   const isNameMode = shiftDisplayMode === "name";
   const isMobile = useMediaQuery(MOBILE);
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const [form, setForm] = useState<AbsenceTypeFormState>(() => buildFormState(absenceType));
   const [expanded, setExpanded] = useState(!!absenceType.isNew);
   const [saving, setSaving] = useState(false);
@@ -250,24 +258,31 @@ function AbsenceTypeRow({
         }}
         onClick={toggleExpanded}
       >
-        {!isNameMode && (
-          <span
-            style={{
-              display: "inline-block",
-              minWidth: 44,
-              padding: "3px 8px",
-              background: form.color,
-              border: `1px solid ${borderColor(form.text)}`,
-              color: form.text,
-              borderRadius: 8,
-              fontSize: "var(--dg-fs-caption)",
-              fontWeight: 700,
-              textAlign: "center",
-            }}
-          >
-            {form.label || "…"}
-          </span>
-        )}
+        {!isNameMode &&
+          (() => {
+            const badge = resolveShiftPillColors(
+              { color: form.color, text: form.text, border: form.border },
+              isDarkTheme,
+            );
+            return (
+              <span
+                style={{
+                  display: "inline-block",
+                  minWidth: 44,
+                  padding: "3px 8px",
+                  background: badge.color,
+                  border: `1px solid ${borderColor(badge.text)}`,
+                  color: badge.text,
+                  borderRadius: 8,
+                  fontSize: "var(--dg-fs-caption)",
+                  fontWeight: 700,
+                  textAlign: "center",
+                }}
+              >
+                {form.label || "…"}
+              </span>
+            );
+          })()}
         <span
           style={{
             flex: 1,

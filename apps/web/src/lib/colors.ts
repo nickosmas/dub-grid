@@ -174,6 +174,69 @@ function hslToRgb(hsl: { h: number; s: number; l: number }): { r: number; g: num
   };
 }
 
+function rgbToHsv(rgb: { r: number; g: number; b: number }): { h: number; s: number; v: number } {
+  const r = rgb.r / 255;
+  const g = rgb.g / 255;
+  const b = rgb.b / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const v = max;
+  const s = max === 0 ? 0 : delta / max;
+
+  if (delta === 0) return { h: 0, s, v };
+
+  let h: number;
+  switch (max) {
+    case r:
+      h = ((g - b) / delta) % 6;
+      break;
+    case g:
+      h = (b - r) / delta + 2;
+      break;
+    default:
+      h = (r - g) / delta + 4;
+      break;
+  }
+  h *= 60;
+  if (h < 0) h += 360;
+
+  return { h, s, v };
+}
+
+function hsvToRgb(hsv: { h: number; s: number; v: number }): { r: number; g: number; b: number } {
+  const h = ((hsv.h % 360) + 360) % 360;
+  const s = Math.max(0, Math.min(1, hsv.s));
+  const v = Math.max(0, Math.min(1, hsv.v));
+
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+
+  let r: number;
+  let g: number;
+  let b: number;
+  if (h < 60) {
+    [r, g, b] = [c, x, 0];
+  } else if (h < 120) {
+    [r, g, b] = [x, c, 0];
+  } else if (h < 180) {
+    [r, g, b] = [0, c, x];
+  } else if (h < 240) {
+    [r, g, b] = [0, x, c];
+  } else if (h < 300) {
+    [r, g, b] = [x, 0, c];
+  } else {
+    [r, g, b] = [c, 0, x];
+  }
+
+  return {
+    r: clampChannel((r + m) * 255),
+    g: clampChannel((g + m) * 255),
+    b: clampChannel((b + m) * 255),
+  };
+}
+
 function relativeLuminance(hex: string): number {
   const { r, g, b } = hexToRgb(hex);
   const transform = (channel: number) => {
@@ -263,6 +326,51 @@ export function borderColor(textHex: string, opacity = 0.35): string {
   const g = parseInt(textHex.slice(3, 5), 16);
   const b = parseInt(textHex.slice(5, 7), 16);
   return `rgba(${r},${g},${b},${opacity})`;
+}
+
+/**
+ * Remaps a pastel shift-category/job color for dark mode. The preset palette
+ * (`PREDEFINED_COLOR_GROUPS`) is tuned for a white page — rendered as-is on
+ * an ink-black page those pale swatches read as blown-out, glaring blocks.
+ *
+ * Works in HSV (not HSL) deliberately: HSL's saturation is coupled to
+ * lightness and reads as much more colorful near L≈0.9 than the same S does
+ * near L≈0.3, so scaling HSL lightness down alone visibly tints near-white
+ * "neutral" presets like Slate. HSV saturation tracks perceived chroma
+ * independent of value, so scaling both proportionally keeps a low-chroma
+ * pastel a neutral gray and a higher-chroma pastel recognizably that hue —
+ * just richer and more vivid than a literal same-saturation "shade" would
+ * be, since these presets are quite pale to begin with. Recomputes readable
+ * text via the same `getReadableTextColor` used everywhere else so contrast
+ * stays correct automatically.
+ */
+export function toDarkPillColors(bgHex: string): { bg: string; text: string } {
+  const normalizedBg = normalizeHex(bgHex);
+  const { h, s, v } = rgbToHsv(hexToRgb(normalizedBg));
+  const darkS = Math.min(s * 1.8, 1);
+  const darkV = Math.max(0.22, Math.min(v * 0.45, 0.46));
+  const bg = rgbToHex(hsvToRgb({ h, s: darkS, v: darkV }));
+  return { bg, text: getReadableTextColor(bg) };
+}
+
+export interface ShiftPillColors {
+  color: string;
+  text: string;
+  border: string;
+}
+
+/**
+ * Pure (non-hook) counterpart to `toDarkPillColors`, for call sites that
+ * render pills inside a loop/map — where calling a hook per-iteration would
+ * break the Rules of Hooks. Callers read the active theme once via
+ * `useTheme()`/`useShiftPillColors` at the top of the component and pass
+ * `isDark` down into this function for each pill.
+ */
+export function resolveShiftPillColors(style: ShiftPillColors, isDark: boolean): ShiftPillColors {
+  if (!isDark) return style;
+
+  const dark = toDarkPillColors(style.color);
+  return { color: dark.bg, text: dark.text, border: borderColor(dark.text) };
 }
 
 /** Resolve a preset color by background hex, preserving valid custom colors. */

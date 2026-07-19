@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import { IndicatorType } from "@/types";
+import { toDarkPillColors } from "@/lib/colors";
 import {
   checkIndicatorTypeDependencies,
   deleteIndicatorType,
@@ -38,6 +40,8 @@ function IndicatorRow({
   onDeleted: (id: number) => void;
   isLast?: boolean;
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const [name, setName] = useState(indicator.name);
   const [color, setColor] = useState(indicator.color);
   const [expanded, setExpanded] = useState(!!indicator.isNew);
@@ -204,7 +208,7 @@ function IndicatorRow({
             width: 14,
             height: 14,
             borderRadius: "9999px",
-            background: color,
+            background: isDarkTheme ? toDarkPillColors(color).bg : color,
             border: "1px solid rgba(0,0,0,0.12)",
             flexShrink: 0,
           }}
@@ -326,7 +330,7 @@ function IndicatorRow({
                     width: 14,
                     height: 14,
                     borderRadius: "9999px",
-                    background: color,
+                    background: isDarkTheme ? toDarkPillColors(color).bg : color,
                     border: "1px solid rgba(0,0,0,0.12)",
                   }}
                 />

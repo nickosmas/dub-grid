@@ -1,7 +1,9 @@
+import { useTheme } from "next-themes";
 import type { ShiftTypeBreakdown, FocusAreaBreakdown } from "@/lib/dashboard-stats";
 import DonutChart from "../DonutChart";
 import Modal from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
+import { toDarkPillColors } from "@/lib/colors";
 
 interface ExpandedBreakdownProps {
   breakdown: ShiftTypeBreakdown;
@@ -51,10 +53,12 @@ export default function ExpandedBreakdown({ breakdown, onClose }: ExpandedBreakd
 }
 
 function FocusAreaCard({ fa, totalShifts }: { fa: FocusAreaBreakdown; totalShifts: number }) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const segments = fa.codes.map((c) => ({
     label: c.assignmentLabel,
     value: c.count,
-    color: c.color,
+    color: isDarkTheme ? toDarkPillColors(c.color).bg : c.color,
   }));
 
   const pct = totalShifts > 0 ? Math.round((fa.total / totalShifts) * 100) : 0;
