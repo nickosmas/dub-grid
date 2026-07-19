@@ -195,7 +195,7 @@ export async function createSandboxForUser(input: {
   const { data: sourceOrg, error: sourceErr } = await serviceClient
     .from("organizations")
     .select(
-      "name, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, logo_url, app_name, meta_description, theme_config, landing_page_config, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, data_retention_days, enforce_conflict_prevention, coverage_rule_config, feature_overrides",
+      "name, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, logo_url, app_name, meta_description, theme_config, landing_page_config, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, data_retention_days, enforce_conflict_prevention, default_shift_enabled, coverage_rule_config, feature_overrides",
     )
     .eq("id", sourceOrgId)
     .maybeSingle();
@@ -241,6 +241,7 @@ export async function createSandboxForUser(input: {
         // Operational config
         data_retention_days: sourceOrg?.data_retention_days ?? 365,
         enforce_conflict_prevention: sourceOrg?.enforce_conflict_prevention ?? false,
+        default_shift_enabled: sourceOrg?.default_shift_enabled ?? true,
         coverage_rule_config: sourceOrg?.coverage_rule_config ?? {
           mentoredCoverageCreditPercent: 100,
         },

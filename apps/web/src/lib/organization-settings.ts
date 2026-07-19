@@ -19,6 +19,7 @@ export type OrganizationSettingsKey =
   | "departmentLabel"
   | "shiftDisplayMode"
   | "enforceConflictPrevention"
+  | "defaultShiftEnabled"
   | "coverageRuleConfig"
   | "openShiftVisibility"
   | "payPeriodStartDate"
@@ -101,6 +102,11 @@ const FIELD_DESCRIPTORS: Record<OrganizationSettingsKey, FieldDescriptor> = {
     sensitive: true,
     format: (value) => (value ? "Enabled" : "Disabled"),
   },
+  defaultShiftEnabled: {
+    label: "Shift-only Assignments",
+    sensitive: false,
+    format: (value) => (value ? "Enabled" : "Disabled"),
+  },
   coverageRuleConfig: {
     label: "Coverage Rules",
     sensitive: true,
@@ -148,6 +154,7 @@ export function pickOrganizationSettings(organization: Organization): Organizati
     departmentLabel: organization.departmentLabel,
     shiftDisplayMode: organization.shiftDisplayMode,
     enforceConflictPrevention: organization.enforceConflictPrevention,
+    defaultShiftEnabled: organization.defaultShiftEnabled,
     coverageRuleConfig: organization.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
     openShiftVisibility: organization.openShiftVisibility ?? DEFAULT_OPEN_SHIFT_VISIBILITY,
     payPeriodStartDate: organization.payPeriodStartDate,

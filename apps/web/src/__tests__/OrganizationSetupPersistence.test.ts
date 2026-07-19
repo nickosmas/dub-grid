@@ -57,6 +57,7 @@ function makeOrganization(): Organization {
     suspendedAt: null,
     suspendedReason: null,
     enforceConflictPrevention: false,
+    defaultShiftEnabled: true,
     openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
     stripeCustomerId: null,
     subscriptionStatus: "trialing",

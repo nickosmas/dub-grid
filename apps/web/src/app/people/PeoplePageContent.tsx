@@ -131,6 +131,7 @@ function PeopleContent() {
             roleLabel={org?.roleLabel}
             orgName={org?.name}
             shiftDisplayMode={org?.shiftDisplayMode}
+            defaultShiftEnabled={org?.defaultShiftEnabled ?? true}
             setupIncomplete={!setupStatus.isComplete}
           />
 

@@ -79,6 +79,7 @@ export async function createOrganization(data: Omit<Organization, "id">): Promis
       // logs in (the start_trial_for_org RPC, called from the login flow, starts
       // the clock then).
       enforce_conflict_prevention: data.enforceConflictPrevention ?? false,
+      default_shift_enabled: data.defaultShiftEnabled ?? true,
       coverage_rule_config: data.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
       data_retention_days: data.dataRetentionDays ?? 365,
       feature_overrides: data.featureOverrides ?? {},

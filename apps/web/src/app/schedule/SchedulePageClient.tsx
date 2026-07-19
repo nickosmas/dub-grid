@@ -6286,6 +6286,7 @@ function SchedulerContent() {
               auditInfo={canEditShifts && canRenderAuthorNames ? auditInfo : undefined}
               overlapWarnings={overnightOverlapWarnings}
               enforceConflicts={org?.enforceConflictPrevention ?? false}
+              defaultShiftEnabled={org?.defaultShiftEnabled ?? true}
               isOwnShift={!!currentEmpId && editPanel.empId === currentEmpId}
               hasActiveRequest={hasActiveRequestForShift(editPanel.empId, editPanel.date)}
               onMakeAvailable={

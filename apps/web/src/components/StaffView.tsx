@@ -124,6 +124,7 @@ interface StaffViewProps {
   roleLabel?: string;
   orgName?: string;
   shiftDisplayMode?: ShiftDisplayMode;
+  defaultShiftEnabled?: boolean;
   setupIncomplete?: boolean;
 }
 
@@ -159,6 +160,7 @@ export default function StaffView({
   roleLabel = "Roles",
   orgName,
   shiftDisplayMode = "code",
+  defaultShiftEnabled = true,
 }: StaffViewProps) {
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
@@ -371,6 +373,7 @@ export default function StaffView({
                 certifications={certifications}
                 absenceTypes={absenceTypes}
                 shiftDisplayMode={shiftDisplayMode}
+                defaultShiftEnabled={defaultShiftEnabled}
               />
             )}
           </div>

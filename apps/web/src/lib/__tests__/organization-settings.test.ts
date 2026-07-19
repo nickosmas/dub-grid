@@ -31,6 +31,7 @@ function makeOrganization(overrides: Partial<Organization> = {}): Organization {
     sandboxOwnerUserId: null,
     sandboxSourceOrgId: null,
     enforceConflictPrevention: false,
+    defaultShiftEnabled: true,
     coverageRuleConfig: { mentoredCoverageCreditPercent: 100 },
     openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
     dataRetentionDays: 365,

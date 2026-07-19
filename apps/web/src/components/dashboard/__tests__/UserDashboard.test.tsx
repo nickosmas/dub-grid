@@ -133,6 +133,7 @@ const org: Organization = {
   timezone: "UTC",
   payPeriodStartDate: null,
   enforceConflictPrevention: true,
+  defaultShiftEnabled: true,
   openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
   coverageRuleConfig: { mentoredCoverageCreditPercent: 50 },
   dataRetentionDays: 365,

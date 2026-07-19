@@ -113,6 +113,7 @@ const baseOrganization: Organization = {
   timezone: "America/Los_Angeles",
   payPeriodStartDate: null,
   enforceConflictPrevention: true,
+  defaultShiftEnabled: true,
   openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
   dataRetentionDays: 90,
   featureOverrides: {},
