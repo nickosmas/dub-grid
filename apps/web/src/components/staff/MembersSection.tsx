@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import Link from "next/link";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import { useQueryClient } from "@tanstack/react-query";
@@ -130,6 +131,8 @@ export function MembersSection({
   const isTablet = useMediaQuery(TABLET);
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const currentUserId = currentUser?.id ?? null;
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
@@ -898,7 +901,12 @@ export function MembersSection({
           {directoryTruncated && (
             <div
               role="alert"
-              className="rounded-md border border-amber-300/70 bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100"
+              className="rounded-md border px-3 py-2 text-[13px]"
+              style={{
+                borderColor: "var(--color-warning-border)",
+                background: "var(--color-warning-bg)",
+                color: "var(--color-warning-text)",
+              }}
             >
               Showing the first {directoryCap ?? 500} members. Use search or filters to find
               specific people. Full pagination is coming soon.
@@ -1623,7 +1631,7 @@ export function MembersSection({
                           ? `${person.firstName} ${person.lastName}`.trim()
                           : person.email;
                       const initials = getAvatarInitials(displayName);
-                      const avatarTone = getAvatarTone(person.personId);
+                      const avatarTone = getAvatarTone(person.personId, isDarkTheme);
                       const isYou = isSelfAction(currentUserId, person.userId);
 
                       return (

@@ -42,7 +42,7 @@ export function Switch({ checked, onChange, disabled, ariaLabel, id, style }: Sw
           width: 18,
           height: 18,
           borderRadius: "50%",
-          background: "#fff",
+          background: "var(--color-text-inverse)",
           position: "absolute",
           top: 3,
           left: checked ? 23 : 3,

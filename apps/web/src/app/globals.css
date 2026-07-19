@@ -94,7 +94,13 @@ html,
 body {
   margin: 0;
   padding: 0;
+  /* Guarantees the background (a gradient in dark mode, see --color-bg in
+     packages/design-tokens) always covers at least one viewport, even when
+     page content is shorter than the screen — otherwise the box ends at
+     content height and whatever's below reads as unstyled browser canvas. */
+  min-height: 100dvh;
   background: var(--color-bg);
+  background-attachment: fixed;
   font-family: var(--font-dm-sans), "DM Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -160,7 +166,7 @@ textarea {
 /* Primary */
 .dg-btn-primary {
   background: var(--color-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-on-brand-text);
   border: none;
 }
 
@@ -174,7 +180,7 @@ textarea {
 
 .dg-btn-brand {
   background: var(--color-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-on-brand-text);
   border: none;
 }
 
@@ -455,7 +461,7 @@ textarea {
 
 .dg-segment-btn.active {
   background: var(--color-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-on-brand-text);
 }
 
 /* ── Span Tabs (pill-style period / filter selector) ────── */
@@ -497,7 +503,7 @@ textarea {
 
 .dg-span-tab.active {
   background: var(--color-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-on-brand-text);
 }
 
 /* Light variant — white container, dark active pill */
@@ -518,7 +524,7 @@ textarea {
 
 .dg-span-tabs--light .dg-span-tab.active {
   background: var(--color-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-on-brand-text);
 }
 
 /* ── Scrollable Tabs (Apple-style chevrons + edge fade) ── */
@@ -1339,7 +1345,7 @@ textarea {
   top: 46%;
   width: 5px;
   height: 9px;
-  border: solid var(--color-text-inverse);
+  border: solid var(--color-on-brand-text);
   border-width: 0 2px 2px 0;
   transform: translate(-50%, -50%) rotate(45deg);
 }
@@ -2920,7 +2926,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     justify-content: center;
     font-size: 12px;
     font-weight: 700;
-    color: var(--color-text-inverse);
+    color: var(--color-on-brand-text);
     flex-shrink: 0;
   }
 

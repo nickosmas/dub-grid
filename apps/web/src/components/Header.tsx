@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import {
   DashboardIcon,
@@ -285,6 +286,7 @@ export default function Header({ orgName }: HeaderProps) {
   });
 
   const { user: authUser } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -403,7 +405,12 @@ export default function Header({ orgName }: HeaderProps) {
         <div
           style={{
             background: "var(--color-surface)",
-            padding: "0 12px",
+            // Left padding matches the schedule toolbar's 16px left
+            // padding (see `data-tour="schedule-toolbar"` in
+            // SchedulePageClient) so the logo lines up with the first
+            // toolbar button below it.
+            paddingLeft: 16,
+            paddingRight: 12,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -506,7 +513,12 @@ export default function Header({ orgName }: HeaderProps) {
       <div
         style={{
           background: "var(--color-surface)",
-          padding: "0 16px",
+          // Left padding centers the logo over the collapsed (icon-only)
+          // sidebar rail on pages that render one (--sidebar-width-icon
+          // is 3rem in components/ui/sidebar.tsx), so the logo stays
+          // perfectly aligned with it when the sidebar collapses.
+          paddingLeft: 9,
+          paddingRight: 16,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -814,6 +826,47 @@ export default function Header({ orgName }: HeaderProps) {
                   </button>
                 </>
               )}
+              <div className="dg-menu-divider" />
+              <div style={{ padding: "6px 10px 4px" }}>
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    color: "var(--color-text-subtle)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    marginBottom: 6,
+                  }}
+                >
+                  Theme
+                </div>
+                <div className="dg-segment" style={{ display: "flex" }}>
+                  <button
+                    type="button"
+                    className={`dg-segment-btn${theme === "light" ? " active" : ""}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setTheme("light")}
+                  >
+                    Light
+                  </button>
+                  <button
+                    type="button"
+                    className={`dg-segment-btn${theme === "dark" ? " active" : ""}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setTheme("dark")}
+                  >
+                    Dark
+                  </button>
+                  <button
+                    type="button"
+                    className={`dg-segment-btn${theme === "system" ? " active" : ""}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setTheme("system")}
+                  >
+                    System
+                  </button>
+                </div>
+              </div>
               <div className="dg-menu-divider" />
               <button
                 className="dg-menu-item dg-menu-item--danger"

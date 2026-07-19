@@ -211,6 +211,7 @@ export default function RootPage() {
   if (!ready) {
     return (
       <div
+        className="dg-force-light"
         style={{
           minHeight: "100vh",
           display: "flex",
@@ -234,7 +235,7 @@ export default function RootPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--color-surface)] text-[var(--color-text-primary)] font-sans overflow-x-hidden">
+    <div className="dg-force-light min-h-screen bg-[var(--color-surface)] text-[var(--color-text-primary)] font-sans overflow-x-hidden">
       {/* ── Navbar ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--color-surface)]/80 backdrop-blur-xl border-b border-[var(--color-border-light)]">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">

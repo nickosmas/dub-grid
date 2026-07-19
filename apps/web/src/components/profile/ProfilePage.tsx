@@ -18,6 +18,7 @@ import { SelfWorkOverview, SelfWorkSchedule } from "./SelfWorkProfile";
 import { ProfilePanel } from "@/components/account/ProfilePanel";
 import { SecurityPanel } from "@/components/account/SecurityPanel";
 import { NotificationsPanel } from "@/components/account/NotificationsPanel";
+import { AppearancePanel } from "@/components/account/AppearancePanel";
 import { DataPrivacyPanel } from "@/components/account/DataPrivacyPanel";
 
 /**
@@ -130,6 +131,8 @@ export function ProfilePage() {
           isSuperAdmin={Boolean(isSuperAdmin)}
         />
       )}
+
+      {activeSection === "appearance" && <AppearancePanel />}
 
       {activeSection === "data-privacy" && <DataPrivacyPanel />}
 
