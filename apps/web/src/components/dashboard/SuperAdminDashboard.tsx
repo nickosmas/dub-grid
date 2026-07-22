@@ -22,6 +22,8 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
     currentPeriodShifts,
     assignmentById,
     absenceTypeById,
+    jobs,
+    shiftCategories,
     periodDates,
     periodLabel,
     overtimeThreshold,
@@ -41,6 +43,8 @@ export default function SuperAdminDashboard(props: DashboardContentProps) {
         currentPeriodShifts={currentPeriodShifts}
         assignmentById={assignmentById}
         absenceTypeById={absenceTypeById}
+        jobs={jobs}
+        shiftCategories={shiftCategories}
         periodDates={periodDates}
         periodLabel={periodLabel}
         isManagementOnly={isManagementOnly}

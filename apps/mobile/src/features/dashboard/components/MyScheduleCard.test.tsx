@@ -128,4 +128,107 @@ describe("MyScheduleCard", () => {
 
     expect(screen.queryByLabelText("Expand your schedule")).not.toBeInTheDocument();
   });
+
+  it("shows the job name under the shift name", () => {
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-11" },
+        entries: [
+          makeEntry({
+            presentation: {
+              label: "D",
+              shiftName: "Day Shift",
+              focusAreaId: 12,
+              focusAreaName: "ICU",
+              startTime: "07:00:00",
+              endTime: "15:00:00",
+              segments: [{ jobName: "Registered Nurse" }],
+            },
+          }),
+        ],
+      },
+    });
+
+    render(<MyScheduleCard accessToken="token" />);
+
+    expect(screen.getByText("Day Shift")).toBeInTheDocument();
+    expect(screen.getByText("Registered Nurse")).toBeInTheDocument();
+  });
+
+  it("does not repeat the job name below when a shiftless job's name is already the shift line", () => {
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-11" },
+        entries: [
+          makeEntry({
+            presentation: {
+              label: "RN",
+              shiftName: "Registered Nurse",
+              focusAreaId: 12,
+              focusAreaName: "ICU",
+              startTime: null,
+              endTime: null,
+              segments: [{ jobName: "Registered Nurse" }],
+            },
+          }),
+        ],
+      },
+    });
+
+    render(<MyScheduleCard accessToken="token" />);
+
+    expect(screen.getAllByText("Registered Nurse")).toHaveLength(1);
+  });
+
+  it("shows a double shift as two side-by-side pills, each with its own job and time", () => {
+    useQuery.mockReturnValue({
+      isLoading: false,
+      data: {
+        range: { startDate: "2026-05-11", endDate: "2026-05-11" },
+        entries: [
+          makeEntry({
+            presentation: {
+              label: "D+E",
+              shiftName: "Day Shift",
+              focusAreaId: 12,
+              focusAreaName: "ICU",
+              startTime: "07:00:00",
+              endTime: "23:00:00",
+              segments: [
+                {
+                  shiftName: "Day Shift",
+                  jobName: "Registered Nurse",
+                  jobColor: "#dbeafe",
+                  jobBorderColor: "#93c5fd",
+                  jobTextColor: "#1e3a8a",
+                  startTime: "07:00:00",
+                  endTime: "15:00:00",
+                },
+                {
+                  shiftName: "Evening Shift",
+                  jobName: "Supervisor",
+                  jobColor: "#fde68a",
+                  jobBorderColor: "#f59e0b",
+                  jobTextColor: "#92400e",
+                  startTime: "15:00:00",
+                  endTime: "23:00:00",
+                },
+              ],
+            },
+          }),
+        ],
+      },
+    });
+
+    render(<MyScheduleCard accessToken="token" />);
+
+    expect(screen.getByText("Day Shift")).toBeInTheDocument();
+    expect(screen.getByText("Evening Shift")).toBeInTheDocument();
+    expect(screen.getByText("Registered Nurse")).toBeInTheDocument();
+    expect(screen.getByText("Supervisor")).toBeInTheDocument();
+    expect(screen.getByText("7:00 AM–3:00 PM")).toBeInTheDocument();
+    expect(screen.getByText("3:00 PM–11:00 PM")).toBeInTheDocument();
+  });
 });

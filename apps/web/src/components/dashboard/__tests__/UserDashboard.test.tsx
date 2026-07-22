@@ -421,7 +421,7 @@ describe("UserDashboard", () => {
     const shiftmateAvatarFrames = screen.getAllByTestId("user-dashboard-shiftmate-avatar-frame");
 
     expect(workingWith).toHaveStyle({
-      background: "rgba(255, 255, 255, 0.16)",
+      background: "#3A55CB",
       borderRadius: "16px",
       justifyContent: "space-between",
     });
@@ -505,7 +505,7 @@ describe("UserDashboard", () => {
     });
   });
 
-  it("keeps Working with at the hero bottom and places split follow-up shifts below it", () => {
+  it("flows Working with and split follow-up shifts naturally instead of pinning to the hero bottom", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-08T10:00:00.000Z"));
 
@@ -610,7 +610,11 @@ describe("UserDashboard", () => {
         "user-dashboard-hero-secondary-shift",
       );
 
-      expect(heroBottomStack).toHaveStyle({ marginTop: "auto" });
+      // Double shift: more content follows, so it flows naturally instead of
+      // being pinned to the bottom of the (possibly much taller) hero card —
+      // relying on the surrounding column's own gap rather than an extra
+      // margin that would crowd the gap below "Working with" out of balance.
+      expect(heroBottomStack).toHaveStyle({ marginTop: "0px" });
       expect(
         Array.from(heroBottomStack.children).map((child) => child.getAttribute("data-testid")),
       ).toEqual(["user-dashboard-working-with", "user-dashboard-hero-secondary-shift"]);

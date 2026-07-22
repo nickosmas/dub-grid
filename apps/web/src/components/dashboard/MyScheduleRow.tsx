@@ -6,10 +6,13 @@ import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
 import { formatDateKey } from "@/lib/utils";
 import { resolveShiftPillColors } from "@/lib/colors";
+import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import type {
   AbsenceType,
   AssignmentDefinition,
+  JobDefinition,
   ScheduleCellStateEntry,
+  ShiftCategory,
   ShiftJobSegment,
   ShiftMap,
 } from "@/types";
@@ -21,8 +24,10 @@ const DAY_BOX_MIN_HEIGHT = 78;
 // EmptyDayPlaceholder. With box-sizing: border-box, an explicit height makes
 // border/padding/font-metric differences between the two irrelevant to their
 // total size — they're guaranteed pixel-equal by construction, not by
-// carefully mirroring internals.
-const SHIFT_PILL_HEIGHT = 42;
+// carefully mirroring internals. Sized for 3 stacked lines (name/job/time)
+// so every pill is the same height regardless of whether a given shift has
+// a job name to show.
+const SHIFT_PILL_HEIGHT = 54;
 
 type MyScheduleRowProps = Pick<
   DashboardContentProps,
@@ -33,6 +38,8 @@ type MyScheduleRowProps = Pick<
   | "periodDates"
   | "periodLabel"
 > & {
+  jobs?: DashboardContentProps["jobs"];
+  shiftCategories?: DashboardContentProps["shiftCategories"];
   // True for a management-only viewer (management department access, no
   // scheduled focus area) — they're never actually scheduled, so this card
   // should stay hidden even though they have an employees row.
@@ -41,11 +48,48 @@ type MyScheduleRowProps = Pick<
 
 type MyScheduleShift = {
   label: string;
+  jobName: string | null;
   timeRange: string | null;
   background: string;
   border: string;
   textColor: string;
 };
+
+function normalizeLabel(value: string | null | undefined): string {
+  return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function resolveShiftJobName(
+  segment: Partial<ShiftJobSegment>,
+  assignment: AssignmentDefinition | null,
+  jobById: Map<number, JobDefinition>,
+): string | null {
+  const jobId = segment.jobId ?? assignment?.jobId ?? null;
+  if (jobId == null) return null;
+
+  const job = jobById.get(jobId) ?? null;
+  return job && shouldShowJobOnGrid(job) ? job.name : null;
+}
+
+// The assignment's own name/label can be an admin-set combined code (e.g.
+// "Evening Shift Supervisor") that already bakes the job in — the job gets
+// its own line below, so the top line should stay shift-only wherever a
+// pure shift name can be resolved. `segment.shiftName` only exists for
+// explicit segments; the common case is a synthetic segment built from
+// `assignmentIds` alone, so fall back to looking up the assignment's own
+// shift by id before ever falling back to the combined name.
+function resolveShiftDisplayName(
+  segment: Partial<ShiftJobSegment>,
+  assignment: AssignmentDefinition | null,
+  shiftById: Map<number, ShiftCategory>,
+): string | null {
+  if (segment.shiftName) return segment.shiftName;
+
+  const shiftId = segment.shiftId ?? assignment?.shiftId ?? assignment?.categoryId ?? null;
+  if (shiftId == null) return null;
+
+  return shiftById.get(shiftId)?.name ?? null;
+}
 
 type MyScheduleDay = {
   key: string;
@@ -81,6 +125,8 @@ function getDelimitedValue(
 function buildWorkedShifts(input: {
   entry: ScheduleCellStateEntry;
   assignmentById: Map<number, AssignmentDefinition>;
+  jobById: Map<number, JobDefinition>;
+  shiftById: Map<number, ShiftCategory>;
   isDarkTheme: boolean;
 }): MyScheduleShift[] {
   const { entry } = input;
@@ -116,8 +162,20 @@ function buildWorkedShifts(input: {
           input.isDarkTheme,
         )
       : null;
+    const label =
+      resolveShiftDisplayName(segment, assignment, input.shiftById) ||
+      assignment?.name ||
+      assignment?.label ||
+      segment.label ||
+      entry.label ||
+      "Shift";
+    const jobName = resolveShiftJobName(segment, assignment, input.jobById);
     shifts.push({
-      label: assignment?.name || assignment?.label || segment.label || entry.label || "Shift",
+      label,
+      // Shiftless jobs (no shift attached) can resolve the same name for
+      // both the shift label above and the job name here — don't show a
+      // job line that just repeats the shift line verbatim.
+      jobName: jobName && normalizeLabel(jobName) !== normalizeLabel(label) ? jobName : null,
       timeRange:
         startTime && endTime ? `${formatTime12h(startTime)} - ${formatTime12h(endTime)}` : null,
       background: resolved?.color ?? "var(--color-bg-secondary)",
@@ -134,6 +192,8 @@ function buildMyScheduleDay(input: {
   entry: ShiftMap[string] | undefined;
   assignmentById: Map<number, AssignmentDefinition>;
   absenceTypeById: Map<number, AbsenceType>;
+  jobById: Map<number, JobDefinition>;
+  shiftById: Map<number, ShiftCategory>;
   isDarkTheme: boolean;
 }): MyScheduleDay {
   const dateKey = formatDateKey(input.date);
@@ -158,6 +218,7 @@ function buildMyScheduleDay(input: {
       shifts: [
         {
           label: absence?.name ?? entry.label ?? "Away",
+          jobName: null,
           timeRange: null,
           background: resolved?.color ?? "var(--color-bg-secondary)",
           border: resolved?.border ?? "var(--color-border)",
@@ -174,6 +235,8 @@ function buildMyScheduleDay(input: {
     shifts: buildWorkedShifts({
       entry,
       assignmentById: input.assignmentById,
+      jobById: input.jobById,
+      shiftById: input.shiftById,
       isDarkTheme: input.isDarkTheme,
     }),
   };
@@ -184,6 +247,8 @@ function buildMyScheduleDays(input: {
   currentPeriodShifts: ShiftMap;
   assignmentById: Map<number, AssignmentDefinition>;
   absenceTypeById: Map<number, AbsenceType>;
+  jobById: Map<number, JobDefinition>;
+  shiftById: Map<number, ShiftCategory>;
   periodDates: Date[];
   isDarkTheme: boolean;
 }): MyScheduleDay[] {
@@ -193,6 +258,8 @@ function buildMyScheduleDays(input: {
       entry: input.currentPeriodShifts[`${input.currentEmpId}_${formatDateKey(date)}`],
       assignmentById: input.assignmentById,
       absenceTypeById: input.absenceTypeById,
+      jobById: input.jobById,
+      shiftById: input.shiftById,
       isDarkTheme: input.isDarkTheme,
     }),
   );
@@ -297,9 +364,25 @@ function ShiftPill({ shift }: { shift: MyScheduleShift }) {
       >
         {shift.label}
       </div>
-      {/* Always rendered (even without a time range) so every pill has the same
-          two-line height — hiding the line visually, not removing it, keeps its
-          reserved space, unlike an absence pill that would otherwise be shorter. */}
+      {/* Job name and time lines are always rendered (even when absent) so
+          every pill has the same three-line height — hiding a line
+          visually, not removing it, keeps its reserved space, unlike an
+          absence pill or job-less shift that would otherwise be shorter. */}
+      <div
+        aria-hidden={!shift.jobName}
+        style={{
+          fontSize: 9,
+          fontWeight: 500,
+          marginTop: 1,
+          opacity: 0.8,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          visibility: shift.jobName ? "visible" : "hidden",
+        }}
+      >
+        {shift.jobName ?? " "}
+      </div>
       <div
         aria-hidden={!shift.timeRange}
         style={{
@@ -401,12 +484,19 @@ export default function MyScheduleRow({
   currentPeriodShifts,
   assignmentById,
   absenceTypeById,
+  jobs = [],
+  shiftCategories = [],
   periodDates,
   periodLabel,
   isManagementOnly = false,
 }: MyScheduleRowProps) {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
+  const jobById = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
+  const shiftById = useMemo(
+    () => new Map(shiftCategories.map((shift) => [shift.id, shift])),
+    [shiftCategories],
+  );
   const days = useMemo(
     () =>
       currentEmpId
@@ -415,11 +505,22 @@ export default function MyScheduleRow({
             currentPeriodShifts,
             assignmentById,
             absenceTypeById,
+            jobById,
+            shiftById,
             periodDates,
             isDarkTheme,
           })
         : [],
-    [currentEmpId, currentPeriodShifts, assignmentById, absenceTypeById, periodDates, isDarkTheme],
+    [
+      currentEmpId,
+      currentPeriodShifts,
+      assignmentById,
+      absenceTypeById,
+      jobById,
+      shiftById,
+      periodDates,
+      isDarkTheme,
+    ],
   );
   const hasAnySchedule = days.some((day) => day.shifts.length > 0);
   const { scrollRef, canScrollLeft, canScrollRight, scrollByPage } = useHorizontalScrollState(
