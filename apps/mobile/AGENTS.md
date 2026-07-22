@@ -17,6 +17,12 @@ Feature code in `apps/mobile/src`.
 - Android: `npm --workspace @dubgrid/mobile run android`
 - Root mobile + contracts tests: `npm run test:mobile`
 
+`hasSeenOnboarding` is device-local storage (`shared/lib/session.ts`), not DB
+state — `npm run db:reset` never clears it. After a local reset, either
+long-press the wordmark on the login screen (`__DEV__`-only, routes back to
+onboarding) or run `npm run db:reset:mobile` from the repo root, which
+best-effort clears app storage on a booted Android emulator via `adb`.
+
 ## Directory Map
 
 ```
