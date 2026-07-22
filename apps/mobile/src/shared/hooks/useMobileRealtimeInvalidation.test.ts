@@ -22,6 +22,7 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       ["mobile", "schedule"],
       ["mobile", "requests"],
       ["mobile", "dashboard"],
+      ["mobile", "shift-swap-options"],
     ]);
   });
 
@@ -57,12 +58,14 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       ["mobile", "schedule"],
       ["mobile", "requests"],
       ["mobile", "dashboard"],
+      ["mobile", "shift-swap-options"],
     ]);
   });
 
   it("refreshes the profile-change-requests queue when a request row changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "profile_change_requests")).toEqual([
       ["mobile", "profile-change-requests"],
+      ["mobile", "profile", "change-requests", "token-1"],
     ]);
   });
 
@@ -79,6 +82,7 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       ["mobile", "schedule"],
       ["mobile", "requests"],
       ["mobile", "dashboard"],
+      ["mobile", "shift-swap-options"],
     ]);
   });
 

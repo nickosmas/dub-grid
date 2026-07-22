@@ -13,6 +13,8 @@ import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
+import { useMobileNotificationsRealtimeTick } from "../hooks/useMobileNotificationsRealtimeTick";
 import { useNotificationFacets } from "../hooks/useNotificationFacets";
 import {
   isNotificationActionSupportedOnMobile,
@@ -28,8 +30,14 @@ import {
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii, mobileSpacing, mobileText } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileSpacing,
+  mobileText,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 
 type FilterChip =
@@ -107,6 +115,8 @@ function formatRelativeTime(value: string): string {
 }
 
 export default function NotificationsScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -156,6 +166,22 @@ export default function NotificationsScreen() {
 
   const manualRefresh = useManualRefresh(async () => {
     await notificationsQuery.refetch();
+  });
+
+  const { session } = useSessionState();
+  const handleRealtimeChange = useCallback(() => {
+    // Bypassing invalidation-only refresh: if the user is still on page 1,
+    // refetch the list directly; otherwise only refresh facets/counts so an
+    // in-progress scroll through older pages isn't disrupted.
+    if (notifications.length <= PAGE_SIZE) {
+      void notificationsQuery.refetch();
+    } else {
+      void facetsQuery.refetch();
+    }
+  }, [facetsQuery, notifications.length, notificationsQuery]);
+  useMobileNotificationsRealtimeTick({
+    userId: session?.user?.id ?? null,
+    onChange: handleRealtimeChange,
   });
 
   const contentState = getMobileQueryContentState({
@@ -390,6 +416,8 @@ interface NotificationCardProps {
 }
 
 function NotificationCard({ notification, onPress, onArchive }: NotificationCardProps) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isUnread = !notification.readAt;
   const isArchived = !!notification.archivedAt;
   const action = extractNotificationAction(notification.metadata);
@@ -482,7 +510,7 @@ function NotificationCard({ notification, onPress, onArchive }: NotificationCard
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   headerArea: {
     gap: 10,
     paddingBottom: 10,

@@ -28,12 +28,13 @@ describe("getOrgRealtimeInvalidationKeys", () => {
     ]);
   });
 
-  it("invalidates staff, directory, and count caches for employee changes", () => {
+  it("invalidates staff, directory, count, and operations-report caches for employee changes", () => {
     expect(getOrgRealtimeInvalidationKeys("org-1", "employees")).toEqual([
       queryKeys.employees.all("org-1"),
       queryKeys.org.employeeCount("org-1"),
       queryKeys.org.directory("org-1"),
       queryKeys.shiftRequests.all("org-1"),
+      queryKeys.reports.operationsAll("org-1"),
     ]);
   });
 
@@ -44,10 +45,11 @@ describe("getOrgRealtimeInvalidationKeys", () => {
     ]);
   });
 
-  it("invalidates schedule and derived request caches for schedule cell changes", () => {
+  it("invalidates schedule, derived request, and operations-report caches for schedule cell changes", () => {
     expect(getOrgRealtimeInvalidationKeys("org-1", "schedule_cells")).toEqual([
       queryKeys.shifts.all("org-1"),
       queryKeys.shiftRequests.all("org-1"),
+      queryKeys.reports.operationsAll("org-1"),
     ]);
   });
 });

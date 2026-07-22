@@ -5,6 +5,7 @@ import { createReactNativeModule, createScreenModule } from "../../../test/nativ
 const useInfiniteQuery = vi.fn();
 const useQuery = vi.fn();
 const useAccessToken = vi.fn();
+const useSessionState = vi.fn();
 const markAllNotificationsRead = vi.fn();
 const markNotificationRead = vi.fn();
 const bulkUpdateNotifications = vi.fn();
@@ -51,6 +52,14 @@ vi.mock("../../../shared/lib/query-client", () => ({
 
 vi.mock("../../auth/hooks/useAccessToken", () => ({
   useAccessToken,
+}));
+
+vi.mock("../../../shared/providers/AuthSessionProvider", () => ({
+  useSessionState,
+}));
+
+vi.mock("../hooks/useMobileNotificationsRealtimeTick", () => ({
+  useMobileNotificationsRealtimeTick: vi.fn(),
 }));
 
 vi.mock("../../../shared/providers/ToastProvider", () => ({
@@ -116,6 +125,7 @@ describe("NotificationsScreen", () => {
     useInfiniteQuery.mockReset();
     useQuery.mockReset();
     useAccessToken.mockReset();
+    useSessionState.mockReset();
     markAllNotificationsRead.mockReset();
     markNotificationRead.mockReset();
     bulkUpdateNotifications.mockReset();
@@ -124,6 +134,7 @@ describe("NotificationsScreen", () => {
     pushToast.mockReset();
 
     useAccessToken.mockReturnValue("token-123");
+    useSessionState.mockReturnValue({ session: { user: { id: "user-1" } } });
     useQuery.mockReturnValue({
       data: undefined,
       error: null,

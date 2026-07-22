@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
+import { createRealtimeChannelName, subscribeToPostgresChanges } from "@dubgrid/realtime-core";
 import {
   invalidateMobileAccountRealtimeQueries,
   type MobileAccountRealtimeTable,
@@ -28,63 +29,29 @@ export function useMobileAccountRealtimeInvalidation({
     ) {
       return;
     }
-    const channelId = `mobile-account-freshness:${userId}:${Date.now()}:${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const channel = supabase.channel(channelId);
+
     const handleChange = (table: MobileAccountRealtimeTable) => {
       invalidateMobileAccountRealtimeQueries(queryClient, accessToken, table);
     };
 
-    channel.on(
-      "postgres_changes",
+    return subscribeToPostgresChanges<MobileAccountRealtimeTable>(
+      supabase,
+      createRealtimeChannelName(`mobile-account-freshness:${userId}`),
+      [
+        { table: "profiles", filter: `id=eq.${userId}`, onEvent: handleChange },
+        { table: "user_sessions", filter: `user_id=eq.${userId}`, onEvent: handleChange },
+        {
+          table: "notification_preferences",
+          filter: `user_id=eq.${userId}`,
+          onEvent: handleChange,
+        },
+        { table: "notifications", filter: `user_id=eq.${userId}`, onEvent: handleChange },
+      ],
       {
-        event: "*",
-        schema: "public",
-        table: "profiles",
-        filter: `id=eq.${userId}`,
+        onError: (error) => {
+          console.error("Mobile account realtime freshness channel error", error);
+        },
       },
-      () => handleChange("profiles"),
     );
-    channel.on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "user_sessions",
-        filter: `user_id=eq.${userId}`,
-      },
-      () => handleChange("user_sessions"),
-    );
-    channel.on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "notification_preferences",
-        filter: `user_id=eq.${userId}`,
-      },
-      () => handleChange("notification_preferences"),
-    );
-    channel.on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "notifications",
-        filter: `user_id=eq.${userId}`,
-      },
-      () => handleChange("notifications"),
-    );
-
-    channel.subscribe((status) => {
-      if (status === "CHANNEL_ERROR") {
-        console.warn("Mobile account realtime freshness channel error");
-      }
-    });
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
   }, [accessToken, disabled, queryClient, userId]);
 }

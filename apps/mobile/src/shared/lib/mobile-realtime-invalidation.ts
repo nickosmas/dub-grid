@@ -38,6 +38,8 @@ export function getMobileRealtimeInvalidationKeys(
   const schedule = ["mobile", "schedule"] as const;
   const requests = ["mobile", "requests"] as const;
   const profileChangeRequests = ["mobile", "profile-change-requests"] as const;
+  const profileChangeRequestsOwn = ["mobile", "profile", "change-requests", accessToken] as const;
+  const shiftSwapOptions = ["mobile", "shift-swap-options"] as const;
   const notifications = ["mobile", "notifications-infinite"] as const;
   const notificationFacets = ["mobile", "notification-facets", accessToken] as const;
   // Prefix-matches both useAdminDashboard's query key and MyScheduleCard's
@@ -62,21 +64,21 @@ export function getMobileRealtimeInvalidationKeys(
     case "invitations":
       return [bootstrap, profile, people, person, dashboard];
     case "employees":
-      return [bootstrap, profile, people, person, schedule, requests, dashboard];
+      return [bootstrap, profile, people, person, schedule, requests, dashboard, shiftSwapOptions];
     case "shift_requests":
       return [requests, schedule, dashboard];
     case "schedule_cells":
     case "schedule_cell_snapshots":
     case "schedule_cell_segments":
-      return [schedule, requests, dashboard];
+      return [schedule, requests, dashboard, shiftSwapOptions];
     case "schedule_notes":
       return [schedule];
     case "profile_change_requests":
-      return [profileChangeRequests];
+      return [profileChangeRequests, profileChangeRequestsOwn];
     case "notifications":
       return [notifications, bootstrap, notificationFacets];
     case "recurring_shifts":
-      return [schedule, requests, dashboard];
+      return [schedule, requests, dashboard, shiftSwapOptions];
     case "publish_history":
       return [schedule, dashboard];
     case "audit_log":

@@ -16,17 +16,21 @@ describe("getMobileAccountRealtimeInvalidationKeys", () => {
     ]);
   });
 
-  it("refreshes the profile namespace on notification preference changes", () => {
+  it("refreshes the profile namespace and the notification-preferences screen's own query on notification preference changes", () => {
     expect(getMobileAccountRealtimeInvalidationKeys("token-1", "notification_preferences")).toEqual(
-      [["mobile", "profile"]],
+      [
+        ["mobile", "profile"],
+        ["mobile", "notification-preferences", "token-1"],
+      ],
     );
   });
 
-  it("refreshes the notifications inbox, bootstrap, and facets on a per-user notification event", () => {
+  it("refreshes the notifications inbox, bootstrap, facets, and the deep-link detail fallback on a per-user notification event", () => {
     expect(getMobileAccountRealtimeInvalidationKeys("token-1", "notifications")).toEqual([
       ["mobile", "notifications-infinite"],
       ["mobile", "bootstrap", "token-1"],
       ["mobile", "notification-facets", "token-1"],
+      ["mobile", "notification-detail"],
     ]);
   });
 });
