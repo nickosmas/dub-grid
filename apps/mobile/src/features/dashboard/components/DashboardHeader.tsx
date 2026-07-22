@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 const CLOCK_TICK_MS = 60_000;
 
@@ -86,6 +87,8 @@ export function DashboardHeader({
   timezone: string | null;
   periodLabel?: string;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -111,7 +114,7 @@ export function DashboardHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   container: {
     gap: 4,
   },

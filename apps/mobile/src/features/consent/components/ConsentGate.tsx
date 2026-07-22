@@ -1,7 +1,8 @@
-import { useEffect, useState, type PropsWithChildren } from "react";
+import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { LEGAL_URLS, needsConsentDecision, setStoredConsent } from "../lib/consent";
 
 const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
@@ -12,6 +13,8 @@ const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
  * Shown again only when the stored choice predates the current consent version.
  */
 export function ConsentGate({ children }: PropsWithChildren) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   // null = still checking storage; once resolved we know whether to prompt.
   const [needsDecision, setNeedsDecision] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
@@ -84,7 +87,7 @@ export function ConsentGate({ children }: PropsWithChildren) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: "flex-end",

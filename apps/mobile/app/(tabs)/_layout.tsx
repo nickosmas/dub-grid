@@ -1,10 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
-import { mobileColors } from "../../src/shared/theme/tokens";
+import { useMobileColors, useThemeMode } from "../../src/shared/providers/ThemeModeProvider";
 
 export default function TabsLayout() {
   const gate = useTabsGate();
+  const mobileColors = useMobileColors();
+  const { resolvedTheme } = useThemeMode();
 
   if (gate.kind === "blocked") {
     return gate.element;
@@ -86,7 +88,7 @@ export default function TabsLayout() {
     <NativeTabs
       backgroundColor={mobileColors.surface}
       badgeBackgroundColor={mobileColors.danger}
-      blurEffect="systemChromeMaterialLight"
+      blurEffect={resolvedTheme === "dark" ? "systemChromeMaterialDark" : "systemChromeMaterialLight"}
       disableTransparentOnScrollEdge
       iconColor={{
         default: mobileColors.textSubtle,

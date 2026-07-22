@@ -12,7 +12,8 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -71,6 +72,8 @@ function normalizePrefs(input: unknown): PrefsShape {
 }
 
 export default function ProfileNotificationsScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
@@ -249,6 +252,8 @@ interface ChannelToggleProps {
 }
 
 function ChannelToggle({ icon, label, value, onValueChange }: ChannelToggleProps) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <Pressable
       accessibilityRole="switch"
@@ -263,7 +268,7 @@ function ChannelToggle({ icon, label, value, onValueChange }: ChannelToggleProps
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   body: {
     gap: 16,
   },

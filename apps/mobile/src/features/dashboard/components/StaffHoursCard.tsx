@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { CountBadge } from "./CountBadge";
 import { ExpandableList } from "./ExpandableList";
 
@@ -11,6 +13,9 @@ export type StaffHoursEntry = MobileDashboardResponse["staffHours"][number];
 // Shared with the full-page expanded staff-hours screen
 // (apps/mobile/app/(tabs)/home/staff-hours.tsx).
 export function StaffHoursRow({ entry }: { entry: StaffHoursEntry }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.row}>
       <View style={styles.copy}>
@@ -62,7 +67,7 @@ export function StaffHoursCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   row: {
     flexDirection: "row",
     justifyContent: "space-between",

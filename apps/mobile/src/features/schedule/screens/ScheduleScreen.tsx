@@ -51,22 +51,28 @@ import {
   getShiftRequests,
   updateShiftRequest,
 } from "../../../shared/lib/api";
-import { getAvatarTone, type AvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTone, resolveShiftPillColors, type AvatarTone } from "@dubgrid/design-tokens";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import {
+  useIsDarkMode,
+  useMobileColors,
+  useThemeMode,
+} from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
-  mobileColors,
   mobileBorderColorFromText,
   mobileRadii,
   mobileSpacing,
   mobileText,
+  type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { useMobileShiftRequestsRealtime } from "../../shift-requests/hooks/useMobileShiftRequestsRealtime";
 import {
   type MobileRequestActionFeedback,
   getMobileRequestActionFeedback,
@@ -148,13 +154,21 @@ const MONTH_EXPAND_TIMING = {
   duration: 240,
   easing: Easing.out(Easing.cubic),
 };
-const ME_HERO_CARD_BACKGROUND = "#2946C7";
-const ME_HERO_COLLABORATOR_BACKGROUND = "#3A55CB";
-// Matches the web hero gradient: dark bottom-left → light top-right.
-const ME_HERO_CARD_GRADIENT = ["#142579", "#2C49CC", "#6E90FF"] as const;
+const ME_HERO_CARD_BACKGROUND_LIGHT = "#2946C7";
+const ME_HERO_CARD_BACKGROUND_DARK = "#152238";
+const ME_HERO_COLLABORATOR_BACKGROUND_LIGHT = "#3A55CB";
+const ME_HERO_COLLABORATOR_BACKGROUND_DARK = "#1E2F66";
+// Matches the web hero gradient: dark bottom-left → light top-right. The
+// dark-mode variant keeps the same dark navy start but ends in the app's
+// own vivid dark-mode brand blue instead of a pale periwinkle, which would
+// read as a washed-out pastel blob against a near-black page.
+const ME_HERO_CARD_GRADIENT_LIGHT = ["#142579", "#2C49CC", "#6E90FF"] as const;
+const ME_HERO_CARD_GRADIENT_DARK = ["#0A1442", "#1D3AA0", "#2075FF"] as const;
 const ME_HERO_CARD_GRADIENT_LOCATIONS = [0, 0.55, 1] as const;
 const ME_HERO_CARD_GRADIENT_START = { x: 0, y: 1 } as const;
 const ME_HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
+const ME_HERO_CARD_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
+const ME_HERO_CARD_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
 if (
   Platform.OS === "android" &&
@@ -757,18 +771,32 @@ function getOpenShiftAbsenceTypeId(openShift: MobileOpenShift): number | null {
   return openShift.state.kind === "absence" ? (openShift.state.absenceTypeId ?? null) : null;
 }
 
-function getOpenShiftJobChip(openShift: MobileOpenShift): JobChip | null {
+function getOpenShiftJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  openShift: MobileOpenShift,
+): JobChip | null {
   if (getOpenShiftAbsenceTypeId(openShift) != null) {
-    return buildAbsenceChip(getOpenShiftShiftName(openShift), openShift.presentation);
+    return buildAbsenceChip(
+      mobileColors,
+      isDark,
+      getOpenShiftShiftName(openShift),
+      openShift.presentation,
+    );
   }
 
   const primarySegment = getOpenShiftPrimarySegment(openShift);
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(getOpenShiftShiftName(openShift), primarySegment);
+    return buildGeneralShiftChip(
+      mobileColors,
+      isDark,
+      getOpenShiftShiftName(openShift),
+      primarySegment,
+    );
   }
 
   const jobSegment = openShift.presentation.segments.find((segment) => segment.jobName);
-  return buildJobChip(jobSegment?.jobName ?? null, jobSegment ?? null);
+  return buildJobChip(mobileColors, isDark, jobSegment?.jobName ?? null, jobSegment ?? null);
 }
 
 function formatOpenShiftCardCountLabel(count: number): string {
@@ -871,6 +899,8 @@ function isCommittedWeekSwipe(input: {
 }
 
 export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -934,6 +964,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const refetchSchedule = scheduleQuery.refetch;
   const refetchMeTeamSchedule = meTeamScheduleQuery.refetch;
   const refetchRequests = requestsQuery.refetch;
+  const handleShiftRequestsRealtimeChange = useCallback(() => {
+    if (canLoadRequests) {
+      void refetchRequests();
+    }
+  }, [canLoadRequests, refetchRequests]);
+  useMobileShiftRequestsRealtime({
+    orgId: bootstrapQuery.data?.currentOrg.id ?? null,
+    onChange: handleShiftRequestsRealtimeChange,
+  });
   const refetchScreenContent = useCallback(async () => {
     const refreshes: Array<Promise<unknown>> = [refetchBootstrap()];
 
@@ -2114,6 +2153,9 @@ function MonthDayCell({
   // grid, so they're excluded from the accessibility tree.
   accessible?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityLabel={accessible ? `Select date ${day.date}` : undefined}
@@ -2159,6 +2201,9 @@ function IconControlButton({
   iconSize?: number;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
@@ -2177,6 +2222,9 @@ function IconControlButton({
 }
 
 function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityLabel="Open alerts"
@@ -2288,7 +2336,26 @@ function normalizeScheduleLabel(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+// User-picked / hardcoded-preset hex colors are tuned for a white page and
+// read as blown-out or washed-out on a dark surface — remap through the
+// shared HSV darkener. Theme tokens (mobileColors.*) are already
+// theme-correct and must NOT be passed through this a second time.
+function darkenTone(
+  tone: { backgroundColor: string; borderColor: string; textColor: string },
+  isDark: boolean,
+): { backgroundColor: string; borderColor: string; textColor: string } {
+  if (!isDark) return tone;
+
+  const resolved = resolveShiftPillColors(
+    { color: tone.backgroundColor, text: tone.textColor, border: tone.borderColor },
+    true,
+  );
+  return { backgroundColor: resolved.color, borderColor: resolved.border, textColor: resolved.text };
+}
+
 function buildAbsenceChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: AbsenceColorSource | null,
 ): JobChip | null {
@@ -2301,13 +2368,29 @@ function buildAbsenceChip(
     return null;
   }
 
+  if (absenceColor) {
+    return {
+      kind: "absence",
+      eyebrowLabel: "Absence",
+      label: trimmedLabel,
+      ...darkenTone(
+        {
+          backgroundColor: absenceColor,
+          borderColor: absenceBorderColor ?? absenceColor,
+          textColor: absenceTextColor ?? mobileColors.textMuted,
+        },
+        isDark,
+      ),
+    };
+  }
+
   return {
     kind: "absence",
     eyebrowLabel: "Absence",
     label: trimmedLabel,
-    backgroundColor: absenceColor ?? mobileColors.surfaceSecondary,
-    borderColor: absenceBorderColor ?? mobileColors.border,
-    textColor: absenceTextColor ?? mobileColors.textMuted,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textMuted,
   };
 }
 
@@ -2318,6 +2401,9 @@ function hasMentoredSegments(
 }
 
 function MentoredPill() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
       <Text style={styles.mentoredPillText}>Mentored</Text>
@@ -2326,10 +2412,12 @@ function MentoredPill() {
 }
 
 function buildGeneralShiftChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
-  const chip = buildJobChip(label, colorSource);
+  const chip = buildJobChip(mobileColors, isDark, label, colorSource);
 
   if (!chip) {
     return null;
@@ -2351,6 +2439,8 @@ function isGeneralShiftSegment(segment: { shiftId?: number | null } | null | und
 }
 
 function buildJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
@@ -2367,9 +2457,14 @@ function buildJobChip(
     return {
       kind: "job",
       label: trimmedLabel,
-      backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
-      borderColor: jobBorderColor ?? mobileColors.border,
-      textColor: jobTextColor ?? mobileColors.textMuted,
+      ...darkenTone(
+        {
+          backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
+          borderColor: jobBorderColor ?? mobileColors.border,
+          textColor: jobTextColor ?? mobileColors.textMuted,
+        },
+        isDark,
+      ),
       isMentored: colorSource?.isMentored === true,
     };
   }
@@ -2379,25 +2474,31 @@ function buildJobChip(
     normalizedLabel.includes("supervisor") ||
     normalizedLabel.includes("lead") ||
     normalizedLabel.includes("manager")
-      ? {
-          backgroundColor: "#FCE7F3",
-          borderColor: "#FBCFE8",
-          textColor: "#BE185D",
-        }
+      ? darkenTone(
+          {
+            backgroundColor: "#FCE7F3",
+            borderColor: "#FBCFE8",
+            textColor: "#BE185D",
+          },
+          isDark,
+        )
       : normalizedLabel.includes("mentor") || normalizedLabel.includes("trainer")
         ? {
             backgroundColor: mobileColors.warningSoft,
             borderColor: mobileColors.warningBorder,
-            textColor: "#B45309",
+            textColor: isDark ? mobileColors.warningText : "#B45309",
           }
         : normalizedLabel.includes("nurse") ||
             normalizedLabel.includes("rn") ||
             normalizedLabel.includes("lpn")
-          ? {
-              backgroundColor: "#ECFEFF",
-              borderColor: "#A5F3FC",
-              textColor: "#0E7490",
-            }
+          ? darkenTone(
+              {
+                backgroundColor: "#ECFEFF",
+                borderColor: "#A5F3FC",
+                textColor: "#0E7490",
+              },
+              isDark,
+            )
           : {
               backgroundColor: mobileColors.surfaceSecondary,
               borderColor: mobileColors.border,
@@ -2412,37 +2513,58 @@ function buildJobChip(
   };
 }
 
-function getScheduleItemJobChip(item: FeaturedMeScheduleSegment["item"]): JobChip | null {
+function getScheduleItemJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  item: FeaturedMeScheduleSegment["item"],
+): JobChip | null {
   if (!item) {
     return null;
   }
 
   if (getScheduleEntryAbsenceTypeId(item.entry) != null) {
-    return buildAbsenceChip(getScheduleItemShiftName(item), item.entry.presentation);
+    return buildAbsenceChip(
+      mobileColors,
+      isDark,
+      getScheduleItemShiftName(item),
+      item.entry.presentation,
+    );
   }
 
   if (isGeneralShiftSegment(item.segment)) {
-    return buildGeneralShiftChip(getScheduleItemShiftName(item), item.segment);
+    return buildGeneralShiftChip(mobileColors, isDark, getScheduleItemShiftName(item), item.segment);
   }
 
   const jobName = getScheduleItemJobName(item);
-  return buildJobChip(jobName, item.segment);
+  return buildJobChip(mobileColors, isDark, jobName, item.segment);
 }
 
-function getSegmentJobChip(segment: MobileScheduleEntrySegment): JobChip | null {
+function getSegmentJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  segment: MobileScheduleEntrySegment,
+): JobChip | null {
   if (isGeneralShiftSegment(segment)) {
-    return buildGeneralShiftChip(segment.shiftName ?? segment.label, segment);
+    return buildGeneralShiftChip(mobileColors, isDark, segment.shiftName ?? segment.label, segment);
   }
 
-  return buildJobChip(segment.jobName ?? null, segment);
+  return buildJobChip(mobileColors, isDark, segment.jobName ?? null, segment);
 }
 
-function getScheduleItemTypeChip(item: FeaturedMeScheduleSegment["item"]): JobChip | null {
-  return getScheduleItemJobChip(item);
+function getScheduleItemTypeChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  item: FeaturedMeScheduleSegment["item"],
+): JobChip | null {
+  return getScheduleItemJobChip(mobileColors, isDark, item);
 }
 
-function getVisibleScheduleItemTypeChip(item: FeaturedMeScheduleSegment["item"]): JobChip | null {
-  const typeChip = getScheduleItemTypeChip(item);
+function getVisibleScheduleItemTypeChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  item: FeaturedMeScheduleSegment["item"],
+): JobChip | null {
+  const typeChip = getScheduleItemTypeChip(mobileColors, isDark, item);
 
   if (!item || !typeChip) {
     return typeChip;
@@ -2650,24 +2772,31 @@ function getRequestDateLabel(request: MobileShiftRequest): string {
 }
 
 function getRequestJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   request: MobileShiftRequest,
   which: "requester" | "target",
 ): JobChip | null {
   if (getRequestAbsenceTypeId(request, which) != null) {
     const presentation =
       which === "requester" ? request.requesterPresentation : request.targetPresentation;
-    return buildAbsenceChip(getRequestShiftName(request, which), presentation);
+    return buildAbsenceChip(mobileColors, isDark, getRequestShiftName(request, which), presentation);
   }
 
   const primarySegment = getRequestPrimarySegment(request, which);
 
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(getRequestShiftName(request, which), primarySegment);
+    return buildGeneralShiftChip(
+      mobileColors,
+      isDark,
+      getRequestShiftName(request, which),
+      primarySegment,
+    );
   }
 
   const segment = getRequestSegments(request, which).find((item) => item.jobName) ?? null;
   const jobName = getRequestJobName(request, which);
-  return buildJobChip(jobName, segment);
+  return buildJobChip(mobileColors, isDark, jobName, segment);
 }
 
 function MeSectionHeader({
@@ -2679,6 +2808,9 @@ function MeSectionHeader({
   actionLabel?: string;
   onAction?: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.meSectionHeader}>
       <View style={styles.meSectionHeaderCopy}>
@@ -2704,6 +2836,9 @@ function JobPill({
   eyebrowDisplay?: "inside" | "outside";
   isMentored?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -2791,6 +2926,9 @@ function MeTypePill({
   titleScale?: "hero" | "row";
   isMentored?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -2816,28 +2954,39 @@ function MeTypePill({
 }
 
 function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
+
   if (entries.length === 0) {
     return null;
   }
 
   const visibleEntries = entries.slice(0, 3);
   const overflowCount = entries.length - visibleEntries.length;
+  const isDark = resolvedTheme === "dark";
+  const collaboratorBackground = {
+    backgroundColor: isDark
+      ? ME_HERO_COLLABORATOR_BACKGROUND_DARK
+      : ME_HERO_COLLABORATOR_BACKGROUND_LIGHT,
+  };
 
   return (
-    <View style={styles.meHeroCollaborators}>
+    <View style={[styles.meHeroCollaborators, collaboratorBackground]}>
       <View style={styles.meHeroCollaboratorLabelRow}>
         <Ionicons color="rgba(255, 255, 255, 0.76)" name="people-outline" size={22} />
         <Text style={styles.meHeroCollaboratorLabel}>Working with</Text>
       </View>
       <View style={styles.meHeroAvatarStack}>
         {visibleEntries.map((entry, index) => {
-          const avatarTone = getAvatarTone(entry.employeeId);
+          const avatarTone = getAvatarTone(entry.employeeId, isDark);
 
           return (
             <View
               key={`${entry.employeeId}-${entry.date}`}
               style={[
                 styles.meHeroCollaboratorAvatarFrame,
+                collaboratorBackground,
                 index > 0 && styles.meHeroCollaboratorAvatarFrameOverlap,
               ]}
             >
@@ -2863,6 +3012,7 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
           <View
             style={[
               styles.meHeroCollaboratorAvatarFrame,
+              collaboratorBackground,
               visibleEntries.length > 0 && styles.meHeroCollaboratorAvatarFrameOverlap,
             ]}
           >
@@ -2893,6 +3043,10 @@ function MeHeroCard({
   shiftmates: MobileScheduleEntry[];
   onPress?: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+
   if (!featuredItem) {
     return (
       <View style={styles.meSectionBlock} testID="me-empty-schedule-state">
@@ -2916,7 +3070,7 @@ function MeHeroCard({
   const heroDateLabel = formatCompactScheduleDate(featuredItem.date);
   const heroDateParts = getCompactScheduleDateParts(featuredItem.date);
   const shiftName = getScheduleItemShiftName(featuredItem);
-  const typeChip = getVisibleScheduleItemTypeChip(featuredItem);
+  const typeChip = getVisibleScheduleItemTypeChip(mobileColors, isDark, featuredItem);
   const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
   const focusAreaName = getScheduleItemFocusArea(featuredItem);
   const timeRange = getScheduleItemTimeRange(featuredItem);
@@ -2939,27 +3093,29 @@ function MeHeroCard({
 
   const cardContent = (
     <View style={styles.meHeroContent}>
-      {badgeLabel || heroDateParts ? (
+      {badgeLabel || heroDateParts || shouldShowShiftName || shouldShowHeroSplitBadge ? (
         <View style={styles.meHeroHeader}>
-          {badgeLabel ? (
-            <View style={styles.meHeroBadge}>
-              <View style={[styles.meHeroBadgeDot, badgeDotStyle]} />
-              <Text style={styles.meHeroBadgeText}>{badgeLabel}</Text>
-            </View>
-          ) : null}
+          <View style={styles.meHeroHeaderCopy}>
+            {badgeLabel ? (
+              <View style={styles.meHeroBadge}>
+                <View style={[styles.meHeroBadgeDot, badgeDotStyle]} />
+                <Text style={styles.meHeroBadgeText}>{badgeLabel}</Text>
+              </View>
+            ) : null}
+            {shouldShowShiftName || shouldShowHeroSplitBadge ? (
+              <View style={styles.meHeroTitleRow}>
+                {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{shiftName}</Text> : null}
+                {shouldShowHeroSplitBadge ? (
+                  <SplitShiftBadge count={splitShiftCount} inverse label={heroSplitShiftLabel} />
+                ) : null}
+              </View>
+            ) : null}
+          </View>
           {heroDateParts ? (
             <View accessibilityLabel={heroDateLabel ?? undefined} style={styles.meHeroDateTile}>
               <Text style={styles.meHeroDateWeekday}>{heroDateParts.weekdayLabel}</Text>
               <Text style={styles.meHeroDateDay}>{heroDateParts.dayLabel}</Text>
             </View>
-          ) : null}
-        </View>
-      ) : null}
-      {shouldShowShiftName || shouldShowHeroSplitBadge ? (
-        <View style={styles.meHeroTitleRow}>
-          {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{shiftName}</Text> : null}
-          {shouldShowHeroSplitBadge ? (
-            <SplitShiftBadge count={splitShiftCount} inverse label={heroSplitShiftLabel} />
           ) : null}
         </View>
       ) : null}
@@ -3009,7 +3165,7 @@ function MeHeroCard({
           leadingDivider
           renderSegmentChip={(segment) => (
             <JobPill
-              chip={getSegmentJobChip(segment)}
+              chip={getSegmentJobChip(mobileColors, isDark, segment)}
               compact
               eyebrowDisplay="outside"
               isMentored={segment.isMentored === true}
@@ -3038,7 +3194,7 @@ function MeHeroCard({
 
   const heroGradient = (
     <LinearGradient
-      colors={ME_HERO_CARD_GRADIENT}
+      colors={isDark ? ME_HERO_CARD_GRADIENT_DARK : ME_HERO_CARD_GRADIENT_LIGHT}
       locations={ME_HERO_CARD_GRADIENT_LOCATIONS}
       start={ME_HERO_CARD_GRADIENT_START}
       end={ME_HERO_CARD_GRADIENT_END}
@@ -3046,6 +3202,10 @@ function MeHeroCard({
       style={StyleSheet.absoluteFill}
     />
   );
+  const heroCardThemeStyle = {
+    backgroundColor: isDark ? ME_HERO_CARD_BACKGROUND_DARK : ME_HERO_CARD_BACKGROUND_LIGHT,
+    shadowColor: isDark ? ME_HERO_CARD_SHADOW_DARK : ME_HERO_CARD_SHADOW_LIGHT,
+  };
 
   return (
     <View style={styles.meSectionBlock}>
@@ -3053,14 +3213,18 @@ function MeHeroCard({
         <Pressable
           accessibilityRole="button"
           onPress={onPress}
-          style={({ pressed }) => [styles.meHeroCard, pressed && styles.meHeroCardPressed]}
+          style={({ pressed }) => [
+            styles.meHeroCard,
+            heroCardThemeStyle,
+            pressed && styles.meHeroCardPressed,
+          ]}
           testID="me-hero-card"
         >
           {heroGradient}
           {cardContent}
         </Pressable>
       ) : (
-        <View style={styles.meHeroCard} testID="me-hero-card">
+        <View style={[styles.meHeroCard, heroCardThemeStyle]} testID="me-hero-card">
           {heroGradient}
           {cardContent}
         </View>
@@ -3080,6 +3244,10 @@ function UpcomingShiftsSection({
   summary: WeeklyHoursSummary | null;
   todayDate: string;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+
   if (items.length === 0) {
     return null;
   }
@@ -3153,7 +3321,7 @@ function UpcomingShiftsSection({
 
               <View style={styles.upcomingDateShiftStack}>
                 {group.items.map((item, itemIndex) => {
-                  const typeChip = getScheduleItemTypeChip(item);
+                  const typeChip = getScheduleItemTypeChip(mobileColors, isDark, item);
                   const shiftName = getScheduleItemShiftName(item);
                   const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
                   const focusAreaName = getScheduleItemFocusArea(item);
@@ -3189,7 +3357,7 @@ function UpcomingShiftsSection({
                                   <Ionicons
                                     color={mobileColors.textMuted}
                                     name="time-outline"
-                                    size={18}
+                                    size={14}
                                   />
                                   <Text style={styles.upcomingShiftTimeText}>{timeRange}</Text>
                                 </View>
@@ -3209,7 +3377,7 @@ function UpcomingShiftsSection({
                               <Ionicons
                                 color={mobileColors.textMuted}
                                 name="time-outline"
-                                size={18}
+                                size={14}
                               />
                               <Text style={styles.upcomingShiftTimeText}>{timeRange}</Text>
                             </View>
@@ -3237,6 +3405,9 @@ function UpcomingShiftsSection({
 }
 
 function UpcomingShiftDashedDivider() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View
       pointerEvents="none"
@@ -3282,6 +3453,9 @@ function OpenShiftsSection({
   onVolunteer: (openShift: MobileOpenShift) => void;
   onSeeAll: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [stackCardHeights, setStackCardHeights] = useState<Record<string, number>>({});
   const availableOpenShiftFeed = useMemo(
@@ -3346,7 +3520,7 @@ function OpenShiftsSection({
       const isVolunteerLoading =
         volunteerBody != null &&
         pendingAction?.key === getMobileRequestActionKey(item.openShift.id, volunteerBody);
-      const jobChip = getOpenShiftJobChip(item.openShift);
+      const jobChip = getOpenShiftJobChip(mobileColors, isDark, item.openShift);
       const isMentored = hasMentoredSegments(item.openShift.presentation.segments);
       const shiftName = getOpenShiftShiftName(item.openShift);
       const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
@@ -3372,7 +3546,7 @@ function OpenShiftsSection({
               <SplitShiftSegmentList
                 renderSegmentChip={(segment) => (
                   <JobPill
-                    chip={getSegmentJobChip(segment)}
+                    chip={getSegmentJobChip(mobileColors, isDark, segment)}
                     compact
                     eyebrowDisplay="outside"
                     isMentored={segment.isMentored === true}
@@ -3462,7 +3636,7 @@ function OpenShiftsSection({
     const isClaimLoading =
       claimBody != null &&
       pendingAction?.key === getMobileRequestActionKey(item.request.id, claimBody);
-    const jobChip = getRequestJobChip(item.request, "requester");
+    const jobChip = getRequestJobChip(mobileColors, isDark, item.request, "requester");
     const isMentored = hasMentoredSegments(getRequestSegments(item.request, "requester"));
     const shiftName = getRequestShiftName(item.request, "requester");
     const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
@@ -3676,6 +3850,10 @@ function ShiftCoverRequestsSection({
   requestsError: unknown;
   onRespond: (requestId: string, accept: boolean) => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
+
   if (!isLoading && !requestsError && requests.length === 0) {
     return null;
   }
@@ -3694,8 +3872,8 @@ function ShiftCoverRequestsSection({
       ) : (
         <View style={styles.requestList}>
           {requests.map((request) => {
-            const avatarTone = getAvatarTone(request.requesterEmpId);
-            const jobChip = getRequestJobChip(request, "requester");
+            const avatarTone = getAvatarTone(request.requesterEmpId, resolvedTheme === "dark");
+            const jobChip = getRequestJobChip(mobileColors, resolvedTheme === "dark", request, "requester");
             const shiftName = getRequestShiftName(request, "requester");
             const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
             const focusAreaName = getRequestFocusAreaName(request, "requester");
@@ -3794,12 +3972,15 @@ function TeamShiftMemberRow({
   row: TeamScheduleShiftRow;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
   const { entry, segment } = row;
-  const avatarTone = getAvatarTone(entry.employeeId);
+  const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");
   const memberName = entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
   const memberTimeRange = getTeamShiftRowTimeRange(row, groupTimeRange);
   const alternateShiftLabel = formatAlternateShiftTitles(row.alternateShiftTitles);
-  const roleChip = getTeamMemberRoleChip(entry, segment);
+  const roleChip = getTeamMemberRoleChip(mobileColors, resolvedTheme === "dark", entry, segment);
   const isMentored = segment
     ? segment.isMentored === true
     : hasMentoredSegments(getScheduleEntrySegments(entry));
@@ -3850,24 +4031,26 @@ function TeamShiftMemberRow({
 }
 
 function getTeamMemberRoleChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   entry: MobileScheduleEntry,
   segment?: MobileScheduleEntrySegment | null,
 ): JobChip | null {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
-    return buildAbsenceChip(getScheduleEntryTitle(entry), entry.presentation);
+    return buildAbsenceChip(mobileColors, isDark, getScheduleEntryTitle(entry), entry.presentation);
   }
 
   if (segment) {
-    return getSegmentJobChip(segment);
+    return getSegmentJobChip(mobileColors, isDark, segment);
   }
 
   const primarySegment = getScheduleEntrySegments(entry)[0] ?? null;
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(getScheduleEntryTitle(entry), primarySegment);
+    return buildGeneralShiftChip(mobileColors, isDark, getScheduleEntryTitle(entry), primarySegment);
   }
 
   const jobSegment = getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
-  return buildJobChip(jobSegment?.jobName ?? null, jobSegment);
+  return buildJobChip(mobileColors, isDark, jobSegment?.jobName ?? null, jobSegment);
 }
 
 function getInitials(name: string): string {
@@ -3883,7 +4066,7 @@ function getInitials(name: string): string {
   return `${first}${last}` || "?";
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   loadingState: {
     gap: 14,
   },
@@ -3998,11 +4181,9 @@ const styles = StyleSheet.create({
   meHeroCard: {
     position: "relative",
     overflow: "hidden",
-    backgroundColor: ME_HERO_CARD_BACKGROUND,
     borderRadius: 24,
     paddingHorizontal: 18,
     paddingVertical: 18,
-    shadowColor: "rgba(37, 99, 235, 0.3)",
     shadowOffset: {
       width: 0,
       height: 14,
@@ -4044,18 +4225,14 @@ const styles = StyleSheet.create({
   },
   meHeroHeader: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 12,
   },
   meHeroHeaderCopy: {
     flex: 1,
-    gap: 10,
-  },
-  meHeroStatusStack: {
-    flex: 1,
     minWidth: 0,
-    gap: 6,
+    gap: 10,
   },
   meHeroBadge: {
     alignSelf: "flex-start",
@@ -4291,7 +4468,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.14)",
-    backgroundColor: ME_HERO_COLLABORATOR_BACKGROUND,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -4299,6 +4475,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     marginTop: 6,
+    marginBottom: 6,
   },
   meHeroCollaboratorLabelRow: {
     flex: 1,
@@ -4321,7 +4498,6 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: ME_HERO_COLLABORATOR_BACKGROUND,
     padding: 2,
   },
   meHeroCollaboratorAvatarFrameOverlap: {
@@ -4483,7 +4659,10 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   upcomingShiftTitleRow: {
-    alignItems: "center",
+    // flex-start (not center) so the time stays pinned to the title's first
+    // line instead of drifting to the vertical middle when a long shift name
+    // wraps to two lines.
+    alignItems: "flex-start",
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 8,
@@ -4512,9 +4691,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    // upcomingShiftTitle's line-height (sectionTitle preset) adds leading
+    // space above its glyphs that this shorter icon+text row doesn't have —
+    // nudge down so it lines up with the title's actual text, not its box top.
+    paddingTop: 3,
   },
+  // Smaller and lighter than upcomingShiftTitle (17px) — the time is
+  // secondary to the shift name, not competing with it for attention.
   upcomingShiftTimeText: {
-    ...mobileText.bodyStrong,
+    ...mobileText.caption,
+    fontSize: 13,
     color: mobileColors.textSubtle,
   },
   upcomingShiftAction: {

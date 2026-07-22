@@ -5,10 +5,11 @@ import { OrganizationLockedScreen } from "../../src/features/auth/screens/Organi
 import { handleExpiredMobileSession } from "../../src/shared/lib/auth-reset";
 import { getOrgUnavailableMessage } from "../../src/shared/lib/errors";
 import { useSessionState } from "../../src/shared/providers/AuthSessionProvider";
-import { mobileColors } from "../../src/shared/theme/tokens";
+import { useMobileColors } from "../../src/shared/providers/ThemeModeProvider";
 import { isManagementOnly, isOnSchedule } from "../../src/features/auth/hooks/employmentStatus";
 
 export default function TabsLayoutWeb() {
+  const mobileColors = useMobileColors();
   const { accessToken, isLoading } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
   const lockedMessage = getOrgUnavailableMessage(bootstrapQuery.error);

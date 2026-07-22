@@ -13,7 +13,8 @@ import { NETWORK_ERROR_MESSAGE, NETWORK_ERROR_TITLE } from "@dubgrid/client-erro
 import { StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetworkStatus } from "./NetworkStateProvider";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { useMobileColors } from "./ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 export type ToastTone = "error" | "success" | "info" | "warning";
 
@@ -33,32 +34,33 @@ const DEFAULT_TOAST_DURATION_MS = 4500;
 const TOAST_MESSAGE_COLOR = "rgba(255, 255, 255, 0.82)";
 const TOAST_SWIPE_DISMISS_THRESHOLD = 32;
 
-const TOAST_TONE = {
-  error: {
-    backgroundColor: "#DC2626",
-    borderColor: "#B91C1C",
-    iconColor: mobileColors.textInverse,
-    iconName: "alert-circle" as const,
-  },
-  success: {
-    backgroundColor: "#16A34A",
-    borderColor: "#166534",
-    iconColor: mobileColors.textInverse,
-    iconName: "checkmark-circle" as const,
-  },
-  info: {
-    backgroundColor: "#1D4ED8",
-    borderColor: "#1E3A8A",
-    iconColor: mobileColors.textInverse,
-    iconName: "information-circle" as const,
-  },
-  warning: {
-    backgroundColor: "#D97706",
-    borderColor: "#92400E",
-    iconColor: mobileColors.textInverse,
-    iconName: "warning" as const,
-  },
-} as const;
+const createToastTone = (mobileColors: MobileColors) =>
+  ({
+    error: {
+      backgroundColor: "#DC2626",
+      borderColor: "#B91C1C",
+      iconColor: mobileColors.textInverse,
+      iconName: "alert-circle" as const,
+    },
+    success: {
+      backgroundColor: "#16A34A",
+      borderColor: "#166534",
+      iconColor: mobileColors.textInverse,
+      iconName: "checkmark-circle" as const,
+    },
+    info: {
+      backgroundColor: "#1D4ED8",
+      borderColor: "#1E3A8A",
+      iconColor: mobileColors.textInverse,
+      iconName: "information-circle" as const,
+    },
+    warning: {
+      backgroundColor: "#D97706",
+      borderColor: "#92400E",
+      iconColor: mobileColors.textInverse,
+      iconName: "warning" as const,
+    },
+  }) as const;
 
 const ToastContext = createContext<{
   pushToast: (toast: ToastInput) => void;
@@ -89,6 +91,9 @@ function getTouchEventY(event: GestureResponderEvent): number | null {
 }
 
 export function ToastProvider({ children }: PropsWithChildren) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const toastTone = useMemo(() => createToastTone(mobileColors), [mobileColors]);
   const insets = useSafeAreaInsets();
   const { isOffline } = useNetworkStatus();
   const idRef = useRef(0);
@@ -239,8 +244,8 @@ export function ToastProvider({ children }: PropsWithChildren) {
     [pushToast],
   );
 
-  const palette = activeToast ? TOAST_TONE[activeToast.tone] : null;
-  const offlinePalette = TOAST_TONE.error;
+  const palette = activeToast ? toastTone[activeToast.tone] : null;
+  const offlinePalette = toastTone.error;
 
   return (
     <ToastContext.Provider value={value}>
@@ -313,7 +318,7 @@ export function useToast() {
   return context;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   host: {
     position: "absolute",
     top: 0,

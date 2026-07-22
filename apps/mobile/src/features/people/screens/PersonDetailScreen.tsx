@@ -49,8 +49,9 @@ import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -115,6 +116,9 @@ function makeDraft(person: MobilePerson): EditDraft {
 }
 
 export default function PersonDetailScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
   const params = useLocalSearchParams<{ id?: string }>();
   const personId = Array.isArray(params.id) ? params.id[0] : params.id;
   const accessToken = useAccessToken();
@@ -424,9 +428,9 @@ export default function PersonDetailScreen() {
       ? (maps.certifications.get(person.certificationId) ?? "Unknown")
       : "None";
   const employmentLabel = person.employmentType === "part_time" ? "Part-time" : "Full-time";
-  const avatarTone = getAvatarTone(person.id);
+  const avatarTone = getAvatarTone(person.id, resolvedTheme === "dark");
   const fullName = getFullName(person);
-  const orgRoleBadge = getMobileOrgRoleBadge(person.orgRole);
+  const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, person.orgRole);
   const accessText = person.userId
     ? "Active app account"
     : person.pendingInvitation
@@ -516,7 +520,9 @@ export default function PersonDetailScreen() {
         }
       />
 
-      <Stack.Screen options={createDetailStackOptions(showCollapsedHeader ? fullName : "")} />
+      <Stack.Screen
+        options={createDetailStackOptions(mobileColors, showCollapsedHeader ? fullName : "")}
+      />
 
       <ProfileHero
         avatarStyle={{
@@ -828,6 +834,8 @@ function AccountLinkChallengeModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [displayed, setDisplayed] = useState(challenge);
 
   useEffect(() => {
@@ -970,6 +978,8 @@ function EditPanel({
   onDiscard: () => void;
   onSave: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [focusedField, setFocusedField] = useState<
     "firstName" | "lastName" | "phone" | "email" | "contactNotes" | null
   >(null);
@@ -1170,7 +1180,7 @@ function EditPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   loadingState: {
     gap: 14,
   },

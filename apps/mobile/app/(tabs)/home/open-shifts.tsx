@@ -13,13 +13,16 @@ import {
 import { OpenShiftRow } from "../../../src/features/dashboard/components/OpenShiftsCard";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { getMobileQueryContentState } from "../../../src/shared/lib/query-state";
-import { mobileColors, mobileText } from "../../../src/shared/theme/tokens";
+import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../src/shared/theme/tokens";
 
 const URGENCY_OPTIONS = ["all", "high", "medium", "low"] as const;
 type UrgencyFilter = (typeof URGENCY_OPTIONS)[number];
 const UNASSIGNED_LABEL = "Unassigned";
 
 export default function OpenShiftsExpandedScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
   const [focusAreaFilter, setFocusAreaFilter] = useState<string>("all");
@@ -144,7 +147,7 @@ export default function OpenShiftsExpandedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   loadingState: {
     gap: 14,
   },

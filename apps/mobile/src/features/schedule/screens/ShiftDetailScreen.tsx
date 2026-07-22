@@ -10,7 +10,7 @@ import {
   type MobileShiftRequest,
 } from "@dubgrid/contracts";
 import { indefiniteArticle } from "@dubgrid/domain";
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTone, resolveShiftPillColors } from "@dubgrid/design-tokens";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -30,12 +30,17 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState, getQueryErrorMessage } from "../../../shared/lib/query-state";
+import {
+  useIsDarkMode,
+  useMobileColors,
+  useThemeMode,
+} from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
-  mobileColors,
   mobileRadii,
   mobileText,
+  type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -679,7 +684,26 @@ function getInitials(name: string): string {
   return `${first}${last}` || "?";
 }
 
+// User-picked hex colors from the backend are tuned for a white page and
+// read as washed-out on a dark surface — remap through the shared HSV
+// darkener. Theme tokens (mobileColors.*) are already theme-correct and
+// must NOT be passed through this a second time.
+function darkenTone(
+  tone: { backgroundColor: string; borderColor: string; textColor: string },
+  isDark: boolean,
+): { backgroundColor: string; borderColor: string; textColor: string } {
+  if (!isDark) return tone;
+
+  const resolved = resolveShiftPillColors(
+    { color: tone.backgroundColor, text: tone.textColor, border: tone.borderColor },
+    true,
+  );
+  return { backgroundColor: resolved.color, borderColor: resolved.border, textColor: resolved.text };
+}
+
 function buildDetailJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: {
     jobColor?: string | null;
@@ -696,16 +720,33 @@ function buildDetailJobChip(
     return null;
   }
 
+  if (jobColor) {
+    return {
+      kind: "job",
+      label: trimmedLabel,
+      ...darkenTone(
+        {
+          backgroundColor: jobColor,
+          borderColor: jobBorderColor ?? jobColor,
+          textColor: jobTextColor ?? mobileColors.textMuted,
+        },
+        isDark,
+      ),
+    };
+  }
+
   return {
     kind: "job",
     label: trimmedLabel,
-    backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
-    borderColor: jobBorderColor ?? mobileColors.border,
-    textColor: jobTextColor ?? mobileColors.textMuted,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textMuted,
   };
 }
 
 function buildDetailGeneralShiftChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: {
     jobColor?: string | null;
@@ -713,7 +754,7 @@ function buildDetailGeneralShiftChip(
     jobTextColor?: string | null;
   } | null,
 ): DetailChip | null {
-  const chip = buildDetailJobChip(label, colorSource);
+  const chip = buildDetailJobChip(mobileColors, isDark, label, colorSource);
 
   if (!chip) {
     return null;
@@ -727,6 +768,8 @@ function buildDetailGeneralShiftChip(
 }
 
 function buildDetailAbsenceChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: AbsenceColorSource | null,
 ): DetailChip | null {
@@ -739,13 +782,29 @@ function buildDetailAbsenceChip(
     return null;
   }
 
+  if (absenceColor) {
+    return {
+      kind: "absence",
+      label: trimmedLabel,
+      eyebrowLabel: "Absence",
+      ...darkenTone(
+        {
+          backgroundColor: absenceColor,
+          borderColor: absenceBorderColor ?? absenceColor,
+          textColor: absenceTextColor ?? mobileColors.textMuted,
+        },
+        isDark,
+      ),
+    };
+  }
+
   return {
     kind: "absence",
     label: trimmedLabel,
     eyebrowLabel: "Absence",
-    backgroundColor: absenceColor ?? mobileColors.surfaceSecondary,
-    borderColor: absenceBorderColor ?? mobileColors.border,
-    textColor: absenceTextColor ?? mobileColors.textMuted,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textMuted,
   };
 }
 
@@ -763,15 +822,29 @@ function hasMentoredSegments(
   return segments?.some((segment) => segment.isMentored === true) ?? false;
 }
 
-function getEntryJobChip(entry: MobileScheduleEntry): DetailChip | null {
+function getEntryJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  entry: MobileScheduleEntry,
+): DetailChip | null {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
-    return buildDetailAbsenceChip(getScheduleEntryTitle(entry), entry.presentation);
+    return buildDetailAbsenceChip(
+      mobileColors,
+      isDark,
+      getScheduleEntryTitle(entry),
+      entry.presentation,
+    );
   }
 
   const primarySegment = getScheduleEntrySegments(entry)[0] ?? null;
 
   if (isGeneralDetailSegment(primarySegment)) {
-    return buildDetailGeneralShiftChip(getScheduleEntryTitle(entry), primarySegment);
+    return buildDetailGeneralShiftChip(
+      mobileColors,
+      isDark,
+      getScheduleEntryTitle(entry),
+      primarySegment,
+    );
   }
 
   const segment = getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
@@ -781,12 +854,21 @@ function getEntryJobChip(entry: MobileScheduleEntry): DetailChip | null {
     return null;
   }
 
-  return buildDetailJobChip(label, segment);
+  return buildDetailJobChip(mobileColors, isDark, label, segment);
 }
 
-function buildSegmentJobChip(segment: MobileScheduleEntrySegment): DetailChip | null {
+function buildSegmentJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  segment: MobileScheduleEntrySegment,
+): DetailChip | null {
   if (isGeneralDetailSegment(segment)) {
-    return buildDetailGeneralShiftChip(segment.shiftName ?? segment.label ?? null, segment);
+    return buildDetailGeneralShiftChip(
+      mobileColors,
+      isDark,
+      segment.shiftName ?? segment.label ?? null,
+      segment,
+    );
   }
 
   const label = segment.jobName?.trim() ?? "";
@@ -795,10 +877,13 @@ function buildSegmentJobChip(segment: MobileScheduleEntrySegment): DetailChip | 
     return null;
   }
 
-  return buildDetailJobChip(label, segment);
+  return buildDetailJobChip(mobileColors, isDark, label, segment);
 }
 
 function MentoredPill() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
       <Text style={styles.mentoredPillText}>Mentored</Text>
@@ -807,6 +892,9 @@ function MentoredPill() {
 }
 
 export default function ShiftDetailScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
   const params = useLocalSearchParams<{
     employeeId?: string;
     date?: string;
@@ -1311,7 +1399,7 @@ export default function ShiftDetailScreen() {
     ? formatPublishedSummary(shiftEntry.publishedByName, publishedAtLabel)
     : null;
   const focusAreaName = shiftEntry ? getScheduleEntryDisplayFocusAreaName(shiftEntry) : null;
-  const jobChip = shiftEntry ? getEntryJobChip(shiftEntry) : null;
+  const jobChip = shiftEntry ? getEntryJobChip(mobileColors, isDark, shiftEntry) : null;
   let detailCardTitle = shiftEntry ? getScheduleEntryTitle(shiftEntry) : "";
 
   if (hasSplitShift) {
@@ -2125,6 +2213,8 @@ function getPickupTargetDetailLabel(
 }
 
 function DetailDateTile({ date }: { date: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const dateLabel = formatCompactScheduleDate(date);
   const dateParts = getCompactScheduleDateParts(date);
 
@@ -2143,6 +2233,9 @@ function DetailHeaderJobPill({
   chip: DetailChip | null;
   isMentored?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -2186,6 +2279,9 @@ function DetailInfoRow({
   label: string;
   value: string;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View accessibilityLabel={`${label} ${value}`} style={styles.detailInfoRow}>
       <View style={[styles.detailInfoIconBox, { backgroundColor: iconBackgroundColor }]}>
@@ -2212,6 +2308,8 @@ function DetailActionButton({
   onPress: () => void;
   tone: "neutral" | "secondary";
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isSecondary = tone === "secondary";
   const contentColor = isSecondary ? mobileColors.brand : mobileColors.dangerText;
 
@@ -2246,6 +2344,9 @@ function DetailPublishedFooter({
   publishedByName: string | null;
   summary: string;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.detailPublishedFooter}>
       <Ionicons color={mobileColors.textSubtle} name="information-circle-outline" size={18} />
@@ -2277,6 +2378,9 @@ function ActionSegmentSelector({
   selectedIndex: number;
   onSelect: (index: number) => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.actionSegmentPanel}>
       <Text style={styles.subsectionLabel}>Choose shift</Text>
@@ -2313,6 +2417,9 @@ function DetailJobPill({
   eyebrowDisplay?: EyebrowDisplay;
   isMentored?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -2374,6 +2481,9 @@ function ShiftmateSegmentGroups({
   groups: ShiftmateSegmentGroup[];
   linkedEmployeeId: string | null;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.shiftmateSegmentGroups}>
       {groups.map((group) => (
@@ -2433,9 +2543,14 @@ function ShiftmateRow({
   linkedEmployeeId: string | null;
   matchedSegment?: MobileScheduleEntrySegment | null;
 }) {
-  const avatarTone = getAvatarTone(entry.employeeId);
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
+  const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");
   const displayName = entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
-  const jobChip = matchedSegment ? buildSegmentJobChip(matchedSegment) : getEntryJobChip(entry);
+  const jobChip = matchedSegment
+    ? buildSegmentJobChip(mobileColors, resolvedTheme === "dark", matchedSegment)
+    : getEntryJobChip(mobileColors, resolvedTheme === "dark", entry);
   const entryTimeRange = matchedSegment
     ? getScheduleEntrySegmentTimeRange(matchedSegment)
     : getScheduleEntryTimeRange(entry);
@@ -2501,6 +2616,8 @@ function SelectorChip({
   showCheck?: boolean;
   variant?: "chip" | "segment";
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isSegment = variant === "segment";
 
   return (
@@ -2515,7 +2632,8 @@ function SelectorChip({
         isSegment && styles.selectorSegment,
         active && styles.selectorChipActive,
         isSegment && active && styles.selectorSegmentActive,
-        disabled && styles.selectorChipDisabled,
+        disabled && !isSegment && styles.selectorChipDisabled,
+        disabled && isSegment && styles.selectorSegmentDisabled,
       ]}
     >
       <View style={isSegment ? styles.selectorSegmentContent : undefined}>
@@ -2524,6 +2642,7 @@ function SelectorChip({
             styles.selectorChipText,
             isSegment && styles.selectorSegmentText,
             active && styles.selectorChipTextActive,
+            disabled && isSegment && styles.selectorSegmentTextDisabled,
           ]}
         >
           {label}
@@ -2553,6 +2672,9 @@ function CoverageOptionCard({
   disabled?: boolean;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -2563,7 +2685,8 @@ function CoverageOptionCard({
       style={[
         styles.coverageOptionCard,
         tone === "danger" && styles.coverageOptionCardDanger,
-        active && styles.coverageOptionCardActive,
+        active &&
+          (tone === "danger" ? styles.coverageOptionCardActiveDanger : styles.coverageOptionCardActive),
         disabled && styles.coverageOptionCardDisabled,
       ]}
     >
@@ -2602,6 +2725,9 @@ function SwapSummaryCard({
   segmentIndex?: number;
   summaryNote?: string;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
   const segments = getScheduleEntrySegments(entry);
   const primarySegment =
     segmentIndex != null
@@ -2613,7 +2739,7 @@ function SwapSummaryCard({
   const timeRange = getScheduleEntryTimeRange(entry);
   const focusAreaName =
     primarySegment?.displayFocusAreaName ?? getScheduleEntryDisplayFocusAreaName(entry);
-  const jobChip = getEntryJobChip(entry);
+  const jobChip = getEntryJobChip(mobileColors, isDark, entry);
   const summaryMeta = [primarySegmentTimeRange ?? timeRange ?? "Time unavailable", focusAreaName]
     .filter(Boolean)
     .join(" · ");
@@ -2651,6 +2777,8 @@ function SwapDateChip({
   disabled?: boolean;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const dateParts = getCompactScheduleDateParts(date);
   const countColor = active ? mobileColors.brand : mobileColors.textMuted;
 
@@ -2704,6 +2832,8 @@ function SwapOptionCard({
   segmentIndex?: number;
   showSegments?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const optionLabel = segmentIndex != null ? getActionSegmentLabel(entry, segmentIndex) : null;
 
   return (
@@ -2742,13 +2872,15 @@ function ShiftEntrySegmentList({
   showSegmentLabels?: boolean;
   variant: "detail" | "supporting";
 }) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
   const segments = getScheduleEntrySegments(entry);
 
   return (
     <SplitShiftSegmentList
       renderSegmentChip={(segment) => (
         <DetailJobPill
-          chip={buildSegmentJobChip(segment)}
+          chip={buildSegmentJobChip(mobileColors, isDark, segment)}
           isMentored={segment.isMentored === true}
         />
       )}
@@ -2760,7 +2892,7 @@ function ShiftEntrySegmentList({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   loadingState: {
     gap: 14,
   },
@@ -3255,6 +3387,9 @@ const styles = StyleSheet.create({
     borderColor: mobileColors.brandBorder,
     backgroundColor: mobileColors.brandSoft,
   },
+  coverageOptionCardActiveDanger: {
+    borderColor: mobileColors.dangerText,
+  },
   coverageOptionCardDisabled: {
     opacity: 0.5,
   },
@@ -3305,14 +3440,19 @@ const styles = StyleSheet.create({
   selectorSegment: {
     minHeight: 56,
     borderRadius: ACTION_SEGMENT_OPTION_RADIUS,
-    backgroundColor: "rgba(255, 255, 255, 0.72)",
+    backgroundColor: mobileColors.surfaceSecondary,
     borderWidth: 1,
     borderColor: mobileColors.brandBorder,
     paddingHorizontal: 14,
     paddingVertical: 13,
+    justifyContent: "center",
   },
   selectorChipDisabled: {
     opacity: 0.5,
+  },
+  selectorSegmentDisabled: {
+    backgroundColor: mobileColors.surfaceMuted,
+    borderColor: mobileColors.borderSubtle,
   },
   selectorChipActive: {
     backgroundColor: mobileColors.brandSoft,
@@ -3343,6 +3483,9 @@ const styles = StyleSheet.create({
   selectorSegmentText: {
     flex: 1,
     minWidth: 0,
+  },
+  selectorSegmentTextDisabled: {
+    color: mobileColors.textSubtle,
   },
   selectorChipTextActive: {
     color: mobileColors.brand,

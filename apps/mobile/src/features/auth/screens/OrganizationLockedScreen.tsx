@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../../shared/components/Button";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
-import { mobileColors, mobileSpacing, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileSpacing, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 function formatLockedMessage(message: string): string {
   return message.replace(/^Organization unavailable\.\s*/i, "").trim() || message;
@@ -19,6 +21,8 @@ export function OrganizationLockedScreen({
   onRetry: () => void;
   onSignOut: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const insets = useSafeAreaInsets();
   const body = formatLockedMessage(message);
 
@@ -48,7 +52,7 @@ export function OrganizationLockedScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: mobileColors.background,

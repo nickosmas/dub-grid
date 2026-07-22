@@ -1,4 +1,4 @@
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 type MobileOrgRole = "super_admin" | "admin" | "user" | null;
 type OrgRole = NonNullable<MobileOrgRole>;
@@ -16,7 +16,10 @@ export function getHighlightedMobileOrgRole(
   return role === "super_admin" || role === "admin" ? role : null;
 }
 
-export function getMobileOrgRoleBadge(role: MobileOrgRole | null | undefined) {
+export function getMobileOrgRoleBadge(
+  mobileColors: MobileColors,
+  role: MobileOrgRole | null | undefined,
+) {
   const highlightedRole = getHighlightedMobileOrgRole(role);
   if (!highlightedRole) {
     return null;

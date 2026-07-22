@@ -25,8 +25,9 @@ import {
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
@@ -48,6 +49,8 @@ function formatStatusLabel(status: MobilePerson["status"]): string {
 }
 
 export default function PeopleScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const bootstrapQuery = useBootstrap(accessToken);
@@ -505,6 +508,9 @@ function PersonRow({
   isLast: boolean;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
   const secondaryDetail = [
     employmentType === "part_time" ? "PT" : "FT",
     accessHint,
@@ -512,8 +518,8 @@ function PersonRow({
   ]
     .filter(Boolean)
     .join(" - ");
-  const avatarTone = getAvatarTone(id);
-  const orgRoleBadge = getMobileOrgRoleBadge(orgRole);
+  const avatarTone = getAvatarTone(id, resolvedTheme === "dark");
+  const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, orgRole);
   const initials =
     name
       .split(" ")
@@ -574,7 +580,7 @@ function PersonRow({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   loadingState: {
     gap: 14,
   },

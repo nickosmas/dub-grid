@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
-import { mobileColors, mobileRadii } from "../../../../shared/theme/tokens";
+import { useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
+import { mobileRadii, type MobileColors } from "../../../../shared/theme/tokens";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -41,6 +43,8 @@ const NOTES: Array<{
 ];
 
 export function IllustrationNotifications() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View accessible={false} style={styles.stack}>
       <View style={styles.headerChip}>
@@ -74,7 +78,7 @@ export function IllustrationNotifications() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   stack: {
     width: 296,
     gap: 8,

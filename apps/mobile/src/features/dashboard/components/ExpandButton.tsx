@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet } from "react-native";
-import { mobileColors } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import type { MobileColors } from "../../../shared/theme/tokens";
 
 // Mirrors web's ExpandButton (apps/web/src/components/dashboard/ExpandButton.tsx):
 // a small icon-only button in a dashboard card's header that opens a full,
@@ -12,6 +14,9 @@ export function ExpandButton({
   accessibilityLabel: string;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
@@ -26,7 +31,7 @@ export function ExpandButton({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   button: {
     width: 28,
     height: 28,

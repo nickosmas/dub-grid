@@ -1,33 +1,39 @@
+import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import type { CardIconTone } from "../../../shared/components/Screen";
 import type { DashboardPeriodMode } from "../../../shared/lib/dates";
 import { PeriodToggle } from "./PeriodToggle";
 
-const TONE_STYLES: Record<CardIconTone, { backgroundColor: string; borderColor: string; iconColor: string }> = {
-  brand: {
-    backgroundColor: mobileColors.brandSoft,
-    borderColor: mobileColors.brandBorder,
-    iconColor: mobileColors.brand,
-  },
-  warning: {
-    backgroundColor: mobileColors.warningSoft,
-    borderColor: mobileColors.warningBorder,
-    iconColor: mobileColors.warningText,
-  },
-  danger: {
-    backgroundColor: mobileColors.dangerSoft,
-    borderColor: mobileColors.dangerBorder,
-    iconColor: mobileColors.dangerText,
-  },
-  success: {
-    backgroundColor: mobileColors.successSoft,
-    borderColor: mobileColors.successBorder,
-    iconColor: mobileColors.successText,
-  },
-};
+function createToneStyles(
+  mobileColors: MobileColors,
+): Record<CardIconTone, { backgroundColor: string; borderColor: string; iconColor: string }> {
+  return {
+    brand: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+      iconColor: mobileColors.brand,
+    },
+    warning: {
+      backgroundColor: mobileColors.warningSoft,
+      borderColor: mobileColors.warningBorder,
+      iconColor: mobileColors.warningText,
+    },
+    danger: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+      iconColor: mobileColors.dangerText,
+    },
+    success: {
+      backgroundColor: mobileColors.successSoft,
+      borderColor: mobileColors.successBorder,
+      iconColor: mobileColors.successText,
+    },
+  };
+}
 
 function MetricTile({
   label,
@@ -42,7 +48,9 @@ function MetricTile({
   icon: keyof typeof Ionicons.glyphMap;
   tone: CardIconTone;
 }) {
-  const toneStyle = TONE_STYLES[tone];
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const toneStyle = useMemo(() => createToneStyles(mobileColors), [mobileColors])[tone];
 
   return (
     <View style={styles.tile}>
@@ -83,8 +91,10 @@ export function DashboardHeroCard({
   onPeriodModeChange: (mode: DashboardPeriodMode) => void;
   isFetching?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const tone = STATUS_TONE[summary.statusLabel] ?? "brand";
-  const toneStyle = TONE_STYLES[tone];
+  const toneStyle = useMemo(() => createToneStyles(mobileColors), [mobileColors])[tone];
 
   return (
     <View style={styles.card}>
@@ -124,7 +134,7 @@ export function DashboardHeroCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   card: {
     backgroundColor: mobileColors.surface,
     borderRadius: mobileRadii.card,

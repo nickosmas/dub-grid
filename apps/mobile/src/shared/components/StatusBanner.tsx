@@ -1,53 +1,56 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useMemo } from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Button } from "./Button";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 type StatusBannerTone = "error" | "warning" | "info" | "success";
 type StatusBannerVariant = "inline" | "centered";
 
-const STATUS_BANNER_TONE = {
-  error: {
-    backgroundColor: mobileColors.dangerSoft,
-    borderColor: mobileColors.dangerBorder,
-    iconColor: mobileColors.dangerText,
-    titleColor: mobileColors.textPrimary,
-    bodyColor: mobileColors.textMuted,
-    iconName: "alert-circle" as const,
-    centeredIconName: "alert-circle-outline" as const,
-    inlineActionTone: "danger" as const,
-  },
-  warning: {
-    backgroundColor: mobileColors.warningSoft,
-    borderColor: mobileColors.warningBorder,
-    iconColor: mobileColors.warningText,
-    titleColor: mobileColors.textPrimary,
-    bodyColor: mobileColors.textMuted,
-    iconName: "warning" as const,
-    centeredIconName: "warning-outline" as const,
-    inlineActionTone: "secondary" as const,
-  },
-  info: {
-    backgroundColor: mobileColors.brandSoft,
-    borderColor: mobileColors.brandBorder,
-    iconColor: mobileColors.brand,
-    titleColor: mobileColors.textPrimary,
-    bodyColor: mobileColors.textMuted,
-    iconName: "information-circle" as const,
-    centeredIconName: "information-circle-outline" as const,
-    inlineActionTone: "secondary" as const,
-  },
-  success: {
-    backgroundColor: mobileColors.successSoft,
-    borderColor: mobileColors.successBorder,
-    iconColor: mobileColors.successText,
-    titleColor: mobileColors.textPrimary,
-    bodyColor: mobileColors.textMuted,
-    iconName: "checkmark-circle" as const,
-    centeredIconName: "checkmark-circle-outline" as const,
-    inlineActionTone: "secondary" as const,
-  },
-} as const;
+const createStatusBannerTone = (mobileColors: MobileColors) =>
+  ({
+    error: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+      iconColor: mobileColors.dangerText,
+      titleColor: mobileColors.textPrimary,
+      bodyColor: mobileColors.textMuted,
+      iconName: "alert-circle" as const,
+      centeredIconName: "alert-circle-outline" as const,
+      inlineActionTone: "danger" as const,
+    },
+    warning: {
+      backgroundColor: mobileColors.warningSoft,
+      borderColor: mobileColors.warningBorder,
+      iconColor: mobileColors.warningText,
+      titleColor: mobileColors.textPrimary,
+      bodyColor: mobileColors.textMuted,
+      iconName: "warning" as const,
+      centeredIconName: "warning-outline" as const,
+      inlineActionTone: "secondary" as const,
+    },
+    info: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+      iconColor: mobileColors.brand,
+      titleColor: mobileColors.textPrimary,
+      bodyColor: mobileColors.textMuted,
+      iconName: "information-circle" as const,
+      centeredIconName: "information-circle-outline" as const,
+      inlineActionTone: "secondary" as const,
+    },
+    success: {
+      backgroundColor: mobileColors.successSoft,
+      borderColor: mobileColors.successBorder,
+      iconColor: mobileColors.successText,
+      titleColor: mobileColors.textPrimary,
+      bodyColor: mobileColors.textMuted,
+      iconName: "checkmark-circle" as const,
+      centeredIconName: "checkmark-circle-outline" as const,
+      inlineActionTone: "secondary" as const,
+    },
+  }) as const;
 
 export function StatusBanner({
   title,
@@ -66,7 +69,10 @@ export function StatusBanner({
   onAction?: () => void;
   fillScreen?: boolean;
 }) {
-  const palette = STATUS_BANNER_TONE[tone];
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const statusBannerTone = useMemo(() => createStatusBannerTone(mobileColors), [mobileColors]);
+  const palette = statusBannerTone[tone];
 
   if (variant === "centered") {
     return (
@@ -125,6 +131,8 @@ function CenteredStatus({
   onAction?: () => void;
   fillScreen: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const centeredStyles = useMemo(() => createCenteredStyles(mobileColors), [mobileColors]);
   const { height: windowHeight } = useWindowDimensions();
   const fillStyle = fillScreen
     ? {
@@ -147,7 +155,7 @@ function CenteredStatus({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   banner: {
     borderRadius: mobileRadii.card,
     borderWidth: 1,
@@ -178,7 +186,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const centeredStyles = StyleSheet.create({
+const createCenteredStyles = (mobileColors: MobileColors) => StyleSheet.create({
   card: {
     paddingHorizontal: 4,
     paddingVertical: 32,

@@ -22,13 +22,15 @@ import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
-  mobileColors,
   mobileRadii,
   mobileSpacing,
   mobileText,
+  type MobileColors,
 } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { useMobileShiftRequestsRealtime } from "../hooks/useMobileShiftRequestsRealtime";
 import {
   type MobileRequestActionFeedback,
   getMobileRequestActionFeedback,
@@ -97,6 +99,8 @@ function hasMentoredSegments(
 }
 
 function MentoredPill() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
       <Text style={styles.mentoredPillText}>Mentored</Text>
@@ -118,6 +122,7 @@ function readOptionalColor(value: string | null | undefined): string | null {
 }
 
 function getShiftPillColors(
+  mobileColors: MobileColors,
   presentation:
     | MobileShiftRequest["requesterPresentation"]
     | MobileOpenShift["presentation"]
@@ -178,6 +183,7 @@ function getOpenShiftLabel(openShift: MobileOpenShift): string {
 }
 
 function buildJobChip(
+  mobileColors: MobileColors,
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
@@ -240,10 +246,11 @@ function buildJobChip(
 }
 
 function buildGeneralShiftChip(
+  mobileColors: MobileColors,
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
-  const chip = buildJobChip(label, colorSource);
+  const chip = buildJobChip(mobileColors, label, colorSource);
 
   if (!chip) {
     return null;
@@ -264,24 +271,27 @@ function isGeneralShiftSegment(segment: { shiftId?: number | null } | null | und
   );
 }
 
-function getOpenShiftJobChip(openShift: MobileOpenShift): JobChip | null {
+function getOpenShiftJobChip(mobileColors: MobileColors, openShift: MobileOpenShift): JobChip | null {
   const primarySegment = openShift.presentation.segments[0] ?? null;
 
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(getOpenShiftLabel(openShift), primarySegment);
+    return buildGeneralShiftChip(mobileColors, getOpenShiftLabel(openShift), primarySegment);
   }
 
   const segment = openShift.presentation.segments.find((item) => item.jobName) ?? null;
 
-  return buildJobChip(segment?.jobName ?? null, segment);
+  return buildJobChip(mobileColors, segment?.jobName ?? null, segment);
 }
 
-function getSegmentJobChip(segment: MobileScheduleEntrySegment): JobChip | null {
+function getSegmentJobChip(
+  mobileColors: MobileColors,
+  segment: MobileScheduleEntrySegment,
+): JobChip | null {
   if (isGeneralShiftSegment(segment)) {
-    return buildGeneralShiftChip(segment.shiftName ?? segment.label, segment);
+    return buildGeneralShiftChip(mobileColors, segment.shiftName ?? segment.label, segment);
   }
 
-  return buildJobChip(segment.jobName ?? null, segment);
+  return buildJobChip(mobileColors, segment.jobName ?? null, segment);
 }
 
 function getOpenShiftFocusAreaName(openShift: MobileOpenShift): string | null {
@@ -326,40 +336,42 @@ type StatusChipTone = {
   textColor: string;
 };
 
-const STATUS_CHIP_TONES: Record<MobileShiftRequest["status"], StatusChipTone> = {
-  open: {
-    backgroundColor: mobileColors.brandSoft,
-    borderColor: mobileColors.brandBorder,
-    textColor: mobileColors.brand,
-  },
-  pending_approval: {
-    backgroundColor: mobileColors.warningSoft,
-    borderColor: mobileColors.warningBorder,
-    textColor: mobileColors.warningText,
-  },
-  approved: {
-    backgroundColor: mobileColors.successSoft,
-    borderColor: mobileColors.successBorder,
-    textColor: mobileColors.successText,
-  },
-  rejected: {
-    backgroundColor: mobileColors.dangerSoft,
-    borderColor: mobileColors.dangerBorder,
-    textColor: mobileColors.dangerText,
-  },
-  cancelled: {
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.border,
-    textColor: mobileColors.textSubtle,
-  },
-  expired: {
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.border,
-    textColor: mobileColors.textSubtle,
-  },
-};
-
-const OPEN_SHIFT_CHIP_TONE = STATUS_CHIP_TONES.open;
+function createStatusChipTones(
+  mobileColors: MobileColors,
+): Record<MobileShiftRequest["status"], StatusChipTone> {
+  return {
+    open: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+      textColor: mobileColors.brand,
+    },
+    pending_approval: {
+      backgroundColor: mobileColors.warningSoft,
+      borderColor: mobileColors.warningBorder,
+      textColor: mobileColors.warningText,
+    },
+    approved: {
+      backgroundColor: mobileColors.successSoft,
+      borderColor: mobileColors.successBorder,
+      textColor: mobileColors.successText,
+    },
+    rejected: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+      textColor: mobileColors.dangerText,
+    },
+    cancelled: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.border,
+      textColor: mobileColors.textSubtle,
+    },
+    expired: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.border,
+      textColor: mobileColors.textSubtle,
+    },
+  };
+}
 
 function CardIcon({
   name,
@@ -368,6 +380,8 @@ function CardIcon({
   name: keyof typeof Ionicons.glyphMap;
   muted?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View style={[styles.cardIconFrame, muted && styles.cardIconFrameMuted]}>
       <Ionicons color={mobileColors.brand} name={name} size={18} />
@@ -376,6 +390,8 @@ function CardIcon({
 }
 
 export default function RequestsScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const params = useLocalSearchParams<{
     requestId?: string | string[];
     tab?: string | string[];
@@ -420,14 +436,19 @@ export default function RequestsScreen() {
     queryFn: () => getMySchedule(accessToken!, requestRange),
     enabled: Boolean(accessToken) && Boolean(linkedEmployeeId) && !canViewAllRequests,
   });
-  const manualRefresh = useManualRefresh(async () => {
+  const refreshRequests = useCallback(() => {
     const refreshes: Array<Promise<unknown>> = [requestsQuery.refetch()];
 
     if (linkedEmployeeId && !canViewAllRequests) {
       refreshes.push(availabilityScheduleQuery.refetch());
     }
 
-    await Promise.all(refreshes);
+    return Promise.all(refreshes);
+  }, [availabilityScheduleQuery, canViewAllRequests, linkedEmployeeId, requestsQuery]);
+  const manualRefresh = useManualRefresh(refreshRequests);
+  useMobileShiftRequestsRealtime({
+    orgId: bootstrapQuery.data?.currentOrg.id ?? null,
+    onChange: refreshRequests,
   });
   const requestActionMutation = useMutation({
     mutationFn: async (input: { requestId: string; body: RequestActionBody }) =>
@@ -913,6 +934,9 @@ function RequestCard({
   onAction: (body: RequestActionBody) => void;
   showDate?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const statusChipTones = useMemo(() => createStatusChipTones(mobileColors), [mobileColors]);
   const shiftLabel = getRequestShiftLabel(request);
   const timeRange = getRequestTimeRange(request);
   const isMentored = hasMentoredSegments(getRequestSegments(request));
@@ -930,7 +954,7 @@ function RequestCard({
       : request.type === "swap"
         ? "Swap request"
         : "Calloff request";
-  const statusTone = STATUS_CHIP_TONES[request.status];
+  const statusTone = statusChipTones[request.status];
 
   const canCancel =
     Boolean(linkedEmployeeId) &&
@@ -966,7 +990,7 @@ function RequestCard({
                 <SplitShiftSegmentList
                   renderSegmentChip={(segment) => (
                     <JobPill
-                      chip={getSegmentJobChip(segment)}
+                      chip={getSegmentJobChip(mobileColors, segment)}
                       compact
                       isMentored={segment.isMentored === true}
                     />
@@ -978,7 +1002,7 @@ function RequestCard({
             ) : (
               <View style={styles.shiftPillRow}>
                 <ShiftPill
-                  colors={getShiftPillColors(request.requesterPresentation)}
+                  colors={getShiftPillColors(mobileColors, request.requesterPresentation)}
                   label={shiftLabel}
                 />
                 {timeRange ? <Text style={styles.shiftTitleTimeText}>{timeRange}</Text> : null}
@@ -995,7 +1019,7 @@ function RequestCard({
                 <SplitShiftSegmentList
                   renderSegmentChip={(segment) => (
                     <JobPill
-                      chip={getSegmentJobChip(segment)}
+                      chip={getSegmentJobChip(mobileColors, segment)}
                       compact
                       isMentored={segment.isMentored === true}
                     />
@@ -1179,9 +1203,13 @@ function OpenShiftCard({
   onAction: (body: RequestActionBody) => void;
   showDate?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const statusChipTones = useMemo(() => createStatusChipTones(mobileColors), [mobileColors]);
+  const openShiftChipTone = statusChipTones.open;
   const shiftLabel = getOpenShiftLabel(openShift);
   const focusAreaName = getOpenShiftFocusAreaName(openShift);
-  const jobChip = getOpenShiftJobChip(openShift);
+  const jobChip = getOpenShiftJobChip(mobileColors, openShift);
   const isMentored = hasMentoredSegments(openShift.presentation.segments);
   const timeRange = getOpenShiftTimeRange(openShift);
   const splitSegments = getSplitShiftSegmentsFromPresentation(
@@ -1207,12 +1235,12 @@ function OpenShiftCard({
           style={[
             styles.statusChip,
             {
-              backgroundColor: OPEN_SHIFT_CHIP_TONE.backgroundColor,
-              borderColor: OPEN_SHIFT_CHIP_TONE.borderColor,
+              backgroundColor: openShiftChipTone.backgroundColor,
+              borderColor: openShiftChipTone.borderColor,
             },
           ]}
         >
-          <Text style={[styles.statusChipText, { color: OPEN_SHIFT_CHIP_TONE.textColor }]}>
+          <Text style={[styles.statusChipText, { color: openShiftChipTone.textColor }]}>
             Open shift
           </Text>
         </View>
@@ -1224,7 +1252,7 @@ function OpenShiftCard({
           <SplitShiftSegmentList
             renderSegmentChip={(segment) => (
               <JobPill
-                chip={getSegmentJobChip(segment)}
+                chip={getSegmentJobChip(mobileColors, segment)}
                 compact
                 isMentored={segment.isMentored === true}
               />
@@ -1291,6 +1319,8 @@ function JobPill({
   compact?: boolean;
   isMentored?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -1361,6 +1391,8 @@ function JobPill({
 }
 
 function ShiftPill({ colors, label }: { colors: ShiftPillColors; label: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View
       accessibilityLabel={`Shift ${label}`}
@@ -1377,7 +1409,7 @@ function ShiftPill({ colors, label }: { colors: ShiftPillColors; label: string }
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   loadingState: {
     gap: 14,
   },

@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useMemo, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileScheduleEntrySegment } from "@dubgrid/contracts";
@@ -7,7 +7,8 @@ import {
   getSplitShiftBadgeLabel,
   getSplitShiftSegmentLabel,
 } from "../lib/schedule";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 
 type SplitShiftVariant = "compact" | "hero" | "detail" | "supporting";
 const SPLIT_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
@@ -23,6 +24,8 @@ export function SplitShiftBadge({
   inverse?: boolean;
   label?: string | null;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const label = customLabel ?? getSplitShiftBadgeLabel(count);
   if (!label) {
     return null;
@@ -78,6 +81,8 @@ export function SplitShiftSegmentList({
   suppressCountAccessibilityLabel?: boolean;
   variant: SplitShiftVariant;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   if (segments.length <= 1 && !showWhenSingle) {
     return null;
   }
@@ -247,6 +252,8 @@ function getHeroSegmentCaption(segment: MobileScheduleEntrySegment): string | nu
 }
 
 function SplitShiftDashedDivider({ inverse }: { inverse: boolean }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View
       pointerEvents="none"
@@ -266,7 +273,7 @@ function SplitShiftDashedDivider({ inverse }: { inverse: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   badge: {
     alignSelf: "flex-start",
     alignItems: "center",

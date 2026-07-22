@@ -1,9 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Tabs } from "expo-router";
-import type { ComponentProps, ComponentType } from "react";
+import { useMemo, type ComponentProps, type ComponentType } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { mobileColors } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { type MobileColors } from "../theme/tokens";
 
 type TabBarRenderer = NonNullable<ComponentProps<typeof Tabs>["tabBar"]>;
 type BottomTabBarProps = Parameters<TabBarRenderer>[0];
@@ -51,6 +52,8 @@ const TAB_CONFIG: Record<
 };
 
 export function FloatingTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View
       style={[
@@ -123,7 +126,7 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   bar: {
     flexDirection: "row",
     alignItems: "center",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../../src/shared/components/Screen";
 import { ListSkeleton } from "../../../src/shared/components/Skeleton";
@@ -13,9 +13,12 @@ import {
 import { CoverageSectionRow } from "../../../src/features/dashboard/components/CoverageBySectionCard";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { getMobileQueryContentState } from "../../../src/shared/lib/query-state";
-import { mobileColors, mobileText } from "../../../src/shared/theme/tokens";
+import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../src/shared/theme/tokens";
 
 export default function CoverageExpandedScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
   const [focusAreaFilter, setFocusAreaFilter] = useState<number | "all">("all");
   const [isFilterVisible, setIsFilterVisible] = useState(false);
@@ -122,7 +125,7 @@ export default function CoverageExpandedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   loadingState: {
     gap: 14,
   },

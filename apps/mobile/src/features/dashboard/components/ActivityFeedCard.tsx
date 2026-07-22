@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { CountBadge, type CountBadgeTone } from "./CountBadge";
 import { ExpandableList } from "./ExpandableList";
 
@@ -40,6 +42,8 @@ export function formatRelativeTime(isoTimestamp: string): string {
 // Shared with the full-page expanded activity screen
 // (apps/mobile/app/(tabs)/home/activity.tsx).
 export function ActivityRow({ item }: { item: ActivityItem }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View style={styles.row}>
       <View style={styles.rowHeader}>
@@ -58,6 +62,8 @@ export function ActivityFeedCard({
   items: MobileDashboardResponse["activity"];
   onSeeAll?: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <Card
       title="Recent activity"
@@ -81,7 +87,7 @@ export function ActivityFeedCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: mobileColors.borderSubtle,

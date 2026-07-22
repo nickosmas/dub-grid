@@ -1,7 +1,9 @@
 import type { PropsWithChildren, ReactNode } from "react";
+import { useMemo } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { hapticSelection } from "../lib/haptics";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 export type ButtonTone =
   | "primary"
@@ -32,6 +34,8 @@ export function Button({
   loading?: boolean;
   onPress: () => void;
 }>) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const content = children ?? label;
   const isDisabled = disabled || loading;
   const spinnerColor =
@@ -102,7 +106,7 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   button: {
     minHeight: 48,
     borderRadius: mobileRadii.control,

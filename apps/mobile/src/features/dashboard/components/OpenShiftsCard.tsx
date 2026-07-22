@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { formatUsDate, formatUsTime } from "../../../shared/lib/dates";
 import { CountBadge, type CountBadgeTone } from "./CountBadge";
 import { ExpandableList } from "./ExpandableList";
@@ -23,6 +25,9 @@ export const URGENCY_BADGE: Record<OpenShiftUrgency, { label: string; tone: Coun
 // Shared with the full-page expanded open-shifts screen
 // (apps/mobile/app/(tabs)/home/open-shifts.tsx).
 export function OpenShiftRow({ shift }: { shift: OpenShift }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.row}>
       <View style={styles.copy}>
@@ -77,7 +82,7 @@ export function OpenShiftsCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   row: {
     flexDirection: "row",
     justifyContent: "space-between",

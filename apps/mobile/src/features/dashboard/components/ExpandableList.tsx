@@ -1,8 +1,9 @@
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 const DEFAULT_COLLAPSED_COUNT = 5;
 
@@ -27,6 +28,8 @@ export function ExpandableList<T>({
    */
   onSeeAll?: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [expanded, setExpanded] = useState(false);
   const hasMore = items.length > collapsedCount;
   const visibleItems = items.slice(0, collapsedCount);
@@ -65,7 +68,7 @@ export function ExpandableList<T>({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   list: {
     gap: 10,
   },

@@ -15,8 +15,9 @@ import {
   markNotificationRead,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import {
   isNotificationActionSupportedOnMobile,
@@ -52,6 +53,8 @@ function getNotificationIconName(type: string): keyof typeof Ionicons.glyphMap {
 }
 
 function MetadataList({ metadata }: { metadata: Record<string, unknown> }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const entries = formatNotificationMetadata(metadata);
   if (!entries.length) return null;
   return (
@@ -68,6 +71,8 @@ function MetadataList({ metadata }: { metadata: Record<string, unknown> }) {
 }
 
 export default function NotificationDetailScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const params = useLocalSearchParams<{ id: string }>();
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
@@ -280,7 +285,7 @@ export default function NotificationDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   container: {
     gap: 14,
     paddingBottom: 24,

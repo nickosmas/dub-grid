@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { router } from "expo-router";
 import {
   Dimensions,
@@ -14,7 +14,8 @@ import { Button } from "../../../shared/components/Button";
 import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { saveHasSeenOnboarding } from "../../../shared/lib/session";
-import { mobileColors } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import type { MobileColors } from "../../../shared/theme/tokens";
 import { OnboardingCard } from "../components/OnboardingCard";
 import { OnboardingPagination } from "../components/OnboardingPagination";
 import { IllustrationNotifications } from "../components/illustrations/IllustrationNotifications";
@@ -25,7 +26,7 @@ const SLIDES: Array<{ visual: ReactNode; title: string; body: string }> = [
   {
     visual: <IllustrationUpcomingShift />,
     title: "Your schedule, always with you",
-    body: "See your shifts at a glance. Know when and where you're working, and what's coming up next.",
+    body: "See your shifts at a glance, so you always know when and where you're working, and what's coming up next.",
   },
   {
     visual: <IllustrationSwapPreview />,
@@ -42,6 +43,8 @@ const SLIDES: Array<{ visual: ReactNode; title: string; body: string }> = [
 const AnimatedScrollView = Animated.ScrollView;
 
 export default function OnboardingScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [pageWidth, setPageWidth] = useState(Dimensions.get("window").width);
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollX = useSharedValue(0);
@@ -146,7 +149,7 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: mobileColors.background,

@@ -1,7 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useMemo } from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Button } from "./Button";
-import { mobileColors, mobileText } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../theme/tokens";
 
 export function EmptyStateCard({
   iconName = "sparkles-outline",
@@ -20,6 +22,9 @@ export function EmptyStateCard({
   compact?: boolean;
   fillScreen?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const compactStyles = useMemo(() => createCompactStyles(mobileColors), [mobileColors]);
   const variant = compact ? compactStyles : styles;
   const { height: windowHeight } = useWindowDimensions();
   const fillStyle =
@@ -47,7 +52,7 @@ export function EmptyStateCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   card: {
     paddingHorizontal: 4,
     paddingVertical: 32,
@@ -84,7 +89,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const compactStyles = StyleSheet.create({
+const createCompactStyles = (mobileColors: MobileColors) => StyleSheet.create({
   card: {
     paddingHorizontal: 4,
     paddingVertical: 12,

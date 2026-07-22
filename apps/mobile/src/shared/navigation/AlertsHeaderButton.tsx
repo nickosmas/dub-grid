@@ -1,11 +1,15 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAccessToken } from "../../features/auth/hooks/useAccessToken";
 import { useBootstrap } from "../../features/auth/hooks/useBootstrap";
-import { mobileColors } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { type MobileColors } from "../theme/tokens";
 
 export function AlertsHeaderButton() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const bootstrapQuery = useBootstrap(accessToken);
   const unreadCount = bootstrapQuery.data?.unreadNotificationCount ?? 0;
@@ -29,7 +33,7 @@ export function AlertsHeaderButton() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   button: {
     minWidth: 44,
     minHeight: 44,

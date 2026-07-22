@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileShiftRequest } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { formatUsDate } from "../../../shared/lib/dates";
 import { CountBadge, type CountBadgeTone } from "./CountBadge";
 import { ExpandableList } from "./ExpandableList";
@@ -22,6 +24,8 @@ export const REQUEST_TYPE_TONE: Record<MobileShiftRequest["type"], CountBadgeTon
 // Shared with the full-page expanded pending-approvals screen
 // (apps/mobile/app/(tabs)/home/pending-approvals.tsx).
 export function ActionQueueRow({ request }: { request: MobileShiftRequest }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View style={styles.row}>
       <CountBadge label={REQUEST_TYPE_LABEL[request.type]} tone={REQUEST_TYPE_TONE[request.type]} />
@@ -67,7 +71,7 @@ export function ActionQueueCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",

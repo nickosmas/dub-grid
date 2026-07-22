@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MobileEnvValidation } from "../lib/env";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenBottomPadding } from "./screen-layout";
 
 function getIssueTitle(key: string): string {
@@ -42,6 +44,8 @@ export function ConfigurationScreen({
 }: {
   validation: Extract<MobileEnvValidation, { status: "invalid" }>;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const insets = useSafeAreaInsets();
 
   return (
@@ -81,7 +85,7 @@ export function ConfigurationScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: mobileColors.background,

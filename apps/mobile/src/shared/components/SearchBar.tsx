@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Pressable, StyleSheet, TextInput, type TextInputProps, View } from "react-native";
-import { mobileColors, mobileRadii } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileRadii, type MobileColors } from "../theme/tokens";
 
 const DEFAULT_DEBOUNCE_MS = 300;
 
@@ -28,6 +29,8 @@ export function SearchBar({
   returnKeyType = "search",
   onSubmitEditing,
 }: SearchBarProps) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const debouncedCallbackRef = useRef(onDebouncedChange);
   useEffect(() => {
     debouncedCallbackRef.current = onDebouncedChange;
@@ -63,17 +66,18 @@ export function SearchBar({
         <Pressable
           accessibilityLabel="Clear search"
           accessibilityRole="button"
-          hitSlop={10}
+          hitSlop={8}
           onPress={() => onChangeText("")}
+          style={({ pressed }) => [styles.clearButton, pressed && styles.clearButtonPressed]}
         >
-          <Ionicons color={mobileColors.textMuted} name="close-circle" size={18} />
+          <Ionicons color={mobileColors.textSecondary} name="close-circle" size={20} />
         </Pressable>
       ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   field: {
     minHeight: 46,
     alignItems: "center",
@@ -97,5 +101,16 @@ const styles = StyleSheet.create({
     color: mobileColors.textPrimary,
     flex: 1,
     paddingVertical: 12,
+  },
+  clearButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: mobileColors.surfaceSecondary,
+  },
+  clearButtonPressed: {
+    transform: [{ scale: 0.96 }],
   },
 });

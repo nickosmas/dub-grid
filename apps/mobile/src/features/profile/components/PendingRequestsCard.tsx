@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 const TYPE_LABELS: Record<MobileProfileChangeRequest["type"], string> = {
   profile_update: "Name change",
@@ -35,6 +37,8 @@ export function PendingRequestsCard({
   cancellingId: string | null;
   onCancel: (request: MobileProfileChangeRequest) => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   if (requests.length === 0) return null;
 
   const countLabel =
@@ -80,7 +84,7 @@ export function PendingRequestsCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   card: {
     backgroundColor: mobileColors.warningSoft,
     borderColor: mobileColors.warningBorder,

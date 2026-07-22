@@ -1,9 +1,10 @@
-import { type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { BottomSheetModal } from "./BottomSheetModal";
 import { Button } from "./Button";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 // Shared filter-sheet idiom, extracted from PeopleScreen.tsx so every
 // screen with a filter/sort bottom sheet (people directory, and the mobile
@@ -26,6 +27,8 @@ export function FilterSheet({
   clearDisabled?: boolean;
   children: ReactNode;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <BottomSheetModal
       footer={
@@ -54,6 +57,8 @@ export function FilterSheet({
 }
 
 export function SelectionSection({ label, children }: { label: string; children: ReactNode }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{label}</Text>
@@ -73,6 +78,8 @@ export function SelectionRow({
   selected: boolean;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <Pressable
       accessibilityRole="button"
@@ -101,6 +108,8 @@ export function FilterButton({
   accessibilityLabel: string;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
@@ -125,7 +134,7 @@ export function FilterButton({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   section: {
     gap: 10,
   },

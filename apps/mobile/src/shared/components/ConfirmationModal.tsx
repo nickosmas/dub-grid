@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   Animated,
   Dimensions,
@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import { Button, type ButtonTone } from "./Button";
 import { hapticImpact } from "../lib/haptics";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
 const SHEET_TRAVEL = Dimensions.get("window").height;
@@ -44,6 +45,8 @@ export function ConfirmationModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDestructive = confirmTone === "danger" || confirmTone === "dangerFilled";
 
   const handleConfirm = () => {
@@ -107,7 +110,7 @@ export function ConfirmationModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: "flex-end",

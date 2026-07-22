@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { mobileColors, mobileText } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../theme/tokens";
 
 export function ModalHeader({
   title,
@@ -15,6 +17,8 @@ export function ModalHeader({
   closeDisabled?: boolean;
   onClose: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View style={styles.root}>
       <View style={styles.copy}>
@@ -43,7 +47,7 @@ export function ModalHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   root: {
     flexDirection: "row",
     alignItems: "flex-start",

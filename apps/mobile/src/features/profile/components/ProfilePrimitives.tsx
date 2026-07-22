@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { ComponentProps, ReactNode } from "react";
+import { useMemo, type ComponentProps, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -11,7 +11,8 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -63,6 +64,9 @@ export function ProfileHero({
   style?: StyleProp<ViewStyle>;
   children?: ReactNode;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={[styles.hero, style]}>
       <View style={styles.heroTop}>
@@ -105,6 +109,9 @@ export function ProfileHero({
 }
 
 export function ProfileHeroMeta({ label, value }: { label: string; value: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.heroMetaItem}>
       <Text style={styles.heroMetaLabel}>{label}</Text>
@@ -124,6 +131,9 @@ export function ProfileSection({
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={[styles.section, style]}>
       {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
@@ -140,6 +150,9 @@ export function ProfilePanel({
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return <View style={[styles.panel, style]}>{children}</View>;
 }
 
@@ -150,6 +163,9 @@ export function ProfileList({
   children: ReactNode;
   variant?: "framed" | "plain";
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return <View style={variant === "plain" ? styles.listPlain : styles.list}>{children}</View>;
 }
 
@@ -166,6 +182,9 @@ export function ProfileInfoRow({
   detail?: string;
   isLast?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={[styles.row, !isLast && styles.rowDivider]}>
       {iconName ? <ProfileIcon name={iconName} /> : null}
@@ -197,6 +216,9 @@ export function ProfileNavRow({
   isLast?: boolean;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -239,6 +261,8 @@ export function ProfileTextInput({
   containerStyle?: StyleProp<ViewStyle>;
   inputStyle?: StyleProp<TextStyle>;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { style: textInputStyle, ...resolvedInputProps } = inputProps;
 
   return (
@@ -280,7 +304,7 @@ export function ProfileTextInput({
   );
 }
 
-export function ProfileChoiceGroup({
+export function ProfileChoiceGroup<TId extends string | number>({
   label,
   items,
   selectedIds,
@@ -288,11 +312,14 @@ export function ProfileChoiceGroup({
   onToggle,
 }: {
   label: string;
-  items: Array<{ id: number; name: string; abbr?: string | null }>;
-  selectedIds: number[];
+  items: Array<{ id: TId; name: string; abbr?: string | null }>;
+  selectedIds: TId[];
   error?: string | null;
-  onToggle: (id: number) => void;
+  onToggle: (id: TId) => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.chipGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -331,6 +358,9 @@ export function ProfileIcon({
   name: IconName;
   tone?: "neutral" | "brand" | "danger" | "success";
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View
       style={[
@@ -357,7 +387,7 @@ export function ProfileIcon({
   );
 }
 
-export const profilePrimitiveStyles = StyleSheet.create({
+const createProfilePrimitiveStyles = (mobileColors: MobileColors) => StyleSheet.create({
   actionsStack: {
     gap: 10,
   },
@@ -371,7 +401,12 @@ export const profilePrimitiveStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+export function useProfilePrimitiveStyles() {
+  const mobileColors = useMobileColors();
+  return useMemo(() => createProfilePrimitiveStyles(mobileColors), [mobileColors]);
+}
+
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   hero: {
     gap: 14,
     paddingTop: 4,

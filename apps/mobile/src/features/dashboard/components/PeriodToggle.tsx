@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import type { DashboardPeriodMode } from "../../../shared/lib/dates";
 
 const OPTIONS: Array<{ mode: DashboardPeriodMode; label: string }> = [
@@ -17,6 +19,9 @@ export function PeriodToggle({
   onChange: (mode: DashboardPeriodMode) => void;
   loading?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={[styles.track, loading ? styles.trackLoading : null]}>
       {OPTIONS.map((option) => {
@@ -41,7 +46,7 @@ export function PeriodToggle({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   track: {
     flexDirection: "row",
     alignSelf: "flex-start",

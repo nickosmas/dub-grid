@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ApiResponseError } from "@dubgrid/api-client";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
@@ -29,11 +29,12 @@ import {
 } from "../../../shared/lib/api";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
-import { loadLastOrgSlug, saveLastOrgSlug } from "../../../shared/lib/session";
+import { loadLastOrgSlug, saveHasSeenOnboarding, saveLastOrgSlug } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 type Stage = "organization" | "credentials" | "mfa";
 
@@ -64,6 +65,8 @@ function getOrgSuffixLabel(apiBaseUrl: string) {
 }
 
 function InlineError({ message }: { message: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View style={styles.errorRow}>
       <Ionicons color={mobileColors.dangerText} name="alert-circle" size={16} />
@@ -96,6 +99,8 @@ function withSessionHandoffTimeout<T>(promise: Promise<T>): Promise<T> {
 }
 
 export default function LoginScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { accessToken, isLoading } = useSessionState();
   const insets = useSafeAreaInsets();
   const emailInputRef = useRef<TextInput>(null);
@@ -303,9 +308,27 @@ export default function LoginScreen() {
 
   const orgLabel = orgName ?? orgSlug;
 
+  // `__DEV__` is a Metro/RN global that isn't defined outside the app
+  // runtime (e.g. under vitest), so guard the lookup rather than reference
+  // it directly.
+  const isDevBuild = typeof __DEV__ !== "undefined" && __DEV__;
+
+  // Dev-only: long-press the wordmark to re-show onboarding after a local
+  // `db:reset`, since `hasSeenOnboarding` lives in device storage and a DB
+  // reset has no way to reach it.
+  async function handleDevResetOnboarding() {
+    if (!isDevBuild) return;
+    await saveHasSeenOnboarding(false);
+    pushToast({ title: "Onboarding reset", message: "Showing onboarding again.", tone: "info" });
+    router.replace("/(auth)/onboarding");
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.brandHeader}>
+      <Pressable
+        style={styles.brandHeader}
+        onLongPress={isDevBuild ? () => void handleDevResetOnboarding() : undefined}
+      >
         <Image
           accessibilityIgnoresInvertColors
           accessibilityLabel="DubGrid logo"
@@ -313,7 +336,7 @@ export default function LoginScreen() {
           style={styles.brandMark}
         />
         <DubGridWordmark fontSize={20} color={mobileColors.textPrimary} />
-      </View>
+      </Pressable>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardArea}
@@ -589,7 +612,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: mobileColors.background,

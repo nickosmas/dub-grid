@@ -1,14 +1,16 @@
+import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { CountBadge } from "./CountBadge";
 import { ExpandableList } from "./ExpandableList";
 
 // Same thresholds as web's CoverageBySectionCard
 // (apps/web/src/components/dashboard/CoverageBySectionCard.tsx).
-export function coverageColor(pct: number): string {
+export function coverageColor(mobileColors: MobileColors, pct: number): string {
   if (pct >= 90) return mobileColors.success;
   if (pct >= 70) return mobileColors.warning;
   return mobileColors.danger;
@@ -20,7 +22,9 @@ export type CoverageSection = MobileDashboardResponse["coverageBySection"][numbe
 // (apps/mobile/app/(tabs)/home/coverage.tsx) so the row layout never drifts
 // between the compact card preview and the full list.
 export function CoverageSectionRow({ section }: { section: CoverageSection }) {
-  const pctColor = coverageColor(section.pct);
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const pctColor = coverageColor(mobileColors, section.pct);
   return (
     <View style={styles.row}>
       <View style={styles.rowHeader}>
@@ -84,7 +88,7 @@ export function CoverageBySectionCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   row: {
     gap: 6,
   },

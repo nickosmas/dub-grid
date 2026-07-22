@@ -13,12 +13,15 @@ import {
 import { StaffHoursRow } from "../../../src/features/dashboard/components/StaffHoursCard";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { getMobileQueryContentState } from "../../../src/shared/lib/query-state";
-import { mobileColors, mobileText } from "../../../src/shared/theme/tokens";
+import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../src/shared/theme/tokens";
 
 type SortMode = "overtime" | "alphabetical";
 const UNASSIGNED_LABEL = "Unassigned";
 
 export default function StaffHoursExpandedScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
   const [sortMode, setSortMode] = useState<SortMode>("overtime");
   const [focusAreaFilter, setFocusAreaFilter] = useState<string>("all");
@@ -148,7 +151,7 @@ export default function StaffHoursExpandedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   loadingState: {
     gap: 14,
   },

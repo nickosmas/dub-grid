@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
-import { mobileColors, mobileRadii } from "../../../../shared/theme/tokens";
+import { useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
+import { mobileRadii, type MobileColors } from "../../../../shared/theme/tokens";
 
 const AVATARS = [
   { bg: "#DBEAFE", fg: "#1D4ED8", initials: "BT" },
@@ -9,6 +11,8 @@ const AVATARS = [
 ];
 
 export function IllustrationUpcomingShift() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View accessible={false} style={styles.card}>
       <View style={styles.topRow}>
@@ -62,7 +66,7 @@ export function IllustrationUpcomingShift() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   card: {
     width: 296,
     backgroundColor: mobileColors.brand,

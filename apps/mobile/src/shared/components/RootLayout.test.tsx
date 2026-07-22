@@ -116,10 +116,10 @@ vi.mock("expo-router", async () => {
 });
 
 vi.mock("../navigation/top-level-stack", () => ({
-  commonStackOptions: {
+  createCommonStackOptions: () => ({
     headerBackButtonDisplayMode: "minimal",
-  },
-  createDetailStackOptions: (title: string) => ({
+  }),
+  createDetailStackOptions: (_mobileColors: unknown, title: string) => ({
     title,
   }),
 }));

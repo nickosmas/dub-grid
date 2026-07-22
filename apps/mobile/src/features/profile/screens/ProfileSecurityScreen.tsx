@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
@@ -22,8 +22,9 @@ import {
 import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
@@ -32,7 +33,7 @@ import {
   ProfilePanel,
   ProfileSection,
   ProfileTextInput,
-  profilePrimitiveStyles,
+  useProfilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
 
 const PENDING_ACCOUNT_DELETION_MESSAGE = "An account deletion request is pending admin review.";
@@ -105,6 +106,8 @@ function getPasswordStrengthLevel(password: string) {
 }
 
 function PasswordStrengthHints({ password }: { password: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const hints = getPasswordStrengthHints(password);
   const level = getPasswordStrengthLevel(password);
   const hasStartedTyping = password.length > 0;
@@ -148,6 +151,9 @@ function PasswordVisibilityToggle({
   label: string;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityLabel={`${isVisible ? "Hide" : "Show"} ${label}`}
@@ -166,6 +172,9 @@ function PasswordVisibilityToggle({
 }
 
 export default function ProfileSecurityScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const profilePrimitiveStyles = useProfilePrimitiveStyles();
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [sessionScopeLoading, setSessionScopeLoading] = useState<"others" | "global" | null>(null);
@@ -759,7 +768,7 @@ export default function ProfileSecurityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   actionsRow: {
     flexDirection: "row",
     gap: 10,

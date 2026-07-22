@@ -1,44 +1,53 @@
 import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
 import { Platform } from "react-native";
-import { mobileColors } from "../theme/tokens";
+import type { MobileColors } from "../theme/tokens";
 
-export const commonStackOptions: NativeStackNavigationOptions = {
-  headerBackVisible: true,
-  headerBackButtonDisplayMode: "minimal",
-  headerShadowVisible: false,
-  headerTintColor: mobileColors.textPrimary,
-  headerStyle: {
-    backgroundColor: mobileColors.background,
-  },
-  headerTitleStyle: {
-    color: mobileColors.textPrimary,
-    fontWeight: "700",
-  },
-  headerLargeTitleStyle: {
-    color: mobileColors.textPrimary,
-    fontWeight: "700",
-  },
-  headerLargeTitleShadowVisible: false,
-  contentStyle: {
-    backgroundColor: mobileColors.background,
-  },
-};
-
-export function createTopLevelStackOptions(title: string): NativeStackNavigationOptions {
-  const useLargeTitle = Platform.OS === "ios";
-
+export function createCommonStackOptions(mobileColors: MobileColors): NativeStackNavigationOptions {
   return {
-    ...commonStackOptions,
-    title,
-    headerLargeTitle: useLargeTitle,
-    headerLargeTitleEnabled: useLargeTitle,
-    headerStyle: useLargeTitle ? undefined : commonStackOptions.headerStyle,
+    headerBackVisible: true,
+    headerBackButtonDisplayMode: "minimal",
+    headerShadowVisible: false,
+    headerTintColor: mobileColors.textPrimary,
+    headerStyle: {
+      backgroundColor: mobileColors.background,
+    },
+    headerTitleStyle: {
+      color: mobileColors.textPrimary,
+      fontWeight: "700",
+    },
+    headerLargeTitleStyle: {
+      color: mobileColors.textPrimary,
+      fontWeight: "700",
+    },
+    headerLargeTitleShadowVisible: false,
+    contentStyle: {
+      backgroundColor: mobileColors.background,
+    },
   };
 }
 
-export function createDetailStackOptions(title: string): NativeStackNavigationOptions {
+export function createTopLevelStackOptions(
+  mobileColors: MobileColors,
+  title: string,
+): NativeStackNavigationOptions {
+  const useLargeTitle = Platform.OS === "ios";
+  const common = createCommonStackOptions(mobileColors);
+
   return {
-    ...commonStackOptions,
+    ...common,
+    title,
+    headerLargeTitle: useLargeTitle,
+    headerLargeTitleEnabled: useLargeTitle,
+    headerStyle: useLargeTitle ? undefined : common.headerStyle,
+  };
+}
+
+export function createDetailStackOptions(
+  mobileColors: MobileColors,
+  title: string,
+): NativeStackNavigationOptions {
+  return {
+    ...createCommonStackOptions(mobileColors),
     title,
     headerLargeTitle: false,
     headerLargeTitleEnabled: false,

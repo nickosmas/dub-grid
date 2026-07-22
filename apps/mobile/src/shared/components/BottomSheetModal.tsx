@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   Animated,
   Dimensions,
@@ -9,7 +9,8 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { mobileColors, mobileRadii } from "../theme/tokens";
+import { mobileRadii, type MobileColors } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
 
 const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
 const SHEET_TRAVEL = Dimensions.get("window").height;
@@ -32,6 +33,8 @@ export function BottomSheetModal({
   footer?: ReactNode;
   children: ReactNode;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const translateY = useRef(new Animated.Value(SHEET_TRAVEL)).current;
 
   useEffect(() => {
@@ -81,7 +84,7 @@ export function BottomSheetModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: "flex-end",

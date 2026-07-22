@@ -243,6 +243,16 @@ export function createReactNativeModule(React: ReactModule) {
       alert: alertMock,
     },
     Animated,
+    Appearance: {
+      getColorScheme: () => "light",
+      setColorScheme: () => undefined,
+      addChangeListener: () => ({
+        remove() {
+          return undefined;
+        },
+      }),
+    },
+    useColorScheme: () => "light",
     AppState: {
       currentState: "active",
       addEventListener: () => ({

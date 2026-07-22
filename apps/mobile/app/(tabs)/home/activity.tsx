@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../../src/shared/components/Screen";
 import { ListSkeleton } from "../../../src/shared/components/Skeleton";
@@ -17,12 +17,15 @@ import {
 } from "../../../src/features/dashboard/components/ActivityFeedCard";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { getMobileQueryContentState } from "../../../src/shared/lib/query-state";
-import { mobileColors, mobileText } from "../../../src/shared/theme/tokens";
+import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../src/shared/theme/tokens";
 
 const ACTIVITY_TYPES: ActivityType[] = ["publish", "shift_change", "request", "user_signup"];
 type TypeFilter = "all" | ActivityType;
 
 export default function ActivityExpandedScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { dashboardQuery, bootstrapQuery } = useExpandedDashboardQuery();
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [isFilterVisible, setIsFilterVisible] = useState(false);
@@ -124,7 +127,7 @@ export default function ActivityExpandedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
   loadingState: {
     gap: 14,
   },
