@@ -53,7 +53,7 @@ describe("NotificationPreferences", () => {
     const saveButton = await screen.findByRole("button", { name: /save preferences/i });
     expect(saveButton).toBeDisabled();
 
-    const [scheduleInApp] = screen.getAllByRole("checkbox");
+    const [scheduleInApp] = screen.getAllByRole("switch");
     fireEvent.click(scheduleInApp);
     await waitFor(() => {
       expect(saveButton).toBeEnabled();
@@ -69,8 +69,8 @@ describe("NotificationPreferences", () => {
   it("centers the notification channel headers over the checkbox columns", async () => {
     render(<NotificationPreferences />);
 
-    const inAppHeader = await screen.findByLabelText("In-App");
-    const emailHeader = screen.getByLabelText("Email");
+    const inAppHeader = (await screen.findByText("In-App")).parentElement;
+    const emailHeader = screen.getByText("Email").parentElement;
 
     expect(inAppHeader).toHaveStyle({
       display: "flex",
