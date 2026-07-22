@@ -1279,7 +1279,8 @@ textarea {
   border-radius: var(--dg-radius-sm);
   transition:
     background var(--dg-duration-fast) ease,
-    color var(--dg-duration-fast) ease;
+    color var(--dg-duration-fast) ease,
+    border-color var(--dg-duration-fast) ease;
 }
 
 .dg-close-btn:hover {
@@ -1312,18 +1313,27 @@ textarea {
   height: 26px;
 }
 
+.dg-close-btn--md,
+.dg-close-btn--lg {
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
 .dg-close-btn--md {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
 }
 
 .dg-close-btn--lg {
   width: 40px;
   height: 40px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
+}
+
+.dg-close-btn--md:hover,
+.dg-close-btn--lg:hover,
+.dg-close-btn--md:focus-visible,
+.dg-close-btn--lg:focus-visible {
+  border-color: var(--color-border);
 }
 
 @media (max-width: 767px) {
