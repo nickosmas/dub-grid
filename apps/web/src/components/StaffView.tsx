@@ -235,7 +235,7 @@ export default function StaffView({
       onOpenChange={handleSidebarOpenChange}
       style={{ minHeight: "unset" }}
     >
-      {!isMobile && (
+      {!isMobile && links.length > 1 && (
         <Sidebar
           collapsible="icon"
           className="border-r border-[var(--color-border)] bg-[var(--color-surface)]"
