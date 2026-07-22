@@ -32,6 +32,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
 import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
@@ -3871,26 +3872,7 @@ export default function ShiftEditPanel({
                 })}
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="dg-btn dg-btn-ghost"
-              style={{ padding: 6, borderRadius: 8, lineHeight: 1 }}
-              aria-label="Close"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            <CloseButton size="md" onClick={onClose} aria-label="Close" />
           </div>
           <div
             style={{
@@ -4029,21 +4011,7 @@ export default function ShiftEditPanel({
               )}
             </div>
           </div>
-          {!isMobile && (
-            <button
-              onClick={onClose}
-              className="dg-btn dg-btn-ghost"
-              style={{
-                border: "1px solid var(--color-border)",
-                padding: "4px 8px",
-                fontSize: "var(--dg-fs-body)",
-                lineHeight: 1,
-              }}
-              aria-label="Close"
-            >
-              ×
-            </button>
-          )}
+          {!isMobile && <CloseButton size="md" onClick={onClose} aria-label="Close" />}
         </div>
 
         {/* Scrollable content */}

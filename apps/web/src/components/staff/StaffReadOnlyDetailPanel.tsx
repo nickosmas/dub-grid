@@ -15,6 +15,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import type { Employee, FocusArea, NamedItem } from "@/types";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { getAvatarTone, borderColorFromText } from "@dubgrid/design-tokens";
 
@@ -118,25 +119,12 @@ export function StaffReadOnlyDetailPanel({
             borderBottom: "1px solid var(--color-border)",
           }}
         >
-          <button
-            className="staff-detail-close"
+          <CloseButton
+            size="md"
+            className="self-end"
             onClick={closePanel}
             aria-label="Close detail panel"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          />
 
           <div
             style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", paddingTop: 8 }}

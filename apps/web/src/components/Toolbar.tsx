@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useRef, useCallback, Fragment } from "react";
 import { ArrowUpDown, Check, Import as ImportIcon, Trash2, Upload } from "lucide-react";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
@@ -85,6 +86,20 @@ interface ToolbarProps {
   hasVisibleScheduleEntries?: boolean;
   /** When false, disables the bulk-delete entry point while still allowing exit. */
   hasRemovableVisibleEntries?: boolean;
+}
+
+/* ── Clear search button ── */
+function ClearSearchButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Hint content={hint("Clear search")} side="bottom">
+      <CloseButton
+        size="sm"
+        onClick={onClick}
+        aria-label="Clear search"
+        style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+      />
+    </Hint>
+  );
 }
 
 /* ── Toggle Switch ── */
@@ -665,24 +680,7 @@ export default function Toolbar({
                 style={{ paddingLeft: 30, width: "100%", borderRadius: "var(--dg-btn-radius)" }}
               />
               {staffSearch && (
-                <Hint content={hint("Clear search")} side="bottom">
-                  <button
-                    onClick={() => onStaffSearchChange("")}
-                    className="dg-btn-ghost"
-                    style={{
-                      position: "absolute",
-                      right: 4,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      padding: "2px 5px",
-                      fontSize: "var(--dg-fs-body-sm)",
-                      lineHeight: 1,
-                      borderRadius: "var(--dg-btn-radius)",
-                    }}
-                  >
-                    ×
-                  </button>
-                </Hint>
+                <ClearSearchButton onClick={() => onStaffSearchChange("")} />
               )}
             </div>
           )}
@@ -963,26 +961,7 @@ export default function Toolbar({
                 borderRadius: "var(--dg-btn-radius)",
               }}
             />
-            {staffSearch && (
-              <Hint content={hint("Clear search")} side="bottom">
-                <button
-                  onClick={() => onStaffSearchChange("")}
-                  className="dg-btn-ghost"
-                  style={{
-                    position: "absolute",
-                    right: 4,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    padding: "2px 5px",
-                    fontSize: "var(--dg-fs-body-sm)",
-                    lineHeight: 1,
-                    borderRadius: "var(--dg-btn-radius)",
-                  }}
-                >
-                  ×
-                </button>
-              </Hint>
-            )}
+            {staffSearch && <ClearSearchButton onClick={() => onStaffSearchChange("")} />}
           </div>
         </div>
       )}

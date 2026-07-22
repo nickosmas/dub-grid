@@ -356,20 +356,20 @@ describe("Toolbar — callbacks", () => {
 });
 
 describe("Toolbar — staff search", () => {
-  it("× clear button appears when staffSearch is non-empty", () => {
+  it("clear button appears when staffSearch is non-empty", () => {
     render(<Toolbar {...defaultProps} staffSearch="Alice" />);
-    expect(screen.getByRole("button", { name: "×" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear search" })).toBeInTheDocument();
   });
 
-  it("× clear button is absent when staffSearch is empty", () => {
+  it("clear button is absent when staffSearch is empty", () => {
     render(<Toolbar {...defaultProps} staffSearch="" />);
-    expect(screen.queryByRole("button", { name: "×" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
   });
 
-  it("clicking × calls onStaffSearchChange with empty string", async () => {
+  it("clicking clear button calls onStaffSearchChange with empty string", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} staffSearch="Alice" />);
-    await user.click(screen.getByRole("button", { name: "×" }));
+    await user.click(screen.getByRole("button", { name: "Clear search" }));
     expect(defaultProps.onStaffSearchChange).toHaveBeenCalledWith("");
   });
 

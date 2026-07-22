@@ -123,8 +123,8 @@ function DayPopover({
         style={{
           background: "var(--color-surface)",
           border: "1px solid var(--color-border)",
-          borderRadius: "var(--dg-radius-md)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.15), 0 4px 10px rgba(0,0,0,0.08)",
+          borderRadius: "var(--dg-radius-lg)",
+          boxShadow: "var(--shadow-menu)",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",

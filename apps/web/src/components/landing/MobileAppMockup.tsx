@@ -36,34 +36,37 @@ import {
   BarChart3,
 } from "lucide-react";
 
-/* ── colorTokens (design-tokens) ── */
+/* ── colorTokens (design-tokens) ──
+   Same light/dark values as `lightColorTokens`/`darkColorTokens` in
+   packages/design-tokens, referenced here as CSS custom properties so the
+   phone screens follow the page theme like every other landing mockup. ── */
 const C = {
-  background: "#F8FAFC",
-  surface: "#FFFFFF",
-  surfaceSecondary: "#F1F5F9",
-  surfaceMuted: "#FAFBFC",
-  border: "#CBD5E1",
-  borderSubtle: "#E2E8F0",
-  textPrimary: "#0F172A",
-  textSecondary: "#1E293B",
-  textMuted: "#475569",
-  textSubtle: "#64748B",
-  textInverse: "#FFFFFF",
-  brand: "#2563EB",
-  brandSoft: "#EFF6FF",
-  brandBorder: "#BFDBFE",
-  success: "#16A34A",
-  successText: "#166534",
-  successSoft: "#F0FDF4",
-  successBorder: "#BBF7D0",
-  warning: "#F59E0B",
-  warningText: "#92400E",
-  warningSoft: "#FFFBEB",
-  warningBorder: "#FDE68A",
-  danger: "#EF4444",
-  dangerText: "#B91C1C",
-  dangerSoft: "#FEF2F2",
-  dangerBorder: "#FECACA",
+  background: "var(--color-bg)",
+  surface: "var(--color-surface)",
+  surfaceSecondary: "var(--color-bg-secondary)",
+  surfaceMuted: "var(--color-row-alt)",
+  border: "var(--color-border)",
+  borderSubtle: "var(--color-border-light)",
+  textPrimary: "var(--color-text-primary)",
+  textSecondary: "var(--color-text-secondary)",
+  textMuted: "var(--color-text-muted)",
+  textSubtle: "var(--color-text-subtle)",
+  textInverse: "var(--color-text-inverse)",
+  brand: "var(--color-brand)",
+  brandSoft: "var(--color-brand-bg)",
+  brandBorder: "var(--color-brand-border)",
+  success: "var(--color-success)",
+  successText: "var(--color-success-text)",
+  successSoft: "var(--color-success-bg)",
+  successBorder: "var(--color-success-border)",
+  warning: "var(--color-warning)",
+  warningText: "var(--color-warning-text)",
+  warningSoft: "var(--color-warning-bg)",
+  warningBorder: "var(--color-warning-border)",
+  danger: "var(--color-danger)",
+  dangerText: "var(--color-danger-text)",
+  dangerSoft: "var(--color-danger-bg)",
+  dangerBorder: "var(--color-danger-border)",
   shadow: "rgba(15, 23, 42, 0.08)",
   shadowStrong: "rgba(15, 23, 42, 0.14)",
 };
@@ -551,41 +554,51 @@ function ScheduleScreen() {
         >
           {/* meHeroContent: gap 11 */}
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-            {/* meHeroHeader: row, alignItems flex-end, justify space-between, gap 12 */}
+            {/* meHeroHeader: row, alignItems flex-start, justify space-between, gap 12.
+                Badge + title share a meHeroHeaderCopy column so the title sits directly
+                under the badge instead of trailing the (taller) date tile's own height. */}
             <div
               style={{
                 display: "flex",
-                alignItems: "flex-end",
+                alignItems: "flex-start",
                 justifyContent: "space-between",
                 gap: 12,
               }}
             >
-              {/* meHeroBadge. Status "active" → meHeroBadgeDotActive (#86EFAC) */}
-              <div
-                style={{
-                  alignSelf: "flex-start",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
+              {/* meHeroHeaderCopy: column, gap 10 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 0 }}>
+                {/* meHeroBadge. Status "active" → meHeroBadgeDotActive (#86EFAC) */}
                 <div
                   style={{
-                    width: 9,
-                    height: 9,
-                    borderRadius: 4.5,
-                    background: "#86EFAC",
-                  }}
-                />
-                <span
-                  style={{
-                    ...label,
-                    color: C.textInverse,
-                    textTransform: "uppercase",
+                    alignSelf: "flex-start",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
                   }}
                 >
-                  On Duty
-                </span>
+                  <div
+                    style={{
+                      width: 9,
+                      height: 9,
+                      borderRadius: 4.5,
+                      background: "#86EFAC",
+                    }}
+                  />
+                  <span
+                    style={{
+                      ...label,
+                      color: C.textInverse,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    On Duty
+                  </span>
+                </div>
+
+                {/* meHeroTitleRow → meHeroTitle */}
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                  <span style={{ ...heroMetric, color: C.textInverse }}>Day Shift</span>
+                </div>
               </div>
               {/* meHeroDateTile */}
               <div
@@ -608,11 +621,6 @@ function ScheduleScreen() {
                 <span style={{ ...label, color: "rgba(255, 255, 255, 0.72)" }}>WED</span>
                 <span style={{ ...heroMetric, color: C.textInverse }}>14</span>
               </div>
-            </div>
-
-            {/* meHeroTitleRow → meHeroTitle */}
-            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-              <span style={{ ...heroMetric, color: C.textInverse }}>Day Shift</span>
             </div>
 
             {/* meHeroAreaRow: marginTop 2 */}

@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 import { fetchAccountIdentity, getVerifiedBrowserAuthUser } from "@/features/account/client";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { openConsentPreferences } from "@/components/CookieConsent";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import ScheduleGridMockup from "@/components/landing/ScheduleGridMockup";
 import StaffViewMockup from "@/components/landing/StaffViewMockup";
@@ -27,8 +29,9 @@ import {
   Building2,
   Lock,
   Menu,
-  X,
   ArrowRight,
+  Sun,
+  Moon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -164,6 +167,32 @@ function RevealSection({
   );
 }
 
+/* ─── Theme Toggle ────────────────────────────────────── */
+
+function ThemeToggleButton({ className = "" }: { className?: string }) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  return (
+    <button
+      type="button"
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      className={`p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors ${className}`}
+      aria-label={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {!mounted ? (
+        <span style={{ display: "block", width: 20, height: 20 }} />
+      ) : resolvedTheme === "dark" ? (
+        <Sun size={20} />
+      ) : (
+        <Moon size={20} />
+      )}
+    </button>
+  );
+}
+
 /* ─── Main Page ───────────────────────────────────────── */
 
 export default function RootPage() {
@@ -211,7 +240,6 @@ export default function RootPage() {
   if (!ready) {
     return (
       <div
-        className="dg-force-light"
         style={{
           minHeight: "100vh",
           display: "flex",
@@ -235,13 +263,13 @@ export default function RootPage() {
   }
 
   return (
-    <div className="dg-force-light min-h-screen bg-[var(--color-surface)] text-[var(--color-text-primary)] font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-[var(--color-surface)] text-[var(--color-text-primary)] font-sans overflow-x-hidden">
       {/* ── Navbar ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-[var(--color-surface)]/80 backdrop-blur-xl border-b border-[var(--color-border-light)]">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <DubGridLogo size={28} color="var(--color-brand)" />
-            <DubGridWordmark fontSize={18} color="#111827" />
+            <DubGridWordmark fontSize={18} />
           </div>
 
           {/* Desktop nav links */}
@@ -261,6 +289,7 @@ export default function RootPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            <ThemeToggleButton />
             <Link
               href="/login"
               className="hidden sm:inline-flex dg-btn dg-btn-primary dg-btn-lg"
@@ -285,15 +314,17 @@ export default function RootPage() {
           <div className="flex items-center justify-between px-6 h-14">
             <div className="flex items-center gap-2.5">
               <DubGridLogo size={28} color="var(--color-brand)" />
-              <DubGridWordmark fontSize={18} color="#111827" />
+              <DubGridWordmark fontSize={18} />
             </div>
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              className="p-2 -mr-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
-              aria-label="Close menu"
-            >
-              <X size={22} />
-            </button>
+            <div className="flex items-center gap-1">
+              <ThemeToggleButton />
+              <CloseButton
+                size="lg"
+                className="-mr-2"
+                onClick={() => setMobileMenuOpen(false)}
+                aria-label="Close menu"
+              />
+            </div>
           </div>
           <div className="flex flex-col items-center justify-center flex-1 gap-8">
             <a

@@ -153,10 +153,10 @@ export function PresetColorPicker({
               overflowY: "auto",
               overscrollBehavior: "contain",
               padding: 14,
-              borderRadius: "var(--dg-radius-md)",
+              borderRadius: "var(--dg-radius-lg)",
               background: "var(--color-surface)",
               border: "1px solid var(--color-border)",
-              boxShadow: "var(--shadow-float)",
+              boxShadow: "var(--shadow-menu)",
             }}
           >
             <div

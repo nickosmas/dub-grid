@@ -14,6 +14,7 @@ import {
   normalizeOptionalUsPhone,
   normalizeStaffName,
 } from "@dubgrid/contracts";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
@@ -441,21 +442,12 @@ export function ManagementStaffPanel({
       <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
         {/* Header */}
         <div className="staff-detail-header">
-          <button className="staff-detail-close" onClick={handleRequestClose} aria-label="Close">
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          <CloseButton
+            size="md"
+            className="self-end"
+            onClick={handleRequestClose}
+            aria-label="Close"
+          />
 
           {/* Profile card */}
           <div

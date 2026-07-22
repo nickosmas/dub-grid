@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
-import { Hint } from "@/components/ui/hint";
-import { hint } from "@/components/ui/hint.types";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import ProgressBar from "@/components/ProgressBar";
+import ScrollableTabs from "@/components/ScrollableTabs";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
 import { resolveShiftPillColors } from "@/lib/colors";
 
@@ -662,7 +662,15 @@ export default function ShiftRequestBoard({
       <div className="dg-panel-overlay" onClick={onClose} />
 
       {/* Panel */}
-      <div className="dg-panel">
+      <div
+        className="dg-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Shift requests"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
+        }}
+      >
         {/* Header */}
         <div
           style={{
@@ -727,86 +735,49 @@ export default function ShiftRequestBoard({
               Pickups, swaps, and approvals
             </div>
           </div>
-          {!isMobile && (
-            <Hint content={hint("Close panel")} side="bottom">
-              <button
-                onClick={onClose}
-                className="dg-btn dg-btn-ghost"
-                style={{
-                  border: "1px solid var(--color-border)",
-                  padding: "4px 8px",
-                  fontSize: "var(--dg-fs-body)",
-                  lineHeight: 1,
-                }}
-                aria-label="Close panel"
-              >
-                ×
-              </button>
-            </Hint>
-          )}
+          {!isMobile && <CloseButton size="md" onClick={onClose} aria-label="Close panel" />}
         </div>
 
         {/* Tab bar */}
         <div
           style={{
-            display: "flex",
+            padding: "12px 20px",
             borderBottom: "1px solid var(--color-border)",
             background: "var(--color-surface)",
             flexShrink: 0,
-            overflowX: "auto",
           }}
         >
-          {tabs
-            .filter((t) => t.visible)
-            .map((tab) => {
-              const isActive = activeTab === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    fontSize: "var(--dg-fs-caption)",
-                    fontWeight: isActive ? 700 : 500,
-                    color: isActive ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                    background: "transparent",
-                    border: "none",
-                    borderBottom: isActive
-                      ? "2px solid var(--color-text-primary)"
-                      : "2px solid transparent",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 6,
-                    whiteSpace: "nowrap",
-                    transition: "color 150ms ease, border-color 150ms ease",
-                  }}
-                >
-                  {tab.label}
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      minWidth: 18,
-                      height: 18,
-                      padding: "0 5px",
-                      borderRadius: 9,
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 700,
-                      background: isActive ? "var(--color-brand)" : "var(--color-bg-secondary)",
-                      color: isActive ? "var(--color-text-inverse)" : "var(--color-text-muted)",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {tab.count}
-                  </span>
-                </button>
-              );
-            })}
+          <ScrollableTabs className="dg-span-tabs dg-span-tabs--light">
+            {tabs
+              .filter((t) => t.visible)
+              .map((tab, i, visibleTabs) => {
+                const isActive = activeTab === tab.key;
+                const prevActive = i > 0 && activeTab === visibleTabs[i - 1].key;
+                const showDivider = i > 0 && !isActive && !prevActive;
+                return (
+                  <Fragment key={tab.key}>
+                    {i > 0 && (
+                      <div
+                        style={{
+                          width: 1,
+                          height: 16,
+                          background: showDivider ? "var(--color-border)" : "transparent",
+                          flexShrink: 0,
+                          alignSelf: "center",
+                        }}
+                      />
+                    )}
+                    <button
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`dg-span-tab${isActive ? " active" : ""}`}
+                    >
+                      {tab.label}
+                      {tab.count > 0 ? ` (${tab.count})` : ""}
+                    </button>
+                  </Fragment>
+                );
+              })}
+          </ScrollableTabs>
         </div>
 
         {/* Scrollable content */}

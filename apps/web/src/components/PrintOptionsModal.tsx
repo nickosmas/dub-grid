@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Printer, X } from "lucide-react";
+import { Printer } from "lucide-react";
 import { FocusArea } from "@/types";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 
@@ -83,13 +84,7 @@ export default function PrintOptionsModal({
           {/* Header */}
           <div className="dg-modal-header">
             <div className="dg-modal-title">Print / Export Options</div>
-            <button
-              onClick={handleRequestClose}
-              aria-label="Close print options"
-              className="dg-modal-close"
-            >
-              <X size={16} />
-            </button>
+            <CloseButton size="md" onClick={handleRequestClose} aria-label="Close print options" />
           </div>
 
           {/* View */}

@@ -8,7 +8,18 @@
    Jobs that show on grid: Supervisor (S), Mentor (M), Office (Ofc),
      Partial (0.3). The "Default shift job" is `show_on_grid: false` so an
      employee with no job override just sees the shift abbr alone.
-   ── */
+
+   Pill colors run through the same `resolveShiftPillColors` remap the real
+   grid uses (via useShiftPillColors) — rendered as-is, these pastel presets
+   read as blown-out, glaring blocks on the dark-mode page. ── */
+
+import { useTheme } from "next-themes";
+import { resolveShiftPillColors } from "@/lib/colors";
+
+function useMockupIsDark(): boolean {
+  const { resolvedTheme } = useTheme();
+  return resolvedTheme === "dark";
+}
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DATES = [22, 23, 24, 25, 26, 27, 28];
@@ -181,13 +192,15 @@ const WARNING_TEXT = "#92400E";
 const TODAY_BG = "color-mix(in srgb, var(--color-brand) 4%, transparent)";
 
 function CertPill({ kind }: { kind: CertCode }) {
-  const c = CERTS[kind];
+  const isDark = useMockupIsDark();
+  const raw = CERTS[kind];
+  const c = resolveShiftPillColors({ color: raw.bg, text: raw.text, border: "transparent" }, isDark);
   return (
     <span
       style={{
         fontSize: 11,
         fontWeight: 700,
-        background: c.bg,
+        background: c.color,
         color: c.text,
         padding: "2px 7px",
         borderRadius: 20,
@@ -247,6 +260,7 @@ function SinglePill({
 /* Split-shift row — pills side-by-side horizontally (data-shift-pill="multi"
    uses flexDirection: "row" + gap: 1 at line 2778 of ScheduleGrid.tsx). */
 function SplitShiftRow({ pair }: { pair: [ShiftAssignment, ShiftAssignment] }) {
+  const isDark = useMockupIsDark();
   return (
     <div
       style={{
@@ -258,7 +272,11 @@ function SplitShiftRow({ pair }: { pair: [ShiftAssignment, ShiftAssignment] }) {
       }}
     >
       {pair.map((seg, i) => {
-        const s = SHIFTS[seg.shift];
+        const raw = SHIFTS[seg.shift];
+        const s = resolveShiftPillColors(
+          { color: raw.bg, text: raw.text, border: raw.border },
+          isDark,
+        );
         return (
           <span
             key={`${seg.shift}-${seg.job ?? "_"}-${i}`}
@@ -269,7 +287,7 @@ function SplitShiftRow({ pair }: { pair: [ShiftAssignment, ShiftAssignment] }) {
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
-              background: s.bg,
+              background: s.color,
               color: s.text,
               border: `1px solid ${s.border}`,
               borderRadius: 6,
@@ -293,7 +311,9 @@ function SplitShiftRow({ pair }: { pair: [ShiftAssignment, ShiftAssignment] }) {
 
 /* Open-shift pill — dashed amber border, two-line shift (+ optional job). */
 function OpenShiftPill({ seg }: { seg: ShiftAssignment }) {
-  const s = SHIFTS[seg.shift];
+  const isDark = useMockupIsDark();
+  const raw = SHIFTS[seg.shift];
+  const s = resolveShiftPillColors({ color: raw.bg, text: raw.text, border: raw.border }, isDark);
   return (
     <span
       style={{
@@ -303,7 +323,7 @@ function OpenShiftPill({ seg }: { seg: ShiftAssignment }) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: s.bg,
+        background: s.color,
         color: s.text,
         border: `1.5px dashed ${WARNING_BORDER}`,
         borderRadius: 6,
@@ -320,27 +340,31 @@ function OpenShiftPill({ seg }: { seg: ShiftAssignment }) {
 }
 
 function CellContent({ cell }: { cell: Cell }) {
+  const isDark = useMockupIsDark();
   if (cell == null) return null;
   if (Array.isArray(cell)) return <SplitShiftRow pair={cell} />;
   if ("shift" in cell) {
-    const s = SHIFTS[cell.shift];
+    const raw = SHIFTS[cell.shift];
+    const s = resolveShiftPillColors({ color: raw.bg, text: raw.text, border: raw.border }, isDark);
     return (
       <SinglePill
         primary={cell.shift}
         secondary={cell.job ?? null}
-        bg={s.bg}
+        bg={s.color}
         text={s.text}
         border={s.border}
       />
     );
   }
   if ("shiftless" in cell) {
-    const j = SHIFTLESS[cell.shiftless];
-    return <SinglePill primary={cell.shiftless} bg={j.bg} text={j.text} border={j.border} />;
+    const raw = SHIFTLESS[cell.shiftless];
+    const j = resolveShiftPillColors({ color: raw.bg, text: raw.text, border: raw.border }, isDark);
+    return <SinglePill primary={cell.shiftless} bg={j.color} text={j.text} border={j.border} />;
   }
   // Absence — secondaryLabel is always null for absences (line 2347)
-  const a = ABSENCES[cell.absence];
-  return <SinglePill primary={a.label} bg={a.bg} text={a.text} border={a.border} />;
+  const raw = ABSENCES[cell.absence];
+  const a = resolveShiftPillColors({ color: raw.bg, text: raw.text, border: raw.border }, isDark);
+  return <SinglePill primary={raw.label} bg={a.color} text={a.text} border={a.border} />;
 }
 
 function TallyCell({ required, scheduled }: { required: number; scheduled: number }) {

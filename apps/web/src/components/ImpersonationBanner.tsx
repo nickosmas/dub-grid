@@ -98,7 +98,7 @@ export default function ImpersonationBanner() {
     <div
       style={{
         height: BANNER_HEIGHT,
-        background: "linear-gradient(135deg, #ef4444, #dc2626)",
+        background: "linear-gradient(135deg, var(--color-danger), var(--color-danger-dark))",
         color: "#fff",
         padding: "0 16px",
         display: "flex",

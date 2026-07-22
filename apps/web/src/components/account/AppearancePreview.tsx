@@ -1,109 +1,253 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { getAvatarTone } from "@dubgrid/design-tokens";
 import { resolveShiftPillColors } from "@/lib/colors";
 
-const PREVIEW_PILLS = [
-  { label: "AM", color: "#BFDBFE", text: "#1D4ED8", border: "#93C5FD" },
-  { label: "PM", color: "#BBF7D0", text: "#166534", border: "#86EFAC" },
-  { label: "Off", color: "#E2E8F0", text: "#334155", border: "#CBD5E1" },
+const PREVIEW_DAYS = [
+  { label: "SUN", date: 19 },
+  { label: "MON", date: 20 },
+  { label: "TUE", date: 21, isToday: true },
+];
+
+type PreviewCell =
+  | { kind: "off" }
+  | { kind: "empty" }
+  | { kind: "shift"; label: string; secondary?: string; tone?: "teal" };
+
+const PREVIEW_ROWS: { name: string; role: string; badge: string; cells: PreviewCell[] }[] = [
+  {
+    name: "Jordan Lee",
+    role: "DCSN",
+    badge: "JLCSN",
+    cells: [{ kind: "off" }, { kind: "off" }, { kind: "shift", label: "Ofc" }],
+  },
+  {
+    name: "Morgan Ellis",
+    role: "Mentor",
+    badge: "JLCSN",
+    cells: [
+      { kind: "empty" },
+      { kind: "shift", label: "Ofc" },
+      { kind: "shift", label: "D", secondary: "M", tone: "teal" },
+    ],
+  },
 ];
 
 /**
  * A compact, self-contained mockup — not the live app chrome itself — so a
  * user can see what light/dark actually looks like without hunting around
- * the page. Built entirely from `var(--color-*)` tokens and the same
- * shift-pill/avatar dark-mode resolvers the real app uses, so it re-renders
- * instantly (no extra state) whenever the selected theme changes.
+ * the page. Mirrors the real ScheduleGrid's structure (section label bar,
+ * Staff/day-header row, name cell + designation badge, shift pills) at a
+ * small scale, built from the same `var(--color-*)` tokens and the
+ * shift-pill dark-mode resolver the real grid uses, so it re-renders
+ * instantly whenever the selected theme changes.
  */
 export function AppearancePreview() {
   const { resolvedTheme } = useTheme();
   const isDarkTheme = resolvedTheme === "dark";
-  const avatarTone = getAvatarTone("preview", isDarkTheme);
 
   return (
-    <div
-      aria-hidden="true"
-      style={{
-        border: "1px solid var(--color-border)",
-        borderRadius: "var(--dg-radius-lg)",
-        background: "var(--color-bg)",
-        padding: 14,
-        maxWidth: 320,
-      }}
-    >
+    <div aria-hidden="true" style={{ maxWidth: 320 }}>
       <div
         style={{
+          fontSize: 13,
+          fontWeight: 800,
+          color: "var(--color-text-secondary)",
+          marginBottom: 8,
+          padding: "5px 8px 5px 7px",
+          background: "var(--color-bg-secondary)",
+          borderRadius: 6,
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border-light)",
-          borderRadius: "var(--dg-radius-md)",
-          padding: "10px 12px",
+          gap: 7,
         }}
       >
-        <div
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: "9999px",
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 12,
-            fontWeight: 700,
-            background: avatarTone.backgroundColor,
-            border: `1px solid ${avatarTone.borderColor}`,
-            color: avatarTone.textColor,
-          }}
-        >
-          JL
-        </div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: "var(--color-text-primary)",
-              lineHeight: 1.2,
-            }}
-          >
-            Jordan Lee
-          </div>
-          <div style={{ fontSize: 11, color: "var(--color-text-muted)", lineHeight: 1.3 }}>
-            Full-time · Nursing
-          </div>
-        </div>
-        <button type="button" className="dg-btn dg-btn-primary" style={{ pointerEvents: "none" }}>
-          + Shift
-        </button>
+        <span style={{ width: 3, height: 14, borderRadius: 2, background: "var(--color-brand)" }} />
+        Nursing
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-        {PREVIEW_PILLS.map((pill) => {
-          const resolved = resolveShiftPillColors(pill, isDarkTheme);
-          return (
+      <div
+        style={{
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--dg-radius-md)",
+          background: "var(--color-surface)",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ display: "flex" }}>
+          <div
+            style={{
+              width: 88,
+              flexShrink: 0,
+              padding: "6px 8px",
+              fontSize: 9,
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              color: "var(--color-text-subtle)",
+              boxShadow: "1px 0 0 0 var(--color-border-light)",
+            }}
+          >
+            Staff
+          </div>
+          {PREVIEW_DAYS.map((day) => (
             <div
-              key={pill.label}
+              key={day.label}
               style={{
                 flex: 1,
                 textAlign: "center",
-                fontSize: 11,
-                fontWeight: 700,
-                borderRadius: "var(--dg-radius-sm)",
-                padding: "6px 0",
-                background: resolved.color,
-                color: resolved.text,
-                border: `1px solid ${resolved.border}`,
+                padding: "5px 0",
+                boxShadow: "1px 0 0 0 var(--color-border-light)",
               }}
             >
-              {pill.label}
+              <div
+                style={{
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: "0.04em",
+                  color: day.isToday ? "var(--color-today-text)" : "var(--color-text-subtle)",
+                }}
+              >
+                {day.label}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  lineHeight: 1.2,
+                  color: day.isToday ? "var(--color-today-text)" : "var(--color-text-secondary)",
+                }}
+              >
+                {day.date}
+              </div>
             </div>
-          );
-        })}
+          ))}
+        </div>
+
+        {PREVIEW_ROWS.map((row, ri) => (
+          <div
+            key={row.name}
+            style={{
+              display: "flex",
+              borderTop:
+                ri > 0 ? "1px solid var(--color-border-light)" : "1px solid var(--color-border)",
+            }}
+          >
+            <div
+              style={{
+                width: 88,
+                flexShrink: 0,
+                padding: "6px 8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 4,
+                minWidth: 0,
+                boxShadow: "1px 0 0 0 var(--color-border-light)",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: "var(--color-text-secondary)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {row.name}
+                </div>
+                <div style={{ fontSize: 8, color: "var(--color-text-subtle)" }}>{row.role}</div>
+              </div>
+              <span
+                style={{
+                  fontSize: 8,
+                  fontWeight: 700,
+                  background: "#EDE9FE",
+                  color: "#6D28D9",
+                  padding: "1px 5px",
+                  borderRadius: 20,
+                  flexShrink: 0,
+                }}
+              >
+                {row.badge}
+              </span>
+            </div>
+            {row.cells.map((cell, ci) => (
+              <div
+                key={ci}
+                style={{
+                  flex: 1,
+                  position: "relative",
+                  height: 38,
+                  boxShadow: "1px 0 0 0 var(--color-border-light)",
+                }}
+              >
+                {cell.kind === "off" && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 4,
+                      borderRadius: 6,
+                      background: "var(--color-text-subtle)",
+                      color: "var(--color-surface)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 11,
+                      fontWeight: 800,
+                    }}
+                  >
+                    X
+                  </div>
+                )}
+                {cell.kind === "shift" &&
+                  (() => {
+                    const resolved =
+                      cell.tone === "teal"
+                        ? resolveShiftPillColors(
+                            { color: "#99F6E4", text: "#0F766E", border: "#5EEAD4" },
+                            isDarkTheme,
+                          )
+                        : {
+                            color: "var(--color-bg-secondary)",
+                            text: "var(--color-text-secondary)",
+                            border: "var(--color-border)",
+                          };
+                    return (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 4,
+                          borderRadius: 6,
+                          background: resolved.color,
+                          color: resolved.text,
+                          border: `1px solid ${resolved.border}`,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 0,
+                        }}
+                      >
+                        <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.2 }}>
+                          {cell.label}
+                        </span>
+                        {cell.secondary && (
+                          <span
+                            style={{ fontSize: 8, fontWeight: 700, lineHeight: 1.2, opacity: 0.78 }}
+                          >
+                            {cell.secondary}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );

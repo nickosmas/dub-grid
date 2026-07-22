@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
@@ -13,7 +14,12 @@ import ProgressBar from "@/components/ProgressBar";
 import ShiftPicker from "@/components/ShiftPicker";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
-import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR, toDarkPillColors } from "@/lib/colors";
+import {
+  borderColor,
+  DESIGNATION_COLORS,
+  DEFAULT_DESIG_COLOR,
+  toDarkPillColors,
+} from "@/lib/colors";
 import {
   deleteRecurringDraft,
   deleteRecurringShift,
@@ -162,26 +168,7 @@ function ShiftCellPopover({
             >
               Select Shift
             </span>
-            <button
-              onClick={onClose}
-              className="dg-btn dg-btn-ghost"
-              style={{ padding: 4, lineHeight: 0 }}
-              aria-label="Close"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            <CloseButton size="md" onClick={onClose} aria-label="Close" />
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
             <ShiftPicker
@@ -1050,7 +1037,7 @@ export function RecurringScheduleSection({
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             style={{
-              padding: "7px 10px 7px 32px",
+              padding: `7px ${searchQuery ? 30 : 10}px 7px 32px`,
               border: "1px solid var(--color-border)",
               borderRadius: "var(--dg-btn-radius)",
               fontSize: "var(--dg-fs-caption)",
@@ -1067,6 +1054,14 @@ export function RecurringScheduleSection({
               event.currentTarget.style.borderColor = "var(--color-border)";
             }}
           />
+          {searchQuery && (
+            <CloseButton
+              size="sm"
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+              style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+            />
+          )}
         </div>
       </div>
 
@@ -1126,7 +1121,7 @@ export function RecurringScheduleSection({
               minWidth: isMobile ? 448 : undefined,
               gridTemplateColumns: `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr))`,
               background: "var(--color-bg)",
-              borderBottom: "1px solid var(--color-dark)",
+              borderBottom: "1px solid var(--color-table-divider-strong)",
             }}
           >
             <div

@@ -295,7 +295,7 @@ function PrintSection({
   const tallyH = `${fontSize * 2.8}px`;
 
   return (
-    <div style={{ marginBottom: "1.4em", breakInside: "avoid", pageBreakInside: "avoid" }}>
+    <div style={{ marginBottom: "1.4em" }}>
       <div
         style={{
           fontSize: "1.3em",
@@ -1034,6 +1034,7 @@ export default function PrintScheduleView({
 
   return (
     <div
+      className="dg-force-light"
       style={{
         position: "fixed",
         inset: 0,

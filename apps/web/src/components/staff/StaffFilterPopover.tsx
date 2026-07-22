@@ -326,7 +326,7 @@ export function StaffFilterPopover({
           sideOffset={4}
           className="isolate z-50"
         >
-          <PopoverPrimitive.Popup className="flex max-h-[70vh] w-[560px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-float)] outline-hidden">
+          <PopoverPrimitive.Popup className="flex max-h-[70vh] w-[560px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[var(--dg-radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-menu)] outline-hidden">
             {content}
           </PopoverPrimitive.Popup>
         </PopoverPrimitive.Positioner>

@@ -6,6 +6,7 @@ import CustomSelect from "@/components/CustomSelect";
 import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
 import { fetchGridmasterSecurity, fetchGridmasterSessions } from "@/features/gridmaster/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { EmptyState } from "@/components/EmptyState";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
@@ -210,31 +211,9 @@ function SessionDetailPanel({
   onClose: () => void;
 }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Session details"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 80,
-        background: "rgba(15, 23, 42, 0.32)",
-        display: "flex",
-        justifyContent: "flex-end",
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: "min(520px, 100%)",
-          height: "100%",
-          background: "var(--color-surface)",
-          boxShadow: "-16px 0 48px rgba(15, 23, 42, 0.18)",
-          display: "flex",
-          flexDirection: "column",
-        }}
-        onClick={(event) => event.stopPropagation()}
-      >
+    <>
+      <div className="staff-detail-overlay" onClick={onClose} />
+      <div role="dialog" aria-modal="true" aria-label="Session details" className="staff-detail-pane">
         <div
           style={{
             padding: "18px 20px",
@@ -264,9 +243,7 @@ function SessionDetailPanel({
               {session.userName ?? session.userEmail ?? "Unknown user"} / {sessionOrgLabel(session)}
             </div>
           </div>
-          <button type="button" onClick={onClose} className="dg-btn dg-btn-ghost dg-btn-sm">
-            Close
-          </button>
+          <CloseButton size="md" onClick={onClose} aria-label="Close session details" />
         </div>
         <div style={{ padding: "8px 20px 24px", overflowY: "auto" }}>
           <DetailRow label="Status" value={statusBadge(session.status)} />
@@ -290,7 +267,7 @@ function SessionDetailPanel({
           <DetailRow label="Created" value={formatDateTime(session.createdAt)} />
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -608,19 +585,28 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             fontSize={12}
           />
           <div style={{ flex: 1 }} />
-          <input
-            className="dg-input"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search sessions..."
-            aria-label="Search sessions"
-            style={{
-              flex: "1 1 220px",
-              maxWidth: 300,
-              minWidth: 180,
-              fontSize: "var(--dg-fs-caption)",
-            }}
-          />
+          <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 300, minWidth: 180 }}>
+            <input
+              className="dg-input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search sessions..."
+              aria-label="Search sessions"
+              style={{
+                width: "100%",
+                paddingRight: search ? 30 : undefined,
+                fontSize: "var(--dg-fs-caption)",
+              }}
+            />
+            {search && (
+              <CloseButton
+                size="sm"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+              />
+            )}
+          </div>
         </div>
 
         <SessionsTable

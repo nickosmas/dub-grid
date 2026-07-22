@@ -3,9 +3,10 @@
 import { useState, useMemo } from "react";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import type { CoverageGap, FocusArea, ShiftCategory } from "@/types";
-import { useMediaQuery, MOBILE } from "@/hooks";
+import { CloseButton } from "@/components/ui/CloseButton";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
+import { useMediaQuery, MOBILE } from "@/hooks";
 
 interface CoveragePanelProps {
   gaps: CoverageGap[];
@@ -64,43 +65,76 @@ export default function CoveragePanel({
     return map;
   }, [filtered]);
 
-  const panelWidth = isMobile ? "100vw" : 380;
+  const subtitle = isUnpublished
+    ? "Not published yet"
+    : gaps.length === 0
+      ? isPartial
+        ? "No gaps on published dates"
+        : "All requirements met"
+      : `${gaps.length} gap${gaps.length !== 1 ? "s" : ""}${isPartial ? " on published dates" : " found"}`;
 
   return (
     <>
       <div className="dg-panel-overlay" onClick={onClose} />
       <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          width: panelWidth,
-          height: "100vh",
-          background: "var(--color-surface)",
-          boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
-          zIndex: 10001,
-          display: "flex",
-          flexDirection: "column",
-          animation: "slideInRight 0.2s ease-out",
+        className="dg-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Coverage overview"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
         }}
       >
         {/* Header */}
         <div
           style={{
-            padding: "16px 20px",
+            padding: isMobile ? "12px 16px" : "16px 20px",
             borderBottom: "1px solid var(--color-border)",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
+            gap: 12,
             flexShrink: 0,
+            background: "var(--color-surface)",
           }}
         >
-          <div>
+          {isMobile && (
+            <button
+              onClick={onClose}
+              aria-label="Back"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 36,
+                height: 36,
+                background: "transparent",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+                padding: 0,
+                flexShrink: 0,
+              }}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--color-text-primary)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 700,
-                color: "var(--color-text-primary)",
+                color: "var(--color-text-secondary)",
               }}
             >
               Coverage Overview
@@ -108,45 +142,16 @@ export default function CoveragePanel({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--color-text-subtle)",
                 marginTop: 2,
               }}
             >
-              {isUnpublished
-                ? "Not published yet"
-                : gaps.length === 0
-                  ? isPartial
-                    ? "No gaps on published dates"
-                    : "All requirements met"
-                  : `${gaps.length} gap${gaps.length !== 1 ? "s" : ""}${isPartial ? " on published dates" : " found"}`}
+              {subtitle}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close coverage panel"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: 6,
-              borderRadius: 8,
-              color: "var(--color-text-muted)",
-            }}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          {!isMobile && (
+            <CloseButton size="md" onClick={onClose} aria-label="Close coverage panel" />
+          )}
         </div>
 
         {!isUnpublished && (
@@ -183,7 +188,7 @@ export default function CoveragePanel({
         )}
 
         {/* Body */}
-        <div style={{ flex: 1, overflow: "auto", padding: "12px 20px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "20px 24px" }}>
           {isUnpublished ? (
             <EmptyState
               size="compact"
@@ -341,13 +346,6 @@ export default function CoveragePanel({
             </>
           )}
         </div>
-
-        <style>{`
-        @keyframes slideInRight {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
-        }
-      `}</style>
       </div>
     </>
   );

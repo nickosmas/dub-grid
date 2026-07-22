@@ -16,6 +16,14 @@ export {
   type AvatarGradientTone,
 } from "./avatar-tone";
 
+export {
+  getReadableTextColor,
+  borderColor,
+  toDarkPillColors,
+  resolveShiftPillColors,
+  type ShiftPillColors,
+} from "./pill-colors";
+
 export const lightColorTokens = {
   background: "#F8FAFC",
   surface: "#FFFFFF",
@@ -79,7 +87,7 @@ export const darkColorTokens: ColorTokens = {
   surfaceSecondary: "#1C1C1F",
   surfaceMuted: "#0A0A0B",
   border: "#2E2E33",
-  borderSubtle: "#232326",
+  borderSubtle: "#2A2A2F",
   textPrimary: "#F1F1F3",
   textSecondary: "#D4D4D8",
   textMuted: "#A1A1AA",
@@ -98,7 +106,7 @@ export const darkColorTokens: ColorTokens = {
   warningSoft: "#241C0B",
   warningBorder: "#3F2F10",
   danger: "#EF4444",
-  dangerText: "#FCA5A5",
+  dangerText: "#FF5C5C",
   dangerSoft: "#2A1414",
   dangerBorder: "#4A1F1F",
   shadow: "rgba(0, 0, 0, 0.55)",
@@ -386,7 +394,7 @@ export const lightShadcnTokens = {
   mutedForeground: "oklch(0.556 0 0)",
   accent: "oklch(0.97 0 0)",
   accentForeground: "oklch(0.205 0 0)",
-  destructive: "oklch(0.577 0.245 27.325)",
+  destructive: lightColorTokens.danger,
   border: "oklch(0.922 0 0)",
   input: "oklch(0.922 0 0)",
   ring: lightColorTokens.brandLight,
@@ -428,7 +436,7 @@ export const darkShadcnTokens: Record<keyof typeof lightShadcnTokens, string> = 
   mutedForeground: "oklch(0.65 0 0)",
   accent: "oklch(0.17 0 0)",
   accentForeground: "oklch(0.97 0 0)",
-  destructive: "oklch(0.704 0.191 22.216)",
+  destructive: darkColorTokens.danger,
   border: "oklch(1 0 0 / 12%)",
   input: "oklch(1 0 0 / 16%)",
   ring: darkColorTokens.brandLight,
@@ -577,6 +585,10 @@ export type WebTheme = "light" | "dark";
 // `--dg-color-dark` / `--dg-color-dark-elevated` are deliberately NOT here —
 // they represent fixed "always dark" chrome (see `stateEffectTokens.onDark*`),
 // not the page theme, and live in `createStaticWebCssVariables` instead.
+// Shared by the login/onboarding shells' dark-mode background — see the
+// `--dg-color-auth-shell-bg` / `--dg-color-onboarding-shell-bg` entries below.
+const darkDiagonalShellGradient = "linear-gradient(135deg, #000000 0%, #000000 40%, #040E33 100%)";
+
 function themedWebCssVariables(theme: WebTheme): Record<string, string> {
   const tokens = theme === "dark" ? darkColorTokens : lightColorTokens;
   const shadows = theme === "dark" ? darkShadowTokens : shadowTokens;
@@ -643,6 +655,23 @@ function themedWebCssVariables(theme: WebTheme): Record<string, string> {
     // against dark mode's near-black surfaces, so this tracks the theme
     // instead.
     "--dg-color-grid-divider-strong": theme === "dark" ? tokens.textMuted : tokens.textPrimary,
+    // Recurring-shifts table header's bottom rule (see
+    // RecurringScheduleSection.tsx): same fixed-`--color-dark`-is-invisible
+    // problem as the grid divider above, but this one needs full white in
+    // dark mode specifically to stand out against the header row.
+    "--dg-color-table-divider-strong": theme === "dark" ? "#FFFFFF" : tokens.textPrimary,
+    // Full-page background behind the login/onboarding auth card (see
+    // .dg-auth-shell) and the onboarding wizard shell (see WizardShell.tsx):
+    // a black-to-vibrant-blue diagonal sweep in dark mode instead of a flat
+    // surface fill, echoing the brand blue without competing with the card.
+    // Held at pure black through the first 40% so the sweep reads as a slow
+    // build into blue rather than an even 0-to-100 fade. Light mode keeps
+    // each shell's existing (non-vibrant) fill.
+    "--dg-color-auth-shell-bg": theme === "dark" ? darkDiagonalShellGradient : tokens.surface,
+    "--dg-color-onboarding-shell-bg":
+      theme === "dark"
+        ? darkDiagonalShellGradient
+        : `linear-gradient(145deg, ${tokens.background} 0%, ${tokens.brandSoft} 100%)`,
   };
 
   const colorAliasVars: Record<string, string> = {};
@@ -823,6 +852,12 @@ export function createWebCssVariables(theme: WebTheme = "light"): Record<string,
  * render light regardless of the visitor's system/selected theme. Custom
  * properties resolve by nearest ancestor definition, so this wins over an
  * inherited `.dark` on `<html>` without needing extra specificity.
+ *
+ * The trailing `@media print` block re-pins the same vars to light for
+ * every printed page and browser print-preview, regardless of the active
+ * theme — printed output should never come out dark-mode-styled. It's
+ * appended last so, at equal specificity, source order lets it win over
+ * `.dark` whenever the media query matches.
  */
 export function createThemedCssText(): string {
   const toDeclarations = (vars: Record<string, string>) =>
@@ -832,5 +867,5 @@ export function createThemedCssText(): string {
 
   const lightDeclarations = toDeclarations(themedWebCssVariables("light"));
 
-  return `:root {\n${lightDeclarations}\n}\n\n.dark {\n${toDeclarations(themedWebCssVariables("dark"))}\n}\n\n.dg-force-light {\n${lightDeclarations}\n}\n`;
+  return `:root {\n${lightDeclarations}\n}\n\n.dark {\n${toDeclarations(themedWebCssVariables("dark"))}\n}\n\n.dg-force-light {\n${lightDeclarations}\n}\n\n@media print {\n  :root,\n  .dark {\n${lightDeclarations}\n  }\n}\n`;
 }

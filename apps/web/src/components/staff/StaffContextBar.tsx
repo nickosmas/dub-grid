@@ -1,6 +1,7 @@
 "use client";
 
 import { Department, Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import type {
   AccountLinkFilter,
@@ -311,25 +312,7 @@ function FilterPill({ label, onClear }: { label: string; onClear: () => void }) 
   return (
     <span className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-light)] bg-[var(--color-bg-secondary)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)] whitespace-nowrap">
       {label}
-      <button
-        onClick={onClear}
-        className="ml-0.5 p-0.5 rounded-sm text-[var(--color-text-faint)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-border-light)] transition-colors cursor-pointer"
-        aria-label={`Clear ${label}`}
-      >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
+      <CloseButton size="xs" onClick={onClear} aria-label={`Clear ${label}`} className="ml-0.5" />
     </span>
   );
 }

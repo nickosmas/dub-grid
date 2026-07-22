@@ -37,6 +37,7 @@ import { useDirectory, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { EmptyState } from "@/components/EmptyState";
 import { getAvatarInitials } from "@/lib/utils";
@@ -1147,8 +1148,16 @@ export function MembersSection({
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Search by name, email, or phone..."
-                  style={{ height: 32, paddingLeft: 32, fontSize: 13 }}
+                  style={{ height: 32, paddingLeft: 32, paddingRight: searchQuery ? 30 : 12, fontSize: 13 }}
                 />
+                {searchQuery && (
+                  <CloseButton
+                    size="sm"
+                    onClick={() => setSearchQuery("")}
+                    aria-label="Clear search"
+                    style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+                  />
+                )}
               </div>
             </div>
 

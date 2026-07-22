@@ -18,7 +18,6 @@ import {
   Shield,
   UserCog,
   Users,
-  X,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProtectedRoute } from "@/components/RouteGuards";
@@ -27,6 +26,7 @@ import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import Modal from "@/components/Modal";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { useAuth } from "@/components/AuthProvider";
 import { usePermissions, type Permissions } from "@/hooks";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
@@ -1089,7 +1089,7 @@ function Toolbar({
           }}
         />
         <input
-          type="search"
+          type="text"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search title or message…"
@@ -1098,25 +1098,12 @@ function Toolbar({
           style={{ paddingLeft: 32, paddingRight: search ? 32 : 12 }}
         />
         {search && (
-          <button
-            type="button"
-            aria-label="Clear search"
+          <CloseButton
+            size="sm"
             onClick={onClearSearch}
-            style={{
-              position: "absolute",
-              top: "50%",
-              right: 6,
-              transform: "translateY(-50%)",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: "var(--color-text-muted)",
-              padding: 4,
-              display: "inline-flex",
-            }}
-          >
-            <X size={14} />
-          </button>
+            aria-label="Clear search"
+            style={{ position: "absolute", top: "50%", right: 6, transform: "translateY(-50%)" }}
+          />
         )}
       </div>
 

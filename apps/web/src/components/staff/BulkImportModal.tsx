@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CheckCircle, Import as ImportIcon, XCircle, X } from "lucide-react";
+import { AlertTriangle, CheckCircle, Import as ImportIcon, XCircle } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { toast } from "sonner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
@@ -417,13 +418,7 @@ export function BulkImportModal({
             {step === "preview" && `Preview (${rows.length} rows)`}
             {step === "result" && "Import Results"}
           </span>
-          <button
-            className="dg-modal-close"
-            onClick={handleRequestClose}
-            aria-label="Close import dialog"
-          >
-            <X size={16} />
-          </button>
+          <CloseButton size="md" onClick={handleRequestClose} aria-label="Close import dialog" />
         </div>
 
         {/* Body */}

@@ -1266,30 +1266,77 @@ textarea {
   color: var(--color-text-primary);
 }
 
-.dg-modal-close {
-  display: flex;
+/* Shared close/clear "X" button. Used by <CloseButton> (components/ui/CloseButton.tsx). */
+.dg-close-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--dg-radius-sm);
+  flex-shrink: 0;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
+  border-radius: var(--dg-radius-sm);
   transition:
     background var(--dg-duration-fast) ease,
     color var(--dg-duration-fast) ease;
 }
 
-.dg-modal-close:hover {
-  background: var(--color-bg-secondary);
+.dg-close-btn:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 12%, transparent);
   color: var(--color-text-primary);
 }
 
-.dg-modal-close:focus-visible {
+.dg-close-btn:active {
+  background: color-mix(in srgb, var(--color-text-primary) 20%, transparent);
+}
+
+.dg-close-btn:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
+}
+
+.dg-close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.dg-close-btn--xs {
+  width: 24px;
+  height: 24px;
+}
+
+.dg-close-btn--sm {
+  width: 26px;
+  height: 26px;
+}
+
+.dg-close-btn--md {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.dg-close-btn--lg {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+@media (max-width: 767px) {
+  .dg-close-btn--xs,
+  .dg-close-btn--sm {
+    width: 32px;
+    height: 32px;
+  }
+
+  .dg-close-btn--lg {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 .dg-modal-section {
@@ -1544,7 +1591,7 @@ table tbody > tr:last-child > th {
   overflow: hidden;
   border-radius: var(--dg-radius-lg);
   border: 1px solid var(--color-border);
-  box-shadow: var(--dg-shadow-staff-detail);
+  box-shadow: var(--shadow-panel);
   z-index: 10001;
   animation: staff-detail-in var(--dg-duration-standard) cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1583,34 +1630,6 @@ table tbody > tr:last-child > th {
   top: 0;
   background: var(--color-surface);
   z-index: 2;
-}
-
-.staff-detail-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--color-text-faint);
-  transition:
-    background 120ms ease,
-    color 120ms ease;
-  flex-shrink: 0;
-  align-self: flex-end;
-}
-
-.staff-detail-close:hover {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-}
-
-.staff-detail-close:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: -2px;
 }
 
 /* Mobile: full-screen panel */
@@ -2379,7 +2398,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 /* ── Auth Form System ──────────────────────────────────── */
 .dg-auth-shell {
   min-height: 100vh;
-  background: var(--color-surface);
+  background: var(--color-auth-shell-bg);
   display: flex;
   flex-direction: column;
   align-items: center;

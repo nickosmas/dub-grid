@@ -17,6 +17,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import InlineEditEmployee, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -196,25 +197,12 @@ export function StaffDetailPanel({
       <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
         {/* Panel header */}
         <div className="staff-detail-header">
-          <button
-            className="staff-detail-close"
+          <CloseButton
+            size="md"
+            className="self-end"
             onClick={handleRequestClose}
             aria-label="Close detail panel"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          />
 
           {/* Profile card area */}
           <div

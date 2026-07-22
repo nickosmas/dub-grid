@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { sectionStyle, thStyle, tdStyle, ROLE_BADGE_COLORS } from "@/lib/styles";
 import { toDarkPillColors } from "@/lib/colors";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { MaybeHint } from "@/components/ui/hint";
 import {
   fetchGridmasterUserMemberships,
@@ -407,11 +408,20 @@ export default function AllUsersView({
               placeholder="Search..."
               style={{
                 paddingLeft: 32,
+                paddingRight: search ? 30 : 12,
                 fontSize: "var(--dg-fs-caption)",
                 background: "var(--color-surface)",
                 border: "1px solid var(--color-border-light)",
               }}
             />
+            {search && (
+              <CloseButton
+                size="sm"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -630,21 +640,12 @@ export default function AllUsersView({
               <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
                 {/* Header */}
                 <div className="staff-detail-header">
-                  <button className="staff-detail-close" onClick={handleClosePanel}>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
+                  <CloseButton
+                    size="md"
+                    className="self-end"
+                    onClick={handleClosePanel}
+                    aria-label="Close detail panel"
+                  />
                   <div
                     style={{
                       width: 56,
