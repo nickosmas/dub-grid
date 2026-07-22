@@ -30,6 +30,9 @@ export const queryKeys = {
       ["org", orgId, "peopleChangeRequests", status] as const,
     publishHistory: (orgId: string) => ["org", orgId, "publishHistory"] as const,
     auditLog: (orgId: string) => ["org", orgId, "auditLog"] as const,
+    // Bare prefix — matches every employee's role-history query for the org
+    // (["org", orgId, "roleHistory", userId]) regardless of which user.
+    roleHistory: (orgId: string) => ["org", orgId, "roleHistory"] as const,
   },
   employees: {
     all: (orgId: string) => ["employees", orgId] as const,
@@ -47,6 +50,9 @@ export const queryKeys = {
   reports: {
     operations: (orgId: string, startDate: string, endDate: string, filters = "") =>
       ["reports", "operations", orgId, startDate, endDate, filters] as const,
+    // Bare prefix — matches every cached date-range/filter variant of the
+    // operations report for the org, for realtime invalidation.
+    operationsAll: (orgId: string) => ["reports", "operations", orgId] as const,
   },
   account: {
     self: (userId: string, orgId: string | null) =>
@@ -87,6 +93,9 @@ export const queryKeys = {
       ["gm", "audit", orgId ?? "platform", page, limit, filters] as const,
     orgSchedule: (orgId: string, startDate: string, endDate: string) =>
       ["gm", "org", orgId, "schedule", startDate, endDate] as const,
+    // Bare prefix — matches every cached date-range variant of orgSchedule
+    // for the org, for realtime invalidation.
+    orgScheduleAll: (orgId: string) => ["gm", "org", orgId, "schedule"] as const,
     impersonation: () => ["gm", "impersonation"] as const,
     impersonationHistory: (page: number, limit: number) =>
       ["gm", "impersonation", "history", page, limit] as const,

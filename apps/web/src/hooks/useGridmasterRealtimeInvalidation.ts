@@ -14,6 +14,7 @@ export type GridmasterRealtimeTable =
   | "organizations"
   | "subscriptions"
   | "audit_log"
+  | "role_change_log"
   | "impersonation_sessions"
   | "focus_areas"
   | "jobs"
@@ -31,7 +32,9 @@ export type GridmasterRealtimeTable =
   | "schedule_cells"
   | "schedule_cell_snapshots"
   | "schedule_cell_segments"
-  | "schedule_notes";
+  | "schedule_notes"
+  | "user_sessions"
+  | "profiles";
 
 type RealtimePayload = {
   new?: Record<string, unknown>;
@@ -57,6 +60,9 @@ const ORG_FILTER_TABLES: GridmasterRealtimeTable[] = [
   "schedule_cell_snapshots",
   "schedule_cell_segments",
   "schedule_notes",
+  "role_change_log",
+  "user_sessions",
+  "profiles",
 ];
 
 function uniqueKeys(keys: readonly (readonly unknown[])[]): readonly unknown[][] {
@@ -74,6 +80,7 @@ function uniqueKeys(keys: readonly (readonly unknown[])[]): readonly unknown[][]
 export function getGridmasterRealtimeInvalidationKeys(
   table: GridmasterRealtimeTable,
   orgId: string | null = null,
+  userId: string | null = null,
 ): readonly unknown[][] {
   const platformSummaryKeys = [
     queryKeys.gridmaster.dashboard(),
@@ -114,13 +121,31 @@ export function getGridmasterRealtimeInvalidationKeys(
         queryKeys.gridmaster.dashboard(),
         ...(orgId ? [queryKeys.gridmaster.orgAudit(orgId, 0, 50)] : []),
       ]);
+    case "role_change_log":
+      return uniqueKeys([
+        queryKeys.gridmaster.auditAll(),
+        queryKeys.gridmaster.overview(),
+        queryKeys.gridmaster.security(),
+        queryKeys.gridmaster.compliance(),
+        queryKeys.gridmaster.dashboard(),
+        ...(orgId ? [queryKeys.gridmaster.orgAudit(orgId, 0, 50)] : []),
+      ]);
     case "impersonation_sessions":
       return uniqueKeys([
         queryKeys.gridmaster.impersonation(),
         queryKeys.gridmaster.security(),
         queryKeys.gridmaster.overview(),
         queryKeys.gridmaster.compliance(),
+        queryKeys.gridmaster.auditAll(),
         ...(orgId ? [queryKeys.gridmaster.orgAudit(orgId, 0, 50)] : []),
+      ]);
+    case "user_sessions":
+      return uniqueKeys([queryKeys.gridmaster.security(), queryKeys.gridmaster.compliance()]);
+    case "profiles":
+      return uniqueKeys([
+        queryKeys.gridmaster.accounts(),
+        queryKeys.gridmaster.allUsers(),
+        ...platformSummaryKeys,
       ]);
     case "employees":
       return uniqueKeys([
@@ -140,10 +165,12 @@ export function getGridmasterRealtimeInvalidationKeys(
         ...(orgId
           ? [queryKeys.gridmaster.orgUsers(orgId), queryKeys.gridmaster.orgHealth(orgId)]
           : []),
+        ...(userId ? [queryKeys.gridmaster.userMemberships(userId)] : []),
       ]);
     case "invitations":
       return uniqueKeys([
         ...platformSummaryKeys,
+        queryKeys.gridmaster.auditAll(),
         ...(orgId
           ? [
               queryKeys.gridmaster.orgInvitations(orgId),
@@ -165,7 +192,14 @@ export function getGridmasterRealtimeInvalidationKeys(
       return uniqueKeys([
         queryKeys.gridmaster.overview(),
         queryKeys.gridmaster.orgHealth(null),
-        ...(orgId ? [queryKeys.gridmaster.org(orgId), queryKeys.gridmaster.orgHealth(orgId)] : []),
+        queryKeys.gridmaster.dashboard(),
+        ...(orgId
+          ? [
+              queryKeys.gridmaster.org(orgId),
+              queryKeys.gridmaster.orgHealth(orgId),
+              queryKeys.gridmaster.orgScheduleAll(orgId),
+            ]
+          : []),
       ]);
     case "focus_areas":
     case "jobs":
@@ -205,12 +239,26 @@ export function resolveGridmasterRealtimeOrgId(
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+/** Resolves the affected user's id, for tables where invalidation targets a
+ * per-user query (currently just `organization_memberships` →
+ * `queryKeys.gridmaster.userMemberships(userId)`). */
+export function resolveGridmasterRealtimeUserId(
+  table: GridmasterRealtimeTable,
+  payload: RealtimePayload,
+): string | null {
+  if (table !== "organization_memberships") return null;
+  const row = payload.new ?? payload.old ?? {};
+  const value = row.user_id;
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 export function invalidateGridmasterRealtimeQueries(
   queryClient: QueryClient,
   table: GridmasterRealtimeTable,
   orgId: string | null,
+  userId: string | null = null,
 ): void {
-  for (const queryKey of getGridmasterRealtimeInvalidationKeys(table, orgId)) {
+  for (const queryKey of getGridmasterRealtimeInvalidationKeys(table, orgId, userId)) {
     void queryClient.invalidateQueries({ queryKey });
     broadcastInvalidation(queryKey);
   }
@@ -236,6 +284,7 @@ export function useGridmasterRealtimeInvalidation({
         queryClient,
         table,
         resolveGridmasterRealtimeOrgId(table, payload),
+        resolveGridmasterRealtimeUserId(table, payload),
       );
     };
 

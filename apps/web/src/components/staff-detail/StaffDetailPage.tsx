@@ -83,7 +83,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [shifts, setShifts] = useState<ShiftMap>({});
   const [recurringShifts, setRecurringShifts] = useState<RecurringShift[]>([]);
-  const [roleHistory, setRoleHistory] = useState<AuditLogEntry[]>([]);
   const [shiftRequests, setShiftRequests] = useState<ShiftRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +111,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
     enabled: !!orgId,
   });
   const invitations = invitationsQuery.data ?? [];
+
+  // Key is a sub-prefix of `queryKeys.org.roleHistory(orgId)`, so realtime
+  // invalidation of the org-level prefix (role_change_log changes)
+  // automatically refreshes this query too.
+  const employeeUserId = employee?.userId ?? null;
+  const roleHistoryQuery = useQuery<AuditLogEntry[]>({
+    queryKey:
+      orgId && employeeUserId
+        ? [...queryKeys.org.roleHistory(orgId), employeeUserId]
+        : ["org", "anon", "roleHistory", employeeId],
+    queryFn: () => fetchEmployeeRoleHistory(employeeUserId!, orgId!),
+    enabled: Boolean(orgId) && Boolean(employeeUserId) && perms.isGridmaster,
+  });
+  const roleHistory = roleHistoryQuery.data ?? [];
 
   useEffect(() => {
     if (perms.isLoading) return;
@@ -177,15 +190,6 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         setShifts(empShifts);
         setRecurringShifts(recShifts);
         setShiftRequests(empRequests);
-
-        if (emp.userId && perms.isGridmaster) {
-          try {
-            const history = await fetchEmployeeRoleHistory(emp.userId, orgId);
-            if (!cancelled) setRoleHistory(history);
-          } catch {
-            // Non-critical — don't crash the page if audit log is unavailable
-          }
-        }
       } catch (err: unknown) {
         if (!cancelled) {
           if (err instanceof EmployeeAccessDeniedError) {
