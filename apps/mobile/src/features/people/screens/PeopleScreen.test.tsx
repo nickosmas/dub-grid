@@ -204,6 +204,22 @@ describe("PeopleScreen", () => {
     });
   });
 
+  it("navigates to the add-person screen for admins who can manage employees", () => {
+    useQuery.mockReturnValue({
+      data: { people: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Add person"));
+
+    expect(routerPush).toHaveBeenCalledWith("/people/add");
+  });
+
   it("sorts the directory by seniority by default", () => {
     useQuery.mockReturnValue({
       data: {
@@ -396,6 +412,7 @@ describe("PeopleScreen", () => {
     expect(screen.queryByText(/Active 1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Inactive/)).not.toBeInTheDocument();
     expect(screen.queryByText("No app access")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Add person")).not.toBeInTheDocument();
   });
 
   it("shows management users to regular users without opening their profile", () => {

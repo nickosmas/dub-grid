@@ -299,6 +299,17 @@ export default function PeopleScreen() {
             expanded={isFilterModalVisible}
             onPress={() => setIsFilterModalVisible(true)}
           />
+          {canManageEmployees ? (
+            <Pressable
+              accessibilityLabel="Add person"
+              accessibilityRole="button"
+              android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+              onPress={() => router.push("/people/add")}
+              style={styles.addPersonButton}
+            >
+              <Ionicons color={mobileColors.textInverse} name="person-add-outline" size={18} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -600,6 +611,14 @@ const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 10,
+  },
+  addPersonButton: {
+    alignItems: "center",
+    backgroundColor: mobileColors.brand,
+    borderRadius: mobileRadii.control,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
   },
   linkList: {
     backgroundColor: mobileColors.surface,
