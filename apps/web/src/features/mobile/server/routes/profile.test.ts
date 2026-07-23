@@ -5,6 +5,7 @@ const fetchSelfProfileSnapshot = vi.fn();
 const listOwnProfileChangeRequests = vi.fn();
 const updateSelfProfileDetails = vi.fn();
 const updateSelfLinkedEmployeePhone = vi.fn();
+const updateSelfMfaStatus = vi.fn();
 const fetchLinkedEmployeeForUser = vi.fn();
 const fetchMobileFocusAreas = vi.fn();
 const mapOrganizationToMobileConfig = vi.fn();
@@ -25,6 +26,7 @@ vi.mock("@/features/account/server", () => ({
   listOwnProfileChangeRequests,
   updateSelfProfileDetails,
   updateSelfLinkedEmployeePhone,
+  updateSelfMfaStatus,
   fetchNotificationPreferences,
   saveNotificationPreferences,
   fetchUserSessionOverviewForUser,
@@ -280,6 +282,37 @@ describe("mobile profile routes", () => {
 
     expect(response.status).toBe(400);
     expect(updateSelfLinkedEmployeePhone).not.toHaveBeenCalled();
+  });
+
+  it("persists the mfa_enabled flag after a mobile enrollment completes", async () => {
+    const { PATCHMfaStatus } = await import("./profile");
+    const response = await PATCHMfaStatus(
+      new Request("http://localhost/api/mobile/v1/profile/mfa-status", {
+        method: "PATCH",
+        body: JSON.stringify({ enabled: true }),
+      }) as never,
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(updateSelfMfaStatus).toHaveBeenCalledWith(
+      "8af6f242-c060-4920-a7db-91b4cb66fd26",
+      true,
+    );
+    expect(payload.user.mfaEnabled).toBe(true);
+  });
+
+  it("rejects an mfa-status update with a non-boolean body", async () => {
+    const { PATCHMfaStatus } = await import("./profile");
+    const response = await PATCHMfaStatus(
+      new Request("http://localhost/api/mobile/v1/profile/mfa-status", {
+        method: "PATCH",
+        body: JSON.stringify({ enabled: "yes" }),
+      }) as never,
+    );
+
+    expect(response.status).toBe(400);
+    expect(updateSelfMfaStatus).not.toHaveBeenCalled();
   });
 });
 

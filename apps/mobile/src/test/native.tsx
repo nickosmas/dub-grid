@@ -192,6 +192,18 @@ export function createReactNativeModule(React: ReactModule) {
       ...domProps,
     });
   });
+  const Switch = ({ value, onValueChange, disabled, ...props }: Record<string, any>) =>
+    React.createElement("input", {
+      type: "checkbox",
+      role: "switch",
+      checked: Boolean(value),
+      disabled,
+      onChange: (event: Event) => {
+        const target = event.target as HTMLInputElement | null;
+        onValueChange?.(Boolean(target?.checked));
+      },
+      ...pickDomProps(props),
+    });
   const Modal = ({ children, visible = true, ...props }: Record<string, any>) =>
     visible
       ? React.createElement("div", pickDomProps(props), children as ReactType.ReactNode)
@@ -308,6 +320,7 @@ export function createReactNativeModule(React: ReactModule) {
       },
       create: <T,>(value: T) => value,
     },
+    Switch,
     Text,
     TextInput,
     UIManager: {

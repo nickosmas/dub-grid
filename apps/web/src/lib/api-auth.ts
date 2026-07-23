@@ -10,6 +10,7 @@ type Claims = JwtPayload & {
   org_id?: unknown;
   org_role?: unknown;
   in_sandbox?: unknown;
+  aal?: string;
 };
 
 type AuthResult = { session: Session; user: User } | { response: NextResponse };

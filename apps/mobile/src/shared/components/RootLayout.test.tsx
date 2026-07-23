@@ -74,6 +74,15 @@ vi.mock("../providers/AuthSessionProvider", async () => {
   };
 });
 
+vi.mock("../providers/AppLockProvider", async () => {
+  const React = await import("react");
+
+  return {
+    AppLockProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement("div", { "data-testid": "app-lock-provider" }, children),
+  };
+});
+
 vi.mock("../providers/ToastProvider", async () => {
   const React = await import("react");
 
@@ -170,6 +179,7 @@ describe("RootLayout", () => {
 
     expect(screen.getByTestId("query-provider")).toBeInTheDocument();
     expect(screen.getByTestId("auth-provider")).toBeInTheDocument();
+    expect(screen.getByTestId("app-lock-provider")).toBeInTheDocument();
     expect(screen.getByTestId("mobile-realtime-provider")).toBeInTheDocument();
     expect(screen.getByTestId("stack")).toBeInTheDocument();
   });

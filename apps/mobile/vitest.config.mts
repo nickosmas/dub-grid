@@ -65,6 +65,7 @@ export default defineConfig(async () => {
           "tracking-transparency",
           "font",
           "asset",
+          "local-authentication",
         ].map((m) => ({
           find: new RegExp(`^expo-${m}$`),
           replacement: path.resolve(__dirname, `./src/test/shims/expo-${m}.ts`),

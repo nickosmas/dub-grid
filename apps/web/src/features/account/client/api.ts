@@ -93,6 +93,9 @@ export interface AccountPermissionsResponse {
   // employees row for the effective org (gridmaster, unlinked super_admin).
   isOnSchedule?: boolean;
   isManagementUser?: boolean;
+  // True when the caller is admin/super_admin/gridmaster and has no
+  // verified TOTP factor — drives a dismissible nag banner, never a block.
+  mfaNagRequired?: boolean;
 }
 
 export interface AccessibleOrganization {

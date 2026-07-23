@@ -59,9 +59,9 @@ function makeQuery(table: string) {
   return query;
 }
 
-function makeAuth() {
+function makeAuth(factors?: Array<{ factor_type: string; status: string }>) {
   return {
-    user: { id: USER_ID, email: "user@example.com" },
+    user: { id: USER_ID, email: "user@example.com", factors },
     session: { access_token: "test-token" },
     claims: { sub: USER_ID, platform_role: "none" },
   };
@@ -255,5 +255,78 @@ describe("GET /api/account/permissions", () => {
     const body = await response.json();
     expect(body.isOnSchedule).toBe(false);
     expect(body.isManagementUser).toBe(false);
+  });
+
+  describe("mfaNagRequired", () => {
+    it("nags a super_admin with no verified TOTP factor", async () => {
+      extractJwtClaims.mockReturnValue({ effectiveRole: "super_admin", orgId: ORG_ID });
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(true);
+    });
+
+    it("does not nag a super_admin who has a verified TOTP factor", async () => {
+      requireAuthenticatedUserWithClaims.mockResolvedValue(
+        makeAuth([{ factor_type: "totp", status: "verified" }]),
+      );
+      extractJwtClaims.mockReturnValue({ effectiveRole: "super_admin", orgId: ORG_ID });
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(false);
+    });
+
+    it("does not nag a super_admin whose only TOTP factor is unverified", async () => {
+      requireAuthenticatedUserWithClaims.mockResolvedValue(
+        makeAuth([{ factor_type: "totp", status: "unverified" }]),
+      );
+      extractJwtClaims.mockReturnValue({ effectiveRole: "super_admin", orgId: ORG_ID });
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(true);
+    });
+
+    it("does not nag a regular user without MFA", async () => {
+      extractJwtClaims.mockReturnValue({ effectiveRole: "user", orgId: ORG_ID });
+      enqueue("profiles", { data: { org_id: null, platform_role: "none" } });
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(false);
+    });
+
+    it("nags a gridmaster with no verified TOTP factor", async () => {
+      extractJwtClaims.mockReturnValue({ effectiveRole: "gridmaster", orgId: ORG_ID });
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(true);
+    });
+
+    it("reflects the impersonating gridmaster's own MFA status, not the target's", async () => {
+      getImpersonationFromCookie.mockReturnValue({
+        targetOrgId: ORG_ID,
+        targetUserId: "target-user",
+        targetOrgRole: "user",
+      });
+      requireAuthenticatedUserWithClaims.mockResolvedValue({
+        ...makeAuth([{ factor_type: "totp", status: "verified" }]),
+        claims: { sub: USER_ID, platform_role: "gridmaster" },
+      });
+      extractJwtClaims.mockReturnValue({ effectiveRole: "gridmaster", orgId: ORG_ID });
+      enqueue("organization_memberships", { data: { org_role: "user", admin_permissions: null } });
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(false);
+    });
   });
 });

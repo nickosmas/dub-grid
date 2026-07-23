@@ -30,6 +30,17 @@ const NO_SELF_EMPLOYMENT_FLAGS: SelfEmploymentFlags = {
   isManagementUser: false,
 };
 
+// Roles nagged to enroll in MFA. Advisory only — see RBAC_SYSTEM_DESIGN.md
+// §13.1: a dismissible in-app nag, not a hard block, to avoid locking out
+// existing admin/gridmaster accounts that haven't enrolled yet.
+const MFA_NAGGED_ROLES = new Set(["admin", "super_admin", "gridmaster"]);
+
+function hasVerifiedTotpFactor(user: { factors?: { factor_type: string; status: string }[] | null }) {
+  return (user.factors ?? []).some(
+    (factor) => factor.factor_type === "totp" && factor.status === "verified",
+  );
+}
+
 async function getSelfEmploymentFlags(
   serviceClient: SupabaseClient,
   userId: string,
@@ -60,6 +71,12 @@ export async function GET(req: NextRequest) {
     const serviceClient = getServiceClient();
     const impersonation = getImpersonationFromCookie(req.headers.get("cookie") ?? "");
 
+    // effectiveRole/orgId reflect the actual authenticated caller, not an
+    // impersonation target — an impersonating gridmaster should still get
+    // nagged about their own MFA status, not the target user's.
+    const { effectiveRole, orgId } = extractJwtClaims(auth.session.access_token);
+    const mfaNagRequired = MFA_NAGGED_ROLES.has(effectiveRole) && !hasVerifiedTotpFactor(auth.user);
+
     if (impersonation && auth.claims.platform_role === "gridmaster") {
       const targetOrgId = impersonation.targetOrgId;
       const { data: targetMembership } = await serviceClient
@@ -81,16 +98,16 @@ export async function GET(req: NextRequest) {
           (targetMembership?.admin_permissions as AdminPermissions | null) ?? null,
           true,
         ),
+        mfaNagRequired,
       });
     }
-
-    const { effectiveRole, orgId } = extractJwtClaims(auth.session.access_token);
 
     // Gridmasters always have full access — they don't have an employees row in
     // the org they're viewing.
     if (effectiveRole === "gridmaster") {
       return NextResponse.json({
         permissions: buildPerms(effectiveRole, orgId, false),
+        mfaNagRequired,
       });
     }
 
@@ -103,6 +120,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         permissions: buildPerms(effectiveRole, orgId, false),
         ...(await getSelfEmploymentFlags(serviceClient, auth.user.id, orgId)),
+        mfaNagRequired,
       });
     }
 
@@ -130,6 +148,7 @@ export async function GET(req: NextRequest) {
           inactive,
         ),
         ...employmentFlags,
+        mfaNagRequired,
       });
     }
 
@@ -142,6 +161,7 @@ export async function GET(req: NextRequest) {
     if (profile?.platform_role === "gridmaster") {
       return NextResponse.json({
         permissions: buildPerms("gridmaster", profile.org_id ?? null, false),
+        mfaNagRequired,
       });
     }
 
@@ -171,6 +191,7 @@ export async function GET(req: NextRequest) {
             profileInactive,
           ),
           ...profileEmploymentFlags,
+          mfaNagRequired,
         });
       }
     }
@@ -178,6 +199,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       permissions: buildPerms(effectiveRole, orgId, false, null, false, inactive),
       ...employmentFlags,
+      mfaNagRequired,
     });
   } catch (error) {
     console.error("account permissions GET failed", error);

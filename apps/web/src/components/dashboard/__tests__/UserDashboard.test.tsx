@@ -325,6 +325,7 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
       ...buildPerms("user", "org-1", false),
       isOnSchedule: true,
       isManagementUser: false,
+      mfaNagRequired: false,
     },
     prevHours: [],
     prevPeriodLabel: "last week",

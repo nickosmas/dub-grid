@@ -20,12 +20,14 @@ import type { Permissions } from "./shared";
 export interface WebPermissions extends Permissions {
   isOnSchedule: boolean;
   isManagementUser: boolean;
+  mfaNagRequired: boolean;
 }
 
 const LOADING_PERMS: WebPermissions = {
   ...buildPerms("user", null, true),
   isOnSchedule: false,
   isManagementUser: false,
+  mfaNagRequired: false,
 };
 LOADING_PERMS.isLoading = true;
 
@@ -33,6 +35,7 @@ const NO_PERMS: WebPermissions = {
   ...buildPerms("user", null, false),
   isOnSchedule: false,
   isManagementUser: false,
+  mfaNagRequired: false,
 };
 
 // ── Module-level cache ──────────────────────────────────────────────────────
@@ -162,9 +165,15 @@ export function usePermissions(): WebPermissions {
           permissions,
           isOnSchedule = false,
           isManagementUser = false,
+          mfaNagRequired = false,
         } = await fetchAccountPermissions();
         if (!mounted) return;
-        const merged: WebPermissions = { ...permissions, isOnSchedule, isManagementUser };
+        const merged: WebPermissions = {
+          ...permissions,
+          isOnSchedule,
+          isManagementUser,
+          mfaNagRequired,
+        };
         permsCache = merged;
         permsCacheTimestamp = Date.now();
         permsCacheUserId = userId;
@@ -175,6 +184,7 @@ export function usePermissions(): WebPermissions {
           ...buildPerms(effectiveRole, orgId, false),
           isOnSchedule: false,
           isManagementUser: false,
+          mfaNagRequired: false,
         };
         permsCache = fallback;
         permsCacheTimestamp = Date.now();
@@ -218,13 +228,19 @@ export function usePermissions(): WebPermissions {
             permissions,
             isOnSchedule = false,
             isManagementUser = false,
+            mfaNagRequired = false,
           } = await fetchAccountPermissions();
           // Guard against an event firing in the gap between the channel
           // emitting and our cleanup completing — and against the user
           // changing while the fetch was in flight (don't write the new
           // user's perms under the old user's cache key).
           if (!mounted) return;
-          const merged: WebPermissions = { ...permissions, isOnSchedule, isManagementUser };
+          const merged: WebPermissions = {
+            ...permissions,
+            isOnSchedule,
+            isManagementUser,
+            mfaNagRequired,
+          };
           permsCache = merged;
           permsCacheTimestamp = Date.now();
           permsCacheUserId = userId;
@@ -291,6 +307,7 @@ export function usePermissions(): WebPermissions {
       canConfigureAdminPermissions: false,
       isOnSchedule: perms.isOnSchedule,
       isManagementUser: perms.isManagementUser,
+      mfaNagRequired: perms.mfaNagRequired,
       atLeast: (r: string) => 0 >= (ROLE_LEVEL[r] ?? 0),
     };
   }

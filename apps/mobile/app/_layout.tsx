@@ -19,6 +19,7 @@ import { ConsentGate } from "../src/features/consent/components/ConsentGate";
 import { ConfigurationScreen } from "../src/shared/components/ConfigurationScreen";
 import { validateMobileEnv } from "../src/shared/lib/env";
 import { queryClient } from "../src/shared/lib/query-client";
+import { AppLockProvider } from "../src/shared/providers/AppLockProvider";
 import { AuthSessionProvider } from "../src/shared/providers/AuthSessionProvider";
 import { NetworkStateProvider } from "../src/shared/providers/NetworkStateProvider";
 import { ThemeModeProvider, useMobileColors, useThemeMode } from "../src/shared/providers/ThemeModeProvider";
@@ -52,24 +53,26 @@ function RootLayoutContent({
           <ToastProvider>
             <QueryClientProvider client={queryClient}>
               <AuthSessionProvider>
-                <MobileRealtimeProvider>
-                  <ConsentGate>
-                    <Stack screenOptions={createCommonStackOptions(mobileColors)}>
-                      <Stack.Screen name="index" options={{ headerShown: false }} />
-                      <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-                      <Stack.Screen
-                        name="(auth)/onboarding"
-                        options={{ headerShown: false, animation: "fade" }}
-                      />
-                      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                      <Stack.Screen name="alerts" options={{ headerShown: false }} />
-                      <Stack.Screen
-                        name="shift/[employeeId]/[date]"
-                        options={createDetailStackOptions(mobileColors, "Shift Detail")}
-                      />
-                    </Stack>
-                  </ConsentGate>
-                </MobileRealtimeProvider>
+                <AppLockProvider>
+                  <MobileRealtimeProvider>
+                    <ConsentGate>
+                      <Stack screenOptions={createCommonStackOptions(mobileColors)}>
+                        <Stack.Screen name="index" options={{ headerShown: false }} />
+                        <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+                        <Stack.Screen
+                          name="(auth)/onboarding"
+                          options={{ headerShown: false, animation: "fade" }}
+                        />
+                        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                        <Stack.Screen name="alerts" options={{ headerShown: false }} />
+                        <Stack.Screen
+                          name="shift/[employeeId]/[date]"
+                          options={createDetailStackOptions(mobileColors, "Shift Detail")}
+                        />
+                      </Stack>
+                    </ConsentGate>
+                  </MobileRealtimeProvider>
+                </AppLockProvider>
               </AuthSessionProvider>
             </QueryClientProvider>
           </ToastProvider>

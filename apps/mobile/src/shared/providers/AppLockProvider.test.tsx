@@ -1,0 +1,142 @@
+import { render, screen, waitFor } from "@testing-library/react";
+import { act } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createReactNativeModule } from "../../test/native";
+
+vi.mock("react-native", async () => createReactNativeModule(await import("react")));
+
+vi.mock("@expo/vector-icons/Ionicons", () => ({
+  default: () => null,
+}));
+
+const hasHardwareAsync = vi.fn();
+const isEnrolledAsync = vi.fn();
+const authenticateAsync = vi.fn();
+
+vi.mock("expo-local-authentication", () => ({
+  hasHardwareAsync: (...args: unknown[]) => hasHardwareAsync(...args),
+  isEnrolledAsync: (...args: unknown[]) => isEnrolledAsync(...args),
+  authenticateAsync: (...args: unknown[]) => authenticateAsync(...args),
+}));
+
+const useSessionState = vi.fn();
+
+vi.mock("./AuthSessionProvider", () => ({
+  useSessionState: () => useSessionState(),
+}));
+
+let appLockEnabled = false;
+const loadAppLockEnabled = vi.fn(async () => appLockEnabled);
+const getAppLockEnabledSnapshot = vi.fn(() => appLockEnabled);
+const subscribeAppLockEnabled = vi.fn((_callback: () => void) => () => {});
+
+vi.mock("../lib/app-lock", () => ({
+  appLockUnsupported: false,
+  loadAppLockEnabled: () => loadAppLockEnabled(),
+  getAppLockEnabledSnapshot: () => getAppLockEnabledSnapshot(),
+  subscribeAppLockEnabled: (callback: () => void) => subscribeAppLockEnabled(callback),
+}));
+
+import { AppLockProvider } from "./AppLockProvider";
+
+let appStateListener: ((state: string) => void) | null = null;
+
+describe("AppLockProvider", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    appLockEnabled = false;
+    appStateListener = null;
+    useSessionState.mockReturnValue({ accessToken: "token-123", isLoading: false });
+    hasHardwareAsync.mockResolvedValue(true);
+    isEnrolledAsync.mockResolvedValue(true);
+    authenticateAsync.mockResolvedValue({ success: true });
+
+    const { AppState } = await import("react-native");
+    vi.spyOn(AppState, "addEventListener").mockImplementation(((
+      _event: string,
+      listener: (state: string) => void,
+    ) => {
+      appStateListener = listener;
+      return { remove: vi.fn() };
+    }) as typeof AppState.addEventListener);
+  });
+
+  it("renders children without a lock screen when the setting is disabled", async () => {
+    appLockEnabled = false;
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("app-content")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+  });
+
+  it("locks on mount when enabled and unlocks after successful authentication", async () => {
+    appLockEnabled = true;
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(authenticateAsync).toHaveBeenCalled();
+      expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+    });
+  });
+
+  it("fails open when the device has no biometrics/passcode enrolled", async () => {
+    appLockEnabled = true;
+    isEnrolledAsync.mockResolvedValue(false);
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+    });
+    expect(authenticateAsync).not.toHaveBeenCalled();
+  });
+
+  it("locks again when the app returns from the background", async () => {
+    appLockEnabled = true;
+
+    render(
+      <AppLockProvider>
+        <div data-testid="app-content">content</div>
+      </AppLockProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+    });
+
+    authenticateAsync.mockClear();
+
+    act(() => {
+      appStateListener?.("background");
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("DubGrid is locked")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(authenticateAsync).toHaveBeenCalled();
+      expect(screen.queryByText("DubGrid is locked")).not.toBeInTheDocument();
+    });
+  });
+});
