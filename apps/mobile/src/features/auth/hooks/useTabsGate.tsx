@@ -63,6 +63,7 @@ export function useTabsGate(): TabsGateResult {
       kind: "blocked",
       element: (
         <OrganizationLockedScreen
+          accessToken={accessToken}
           isRetrying={bootstrapQuery.isFetching}
           message={lockedMessage}
           onRetry={() => {
