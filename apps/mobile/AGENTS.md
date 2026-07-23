@@ -65,6 +65,15 @@ apps/mobile/
 - `app.json`, `metro.config.js`, `babel.config.js`, EAS/OTA settings, native build
   config, and Expo scheme are all high-risk. Explain changes before applying.
 
+## Deliberately Web-Only Feature Areas
+
+Reports, billing/subscription management, the Gridmaster portal, the
+permissions editor, and org-level settings panels (departments, jobs,
+absence types, schedule rules, coverage, activity log) have no mobile
+surface, front or backend, by design — these are admin/config-heavy
+workflows that reasonably stay desktop-only. Don't treat their absence as
+a gap to fill; confirm with the user before adding any of them to mobile.
+
 ## Platform Rules
 
 - Do not use browser-only APIs (`window`, `document`, `localStorage`) in native

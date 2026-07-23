@@ -1418,12 +1418,16 @@ Actions also include Next.js's built-in CSRF protection.
 
 ### 12.6 MFA Status Endpoint (Partial)
 
-Multi-factor authentication is **partially implemented**. The
+Multi-factor authentication enrollment is fully built on both platforms:
+web (`MFASetup.tsx`, QR + manual secret) and mobile
+(`ProfileSecurityScreen.tsx`, manual secret entry), both backed by
+Supabase's native `auth.mfa.enroll`/`challengeAndVerify`/`unenroll`. The
 `/api/account/mfa-status` Route Handler reports whether the current user has
-MFA enrolled (backed by `profiles.mfa_enabled` and Supabase's MFA factors), and
-the mobile profile/security surface and web account screens read it. Full
-enforcement — _requiring_ TOTP for gridmaster and super_admin, plus an
-enrollment flow — is still outstanding (see §13.1).
+MFA enrolled (backed by `profiles.mfa_enabled` and Supabase's MFA factors).
+What's still advisory-only rather than enforced: gridmaster/super_admin/admin
+accounts without a verified TOTP factor get a dismissible in-app nag, not a
+hard block (see §13.1) — a deliberate choice to avoid locking out existing
+admins.
 
 ---
 
@@ -1433,14 +1437,14 @@ The following features are recommended before a production launch.
 
 ### 13.1 Priority 1 — Security (Implement Before Launch)
 
-#### Multi-Factor Authentication (MFA) — Partially Implemented
+#### Multi-Factor Authentication (MFA) — Enrollment Done, Enforcement Advisory
 
-| Property         | Detail                                                                                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status           | **Partial.** An `/api/account/mfa-status` endpoint exists and surfaces enrollment state to web + mobile (see §12.6). Enrollment flow and role-based _enforcement_ are not done. |
-| Gap              | Until enrollment is enforced, any user whose password is compromised gives an attacker full access. Gridmaster and super admin accounts are high-value targets.                 |
-| Recommendation   | Build the enrollment flow and enforce TOTP (Supabase MFA) for gridmaster and super_admin. Prompt admin/user roles to enroll optionally.                                         |
-| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challenge()` / `verify()`                                                                                                          |
+| Property         | Detail                                                                                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Status           | Enrollment is fully built on web and mobile (see §12.6). Role-based enforcement is a dismissible nag banner for gridmaster/super_admin/admin without a verified factor, not a hard block.        |
+| Gap              | An unenrolled admin can dismiss the nag indefinitely; a compromised password alone still grants full access until they choose to enroll.                                                        |
+| Recommendation   | If a hard requirement is wanted later, gate `/settings` and `/gridmaster` in `middleware.ts` behind AAL2 for privileged roles — deliberately not done now to avoid locking out existing accounts. |
+| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challengeAndVerify()` / `unenroll()`                                                                                                                  |
 
 #### Failed Login Attempt Tracking & Account Lockout
 
@@ -1458,12 +1462,10 @@ The following features are recommended before a production launch.
 
 ### 13.2 Priority 2 — User Lifecycle
 
-#### Soft Delete for Users and Orgs
-
-| Property       | Detail                                                                                                        |
-| -------------- | ------------------------------------------------------------------------------------------------------------- |
-| Gap            | Hard deletes cascade through all tables with no recovery path.                                                |
-| Recommendation | Add `deleted_at TIMESTAMPTZ` to profiles and organizations. RLS adds `AND deleted_at IS NULL` to all queries. |
+Soft delete for both users (`profiles.deactivated_at`) and organizations
+(`organizations.archived_at`) already shipped — see §10a for orgs and the
+`deactivated_at`-aware queries referenced throughout §6/§9. No open gap
+here.
 
 ### 13.3 Priority 3 — Operational
 
@@ -1492,13 +1494,13 @@ The following features are recommended before a production launch.
 
 | Priority | Feature                                  | Status      | Risk if Skipped                                                                                           |
 | -------- | ---------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
-| P1       | MFA for Gridmaster & Super Admin         | **Partial** | Status endpoint exists; enrollment + enforcement still missing → account takeover via password compromise |
+| P1       | MFA for Gridmaster & Super Admin         | **Partial** | Enrollment done (web + mobile); enforcement is a dismissible nag, not a hard block → account takeover still possible for admins who ignore the nag |
 | P1       | Failed login tracking & lockout          | Not done    | Brute-force attacks succeed silently                                                                      |
 | P1       | IP allowlisting for Gridmaster           | Not done    | Stolen credentials = full platform access                                                                 |
 | ~~P1~~   | ~~Password reset flow~~                  | ✅ Done     | ~~Users locked out permanently if password lost~~                                                         |
 | ~~P2~~   | ~~Email verification~~                   | ✅ Done     | ~~Unverified accounts receive org roles~~                                                                 |
 | ~~P2~~   | ~~Rate limiting on API routes~~          | ✅ Done     | ~~Abuse of public endpoints~~                                                                             |
-| P2       | Soft delete (users & orgs)               | Not done    | Accidental permanent data loss                                                                            |
+| ~~P2~~   | ~~Soft delete (users & orgs)~~           | ✅ Done     | ~~Accidental permanent data loss~~ — see §10a and `profiles.deactivated_at`                              |
 | P3       | Refresh token rotation + reuse detection | Not done    | Stolen tokens usable indefinitely                                                                         |
 | P3       | Role change notifications                | Not done    | Silent UX — confused users after demotion                                                                 |
 | ~~P3~~   | ~~GDPR data export~~                     | ✅ Done     | ~~Legal compliance gap in EU/UK markets~~                                                                 |
