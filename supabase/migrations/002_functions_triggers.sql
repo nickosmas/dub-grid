@@ -7280,7 +7280,11 @@ COMMENT ON FUNCTION public.remove_focus_area_from_employees IS 'Removes a focus 
 
 -- ── People Directory (union of employees + app-only users) ──────────────────
 
-CREATE OR REPLACE FUNCTION public.get_org_directory(p_org_id UUID)
+CREATE OR REPLACE FUNCTION public.get_org_directory(
+  p_org_id UUID,
+  p_limit INT DEFAULT 50,
+  p_offset INT DEFAULT 0
+)
 RETURNS TABLE (
   person_id               TEXT,
   source                  TEXT,
@@ -7455,11 +7459,11 @@ BEGIN
     AND inv3.revoked_at IS NULL
 
   ORDER BY seniority NULLS LAST, first_name, last_name
-  LIMIT 501;
+  LIMIT p_limit OFFSET p_offset;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_org_directory(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_org_directory(UUID, INT, INT) TO authenticated;
 
 
 -- ══════════════════════════════════════════════════════════════════════════════

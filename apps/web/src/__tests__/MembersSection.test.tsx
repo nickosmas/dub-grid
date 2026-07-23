@@ -53,8 +53,9 @@ vi.mock("@/hooks", async (importOriginal) => {
       directory: mockDirectory,
       loading: false,
       error: null,
-      truncated: false,
-      cap: null,
+      hasMore: false,
+      loadingMore: false,
+      loadMore: vi.fn(),
     }),
   };
 });

@@ -6,7 +6,11 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
 });
+
+const DEFAULT_PAGE_SIZE = 50;
 
 export async function GET(req: NextRequest) {
   try {
@@ -36,20 +40,21 @@ export async function GET(req: NextRequest) {
     // Sign-in activity is admin telemetry: staff managers see it, view-only
     // directory callers don't.
     const canSeeActivity = canSeePermissions || orgAuth.permissions.canManageEmployees;
+    const limit = parsed.data.limit ?? DEFAULT_PAGE_SIZE;
+    const offset = parsed.data.offset ?? 0;
     const { data, error } = await serviceClient.rpc("get_org_directory", {
       // Use the auth-effective orgId — when the caller is in sandbox
       // mode, this is the sandbox id, not the body's real-org id.
       p_org_id: orgAuth.orgId,
+      p_limit: limit,
+      p_offset: offset,
     });
     if (error) throw error;
 
-    // The RPC caps at LIMIT 501 (stopgap until real pagination lands). When we
-    // see 501 rows we know the org had >500 members; drop the overflow row and
-    // signal truncation so the UI can warn the user we aren't showing everyone.
-    const DIRECTORY_CAP = 500;
-    const rawRows = (data ?? []) as Record<string, unknown>[];
-    const truncated = rawRows.length > DIRECTORY_CAP;
-    const rows = truncated ? rawRows.slice(0, DIRECTORY_CAP) : rawRows;
+    const rows = (data ?? []) as Record<string, unknown>[];
+    // A full page suggests more rows may exist; the client re-checks by
+    // fetching the next page and stopping once it comes back short.
+    const hasMore = rows.length === limit;
 
     const directory = rows.map((row: Record<string, unknown>) => {
       const scheduledDepartmentIds =
@@ -105,7 +110,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       directory,
-      ...(truncated ? { truncated: true, cap: DIRECTORY_CAP } : {}),
+      hasMore,
+      nextOffset: hasMore ? offset + rows.length : null,
     });
   } catch (error) {
     console.error("organization directory GET failed", error);

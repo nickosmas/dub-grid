@@ -517,8 +517,9 @@ export function MembersSection({
 
   const {
     directory,
-    truncated: directoryTruncated,
-    cap: directoryCap,
+    hasMore: directoryHasMore,
+    loadingMore: directoryLoadingMore,
+    loadMore: loadMoreDirectory,
   } = useDirectory(directoryOrgId);
   // Access role (org_role) per linked employee, sourced from the directory.
   // Only populated when the viewer can load directory data; staff with no
@@ -899,18 +900,24 @@ export function MembersSection({
             </p>
           </div>
 
-          {directoryTruncated && (
+          {directoryHasMore && (
             <div
-              role="alert"
-              className="rounded-md border px-3 py-2 text-[13px]"
+              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-[13px]"
               style={{
-                borderColor: "var(--color-warning-border)",
-                background: "var(--color-warning-bg)",
-                color: "var(--color-warning-text)",
+                borderColor: "var(--color-border-light)",
+                background: "var(--color-muted)",
+                color: "var(--color-text-muted)",
               }}
             >
-              Showing the first {directoryCap ?? 500} members. Use search or filters to find
-              specific people. Full pagination is coming soon.
+              <span>Not everyone is shown yet. Use search or filters to find specific people.</span>
+              <button
+                type="button"
+                className="dg-btn dg-btn-secondary"
+                onClick={loadMoreDirectory}
+                disabled={directoryLoadingMore}
+              >
+                {directoryLoadingMore ? "Loading…" : "Load more"}
+              </button>
             </div>
           )}
 
