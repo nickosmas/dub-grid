@@ -12,7 +12,6 @@ import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import ScheduleGridMockup from "@/components/landing/ScheduleGridMockup";
 import StaffViewMockup from "@/components/landing/StaffViewMockup";
 import SettingsMockup from "@/components/landing/SettingsMockup";
-import PermissionsMockup from "@/components/landing/PermissionsMockup";
 import RecurringShiftsMockup from "@/components/landing/RecurringShiftsMockup";
 import DashboardMockup from "@/components/landing/DashboardMockup";
 import MobileAppMockup from "@/components/landing/MobileAppMockup";
@@ -25,9 +24,6 @@ import {
   Radio,
   BarChart3,
   Mail,
-  FileText,
-  Building2,
-  Lock,
   Menu,
   ArrowRight,
   Sun,
@@ -93,33 +89,6 @@ const FEATURES: Feature[] = [
   },
 ];
 
-const TRUST_SIGNALS = [
-  {
-    icon: Shield,
-    title: "Permissions that fit",
-    description:
-      "Owners, admins, and staff each see what's theirs. You decide what every admin can change.",
-  },
-  {
-    icon: FileText,
-    title: "A full audit trail",
-    description:
-      "Every role change and schedule version is recorded, immutably. Nothing gets quietly overwritten or erased.",
-  },
-  {
-    icon: Lock,
-    title: "Invitation required",
-    description:
-      "Nobody walks in off the street. Every account starts from a link, every link has an expiry.",
-  },
-  {
-    icon: Building2,
-    title: "One app, every facility",
-    description:
-      "Each facility gets its own private workspace on its own subdomain. Easy to scale, hard to mix up.",
-  },
-];
-
 /* ─── Scroll Reveal Hook ──────────────────────────────── */
 
 function useScrollReveal() {
@@ -158,9 +127,14 @@ function RevealSection({
     <section
       ref={ref}
       id={id}
-      className={`transition-all duration-700 ease-out ${
+      className={`${
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       } ${className}`}
+      style={{
+        transition:
+          "opacity 700ms ease-out, transform 700ms ease-out, " +
+          "background-color var(--dg-duration-fast) ease, color var(--dg-duration-fast) ease",
+      }}
     >
       {children}
     </section>
@@ -272,22 +246,6 @@ export default function RootPage() {
             <DubGridWordmark fontSize={18} />
           </div>
 
-          {/* Desktop nav links */}
-          <div className="hidden md:flex items-center gap-8">
-            <a
-              href="#features"
-              className="text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
-            >
-              Features
-            </a>
-            <a
-              href="#security"
-              className="text-sm font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
-            >
-              Security
-            </a>
-          </div>
-
           <div className="flex items-center gap-4">
             <ThemeToggleButton />
             <Link
@@ -327,24 +285,7 @@ export default function RootPage() {
             </div>
           </div>
           <div className="flex flex-col items-center justify-center flex-1 gap-8">
-            <a
-              href="#features"
-              onClick={() => setMobileMenuOpen(false)}
-              className="text-2xl font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-subtle)] transition-colors"
-            >
-              Features
-            </a>
-            <a
-              href="#security"
-              onClick={() => setMobileMenuOpen(false)}
-              className="text-2xl font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-subtle)] transition-colors"
-            >
-              Security
-            </a>
-            <Link
-              href="/login"
-              className="mt-4 dg-btn dg-btn-primary dg-btn-lg"
-            >
+            <Link href="/login" className="dg-btn dg-btn-primary dg-btn-lg">
               Sign In
             </Link>
           </div>
@@ -429,18 +370,17 @@ export default function RootPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {FEATURES.map((feature, i) => {
+            {FEATURES.map((feature) => {
               const Icon = feature.icon;
               return (
                 <div
                   key={feature.title}
-                  className="group rounded-2xl border border-[var(--color-border-light)] bg-[var(--color-surface)] p-6 lg:p-8 hover:border-[var(--color-border)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
-                  style={{ transitionDelay: `${i * 75}ms` }}
+                  className="group rounded-2xl border border-[var(--color-border-light)] bg-[var(--color-surface)] p-6 lg:p-8 hover:border-[var(--color-border)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-150"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-[var(--color-bg-secondary)] flex items-center justify-center mb-4 group-hover:bg-[var(--color-border-light)] transition-colors duration-300">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--color-bg-secondary)] flex items-center justify-center mb-4 group-hover:bg-[var(--color-border-light)] transition-colors duration-150">
                     <Icon
                       size={20}
-                      className="text-[var(--color-text-muted)] group-hover:text-[var(--color-text-muted)] transition-colors duration-300"
+                      className="text-[var(--color-text-muted)] group-hover:text-[var(--color-text-muted)] transition-colors duration-150"
                     />
                   </div>
                   <h3 className="text-base font-semibold text-[var(--color-text-secondary)] mb-2">
@@ -521,52 +461,6 @@ export default function RootPage() {
         </div>
       </RevealSection>
 
-      {/* ── Security & Trust ── */}
-      <RevealSection id="security" className="py-16 sm:py-20 lg:py-24">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-[-0.03em] text-[var(--color-text-primary)]">
-              Secure by design
-            </h2>
-            <p className="mt-4 text-lg text-[var(--color-text-muted)] max-w-xl mx-auto leading-relaxed">
-              Serious security under the hood. Nothing for you to configure to get there.
-            </p>
-          </div>
-
-          <div className="flex flex-col lg:flex-row gap-10 items-start">
-            {/* Trust signal cards */}
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {TRUST_SIGNALS.map((signal) => {
-                const Icon = signal.icon;
-                return (
-                  <div
-                    key={signal.title}
-                    className="p-6 rounded-2xl bg-[var(--color-surface)] border border-[var(--color-border-light)] hover:border-[var(--color-border)] hover:shadow-sm transition-all duration-200"
-                  >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-9 h-9 rounded-lg bg-[var(--color-bg-secondary)] flex items-center justify-center">
-                        <Icon size={18} className="text-[var(--color-text-muted)]" />
-                      </div>
-                      <h3 className="text-base font-semibold text-[var(--color-text-secondary)]">
-                        {signal.title}
-                      </h3>
-                    </div>
-                    <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">
-                      {signal.description}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Permissions mockup */}
-            <div className="w-full lg:w-auto lg:shrink-0">
-              <PermissionsMockup />
-            </div>
-          </div>
-        </div>
-      </RevealSection>
-
       {/* ── Mobile App Mockup ── */}
       <RevealSection className="py-12 sm:py-16 lg:py-20 bg-[var(--color-bg)]">
         <div className="max-w-5xl mx-auto px-6">
@@ -585,8 +479,16 @@ export default function RootPage() {
         </div>
       </RevealSection>
 
-      {/* ── CTA ── */}
-      <RevealSection className="py-16 sm:py-20 lg:py-24 bg-[var(--color-brand)] relative overflow-hidden">
+      {/* ── CTA ──
+          Background sits on its own layer (not the section's own bg) since
+          dark mode swaps the flat brand-blue fill for a gradient sweep
+          (--color-cta-shell-bg), and Tailwind's arbitrary-value bg utility
+          only sets background-color — it can't hold a gradient value. */}
+      <RevealSection className="py-16 sm:py-20 lg:py-24 relative overflow-hidden">
+        <div
+          className="absolute inset-0"
+          style={{ background: "var(--color-cta-shell-bg)" }}
+        />
         {/* Grid pattern */}
         <div
           className="absolute inset-0"

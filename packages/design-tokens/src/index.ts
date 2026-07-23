@@ -73,6 +73,11 @@ export const lightColorTokens = {
   // Text/icon color for content placed on a --color-brand or --color-brand-light
   // fill (e.g. .dg-btn-primary).
   onBrandText: "#FFFFFF",
+  // Button/chip surface for controls placed on a brand-colored backdrop (e.g.
+  // .dg-btn-on-brand-solid on the landing page's CTA band). Fixed white in
+  // both themes — unlike --color-surface, which inverts to near-black in dark
+  // mode and would kill the button's contrast against the (still-blue) backdrop.
+  onBrandSurface: "#FFFFFF",
 } as const;
 
 export type ColorTokens = Record<keyof typeof lightColorTokens, string>;
@@ -127,6 +132,7 @@ export const darkColorTokens: ColorTokens = {
   controlPrimary: "#26262B",
   controlPrimaryHover: "#323238",
   onBrandText: "#FFFFFF",
+  onBrandSurface: "#FFFFFF",
 } as const;
 
 /** @deprecated Use `lightColorTokens` (or the theme-aware helpers) directly — this alias exists only for back-compat with existing static imports. */
@@ -589,6 +595,15 @@ export type WebTheme = "light" | "dark";
 // `--dg-color-auth-shell-bg` / `--dg-color-onboarding-shell-bg` entries below.
 const darkDiagonalShellGradient = "linear-gradient(135deg, #000000 0%, #000000 40%, #040E33 100%)";
 
+// Landing page's marketing CTA band ("Done with the spreadsheet?" — see
+// apps/web/src/app/page.tsx). Light mode keeps a flat brand-blue fill; dark
+// mode swaps to the same deep navy → app-blue sweep as the mobile app's
+// on-duty hero card gradient (MobileAppMockup.tsx / ScheduleScreen.tsx's
+// ME_HERO_CARD_GRADIENT_DARK) instead of reusing the unchanged light-mode
+// blue, so the band reads as dark-mode-native rather than a light panel
+// pasted onto a dark page.
+const darkCtaShellGradient = "linear-gradient(to top right, #0A1442 0%, #1D3AA0 55%, #2075FF 100%)";
+
 function themedWebCssVariables(theme: WebTheme): Record<string, string> {
   const tokens = theme === "dark" ? darkColorTokens : lightColorTokens;
   const shadows = theme === "dark" ? darkShadowTokens : shadowTokens;
@@ -615,6 +630,7 @@ function themedWebCssVariables(theme: WebTheme): Record<string, string> {
     "--dg-color-text-faint": textFaint,
     "--dg-color-text-inverse": tokens.textInverse,
     "--dg-color-on-brand-text": tokens.onBrandText,
+    "--dg-color-on-brand-surface": tokens.onBrandSurface,
     "--dg-color-brand": tokens.brand,
     "--dg-color-brand-light": tokens.brandLight,
     "--dg-color-brand-bg": tokens.brandSoft,
@@ -649,6 +665,8 @@ function themedWebCssVariables(theme: WebTheme): Record<string, string> {
     "--dg-color-today-bg": tokens.brandSoft,
     "--dg-color-today-text": todayText,
     "--dg-color-today-border": todayBorder,
+    "--dg-color-shadow": tokens.shadow,
+    "--dg-color-shadow-strong": tokens.shadowStrong,
     // Strong grid dividers (schedule header's bottom rule, week-split line):
     // need to read as a heavier line than the regular day dividers in both
     // themes, but `--color-dark` (fixed near-black chrome) is invisible
@@ -672,6 +690,7 @@ function themedWebCssVariables(theme: WebTheme): Record<string, string> {
       theme === "dark"
         ? darkDiagonalShellGradient
         : `linear-gradient(145deg, ${tokens.background} 0%, ${tokens.brandSoft} 100%)`,
+    "--dg-color-cta-shell-bg": theme === "dark" ? darkCtaShellGradient : tokens.brand,
   };
 
   const colorAliasVars: Record<string, string> = {};

@@ -75,6 +75,8 @@
   --color-today-text: var(--dg-color-today-text);
   --color-today-border: var(--dg-color-today-border);
   --color-row-hover: var(--dg-color-row-hover);
+  --color-shadow: var(--dg-color-shadow);
+  --color-shadow-strong: var(--dg-color-shadow-strong);
 }
 
 *,
@@ -105,6 +107,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none; /* Prevent bounce effect */
+  /* Keeps the page backdrop in sync with foreground elements (cards,
+     sections) on theme toggle — without this, transparent wrappers snap
+     instantly while their children fade, so children look like they lag. */
+  transition: background-color var(--dg-duration-fast) ease;
 }
 
 button,
@@ -286,11 +292,14 @@ textarea {
   background: color-mix(in srgb, var(--color-text-inverse) 28%, transparent);
 }
 
-/* Buttons that sit ON a solid brand surface (e.g. the landing page closing CTA). */
+/* Buttons that sit ON a solid brand surface (e.g. the landing page closing CTA).
+   Uses --color-on-brand-surface (fixed white in both themes), not --color-surface
+   — the latter inverts to near-black in dark mode, which would kill contrast
+   against the still-blue CTA backdrop the button sits on. */
 .dg-btn-on-brand-solid {
-  background: var(--color-surface);
+  background: var(--color-on-brand-surface);
   color: var(--color-brand);
-  border: 1px solid var(--color-surface);
+  border: 1px solid var(--color-on-brand-surface);
 }
 
 .dg-btn-on-brand-solid:hover {

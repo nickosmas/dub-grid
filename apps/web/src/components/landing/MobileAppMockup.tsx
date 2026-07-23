@@ -6,7 +6,9 @@
      · packages/design-tokens/src/index.ts         . Colour / type / radius
      · apps/mobile/src/shared/components/Screen.tsx . Screen wrapper, Card
      · apps/mobile/src/shared/components/Button.tsx . Buttons
-     · apps/mobile/app/(tabs)/_layout.tsx           . Bottom tab bar
+     · apps/mobile/app/(tabs)/_layout.tsx           . Tab set, active tab
+       (real bar is now Expo Router `NativeTabs` — OS-rendered, no literal
+       icon size to match; the 28px custom icons here are an approximation)
      · apps/mobile/src/features/schedule/screens/ScheduleScreen.tsx
      · apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx
      · apps/mobile/src/features/dashboard/screens/AdminHomeScreen.tsx
@@ -19,6 +21,7 @@
    Phone 3. The shift-requests "Available" tab. ── */
 
 import { Fragment } from "react";
+import { useTheme } from "next-themes";
 import {
   Home,
   Calendar,
@@ -67,9 +70,23 @@ const C = {
   dangerText: "var(--color-danger-text)",
   dangerSoft: "var(--color-danger-bg)",
   dangerBorder: "var(--color-danger-border)",
-  shadow: "rgba(15, 23, 42, 0.08)",
-  shadowStrong: "rgba(15, 23, 42, 0.14)",
+  shadow: "var(--color-shadow)",
+  shadowStrong: "var(--color-shadow-strong)",
 };
+
+/* ── ScheduleScreen.tsx's ME_HERO_CARD_GRADIENT_LIGHT/_DARK + matching
+   shadow — the "On Duty" hero card is the one place the real app swaps a
+   literal (non-token) color set between themes, so it needs its own JS
+   theme read rather than a CSS var. ── */
+function useMockupIsDark(): boolean {
+  const { resolvedTheme } = useTheme();
+  return resolvedTheme === "dark";
+}
+
+const ME_HERO_GRADIENT_LIGHT = "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
+const ME_HERO_GRADIENT_DARK = "linear-gradient(to top right, #0A1442 0%, #1D3AA0 55%, #2075FF 100%)";
+const ME_HERO_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
+const ME_HERO_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
 /* ── mobileTypographyTokens.text — { fontSize, lineHeight, fontWeight } ── */
 const heroMetric = { fontSize: 24, lineHeight: "30px", fontWeight: 700 };
@@ -459,6 +476,7 @@ const UPCOMING = [
 ];
 
 function ScheduleScreen() {
+  const isDark = useMockupIsDark();
   return (
     <>
       {/* ── Sticky header. Screen.stickyHeaderShell + meWeekNavigator ── */}
@@ -539,17 +557,18 @@ function ScheduleScreen() {
         }}
       >
         {/* ── MeHeroCard. Status "active" (on duty / in progress).
-              Real gradient ME_HERO_CARD_GRADIENT goes bottom-left → top-right,
-              colors #142579 → #2C49CC → #6E90FF at stops 0 / 0.55 / 1. ── */}
+              Real gradient goes bottom-left → top-right; ScheduleScreen.tsx
+              swaps to a deeper navy/app-blue set (+ dimmer shadow) in dark
+              mode (ME_HERO_CARD_GRADIENT_DARK / ME_HERO_CARD_SHADOW_DARK). ── */}
         <div
           style={{
-            background: "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)",
+            background: isDark ? ME_HERO_GRADIENT_DARK : ME_HERO_GRADIENT_LIGHT,
             borderRadius: 24,
             paddingLeft: 18,
             paddingRight: 18,
             paddingTop: 18,
             paddingBottom: 18,
-            boxShadow: "0 14px 28px rgba(37, 99, 235, 0.3)",
+            boxShadow: `0 14px 28px ${isDark ? ME_HERO_SHADOW_DARK : ME_HERO_SHADOW_LIGHT}`,
           }}
         >
           {/* meHeroContent: gap 11 */}
@@ -638,14 +657,18 @@ function ScheduleScreen() {
               </span>
             </div>
 
-            {/* meHeroRoleRow → MeTypePill → JobPill (compact). "Mentor" job chip */}
+            {/* meHeroRoleRow → MeTypePill → JobPill (compact). "Mentor" job chip.
+                buildJobChip's mentor/trainer branch: bg/border track the shared
+                warning token, but text stays a bespoke light-mode amber
+                (#B45309, darker than warningText) and only swaps to the token's
+                warningText in dark mode. */}
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
               <div
                 style={{
                   alignSelf: "flex-start",
                   borderRadius: 8,
-                  border: "1px solid #FED7AA",
-                  background: "#FFF7ED",
+                  border: `1px solid ${C.warningBorder}`,
+                  background: C.warningSoft,
                   paddingLeft: 9,
                   paddingRight: 9,
                   paddingTop: 5,
@@ -659,7 +682,7 @@ function ScheduleScreen() {
                     lineHeight: "14px",
                     fontWeight: 700,
                     textTransform: "uppercase",
-                    color: "#B45309",
+                    color: isDark ? C.warningText : "#B45309",
                   }}
                 >
                   Mentor
@@ -1741,7 +1764,7 @@ export default function MobileAppMockup() {
       <Phone active="Home">
         <AdminHomeScreenMockup />
       </Phone>
-      <Phone active="Home">
+      <Phone active="Schedule">
         <ScheduleScreen />
       </Phone>
       <Phone active="Requests">
