@@ -237,6 +237,14 @@ export const mobileProfilePhoneUpdateResponseSchema = z.object({
   linkedEmployee: mobileProfileLinkedEmployeeSchema,
 });
 
+export const mobileProfileMfaStatusUpdateBodySchema = z.object({
+  enabled: z.boolean(),
+});
+
+export const mobileProfileMfaStatusUpdateResponseSchema = z.object({
+  user: mobileProfileUserSchema,
+});
+
 export const mobileProfileChangeRequestTypeSchema = z.enum(["profile_update", "account_deletion"]);
 
 export const mobileProfileChangeRequestStatusSchema = z.enum([
@@ -762,6 +770,38 @@ export const mobilePersonUpdateResponseSchema = z.object({
   person: mobilePersonSchema,
 });
 
+export const mobilePersonCreateBodySchema = z.object({
+  firstName: staffNameSchema,
+  lastName: staffNameSchema,
+  employmentType: z.enum(["full_time", "part_time"]).default("full_time"),
+  certificationId: z.number().int().nullable(),
+  focusAreaIds: z.array(z.number().int()).min(1),
+  email: optionalStaffEmailSchema,
+});
+
+export const mobilePersonCreateResponseSchema = z.object({
+  success: z.literal(true),
+  person: mobilePersonSchema,
+});
+
+export const mobileBillingAccessStateSchema = z.enum([
+  "active",
+  "trial_pending",
+  "trialing",
+  "trial_ending_soon",
+  "trial_grace",
+  "payment_attention_required",
+  "locked",
+  "suspended",
+]);
+
+export const mobileOrgStatusResponseSchema = z.object({
+  state: mobileBillingAccessStateSchema,
+  isLocked: z.boolean(),
+  trialGraceEndsAt: z.string().nullable(),
+  orgRole: mobileRoleSchema,
+});
+
 export const mobilePersonStatusUpdateBodySchema = z.object({
   action: z.enum(["deactivate", "activate", "remove"]),
   expectedVersion: z.number().int().nonnegative(),
@@ -929,6 +969,11 @@ export type MobileBootstrapResponse = z.infer<typeof mobileBootstrapResponseSche
 export type MobileProfileResponse = z.infer<typeof mobileProfileResponseSchema>;
 export type MobileProfileAccountUpdateBody = z.infer<typeof mobileProfileAccountUpdateBodySchema>;
 export type MobileProfilePhoneUpdateBody = z.infer<typeof mobileProfilePhoneUpdateBodySchema>;
+export type MobileProfileMfaStatusUpdateBody = z.infer<
+  typeof mobileProfileMfaStatusUpdateBodySchema
+>;
+export type MobilePersonCreateBody = z.infer<typeof mobilePersonCreateBodySchema>;
+export type MobileOrgStatusResponse = z.infer<typeof mobileOrgStatusResponseSchema>;
 export type MobileProfileChangeRequest = z.infer<typeof mobileProfileChangeRequestSchema>;
 export type MobileProfileChangeRequestCreateBody = z.infer<
   typeof mobileProfileChangeRequestCreateBodySchema
