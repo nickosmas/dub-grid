@@ -21,7 +21,6 @@ import {
   saveOrganizationRoles,
 } from "@/features/settings/client";
 import { toast } from "sonner";
-import ImpersonationPanel from "@/components/ImpersonationPanel";
 import {
   type SectionId,
   resolveSection,
@@ -418,10 +417,6 @@ export default function SettingsPage({
             canManageIndicatorTypes={canManageIndicatorTypes}
           />
         )}
-
-      {/* ── Platform group ──────────────────────────────────── */}
-
-      {activeSection === "platform-impersonation" && isGridmaster && <ImpersonationPanel />}
 
       {/* ── Danger Zone group ───────────────────────────────── */}
 
