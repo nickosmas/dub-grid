@@ -195,63 +195,63 @@ function DayPopover({
                             isDarkTheme,
                           );
                           return (
-                          <div
-                            key={`${name}-${shift}-${ni}`}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 5,
-                              padding: "2px 4px",
-                              borderRadius: 6,
-                              background:
-                                hasHighlightedSearch && isHighlighted
-                                  ? "var(--color-brand-bg)"
-                                  : "transparent",
-                              boxShadow:
-                                hasHighlightedSearch && isHighlighted
-                                  ? "inset 3px 0 0 0 var(--color-brand)"
-                                  : undefined,
-                              opacity: hasHighlightedSearch && !isHighlighted ? 0.35 : 1,
-                              transition:
-                                "opacity 150ms ease, background 150ms ease, box-shadow 150ms ease",
-                            }}
-                          >
                             <div
+                              key={`${name}-${shift}-${ni}`}
                               style={{
-                                background: s.color,
-                                border: dk
-                                  ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}`
-                                  : `1px solid ${borderColor(s.text)}`,
-                                borderRadius: 4,
-                                padding: isNameMode ? "3px 6px" : dk ? "1px 5px" : "2px 6px",
-                                fontSize: "var(--dg-fs-footnote)",
-                                fontWeight: 600,
-                                color: s.text,
-                                opacity: dk === "deleted" ? 0.5 : 1,
-                                textDecoration: dk === "deleted" ? "line-through" : "none",
-                                maxWidth: 120,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {isNameMode ? pillText(shift, 14) : shift}
-                            </div>
-                            <span
-                              style={{
-                                fontSize: "var(--dg-fs-footnote)",
-                                color:
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 5,
+                                padding: "2px 4px",
+                                borderRadius: 6,
+                                background:
                                   hasHighlightedSearch && isHighlighted
-                                    ? "var(--color-brand)"
-                                    : "var(--color-text-secondary)",
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
+                                    ? "var(--color-brand-bg)"
+                                    : "transparent",
+                                boxShadow:
+                                  hasHighlightedSearch && isHighlighted
+                                    ? "inset 3px 0 0 0 var(--color-brand)"
+                                    : undefined,
+                                opacity: hasHighlightedSearch && !isHighlighted ? 0.35 : 1,
+                                transition:
+                                  "opacity 150ms ease, background 150ms ease, box-shadow 150ms ease",
                               }}
                             >
-                              {shortName(name)}
-                            </span>
-                          </div>
+                              <div
+                                style={{
+                                  background: s.color,
+                                  border: dk
+                                    ? `2px dashed ${DRAFT_BORDER_COLORS[dk]}`
+                                    : `1px solid ${borderColor(s.text)}`,
+                                  borderRadius: 4,
+                                  padding: isNameMode ? "3px 6px" : dk ? "1px 5px" : "2px 6px",
+                                  fontSize: "var(--dg-fs-footnote)",
+                                  fontWeight: 600,
+                                  color: s.text,
+                                  opacity: dk === "deleted" ? 0.5 : 1,
+                                  textDecoration: dk === "deleted" ? "line-through" : "none",
+                                  maxWidth: 120,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {isNameMode ? pillText(shift, 14) : shift}
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: "var(--dg-fs-footnote)",
+                                  color:
+                                    hasHighlightedSearch && isHighlighted
+                                      ? "var(--color-brand)"
+                                      : "var(--color-text-secondary)",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {shortName(name)}
+                              </span>
+                            </div>
                           );
                         },
                       )}

@@ -2459,12 +2459,16 @@ function SchedulerContent() {
         const candidateAssignmentIds = openShift.eligibleAssignmentDefinitionIds?.length
           ? openShift.eligibleAssignmentDefinitionIds
           : openShift.assignmentIds;
-        const viewerEligible = isEmployeeEligibleForOpenShift(candidateAssignmentIds, currentEmployee, {
-          assignmentById,
-          shiftCategories,
-          jobs,
-          orgRoles,
-        });
+        const viewerEligible = isEmployeeEligibleForOpenShift(
+          candidateAssignmentIds,
+          currentEmployee,
+          {
+            assignmentById,
+            shiftCategories,
+            jobs,
+            orgRoles,
+          },
+        );
 
         // Schedulers/staff managers always see every open shift as a filling
         // tool, regardless of the org-level visibility setting or their own
@@ -6175,7 +6179,9 @@ function SchedulerContent() {
                     </strong>{" "}
                     on <strong>{openShiftDetails.date}</strong>
                   </div>
-                  {openShiftDetails.calledOffBy && <div>Called off by {openShiftDetails.calledOffBy}</div>}
+                  {openShiftDetails.calledOffBy && (
+                    <div>Called off by {openShiftDetails.calledOffBy}</div>
+                  )}
                   <div>{openShiftDetails.needed ?? 1} needed</div>
                   <div style={{ color: "var(--color-text-muted)" }}>
                     {openShiftDetailsReasons.length > 0

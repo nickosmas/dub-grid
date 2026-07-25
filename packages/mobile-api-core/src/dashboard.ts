@@ -343,7 +343,9 @@ export function computeStaffHoursForPeriod(
     }
   }
 
-  return results.sort((a, b) => b.overtimeHours - a.overtimeHours).slice(0, MAX_STAFF_HOURS_ENTRIES);
+  return results
+    .sort((a, b) => b.overtimeHours - a.overtimeHours)
+    .slice(0, MAX_STAFF_HOURS_ENTRIES);
 }
 
 const SHIFT_CHANGE_DESCRIPTION: Record<DashboardPublishChange["kind"], string> = {
@@ -398,7 +400,8 @@ export function buildActivityFeed(
 
   for (const request of shiftRequests) {
     const isPickup = request.type === "pickup";
-    const shiftName = request.requesterPresentation.shiftName || request.requesterPresentation.label;
+    const shiftName =
+      request.requesterPresentation.shiftName || request.requesterPresentation.label;
     const statusLabel = getShiftRequestStatusLabel(request.status);
     items.push({
       id: `req_${request.id}`,
@@ -447,49 +450,54 @@ export async function loadMobileDashboardPayload(
 
   const isAdmin = auth.effectiveRole === "admin";
 
-  const [coverageSummary, shiftRequests, openShiftContext, publishHistoryRows, acceptedInvitations] =
-    await Promise.all([
-      deps.fetchMobileCoverageSummary(auth.serviceClient, {
-        orgId: auth.currentOrg.id,
-        showAll: true,
-        timeZone: auth.currentOrg.timezone ?? null,
-        startDate: range.startDate,
-        endDate: range.endDate,
-      }),
-      // Both admin and super_admin can approve requests (canApproveShiftRequests
-      // is true for both by default), so the pending-approvals count on the
-      // hero summary reflects both — only the ActionQueueCard list itself
-      // stays admin-only on the client, matching web's AdminDashboard. This
-      // also doubles as the activity feed's "request" events (no employeeId
-      // set here, so the underlying query is unfiltered by status/type —
-      // matches web's unfiltered shift-request fetch for its own feed).
-      deps.fetchMobileShiftRequests(auth.serviceClient, {
-        orgId: auth.currentOrg.id,
-        includeOpenPickupRequests: false,
-        startDate: range.startDate,
-        endDate: range.endDate,
-      }),
-      deps.fetchMobileOpenShiftContext(auth.serviceClient, auth.currentOrg.id),
-      deps.fetchMobilePublishHistoryRows(auth.serviceClient, auth.currentOrg.id, {
-        startDate: range.startDate,
-        endDate: range.endDate,
-      }),
-      deps.fetchMobileAcceptedInvitationRows(auth.serviceClient, auth.currentOrg.id, {
-        startDate: range.startDate,
-        endDate: range.endDate,
-      }),
-    ]);
+  const [
+    coverageSummary,
+    shiftRequests,
+    openShiftContext,
+    publishHistoryRows,
+    acceptedInvitations,
+  ] = await Promise.all([
+    deps.fetchMobileCoverageSummary(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      showAll: true,
+      timeZone: auth.currentOrg.timezone ?? null,
+      startDate: range.startDate,
+      endDate: range.endDate,
+    }),
+    // Both admin and super_admin can approve requests (canApproveShiftRequests
+    // is true for both by default), so the pending-approvals count on the
+    // hero summary reflects both — only the ActionQueueCard list itself
+    // stays admin-only on the client, matching web's AdminDashboard. This
+    // also doubles as the activity feed's "request" events (no employeeId
+    // set here, so the underlying query is unfiltered by status/type —
+    // matches web's unfiltered shift-request fetch for its own feed).
+    deps.fetchMobileShiftRequests(auth.serviceClient, {
+      orgId: auth.currentOrg.id,
+      includeOpenPickupRequests: false,
+      startDate: range.startDate,
+      endDate: range.endDate,
+    }),
+    deps.fetchMobileOpenShiftContext(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchMobilePublishHistoryRows(auth.serviceClient, auth.currentOrg.id, {
+      startDate: range.startDate,
+      endDate: range.endDate,
+    }),
+    deps.fetchMobileAcceptedInvitationRows(auth.serviceClient, auth.currentOrg.id, {
+      startDate: range.startDate,
+      endDate: range.endDate,
+    }),
+  ]);
 
   const shiftCategoriesById = new Map(
     openShiftContext.shiftCategoryRows.map((row) => [row.id, row]),
   );
-  const focusAreaNameById = new Map(openShiftContext.focusAreaRows.map((row) => [row.id, row.name]));
+  const focusAreaNameById = new Map(
+    openShiftContext.focusAreaRows.map((row) => [row.id, row.name]),
+  );
 
   const publisherIds = Array.from(
     new Set(
-      publishHistoryRows
-        .map((row) => row.published_by)
-        .filter((id): id is string => Boolean(id)),
+      publishHistoryRows.map((row) => row.published_by).filter((id): id is string => Boolean(id)),
     ),
   );
   const profileNameRows =
@@ -506,7 +514,8 @@ export async function loadMobileDashboardPayload(
   const pendingApprovalRequests = shiftRequests.filter(
     (request) => request.status === "pending_approval",
   );
-  const { openShifts, totals, byFocusArea, hasCoverageRequirements, scheduleRows } = coverageSummary;
+  const { openShifts, totals, byFocusArea, hasCoverageRequirements, scheduleRows } =
+    coverageSummary;
   const openGapCount = openShifts.reduce((sum, shift) => sum + shift.needed, 0);
   const coveragePct = hasCoverageRequirements ? totals.pct : null;
 
@@ -528,8 +537,18 @@ export async function loadMobileDashboardPayload(
       .slice()
       .sort((a, b) => (a.date < b.date ? -1 : 1))
       .slice(0, MAX_OPEN_SHIFTS),
-    activity: buildActivityFeed(publishHistoryRows, shiftRequests, acceptedInvitations, nameByProfileId),
-    staffHours: computeStaffHoursForPeriod(scheduleRows, shiftCategoriesById, focusAreaNameById, range),
+    activity: buildActivityFeed(
+      publishHistoryRows,
+      shiftRequests,
+      acceptedInvitations,
+      nameByProfileId,
+    ),
+    staffHours: computeStaffHoursForPeriod(
+      scheduleRows,
+      shiftCategoriesById,
+      focusAreaNameById,
+      range,
+    ),
     actionQueue: isAdmin ? pendingApprovalRequests.slice(0, MAX_ACTION_QUEUE_ITEMS) : [],
   };
 }

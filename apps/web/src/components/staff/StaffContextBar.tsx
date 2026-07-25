@@ -3,6 +3,7 @@
 import { Department, Employee, FocusArea, NamedItem, Invitation } from "@/types";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useIsInSandbox } from "@/hooks";
 import type {
   AccountLinkFilter,
   ContactPresenceFilter,
@@ -44,6 +45,7 @@ interface StaffContextBarProps {
   selectionCount: number;
   selectedIds: Set<string>;
   canManageEmployees: boolean;
+  canManageManagementAccess: boolean;
   displayList: Employee[];
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onBulkInvite: (employees: Employee[]) => void;
@@ -90,6 +92,7 @@ export function StaffContextBar({
   selectionCount,
   selectedIds,
   canManageEmployees,
+  canManageManagementAccess,
   displayList,
   pendingInviteByEmployeeId,
   onBulkInvite,
@@ -102,6 +105,7 @@ export function StaffContextBar({
   onSaveOrder,
   onCancelReorder,
 }: StaffContextBarProps) {
+  const isInSandbox = useIsInSandbox();
   const showFilters = hasActiveFilters && selectionCount === 0 && !isReordering;
   const showBulk = selectionCount > 0 && canManageEmployees && !isReordering;
   const showReorder = isReordering;
@@ -226,10 +230,14 @@ export function StaffContextBar({
             </span>
           </div>
           <div className="flex-1" />
-          {invitableEmployees.length > 0 && (
+          {invitableEmployees.length > 0 && canManageManagementAccess && (
             <button
               onClick={() => onBulkInvite(invitableEmployees)}
+              disabled={isInSandbox}
               className="dg-btn dg-btn-secondary dg-btn-sm"
+              title={
+                isInSandbox ? "Sending invitations isn't available in sandbox mode." : undefined
+              }
             >
               Invite ({invitableEmployees.length})
             </button>
@@ -275,12 +283,54 @@ export function StaffContextBar({
               style={{ background: "white" }}
             >
               <svg width="16" height="16" viewBox="0 0 14 14">
-                <rect x="3" y="1" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
-                <rect x="8.5" y="1" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
-                <rect x="3" y="5.75" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
-                <rect x="8.5" y="5.75" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
-                <rect x="3" y="10.5" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
-                <rect x="8.5" y="10.5" width="2.5" height="2.5" rx="1.25" fill="var(--color-control-primary)" />
+                <rect
+                  x="3"
+                  y="1"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
+                <rect
+                  x="8.5"
+                  y="1"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
+                <rect
+                  x="3"
+                  y="5.75"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
+                <rect
+                  x="8.5"
+                  y="5.75"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
+                <rect
+                  x="3"
+                  y="10.5"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
+                <rect
+                  x="8.5"
+                  y="10.5"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
               </svg>
             </div>
             <div>

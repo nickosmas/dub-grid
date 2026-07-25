@@ -652,7 +652,10 @@ export async function POST(req: NextRequest) {
           !canViewManagementProfiles(auth.permissions) &&
           (await isManagementEmployee(auth.serviceClient, data.orgId, employee))
         ) {
-          return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+          return NextResponse.json(
+            { error: API_ERRORS.CANNOT_VIEW_MANAGEMENT_PROFILE },
+            { status: 403 },
+          );
         }
 
         if (!isEmployeeDetailViewer(auth.permissions)) {
@@ -681,7 +684,10 @@ export async function POST(req: NextRequest) {
           auth.permissions.canViewEmployeeDetails ||
           auth.permissions.canManageEmployees;
         if (!canReadOtherEmployees && auth.actor.id !== data.userId) {
-          return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+          return NextResponse.json(
+            { error: API_ERRORS.CANNOT_VIEW_EMPLOYEE_DETAILS },
+            { status: 403 },
+          );
         }
 
         const { data: row, error } = await auth.serviceClient
@@ -702,7 +708,10 @@ export async function POST(req: NextRequest) {
           !canViewManagementProfiles(auth.permissions) &&
           (await isManagementEmployee(auth.serviceClient, data.orgId, employee))
         ) {
-          return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+          return NextResponse.json(
+            { error: API_ERRORS.CANNOT_VIEW_MANAGEMENT_PROFILE },
+            { status: 403 },
+          );
         }
 
         return NextResponse.json({ employee });

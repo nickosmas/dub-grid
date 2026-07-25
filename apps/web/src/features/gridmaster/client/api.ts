@@ -270,9 +270,7 @@ export function fetchGridmasterSessions(options?: {
     params.set("offset", String(options.offset));
   }
   const suffix = params.toString();
-  return requestGridmasterJson(
-    `/api/gridmaster/security/sessions${suffix ? `?${suffix}` : ""}`,
-  );
+  return requestGridmasterJson(`/api/gridmaster/security/sessions${suffix ? `?${suffix}` : ""}`);
 }
 
 export function fetchGridmasterBilling(): Promise<GridmasterBillingSummary> {

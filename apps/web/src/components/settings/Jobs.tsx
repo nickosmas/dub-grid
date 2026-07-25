@@ -717,8 +717,8 @@ function DefaultShiftToggle({
             ) : (
               <>
                 Staff can no longer be scheduled with just a shift going forward, and the{" "}
-                <strong>Default Shift Job</strong> is hidden from Jobs settings. Shifts and
-                coverage requirements that already use it keep working as before.
+                <strong>Default Shift Job</strong> is hidden from Jobs settings. Shifts and coverage
+                requirements that already use it keep working as before.
               </>
             )
           }

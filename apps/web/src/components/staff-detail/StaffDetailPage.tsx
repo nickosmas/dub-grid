@@ -48,7 +48,10 @@ import {
   fetchScheduleActorNames,
   fetchShiftRequests,
 } from "@/features/schedule/client";
-import { revokeInvitation, updateOrganizationMembershipGuarded } from "@/features/organization/client";
+import {
+  revokeInvitation,
+  updateOrganizationMembershipGuarded,
+} from "@/features/organization/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { StaffDetailHeader } from "./StaffDetailHeader";
 import EditEmployeePanel from "@/components/EditEmployeePanel";

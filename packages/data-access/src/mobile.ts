@@ -306,7 +306,9 @@ function normalizeEmbeddedEmployee(value: unknown): MobileEmbeddedEmployeeRow | 
   };
 }
 
-function buildStateFromSnapshot(snapshot: DbScheduleCellSnapshot): MobilePublishedScheduleRow["state"] {
+function buildStateFromSnapshot(
+  snapshot: DbScheduleCellSnapshot,
+): MobilePublishedScheduleRow["state"] {
   const orderedSegments = [...(snapshot.segments ?? [])].sort(
     (left, right) => left.position - right.position,
   );

@@ -37,7 +37,22 @@ export const API_ERRORS = {
   INVALID_INPUT: "Some of the details look off. Please review and try again.",
   INVALID_BODY: "We couldn't read that request. Please try again.",
   UNAUTHORIZED: "Please sign in to continue.",
+  // Generic fallback — used by CLIENT_FRIENDLY_ERROR_PATTERNS' catch-all regex
+  // for any forbidden/unauthorized error that isn't one of the specific
+  // causes below. Prefer a specific constant at new call sites.
   FORBIDDEN: "You don't have permission to do that.",
+  NOT_ORG_MEMBER: "You don't have access to this organization.",
+  INSUFFICIENT_PERMISSION:
+    "You don't have permission to perform this action. Ask an admin for help.",
+  CANNOT_MANAGE_EMPLOYEES:
+    "You don't have permission to manage employees. Ask an admin to make this change.",
+  CANNOT_ASSIGN_SUPER_ADMIN: "Only a super admin or gridmaster can assign the super admin role.",
+  SUPER_ADMIN_OR_GRIDMASTER_ONLY: "Only a super admin or gridmaster can send invitations.",
+  GRIDMASTER_ONLY: "This action is restricted to gridmaster accounts.",
+  SUPER_ADMIN_ONLY: "Only a super admin can do this.",
+  CANNOT_ACT_FOR_OTHERS: "You can only do this for your own shift requests.",
+  CANNOT_VIEW_EMPLOYEE_DETAILS: "You don't have permission to view this employee's details.",
+  CANNOT_VIEW_MANAGEMENT_PROFILE: "You don't have permission to view management profiles.",
 } as const;
 
 // ── Pattern tables ───────────────────────────────────────────────────────────

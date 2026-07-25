@@ -1,7 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import MyScheduleRow from "@/components/dashboard/MyScheduleRow";
-import type { AbsenceType, AssignmentDefinition, JobDefinition, ShiftCategory, ShiftMap } from "@/types";
+import type {
+  AbsenceType,
+  AssignmentDefinition,
+  JobDefinition,
+  ShiftCategory,
+  ShiftMap,
+} from "@/types";
 
 const assignment: AssignmentDefinition = {
   id: 101,

@@ -1155,14 +1155,24 @@ export function MembersSection({
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Search by name, email, or phone..."
-                  style={{ height: 32, paddingLeft: 32, paddingRight: searchQuery ? 30 : 12, fontSize: 13 }}
+                  style={{
+                    height: 32,
+                    paddingLeft: 32,
+                    paddingRight: searchQuery ? 30 : 12,
+                    fontSize: 13,
+                  }}
                 />
                 {searchQuery && (
                   <CloseButton
                     size="sm"
                     onClick={() => setSearchQuery("")}
                     aria-label="Clear search"
-                    style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+                    style={{
+                      position: "absolute",
+                      right: 4,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                    }}
                   />
                 )}
               </div>
@@ -1291,6 +1301,7 @@ export function MembersSection({
               selectionCount={selectedIds.size}
               selectedIds={selectedIds}
               canManageEmployees={canManageEmployees}
+              canManageManagementAccess={canManageManagementAccess}
               displayList={displayList}
               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
               onBulkInvite={(employeesToInvite) => {
@@ -1677,7 +1688,9 @@ export function MembersSection({
                                   background: isPending
                                     ? "var(--color-surface)"
                                     : avatarTone.backgroundColor,
-                                  color: isPending ? "var(--color-text-muted)" : avatarTone.textColor,
+                                  color: isPending
+                                    ? "var(--color-text-muted)"
+                                    : avatarTone.textColor,
                                   border: isPending
                                     ? "1px solid var(--color-border-light)"
                                     : `1px solid ${avatarTone.borderColor}`,
@@ -1928,7 +1941,9 @@ export function MembersSection({
           onDeactivate={(employeeId, note) => onDeactivate(employeeId, note)}
           onActivate={(employeeId) => onActivate(employeeId)}
           onClose={() => setExpandedEmpId(null)}
-          onInvite={(employee) => setInviteEmployee(employee)}
+          onInvite={
+            canManageManagementAccess ? (employee) => setInviteEmployee(employee) : undefined
+          }
           canManageManagementAccess={canManageManagementAccess}
           hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
           hasPendingManagementInvite={

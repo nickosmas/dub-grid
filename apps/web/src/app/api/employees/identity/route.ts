@@ -98,7 +98,7 @@ export async function PATCH(req: NextRequest) {
 
     const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
     if (!hasPermission) {
-      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+      return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }
 
     const { data: currentRow, error: currentError } = await serviceClient

@@ -248,10 +248,7 @@ export default function RootPage() {
 
           <div className="flex items-center gap-4">
             <ThemeToggleButton />
-            <Link
-              href="/login"
-              className="hidden sm:inline-flex dg-btn dg-btn-primary dg-btn-lg"
-            >
+            <Link href="/login" className="hidden sm:inline-flex dg-btn dg-btn-primary dg-btn-lg">
               Sign In
             </Link>
             {/* Mobile hamburger */}
@@ -332,10 +329,7 @@ export default function RootPage() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mt-10">
-            <Link
-              href="/request-demo"
-              className="dg-btn dg-btn-primary dg-btn-lg"
-            >
+            <Link href="/request-demo" className="dg-btn dg-btn-primary dg-btn-lg">
               Request Demo
               <ArrowRight size={18} />
             </Link>
@@ -485,10 +479,7 @@ export default function RootPage() {
           (--color-cta-shell-bg), and Tailwind's arbitrary-value bg utility
           only sets background-color — it can't hold a gradient value. */}
       <RevealSection className="py-16 sm:py-20 lg:py-24 relative overflow-hidden">
-        <div
-          className="absolute inset-0"
-          style={{ background: "var(--color-cta-shell-bg)" }}
-        />
+        <div className="absolute inset-0" style={{ background: "var(--color-cta-shell-bg)" }} />
         {/* Grid pattern */}
         <div
           className="absolute inset-0"
@@ -508,10 +499,7 @@ export default function RootPage() {
           <p className="text-lg text-white/60 mt-4 max-w-xl mx-auto">
             Your team deserves something that just works.
           </p>
-          <Link
-            href="/request-demo"
-            className="mt-8 dg-btn dg-btn-on-brand-solid dg-btn-lg"
-          >
+          <Link href="/request-demo" className="mt-8 dg-btn dg-btn-on-brand-solid dg-btn-lg">
             Request Demo
             <ArrowRight size={18} />
           </Link>

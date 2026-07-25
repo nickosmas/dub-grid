@@ -1174,6 +1174,10 @@ ALTER TABLE public.publish_history
 
 -- organizations
 CREATE INDEX idx_organizations_id ON public.organizations(id);
+-- Enforces the app-layer "one active sandbox per user" invariant at the DB
+-- level. Previously only enforced by a racy SELECT-then-INSERT in
+-- findActiveSandboxForUser/createSandboxForUser (features/test-sandbox/server.ts).
+CREATE UNIQUE INDEX organizations_one_active_sandbox_per_user ON public.organizations(sandbox_owner_user_id) WHERE workspace_kind = 'sandbox' AND archived_at IS NULL;
 
 -- profiles
 CREATE INDEX idx_profiles_org_id ON public.profiles(org_id);

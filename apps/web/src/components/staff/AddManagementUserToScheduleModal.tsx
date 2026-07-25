@@ -19,7 +19,14 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
  *  views), so callers with just an `Employee` in scope can pass it directly. */
 type SchedulePrefillPerson = Pick<
   DirectoryPerson,
-  "firstName" | "lastName" | "email" | "phone" | "certificationId" | "focusAreaIds" | "roleIds" | "userId"
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "phone"
+  | "certificationId"
+  | "focusAreaIds"
+  | "roleIds"
+  | "userId"
 >;
 
 interface AddManagementUserToScheduleModalProps {

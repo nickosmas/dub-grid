@@ -16,7 +16,7 @@ import {
   getStaffFieldErrorsFromZod,
   validateStaffOrgReferences,
 } from "@/lib/staff-validation";
-import { dispatchNotificationEvent } from "@/features/notifications/server/events";
+import { dispatchNotificationEvent } from "@/features/notifications/server";
 import type { Employee } from "@/types";
 
 export const dynamic = "force-dynamic";

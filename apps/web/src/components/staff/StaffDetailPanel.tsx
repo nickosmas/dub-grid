@@ -27,6 +27,7 @@ import { MemberAccessControls } from "./MemberAccessControls";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
 import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
 import { getAvatarTone } from "@dubgrid/design-tokens";
+import { useIsInSandbox } from "@/hooks";
 
 function statusTone(status: Employee["status"]): StatusPillTone {
   if (status === "inactive") return "warning";
@@ -95,6 +96,7 @@ export function StaffDetailPanel({
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
   const { resolvedTheme } = useTheme();
+  const isInSandbox = useIsInSandbox();
   const isSelf = isSelfAction(currentUser?.id, employee.userId);
   const avatarTone = getAvatarTone(employee.id, resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -416,12 +418,17 @@ export function StaffDetailPanel({
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                     {onInvite && (
                       <button
-                        disabled={revokingInvite}
+                        disabled={revokingInvite || isInSandbox}
                         onClick={() => setPendingInvitationAction("reinvite")}
                         className="dg-btn dg-btn-ghost dg-btn-xs"
                         style={{
                           color: "var(--color-link)",
                         }}
+                        title={
+                          isInSandbox
+                            ? "Sending invitations isn't available in sandbox mode."
+                            : undefined
+                        }
                       >
                         <ButtonLoading loading={revokingInvite} spinnerSize={12}>
                           Reinvite
@@ -430,12 +437,17 @@ export function StaffDetailPanel({
                     )}
                     {onRevoke && (
                       <button
-                        disabled={revokingInvite}
+                        disabled={revokingInvite || isInSandbox}
                         onClick={() => setPendingInvitationAction("revoke")}
                         className="dg-btn dg-btn-ghost dg-btn-xs"
                         style={{
                           color: "var(--color-danger)",
                         }}
+                        title={
+                          isInSandbox
+                            ? "Revoking invitations isn't available in sandbox mode."
+                            : undefined
+                        }
                       >
                         <ButtonLoading loading={revokingInvite} spinnerSize={12}>
                           Revoke
@@ -449,11 +461,17 @@ export function StaffDetailPanel({
                 onInvite && (
                   <button
                     onClick={() => onInvite(employee)}
+                    disabled={isInSandbox}
                     className="dg-btn dg-btn-secondary"
                     style={{
                       width: "100%",
                       justifyContent: "center",
                     }}
+                    title={
+                      isInSandbox
+                        ? "Sending invitations isn't available in sandbox mode."
+                        : undefined
+                    }
                   >
                     <svg
                       width="13"

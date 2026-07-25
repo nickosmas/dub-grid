@@ -70,9 +70,10 @@ beforeEach(() => {
   vi.mocked(useOrganizationData).mockReturnValue(
     organizationData as unknown as ReturnType<typeof useOrganizationData>,
   );
-  vi.mocked(useEmployees).mockReturnValue({ employees: [], loading: false } as unknown as ReturnType<
-    typeof useEmployees
-  >);
+  vi.mocked(useEmployees).mockReturnValue({
+    employees: [],
+    loading: false,
+  } as unknown as ReturnType<typeof useEmployees>);
 });
 
 describe("DashboardPageContent", () => {

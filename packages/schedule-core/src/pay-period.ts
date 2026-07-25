@@ -59,7 +59,9 @@ export function getDashboardPeriodStartIso(
   payPeriodStartDateIso?: string | null,
 ): string {
   if (span === 2) {
-    return getContainingPayPeriodStartIso(todayIso, payPeriodStartDateIso) ?? getIsoWeekStart(todayIso);
+    return (
+      getContainingPayPeriodStartIso(todayIso, payPeriodStartDateIso) ?? getIsoWeekStart(todayIso)
+    );
   }
   return getIsoWeekStart(todayIso);
 }

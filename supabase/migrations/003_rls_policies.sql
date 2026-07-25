@@ -1094,3 +1094,21 @@ CREATE POLICY "gridmaster_insert_audit_log"
 -- No UPDATE/DELETE for gridmaster — audit_log is append-only
 
 -- Service role bypasses RLS for server-side audit logging
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- stripe_processed_events
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Webhook replay-idempotency ledger, written only by the Stripe webhook
+-- handler via the service-role client (which bypasses RLS). Deny all access
+-- to authenticated/anon — without this, the blanket `GRANT ... TO
+-- authenticated` in 004_grants.sql would let any signed-in user pre-insert a
+-- real Stripe event_id, making the webhook handler treat a billing-critical
+-- event as already-processed and silently skip it.
+
+ALTER TABLE public.stripe_processed_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "deny_all_stripe_processed_events"
+  ON public.stripe_processed_events FOR ALL TO authenticated, anon
+  USING (FALSE)
+  WITH CHECK (FALSE);

@@ -303,7 +303,12 @@ export default function EnhancedImpersonation({
                   size="sm"
                   onClick={() => setOrgSearch("")}
                   aria-label="Clear search"
-                  style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+                  style={{
+                    position: "absolute",
+                    right: 4,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                  }}
                 />
               )}
             </div>
@@ -572,7 +577,12 @@ export default function EnhancedImpersonation({
                   size="sm"
                   onClick={() => setSearch("")}
                   aria-label="Clear search"
-                  style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+                  style={{
+                    position: "absolute",
+                    right: 4,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                  }}
                 />
               )}
             </div>

@@ -60,8 +60,8 @@ export interface AuthorizedOrgRequest {
   orgId: string;
 }
 
-function forbiddenResponse() {
-  return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+function forbiddenResponse(message: string = API_ERRORS.FORBIDDEN) {
+  return NextResponse.json({ error: message }, { status: 403 });
 }
 
 function lockedOrganizationResponse() {
@@ -260,6 +260,18 @@ export async function requireOrgPermissions(
     return { response: auth.response };
   }
 
+  // `ignoreSandbox` exists so read-only endpoints (billing) can show the
+  // real org's state while the caller is sandboxed. It must never be
+  // combined with a mutating request — that would let a sandboxed caller
+  // write to their real org. Fail loudly (programming error, not a runtime
+  // condition) rather than silently allowing it if a future endpoint gets
+  // this wrong.
+  if (options?.ignoreSandbox && req.method !== "GET" && req.method !== "HEAD") {
+    throw new Error(
+      `requireOrgPermissions: ignoreSandbox must not be used with ${req.method} — it bypasses the sandbox redirect and would let a sandboxed caller mutate their real org.`,
+    );
+  }
+
   const serviceClient = getServiceClient();
 
   // ── Sandbox org-redirect ────────────────────────────────────────────
@@ -323,7 +335,7 @@ export async function requireOrgPermissions(
 
   const isGridmaster = profile?.platform_role === "gridmaster";
   if (!isGridmaster && !membership) {
-    return { response: forbiddenResponse() };
+    return { response: forbiddenResponse(API_ERRORS.NOT_ORG_MEMBER) };
   }
 
   const role = isGridmaster
@@ -352,7 +364,7 @@ export async function requireOrgPermissions(
   }
 
   if (!isAllowed(permissions)) {
-    return { response: forbiddenResponse() };
+    return { response: forbiddenResponse(API_ERRORS.INSUFFICIENT_PERMISSION) };
   }
 
   if (!options?.allowDuringSetup && !permissions.isGridmaster) {

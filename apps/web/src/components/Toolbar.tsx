@@ -163,9 +163,7 @@ function SortMenuButton({
             fontWeight: 600,
             borderRadius: "var(--dg-btn-radius)",
             flexShrink: 0,
-            border: open
-              ? "1px solid var(--color-brand-border)"
-              : "1px solid var(--color-border)",
+            border: open ? "1px solid var(--color-brand-border)" : "1px solid var(--color-border)",
             background: open ? "var(--color-brand-bg)" : undefined,
             color: open ? "var(--color-brand)" : undefined,
           }}
@@ -679,9 +677,7 @@ export default function Toolbar({
                 className="dg-input"
                 style={{ paddingLeft: 30, width: "100%", borderRadius: "var(--dg-btn-radius)" }}
               />
-              {staffSearch && (
-                <ClearSearchButton onClick={() => onStaffSearchChange("")} />
-              )}
+              {staffSearch && <ClearSearchButton onClick={() => onStaffSearchChange("")} />}
             </div>
           )}
           {hasData && (

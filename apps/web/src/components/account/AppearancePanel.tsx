@@ -20,8 +20,8 @@ export function AppearancePanel() {
         <div>
           <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">Theme</div>
           <p className="mb-0 mt-1 text-[13px] text-[var(--color-text-muted)]">
-            Follow your device's appearance, or choose light or dark. This only affects how
-            DubGrid looks on this device.
+            Follow your device's appearance, or choose light or dark. This only affects how DubGrid
+            looks on this device.
           </p>
         </div>
         <div className="dg-segment" style={{ display: "flex", maxWidth: 320 }}>

@@ -193,7 +193,8 @@ export function EmployeeStatusActions({
                     color: "var(--color-text-muted)",
                   }}
                 >
-                  They&apos;ll lose access and won&apos;t appear in active staff. You can reactivate them later.
+                  They&apos;ll lose access and won&apos;t appear in active staff. You can reactivate
+                  them later.
                 </span>
               </span>
             </label>

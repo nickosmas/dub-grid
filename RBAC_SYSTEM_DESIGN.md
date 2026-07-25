@@ -1439,12 +1439,12 @@ The following features are recommended before a production launch.
 
 #### Multi-Factor Authentication (MFA) — Enrollment Done, Enforcement Advisory
 
-| Property         | Detail                                                                                                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Status           | Enrollment is fully built on web and mobile (see §12.6). Role-based enforcement is a dismissible nag banner for gridmaster/super_admin/admin without a verified factor, not a hard block.        |
-| Gap              | An unenrolled admin can dismiss the nag indefinitely; a compromised password alone still grants full access until they choose to enroll.                                                        |
+| Property         | Detail                                                                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status           | Enrollment is fully built on web and mobile (see §12.6). Role-based enforcement is a dismissible nag banner for gridmaster/super_admin/admin without a verified factor, not a hard block.         |
+| Gap              | An unenrolled admin can dismiss the nag indefinitely; a compromised password alone still grants full access until they choose to enroll.                                                          |
 | Recommendation   | If a hard requirement is wanted later, gate `/settings` and `/gridmaster` in `middleware.ts` behind AAL2 for privileged roles — deliberately not done now to avoid locking out existing accounts. |
-| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challengeAndVerify()` / `unenroll()`                                                                                                                  |
+| Supabase support | Built-in via `supabase.auth.mfa.enroll()` / `challengeAndVerify()` / `unenroll()`                                                                                                                 |
 
 #### Failed Login Attempt Tracking & Account Lockout
 
@@ -1492,18 +1492,18 @@ here.
 
 ### 13.4 Feature Priority Summary
 
-| Priority | Feature                                  | Status      | Risk if Skipped                                                                                           |
-| -------- | ---------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
+| Priority | Feature                                  | Status      | Risk if Skipped                                                                                                                                    |
+| -------- | ---------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P1       | MFA for Gridmaster & Super Admin         | **Partial** | Enrollment done (web + mobile); enforcement is a dismissible nag, not a hard block → account takeover still possible for admins who ignore the nag |
-| P1       | Failed login tracking & lockout          | Not done    | Brute-force attacks succeed silently                                                                      |
-| P1       | IP allowlisting for Gridmaster           | Not done    | Stolen credentials = full platform access                                                                 |
-| ~~P1~~   | ~~Password reset flow~~                  | ✅ Done     | ~~Users locked out permanently if password lost~~                                                         |
-| ~~P2~~   | ~~Email verification~~                   | ✅ Done     | ~~Unverified accounts receive org roles~~                                                                 |
-| ~~P2~~   | ~~Rate limiting on API routes~~          | ✅ Done     | ~~Abuse of public endpoints~~                                                                             |
-| ~~P2~~   | ~~Soft delete (users & orgs)~~           | ✅ Done     | ~~Accidental permanent data loss~~ — see §10a and `profiles.deactivated_at`                              |
-| P3       | Refresh token rotation + reuse detection | Not done    | Stolen tokens usable indefinitely                                                                         |
-| P3       | Role change notifications                | Not done    | Silent UX — confused users after demotion                                                                 |
-| ~~P3~~   | ~~GDPR data export~~                     | ✅ Done     | ~~Legal compliance gap in EU/UK markets~~                                                                 |
+| P1       | Failed login tracking & lockout          | Not done    | Brute-force attacks succeed silently                                                                                                               |
+| P1       | IP allowlisting for Gridmaster           | Not done    | Stolen credentials = full platform access                                                                                                          |
+| ~~P1~~   | ~~Password reset flow~~                  | ✅ Done     | ~~Users locked out permanently if password lost~~                                                                                                  |
+| ~~P2~~   | ~~Email verification~~                   | ✅ Done     | ~~Unverified accounts receive org roles~~                                                                                                          |
+| ~~P2~~   | ~~Rate limiting on API routes~~          | ✅ Done     | ~~Abuse of public endpoints~~                                                                                                                      |
+| ~~P2~~   | ~~Soft delete (users & orgs)~~           | ✅ Done     | ~~Accidental permanent data loss~~ — see §10a and `profiles.deactivated_at`                                                                        |
+| P3       | Refresh token rotation + reuse detection | Not done    | Stolen tokens usable indefinitely                                                                                                                  |
+| P3       | Role change notifications                | Not done    | Silent UX — confused users after demotion                                                                                                          |
+| ~~P3~~   | ~~GDPR data export~~                     | ✅ Done     | ~~Legal compliance gap in EU/UK markets~~                                                                                                          |
 
 ---
 

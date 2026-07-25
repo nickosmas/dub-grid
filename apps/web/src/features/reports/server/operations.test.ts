@@ -341,18 +341,16 @@ describe("operations reports", () => {
       { focusAreaIds: [10] },
     );
 
-    expect(payload.reports.employeeDirectory.map((row) => row.employeeName)).toContain(
+    expect(payload.reports.employeeDirectory.map((row) => row.employeeName)).toContain("Casey Lee");
+    expect(payload.reports.rosterStatus.map((row) => row.employeeName)).toContain("Casey Lee");
+    expect(payload.reports.certificationRoleMatrix.map((row) => row.employeeName)).toContain(
       "Casey Lee",
     );
-    expect(payload.reports.rosterStatus.map((row) => row.employeeName)).toContain("Casey Lee");
-    expect(
-      payload.reports.certificationRoleMatrix.map((row) => row.employeeName),
-    ).toContain("Casey Lee");
     expect(payload.reports.accountAccess.map((row) => row.employeeName)).toContain("Casey Lee");
     expect(payload.reports.staffHours.map((row) => row.employeeName)).not.toContain("Casey Lee");
-    expect(
-      payload.reports.scheduleMatrix.rows.map((row) => row.employeeName),
-    ).not.toContain("Casey Lee");
+    expect(payload.reports.scheduleMatrix.rows.map((row) => row.employeeName)).not.toContain(
+      "Casey Lee",
+    );
 
     const directoryRow = payload.reports.employeeDirectory.find(
       (row) => row.employeeName === "Casey Lee",

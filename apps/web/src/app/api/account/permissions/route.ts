@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdminPermissions, OrganizationRole } from "@/types";
-import { buildPerms, extractJwtClaims } from "@/features/permissions/shared";
+import { buildPerms } from "@/features/permissions/shared";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
+import { verifyImpersonationSession } from "@/lib/impersonation-server";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { isCallerInactive } from "@/app/api/shared/permissions";
@@ -35,7 +36,9 @@ const NO_SELF_EMPLOYMENT_FLAGS: SelfEmploymentFlags = {
 // existing admin/gridmaster accounts that haven't enrolled yet.
 const MFA_NAGGED_ROLES = new Set(["admin", "super_admin", "gridmaster"]);
 
-function hasVerifiedTotpFactor(user: { factors?: { factor_type: string; status: string }[] | null }) {
+function hasVerifiedTotpFactor(user: {
+  factors?: { factor_type: string; status: string }[] | null;
+}) {
   return (user.factors ?? []).some(
     (factor) => factor.factor_type === "totp" && factor.status === "verified",
   );
@@ -74,32 +77,54 @@ export async function GET(req: NextRequest) {
     // effectiveRole/orgId reflect the actual authenticated caller, not an
     // impersonation target — an impersonating gridmaster should still get
     // nagged about their own MFA status, not the target user's.
-    const { effectiveRole, orgId } = extractJwtClaims(auth.session.access_token);
+    //
+    // Derived from auth.claims (already sandbox-rewritten by
+    // requireAuthenticatedUserWithClaims: org_id -> sandbox org, org_role ->
+    // "super_admin") rather than re-decoding the raw access token — the raw
+    // token never reflects sandbox mode, which previously caused this route
+    // (and therefore usePermissions() everywhere it's consumed) to report the
+    // real org while the user was banner-confirmed to be sandboxed.
+    const claimOrgId = typeof auth.claims.org_id === "string" ? auth.claims.org_id : null;
+    const claimOrgRole = (auth.claims.org_role as string) || "user";
+    const effectiveRole = auth.claims.platform_role === "gridmaster" ? "gridmaster" : claimOrgRole;
+    const orgId = claimOrgId;
     const mfaNagRequired = MFA_NAGGED_ROLES.has(effectiveRole) && !hasVerifiedTotpFactor(auth.user);
 
     if (impersonation && auth.claims.platform_role === "gridmaster") {
-      const targetOrgId = impersonation.targetOrgId;
-      const { data: targetMembership } = await serviceClient
-        .from("organization_memberships")
-        .select("org_role, admin_permissions")
-        .eq("user_id", impersonation.targetUserId)
-        .eq("org_id", targetOrgId)
-        .single();
-      const targetRole =
-        (targetMembership?.org_role as OrganizationRole | null) ??
-        (impersonation.targetOrgRole as OrganizationRole | null) ??
-        "user";
+      // The cookie is client-writable — cross-check its sessionId against
+      // the authoritative impersonation_sessions row before trusting
+      // targetOrgId/targetUserId, rather than the cookie's own copies.
+      const verified = await verifyImpersonationSession(
+        serviceClient,
+        impersonation.sessionId,
+        auth.user.id,
+      );
 
-      return NextResponse.json({
-        permissions: buildPerms(
-          targetRole,
-          targetOrgId,
-          false,
-          (targetMembership?.admin_permissions as AdminPermissions | null) ?? null,
-          true,
-        ),
-        mfaNagRequired,
-      });
+      if (verified) {
+        const { data: targetMembership } = await serviceClient
+          .from("organization_memberships")
+          .select("org_role, admin_permissions")
+          .eq("user_id", verified.targetUserId)
+          .eq("org_id", verified.targetOrgId)
+          .single();
+        const targetRole =
+          (targetMembership?.org_role as OrganizationRole | null) ??
+          (impersonation.targetOrgRole as OrganizationRole | null) ??
+          "user";
+
+        return NextResponse.json({
+          permissions: buildPerms(
+            targetRole,
+            verified.targetOrgId,
+            false,
+            (targetMembership?.admin_permissions as AdminPermissions | null) ?? null,
+            true,
+          ),
+          mfaNagRequired,
+        });
+      }
+      // No matching active session — fall through and report the caller's
+      // own (real) permissions instead of trusting the stale/forged cookie.
     }
 
     // Gridmasters always have full access — they don't have an employees row in

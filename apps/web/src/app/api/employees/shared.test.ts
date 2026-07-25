@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { canManageEmployees } from "./shared";
 
 type MockRows = {
-  membership?: { org_role: string | null; admin_permissions: Record<string, boolean> | null } | null;
+  membership?: {
+    org_role: string | null;
+    admin_permissions: Record<string, boolean> | null;
+  } | null;
   profile?: { platform_role: string | null } | null;
   organization?: {
     suspended_at: string | null;

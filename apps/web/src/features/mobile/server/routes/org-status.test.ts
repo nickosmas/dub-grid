@@ -60,7 +60,10 @@ describe("GET mobile org-status route", () => {
     getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
     getClaims.mockResolvedValue({ data: { claims: { org_id: "org-1" } } });
     fetchMobileOrganizationMembershipRows.mockResolvedValue([
-      { organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" }, org_role: "user" },
+      {
+        organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+        org_role: "user",
+      },
     ]);
     fetchMobileOrganizationRowById.mockResolvedValue(ORG_ROW);
   });

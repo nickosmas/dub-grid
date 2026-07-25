@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/reconcile-org-domains",
       "schedule": "0 3 * * 0"
+    },
+    {
+      "path": "/api/cron/sandbox-cleanup",
+      "schedule": "0 5 * * *"
     }
   ]
 }

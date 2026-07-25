@@ -2903,62 +2903,62 @@ function ConfigTab({
                     ),
                   };
                   return (
-                  <tr key={at0.id}>
-                    <td
-                      style={{
-                        padding: "8px 14px",
-                        borderBottom: "1px solid var(--color-border-light)",
-                      }}
-                    >
-                      <span
+                    <tr key={at0.id}>
+                      <td
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          minWidth: 32,
-                          height: 26,
-                          padding: "0 8px",
-                          borderRadius: 8,
-                          fontSize: "var(--dg-fs-caption)",
-                          fontWeight: 700,
-                          background: at.color,
-                          color: at.text,
-                          border: `1.5px solid ${at.border}`,
+                          padding: "8px 14px",
+                          borderBottom: "1px solid var(--color-border-light)",
                         }}
                       >
-                        {at.label}
-                      </span>
-                    </td>
-                    <td
-                      style={{
-                        padding: "8px 14px",
-                        fontSize: "var(--dg-fs-label)",
-                        fontWeight: 600,
-                        color: "var(--color-text-primary)",
-                        borderBottom: "1px solid var(--color-border-light)",
-                      }}
-                    >
-                      {at.name}
-                    </td>
-                    <td
-                      style={{
-                        padding: "8px 14px",
-                        borderBottom: "1px solid var(--color-border-light)",
-                      }}
-                    >
-                      <span
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            minWidth: 32,
+                            height: 26,
+                            padding: "0 8px",
+                            borderRadius: 8,
+                            fontSize: "var(--dg-fs-caption)",
+                            fontWeight: 700,
+                            background: at.color,
+                            color: at.text,
+                            border: `1.5px solid ${at.border}`,
+                          }}
+                        >
+                          {at.label}
+                        </span>
+                      </td>
+                      <td
                         style={{
-                          display: "inline-block",
-                          width: 20,
-                          height: 20,
-                          borderRadius: 4,
-                          background: at.color,
-                          border: `1px solid ${at.border}`,
-                          verticalAlign: "middle",
+                          padding: "8px 14px",
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                          color: "var(--color-text-primary)",
+                          borderBottom: "1px solid var(--color-border-light)",
                         }}
-                      />
-                    </td>
-                  </tr>
+                      >
+                        {at.name}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 14px",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: 20,
+                            height: 20,
+                            borderRadius: 4,
+                            background: at.color,
+                            border: `1px solid ${at.border}`,
+                            verticalAlign: "middle",
+                          }}
+                        />
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>

@@ -4,12 +4,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const requireOrgPermissions = vi.fn();
 const userRpc = vi.fn();
 const serviceFrom = vi.fn();
+const resolveEffectiveOrgId = vi.fn();
 
 vi.mock("@/app/api/shared/permissions", () => ({
   requireOrgPermissions: (...args: unknown[]) => requireOrgPermissions(...args),
   // The sandbox redirect resolves the effective org before permission checks;
-  // in tests it is a pass-through so the body orgId is used unchanged.
-  resolveEffectiveOrgId: async (_req: NextRequest, _userId: string, orgId: string) => orgId,
+  // defaults to a pass-through (see beforeEach) so most tests can use the
+  // body orgId unchanged. Tests exercising the sandbox redirect itself
+  // override this per-test.
+  resolveEffectiveOrgId: (...args: unknown[]) => resolveEffectiveOrgId(...args),
 }));
 
 vi.mock("@/lib/csrf", () => ({
@@ -45,11 +48,13 @@ describe("POST /api/schedule/manage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     userRpc.mockResolvedValue({ data: 0, error: null });
-    requireOrgPermissions.mockResolvedValue({
+    resolveEffectiveOrgId.mockImplementation((_req, _userId, orgId) => Promise.resolve(orgId));
+    requireOrgPermissions.mockImplementation(async (_req, orgId) => ({
       userClient: { rpc: userRpc },
       serviceClient: { from: serviceFrom },
       actor: { id: "actor-user" },
-    });
+      orgId,
+    }));
   });
 
   it("delegates importPreviousSchedule to the SQL RPC and returns per-row outcomes", async () => {
@@ -142,6 +147,65 @@ describe("POST /api/schedule/manage", () => {
       "import_previous_schedule",
       expect.objectContaining({ p_dry_run: true }),
     );
+  });
+
+  it("upserts a shift against the effective (sandbox-redirected) org, not the raw body org id", async () => {
+    const requestedOrgId = "11111111-1111-4111-8111-111111111111";
+    const sandboxOrgId = "99999999-9999-4999-8999-999999999999";
+    const employeeId = "22222222-2222-4222-8222-222222222222";
+
+    // The top-level sandbox redirect (lines ~497-508 in route.ts) rewrites
+    // data.orgId in place before any action-specific handler runs.
+    resolveEffectiveOrgId.mockResolvedValue(sandboxOrgId);
+    userRpc.mockResolvedValue({ error: null });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShift",
+        orgId: requestedOrgId,
+        employeeId,
+        date: "2026-08-03",
+        input: { kind: "absence", segments: [], absenceTypeId: 7 },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(resolveEffectiveOrgId).toHaveBeenCalledWith(
+      expect.anything(),
+      "actor-user",
+      requestedOrgId,
+    );
+    expect(requireOrgPermissions).toHaveBeenCalledWith(
+      expect.anything(),
+      sandboxOrgId,
+      expect.any(Function),
+    );
+    expect(userRpc).toHaveBeenCalledWith(
+      "write_schedule_cell_snapshot",
+      expect.objectContaining({ p_org_id: sandboxOrgId, p_emp_id: employeeId }),
+    );
+  });
+
+  it("rejects a mismatched org id when the caller has no sandbox and requireOrgPermissions denies it", async () => {
+    const orgId = "11111111-1111-4111-8111-111111111111";
+    const employeeId = "22222222-2222-4222-8222-222222222222";
+
+    requireOrgPermissions.mockResolvedValue({
+      response: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "upsertShift",
+        orgId,
+        employeeId,
+        date: "2026-08-03",
+        input: { kind: "absence", segments: [], absenceTypeId: 7 },
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(userRpc).not.toHaveBeenCalled();
   });
 
   it("bulk deletes selected shifts after one permission check", async () => {

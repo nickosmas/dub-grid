@@ -110,7 +110,9 @@ describe("mobile dashboard route", () => {
       // No coverage requirements configured in this fixture — the real
       // engine reports the section purely from its (unmet) open shifts.
       totals: { totalRequired: 2, totalFilled: 0, pct: 0, openSlots: 2 },
-      byFocusArea: [{ focusAreaId: 1, focusAreaName: "ICU", requiredTotal: 2, filledTotal: 0, pct: 0 }],
+      byFocusArea: [
+        { focusAreaId: 1, focusAreaName: "ICU", requiredTotal: 2, filledTotal: 0, pct: 0 },
+      ],
       hasCoverageRequirements: false,
       scheduleRows: [],
     });
@@ -127,7 +129,14 @@ describe("mobile dashboard route", () => {
     expect(payload.range).toEqual({ startDate: "2026-05-11", endDate: "2026-05-17" });
     expect(payload.overtimeThresholdHours).toBe(40);
     expect(payload.coverageBySection).toEqual([
-      { focusAreaId: 1, focusAreaName: "ICU", requiredTotal: 2, filledTotal: 0, pct: 0, openSlots: 2 },
+      {
+        focusAreaId: 1,
+        focusAreaName: "ICU",
+        requiredTotal: 2,
+        filledTotal: 0,
+        pct: 0,
+        openSlots: 2,
+      },
     ]);
     expect(payload.openShifts).toHaveLength(1);
     expect(fetchMobileCoverageSummary).toHaveBeenCalledWith(

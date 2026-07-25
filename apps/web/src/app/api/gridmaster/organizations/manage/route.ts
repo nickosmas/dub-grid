@@ -101,6 +101,28 @@ export async function POST(req: NextRequest) {
   const requestClient = createRequestSupabaseClient(req);
   const serviceClient = getServiceClient();
 
+  // Defense in depth: the gridmaster dashboard's organization list already
+  // excludes sandbox orgs (workspace_kind = 'real' filter), so this should
+  // be unreachable via the UI — but guard the API directly in case a
+  // sandbox org id ever reaches this route. Sandbox lifecycle is owned by
+  // the user + the cron cleanup job, not gridmaster tooling.
+  if (parsed.data.action !== "createOrganizationSetup") {
+    const { data: targetOrg, error: targetOrgError } = await serviceClient
+      .from("organizations")
+      .select("workspace_kind")
+      .eq("id", parsed.data.orgId)
+      .maybeSingle();
+    if (targetOrgError) {
+      return apiErrorResponse(targetOrgError, "Gridmaster organization request failed");
+    }
+    if (targetOrg?.workspace_kind === "sandbox") {
+      return NextResponse.json(
+        { error: "Sandbox organizations aren't managed here." },
+        { status: 400 },
+      );
+    }
+  }
+
   try {
     switch (parsed.data.action) {
       case "archiveOrganization": {

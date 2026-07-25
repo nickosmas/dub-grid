@@ -616,7 +616,10 @@ export function summarizeCoverageByFocusArea(
       focusAreaName: focusAreaNameById.get(focusAreaId) ?? "Unknown",
       filledTotal: totals.filledTotal,
       requiredTotal: totals.requiredTotal,
-      pct: totals.requiredTotal > 0 ? Math.round((totals.filledTotal / totals.requiredTotal) * 100) : 100,
+      pct:
+        totals.requiredTotal > 0
+          ? Math.round((totals.filledTotal / totals.requiredTotal) * 100)
+          : 100,
     }))
     .filter((entry) => entry.requiredTotal > 0);
 }

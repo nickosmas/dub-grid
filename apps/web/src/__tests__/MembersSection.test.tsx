@@ -75,7 +75,8 @@ vi.mock("@base-ui/react/popover", () => {
         className,
       }: {
         children: React.ReactNode;
-        className?: string | ((state: { open: boolean; side: string; align: string }) => string | undefined);
+        className?:
+          string | ((state: { open: boolean; side: string; align: string }) => string | undefined);
       }) => (
         <div
           className={
@@ -260,7 +261,11 @@ describe("MembersSection — management-only view access", () => {
     // Inviting/editing management access requires canManageManagementAccess
     // (super_admin/gridmaster), not just canManageEmployees — see the "+ Add"
     // gate on the Management tab in MembersSection.tsx.
-    renderMembersSection({ canManageEmployees: false, isSuperAdmin: true, isManagementUser: false });
+    renderMembersSection({
+      canManageEmployees: false,
+      isSuperAdmin: true,
+      isManagementUser: false,
+    });
 
     const toggle = screen.getByRole("button", { name: /On Schedule/i });
     await user.click(toggle);

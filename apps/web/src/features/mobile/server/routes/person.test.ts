@@ -214,5 +214,4 @@ describe("mobile person route", () => {
       userId: null,
     });
   });
-
 });

@@ -187,7 +187,9 @@ function classificationTitle(classification: EnrichedClassification): string | u
   return `Similar to ${who} — different contact info, double-check before importing`;
 }
 
-function classificationRowBackground(status: RowDuplicateClassification["status"]): string | undefined {
+function classificationRowBackground(
+  status: RowDuplicateClassification["status"],
+): string | undefined {
   if (status === "blocked") return "var(--color-danger-bg)";
   if (status === "warning") return "var(--color-warning-bg)";
   return undefined;
@@ -575,8 +577,8 @@ export function BulkImportModal({
                       <XCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
                       <div>
                         {importableCount} of {rows.length} row{rows.length !== 1 ? "s" : ""} will be
-                        imported. {blockedCount} duplicate{blockedCount !== 1 ? "s" : ""} of existing
-                        employees blocked.
+                        imported. {blockedCount} duplicate{blockedCount !== 1 ? "s" : ""} of
+                        existing employees blocked.
                       </div>
                     </div>
                   )}
@@ -697,7 +699,9 @@ export function BulkImportModal({
                         return (
                           <tr
                             key={`preview-${row.firstName}-${row.lastName}-${i}`}
-                            style={{ background: classificationRowBackground(classification.status) }}
+                            style={{
+                              background: classificationRowBackground(classification.status),
+                            }}
                           >
                             <td
                               style={{
@@ -729,8 +733,7 @@ export function BulkImportModal({
                                 style={{
                                   padding: "8px 12px",
                                   borderBottom,
-                                  color:
-                                    col.key === "name" ? undefined : "var(--color-text-muted)",
+                                  color: col.key === "name" ? undefined : "var(--color-text-muted)",
                                   ...(col.maxWidth
                                     ? {
                                         maxWidth: col.maxWidth,

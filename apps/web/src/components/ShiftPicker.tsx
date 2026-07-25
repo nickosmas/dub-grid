@@ -208,7 +208,8 @@ export default function ShiftPicker({
     // `color`/`text` are already dark-resolved by the caller; re-derive the
     // border from the resolved text rather than trusting the raw stored
     // border, unless it's the literal "transparent" sentinel.
-    const effectiveBorder = border === "transparent" ? "transparent" : isDarkTheme ? borderColor(text) : border;
+    const effectiveBorder =
+      border === "transparent" ? "transparent" : isDarkTheme ? borderColor(text) : border;
     return {
       background: color,
       border: isActive

@@ -103,7 +103,12 @@ function formatDateGroupLabel(value: string | null | undefined): string {
   const diffDays = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86_400_000);
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
-  return date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function groupSessionsByDate(
@@ -213,7 +218,12 @@ function SessionDetailPanel({
   return (
     <>
       <div className="staff-detail-overlay" onClick={onClose} />
-      <div role="dialog" aria-modal="true" aria-label="Session details" className="staff-detail-pane">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Session details"
+        className="staff-detail-pane"
+      >
         <div
           style={{
             padding: "18px 20px",
@@ -603,7 +613,12 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
                 size="sm"
                 onClick={() => setSearch("")}
                 aria-label="Clear search"
-                style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                }}
               />
             )}
           </div>

@@ -126,12 +126,7 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
           Sign back in
         </Link>
       ) : (
-        <button
-          type="button"
-          className="dg-btn dg-btn-primary dg-btn-lg"
-          disabled
-          aria-busy="true"
-        >
+        <button type="button" className="dg-btn dg-btn-primary dg-btn-lg" disabled aria-busy="true">
           Sign back in
         </button>
       )}

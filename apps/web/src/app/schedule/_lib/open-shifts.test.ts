@@ -6,7 +6,13 @@ import {
   isEmployeeEligibleForOpenShift,
   selectVisibleCoverageGaps,
 } from "./open-shifts";
-import type { AssignmentDefinition, CoverageGap, Employee, ShiftCategory, ShiftRequest } from "@/types";
+import type {
+  AssignmentDefinition,
+  CoverageGap,
+  Employee,
+  ShiftCategory,
+  ShiftRequest,
+} from "@/types";
 
 function buildEmployee(overrides: Partial<Employee> = {}): Employee {
   return {
@@ -107,7 +113,9 @@ function buildShiftCategory(overrides: Partial<ShiftCategory> = {}): ShiftCatego
   };
 }
 
-function buildAssignmentDefinition(overrides: Partial<AssignmentDefinition> = {}): AssignmentDefinition {
+function buildAssignmentDefinition(
+  overrides: Partial<AssignmentDefinition> = {},
+): AssignmentDefinition {
   return {
     id: 21,
     orgId: "org-1",
@@ -419,19 +427,27 @@ describe("isEmployeeEligibleForOpenShift", () => {
     const byId = new Map([[certifiedAssignment.id, certifiedAssignment]]);
 
     expect(
-      isEmployeeEligibleForOpenShift([21], buildEmployee({ focusAreaIds: [11], certificationId: null }), {
-        assignmentById: byId,
-        shiftCategories,
-        jobs: [],
-      }),
+      isEmployeeEligibleForOpenShift(
+        [21],
+        buildEmployee({ focusAreaIds: [11], certificationId: null }),
+        {
+          assignmentById: byId,
+          shiftCategories,
+          jobs: [],
+        },
+      ),
     ).toBe(false);
 
     expect(
-      isEmployeeEligibleForOpenShift([21], buildEmployee({ focusAreaIds: [11], certificationId: 3 }), {
-        assignmentById: byId,
-        shiftCategories,
-        jobs: [],
-      }),
+      isEmployeeEligibleForOpenShift(
+        [21],
+        buildEmployee({ focusAreaIds: [11], certificationId: 3 }),
+        {
+          assignmentById: byId,
+          shiftCategories,
+          jobs: [],
+        },
+      ),
     ).toBe(true);
   });
 

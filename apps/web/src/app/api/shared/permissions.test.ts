@@ -151,8 +151,8 @@ function createServiceClientMock(rows: MockAccessRow) {
   };
 }
 
-function makeRequest() {
-  return new NextRequest("http://localhost/api/schedule/manage");
+function makeRequest(method?: string) {
+  return new NextRequest("http://localhost/api/schedule/manage", { method });
 }
 
 describe("requireOrgPermissions", () => {
@@ -494,5 +494,51 @@ describe("requireOrgPermissions", () => {
       expect(result.permissions.isGridmaster).toBe(true);
       expect(result.permissions.isInactive).toBe(false);
     }
+  });
+
+  describe("ignoreSandbox misuse guard", () => {
+    function baseRows() {
+      return createServiceClientMock({
+        membership: { org_role: "super_admin", admin_permissions: null },
+        profile: { platform_role: "none" },
+        organization: {
+          suspended_at: null,
+          subscription_status: "active",
+          trial_ends_at: null,
+        },
+      });
+    }
+
+    it("allows ignoreSandbox on a GET request", async () => {
+      getServiceClient.mockReturnValue(baseRows());
+
+      const { requireOrgPermissions } = await import("./permissions");
+      const result = await requireOrgPermissions(
+        makeRequest("GET"),
+        "11111111-1111-4111-8111-111111111111",
+        () => true,
+        { ignoreSandbox: true },
+      );
+
+      expect("response" in result).toBe(false);
+    });
+
+    it("throws if ignoreSandbox is combined with a mutating request method", async () => {
+      getServiceClient.mockReturnValue(baseRows());
+
+      const { requireOrgPermissions } = await import("./permissions");
+
+      // This must fail loudly rather than silently letting a sandboxed
+      // caller's write reach their real org — ignoreSandbox is meant for
+      // read-only endpoints (e.g. billing) only.
+      await expect(
+        requireOrgPermissions(
+          makeRequest("POST"),
+          "11111111-1111-4111-8111-111111111111",
+          () => true,
+          { ignoreSandbox: true },
+        ),
+      ).rejects.toThrow(/ignoreSandbox must not be used with POST/);
+    });
   });
 });

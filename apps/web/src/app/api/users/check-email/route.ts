@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
   if (!hasPermission) {
-    return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+    return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
   }
 
   // Match by lowercased email against auth.users. Service-role required.

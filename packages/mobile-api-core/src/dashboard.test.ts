@@ -27,7 +27,15 @@ function makeOpenShift(overrides: Partial<MobileOpenShift> = {}): MobileOpenShif
     focusAreaName: "ICU",
     needed: 1,
     urgency: null,
-    state: { kind: "worked", segments: [], absenceTypeId: null, customStartTime: null, customEndTime: null, seriesId: null, fromRecurring: false },
+    state: {
+      kind: "worked",
+      segments: [],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    },
     presentation: { label: "D", segments: [] } as unknown as MobileOpenShift["presentation"],
     canVolunteer: true,
     volunteerBlockReason: null,
@@ -35,7 +43,9 @@ function makeOpenShift(overrides: Partial<MobileOpenShift> = {}): MobileOpenShif
   };
 }
 
-function makeCoverageSummary(overrides: Partial<MobileCoverageSummary> = {}): MobileCoverageSummary {
+function makeCoverageSummary(
+  overrides: Partial<MobileCoverageSummary> = {},
+): MobileCoverageSummary {
   return {
     openShifts: [],
     totals: { totalRequired: 0, totalFilled: 0, pct: 100, openSlots: 0 },
@@ -54,8 +64,22 @@ describe("buildCoverageSectionsResponse", () => {
     ];
 
     expect(buildCoverageSectionsResponse(byFocusArea)).toEqual([
-      { focusAreaId: 2, focusAreaName: "ER", requiredTotal: 6, filledTotal: 2, pct: 33, openSlots: 4 },
-      { focusAreaId: 1, focusAreaName: "ICU", requiredTotal: 4, filledTotal: 4, pct: 100, openSlots: 0 },
+      {
+        focusAreaId: 2,
+        focusAreaName: "ER",
+        requiredTotal: 6,
+        filledTotal: 2,
+        pct: 33,
+        openSlots: 4,
+      },
+      {
+        focusAreaId: 1,
+        focusAreaName: "ICU",
+        requiredTotal: 4,
+        filledTotal: 4,
+        pct: 100,
+        openSlots: 0,
+      },
     ]);
   });
 });
@@ -108,19 +132,22 @@ describe("computeStaffHoursForPeriod", () => {
   it("omits employees who stay under the threshold", () => {
     const rows = [makeRow({ date: "2026-05-11" }), makeRow({ date: "2026-05-12" })]; // 24h
 
-    expect(
-      computeStaffHoursForPeriod(rows, shiftCategoriesById, focusAreaNameById, range),
-    ).toEqual([]);
+    expect(computeStaffHoursForPeriod(rows, shiftCategoriesById, focusAreaNameById, range)).toEqual(
+      [],
+    );
   });
 
   it("ignores absence and deleted cells", () => {
     const rows = [
-      makeRow({ date: "2026-05-11", state: { kind: "absence", segments: [], customStartTime: null, customEndTime: null } }),
+      makeRow({
+        date: "2026-05-11",
+        state: { kind: "absence", segments: [], customStartTime: null, customEndTime: null },
+      }),
     ];
 
-    expect(
-      computeStaffHoursForPeriod(rows, shiftCategoriesById, focusAreaNameById, range),
-    ).toEqual([]);
+    expect(computeStaffHoursForPeriod(rows, shiftCategoriesById, focusAreaNameById, range)).toEqual(
+      [],
+    );
   });
 
   it("uses a custom time override when present instead of the shift category default", () => {
@@ -197,7 +224,9 @@ describe("computeStaffHoursForPeriod", () => {
 });
 
 describe("buildActivityFeed", () => {
-  function makeRow(overrides: Partial<DashboardPublishHistoryRow> = {}): DashboardPublishHistoryRow {
+  function makeRow(
+    overrides: Partial<DashboardPublishHistoryRow> = {},
+  ): DashboardPublishHistoryRow {
     return {
       published_by: "profile-1",
       start_date: "2026-05-11",
@@ -219,9 +248,7 @@ describe("buildActivityFeed", () => {
     const result = buildActivityFeed(rows, [], [], nameByProfileId);
 
     expect(result[0]?.type).toBe("publish");
-    expect(result[0]?.description).toBe(
-      "Jordan Lee published the schedule for May 11 to May 17",
-    );
+    expect(result[0]?.description).toBe("Jordan Lee published the schedule for May 11 to May 17");
     expect(result[0]?.timestamp).toBe("2026-05-10T12:00:00.000Z");
   });
 
@@ -273,7 +300,13 @@ describe("buildActivityFeed", () => {
     const result = buildActivityFeed(
       [],
       [],
-      [{ email: "jane@example.com", role_to_assign: "Nurse", accepted_at: "2026-05-10T09:00:00.000Z" }],
+      [
+        {
+          email: "jane@example.com",
+          role_to_assign: "Nurse",
+          accepted_at: "2026-05-10T09:00:00.000Z",
+        },
+      ],
       new Map(),
     );
 
@@ -298,7 +331,11 @@ describe("buildActivityFeed", () => {
       } as unknown as MobileShiftRequest,
     ];
     const invitations = [
-      { email: "jane@example.com", role_to_assign: "Nurse", accepted_at: "2026-05-10T06:00:00.000Z" },
+      {
+        email: "jane@example.com",
+        role_to_assign: "Nurse",
+        accepted_at: "2026-05-10T06:00:00.000Z",
+      },
     ];
 
     const result = buildActivityFeed(rows, requests, invitations, new Map());
@@ -357,9 +394,11 @@ describe("loadMobileDashboardPayload", () => {
     return {
       fetchMobileCoverageSummary: vi.fn().mockResolvedValue(makeCoverageSummary()),
       fetchMobileShiftRequests: vi.fn().mockResolvedValue([]),
-      fetchMobileOpenShiftContext: vi
-        .fn()
-        .mockResolvedValue({ shiftCategoryRows: [], coverageRequirementRows: [], focusAreaRows: [] }),
+      fetchMobileOpenShiftContext: vi.fn().mockResolvedValue({
+        shiftCategoryRows: [],
+        coverageRequirementRows: [],
+        focusAreaRows: [],
+      }),
       fetchMobilePublishHistoryRows: vi.fn().mockResolvedValue([]),
       fetchMobileAcceptedInvitationRows: vi.fn().mockResolvedValue([]),
       fetchProfileNameRowsByIds: vi.fn().mockResolvedValue([]),
@@ -391,7 +430,11 @@ describe("loadMobileDashboardPayload", () => {
     } as unknown as MobileShiftRequest;
     deps.fetchMobileShiftRequests.mockResolvedValue([pendingRequest]);
 
-    const adminAuth = { currentOrg: { id: "org-1" }, effectiveRole: "admin", serviceClient: {} as never };
+    const adminAuth = {
+      currentOrg: { id: "org-1" },
+      effectiveRole: "admin",
+      serviceClient: {} as never,
+    };
     const adminPayload = await loadMobileDashboardPayload(adminAuth, range, deps);
     expect(deps.fetchMobileShiftRequests).toHaveBeenCalledTimes(1);
     expect(adminPayload.actionQueue).toEqual([pendingRequest]);
@@ -416,27 +459,51 @@ describe("loadMobileDashboardPayload", () => {
     deps.fetchMobileCoverageSummary.mockResolvedValue(
       makeCoverageSummary({
         openShifts: [
-          makeOpenShift({ id: "s1", date: "2026-05-11", focusAreaId: 1, focusAreaName: "ICU", needed: 3 }),
+          makeOpenShift({
+            id: "s1",
+            date: "2026-05-11",
+            focusAreaId: 1,
+            focusAreaName: "ICU",
+            needed: 3,
+          }),
         ],
         totals: { totalRequired: 70, totalFilled: 67, pct: 96, openSlots: 3 },
-        byFocusArea: [{ focusAreaId: 1, focusAreaName: "ICU", requiredTotal: 70, filledTotal: 67, pct: 96 }],
+        byFocusArea: [
+          { focusAreaId: 1, focusAreaName: "ICU", requiredTotal: 70, filledTotal: 67, pct: 96 },
+        ],
         hasCoverageRequirements: true,
       }),
     );
-    const auth = { currentOrg: { id: "org-1" }, effectiveRole: "admin", serviceClient: {} as never };
+    const auth = {
+      currentOrg: { id: "org-1" },
+      effectiveRole: "admin",
+      serviceClient: {} as never,
+    };
 
     const payload = await loadMobileDashboardPayload(auth, range, deps);
 
     expect(payload.metrics.coveragePct).toBe(96);
     expect(payload.metrics.openGapCount).toBe(3);
     expect(payload.coverageBySection).toEqual([
-      { focusAreaId: 1, focusAreaName: "ICU", requiredTotal: 70, filledTotal: 67, pct: 96, openSlots: 3 },
+      {
+        focusAreaId: 1,
+        focusAreaName: "ICU",
+        requiredTotal: 70,
+        filledTotal: 67,
+        pct: 96,
+        openSlots: 3,
+      },
     ]);
   });
 
   it("sources staffHours from the coverage summary's scheduleRows instead of a separate fetch", async () => {
     const deps = makeDeps();
-    const shiftCategoryRow = { id: 10, start_time: "07:00", end_time: "19:00", break_minutes: null };
+    const shiftCategoryRow = {
+      id: 10,
+      start_time: "07:00",
+      end_time: "19:00",
+      break_minutes: null,
+    };
     deps.fetchMobileOpenShiftContext.mockResolvedValue({
       shiftCategoryRows: [shiftCategoryRow],
       coverageRequirementRows: [],
@@ -457,7 +524,11 @@ describe("loadMobileDashboardPayload", () => {
     deps.fetchMobileCoverageSummary.mockResolvedValue(
       makeCoverageSummary({ scheduleRows: [row, row, row, row] }), // 4 x 12h = 48h -> 8h OT
     );
-    const auth = { currentOrg: { id: "org-1" }, effectiveRole: "admin", serviceClient: {} as never };
+    const auth = {
+      currentOrg: { id: "org-1" },
+      effectiveRole: "admin",
+      serviceClient: {} as never,
+    };
 
     const payload = await loadMobileDashboardPayload(auth, range, deps);
 
@@ -478,7 +549,11 @@ describe("loadMobileDashboardPayload", () => {
 
   it("reports a null coveragePct when no coverage requirements are configured", async () => {
     const deps = makeDeps();
-    const auth = { currentOrg: { id: "org-1" }, effectiveRole: "admin", serviceClient: {} as never };
+    const auth = {
+      currentOrg: { id: "org-1" },
+      effectiveRole: "admin",
+      serviceClient: {} as never,
+    };
 
     const payload = await loadMobileDashboardPayload(auth, range, deps);
 
@@ -533,14 +608,20 @@ describe("cross-platform coverage parity", () => {
         }),
       ),
       fetchMobileShiftRequests: vi.fn().mockResolvedValue([]),
-      fetchMobileOpenShiftContext: vi
-        .fn()
-        .mockResolvedValue({ shiftCategoryRows: [], coverageRequirementRows: [], focusAreaRows: [] }),
+      fetchMobileOpenShiftContext: vi.fn().mockResolvedValue({
+        shiftCategoryRows: [],
+        coverageRequirementRows: [],
+        focusAreaRows: [],
+      }),
       fetchMobilePublishHistoryRows: vi.fn().mockResolvedValue([]),
       fetchMobileAcceptedInvitationRows: vi.fn().mockResolvedValue([]),
       fetchProfileNameRowsByIds: vi.fn().mockResolvedValue([]),
     };
-    const auth = { currentOrg: { id: "org-1" }, effectiveRole: "admin", serviceClient: {} as never };
+    const auth = {
+      currentOrg: { id: "org-1" },
+      effectiveRole: "admin",
+      serviceClient: {} as never,
+    };
     const range = { startDate: "2026-05-11", endDate: "2026-05-11" };
 
     const payload = await loadMobileDashboardPayload(auth, range, deps);

@@ -15,8 +15,10 @@ const SIZE_CLASS: Record<CloseButtonSize, string> = {
 
 const ICON_PX: Record<CloseButtonSize, number> = { xs: 12, sm: 14, md: 16, lg: 20 };
 
-interface CloseButtonProps
-  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "size"> {
+interface CloseButtonProps extends Omit<
+  ButtonHTMLAttributes<HTMLButtonElement>,
+  "children" | "size"
+> {
   /** Visual + hit-target size. See `.dg-close-btn--*` in globals.css for exact px. */
   size?: CloseButtonSize;
   /** Every close/clear "X" must have an accessible name. */

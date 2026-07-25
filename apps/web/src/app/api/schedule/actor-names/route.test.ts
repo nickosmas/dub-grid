@@ -25,8 +25,13 @@ const OTHER_ORG_USER_ID = "33333333-3333-4333-8333-333333333333";
 
 // Each table gets a queue of results; the query builder is both awaitable
 // (profiles/employees end on `.in(...)`) and supports `.maybeSingle()` (the
-// viewer-membership access check).
+// viewer-membership access check). organization_memberships is queried
+// twice per request now (viewer access check, then the ids-scoping query),
+// so tests that use it enqueue two results in order.
 const tableResults = new Map<string, Array<{ data: unknown; error: unknown }>>();
+// Records the args passed to `.in(...)` per table, in call order, so tests
+// can assert which ids actually reached a given table's query.
+const inCalls = new Map<string, unknown[][]>();
 
 function enqueue(table: string, ...results: Array<{ data: unknown; error?: unknown }>) {
   tableResults.set(
@@ -43,7 +48,12 @@ function makeQuery(table: string) {
   const query = {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
-    in: vi.fn(() => query),
+    in: vi.fn((_column: string, values: unknown[]) => {
+      const calls = inCalls.get(table) ?? [];
+      calls.push(values);
+      inCalls.set(table, calls);
+      return query;
+    }),
     is: vi.fn(() => query),
     maybeSingle: vi.fn(() => Promise.resolve(nextResult(table))),
     then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) =>
@@ -64,6 +74,7 @@ describe("POST /api/schedule/actor-names", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     tableResults.clear();
+    inCalls.clear();
     serviceFrom.mockImplementation((table: string) => makeQuery(table));
     requireAuthenticatedUserWithClaims.mockResolvedValue({
       user: { id: VIEWER_ID, email: "viewer@example.com" },
@@ -73,8 +84,13 @@ describe("POST /api/schedule/actor-names", () => {
   });
 
   it("resolves names only for profile ids found for the requested org", async () => {
-    // Viewer is a member of the org -> access granted.
-    enqueue("organization_memberships", { data: { user_id: VIEWER_ID } });
+    // Viewer is a member of the org -> access granted. Second result is the
+    // ids-scoping query: only the same-org id is an active member.
+    enqueue(
+      "organization_memberships",
+      { data: { user_id: VIEWER_ID } },
+      { data: [{ user_id: SAME_ORG_USER_ID }] },
+    );
     enqueue("profiles", {
       data: [{ id: SAME_ORG_USER_ID, first_name: "Ada", last_name: "Lovelace" }],
     });
@@ -89,8 +105,29 @@ describe("POST /api/schedule/actor-names", () => {
     });
   });
 
+  it("never queries profiles with a cross-org id, even if the caller requests one", async () => {
+    // The ids-scoping query only reports SAME_ORG_USER_ID as a member —
+    // OTHER_ORG_USER_ID must never reach the profiles.in(...) call.
+    enqueue(
+      "organization_memberships",
+      { data: { user_id: VIEWER_ID } },
+      { data: [{ user_id: SAME_ORG_USER_ID }] },
+    );
+    enqueue("profiles", {
+      data: [{ id: SAME_ORG_USER_ID, first_name: "Ada", last_name: "Lovelace" }],
+    });
+    enqueue("employees", { data: [] });
+
+    await POST(makeRequest([SAME_ORG_USER_ID, OTHER_ORG_USER_ID]));
+
+    const profilesInCalls = inCalls.get("profiles") ?? [];
+    expect(profilesInCalls).toHaveLength(1);
+    expect(profilesInCalls[0]).toEqual([SAME_ORG_USER_ID]);
+    expect(profilesInCalls[0]).not.toContain(OTHER_ORG_USER_ID);
+  });
+
   it("returns no name for arbitrary ids the org has no record of", async () => {
-    enqueue("organization_memberships", { data: { user_id: VIEWER_ID } });
+    enqueue("organization_memberships", { data: { user_id: VIEWER_ID } }, { data: [] });
     enqueue("profiles", { data: [] });
     enqueue("employees", { data: [] });
 
@@ -98,6 +135,8 @@ describe("POST /api/schedule/actor-names", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ names: {} });
+    // No org members among the requested ids -> profiles is never queried.
+    expect(inCalls.get("profiles") ?? []).toHaveLength(0);
   });
 
   it("forbids a non-gridmaster viewer who is not a member of the org", async () => {

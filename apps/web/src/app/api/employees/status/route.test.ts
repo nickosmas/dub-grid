@@ -153,6 +153,7 @@ import { POST } from "./route";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
 const EMP_ID = "33333333-3333-4333-8333-333333333333";
+const SANDBOX_ORG_ID = "99999999-9999-4999-8999-999999999999";
 
 function makeRequest() {
   return new NextRequest("http://localhost/api/employees/status", {
@@ -186,7 +187,7 @@ describe("POST /api/employees/status", () => {
     const response = await POST(makeRequest());
 
     expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({ error: API_ERRORS.FORBIDDEN });
+    await expect(response.json()).resolves.toEqual({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES });
   });
 
   it("does not deny an inactive super_admin (bypass, matches account/permissions/route.ts)", async () => {
@@ -331,6 +332,71 @@ describe("POST /api/employees/status", () => {
       `dg:org:${ORG_ID}:employees`,
       "dg:gm:allUsers",
     );
+  });
+
+  it("uses the effective (sandbox-redirected) org id for the mutation, not the raw requested org id (H-1)", async () => {
+    const EMPLOYEE_USER_ID = "88888888-8888-4888-8888-888888888888";
+
+    // The caller's request body carries the REAL org id, but a sandbox
+    // cookie is active — resolveEffectiveOrgId redirects to the sandbox.
+    // Every downstream write/cache-key/audit-log call must use the
+    // resolved (sandbox) org, never the raw requested one.
+    resolveEffectiveOrgId.mockResolvedValue(SANDBOX_ORG_ID);
+    isCallerInactive.mockResolvedValue(false);
+    membershipMaybeSingle.mockResolvedValue({
+      data: { org_role: "super_admin", admin_permissions: null },
+      error: null,
+    });
+    profileSingle.mockResolvedValue({ data: { platform_role: "none" }, error: null });
+    employeeCurrentSingle.mockResolvedValue({
+      data: {
+        id: EMP_ID,
+        org_id: SANDBOX_ORG_ID,
+        status: "active",
+        version: 1,
+        user_id: EMPLOYEE_USER_ID,
+      },
+      error: null,
+    });
+    employeeUpdateMaybeSingle.mockResolvedValue({
+      data: {
+        id: EMP_ID,
+        org_id: SANDBOX_ORG_ID,
+        status: "removed",
+        version: 2,
+        user_id: EMPLOYEE_USER_ID,
+      },
+      error: null,
+    });
+    targetMembershipMaybeSingle.mockResolvedValue({ data: { org_role: "user" }, error: null });
+    membershipArchiveUpdate.mockResolvedValue({ error: null });
+    auditInsert.mockResolvedValue({ error: null });
+
+    const request = new NextRequest("http://localhost/api/employees/status", {
+      method: "POST",
+      body: JSON.stringify({
+        empId: EMP_ID,
+        orgId: ORG_ID,
+        action: "remove",
+        expectedVersion: 1,
+      }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(resolveEffectiveOrgId).toHaveBeenCalledWith(expect.anything(), USER_ID, ORG_ID);
+    // Cache keys and the audit log must be built from the effective (sandbox)
+    // org, not the raw request body org — this is the guarantee that was
+    // previously untested (the mock echoed its input, so divergence was
+    // never actually exercised).
+    expect(cacheDel).toHaveBeenCalledWith(
+      `dg:org:${SANDBOX_ORG_ID}:orgUsers`,
+      `dg:org:${SANDBOX_ORG_ID}:orgDirectory`,
+      `dg:org:${SANDBOX_ORG_ID}:employees`,
+      "dg:gm:allUsers",
+    );
+    expect(auditInsert).toHaveBeenCalledWith(expect.objectContaining({ org_id: SANDBOX_ORG_ID }));
   });
 
   it("refuses to remove the org's only super_admin", async () => {

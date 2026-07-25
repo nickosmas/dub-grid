@@ -228,9 +228,6 @@ describe("RunLogoutTeardown", () => {
     renderWithClient(<RunLogoutTeardown scope={null} />);
 
     expect(mockToastInfo).not.toHaveBeenCalled();
-    expect(screen.getByRole("link", { name: /sign back in/i })).toHaveAttribute(
-      "href",
-      "/login",
-    );
+    expect(screen.getByRole("link", { name: /sign back in/i })).toHaveAttribute("href", "/login");
   });
 });

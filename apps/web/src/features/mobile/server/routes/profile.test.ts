@@ -295,10 +295,7 @@ describe("mobile profile routes", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(updateSelfMfaStatus).toHaveBeenCalledWith(
-      "8af6f242-c060-4920-a7db-91b4cb66fd26",
-      true,
-    );
+    expect(updateSelfMfaStatus).toHaveBeenCalledWith("8af6f242-c060-4920-a7db-91b4cb66fd26", true);
     expect(payload.user.mfaEnabled).toBe(true);
   });
 

@@ -419,7 +419,12 @@ export default function AllUsersView({
                 size="sm"
                 onClick={() => setSearch("")}
                 aria-label="Clear search"
-                style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                }}
               />
             )}
           </div>

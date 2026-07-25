@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         effectiveOrgId,
       );
       if (!allowed) {
-        return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+        return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
       }
     }
 

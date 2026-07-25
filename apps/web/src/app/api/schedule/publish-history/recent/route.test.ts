@@ -99,9 +99,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
       userClient: {},
     });
 
-    const response = await GET(
-      makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }),
-    );
+    const response = await GET(makeRequest({ orgId: ORG_ID, since: "2026-05-05T00:00:00.000Z" }));
     const body = await response.json();
 
     expect(response.status).toBe(200);

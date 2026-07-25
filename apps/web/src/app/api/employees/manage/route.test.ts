@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 const validateCsrfOrigin = vi.fn();
 const requireOrgPermissions = vi.fn();
@@ -138,7 +139,7 @@ describe("POST /api/employees/manage", () => {
 
       expect(response.status).toBe(403);
       expect(await response.json()).toEqual({
-        error: "You don't have permission to do that.",
+        error: API_ERRORS.CANNOT_VIEW_MANAGEMENT_PROFILE,
       });
     });
 

@@ -1254,7 +1254,11 @@ function buildAvailableShiftItems(input: {
     jobs: input.jobs,
   };
   const isEligible = (candidateAssignmentIds: number[]) =>
-    isEmployeeEligibleForOpenShift(candidateAssignmentIds, input.currentEmployee ?? null, eligibilityContext);
+    isEmployeeEligibleForOpenShift(
+      candidateAssignmentIds,
+      input.currentEmployee ?? null,
+      eligibilityContext,
+    );
 
   // Visibility governs the staff view only; this dashboard is never the
   // scheduler tool. `always` shows every open shift regardless of the viewer's
@@ -1890,7 +1894,9 @@ function SplitShiftBadge({ inverse = false, label }: { inverse?: boolean; label:
       style={{
         alignItems: "center",
         background: inverse ? "rgba(255,255,255,0.16)" : "var(--color-brand-bg)",
-        border: inverse ? "1px solid rgba(255,255,255,0.28)" : "1px solid var(--color-brand-border)",
+        border: inverse
+          ? "1px solid rgba(255,255,255,0.28)"
+          : "1px solid var(--color-brand-border)",
         borderRadius: 999,
         color: inverse ? "#fff" : "var(--color-brand)",
         display: "inline-flex",

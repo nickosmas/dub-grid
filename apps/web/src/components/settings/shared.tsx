@@ -227,47 +227,49 @@ export function PresetColorPicker({
                     {group.colors.map((color) => {
                       const colorDisplay = toDisplay(color);
                       return (
-                      <MaybeHint key={color.id} content={color.name} side="top">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (disabled) return;
-                            onChange(color);
-                            setOpen(false);
-                          }}
-                          disabled={disabled}
-                          title={color.name}
-                          aria-label={color.name}
-                          style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: "9999px",
-                            background: colorDisplay.bg,
-                            border:
-                              active.id === color.id
-                                ? `2px solid ${colorDisplay.text}`
-                                : "1px solid var(--color-border)",
-                            cursor: disabled ? "not-allowed" : "pointer",
-                            padding: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            boxShadow:
-                              active.id === color.id ? `0 0 0 1px ${colorDisplay.text}` : undefined,
-                          }}
-                        >
-                          {active.id === color.id && (
-                            <span
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: "9999px",
-                                background: colorDisplay.text,
-                              }}
-                            />
-                          )}
-                        </button>
-                      </MaybeHint>
+                        <MaybeHint key={color.id} content={color.name} side="top">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (disabled) return;
+                              onChange(color);
+                              setOpen(false);
+                            }}
+                            disabled={disabled}
+                            title={color.name}
+                            aria-label={color.name}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: "9999px",
+                              background: colorDisplay.bg,
+                              border:
+                                active.id === color.id
+                                  ? `2px solid ${colorDisplay.text}`
+                                  : "1px solid var(--color-border)",
+                              cursor: disabled ? "not-allowed" : "pointer",
+                              padding: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow:
+                                active.id === color.id
+                                  ? `0 0 0 1px ${colorDisplay.text}`
+                                  : undefined,
+                            }}
+                          >
+                            {active.id === color.id && (
+                              <span
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: "9999px",
+                                  background: colorDisplay.text,
+                                }}
+                              />
+                            )}
+                          </button>
+                        </MaybeHint>
                       );
                     })}
                   </div>

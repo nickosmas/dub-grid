@@ -44,7 +44,8 @@ function makeDeps(
       status: emp.status,
       userId: emp.userId,
     })) as unknown as Parameters<typeof updateMobilePersonStatus>[2]["mapEmployeeToMobilePerson"],
-    fetchActiveMembershipOrgRole: overrides.fetchActiveMembershipOrgRole ?? vi.fn().mockResolvedValue("user"),
+    fetchActiveMembershipOrgRole:
+      overrides.fetchActiveMembershipOrgRole ?? vi.fn().mockResolvedValue("user"),
     countActiveSuperAdmins: overrides.countActiveSuperAdmins ?? vi.fn().mockResolvedValue(0),
     archiveOrganizationMembership: vi.fn(),
     restoreOrganizationMembership: vi.fn(),

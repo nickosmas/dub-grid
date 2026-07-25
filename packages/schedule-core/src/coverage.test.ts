@@ -38,22 +38,36 @@ function makeShiftCategory(
 function makeCoverageRequirement(
   overrides: Partial<CoverageRequirementLike> = {},
 ): CoverageRequirementLike {
-  return { focusAreaId: 1, jobId: 1, preferredShiftId: 1, assignmentId: 1, dayOfWeek: null, minStaff: 3, ...overrides };
+  return {
+    focusAreaId: 1,
+    jobId: 1,
+    preferredShiftId: 1,
+    assignmentId: 1,
+    dayOfWeek: null,
+    minStaff: 3,
+    ...overrides,
+  };
 }
 
 describe("resolveRequirement", () => {
   it("returns day-specific match", () => {
-    const reqs = [makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 5 })];
+    const reqs = [
+      makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 5 }),
+    ];
     expect(resolveRequirement(reqs, 1, 10, 1)).toEqual({ minStaff: 5 });
   });
 
   it("falls back to every-day when no day-specific match", () => {
-    const reqs = [makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 })];
+    const reqs = [
+      makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 }),
+    ];
     expect(resolveRequirement(reqs, 1, 10, 2)).toEqual({ minStaff: 3 });
   });
 
   it("returns null when neither day-specific nor every-day match", () => {
-    const reqs = [makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 5 })];
+    const reqs = [
+      makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 5 }),
+    ];
     expect(resolveRequirement(reqs, 1, 10, 3)).toBeNull();
   });
 });
@@ -95,7 +109,12 @@ describe("computeCoverageGaps / computeCoverageCategorySnapshots", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
     const code = makeAssignment({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
+    const req = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 10,
+      dayOfWeek: null,
+      minStaff: 3,
+    });
     const emp1 = makeEmployee({ id: "emp-1" });
 
     const gaps = computeCoverageGaps(
@@ -119,7 +138,12 @@ describe("computeCoverageGaps / computeCoverageCategorySnapshots", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
     const code = makeAssignment({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 1 });
+    const req = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 10,
+      dayOfWeek: null,
+      minStaff: 1,
+    });
     const emp = makeEmployee({ id: "emp-1" });
 
     const gaps = computeCoverageGaps(
@@ -184,7 +208,10 @@ describe("summarizeCoverageTotals", () => {
 
 describe("summarizeCoverageByFocusArea", () => {
   it("aggregates per focus area and filters out zero-requirement sections", () => {
-    const focusAreas = [makeFocusArea({ id: 1, name: "ICU" }), makeFocusArea({ id: 2, name: "ER" })];
+    const focusAreas = [
+      makeFocusArea({ id: 1, name: "ICU" }),
+      makeFocusArea({ id: 2, name: "ER" }),
+    ];
     const snapshots = [
       {
         focusAreaId: 1,
@@ -247,7 +274,12 @@ describe("cross-platform parity", () => {
     const fa = makeFocusArea({ id: 1, name: "ICU" });
     const cat = makeShiftCategory({ id: 1, name: "Day" });
     const mentoredCode = makeAssignment({ id: 10, label: "D", categoryId: 1, focusAreaId: 1 });
-    const req = makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 });
+    const req = makeCoverageRequirement({
+      focusAreaId: 1,
+      assignmentId: 10,
+      dayOfWeek: null,
+      minStaff: 3,
+    });
     const emp1 = makeEmployee({ id: "emp-1" });
     const emp2 = makeEmployee({ id: "emp-2" }); // mentored, 50% credit
     const emp3 = makeEmployee({ id: "emp-3" });

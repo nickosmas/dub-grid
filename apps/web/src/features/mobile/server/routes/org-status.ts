@@ -37,10 +37,7 @@ export async function GET(req: NextRequest) {
     userData.user.id,
   );
   if (membershipRows.length === 0) {
-    return NextResponse.json(
-      { error: "No active organization membership found" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: "No active organization membership found" }, { status: 403 });
   }
 
   const { data: claimsData } = await serviceClient.auth.getClaims(accessToken);
