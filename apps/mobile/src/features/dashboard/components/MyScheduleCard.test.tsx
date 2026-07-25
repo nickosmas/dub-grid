@@ -32,7 +32,15 @@ function makeEntry(overrides: Record<string, unknown> = {}) {
     employeeSeniority: 1,
     employeeFocusAreaIds: [12],
     date: "2026-05-11",
-    state: { kind: "worked", segments: [], absenceTypeId: null, customStartTime: null, customEndTime: null, seriesId: null, fromRecurring: false },
+    state: {
+      kind: "worked",
+      segments: [],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    },
     presentation: {
       label: "D",
       shiftName: "Day Shift",
@@ -75,7 +83,15 @@ describe("MyScheduleCard", () => {
         entries: [
           makeEntry({
             date: "2026-05-11",
-            state: { kind: "absence", segments: [], absenceTypeId: 1, customStartTime: null, customEndTime: null, seriesId: null, fromRecurring: false },
+            state: {
+              kind: "absence",
+              segments: [],
+              absenceTypeId: 1,
+              customStartTime: null,
+              customEndTime: null,
+              seriesId: null,
+              fromRecurring: false,
+            },
           }),
         ],
       },

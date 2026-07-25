@@ -17,15 +17,16 @@ export function AppSplashScreen(_props?: { body?: string }) {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: mobileColors.background,
-  },
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: mobileColors.background,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: mobileColors.background,
+    },
+    container: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.background,
+    },
+  });

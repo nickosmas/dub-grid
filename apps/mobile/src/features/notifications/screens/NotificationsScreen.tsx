@@ -510,217 +510,218 @@ function NotificationCard({ notification, onPress, onArchive }: NotificationCard
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  headerArea: {
-    gap: 10,
-    paddingBottom: 10,
-  },
-  chipScroll: {
-    marginHorizontal: -mobileSpacing.screenX,
-  },
-  chipRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: mobileSpacing.screenX,
-    paddingVertical: 2,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minHeight: 36,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: mobileRadii.pill,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-  },
-  chipActive: {
-    borderColor: mobileColors.brand,
-    backgroundColor: mobileColors.brand,
-  },
-  chipText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: mobileColors.textSecondary,
-  },
-  chipTextActive: {
-    color: mobileColors.textInverse,
-  },
-  chipBadge: {
-    minWidth: 20,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: mobileRadii.pill,
-    backgroundColor: mobileColors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  chipBadgeActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.22)",
-  },
-  chipBadgeText: {
-    ...mobileText.badge,
-    color: mobileColors.textMuted,
-    textAlign: "center",
-  },
-  chipBadgeTextActive: {
-    color: mobileColors.textInverse,
-  },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  loadingState: {
-    gap: 14,
-  },
-  actionCopy: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  list: {
-    gap: 10,
-  },
-  alertCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    padding: 16,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-  },
-  alertCardMuted: {
-    backgroundColor: mobileColors.surfaceSecondary,
-  },
-  alertHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  alertTitleRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    flex: 1,
-  },
-  titleColumn: {
-    flex: 1,
-    gap: 4,
-  },
-  titleLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  alertIconFrame: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: mobileColors.brandSoft,
-  },
-  alertIconFrameMuted: {
-    backgroundColor: mobileColors.surface,
-  },
-  unreadDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: mobileColors.brand,
-  },
-  alertTitle: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-  },
-  alertTitleMuted: {
-    color: mobileColors.textSecondary,
-  },
-  alertMessage: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-  },
-  alertMeta: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-  },
-  priorityChip: {
-    ...mobileText.caption,
-    fontWeight: "700",
-    color: mobileColors.danger,
-    letterSpacing: 0.5,
-  },
-  priorityCritical: {
-    color: mobileColors.danger,
-  },
-  priorityHigh: {
-    color: mobileColors.warning,
-  },
-  groupBadge: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-    backgroundColor: mobileColors.surfaceSecondary,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 999,
-  },
-  cardActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginLeft: 42,
-    paddingTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: mobileColors.borderSubtle,
-  },
-  ctaPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: mobileRadii.pill,
-    backgroundColor: mobileColors.brandSoft,
-  },
-  ctaPillPressed: {
-    backgroundColor: mobileColors.brandBorder,
-  },
-  ctaPillLabel: {
-    ...mobileText.label,
-    color: mobileColors.brand,
-    fontWeight: "600",
-  },
-  webOnlyHint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: mobileRadii.pill,
-    backgroundColor: mobileColors.surfaceMuted,
-  },
-  webOnlyHintLabel: {
-    ...mobileText.label,
-    color: mobileColors.textMuted,
-    fontWeight: "600",
-  },
-  archiveButton: {
-    width: 36,
-    height: 36,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  archiveButtonPressed: {
-    backgroundColor: mobileColors.surfaceSecondary,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    headerArea: {
+      gap: 10,
+      paddingBottom: 10,
+    },
+    chipScroll: {
+      marginHorizontal: -mobileSpacing.screenX,
+    },
+    chipRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: mobileSpacing.screenX,
+      paddingVertical: 2,
+    },
+    chip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      minHeight: 36,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+    },
+    chipActive: {
+      borderColor: mobileColors.brand,
+      backgroundColor: mobileColors.brand,
+    },
+    chipText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: mobileColors.textSecondary,
+    },
+    chipTextActive: {
+      color: mobileColors.textInverse,
+    },
+    chipBadge: {
+      minWidth: 20,
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.surfaceSecondary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    chipBadgeActive: {
+      backgroundColor: "rgba(255, 255, 255, 0.22)",
+    },
+    chipBadgeText: {
+      ...mobileText.badge,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+    },
+    chipBadgeTextActive: {
+      color: mobileColors.textInverse,
+    },
+    actionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    loadingState: {
+      gap: 14,
+    },
+    actionCopy: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    list: {
+      gap: 10,
+    },
+    alertCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      padding: 16,
+      gap: 10,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+    },
+    alertCardMuted: {
+      backgroundColor: mobileColors.surfaceSecondary,
+    },
+    alertHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    alertTitleRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      flex: 1,
+    },
+    titleColumn: {
+      flex: 1,
+      gap: 4,
+    },
+    titleLine: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    alertIconFrame: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.brandSoft,
+    },
+    alertIconFrameMuted: {
+      backgroundColor: mobileColors.surface,
+    },
+    unreadDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 999,
+      backgroundColor: mobileColors.brand,
+    },
+    alertTitle: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+    },
+    alertTitleMuted: {
+      color: mobileColors.textSecondary,
+    },
+    alertMessage: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    alertMeta: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
+    priorityChip: {
+      ...mobileText.caption,
+      fontWeight: "700",
+      color: mobileColors.danger,
+      letterSpacing: 0.5,
+    },
+    priorityCritical: {
+      color: mobileColors.danger,
+    },
+    priorityHigh: {
+      color: mobileColors.warning,
+    },
+    groupBadge: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+      backgroundColor: mobileColors.surfaceSecondary,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: 999,
+    },
+    cardActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginLeft: 42,
+      paddingTop: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
+    },
+    ctaPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.brandSoft,
+    },
+    ctaPillPressed: {
+      backgroundColor: mobileColors.brandBorder,
+    },
+    ctaPillLabel: {
+      ...mobileText.label,
+      color: mobileColors.brand,
+      fontWeight: "600",
+    },
+    webOnlyHint: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.surfaceMuted,
+    },
+    webOnlyHintLabel: {
+      ...mobileText.label,
+      color: mobileColors.textMuted,
+      fontWeight: "600",
+    },
+    archiveButton: {
+      width: 36,
+      height: 36,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    archiveButtonPressed: {
+      backgroundColor: mobileColors.surfaceSecondary,
+    },
+  });

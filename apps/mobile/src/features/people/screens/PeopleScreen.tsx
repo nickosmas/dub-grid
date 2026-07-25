@@ -11,7 +11,12 @@ import type {
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { FilterButton, FilterSheet, SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
+import {
+  FilterButton,
+  FilterSheet,
+  SelectionRow,
+  SelectionSection,
+} from "../../../shared/components/FilterSheet";
 import { SearchBar } from "../../../shared/components/SearchBar";
 import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
@@ -591,107 +596,108 @@ function PersonRow({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  section: {
-    gap: 10,
-  },
-  sectionTitle: {
-    ...mobileText.label,
-    color: mobileColors.textSubtle,
-    textTransform: "uppercase",
-  },
-  searchBarRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-  },
-  addPersonButton: {
-    alignItems: "center",
-    backgroundColor: mobileColors.brand,
-    borderRadius: mobileRadii.control,
-    height: 46,
-    justifyContent: "center",
-    width: 46,
-  },
-  linkList: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    overflow: "hidden",
-  },
-  personRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    minHeight: 76,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  personRowDivider: {
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  rowDivider: {
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  requestRow: {
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  requestCopy: {
-    gap: 3,
-  },
-  requestActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  personRowPressed: {
-    opacity: 0.62,
-  },
-  personAvatar: {
-    alignItems: "center",
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  personAvatarText: {
-    ...mobileText.bodyStrong,
-  },
-  personCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  personNameRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-    minWidth: 0,
-  },
-  personName: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-    flexShrink: 1,
-  },
-  personSubtitle: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  personAccess: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
+    },
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    section: {
+      gap: 10,
+    },
+    sectionTitle: {
+      ...mobileText.label,
+      color: mobileColors.textSubtle,
+      textTransform: "uppercase",
+    },
+    searchBarRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
+    },
+    addPersonButton: {
+      alignItems: "center",
+      backgroundColor: mobileColors.brand,
+      borderRadius: mobileRadii.control,
+      height: 46,
+      justifyContent: "center",
+      width: 46,
+    },
+    linkList: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      overflow: "hidden",
+    },
+    personRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      minHeight: 76,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    personRowDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    rowDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    requestRow: {
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    requestCopy: {
+      gap: 3,
+    },
+    requestActions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    personRowPressed: {
+      opacity: 0.62,
+    },
+    personAvatar: {
+      alignItems: "center",
+      borderRadius: 22,
+      borderWidth: 1,
+      height: 44,
+      justifyContent: "center",
+      width: 44,
+    },
+    personAvatarText: {
+      ...mobileText.bodyStrong,
+    },
+    personCopy: {
+      flex: 1,
+      gap: 3,
+      minWidth: 0,
+    },
+    personNameRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      minWidth: 0,
+    },
+    personName: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      flexShrink: 1,
+    },
+    personSubtitle: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    personAccess: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+  });

@@ -89,7 +89,11 @@ describe("StaffHoursExpandedScreen", () => {
           overtimeThresholdHours: 40,
           staffHours: [
             makeEntry({ employeeId: "emp-1", employeeName: "Alex Rivera", focusAreaName: "ICU" }),
-            makeEntry({ employeeId: "emp-2", employeeName: "Jordan Lee", focusAreaName: "Med-Surg" }),
+            makeEntry({
+              employeeId: "emp-2",
+              employeeName: "Jordan Lee",
+              focusAreaName: "Med-Surg",
+            }),
           ],
         },
       },

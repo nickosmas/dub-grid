@@ -88,7 +88,9 @@ export default function TabsLayout() {
     <NativeTabs
       backgroundColor={mobileColors.surface}
       badgeBackgroundColor={mobileColors.danger}
-      blurEffect={resolvedTheme === "dark" ? "systemChromeMaterialDark" : "systemChromeMaterialLight"}
+      blurEffect={
+        resolvedTheme === "dark" ? "systemChromeMaterialDark" : "systemChromeMaterialLight"
+      }
       disableTransparentOnScrollEdge
       iconColor={{
         default: mobileColors.textSubtle,

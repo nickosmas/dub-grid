@@ -318,47 +318,48 @@ export function useToast() {
   return context;
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  host: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    paddingHorizontal: 20,
-    zIndex: 100,
-    elevation: 100,
-  },
-  toast: {
-    width: "100%",
-    maxWidth: 520,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    paddingVertical: 14,
-    paddingLeft: 20,
-    paddingRight: 20,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  toastMain: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  toastCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  toastTitle: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textInverse,
-  },
-  toastMessage: {
-    ...mobileText.meta,
-    color: TOAST_MESSAGE_COLOR,
-    fontWeight: "500",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    host: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      paddingHorizontal: 20,
+      zIndex: 100,
+      elevation: 100,
+    },
+    toast: {
+      width: "100%",
+      maxWidth: 520,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      paddingVertical: 14,
+      paddingLeft: 20,
+      paddingRight: 20,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    toastMain: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    toastCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    toastTitle: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textInverse,
+    },
+    toastMessage: {
+      ...mobileText.meta,
+      color: TOAST_MESSAGE_COLOR,
+      fontWeight: "500",
+    },
+  });

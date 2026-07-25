@@ -24,10 +24,12 @@ function formatGraceDate(value: string | null): string | null {
 // org-status route is the one place that returns billing state even when
 // the org is locked, so this is progressive enhancement on top of `message`,
 // not a replacement for it (falls back silently if the fetch fails).
-function getDetailLine(status: {
-  state: string;
-  trialGraceEndsAt: string | null;
-} | null): string | null {
+function getDetailLine(
+  status: {
+    state: string;
+    trialGraceEndsAt: string | null;
+  } | null,
+): string | null {
   if (!status) return null;
 
   if (status.state === "suspended") {
@@ -72,7 +74,8 @@ export function OrganizationLockedScreen({
   });
   const status = statusQuery.data ?? null;
   const detailLine = getDetailLine(status);
-  const graceDate = status?.state === "trial_grace" ? formatGraceDate(status.trialGraceEndsAt) : null;
+  const graceDate =
+    status?.state === "trial_grace" ? formatGraceDate(status.trialGraceEndsAt) : null;
   const isSuperAdmin = status?.orgRole === "super_admin";
 
   return (
@@ -91,9 +94,7 @@ export function OrganizationLockedScreen({
           <Text style={styles.title}>Organization unavailable</Text>
           <Text style={styles.body}>{body}</Text>
           {detailLine ? <Text style={styles.detail}>{detailLine}</Text> : null}
-          {graceDate ? (
-            <Text style={styles.detail}>Grace period ends {graceDate}.</Text>
-          ) : null}
+          {graceDate ? <Text style={styles.detail}>Grace period ends {graceDate}.</Text> : null}
         </View>
 
         <View style={styles.actions}>
@@ -102,7 +103,9 @@ export function OrganizationLockedScreen({
             <Button
               label="Manage billing on web"
               onPress={() => {
-                void Linking.openURL(`${getMobileEnvConfig().apiBaseUrl}/settings?section=org-billing`);
+                void Linking.openURL(
+                  `${getMobileEnvConfig().apiBaseUrl}/settings?section=org-billing`,
+                );
               }}
               tone="secondary"
             />
@@ -114,39 +117,40 @@ export function OrganizationLockedScreen({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: mobileColors.background,
-  },
-  content: {
-    flexGrow: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 32,
-    gap: mobileSpacing.sectionGap,
-  },
-  copy: {
-    gap: mobileSpacing.cardGap,
-  },
-  eyebrow: {
-    ...mobileText.label,
-    color: mobileColors.brand,
-    textTransform: "uppercase",
-  },
-  title: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  detail: {
-    ...mobileText.body,
-    color: mobileColors.textSubtle,
-  },
-  actions: {
-    gap: mobileSpacing.cardGap,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: mobileColors.background,
+    },
+    content: {
+      flexGrow: 1,
+      justifyContent: "center",
+      paddingHorizontal: 24,
+      paddingVertical: 32,
+      gap: mobileSpacing.sectionGap,
+    },
+    copy: {
+      gap: mobileSpacing.cardGap,
+    },
+    eyebrow: {
+      ...mobileText.label,
+      color: mobileColors.brand,
+      textTransform: "uppercase",
+    },
+    title: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textPrimary,
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    detail: {
+      ...mobileText.body,
+      color: mobileColors.textSubtle,
+    },
+    actions: {
+      gap: mobileSpacing.cardGap,
+    },
+  });

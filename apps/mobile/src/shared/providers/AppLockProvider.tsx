@@ -129,25 +129,26 @@ export function AppLockProvider({ children }: PropsWithChildren) {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  root: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: mobileColors.surface,
-  },
-  card: {
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 32,
-  },
-  title: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-    textAlign: "center",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.surface,
+    },
+    card: {
+      alignItems: "center",
+      gap: 12,
+      paddingHorizontal: 32,
+    },
+    title: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+      textAlign: "center",
+    },
+  });

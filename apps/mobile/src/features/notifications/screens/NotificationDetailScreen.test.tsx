@@ -74,12 +74,11 @@ const SAMPLE_NOTIFICATION = {
 
 function mockQueryClient(cachedNotifications: (typeof SAMPLE_NOTIFICATION)[] = []) {
   return {
-    getQueriesData: vi.fn().mockReturnValue([
-      [
-        ["mobile", "notifications-infinite"],
-        { pages: [{ notifications: cachedNotifications }] },
-      ],
-    ]),
+    getQueriesData: vi
+      .fn()
+      .mockReturnValue([
+        [["mobile", "notifications-infinite"], { pages: [{ notifications: cachedNotifications }] }],
+      ]),
     invalidateQueries: vi.fn().mockResolvedValue(undefined),
   };
 }
@@ -173,7 +172,9 @@ describe("NotificationDetailScreen", () => {
     render(<NotificationDetailScreen />);
 
     expect(
-      screen.getByText("This action isn't available in the mobile app. Sign in on the web to complete it."),
+      screen.getByText(
+        "This action isn't available in the mobile app. Sign in on the web to complete it.",
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByText("Review request")).not.toBeInTheDocument();
   });

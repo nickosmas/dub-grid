@@ -15,7 +15,11 @@ function createMockChannel() {
       return channel;
     }),
   };
-  return { channel, onCalls, emitStatus: (status: string, err?: Error) => subscribeCallback?.(status, err) };
+  return {
+    channel,
+    onCalls,
+    emitStatus: (status: string, err?: Error) => subscribeCallback?.(status, err),
+  };
 }
 
 let mockChannel: ReturnType<typeof createMockChannel>;

@@ -87,26 +87,27 @@ export function ActivityFeedCard({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  divider: {
-    height: 1,
-    backgroundColor: mobileColors.borderSubtle,
-  },
-  row: {
-    gap: 4,
-  },
-  rowHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  label: {
-    ...mobileText.body,
-    color: mobileColors.textPrimary,
-  },
-  value: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    divider: {
+      height: 1,
+      backgroundColor: mobileColors.borderSubtle,
+    },
+    row: {
+      gap: 4,
+    },
+    rowHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    label: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+    },
+    value: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+  });

@@ -85,61 +85,62 @@ export function ConfigurationScreen({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: mobileColors.background,
-  },
-  content: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 20,
-    paddingBottom: 20,
-    gap: 16,
-  },
-  card: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    padding: 18,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-  },
-  eyebrow: {
-    ...mobileText.label,
-    color: mobileColors.brand,
-    textTransform: "uppercase",
-  },
-  title: {
-    ...mobileText.heroMetric,
-    fontSize: 28,
-    lineHeight: 34,
-    color: mobileColors.textPrimary,
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  step: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.brand,
-  },
-  sectionTitle: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  issue: {
-    gap: 4,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-  },
-  issueKey: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textPrimary,
-  },
-  issueMessage: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: mobileColors.background,
+    },
+    content: {
+      flexGrow: 1,
+      justifyContent: "center",
+      padding: 20,
+      paddingBottom: 20,
+      gap: 16,
+    },
+    card: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      padding: 18,
+      gap: 12,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+    },
+    eyebrow: {
+      ...mobileText.label,
+      color: mobileColors.brand,
+      textTransform: "uppercase",
+    },
+    title: {
+      ...mobileText.heroMetric,
+      fontSize: 28,
+      lineHeight: 34,
+      color: mobileColors.textPrimary,
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    step: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.brand,
+    },
+    sectionTitle: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    issue: {
+      gap: 4,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+    },
+    issueKey: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textPrimary,
+    },
+    issueMessage: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+  });

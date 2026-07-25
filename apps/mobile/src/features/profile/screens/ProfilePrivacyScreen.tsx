@@ -88,25 +88,26 @@ export default function ProfilePrivacyScreen() {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  toggleRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-  },
-  toggleCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  toggleLabel: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  toggleDescription: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    toggleRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "space-between",
+    },
+    toggleCopy: {
+      flex: 1,
+      gap: 3,
+      minWidth: 0,
+    },
+    toggleLabel: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    toggleDescription: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+  });

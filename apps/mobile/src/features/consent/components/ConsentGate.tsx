@@ -87,47 +87,48 @@ export function ConsentGate({ children }: PropsWithChildren) {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: mobileColors.overlay,
-  },
-  sheet: {
-    width: "100%",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: SHEET_BOTTOM_PADDING,
-    gap: 20,
-    shadowColor: mobileColors.textPrimary,
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
-    shadowRadius: 28,
-    elevation: 16,
-  },
-  copy: {
-    gap: 8,
-  },
-  title: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-  },
-  link: {
-    ...mobileText.body,
-    color: mobileColors.brand,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  actions: {
-    gap: 10,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: mobileColors.overlay,
+    },
+    sheet: {
+      width: "100%",
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+      paddingHorizontal: 20,
+      paddingTop: 24,
+      paddingBottom: SHEET_BOTTOM_PADDING,
+      gap: 20,
+      shadowColor: mobileColors.textPrimary,
+      shadowOffset: { width: 0, height: -8 },
+      shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
+      shadowRadius: 28,
+      elevation: 16,
+    },
+    copy: {
+      gap: 8,
+    },
+    title: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    link: {
+      ...mobileText.body,
+      color: mobileColors.brand,
+      fontWeight: "600",
+      marginTop: 4,
+    },
+    actions: {
+      gap: 10,
+    },
+  });

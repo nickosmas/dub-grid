@@ -2,10 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { MobileScheduleRange } from "@dubgrid/contracts";
 import { getDashboard } from "../../../shared/lib/api";
 
-export function getAdminDashboardQueryKey(
-  accessToken: string | null,
-  range?: MobileScheduleRange,
-) {
+export function getAdminDashboardQueryKey(accessToken: string | null, range?: MobileScheduleRange) {
   return ["mobile", "dashboard", accessToken, range?.startDate, range?.endDate] as const;
 }
 

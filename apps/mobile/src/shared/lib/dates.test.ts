@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatDashboardDateRange, formatUsDate, formatUsTime, getDashboardPeriodRange } from "./dates";
+import {
+  formatDashboardDateRange,
+  formatUsDate,
+  formatUsTime,
+  getDashboardPeriodRange,
+} from "./dates";
 
 describe("formatUsDate", () => {
   it("formats an ISO date key as a short US date", () => {
@@ -88,7 +93,9 @@ describe("formatDashboardDateRange", () => {
   });
 
   it("formats a range spanning two months in the same year", () => {
-    expect(formatDashboardDateRange("2026-07-26", "2026-08-01", "week")).toBe("Jul 26 – Aug 1, 2026");
+    expect(formatDashboardDateRange("2026-07-26", "2026-08-01", "week")).toBe(
+      "Jul 26 – Aug 1, 2026",
+    );
   });
 
   it("formats a range spanning a year boundary", () => {

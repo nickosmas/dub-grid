@@ -68,12 +68,13 @@ export function ExpandableList<T>({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  list: {
-    gap: 10,
-  },
-  sheetTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    list: {
+      gap: 10,
+    },
+    sheetTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+  });

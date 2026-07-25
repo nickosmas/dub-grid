@@ -33,31 +33,32 @@ export function AlertsHeaderButton() {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  button: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonPressed: {
-    opacity: 0.7,
-  },
-  badge: {
-    position: "absolute",
-    top: 7,
-    right: 4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 999,
-    paddingHorizontal: 4,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: mobileColors.danger,
-  },
-  badgeText: {
-    color: mobileColors.textInverse,
-    fontSize: 10,
-    fontWeight: "700",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    button: {
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    buttonPressed: {
+      opacity: 0.7,
+    },
+    badge: {
+      position: "absolute",
+      top: 7,
+      right: 4,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 999,
+      paddingHorizontal: 4,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.danger,
+    },
+    badgeText: {
+      color: mobileColors.textInverse,
+      fontSize: 10,
+      fontWeight: "700",
+    },
+  });

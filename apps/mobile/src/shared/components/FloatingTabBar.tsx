@@ -126,56 +126,57 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  bar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    marginHorizontal: 16,
-    height: 68,
-    backgroundColor: mobileColors.surface,
-    borderRadius: 34,
-    paddingHorizontal: 8,
-    ...Platform.select({
-      android: {
-        elevation: 8,
-      },
-      default: {
-        shadowColor: "#000",
-        shadowOpacity: 0.12,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 4 },
-      },
-    }),
-  },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 6,
-  },
-  iconPill: {
-    width: 64,
-    height: 32,
-    borderRadius: 9999,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-  },
-  iconPillActive: {
-    backgroundColor: mobileColors.brandSoft,
-  },
-  label: {
-    marginTop: 2,
-    fontSize: 11,
-  },
-  labelActive: {
-    color: mobileColors.brand,
-    fontWeight: "700",
-  },
-  labelInactive: {
-    color: mobileColors.textSubtle,
-    fontWeight: "600",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    bar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-around",
+      marginHorizontal: 16,
+      height: 68,
+      backgroundColor: mobileColors.surface,
+      borderRadius: 34,
+      paddingHorizontal: 8,
+      ...Platform.select({
+        android: {
+          elevation: 8,
+        },
+        default: {
+          shadowColor: "#000",
+          shadowOpacity: 0.12,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 4 },
+        },
+      }),
+    },
+    tab: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 6,
+    },
+    iconPill: {
+      width: 64,
+      height: 32,
+      borderRadius: 9999,
+      overflow: "hidden",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "transparent",
+    },
+    iconPillActive: {
+      backgroundColor: mobileColors.brandSoft,
+    },
+    label: {
+      marginTop: 2,
+      fontSize: 11,
+    },
+    labelActive: {
+      color: mobileColors.brand,
+      fontWeight: "700",
+    },
+    labelInactive: {
+      color: mobileColors.textSubtle,
+      fontWeight: "600",
+    },
+  });

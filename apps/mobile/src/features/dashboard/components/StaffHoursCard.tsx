@@ -67,22 +67,23 @@ export function StaffHoursCard({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8,
-  },
-  copy: {
-    gap: 2,
-  },
-  label: {
-    ...mobileText.body,
-    color: mobileColors.textPrimary,
-  },
-  value: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8,
+    },
+    copy: {
+      gap: 2,
+    },
+    label: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+    },
+    value: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+  });

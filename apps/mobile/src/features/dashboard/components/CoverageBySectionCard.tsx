@@ -88,42 +88,43 @@ export function CoverageBySectionCard({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  row: {
-    gap: 6,
-  },
-  rowHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    gap: 8,
-  },
-  rowNumbers: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
-    flexShrink: 0,
-  },
-  label: {
-    ...mobileText.body,
-    color: mobileColors.textPrimary,
-    flexShrink: 1,
-  },
-  filledText: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-  },
-  pctText: {
-    ...mobileText.bodyStrong,
-  },
-  track: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: mobileColors.borderSubtle,
-    overflow: "hidden",
-  },
-  fill: {
-    height: "100%",
-    borderRadius: 3,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    row: {
+      gap: 6,
+    },
+    rowHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "baseline",
+      gap: 8,
+    },
+    rowNumbers: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      gap: 8,
+      flexShrink: 0,
+    },
+    label: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+      flexShrink: 1,
+    },
+    filledText: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
+    pctText: {
+      ...mobileText.bodyStrong,
+    },
+    track: {
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: mobileColors.borderSubtle,
+      overflow: "hidden",
+    },
+    fill: {
+      height: "100%",
+      borderRadius: 3,
+    },
+  });

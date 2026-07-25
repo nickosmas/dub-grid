@@ -174,66 +174,67 @@ export function DetailSkeleton({ sections = 2 }: { sections?: number }) {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  block: {
-    backgroundColor: mobileColors.borderSubtle,
-  },
-  section: {
-    gap: mobileSpacing.sectionGap,
-  },
-  heroCard: {
-    paddingVertical: 4,
-    gap: 12,
-  },
-  heroRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  heroButton: {
-    flex: 1,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  listCard: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: mobileColors.borderSubtle,
-    paddingVertical: 14,
-    gap: 10,
-  },
-  listRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  detailCard: {
-    paddingVertical: 4,
-    gap: 12,
-  },
-  detailHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  detailActionRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  detailAction: {
-    flex: 1,
-  },
-  detailSection: {
-    gap: 10,
-  },
-  detailListCard: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: mobileColors.borderSubtle,
-    paddingVertical: 14,
-    gap: 10,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    block: {
+      backgroundColor: mobileColors.borderSubtle,
+    },
+    section: {
+      gap: mobileSpacing.sectionGap,
+    },
+    heroCard: {
+      paddingVertical: 4,
+      gap: 12,
+    },
+    heroRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    heroButton: {
+      flex: 1,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
+    },
+    listCard: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: mobileColors.borderSubtle,
+      paddingVertical: 14,
+      gap: 10,
+    },
+    listRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    detailCard: {
+      paddingVertical: 4,
+      gap: 12,
+    },
+    detailHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    detailActionRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    detailAction: {
+      flex: 1,
+    },
+    detailSection: {
+      gap: 10,
+    },
+    detailListCard: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderColor: mobileColors.borderSubtle,
+      paddingVertical: 14,
+      gap: 10,
+    },
+  });

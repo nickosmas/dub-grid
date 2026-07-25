@@ -22,7 +22,11 @@ import { queryClient } from "../src/shared/lib/query-client";
 import { AppLockProvider } from "../src/shared/providers/AppLockProvider";
 import { AuthSessionProvider } from "../src/shared/providers/AuthSessionProvider";
 import { NetworkStateProvider } from "../src/shared/providers/NetworkStateProvider";
-import { ThemeModeProvider, useMobileColors, useThemeMode } from "../src/shared/providers/ThemeModeProvider";
+import {
+  ThemeModeProvider,
+  useMobileColors,
+  useThemeMode,
+} from "../src/shared/providers/ThemeModeProvider";
 import { ToastProvider } from "../src/shared/providers/ToastProvider";
 import {
   createCommonStackOptions,

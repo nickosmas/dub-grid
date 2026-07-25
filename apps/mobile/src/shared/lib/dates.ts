@@ -53,7 +53,11 @@ export function getDashboardPeriodRange(
     return { startDate: todayKey, endDate: todayKey };
   }
 
-  const startKey = getDashboardPeriodStartIso(todayKey, mode === "2weeks" ? 2 : 1, payPeriodStartDate);
+  const startKey = getDashboardPeriodStartIso(
+    todayKey,
+    mode === "2weeks" ? 2 : 1,
+    payPeriodStartDate,
+  );
   const start = new Date(`${startKey}T00:00:00`);
   const end = new Date(start);
   end.setDate(start.getDate() + (mode === "2weeks" ? 13 : 6));
@@ -61,8 +65,18 @@ export function getDashboardPeriodRange(
 }
 
 const MONTH_NAMES = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 

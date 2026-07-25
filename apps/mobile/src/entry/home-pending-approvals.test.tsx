@@ -17,7 +17,8 @@ vi.mock("../features/dashboard/hooks/useExpandedDashboardQuery", () => ({
 let PendingApprovalsExpandedScreen: (typeof import("../../app/(tabs)/home/pending-approvals"))["default"];
 
 beforeAll(async () => {
-  PendingApprovalsExpandedScreen = (await import("../../app/(tabs)/home/pending-approvals")).default;
+  PendingApprovalsExpandedScreen = (await import("../../app/(tabs)/home/pending-approvals"))
+    .default;
 });
 
 function makeRequest(overrides: Record<string, unknown> = {}) {

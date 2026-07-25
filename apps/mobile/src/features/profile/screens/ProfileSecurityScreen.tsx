@@ -500,7 +500,8 @@ export default function ProfileSecurityScreen() {
     setMfaLoading(true);
     setMfaError(null);
     try {
-      const { data: factorsData, error: listError } = await getSupabaseClient().auth.mfa.listFactors();
+      const { data: factorsData, error: listError } =
+        await getSupabaseClient().auth.mfa.listFactors();
       if (listError) throw listError;
 
       const existingVerifiedTotp = factorsData.all.find(isVerifiedTotpFactor);
@@ -588,7 +589,8 @@ export default function ProfileSecurityScreen() {
     if (mfaLoading) return;
     setMfaLoading(true);
     try {
-      const { data: factorsData, error: listError } = await getSupabaseClient().auth.mfa.listFactors();
+      const { data: factorsData, error: listError } =
+        await getSupabaseClient().auth.mfa.listFactors();
       if (listError) throw listError;
 
       const verifiedTotp = factorsData.totp.filter((factor) => factor.status === "verified");
@@ -848,9 +850,7 @@ export default function ProfileSecurityScreen() {
           <ProfileSection title="Two-factor authentication">
             {mfaStep === "enrolling" ? (
               <>
-                {mfaError ? (
-                  <StatusBanner body={mfaError} title="Could not verify code" />
-                ) : null}
+                {mfaError ? <StatusBanner body={mfaError} title="Could not verify code" /> : null}
                 <Text style={styles.mfaInstructions}>
                   Add a new entry in your authenticator app (Google Authenticator, Authy, 1Password,
                   etc.) using this key, then enter the 6-digit code it generates.
@@ -1058,196 +1058,197 @@ export default function ProfileSecurityScreen() {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  actionsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  actionButtonSlot: {
-    flex: 1,
-    minWidth: 0,
-  },
-  passwordStrength: {
-    gap: 8,
-  },
-  passwordStrengthHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "space-between",
-  },
-  passwordStrengthTitle: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  passwordStrengthLevel: {
-    ...mobileText.caption,
-    fontWeight: "600",
-  },
-  passwordStrengthLevelShort: {
-    color: mobileColors.dangerText,
-  },
-  passwordStrengthLevelMedium: {
-    color: mobileColors.warningText,
-  },
-  passwordStrengthLevelStrong: {
-    color: mobileColors.successText,
-  },
-  passwordHintList: {
-    gap: 6,
-  },
-  passwordHintRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  passwordHintDot: {
-    backgroundColor: mobileColors.border,
-    borderRadius: 3,
-    height: 6,
-    width: 6,
-  },
-  passwordHintDotMet: {
-    backgroundColor: mobileColors.success,
-  },
-  passwordHintText: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    flexShrink: 1,
-  },
-  passwordHintTextMet: {
-    color: mobileColors.successText,
-    fontWeight: "500",
-  },
-  passwordVisibilityButton: {
-    alignItems: "center",
-    borderRadius: 20,
-    height: 40,
-    justifyContent: "center",
-    width: 40,
-  },
-  signOutNotice: {
-    ...mobileText.meta,
-    color: mobileColors.danger,
-    fontWeight: "500",
-  },
-  mfaInstructions: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 16,
-  },
-  toggleCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  rowTitle: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  rowDescription: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-  mfaSecretRow: {
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  mfaSecretText: {
-    ...mobileText.body,
-    color: mobileColors.textPrimary,
-    fontFamily: "monospace",
-    letterSpacing: 1,
-  },
-  sessionList: {
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    gap: 0,
-    overflow: "hidden",
-  },
-  sessionItem: {
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  sessionItemDivider: {
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  sessionRow: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-  },
-  sessionIcon: {
-    alignItems: "center",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-  sessionIconText: {
-    ...mobileText.micro,
-    color: mobileColors.textSecondary,
-  },
-  sessionCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  sessionTitleRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  sessionTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  sessionCurrentBadge: {
-    backgroundColor: mobileColors.brand,
-    borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-  },
-  sessionCurrentBadgeText: {
-    ...mobileText.micro,
-    color: mobileColors.textInverse,
-    fontWeight: "700",
-  },
-  sessionBody: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  sessionMeta: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-  },
-  sessionGroupHeading: {
-    ...mobileText.caption,
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    color: mobileColors.textMuted,
-    fontWeight: "600",
-    letterSpacing: 0.4,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    textTransform: "uppercase",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    actionsRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    actionButtonSlot: {
+      flex: 1,
+      minWidth: 0,
+    },
+    passwordStrength: {
+      gap: 8,
+    },
+    passwordStrengthHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
+      justifyContent: "space-between",
+    },
+    passwordStrengthTitle: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    passwordStrengthLevel: {
+      ...mobileText.caption,
+      fontWeight: "600",
+    },
+    passwordStrengthLevelShort: {
+      color: mobileColors.dangerText,
+    },
+    passwordStrengthLevelMedium: {
+      color: mobileColors.warningText,
+    },
+    passwordStrengthLevelStrong: {
+      color: mobileColors.successText,
+    },
+    passwordHintList: {
+      gap: 6,
+    },
+    passwordHintRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+    },
+    passwordHintDot: {
+      backgroundColor: mobileColors.border,
+      borderRadius: 3,
+      height: 6,
+      width: 6,
+    },
+    passwordHintDotMet: {
+      backgroundColor: mobileColors.success,
+    },
+    passwordHintText: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      flexShrink: 1,
+    },
+    passwordHintTextMet: {
+      color: mobileColors.successText,
+      fontWeight: "500",
+    },
+    passwordVisibilityButton: {
+      alignItems: "center",
+      borderRadius: 20,
+      height: 40,
+      justifyContent: "center",
+      width: 40,
+    },
+    signOutNotice: {
+      ...mobileText.meta,
+      color: mobileColors.danger,
+      fontWeight: "500",
+    },
+    mfaInstructions: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    toggleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 16,
+    },
+    toggleCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    rowTitle: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    rowDescription: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+    mfaSecretRow: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    mfaSecretText: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+      fontFamily: "monospace",
+      letterSpacing: 1,
+    },
+    sessionList: {
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      gap: 0,
+      overflow: "hidden",
+    },
+    sessionItem: {
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    sessionItemDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    sessionRow: {
+      flexDirection: "row",
+      gap: 12,
+      alignItems: "center",
+    },
+    sessionIcon: {
+      alignItems: "center",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 36,
+      justifyContent: "center",
+      width: 36,
+    },
+    sessionIconText: {
+      ...mobileText.micro,
+      color: mobileColors.textSecondary,
+    },
+    sessionCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    sessionTitleRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+    },
+    sessionTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    sessionCurrentBadge: {
+      backgroundColor: mobileColors.brand,
+      borderRadius: 999,
+      paddingHorizontal: 7,
+      paddingVertical: 1,
+    },
+    sessionCurrentBadgeText: {
+      ...mobileText.micro,
+      color: mobileColors.textInverse,
+      fontWeight: "700",
+    },
+    sessionBody: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    sessionMeta: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
+    sessionGroupHeading: {
+      ...mobileText.caption,
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      color: mobileColors.textMuted,
+      fontWeight: "600",
+      letterSpacing: 0.4,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      textTransform: "uppercase",
+    },
+  });

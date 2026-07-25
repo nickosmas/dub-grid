@@ -132,9 +132,7 @@ export function Screen({
   const scrollHandle = useMemo<ScreenScrollHandle>(
     () =>
       ({
-        scrollTo: (
-          options?: { x?: number; y?: number; animated?: boolean } | number,
-        ) => {
+        scrollTo: (options?: { x?: number; y?: number; animated?: boolean } | number) => {
           const target = typeof options === "number" ? { y: options } : (options ?? {});
           const y =
             isIosStickyHeader && typeof target.y === "number"
@@ -284,87 +282,88 @@ export function Card({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: mobileColors.background,
-  },
-  scrollView: {
-    flex: 1,
-    backgroundColor: mobileColors.background,
-  },
-  content: {
-    paddingHorizontal: mobileSpacing.screenX,
-    gap: mobileSpacing.sectionGap,
-  },
-  contentDefault: {
-    paddingTop: 0,
-  },
-  contentWithStickyHeader: {
-    paddingTop: mobileSpacing.sectionGap,
-  },
-  stickyHeaderShell: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    backgroundColor: mobileColors.background,
-    paddingHorizontal: mobileSpacing.screenX,
-    paddingTop: 4,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: mobileColors.borderSubtle,
-    elevation: 4,
-  },
-  overlayLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 20,
-    elevation: 20,
-  },
-  card: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    padding: 18,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    shadowColor: mobileColors.shadowStrong,
-    shadowOffset: {
-      width: 0,
-      height: 8,
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: mobileColors.background,
     },
-    shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  cardHeaderCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  cardHeaderAccessory: {
-    alignSelf: "flex-start",
-  },
-  cardIconFrame: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cardTitle: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  cardBody: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-});
+    scrollView: {
+      flex: 1,
+      backgroundColor: mobileColors.background,
+    },
+    content: {
+      paddingHorizontal: mobileSpacing.screenX,
+      gap: mobileSpacing.sectionGap,
+    },
+    contentDefault: {
+      paddingTop: 0,
+    },
+    contentWithStickyHeader: {
+      paddingTop: mobileSpacing.sectionGap,
+    },
+    stickyHeaderShell: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+      backgroundColor: mobileColors.background,
+      paddingHorizontal: mobileSpacing.screenX,
+      paddingTop: 4,
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: mobileColors.borderSubtle,
+      elevation: 4,
+    },
+    overlayLayer: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 20,
+      elevation: 20,
+    },
+    card: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      padding: 18,
+      gap: 10,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      shadowColor: mobileColors.shadowStrong,
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 20,
+      elevation: 2,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    cardHeaderCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    cardHeaderAccessory: {
+      alignSelf: "flex-start",
+    },
+    cardIconFrame: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    cardTitle: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    cardBody: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+  });

@@ -268,64 +268,65 @@ function ChannelToggle({ icon, label, value, onValueChange }: ChannelToggleProps
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  body: {
-    gap: 16,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 16,
-    padding: 16,
-  },
-  toggleCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  rowTitle: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  rowDescription: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-  categoryBlock: {
-    padding: 16,
-    gap: 8,
-  },
-  categoryDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: mobileColors.borderSubtle,
-  },
-  channelRow: {
-    flexDirection: "row",
-    gap: 10,
-    flexWrap: "wrap",
-    marginTop: 6,
-  },
-  channelChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-  },
-  channelLabel: {
-    ...mobileText.label,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  savingNote: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-    textAlign: "center",
-    paddingVertical: 4,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    body: {
+      gap: 16,
+    },
+    toggleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 16,
+      padding: 16,
+    },
+    toggleCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    rowTitle: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    rowDescription: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+    categoryBlock: {
+      padding: 16,
+      gap: 8,
+    },
+    categoryDivider: {
+      borderBottomWidth: 1,
+      borderBottomColor: mobileColors.borderSubtle,
+    },
+    channelRow: {
+      flexDirection: "row",
+      gap: 10,
+      flexWrap: "wrap",
+      marginTop: 6,
+    },
+    channelChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+    },
+    channelLabel: {
+      ...mobileText.label,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    savingNote: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+      paddingVertical: 4,
+    },
+  });

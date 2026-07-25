@@ -149,39 +149,40 @@ export default function OnboardingScreen() {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: mobileColors.background,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  brand: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  brandMark: {
-    width: 24,
-    height: 24,
-  },
-  skipButton: {
-    minWidth: 64,
-    alignItems: "flex-end",
-  },
-  scroller: {
-    flex: 1,
-  },
-  footer: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    gap: 24,
-    alignItems: "stretch",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: mobileColors.background,
+    },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 4,
+    },
+    brand: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    brandMark: {
+      width: 24,
+      height: 24,
+    },
+    skipButton: {
+      minWidth: 64,
+      alignItems: "flex-end",
+    },
+    scroller: {
+      flex: 1,
+    },
+    footer: {
+      paddingHorizontal: 24,
+      paddingBottom: 16,
+      gap: 24,
+      alignItems: "stretch",
+    },
+  });

@@ -155,57 +155,59 @@ function CenteredStatus({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  banner: {
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    padding: 16,
-    gap: 14,
-  },
-  copyRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  icon: {
-    flexShrink: 0,
-    marginTop: 1,
-  },
-  copy: {
-    flex: 1,
-    gap: 4,
-  },
-  title: {
-    ...mobileText.cardTitle,
-  },
-  body: {
-    ...mobileText.body,
-  },
-  actionRow: {
-    alignItems: "flex-start",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    banner: {
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      padding: 16,
+      gap: 14,
+    },
+    copyRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    icon: {
+      flexShrink: 0,
+      marginTop: 1,
+    },
+    copy: {
+      flex: 1,
+      gap: 4,
+    },
+    title: {
+      ...mobileText.cardTitle,
+    },
+    body: {
+      ...mobileText.body,
+    },
+    actionRow: {
+      alignItems: "flex-start",
+    },
+  });
 
-const createCenteredStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  card: {
-    paddingHorizontal: 4,
-    paddingVertical: 32,
-    gap: 16,
-    alignItems: "center",
-  },
-  copy: {
-    gap: 6,
-    alignItems: "center",
-  },
-  title: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-    textAlign: "center",
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    textAlign: "center",
-    maxWidth: 320,
-  },
-});
+const createCenteredStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    card: {
+      paddingHorizontal: 4,
+      paddingVertical: 32,
+      gap: 16,
+      alignItems: "center",
+    },
+    copy: {
+      gap: 6,
+      alignItems: "center",
+    },
+    title: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+      textAlign: "center",
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+      maxWidth: 320,
+    },
+  });

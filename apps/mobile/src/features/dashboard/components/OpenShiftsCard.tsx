@@ -42,7 +42,10 @@ export function OpenShiftRow({ shift }: { shift: OpenShift }) {
       </View>
       <View style={styles.badges}>
         {shift.urgency != null ? (
-          <CountBadge label={URGENCY_BADGE[shift.urgency].label} tone={URGENCY_BADGE[shift.urgency].tone} />
+          <CountBadge
+            label={URGENCY_BADGE[shift.urgency].label}
+            tone={URGENCY_BADGE[shift.urgency].tone}
+          />
         ) : null}
         <CountBadge label={`${shift.needed} needed`} tone="brand" />
       </View>
@@ -63,7 +66,9 @@ export function OpenShiftsCard({
       icon="calendar-outline"
       iconTone="brand"
       headerAccessory={
-        openShifts.length > 0 ? <CountBadge label={String(openShifts.length)} tone="brand" /> : undefined
+        openShifts.length > 0 ? (
+          <CountBadge label={String(openShifts.length)} tone="brand" />
+        ) : undefined
       }
       detail={
         openShifts.length > 0 ? (
@@ -75,36 +80,41 @@ export function OpenShiftsCard({
             renderItem={(shift) => <OpenShiftRow shift={shift} />}
           />
         ) : (
-          <EmptyStateCard compact iconName="checkmark-circle-outline" title="No open shifts right now" />
+          <EmptyStateCard
+            compact
+            iconName="checkmark-circle-outline"
+            title="No open shifts right now"
+          />
         )
       }
     />
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8,
-  },
-  copy: {
-    flexShrink: 1,
-    gap: 2,
-  },
-  badges: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flexShrink: 0,
-  },
-  label: {
-    ...mobileText.body,
-    color: mobileColors.textPrimary,
-  },
-  meta: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8,
+    },
+    copy: {
+      flexShrink: 1,
+      gap: 2,
+    },
+    badges: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      flexShrink: 0,
+    },
+    label: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+    },
+    meta: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+  });

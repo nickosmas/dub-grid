@@ -35,9 +35,7 @@ export default function AddPersonScreen() {
   const [employmentType, setEmploymentType] = useState<"full_time" | "part_time">("full_time");
   const [certificationId, setCertificationId] = useState<number | null>(null);
   const [focusAreaIds, setFocusAreaIds] = useState<number[]>([]);
-  const [focusedField, setFocusedField] = useState<"firstName" | "lastName" | "email" | null>(
-    null,
-  );
+  const [focusedField, setFocusedField] = useState<"firstName" | "lastName" | "email" | null>(null);
 
   const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
   const certificationLabel =

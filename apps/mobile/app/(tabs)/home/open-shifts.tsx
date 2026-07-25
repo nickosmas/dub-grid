@@ -73,13 +73,15 @@ export default function OpenShiftsExpandedScreen() {
 
   const filtered = openShifts.filter((shift) => {
     if (urgencyFilter !== "all" && shift.urgency !== urgencyFilter) return false;
-    if (focusAreaFilter !== "all" && (shift.focusAreaName ?? UNASSIGNED_LABEL) !== focusAreaFilter) {
+    if (
+      focusAreaFilter !== "all" &&
+      (shift.focusAreaName ?? UNASSIGNED_LABEL) !== focusAreaFilter
+    ) {
       return false;
     }
     return true;
   });
-  const activeFilterCount =
-    (urgencyFilter !== "all" ? 1 : 0) + (focusAreaFilter !== "all" ? 1 : 0);
+  const activeFilterCount = (urgencyFilter !== "all" ? 1 : 0) + (focusAreaFilter !== "all" ? 1 : 0);
 
   return (
     <Screen title="Open shifts" bottomPaddingMode="tabbed">
@@ -98,7 +100,9 @@ export default function OpenShiftsExpandedScreen() {
           {URGENCY_OPTIONS.map((option) => (
             <SelectionRow
               key={option}
-              label={option === "all" ? "All urgency" : option.charAt(0).toUpperCase() + option.slice(1)}
+              label={
+                option === "all" ? "All urgency" : option.charAt(0).toUpperCase() + option.slice(1)
+              }
               onPress={() => setUrgencyFilter(option)}
               selected={urgencyFilter === option}
             />
@@ -135,7 +139,10 @@ export default function OpenShiftsExpandedScreen() {
       </View>
 
       {filtered.length === 0 ? (
-        <EmptyStateCard iconName="checkmark-circle-outline" title="No open shifts match this filter" />
+        <EmptyStateCard
+          iconName="checkmark-circle-outline"
+          title="No open shifts match this filter"
+        />
       ) : (
         <View style={styles.list}>
           {filtered.map((shift) => (
@@ -147,26 +154,27 @@ export default function OpenShiftsExpandedScreen() {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  count: {
-    ...mobileText.label,
-  },
-  list: {
-    gap: 16,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
+    },
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      paddingTop: 12,
+      paddingBottom: 4,
+    },
+    count: {
+      ...mobileText.label,
+    },
+    list: {
+      gap: 16,
+    },
+  });

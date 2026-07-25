@@ -82,7 +82,11 @@ describe("ActivityExpandedScreen", () => {
         data: {
           activity: [
             makeItem({ id: "pub-1", type: "publish", description: "Schedule published" }),
-            makeItem({ id: "signup-1", type: "user_signup", description: "User sign-up completed" }),
+            makeItem({
+              id: "signup-1",
+              type: "user_signup",
+              description: "User sign-up completed",
+            }),
           ],
         },
       },

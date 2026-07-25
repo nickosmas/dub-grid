@@ -29,36 +29,37 @@ export function OnboardingCard({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  page: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    alignItems: "center",
-    justifyContent: "flex-start",
-  },
-  content: {
-    alignItems: "center",
-    gap: 16,
-    maxWidth: 360,
-    width: "100%",
-  },
-  visualFrame: {
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  title: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-    fontSize: 26,
-    lineHeight: 32,
-    textAlign: "center",
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: "center",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    page: {
+      flex: 1,
+      paddingHorizontal: 24,
+      paddingTop: 24,
+      alignItems: "center",
+      justifyContent: "flex-start",
+    },
+    content: {
+      alignItems: "center",
+      gap: 16,
+      maxWidth: 360,
+      width: "100%",
+    },
+    visualFrame: {
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    title: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textPrimary,
+      fontSize: 26,
+      lineHeight: 32,
+      textAlign: "center",
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      fontSize: 15,
+      lineHeight: 22,
+      textAlign: "center",
+    },
+  });

@@ -1180,84 +1180,85 @@ function EditPanel({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  quickActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    paddingBottom: 16,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  noteText: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-  },
-  input: {
-    // Explicit regular weight — don't spread `mobileText.sectionTitle`,
-    // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
-    // Omitting `fontFamily` also avoids the Android EditText
-    // non-interactive bug when DM Sans hasn't loaded.
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: "400",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    color: mobileColors.textPrimary,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  actionStack: {
-    gap: 10,
-    paddingTop: 12,
-  },
-  actionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  sheetHeader: {
-    gap: 4,
-  },
-  sheetTitle: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-  },
-  sheetSubtitle: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  modalInfoPanel: {
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    gap: 8,
-    padding: 16,
-  },
-  modalInfoTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  modalInfoText: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-  },
-  modalActionStack: {
-    gap: 10,
-    paddingTop: 4,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
+    },
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    quickActions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+      paddingBottom: 16,
+    },
+    actionsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    noteText: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    input: {
+      // Explicit regular weight — don't spread `mobileText.sectionTitle`,
+      // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
+      // Omitting `fontFamily` also avoids the Android EditText
+      // non-interactive bug when DM Sans hasn't loaded.
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: "400",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      color: mobileColors.textPrimary,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+    },
+    actionStack: {
+      gap: 10,
+      paddingTop: 12,
+    },
+    actionRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    sheetHeader: {
+      gap: 4,
+    },
+    sheetTitle: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textPrimary,
+    },
+    sheetSubtitle: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    modalInfoPanel: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      gap: 8,
+      padding: 16,
+    },
+    modalInfoTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    modalInfoText: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    modalActionStack: {
+      gap: 10,
+      paddingTop: 4,
+    },
+  });

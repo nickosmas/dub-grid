@@ -127,30 +127,31 @@ export default function ActivityExpandedScreen() {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  count: {
-    ...mobileText.label,
-  },
-  list: {
-    gap: 10,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: mobileColors.borderSubtle,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
+    },
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      paddingTop: 12,
+      paddingBottom: 4,
+    },
+    count: {
+      ...mobileText.label,
+    },
+    list: {
+      gap: 10,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: mobileColors.borderSubtle,
+    },
+  });

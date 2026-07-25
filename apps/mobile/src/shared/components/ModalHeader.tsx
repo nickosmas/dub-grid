@@ -47,41 +47,42 @@ export function ModalHeader({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  root: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  copy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 4,
-    paddingTop: 10,
-  },
-  title: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-  },
-  subtitle: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeButtonPressed: {
-    transform: [{ scale: 0.96 }],
-  },
-  closeButtonDisabled: {
-    opacity: 0.5,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    root: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    copy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 4,
+      paddingTop: 10,
+    },
+    title: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textPrimary,
+    },
+    subtitle: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    closeButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surfaceSecondary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    closeButtonPressed: {
+      transform: [{ scale: 0.96 }],
+    },
+    closeButtonDisabled: {
+      opacity: 0.5,
+    },
+  });

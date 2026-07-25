@@ -9,7 +9,8 @@ vi.mock("../../../shared/components/Screen", async () => createScreenModule(awai
 const useThemeMode = vi.fn();
 
 vi.mock("../../../shared/providers/ThemeModeProvider", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../shared/providers/ThemeModeProvider")>();
+  const actual =
+    await importOriginal<typeof import("../../../shared/providers/ThemeModeProvider")>();
   return {
     ...actual,
     useThemeMode: () => useThemeMode(),

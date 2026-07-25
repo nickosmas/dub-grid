@@ -14,7 +14,11 @@ describe("DashboardHeroCard", () => {
   it("renders the headline and status pill", () => {
     render(
       <DashboardHeroCard
-        summary={{ statusLabel: "Attention", title: "2 coverage gaps", description: "Resolve staffing gaps." }}
+        summary={{
+          statusLabel: "Attention",
+          title: "2 coverage gaps",
+          description: "Resolve staffing gaps.",
+        }}
         metrics={{ coveragePct: 86, openGapCount: 2, pendingApprovalsCount: 0 }}
         periodMode="week"
         onPeriodModeChange={vi.fn()}
@@ -41,7 +45,11 @@ describe("DashboardHeroCard", () => {
   it("shows a dash and 'Not configured' when coveragePct is null", () => {
     render(
       <DashboardHeroCard
-        summary={{ statusLabel: "Setup", title: "Coverage requirements not configured", description: "" }}
+        summary={{
+          statusLabel: "Setup",
+          title: "Coverage requirements not configured",
+          description: "",
+        }}
         metrics={{ coveragePct: null, openGapCount: 0, pendingApprovalsCount: 0 }}
         periodMode="week"
         onPeriodModeChange={vi.fn()}

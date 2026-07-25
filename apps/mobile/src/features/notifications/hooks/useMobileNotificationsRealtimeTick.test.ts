@@ -15,7 +15,11 @@ function createMockChannel() {
       return channel;
     }),
   };
-  return { channel, onCalls, emitStatus: (status: string, err?: Error) => subscribeCallback?.(status, err) };
+  return {
+    channel,
+    onCalls,
+    emitStatus: (status: string, err?: Error) => subscribeCallback?.(status, err),
+  };
 }
 
 let mockChannel: ReturnType<typeof createMockChannel>;
@@ -46,9 +50,7 @@ describe("useMobileNotificationsRealtimeTick", () => {
     channelNames.length = 0;
     mockChannel = createMockChannel();
 
-    renderHook(() =>
-      useMobileNotificationsRealtimeTick({ userId: "user-1", onChange: vi.fn() }),
-    );
+    renderHook(() => useMobileNotificationsRealtimeTick({ userId: "user-1", onChange: vi.fn() }));
 
     expect(channelNames[0]).toMatch(/^notifications:user:user-1:/);
     expect(mockChannel.onCalls[0]?.filter).toEqual({

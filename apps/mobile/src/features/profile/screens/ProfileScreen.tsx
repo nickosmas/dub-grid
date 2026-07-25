@@ -592,55 +592,56 @@ function OrganizationOptionRow({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  orgOptionRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    minHeight: 70,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  orgOptionCurrent: {
-    backgroundColor: mobileColors.surfaceSecondary,
-  },
-  orgOptionPressed: {
-    opacity: 0.64,
-  },
-  orgOptionDivider: {
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  orgOptionIcon: {
-    alignItems: "center",
-    height: 32,
-    justifyContent: "center",
-    width: 32,
-  },
-  orgOptionCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  orgOptionName: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  orgOptionMeta: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  orgOptionStatus: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-    fontWeight: "500",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
+    },
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    orgOptionRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      minHeight: 70,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    orgOptionCurrent: {
+      backgroundColor: mobileColors.surfaceSecondary,
+    },
+    orgOptionPressed: {
+      opacity: 0.64,
+    },
+    orgOptionDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    orgOptionIcon: {
+      alignItems: "center",
+      height: 32,
+      justifyContent: "center",
+      width: 32,
+    },
+    orgOptionCopy: {
+      flex: 1,
+      gap: 3,
+      minWidth: 0,
+    },
+    orgOptionName: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    orgOptionMeta: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    orgOptionStatus: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+      fontWeight: "500",
+    },
+  });

@@ -114,16 +114,17 @@ export function DashboardHeader({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  container: {
-    gap: 4,
-  },
-  greeting: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  meta: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    container: {
+      gap: 4,
+    },
+    greeting: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    meta: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+  });

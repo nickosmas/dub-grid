@@ -21,7 +21,9 @@ describe("DashboardHeader", () => {
     vi.setSystemTime(new Date("2026-05-11T08:00:00"));
     vi.spyOn(Math, "random").mockReturnValue(0);
 
-    render(<DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />);
+    render(
+      <DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />,
+    );
 
     expect(screen.getByText("Good morning, Jordan!")).toBeInTheDocument();
   });
@@ -69,7 +71,9 @@ describe("DashboardHeader", () => {
   it("renders the org name alongside the local time", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
 
-    render(<DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />);
+    render(
+      <DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />,
+    );
 
     expect(screen.getByText(/Acme Care/)).toBeInTheDocument();
   });
@@ -92,7 +96,9 @@ describe("DashboardHeader", () => {
   it("omits the | separator entirely when no period label is given", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
 
-    render(<DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />);
+    render(
+      <DashboardHeader firstName="Jordan" orgName="Acme Care" timezone="America/Los_Angeles" />,
+    );
 
     expect(screen.queryByText(/\|/)).not.toBeInTheDocument();
   });

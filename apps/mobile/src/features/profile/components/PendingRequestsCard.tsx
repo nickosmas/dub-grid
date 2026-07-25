@@ -84,63 +84,64 @@ export function PendingRequestsCard({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  card: {
-    backgroundColor: mobileColors.warningSoft,
-    borderColor: mobileColors.warningBorder,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    gap: 14,
-    padding: 16,
-  },
-  header: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    gap: 12,
-  },
-  icon: {
-    flexShrink: 0,
-    marginTop: 1,
-  },
-  headerCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  title: {
-    ...mobileText.cardTitle,
-    color: mobileColors.warningText,
-  },
-  subtitle: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  list: {
-    gap: 10,
-  },
-  row: {
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.border,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    gap: 10,
-    padding: 12,
-  },
-  rowCopy: {
-    gap: 3,
-  },
-  rowTitle: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-  },
-  rowDescription: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  rowMeta: {
-    ...mobileText.meta,
-    color: mobileColors.textSubtle,
-  },
-  rowAction: {
-    alignItems: "flex-start",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: mobileColors.warningSoft,
+      borderColor: mobileColors.warningBorder,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      gap: 14,
+      padding: 16,
+    },
+    header: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      gap: 12,
+    },
+    icon: {
+      flexShrink: 0,
+      marginTop: 1,
+    },
+    headerCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    title: {
+      ...mobileText.cardTitle,
+      color: mobileColors.warningText,
+    },
+    subtitle: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    list: {
+      gap: 10,
+    },
+    row: {
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.border,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      gap: 10,
+      padding: 12,
+    },
+    rowCopy: {
+      gap: 3,
+    },
+    rowTitle: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+    },
+    rowDescription: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    rowMeta: {
+      ...mobileText.meta,
+      color: mobileColors.textSubtle,
+    },
+    rowAction: {
+      alignItems: "flex-start",
+    },
+  });

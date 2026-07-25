@@ -100,8 +100,15 @@ export function DashboardHeroCard({
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <View style={styles.headerCopy}>
-          <View style={[styles.statusPill, { backgroundColor: toneStyle.backgroundColor, borderColor: toneStyle.borderColor }]}>
-            <Text style={[styles.statusPillLabel, { color: toneStyle.iconColor }]}>{summary.statusLabel}</Text>
+          <View
+            style={[
+              styles.statusPill,
+              { backgroundColor: toneStyle.backgroundColor, borderColor: toneStyle.borderColor },
+            ]}
+          >
+            <Text style={[styles.statusPillLabel, { color: toneStyle.iconColor }]}>
+              {summary.statusLabel}
+            </Text>
           </View>
           <Text style={styles.title}>{summary.title}</Text>
         </View>
@@ -134,94 +141,95 @@ export function DashboardHeroCard({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  card: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 18,
-    gap: 16,
-    shadowColor: mobileColors.shadowStrong,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 2,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  headerCopy: {
-    flexShrink: 1,
-    gap: 6,
-  },
-  statusPill: {
-    alignSelf: "flex-start",
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  statusPillLabel: {
-    ...mobileText.badge,
-  },
-  title: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  tileRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  tile: {
-    flexGrow: 1,
-    flexBasis: "30%",
-    minWidth: 0,
-    overflow: "hidden",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 12,
-    gap: 6,
-  },
-  tileHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 6,
-  },
-  tileLabel: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-    flex: 1,
-    flexShrink: 1,
-    flexWrap: "wrap",
-  },
-  tileIconFrame: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-    // Nudge into the tile's top-right corner, matching the shared Card
-    // component's icon treatment. Kept smaller than the tile's own padding
-    // (12) so it stays inside the tile's overflow:hidden bounds.
-    marginTop: -4,
-    marginRight: -4,
-  },
-  tileValue: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-  },
-  tileDetail: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 18,
+      gap: 16,
+      shadowColor: mobileColors.shadowStrong,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 1,
+      shadowRadius: 20,
+      elevation: 2,
+    },
+    headerRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    headerCopy: {
+      flexShrink: 1,
+      gap: 6,
+    },
+    statusPill: {
+      alignSelf: "flex-start",
+      borderRadius: 999,
+      borderWidth: 1,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    statusPillLabel: {
+      ...mobileText.badge,
+    },
+    title: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    tileRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    tile: {
+      flexGrow: 1,
+      flexBasis: "30%",
+      minWidth: 0,
+      overflow: "hidden",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 12,
+      gap: 6,
+    },
+    tileHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 6,
+    },
+    tileLabel: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+      flex: 1,
+      flexShrink: 1,
+      flexWrap: "wrap",
+    },
+    tileIconFrame: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+      // Nudge into the tile's top-right corner, matching the shared Card
+      // component's icon treatment. Kept smaller than the tile's own padding
+      // (12) so it stays inside the tile's overflow:hidden bounds.
+      marginTop: -4,
+      marginRight: -4,
+    },
+    tileValue: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textPrimary,
+    },
+    tileDetail: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+  });

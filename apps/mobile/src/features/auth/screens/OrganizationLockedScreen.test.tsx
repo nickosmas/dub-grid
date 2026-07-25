@@ -70,7 +70,9 @@ describe("OrganizationLockedScreen", () => {
       />,
     );
 
-    expect(screen.getByText("This organization was suspended by DubGrid staff.")).toBeInTheDocument();
+    expect(
+      screen.getByText("This organization was suspended by DubGrid staff."),
+    ).toBeInTheDocument();
   });
 
   it("shows the grace-period end date for a trial_grace org", () => {

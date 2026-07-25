@@ -153,7 +153,9 @@ export function MyScheduleCard({
 
   const range = query.data?.range;
   const entries = query.data?.entries ?? [];
-  const entryByDate = new Map<string, MobileScheduleEntry>(entries.map((entry) => [entry.date, entry]));
+  const entryByDate = new Map<string, MobileScheduleEntry>(
+    entries.map((entry) => [entry.date, entry]),
+  );
   const dates = range ? buildDateList(range.startDate, range.endDate) : [];
 
   return (
@@ -194,13 +196,19 @@ export function MyScheduleCard({
                           style={[
                             styles.shiftPill,
                             segment.pill
-                              ? { backgroundColor: segment.pill.color, borderColor: segment.pill.border }
+                              ? {
+                                  backgroundColor: segment.pill.color,
+                                  borderColor: segment.pill.border,
+                                }
                               : null,
                           ]}
                         >
                           <Text
                             numberOfLines={1}
-                            style={[styles.shiftName, segment.pill ? { color: segment.pill.text } : null]}
+                            style={[
+                              styles.shiftName,
+                              segment.pill ? { color: segment.pill.text } : null,
+                            ]}
                           >
                             {segment.label}
                           </Text>
@@ -218,7 +226,10 @@ export function MyScheduleCard({
                           </Text>
                           <Text
                             numberOfLines={1}
-                            style={[styles.shiftTime, segment.pill ? { color: segment.pill.text } : null]}
+                            style={[
+                              styles.shiftTime,
+                              segment.pill ? { color: segment.pill.text } : null,
+                            ]}
                           >
                             {segment.timeRangeLabel ?? " "}
                           </Text>
@@ -235,86 +246,91 @@ export function MyScheduleCard({
             })}
           </ScrollView>
         ) : (
-          <EmptyStateCard compact iconName="calendar-outline" title="You're not scheduled this week" />
+          <EmptyStateCard
+            compact
+            iconName="calendar-outline"
+            title="You're not scheduled this week"
+          />
         )
       }
     />
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  // Cancels Card's own 18px horizontal padding (Screen.tsx's `card` style)
-  // so the scroll track itself bleeds edge-to-edge instead of sitting inset —
-  // everything else in the card (title, icon) keeps the normal padding. The
-  // same 18px comes back as contentContainerStyle padding below, so the
-  // first/last day cards still sit inset at rest; only the track between
-  // them (visible while actively scrolling) is truly edge-to-edge.
-  scrollView: {
-    marginHorizontal: -18,
-  },
-  scrollContent: {
-    gap: DAY_CARD_GAP,
-    paddingHorizontal: 18,
-  },
-  dayCard: {
-    minWidth: PILL_WIDTH,
-    gap: 8,
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 12,
-  },
-  dayHeader: {
-    ...mobileText.label,
-    color: mobileColors.textMuted,
-  },
-  // Multiple shifts in one day (a "double shift") lay out side by side in
-  // this row, rather than stacked, to fit the horizontally-scrolling strip.
-  shiftRow: {
-    flexDirection: "row",
-    gap: PILL_GAP,
-  },
-  shiftPill: {
-    width: PILL_WIDTH,
-    gap: 2,
-    minHeight: SHIFT_PILL_MIN_HEIGHT,
-    justifyContent: "center",
-    borderRadius: PILL_RADIUS,
-    borderWidth: 1,
-    borderColor: mobileColors.border,
-    backgroundColor: mobileColors.surface,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-  },
-  shiftName: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textPrimary,
-  },
-  shiftJobName: {
-    ...mobileText.caption,
-    fontSize: 11,
-    lineHeight: 14,
-    fontWeight: "500",
-    color: mobileColors.textMuted,
-    opacity: 0.85,
-  },
-  // Explicit smaller size (not mobileText.caption's 12px) so a full time
-  // range like "10:00 PM–6:00 AM" fits in the pill's width without
-  // ellipsizing.
-  shiftTime: {
-    ...mobileText.caption,
-    fontSize: 11,
-    lineHeight: 14,
-    color: mobileColors.textMuted,
-  },
-  emptyPill: {
-    width: PILL_WIDTH,
-    minHeight: SHIFT_PILL_MIN_HEIGHT,
-    justifyContent: "center",
-  },
-  emptyText: {
-    ...mobileText.body,
-    color: mobileColors.textSubtle,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    // Cancels Card's own 18px horizontal padding (Screen.tsx's `card` style)
+    // so the scroll track itself bleeds edge-to-edge instead of sitting inset —
+    // everything else in the card (title, icon) keeps the normal padding. The
+    // same 18px comes back as contentContainerStyle padding below, so the
+    // first/last day cards still sit inset at rest; only the track between
+    // them (visible while actively scrolling) is truly edge-to-edge.
+    scrollView: {
+      marginHorizontal: -18,
+    },
+    scrollContent: {
+      gap: DAY_CARD_GAP,
+      paddingHorizontal: 18,
+    },
+    dayCard: {
+      minWidth: PILL_WIDTH,
+      gap: 8,
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 12,
+    },
+    dayHeader: {
+      ...mobileText.label,
+      color: mobileColors.textMuted,
+    },
+    // Multiple shifts in one day (a "double shift") lay out side by side in
+    // this row, rather than stacked, to fit the horizontally-scrolling strip.
+    shiftRow: {
+      flexDirection: "row",
+      gap: PILL_GAP,
+    },
+    shiftPill: {
+      width: PILL_WIDTH,
+      gap: 2,
+      minHeight: SHIFT_PILL_MIN_HEIGHT,
+      justifyContent: "center",
+      borderRadius: PILL_RADIUS,
+      borderWidth: 1,
+      borderColor: mobileColors.border,
+      backgroundColor: mobileColors.surface,
+      paddingHorizontal: 6,
+      paddingVertical: 6,
+    },
+    shiftName: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textPrimary,
+    },
+    shiftJobName: {
+      ...mobileText.caption,
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: "500",
+      color: mobileColors.textMuted,
+      opacity: 0.85,
+    },
+    // Explicit smaller size (not mobileText.caption's 12px) so a full time
+    // range like "10:00 PM–6:00 AM" fits in the pill's width without
+    // ellipsizing.
+    shiftTime: {
+      ...mobileText.caption,
+      fontSize: 11,
+      lineHeight: 14,
+      color: mobileColors.textMuted,
+    },
+    emptyPill: {
+      width: PILL_WIDTH,
+      minHeight: SHIFT_PILL_MIN_HEIGHT,
+      justifyContent: "center",
+    },
+    emptyText: {
+      ...mobileText.body,
+      color: mobileColors.textSubtle,
+    },
+  });

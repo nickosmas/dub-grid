@@ -52,75 +52,77 @@ export function EmptyStateCard({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  card: {
-    paddingHorizontal: 4,
-    paddingVertical: 32,
-    gap: 16,
-    alignItems: "center",
-  },
-  iconFrame: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: mobileColors.brandSoft,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  copy: {
-    gap: 6,
-    alignItems: "center",
-  },
-  title: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-    textAlign: "center",
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    textAlign: "center",
-    maxWidth: 320,
-  },
-  actionRow: {
-    alignItems: "center",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    card: {
+      paddingHorizontal: 4,
+      paddingVertical: 32,
+      gap: 16,
+      alignItems: "center",
+    },
+    iconFrame: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: mobileColors.brandSoft,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    copy: {
+      gap: 6,
+      alignItems: "center",
+    },
+    title: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+      textAlign: "center",
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+      maxWidth: 320,
+    },
+    actionRow: {
+      alignItems: "center",
+    },
+  });
 
-const createCompactStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  card: {
-    paddingHorizontal: 4,
-    paddingVertical: 12,
-    gap: 10,
-    alignItems: "center",
-  },
-  iconFrame: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: mobileColors.brandSoft,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  copy: {
-    gap: 4,
-    alignItems: "center",
-  },
-  title: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textPrimary,
-    textAlign: "center",
-  },
-  body: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    textAlign: "center",
-  },
-  actionRow: {
-    alignItems: "center",
-  },
-});
+const createCompactStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    card: {
+      paddingHorizontal: 4,
+      paddingVertical: 12,
+      gap: 10,
+      alignItems: "center",
+    },
+    iconFrame: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: mobileColors.brandSoft,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    copy: {
+      gap: 4,
+      alignItems: "center",
+    },
+    title: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textPrimary,
+      textAlign: "center",
+    },
+    body: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+    },
+    actionRow: {
+      alignItems: "center",
+    },
+  });

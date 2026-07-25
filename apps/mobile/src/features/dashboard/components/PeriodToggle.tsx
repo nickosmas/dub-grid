@@ -46,33 +46,34 @@ export function PeriodToggle({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  track: {
-    flexDirection: "row",
-    alignSelf: "flex-start",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 2,
-  },
-  trackLoading: {
-    opacity: 0.5,
-  },
-  segment: {
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  segmentSelected: {
-    backgroundColor: mobileColors.brand,
-  },
-  segmentLabel: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-  segmentLabelSelected: {
-    color: mobileColors.textInverse,
-    fontWeight: "700",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    track: {
+      flexDirection: "row",
+      alignSelf: "flex-start",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 2,
+    },
+    trackLoading: {
+      opacity: 0.5,
+    },
+    segment: {
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+      borderRadius: 999,
+    },
+    segmentSelected: {
+      backgroundColor: mobileColors.brand,
+    },
+    segmentLabel: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+    segmentLabelSelected: {
+      color: mobileColors.textInverse,
+      fontWeight: "700",
+    },
+  });

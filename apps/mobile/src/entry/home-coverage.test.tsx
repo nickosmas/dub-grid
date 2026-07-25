@@ -88,7 +88,10 @@ describe("CoverageExpandedScreen", () => {
           ],
         },
       },
-      bootstrapQuery: { isLoading: false, data: { currentOrg: { labels: { focusArea: "Wings" } } } },
+      bootstrapQuery: {
+        isLoading: false,
+        data: { currentOrg: { labels: { focusArea: "Wings" } } },
+      },
     });
 
     render(<CoverageExpandedScreen />);

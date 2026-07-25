@@ -120,7 +120,11 @@ export function AdminHomeScreen() {
           firstName={firstName}
           orgName={bootstrapQuery.data?.currentOrg.name ?? ""}
           timezone={bootstrapQuery.data?.currentOrg.timezone ?? null}
-          periodLabel={formatDashboardDateRange(data.range.startDate, data.range.endDate, periodMode)}
+          periodLabel={formatDashboardDateRange(
+            data.range.startDate,
+            data.range.endDate,
+            periodMode,
+          )}
         />
       }
     >

@@ -160,16 +160,13 @@ describe("ProfileNotificationsScreen", () => {
     const [firstInAppToggle] = screen.getAllByText("In-app");
     fireEvent.click(firstInAppToggle);
 
-    expect(setQueryData).toHaveBeenCalledWith(
-      ["mobile", "notification-preferences", "token-123"],
-      {
-        prefs: {
-          schedule: { in_app: false, email: false },
-          shift_requests: { in_app: true, email: false },
-          system: { in_app: true, email: false },
-        },
+    expect(setQueryData).toHaveBeenCalledWith(["mobile", "notification-preferences", "token-123"], {
+      prefs: {
+        schedule: { in_app: false, email: false },
+        shift_requests: { in_app: true, email: false },
+        system: { in_app: true, email: false },
       },
-    );
+    });
     expect(mutate).toHaveBeenCalledWith({
       schedule: { in_app: false, email: false },
       shift_requests: { in_app: true, email: false },

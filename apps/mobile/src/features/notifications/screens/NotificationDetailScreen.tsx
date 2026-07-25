@@ -285,116 +285,117 @@ export default function NotificationDetailScreen() {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  container: {
-    gap: 14,
-    paddingBottom: 24,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  iconFrame: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: mobileColors.brandSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  priorityChip: {
-    ...mobileText.caption,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  priorityCritical: {
-    color: mobileColors.danger,
-    backgroundColor: mobileColors.dangerSoft,
-  },
-  priorityHigh: {
-    color: mobileColors.warning,
-    backgroundColor: mobileColors.warningSoft,
-  },
-  title: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  webOnlyHint: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: mobileRadii.control,
-    backgroundColor: mobileColors.surfaceMuted,
-  },
-  webOnlyHintLabel: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    flexShrink: 1,
-  },
-  timestamp: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-  },
-  message: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-    lineHeight: 22,
-  },
-  metadataCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    gap: 8,
-  },
-  metadataTitle: {
-    ...mobileText.label,
-    color: mobileColors.textPrimary,
-    fontWeight: "700",
-    marginBottom: 4,
-  },
-  metadataRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  metadataKey: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-  metadataValue: {
-    ...mobileText.caption,
-    color: mobileColors.textPrimary,
-    flexShrink: 1,
-    textAlign: "right",
-  },
-  actionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    borderColor: mobileColors.border,
-    backgroundColor: mobileColors.surface,
-  },
-  actionLabel: {
-    ...mobileText.label,
-    color: mobileColors.textPrimary,
-    fontWeight: "600",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    container: {
+      gap: 14,
+      paddingBottom: 24,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    iconFrame: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: mobileColors.brandSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    priorityChip: {
+      ...mobileText.caption,
+      fontWeight: "700",
+      letterSpacing: 0.5,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 999,
+    },
+    priorityCritical: {
+      color: mobileColors.danger,
+      backgroundColor: mobileColors.dangerSoft,
+    },
+    priorityHigh: {
+      color: mobileColors.warning,
+      backgroundColor: mobileColors.warningSoft,
+    },
+    title: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    webOnlyHint: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: mobileRadii.control,
+      backgroundColor: mobileColors.surfaceMuted,
+    },
+    webOnlyHintLabel: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      flexShrink: 1,
+    },
+    timestamp: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
+    message: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+      lineHeight: 22,
+    },
+    metadataCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      gap: 8,
+    },
+    metadataTitle: {
+      ...mobileText.label,
+      color: mobileColors.textPrimary,
+      fontWeight: "700",
+      marginBottom: 4,
+    },
+    metadataRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    metadataKey: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+    metadataValue: {
+      ...mobileText.caption,
+      color: mobileColors.textPrimary,
+      flexShrink: 1,
+      textAlign: "right",
+    },
+    actionsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 12,
+    },
+    actionButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileColors.border,
+      backgroundColor: mobileColors.surface,
+    },
+    actionLabel: {
+      ...mobileText.label,
+      color: mobileColors.textPrimary,
+      fontWeight: "600",
+    },
+  });

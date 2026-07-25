@@ -31,15 +31,16 @@ export function ExpandButton({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  button: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  buttonPressed: {
-    backgroundColor: mobileColors.brandSoft,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    button: {
+      width: 28,
+      height: 28,
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    buttonPressed: {
+      backgroundColor: mobileColors.brandSoft,
+    },
+  });

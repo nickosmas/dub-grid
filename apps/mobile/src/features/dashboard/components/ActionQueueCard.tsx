@@ -52,7 +52,9 @@ export function ActionQueueCard({
       icon="checkmark-done-outline"
       iconTone="brand"
       headerAccessory={
-        requests.length > 0 ? <CountBadge label={String(requests.length)} tone="brand" /> : undefined
+        requests.length > 0 ? (
+          <CountBadge label={String(requests.length)} tone="brand" />
+        ) : undefined
       }
       detail={
         requests.length > 0 ? (
@@ -64,30 +66,35 @@ export function ActionQueueCard({
             renderItem={(request) => <ActionQueueRow request={request} />}
           />
         ) : (
-          <EmptyStateCard compact iconName="checkmark-circle-outline" title="No requests are waiting on you" />
+          <EmptyStateCard
+            compact
+            iconName="checkmark-circle-outline"
+            title="No requests are waiting on you"
+          />
         )
       }
     />
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  copy: {
-    flexShrink: 1,
-    gap: 2,
-  },
-  label: {
-    ...mobileText.body,
-    color: mobileColors.textPrimary,
-    flexShrink: 1,
-  },
-  meta: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    copy: {
+      flexShrink: 1,
+      gap: 2,
+    },
+    label: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+      flexShrink: 1,
+    },
+    meta: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+  });

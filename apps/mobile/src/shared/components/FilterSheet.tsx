@@ -134,76 +134,77 @@ export function FilterButton({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  section: {
-    gap: 10,
-  },
-  sectionTitle: {
-    ...mobileText.label,
-    color: mobileColors.textSubtle,
-    textTransform: "uppercase",
-  },
-  sheetTitle: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-  },
-  footerSpacer: {
-    flex: 1,
-  },
-  filterButton: {
-    minHeight: 46,
-    alignItems: "center",
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  filterButtonActive: {
-    backgroundColor: mobileColors.brand,
-    borderColor: mobileColors.brand,
-  },
-  filterButtonText: {
-    color: mobileColors.textSecondary,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  filterButtonTextActive: {
-    color: mobileColors.textInverse,
-  },
-  selectionList: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    overflow: "hidden",
-  },
-  selectionRow: {
-    minHeight: 58,
-    alignItems: "center",
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  selectionRowPressed: {
-    opacity: 0.64,
-  },
-  selectionRowCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  selectionRowTitle: {
-    ...mobileText.body,
-    color: mobileColors.textPrimary,
-  },
-  selectionRowDetail: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    section: {
+      gap: 10,
+    },
+    sectionTitle: {
+      ...mobileText.label,
+      color: mobileColors.textSubtle,
+      textTransform: "uppercase",
+    },
+    sheetTitle: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textPrimary,
+    },
+    footerSpacer: {
+      flex: 1,
+    },
+    filterButton: {
+      minHeight: 46,
+      alignItems: "center",
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 8,
+      justifyContent: "center",
+      paddingHorizontal: 14,
+    },
+    filterButtonActive: {
+      backgroundColor: mobileColors.brand,
+      borderColor: mobileColors.brand,
+    },
+    filterButtonText: {
+      color: mobileColors.textSecondary,
+      fontSize: 14,
+      fontWeight: "700",
+    },
+    filterButtonTextActive: {
+      color: mobileColors.textInverse,
+    },
+    selectionList: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      overflow: "hidden",
+    },
+    selectionRow: {
+      minHeight: 58,
+      alignItems: "center",
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      flexDirection: "row",
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    selectionRowPressed: {
+      opacity: 0.64,
+    },
+    selectionRowCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    selectionRowTitle: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+    },
+    selectionRowDetail: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+  });

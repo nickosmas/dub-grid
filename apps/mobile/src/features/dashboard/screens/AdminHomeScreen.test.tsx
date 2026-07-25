@@ -162,7 +162,11 @@ describe("AdminHomeScreen", () => {
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
     });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
 
     render(<AdminHomeScreen />);
 
@@ -176,9 +180,17 @@ describe("AdminHomeScreen", () => {
   it("omits the pending-approvals queue for a super_admin", () => {
     useBootstrap.mockReturnValue({
       isLoading: false,
-      data: makeBootstrapData({ effectiveRole: "super_admin", focusAreaIds: [1], departmentIds: [] }),
+      data: makeBootstrapData({
+        effectiveRole: "super_admin",
+        focusAreaIds: [1],
+        departmentIds: [],
+      }),
     });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
 
     render(<AdminHomeScreen />);
 
@@ -192,7 +204,11 @@ describe("AdminHomeScreen", () => {
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [], departmentIds: [9] }),
     });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
 
     render(<AdminHomeScreen />);
 
@@ -204,7 +220,11 @@ describe("AdminHomeScreen", () => {
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [9] }),
     });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
 
     render(<AdminHomeScreen />);
 
@@ -216,7 +236,11 @@ describe("AdminHomeScreen", () => {
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
     });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
 
     render(<AdminHomeScreen />);
 
@@ -230,7 +254,11 @@ describe("AdminHomeScreen", () => {
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
     });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
 
     render(<AdminHomeScreen />);
 
@@ -250,7 +278,11 @@ describe("AdminHomeScreen", () => {
         linkedEmployee: { firstName: "Alex", focusAreaIds: [1], departmentIds: [] },
       },
     });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
 
     render(<AdminHomeScreen />);
 
@@ -267,7 +299,11 @@ describe("AdminHomeScreen", () => {
         linkedEmployee: null,
       },
     });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
 
     render(<AdminHomeScreen />);
 
@@ -279,7 +315,11 @@ describe("AdminHomeScreen", () => {
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
     });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
 
     render(<AdminHomeScreen />);
 
@@ -312,7 +352,11 @@ describe("AdminHomeScreen", () => {
       isLoading: false,
       data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [] }),
     });
-    useAdminDashboard.mockReturnValue({ isLoading: false, isError: false, data: EMPTY_DASHBOARD_DATA });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
 
     render(<AdminHomeScreen />);
 

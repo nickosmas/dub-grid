@@ -59,7 +59,10 @@ export default function PendingApprovalsExpandedScreen() {
   return (
     <Screen title="Pending approvals" bottomPaddingMode="tabbed">
       {requests.length === 0 ? (
-        <EmptyStateCard iconName="checkmark-circle-outline" title="No requests are waiting on you" />
+        <EmptyStateCard
+          iconName="checkmark-circle-outline"
+          title="No requests are waiting on you"
+        />
       ) : (
         <View style={styles.list}>
           {requests.map((request) => (
@@ -71,16 +74,17 @@ export default function PendingApprovalsExpandedScreen() {
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  list: {
-    gap: 16,
-    paddingTop: 12,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
+    },
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    list: {
+      gap: 16,
+      paddingTop: 12,
+    },
+  });

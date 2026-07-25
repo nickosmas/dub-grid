@@ -77,40 +77,41 @@ export function SearchBar({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) => StyleSheet.create({
-  field: {
-    minHeight: 46,
-    alignItems: "center",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    flexDirection: "row",
-    flex: 1,
-    gap: 9,
-    paddingHorizontal: 14,
-  },
-  input: {
-    // Explicit regular weight — don't spread `mobileText.sectionTitle`,
-    // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
-    // Omitting `fontFamily` also avoids the Android EditText
-    // non-interactive bug when DM Sans hasn't loaded.
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: "400",
-    color: mobileColors.textPrimary,
-    flex: 1,
-    paddingVertical: 12,
-  },
-  clearButton: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: mobileColors.surfaceSecondary,
-  },
-  clearButtonPressed: {
-    transform: [{ scale: 0.96 }],
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    field: {
+      minHeight: 46,
+      alignItems: "center",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      flexDirection: "row",
+      flex: 1,
+      gap: 9,
+      paddingHorizontal: 14,
+    },
+    input: {
+      // Explicit regular weight — don't spread `mobileText.sectionTitle`,
+      // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
+      // Omitting `fontFamily` also avoids the Android EditText
+      // non-interactive bug when DM Sans hasn't loaded.
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: "400",
+      color: mobileColors.textPrimary,
+      flex: 1,
+      paddingVertical: 12,
+    },
+    clearButton: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.surfaceSecondary,
+    },
+    clearButtonPressed: {
+      transform: [{ scale: 0.96 }],
+    },
+  });

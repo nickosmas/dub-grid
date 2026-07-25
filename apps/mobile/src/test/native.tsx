@@ -421,4 +421,3 @@ export function createScreenModule(React: ReactModule) {
     },
   };
 }
-
