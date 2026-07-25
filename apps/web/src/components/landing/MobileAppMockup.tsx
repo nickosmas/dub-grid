@@ -83,8 +83,10 @@ function useMockupIsDark(): boolean {
   return resolvedTheme === "dark";
 }
 
-const ME_HERO_GRADIENT_LIGHT = "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
-const ME_HERO_GRADIENT_DARK = "linear-gradient(to top right, #0A1442 0%, #1D3AA0 55%, #2075FF 100%)";
+const ME_HERO_GRADIENT_LIGHT =
+  "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
+const ME_HERO_GRADIENT_DARK =
+  "linear-gradient(to top right, #0A1442 0%, #1D3AA0 55%, #2075FF 100%)";
 const ME_HERO_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
 const ME_HERO_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
@@ -248,8 +250,15 @@ function StatusBar() {
   );
 }
 
-/* ── Phone frame — native iPhone 17 Pro Max, rendered through transform: scale ── */
+/* ── Phone frame — native iPhone 17 Pro Max, rendered through transform: scale.
+   Bezel is near-black in both themes on a real device, but that reads as
+   invisible against this page's near-black dark-mode background, so the
+   bezel itself switches to a lighter chassis gray in dark mode. ── */
+const BEZEL_LIGHT = "#0A0A0C";
+const BEZEL_DARK = "#3F3F46";
+
 function Phone({ active, children }: { active: string; children: React.ReactNode }) {
+  const isDark = useMockupIsDark();
   const outerW = SCREEN_W + BEZEL * 2;
   const outerH = SCREEN_H + BEZEL * 2;
   return (
@@ -267,7 +276,7 @@ function Phone({ active, children }: { active: string; children: React.ReactNode
           transform: `scale(${SCALE})`,
           transformOrigin: "top left",
           borderRadius: 62,
-          background: "#0A0A0C",
+          background: isDark ? BEZEL_DARK : BEZEL_LIGHT,
           padding: BEZEL,
           boxShadow: "0 30px 80px rgba(15,23,42,0.28), 0 6px 18px rgba(15,23,42,0.14)",
         }}
@@ -409,7 +418,14 @@ function MockCard({
         boxShadow: `0 8px 20px ${C.shadowStrong}`,
       }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
           <IconChip tone={iconTone}>
             <Icon size={16} color={t.text} strokeWidth={2} />
@@ -585,7 +601,9 @@ function ScheduleScreen() {
               }}
             >
               {/* meHeroHeaderCopy: column, gap 10 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 0 }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 0 }}
+              >
                 {/* meHeroBadge. Status "active" → meHeroBadgeDotActive (#86EFAC) */}
                 <div
                   style={{
@@ -1330,16 +1348,31 @@ const STAFF_HOURS = [
 ];
 
 const ACTIVITY: Array<{ type: string; tone: Tone; time: string; desc: string }> = [
-  { type: "Published", tone: "brand", time: "2h ago", desc: "Published the schedule for Jul 12–18" },
+  {
+    type: "Published",
+    tone: "brand",
+    time: "2h ago",
+    desc: "Published the schedule for Jul 12–18",
+  },
   {
     type: "Shift change",
     tone: "warning",
     time: "4h ago",
     desc: "Marcus Webb picked up Jordan Reyes's Day shift on Jul 13",
   },
-  { type: "Request", tone: "success", time: "6h ago", desc: "Priya Shah requested a swap for Jul 14" },
+  {
+    type: "Request",
+    tone: "success",
+    time: "6h ago",
+    desc: "Priya Shah requested a swap for Jul 14",
+  },
   { type: "Sign-up", tone: "success", time: "1d ago", desc: "Sam Whitfield joined Calm Haven" },
-  { type: "Shift change", tone: "warning", time: "1d ago", desc: "Devon Brooks called off for Jul 14" },
+  {
+    type: "Shift change",
+    tone: "warning",
+    time: "1d ago",
+    desc: "Devon Brooks called off for Jul 14",
+  },
   { type: "Published", tone: "brand", time: "2d ago", desc: "Published the schedule for Jul 5–11" },
 ];
 
@@ -1665,9 +1698,7 @@ function AdminHomeScreenMockup() {
             })}
             {/* hasMore = items.length > collapsedCount(5) — 4 real sections,
                 so no "See all" link (matches the real screenshot). */}
-            {COVERAGE_SECTIONS.length > 5 ? (
-              <SeeAllLink count={COVERAGE_SECTIONS.length} />
-            ) : null}
+            {COVERAGE_SECTIONS.length > 5 ? <SeeAllLink count={COVERAGE_SECTIONS.length} /> : null}
           </div>
         </MockCard>
 
@@ -1682,7 +1713,12 @@ function AdminHomeScreenMockup() {
             {ADMIN_OPEN_SHIFTS.slice(0, 5).map((s) => (
               <div
                 key={`${s.area}-${s.meta}`}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 8,
+                }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 1 }}>
                   <span style={{ ...body, color: C.textPrimary }}>{s.area}</span>
@@ -1706,7 +1742,12 @@ function AdminHomeScreenMockup() {
             {STAFF_HOURS.slice(0, 5).map((entry) => (
               <div
                 key={entry.name}
-                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 8,
+                }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <span style={{ ...body, color: C.textPrimary }}>{entry.name}</span>

@@ -81,8 +81,10 @@ type ShiftlessCode = keyof typeof SHIFTLESS;
 type AbsenceCode = keyof typeof ABSENCES;
 type CertCode = keyof typeof CERTS;
 
-/* A worked-shift assignment: a shift code plus optional with_shift job. */
-type ShiftAssignment = { shift: ShiftCode; job?: JobCode };
+/* A worked-shift assignment: a shift code plus optional with_shift job.
+   `needed` is only meaningful for open-shift entries (how many teammates
+   the slot still needs); assigned cells never set it. */
+type ShiftAssignment = { shift: ShiftCode; job?: JobCode; needed?: number };
 
 /* A cell value: shift, shiftless job, absence, split shift, or empty. */
 type Cell =
@@ -186,15 +188,33 @@ const COVERAGE: {
   { code: "E", required: 1, scheduled: [0, 1, 1, 2, 1, 1, 0] },
 ];
 
-const WARNING_BG = "rgba(245, 158, 11, 0.08)";
-const WARNING_BORDER = "#F59E0B";
-const WARNING_TEXT = "#92400E";
+/* ── Warning tokens as CSS vars (not hardcoded hex) so the row follows the
+   page theme like ScheduleGrid.tsx does — dg-warning-bg etc. remap in dark
+   mode via the design-tokens theme block. ── */
+const WARNING_BG = "var(--color-warning-bg, #FFF8E1)";
+const WARNING_BORDER = "var(--color-warning-border, #F59E0B)";
+const WARNING_TEXT = "var(--color-warning-text, #92400E)";
+const WARNING_SOLID = "var(--color-warning)";
+/* Repeating-linear-gradient dashed divider — ScheduleGrid.tsx uses this
+   background-image technique (not a literal `border` with style dashed)
+   because Chromium clips border/box-shadow decorations on position:sticky
+   elements at fractional browser zoom (see globals.css data-bottom-divider
+   rules and the Open Shifts label cell in ScheduleGrid.tsx). */
+const WARNING_DASH_DIVIDER: React.CSSProperties = {
+  backgroundImage: `repeating-linear-gradient(to right, ${WARNING_BORDER} 0 6px, transparent 6px 10px)`,
+  backgroundPosition: "0 100%",
+  backgroundRepeat: "no-repeat",
+  backgroundSize: "100% 2px",
+};
 const TODAY_BG = "color-mix(in srgb, var(--color-brand) 4%, transparent)";
 
 function CertPill({ kind }: { kind: CertCode }) {
   const isDark = useMockupIsDark();
   const raw = CERTS[kind];
-  const c = resolveShiftPillColors({ color: raw.bg, text: raw.text, border: "transparent" }, isDark);
+  const c = resolveShiftPillColors(
+    { color: raw.bg, text: raw.text, border: "transparent" },
+    isDark,
+  );
   return (
     <span
       style={{
@@ -309,32 +329,71 @@ function SplitShiftRow({ pair }: { pair: [ShiftAssignment, ShiftAssignment] }) {
   );
 }
 
-/* Open-shift pill — dashed amber border, two-line shift (+ optional job). */
+/* Open-shift pill. Unlike an assigned cell's pill, this does NOT take the
+   shift's own color (D=cyan/E=amber) — ScheduleGrid.tsx only colors an open
+   shift from a specific prior assignment (e.g. a call-off that inherited
+   its color), and a freshly-unfilled slot has no assignment to inherit
+   from, so it falls back to a plain surface fill with a dashed amber
+   border/text and a small amber "needed" count badge. */
 function OpenShiftPill({ seg }: { seg: ShiftAssignment }) {
-  const isDark = useMockupIsDark();
-  const raw = SHIFTS[seg.shift];
-  const s = resolveShiftPillColors({ color: raw.bg, text: raw.text, border: raw.border }, isDark);
+  const needed = seg.needed ?? 1;
+  const hasSecondaryLabel = !!seg.job;
   return (
     <span
       style={{
-        flex: "1 1 0",
-        minWidth: 0,
+        position: "relative",
         display: "flex",
-        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        background: s.color,
-        color: s.text,
-        border: `1.5px dashed ${WARNING_BORDER}`,
+        gap: 6,
+        flex: "1 1 72px",
+        minWidth: 0,
+        maxWidth: "100%",
+        padding: hasSecondaryLabel ? "4px 8px" : "5px 8px",
         borderRadius: 6,
-        padding: "2px 4px",
-        lineHeight: 1.1,
-        letterSpacing: "0.01em",
-        gap: 1,
+        border: `1.5px dashed ${WARNING_BORDER}`,
+        background: "var(--color-surface)",
+        color: WARNING_TEXT,
+        fontSize: 12,
+        fontWeight: 600,
+        lineHeight: 1.3,
+        overflow: "hidden",
       }}
     >
-      <span style={{ fontSize: 12, fontWeight: 800 }}>{seg.shift}</span>
-      {seg.job && <span style={{ fontSize: 10, fontWeight: 600, opacity: 0.78 }}>{seg.job}</span>}
+      <span
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: hasSecondaryLabel ? 1 : 0,
+          minWidth: 0,
+        }}
+      >
+        <span style={{ fontWeight: 800, lineHeight: 1.1 }}>{seg.shift}</span>
+        {seg.job && (
+          <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.3, opacity: 0.78 }}>
+            {seg.job}
+          </span>
+        )}
+      </span>
+      <span
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: WARNING_SOLID,
+          color: "var(--color-text-inverse)",
+          fontSize: 10,
+          fontWeight: 700,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          lineHeight: 1,
+          flexShrink: 0,
+        }}
+      >
+        {needed}
+      </span>
     </span>
   );
 }
@@ -405,11 +464,14 @@ export default function ScheduleGridMockup() {
   const gridTemplate = `${NAME_COL_WIDTH}px repeat(7, minmax(0, 1fr))`;
   return (
     <div style={{ maxWidth: 1080, margin: "0 auto" }}>
-      {/* Focus area section heading — sits ABOVE the grid card with a 3px
-          brand-colored accent bar (ScheduleGrid.tsx lines 1188–1212). */}
+      {/* Focus area section heading — a full-width bar (not a hugging pill)
+          sitting ABOVE the grid card with a 3px brand-colored accent bar.
+          Matches ScheduleGrid.tsx's section label exactly: `display: flex`
+          (a block-level flex container, so the background spans the same
+          width as the grid card below it), not `inline-flex`. */}
       <div
         style={{
-          display: "inline-flex",
+          display: "flex",
           alignItems: "center",
           gap: 8,
           padding: "6px 10px 6px 8px",
@@ -417,15 +479,13 @@ export default function ScheduleGridMockup() {
           borderRadius: 6,
           background: "var(--color-bg-secondary)",
           color: "var(--color-text-secondary)",
-          fontSize: 16,
+          fontSize: "var(--dg-fs-heading)",
           fontWeight: 800,
-          letterSpacing: "-0.005em",
         }}
       >
         <span
           aria-hidden="true"
           style={{
-            display: "block",
             width: 3,
             height: 18,
             borderRadius: 2,
@@ -436,6 +496,11 @@ export default function ScheduleGridMockup() {
         Skilled Nursing
       </div>
 
+      {/* No toolbar here — ScheduleGrid.tsx's own card starts directly with
+          the grid (Staff/day header row). The week-nav/Publish toolbar is a
+          separate, unconnected element the schedule page renders above the
+          card (components/Toolbar.tsx + DraftBanner.tsx), not part of
+          ScheduleGrid itself, so the mockup omits it rather than fake it. */}
       <div
         style={{
           background: "var(--color-surface)",
@@ -445,124 +510,6 @@ export default function ScheduleGridMockup() {
           boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
         }}
       >
-        {/* Toolbar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "12px 16px",
-            borderBottom: "1px solid var(--color-border-light)",
-            background: "var(--color-bg)",
-          }}
-        >
-          <button
-            type="button"
-            aria-label="Previous week"
-            style={{
-              width: 32,
-              height: 32,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              background: "var(--color-surface)",
-              color: "var(--color-text-secondary)",
-              cursor: "default",
-            }}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-          <div
-            style={{
-              padding: "6px 14px",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              background: "var(--color-surface)",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--color-text-secondary)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Mar 22 – Mar 28
-          </div>
-          <button
-            type="button"
-            aria-label="Next week"
-            style={{
-              width: 32,
-              height: 32,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              background: "var(--color-surface)",
-              color: "var(--color-text-secondary)",
-              cursor: "default",
-            }}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            style={{
-              padding: "6px 12px",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              background: "var(--color-surface)",
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--color-text-secondary)",
-              cursor: "default",
-            }}
-          >
-            Today
-          </button>
-
-          <div style={{ flex: 1 }} />
-
-          <button
-            type="button"
-            style={{
-              padding: "6px 14px",
-              border: "1px solid var(--color-brand)",
-              borderRadius: 8,
-              background: "var(--color-brand)",
-              color: "#fff",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "default",
-            }}
-          >
-            Publish
-          </button>
-        </div>
-
         {/* Grid */}
         <div
           role="grid"
@@ -635,7 +582,8 @@ export default function ScheduleGridMockup() {
           })}
 
           {/* Open shifts row — matches the real grid: briefcase glyph + label + count badge,
-              warning bg, 2px dashed bottom border in warning color. */}
+              warning bg, dashed bottom divider drawn via the same repeating-gradient
+              background-image ScheduleGrid.tsx uses (not a literal dashed border). */}
           <div
             style={{
               position: "sticky",
@@ -648,9 +596,9 @@ export default function ScheduleGridMockup() {
               gap: 6,
               minHeight: ROW_HEIGHT,
               borderRight: "1px solid var(--color-border-light)",
-              borderBottom: `2px dashed ${WARNING_BORDER}`,
               color: WARNING_TEXT,
               whiteSpace: "nowrap" as const,
+              ...WARNING_DASH_DIVIDER,
             }}
           >
             {/* Briefcase glyph */}
@@ -686,8 +634,8 @@ export default function ScheduleGridMockup() {
                 height: 18,
                 padding: "0 5px",
                 borderRadius: 9,
-                background: WARNING_BORDER,
-                color: "#fff",
+                background: WARNING_SOLID,
+                color: "var(--color-text-inverse)",
                 fontSize: 11,
                 fontWeight: 700,
                 lineHeight: 1,
@@ -703,15 +651,17 @@ export default function ScheduleGridMockup() {
                 key={`open-${idx}`}
                 style={{
                   display: "flex",
-                  alignItems: "stretch",
-                  gap: 4,
+                  flexWrap: "wrap",
+                  alignContent: "flex-start",
+                  alignItems: "flex-start",
+                  gap: 6,
                   padding: 6,
                   minHeight: ROW_HEIGHT,
                   background: isToday
                     ? `linear-gradient(${TODAY_BG}, ${TODAY_BG}), ${WARNING_BG}`
                     : WARNING_BG,
                   borderLeft: idx === 0 ? undefined : "1px solid var(--color-border-light)",
-                  borderBottom: `2px dashed ${WARNING_BORDER}`,
+                  ...WARNING_DASH_DIVIDER,
                 }}
               >
                 {openList.map((seg, i) => (
