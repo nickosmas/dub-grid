@@ -741,7 +741,8 @@ CREATE POLICY "audit_select"
 
 CREATE POLICY "own_locks_only"
   ON public.jwt_refresh_locks FOR ALL TO authenticated
-  USING (user_id = auth.uid());
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -775,8 +776,9 @@ COMMENT ON POLICY "gridmaster_update_impersonation" ON public.impersonation_sess
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE POLICY "own_sessions_only"
-  ON public.user_sessions
-  USING (user_id = auth.uid());
+  ON public.user_sessions FOR ALL TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
