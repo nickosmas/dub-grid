@@ -2160,8 +2160,6 @@ async function seedJobsForOrg(
       color: job.color,
       border_color: job.border_color,
       text_color: job.text_color,
-      shift_time_overrides: job.shift_time_overrides,
-      shift_color_overrides: job.shift_color_overrides,
       default_start_time: job.default_start_time,
       default_end_time: job.default_end_time,
       default_duration_hours: job.default_duration_hours,
@@ -2178,7 +2176,6 @@ async function seedJobsForOrg(
            applicable_shift_ids bigint[], eligible_role_ids bigint[],
            required_certification_ids bigint[],
            color text, border_color text, text_color text,
-           shift_time_overrides jsonb, shift_color_overrides jsonb,
            default_start_time time, default_end_time time,
            default_duration_hours smallint, default_duration_minutes smallint,
            sort_order int, system_key text
@@ -2190,7 +2187,6 @@ async function seedJobsForOrg(
            focus_area_ids, department_ids, applicable_shift_ids,
            eligible_role_ids, required_certification_ids,
            color, border_color, text_color,
-           shift_time_overrides, shift_color_overrides,
            default_start_time, default_end_time,
            default_duration_hours, default_duration_minutes,
            sort_order, system_key
@@ -2199,7 +2195,6 @@ async function seedJobsForOrg(
                 focus_area_ids, department_ids, applicable_shift_ids,
                 eligible_role_ids, required_certification_ids,
                 color, border_color, text_color,
-                shift_time_overrides, shift_color_overrides,
                 default_start_time, default_end_time,
                 default_duration_hours, default_duration_minutes,
                 sort_order, system_key
@@ -2215,6 +2210,42 @@ async function seedJobsForOrg(
     for (const row of rows) {
       jobIdByKey.set(row.key, id(row.id));
     }
+  }
+
+  const overrideRows: Array<{
+    job_id: number;
+    shift_id: number;
+    start_time: string | null;
+    end_time: string | null;
+    color: string | null;
+  }> = [];
+  for (const job of orderedJobs) {
+    const jobId = jobIdByKey.get(job.key);
+    if (jobId == null) continue;
+    const shiftIds = uniqueNumbers([
+      ...Object.keys(job.shift_time_overrides).map(Number),
+      ...Object.keys(job.shift_color_overrides).map(Number),
+    ]);
+    for (const shiftId of shiftIds) {
+      const timeOverride = job.shift_time_overrides[String(shiftId)];
+      overrideRows.push({
+        job_id: jobId,
+        shift_id: shiftId,
+        start_time: timeOverride?.startTime ?? null,
+        end_time: timeOverride?.endTime ?? null,
+        color: job.shift_color_overrides[String(shiftId)] ?? null,
+      });
+    }
+  }
+  if (overrideRows.length > 0) {
+    await db.query(
+      `INSERT INTO public.job_shift_overrides (job_id, org_id, shift_id, start_time, end_time, color)
+       SELECT job_id, $2, shift_id, start_time, end_time, color
+       FROM jsonb_to_recordset($1::jsonb) AS x(
+         job_id bigint, shift_id bigint, start_time time, end_time time, color text
+       )`,
+      [JSON.stringify(overrideRows), orgId],
+    );
   }
 
   const shiftAbbrUpdatesToApply: Array<{ shift_id: number; abbr: string }> = [];
@@ -3118,8 +3149,8 @@ async function main() {
   // has a super_admin/admin to attribute the publish to.
   console.log("\n  Recording publish history for seeded schedules...");
   const { rowCount: publishHistoryCount } = await db.query(
-    `INSERT INTO public.publish_history (org_id, published_by, start_date, end_date, change_count, changes)
-     SELECT agg.org_id, publisher.user_id, agg.start_date, agg.end_date, agg.change_count, '[]'::jsonb
+    `INSERT INTO public.publish_history (org_id, published_by, start_date, end_date, change_count)
+     SELECT agg.org_id, publisher.user_id, agg.start_date, agg.end_date, agg.change_count
      FROM (
        SELECT c.org_id,
               MIN(c.date) AS start_date,

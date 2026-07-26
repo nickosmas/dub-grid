@@ -19,6 +19,7 @@ ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shift_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.job_shift_overrides ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.absence_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_cells ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_cell_snapshots ENABLE ROW LEVEL SECURITY;
@@ -37,6 +38,7 @@ ALTER TABLE public.mobile_device_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_draft_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_shifts_draft_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.publish_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.schedule_publish_changes ENABLE ROW LEVEL SECURITY;
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -327,6 +329,29 @@ CREATE POLICY "admin_delete_jobs"
   ON public.jobs FOR DELETE TO authenticated
   USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
 
+-- ── job_shift_overrides ──────────────────────────────────────────────────────
+
+CREATE POLICY "gridmaster_all_job_shift_overrides"
+  ON public.job_shift_overrides FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_job_shift_overrides"
+  ON public.job_shift_overrides FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_insert_job_shift_overrides"
+  ON public.job_shift_overrides FOR INSERT TO authenticated
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
+
+CREATE POLICY "admin_update_job_shift_overrides"
+  ON public.job_shift_overrides FOR UPDATE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'))
+  WITH CHECK (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_delete_job_shift_overrides"
+  ON public.job_shift_overrides FOR DELETE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
+
 -- ── absence_types ──────────────────────────────────────────────────────────────
 
 CREATE POLICY "gridmaster_all_absence_types"
@@ -450,6 +475,19 @@ CREATE POLICY "gridmaster_all_publish_history"
 CREATE POLICY "members_select_publish_history"
   ON public.publish_history FOR SELECT TO authenticated
   USING (org_id = public.caller_org_id());
+
+-- ── schedule_publish_changes ─────────────────────────────────────────────────
+-- Written only via publish_schedule() (SECURITY DEFINER); no direct
+-- insert/update/delete policies for authenticated, mirroring publish_history.
+
+CREATE POLICY "gridmaster_all_schedule_publish_changes"
+  ON public.schedule_publish_changes FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_schedule_publish_changes"
+  ON public.schedule_publish_changes FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
 CREATE POLICY "gridmaster_all_schedule_cells"
   ON public.schedule_cells FOR ALL TO authenticated
   USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());

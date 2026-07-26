@@ -304,8 +304,6 @@ BEGIN
     color,
     border_color,
     text_color,
-    shift_time_overrides,
-    shift_color_overrides,
     default_start_time,
     default_end_time,
     default_duration_hours,
@@ -322,7 +320,6 @@ BEGIN
       '{}'::bigint[],
       '{}'::bigint[],
       '#E2E8F0', 'transparent', '#1E293B',
-      '{}'::jsonb, '{}'::jsonb,
       NULL, NULL, 8, 0, 0, NULL
     ),
     (
@@ -333,7 +330,6 @@ BEGIN
       '{}'::bigint[],
       '{}'::bigint[],
       '#FDE68A', 'transparent', '#92400E',
-      '{}'::jsonb, '{}'::jsonb,
       NULL, NULL, 3, 0, 1, NULL
     ),
     (
@@ -344,7 +340,6 @@ BEGIN
       '{}'::bigint[],
       '{}'::bigint[],
       '#E2E8F0', 'transparent', '#1E293B',
-      '{}'::jsonb, '{}'::jsonb,
       NULL, NULL, NULL, NULL, -1000, 'default_shift_job'
     ),
     (
@@ -355,7 +350,6 @@ BEGIN
       ARRAY[role_supv],
       ARRAY[cert_jlcsn, cert_staff, cert_csn4],
       '#E2E8F0', 'transparent', '#1E293B',
-      '{}'::jsonb, '{}'::jsonb,
       NULL, NULL, NULL, NULL, 4, NULL
     ),
     (
@@ -366,7 +360,6 @@ BEGIN
       ARRAY[role_mentor],
       '{}'::bigint[],
       '#E2E8F0', 'transparent', '#1E293B',
-      '{}'::jsonb, '{}'::jsonb,
       NULL, NULL, NULL, NULL, 5, NULL
     );
 

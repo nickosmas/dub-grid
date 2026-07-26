@@ -26,7 +26,7 @@ const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, arc
 const SHIFT_CATEGORY_COLS =
   "id, org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes, archived_at";
 const JOB_COLS =
-  "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, shift_time_overrides, shift_color_overrides, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
+  "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, job_shift_overrides(shift_id, start_time, end_time, color), default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
 const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_id, sort_order, archived_at";
 const ORG_ROLE_COLS =
   "id, org_id, name, abbr, is_schedule_role, department_id, sort_order, archived_at";
@@ -85,9 +85,8 @@ export interface MobileProfileNameRow {
   last_name: string | null;
 }
 
-// Matches web's PublishChange (apps/web/src/types/index.ts) — stored verbatim
-// as JSONB on publish_history.changes, written camelCase by web's publish
-// action, so the shape carries over as-is.
+// Narrower mobile subset of web's PublishChange (apps/web/src/types/index.ts),
+// mapped from the schedule_publish_changes child table rows.
 export interface MobilePublishChange {
   empId: string;
   date: string;
@@ -697,7 +696,9 @@ export async function fetchMobilePublishHistoryRows(
 ): Promise<MobilePublishHistoryRow[]> {
   let query = serviceClient
     .from("publish_history")
-    .select("published_by, start_date, end_date, published_at, change_count, changes")
+    .select(
+      "published_by, start_date, end_date, published_at, change_count, schedule_publish_changes(emp_id, date, kind)",
+    )
     .eq("org_id", orgId)
     .order("published_at", { ascending: false });
 
@@ -712,7 +713,18 @@ export async function fetchMobilePublishHistoryRows(
 
   if (error) throw error;
 
-  return (data ?? []) as MobilePublishHistoryRow[];
+  const rows = (data ?? []) as (Omit<MobilePublishHistoryRow, "changes"> & {
+    schedule_publish_changes: { emp_id: string; date: string; kind: string }[];
+  })[];
+
+  return rows.map(({ schedule_publish_changes, ...row }) => ({
+    ...row,
+    changes: (schedule_publish_changes ?? []).map((c) => ({
+      empId: c.emp_id,
+      date: c.date,
+      kind: c.kind as MobilePublishChange["kind"],
+    })),
+  }));
 }
 
 export async function fetchProfileNameRowsByIds(

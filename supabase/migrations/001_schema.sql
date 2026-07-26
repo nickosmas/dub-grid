@@ -352,8 +352,6 @@ CREATE TABLE public.jobs (
   color                      TEXT NOT NULL DEFAULT '#E2E8F0',
   border_color               TEXT NOT NULL DEFAULT 'transparent',
   text_color                 TEXT NOT NULL DEFAULT '#1E293B',
-  shift_time_overrides       JSONB NOT NULL DEFAULT '{}'::jsonb,
-  shift_color_overrides      JSONB NOT NULL DEFAULT '{}'::jsonb,
   default_start_time         TIME,
   default_end_time           TIME,
   default_duration_hours     SMALLINT,
@@ -371,6 +369,31 @@ CREATE TABLE public.jobs (
 );
 
 ALTER TABLE ONLY public.jobs REPLICA IDENTITY FULL;
+
+
+-- ── job_shift_overrides ──────────────────────────────────────────────────────
+-- Per-(job, shift) time/color overrides. One row per overridden shift instead
+-- of a JSONB map keyed by shift_id, so archiving/deleting a shift cascades
+-- cleanly instead of leaving an orphaned key behind.
+
+CREATE TABLE public.job_shift_overrides (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  org_id      UUID NOT NULL,
+  job_id      BIGINT NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+  shift_id    BIGINT NOT NULL REFERENCES public.shift_categories(id) ON DELETE CASCADE,
+  start_time  TIME,
+  end_time    TIME,
+  color       TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+  UNIQUE (job_id, shift_id)
+);
+
+CREATE INDEX idx_job_shift_overrides_shift ON public.job_shift_overrides(shift_id);
+CREATE INDEX idx_job_shift_overrides_org ON public.job_shift_overrides(org_id);
+
+ALTER TABLE ONLY public.job_shift_overrides REPLICA IDENTITY FULL;
 
 -- ── absence_types ───────────────────────────────────────────────────────────
 
@@ -849,13 +872,41 @@ CREATE TABLE public.publish_history (
   start_date    DATE NOT NULL,
   end_date      DATE NOT NULL,
   change_count  INTEGER NOT NULL DEFAULT 0,
-  changes       JSONB NOT NULL DEFAULT '[]'::JSONB,
   published_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_publish_history_org_date ON public.publish_history(org_id, published_at DESC);
 
 ALTER TABLE ONLY public.publish_history REPLICA IDENTITY FULL;
+
+
+-- ── schedule_publish_changes ─────────────────────────────────────────────────
+-- Per-cell changes for one publish_history row. One row per changed cell
+-- instead of a JSONB array, so change rows are independently indexable by
+-- (org, emp, date) and cascade-delete with their parent publish_history row.
+
+CREATE TABLE public.schedule_publish_changes (
+  id                    BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  publish_history_id    UUID NOT NULL REFERENCES public.publish_history(id) ON DELETE CASCADE,
+  org_id                UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  emp_id                UUID NOT NULL,
+  date                  DATE NOT NULL,
+  kind                  TEXT NOT NULL CHECK (kind IN ('new', 'modified', 'deleted')),
+  from_state            JSONB,
+  to_state              JSONB,
+  from_absence_type_id  BIGINT,
+  to_absence_type_id    BIGINT,
+  updated_by            UUID,
+  from_custom_start     TIME,
+  from_custom_end       TIME,
+  to_custom_start       TIME,
+  to_custom_end         TIME
+);
+
+CREATE INDEX idx_schedule_publish_changes_emp_date ON public.schedule_publish_changes(org_id, emp_id, date);
+CREATE INDEX idx_schedule_publish_changes_history ON public.schedule_publish_changes(publish_history_id);
+
+ALTER TABLE ONLY public.schedule_publish_changes REPLICA IDENTITY FULL;
 
 
 -- ── recurring_shifts_draft_sessions ─────────────────────────────────────────
@@ -1450,6 +1501,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.employees;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.focus_areas;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_categories;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.jobs;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.job_shift_overrides;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.shift_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.profile_change_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.absence_types;

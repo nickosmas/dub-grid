@@ -53,6 +53,16 @@ export interface DbShiftCategory {
   archived_at: string | null;
 }
 
+export interface DbJobShiftOverride {
+  id: number;
+  org_id: string;
+  job_id: number;
+  shift_id: number;
+  start_time: string | null;
+  end_time: string | null;
+  color: string | null;
+}
+
 export interface DbJobDefinition {
   id: number;
   org_id: string;
@@ -69,8 +79,7 @@ export interface DbJobDefinition {
   color: string;
   border_color: string;
   text_color: string;
-  shift_time_overrides: Record<string, { startTime: string | null; endTime: string | null }> | null;
-  shift_color_overrides: Record<string, string> | null;
+  job_shift_overrides?: Pick<DbJobShiftOverride, "shift_id" | "start_time" | "end_time" | "color">[] | null;
   default_start_time: string | null;
   default_end_time: string | null;
   default_duration_hours: number | null;

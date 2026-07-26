@@ -265,22 +265,22 @@ export function rowToShiftCategory(row: DbShiftCategory): ShiftCategory {
 export function rowToJobDefinition(row: DbJobDefinition): JobDefinition {
   const assignmentMode = row.assignment_mode ?? "with_shift";
   const focusAreaIds = row.focus_area_ids ?? [];
+  const overrideRows = row.job_shift_overrides ?? [];
   const shiftTimeOverrides = Object.fromEntries(
-    Object.entries(row.shift_time_overrides ?? {})
-      .filter(([shiftId, value]) => shiftId.trim().length > 0 && value != null)
-      .map(([shiftId, value]) => [
-        shiftId,
+    overrideRows
+      .filter((override) => override.start_time != null || override.end_time != null)
+      .map((override) => [
+        String(override.shift_id),
         {
-          startTime: trimTime(value.startTime) ?? null,
-          endTime: trimTime(value.endTime) ?? null,
+          startTime: trimTime(override.start_time) ?? null,
+          endTime: trimTime(override.end_time) ?? null,
         },
       ]),
   );
   const shiftColorOverrides = Object.fromEntries(
-    Object.entries(row.shift_color_overrides ?? {}).filter(
-      ([shiftId, value]) =>
-        shiftId.trim().length > 0 && typeof value === "string" && value.trim().length > 0,
-    ),
+    overrideRows
+      .filter((override) => typeof override.color === "string" && override.color.trim().length > 0)
+      .map((override) => [String(override.shift_id), override.color as string]),
   );
   const style =
     assignmentMode === "shiftless"

@@ -1416,9 +1416,32 @@ BEGIN
   v_change_count := v_change_count + v_note_new + v_note_deleted;
 
   -- Insert publish_history record
-  INSERT INTO public.publish_history (org_id, published_by, start_date, end_date, change_count, changes)
-  VALUES (p_org_id, v_actor_id, p_start_date, p_end_date, v_change_count, v_changes)
+  INSERT INTO public.publish_history (org_id, published_by, start_date, end_date, change_count)
+  VALUES (p_org_id, v_actor_id, p_start_date, p_end_date, v_change_count)
   RETURNING id INTO v_history_id;
+
+  -- Explode the in-memory changes array into one row per changed cell.
+  INSERT INTO public.schedule_publish_changes (
+    publish_history_id, org_id, emp_id, date, kind, from_state, to_state,
+    from_absence_type_id, to_absence_type_id, updated_by,
+    from_custom_start, from_custom_end, to_custom_start, to_custom_end
+  )
+  SELECT
+    v_history_id,
+    p_org_id,
+    (c->>'empId')::UUID,
+    (c->>'date')::DATE,
+    c->>'kind',
+    c->'fromState',
+    c->'toState',
+    NULLIF(c->>'fromAbsenceTypeId', '')::BIGINT,
+    NULLIF(c->>'toAbsenceTypeId', '')::BIGINT,
+    NULLIF(c->>'updatedBy', '')::UUID,
+    NULLIF(c->>'fromCustomStart', '')::TIME,
+    NULLIF(c->>'fromCustomEnd', '')::TIME,
+    NULLIF(c->>'toCustomStart', '')::TIME,
+    NULLIF(c->>'toCustomEnd', '')::TIME
+  FROM jsonb_array_elements(v_changes) AS c;
 
   -- Notes: draft → published
   UPDATE public.schedule_notes
@@ -3895,7 +3918,8 @@ DECLARE
   v_assignment_mode TEXT;
   v_default_start TIME;
   v_default_end TIME;
-  v_shift_override JSONB;
+  v_override_start TIME;
+  v_override_end TIME;
   v_shift_start TIME;
   v_shift_end TIME;
 BEGIN
@@ -3924,21 +3948,21 @@ BEGIN
       j.assignment_mode,
       j.default_start_time,
       j.default_end_time,
-      CASE
-        WHEN v_shift_id IS NOT NULL THEN j.shift_time_overrides -> (v_shift_id::TEXT)
-        ELSE NULL
-      END AS shift_override,
+      jso.start_time,
+      jso.end_time,
       sc.start_time,
       sc.end_time
     INTO
       v_assignment_mode,
       v_default_start,
       v_default_end,
-      v_shift_override,
+      v_override_start,
+      v_override_end,
       v_shift_start,
       v_shift_end
     FROM public.jobs j
     LEFT JOIN public.shift_categories sc ON sc.id = v_shift_id
+    LEFT JOIN public.job_shift_overrides jso ON jso.job_id = v_job_id AND jso.shift_id = v_shift_id
     WHERE j.id = v_job_id
       AND j.archived_at IS NULL;
 
@@ -3948,7 +3972,7 @@ BEGIN
 
     segment_position := v_idx;
     start_time := COALESCE(
-      NULLIF(v_shift_override ->> 'startTime', '')::TIME,
+      v_override_start,
       CASE
         WHEN v_shift_id IS NULL OR v_assignment_mode = 'shiftless' THEN v_default_start
         ELSE NULL
@@ -3956,7 +3980,7 @@ BEGIN
       v_shift_start
     );
     end_time := COALESCE(
-      NULLIF(v_shift_override ->> 'endTime', '')::TIME,
+      v_override_end,
       CASE
         WHEN v_shift_id IS NULL OR v_assignment_mode = 'shiftless' THEN v_default_end
         ELSE NULL
@@ -7284,9 +7308,29 @@ SET search_path = 'public'
 AS $$
   SELECT ph.id, ph.published_by,
          COALESCE(NULLIF(TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')), ''), 'Unknown') AS published_by_name,
-         ph.start_date, ph.end_date, ph.change_count, ph.changes, ph.published_at
+         ph.start_date, ph.end_date, ph.change_count,
+         COALESCE(agg.changes, '[]'::JSONB) AS changes,
+         ph.published_at
   FROM public.publish_history ph
   LEFT JOIN public.profiles p ON p.id = ph.published_by
+  LEFT JOIN LATERAL (
+    SELECT jsonb_agg(jsonb_build_object(
+      'empId', spc.emp_id,
+      'date', spc.date,
+      'kind', spc.kind,
+      'fromState', spc.from_state,
+      'toState', spc.to_state,
+      'fromAbsenceTypeId', spc.from_absence_type_id,
+      'toAbsenceTypeId', spc.to_absence_type_id,
+      'updatedBy', spc.updated_by,
+      'fromCustomStart', spc.from_custom_start,
+      'fromCustomEnd', spc.from_custom_end,
+      'toCustomStart', spc.to_custom_start,
+      'toCustomEnd', spc.to_custom_end
+    )) AS changes
+    FROM public.schedule_publish_changes spc
+    WHERE spc.publish_history_id = ph.id
+  ) agg ON TRUE
   WHERE ph.org_id = p_org_id
     AND ph.org_id = public.caller_org_id()
   ORDER BY ph.published_at DESC
@@ -7642,8 +7686,6 @@ BEGIN
   NEW.department_ids := COALESCE(NEW.department_ids, '{}'::BIGINT[]);
   NEW.focus_area_ids := COALESCE(NEW.focus_area_ids, '{}'::BIGINT[]);
   NEW.applicable_shift_ids := COALESCE(NEW.applicable_shift_ids, '{}'::BIGINT[]);
-  NEW.shift_time_overrides := COALESCE(NEW.shift_time_overrides, '{}'::jsonb);
-  NEW.shift_color_overrides := COALESCE(NEW.shift_color_overrides, '{}'::jsonb);
 
   -- Scheduled jobs inherit colors from shift_categories. Keep stored job color
   -- columns neutral unless this is a shiftless job where the job owns its color.
@@ -7713,74 +7755,197 @@ BEGIN
     RAISE EXCEPTION 'Selected job shifts must belong to the selected placement';
   END IF;
 
-  IF EXISTS (
-    SELECT 1
-    FROM jsonb_object_keys(NEW.shift_time_overrides) AS shift_keys(shift_id_text)
-    WHERE shift_keys.shift_id_text !~ '^[0-9]+$'
-  ) THEN
-    RAISE EXCEPTION 'Job time overrides must use numeric shift ids as keys';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM jsonb_object_keys(NEW.shift_color_overrides) AS shift_keys(shift_id_text)
-    WHERE shift_keys.shift_id_text !~ '^[0-9]+$'
-  ) THEN
-    RAISE EXCEPTION 'Job color overrides must use numeric shift ids as keys';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM jsonb_object_keys(NEW.shift_time_overrides) AS shift_keys(shift_id_text)
-    LEFT JOIN public.shift_categories sc ON sc.id = shift_keys.shift_id_text::BIGINT
-    WHERE sc.id IS NULL OR sc.archived_at IS NOT NULL
-  ) THEN
-    RAISE EXCEPTION 'Job time overrides can only reference existing shifts';
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM jsonb_object_keys(NEW.shift_color_overrides) AS shift_keys(shift_id_text)
-    LEFT JOIN public.shift_categories sc ON sc.id = shift_keys.shift_id_text::BIGINT
-    WHERE sc.id IS NULL OR sc.archived_at IS NOT NULL
-  ) THEN
-    RAISE EXCEPTION 'Job color overrides can only reference existing shifts';
-  END IF;
-
-  IF (array_length(NEW.focus_area_ids, 1) IS NOT NULL OR array_length(NEW.department_ids, 1) IS NOT NULL)
-     AND EXISTS (
-      SELECT 1
-      FROM (
-        SELECT shift_keys.shift_id_text::BIGINT AS shift_id
-        FROM jsonb_object_keys(NEW.shift_time_overrides) AS shift_keys(shift_id_text)
-        UNION
-        SELECT shift_keys.shift_id_text::BIGINT AS shift_id
-        FROM jsonb_object_keys(NEW.shift_color_overrides) AS shift_keys(shift_id_text)
-      ) override_shift_ids
-      JOIN public.shift_categories sc ON sc.id = override_shift_ids.shift_id
-      LEFT JOIN public.focus_areas fa ON fa.id = sc.focus_area_id
-      WHERE sc.focus_area_id IS NULL
-        OR (
-          array_length(NEW.focus_area_ids, 1) IS NOT NULL
-          AND NOT (sc.focus_area_id = ANY(NEW.focus_area_ids))
-        )
-        OR (
-          array_length(NEW.focus_area_ids, 1) IS NULL
-          AND array_length(NEW.department_ids, 1) IS NOT NULL
-          AND (fa.department_id IS NULL OR NOT (fa.department_id = ANY(NEW.department_ids)))
-        )
-    ) THEN
-    RAISE EXCEPTION 'Job overrides must target shifts inside the selected placement';
-  END IF;
-
   RETURN NEW;
 END;
 $$;
 
 CREATE TRIGGER trg_jobs_validate_placement
-  BEFORE INSERT OR UPDATE OF assignment_mode, department_ids, focus_area_ids, applicable_shift_ids, shift_time_overrides, shift_color_overrides, color, border_color, text_color
+  BEFORE INSERT OR UPDATE OF assignment_mode, department_ids, focus_area_ids, applicable_shift_ids, color, border_color, text_color
   ON public.jobs
   FOR EACH ROW EXECUTE FUNCTION public.validate_job_placement();
+
+
+-- Prunes job_shift_overrides rows that no longer match the job's placement
+-- after department_ids/focus_area_ids/applicable_shift_ids change. Previously
+-- (when overrides lived in JSONB on the same row) a placement change could
+-- leave stale, invisible override keys behind with no cleanup at all.
+CREATE OR REPLACE FUNCTION public.prune_invalid_job_shift_overrides()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+  DELETE FROM public.job_shift_overrides jso
+  USING public.shift_categories sc
+  LEFT JOIN public.focus_areas fa ON fa.id = sc.focus_area_id
+  WHERE jso.job_id = NEW.id
+    AND sc.id = jso.shift_id
+    AND (
+      sc.archived_at IS NOT NULL
+      OR (
+        array_length(NEW.applicable_shift_ids, 1) IS NOT NULL
+        AND NOT (jso.shift_id = ANY(NEW.applicable_shift_ids))
+      )
+      OR (
+        array_length(NEW.focus_area_ids, 1) IS NOT NULL
+        AND (sc.focus_area_id IS NULL OR NOT (sc.focus_area_id = ANY(NEW.focus_area_ids)))
+      )
+      OR (
+        array_length(NEW.focus_area_ids, 1) IS NULL
+        AND array_length(NEW.department_ids, 1) IS NOT NULL
+        AND (fa.department_id IS NULL OR NOT (fa.department_id = ANY(NEW.department_ids)))
+      )
+    );
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_jobs_prune_invalid_shift_overrides
+  AFTER UPDATE OF department_ids, focus_area_ids, applicable_shift_ids
+  ON public.jobs
+  FOR EACH ROW EXECUTE FUNCTION public.prune_invalid_job_shift_overrides();
+
+
+-- Validates job_shift_overrides rows: shift must be non-archived and belong
+-- to the job's selected focus areas/departments (same rules that used to be
+-- enforced against JSONB keys inside validate_job_placement()).
+CREATE OR REPLACE FUNCTION public.validate_job_shift_override()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_job public.jobs;
+  v_shift public.shift_categories;
+BEGIN
+  SELECT * INTO v_job FROM public.jobs WHERE id = NEW.job_id;
+  IF v_job.id IS NULL THEN
+    RAISE EXCEPTION 'Job override must reference an existing job';
+  END IF;
+  NEW.org_id := v_job.org_id;
+
+  SELECT * INTO v_shift FROM public.shift_categories WHERE id = NEW.shift_id;
+  IF v_shift.id IS NULL OR v_shift.archived_at IS NOT NULL THEN
+    RAISE EXCEPTION 'Job overrides can only reference existing shifts';
+  END IF;
+
+  IF array_length(v_job.focus_area_ids, 1) IS NOT NULL
+     AND (v_shift.focus_area_id IS NULL OR NOT (v_shift.focus_area_id = ANY(v_job.focus_area_ids)))
+  THEN
+    RAISE EXCEPTION 'Job overrides must target shifts inside the selected placement';
+  ELSIF array_length(v_job.focus_area_ids, 1) IS NULL
+        AND array_length(v_job.department_ids, 1) IS NOT NULL
+  THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM public.focus_areas fa
+      WHERE fa.id = v_shift.focus_area_id AND fa.department_id = ANY(v_job.department_ids)
+    ) THEN
+      RAISE EXCEPTION 'Job overrides must target shifts inside the selected placement';
+    END IF;
+  END IF;
+
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_job_shift_overrides_validate
+  BEFORE INSERT OR UPDATE ON public.job_shift_overrides
+  FOR EACH ROW EXECUTE FUNCTION public.validate_job_shift_override();
+
+
+-- Replaces a job's full set of shift time/color overrides in one call.
+-- Accepts the same JSONB-map shape the client already builds
+-- ({ [shiftId]: { startTime, endTime } } / { [shiftId]: color }), so no
+-- client-side changes are needed — only the storage moved to a real table.
+CREATE OR REPLACE FUNCTION public.set_job_shift_overrides(
+  p_job_id BIGINT,
+  p_time_overrides JSONB DEFAULT '{}'::jsonb,
+  p_color_overrides JSONB DEFAULT '{}'::jsonb,
+  p_actor_id UUID DEFAULT NULL
+) RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  v_org_id UUID;
+  -- check_admin_permission_for_org() reads auth.uid()/auth.jwt(), which are
+  -- empty when this RPC is invoked via a service-role client (no JWT
+  -- context) — accept an explicit actor id for that case, same pattern as
+  -- publish_schedule().
+  v_actor_id UUID := COALESCE(auth.uid(), p_actor_id);
+  v_is_gridmaster BOOLEAN := FALSE;
+  v_org_role public.org_role := 'user'::public.org_role;
+BEGIN
+  IF v_actor_id IS NULL THEN
+    RAISE EXCEPTION 'Unauthorized: missing actor identity';
+  END IF;
+
+  SELECT org_id INTO v_org_id FROM public.jobs WHERE id = p_job_id;
+  IF v_org_id IS NULL THEN
+    RAISE EXCEPTION 'Job not found';
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1 FROM public.profiles WHERE id = v_actor_id AND platform_role = 'gridmaster'
+  ) INTO v_is_gridmaster;
+
+  SELECT COALESCE(
+    (SELECT cm.org_role FROM public.organization_memberships cm
+     WHERE cm.user_id = v_actor_id AND cm.org_id = v_org_id AND cm.archived_at IS NULL LIMIT 1),
+    'user'::public.org_role
+  ) INTO v_org_role;
+
+  IF NOT (v_is_gridmaster OR v_org_role::TEXT IN ('super_admin', 'admin')) THEN
+    RAISE EXCEPTION 'Unauthorized: insufficient permissions to manage schedule definitions';
+  END IF;
+
+  IF v_org_role::TEXT = 'admin' AND NOT v_is_gridmaster THEN
+    IF NOT COALESCE(
+      (SELECT (cm.admin_permissions->>'canManageScheduleDefinitions')::BOOLEAN
+       FROM public.organization_memberships cm
+       WHERE cm.user_id = v_actor_id AND cm.org_id = v_org_id AND cm.archived_at IS NULL),
+      FALSE
+    ) THEN
+      RAISE EXCEPTION 'Unauthorized: you do not have permission to manage schedule definitions';
+    END IF;
+  END IF;
+
+  -- Remove overrides for shifts no longer present in either map.
+  DELETE FROM public.job_shift_overrides jso
+  WHERE jso.job_id = p_job_id
+    AND jso.shift_id::TEXT NOT IN (
+      SELECT jsonb_object_keys(p_time_overrides)
+      UNION
+      SELECT jsonb_object_keys(p_color_overrides)
+    );
+
+  -- Upsert one row per shift_id present in either map.
+  INSERT INTO public.job_shift_overrides (job_id, org_id, shift_id, start_time, end_time, color)
+  SELECT
+    p_job_id,
+    v_org_id,
+    shift_ids.shift_id,
+    NULLIF(p_time_overrides -> shift_ids.shift_id::TEXT ->> 'startTime', '')::TIME,
+    NULLIF(p_time_overrides -> shift_ids.shift_id::TEXT ->> 'endTime', '')::TIME,
+    NULLIF(p_color_overrides ->> shift_ids.shift_id::TEXT, '')
+  FROM (
+    SELECT jsonb_object_keys(p_time_overrides)::BIGINT AS shift_id
+    UNION
+    SELECT jsonb_object_keys(p_color_overrides)::BIGINT AS shift_id
+  ) shift_ids
+  ON CONFLICT (job_id, shift_id) DO UPDATE SET
+    start_time = EXCLUDED.start_time,
+    end_time = EXCLUDED.end_time,
+    color = EXCLUDED.color,
+    updated_at = now();
+
+  -- Drop rows that ended up with no override data at all (mirrors the
+  -- client's normalizeShiftTimeOverrides/normalizeShiftColorOverrides
+  -- dropping empty entries).
+  DELETE FROM public.job_shift_overrides
+  WHERE job_id = p_job_id
+    AND start_time IS NULL AND end_time IS NULL AND color IS NULL;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.set_job_shift_overrides(BIGINT, JSONB, JSONB, UUID) TO authenticated;
 
 
 -- ══════════════════════════════════════════════════════════════════════════════

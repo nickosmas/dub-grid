@@ -362,7 +362,7 @@ function getShiftRequestStatusLabel(status: string): string {
 
 // Same 4 event types as web's buildActivityFeed (apps/web/src/lib/
 // dashboard-stats.ts): publish, shift_change (per-shift diff from the same
-// publish_history.changes JSONB column web reads), request (any shift
+// schedule_publish_changes rows web reads), request (any shift
 // request, no status/type filter — matches web's unfiltered fetch), and
 // user_signup (any invitation with a non-null acceptedAt). Mobile's activity
 // item is pre-composed text (no separate highlight/href fields like web's),

@@ -1047,8 +1047,6 @@ async function ensureDefaultShiftJobForOrg(orgId: string): Promise<void> {
     color: "#E2E8F0",
     border_color: "transparent",
     text_color: "#1E293B",
-    shift_time_overrides: {},
-    shift_color_overrides: {},
     default_start_time: null,
     default_end_time: null,
     default_duration_hours: null,
@@ -2627,11 +2625,6 @@ export async function POST(req: NextRequest) {
           color: storedStyle.color,
           border_color: storedStyle.border_color,
           text_color: storedStyle.text_color,
-          shift_time_overrides: normalizeShiftTimeOverrides(
-            validatedJob.job.shiftTimeOverrides as
-              Record<string, JobShiftTimeOverride | undefined> | undefined,
-          ),
-          shift_color_overrides: normalizeShiftColorOverrides(validatedJob.job.shiftColorOverrides),
           default_start_time: normalizedTiming.defaultStartTime,
           default_end_time: normalizedTiming.defaultEndTime,
           default_duration_hours: normalizedTiming.defaultDurationHours,
@@ -2639,6 +2632,11 @@ export async function POST(req: NextRequest) {
           sort_order: validatedJob.job.sortOrder,
           system_key: validatedJob.job.systemKey ?? null,
         };
+        const timeOverrides = normalizeShiftTimeOverrides(
+          validatedJob.job.shiftTimeOverrides as
+            Record<string, JobShiftTimeOverride | undefined> | undefined,
+        );
+        const colorOverrides = normalizeShiftColorOverrides(validatedJob.job.shiftColorOverrides);
 
         let savedRow;
         if (validatedJob.job.id) {
@@ -2660,6 +2658,20 @@ export async function POST(req: NextRequest) {
           if (error) throw error;
           savedRow = inserted;
         }
+
+        const { error: overridesError } = await serviceClient.rpc("set_job_shift_overrides", {
+          p_job_id: savedRow.id,
+          p_time_overrides: timeOverrides,
+          p_color_overrides: colorOverrides,
+          p_actor_id: actor.id,
+        });
+        if (overridesError) throw overridesError;
+        const { data: overrideRows, error: overrideRowsError } = await serviceClient
+          .from("job_shift_overrides")
+          .select("shift_id, start_time, end_time, color")
+          .eq("job_id", savedRow.id);
+        if (overrideRowsError) throw overrideRowsError;
+        savedRow.job_shift_overrides = overrideRows ?? [];
 
         await cacheDel(
           CacheKey.assignments(validatedJob.job.orgId),

@@ -41,7 +41,7 @@ describe("publish schedule database contract", () => {
     expect(sql).toContain("v_actor_id UUID := COALESCE(auth.uid(), p_actor_id);");
     expect(sql).toContain("RAISE EXCEPTION 'Unauthorized: missing actor identity';");
     expect(sql).toContain(
-      "VALUES (p_org_id, v_actor_id, p_start_date, p_end_date, v_change_count, v_changes)",
+      "VALUES (p_org_id, v_actor_id, p_start_date, p_end_date, v_change_count)",
     );
   });
 

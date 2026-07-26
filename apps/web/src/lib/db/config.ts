@@ -708,8 +708,6 @@ export async function upsertJobDefinition(
     color: storedStyle.color,
     border_color: storedStyle.borderColor,
     text_color: storedStyle.textColor,
-    shift_time_overrides: normalizeShiftTimeOverrides(job.shiftTimeOverrides),
-    shift_color_overrides: normalizeShiftColorOverrides(job.shiftColorOverrides),
     default_start_time: normalizedTiming.defaultStartTime,
     default_end_time: normalizedTiming.defaultEndTime,
     default_duration_hours: normalizedTiming.defaultDurationHours,
@@ -717,6 +715,8 @@ export async function upsertJobDefinition(
     sort_order: job.sortOrder,
     system_key: job.systemKey ?? null,
   };
+  const timeOverrides = normalizeShiftTimeOverrides(job.shiftTimeOverrides);
+  const colorOverrides = normalizeShiftColorOverrides(job.shiftColorOverrides);
 
   let saved: DbJobDefinition;
   if (job.id) {
@@ -734,6 +734,19 @@ export async function upsertJobDefinition(
     if (error) throw error;
     saved = data as DbJobDefinition;
   }
+
+  const { error: overridesError } = await supabase.rpc("set_job_shift_overrides", {
+    p_job_id: saved.id,
+    p_time_overrides: timeOverrides,
+    p_color_overrides: colorOverrides,
+  });
+  if (overridesError) throw overridesError;
+  const { data: overrideRows, error: overrideRowsError } = await supabase
+    .from("job_shift_overrides")
+    .select("shift_id, start_time, end_time, color")
+    .eq("job_id", saved.id);
+  if (overrideRowsError) throw overrideRowsError;
+  saved.job_shift_overrides = overrideRows ?? [];
 
   await refreshDerivedScheduleCaches(job.orgId);
   void logAudit("job.upserted", "job", String(saved.id), { name: job.name }, job.orgId);
