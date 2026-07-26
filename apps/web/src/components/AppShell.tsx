@@ -139,10 +139,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           zIndex: 9999,
         }}
       >
-        <ImpersonationBanner />
-        <UserViewBanner />
-        <InactiveAccountBanner />
-        <MfaNagBanner />
+        {isAppRoute(pathname) && (
+          <>
+            <ImpersonationBanner />
+            <UserViewBanner />
+            <InactiveAccountBanner />
+            <MfaNagBanner />
+          </>
+        )}
         {showHeader && <AppHeader />}
       </div>
       <div key={effectiveOrgKey} style={{ display: "contents" }}>
