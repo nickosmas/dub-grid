@@ -7,7 +7,9 @@ export type AuditAction =
   | "employee.created"
   | "employee.updated"
   | "employee.archived"
+  | "employee.removed"
   | "employee.benched"
+  | "employee.deactivated"
   | "employee.activated"
   // Shift management
   | "shift.created"

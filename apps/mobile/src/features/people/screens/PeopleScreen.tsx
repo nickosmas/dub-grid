@@ -1,4 +1,4 @@
-import { type ReactNode, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
@@ -8,10 +8,15 @@ import type {
   MobilePerson,
   MobileProfileChangeRequest,
 } from "@dubgrid/contracts";
-import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import {
+  FilterButton,
+  FilterSheet,
+  SelectionRow,
+  SelectionSection,
+} from "../../../shared/components/FilterSheet";
 import { SearchBar } from "../../../shared/components/SearchBar";
 import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
@@ -25,8 +30,9 @@ import {
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
@@ -48,6 +54,8 @@ function formatStatusLabel(status: MobilePerson["status"]): string {
 }
 
 export default function PeopleScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const bootstrapQuery = useBootstrap(accessToken);
@@ -208,31 +216,14 @@ export default function PeopleScreen() {
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
-      <BottomSheetModal
-        footer={
-          <>
-            <Button
-              compact
-              disabled={activeFilterCount === 0}
-              label="Clear all"
-              tone="neutral"
-              onPress={clearFilters}
-            />
-            <View style={styles.filterFooterSpacer} />
-            <Button
-              compact
-              label="Done"
-              tone="primary"
-              onPress={() => setIsFilterModalVisible(false)}
-            />
-          </>
-        }
+      <FilterSheet
+        clearDisabled={activeFilterCount === 0}
+        title="Filter directory"
+        onClearAll={clearFilters}
         onDismiss={() => setIsFilterModalVisible(false)}
-        scrollable
+        onDone={() => setIsFilterModalVisible(false)}
         visible={isFilterModalVisible}
       >
-        <Text style={styles.sheetTitle}>Filter directory</Text>
-
         <SelectionSection label="Focus area">
           <SelectionRow
             label="All focus areas"
@@ -297,7 +288,7 @@ export default function PeopleScreen() {
             selected={sortMode === "alphabetical"}
           />
         </SelectionSection>
-      </BottomSheetModal>
+      </FilterSheet>
 
       <View style={styles.section}>
         <View style={styles.searchBarRow}>
@@ -307,29 +298,23 @@ export default function PeopleScreen() {
             placeholder="Search people"
             value={searchValue}
           />
-          <Pressable
+          <FilterButton
             accessibilityLabel="Open people filters and sort"
-            accessibilityRole="button"
-            accessibilityState={{ expanded: isFilterModalVisible }}
-            android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+            activeCount={activeFilterCount}
+            expanded={isFilterModalVisible}
             onPress={() => setIsFilterModalVisible(true)}
-            style={[styles.filterButton, activeFilterCount > 0 && styles.filterButtonActive]}
-          >
-            <Ionicons
-              color={activeFilterCount > 0 ? mobileColors.textInverse : mobileColors.textSecondary}
-              name="options-outline"
-              size={16}
-            />
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.filterButtonText,
-                activeFilterCount > 0 && styles.filterButtonTextActive,
-              ]}
+          />
+          {canManageEmployees ? (
+            <Pressable
+              accessibilityLabel="Add person"
+              accessibilityRole="button"
+              android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+              onPress={() => router.push("/people/add")}
+              style={styles.addPersonButton}
             >
-              Filter
-            </Text>
-          </Pressable>
+              <Ionicons color={mobileColors.textInverse} name="person-add-outline" size={18} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -433,6 +418,15 @@ export default function PeopleScreen() {
                 : person.userId
                   ? "App access"
                   : "No app access";
+              const isSelf =
+                (currentEmployeeId !== null && person.id === currentEmployeeId) ||
+                (currentUserId !== null &&
+                  person.userId !== null &&
+                  person.userId === currentUserId);
+              // Management users' profile view is manager-only; their rows stay
+              // visible but don't navigate for everyone else.
+              const navigable =
+                isSelf || canManageEmployees || !person.managementDepartmentIds?.length;
 
               return (
                 <PersonRow
@@ -442,13 +436,9 @@ export default function PeopleScreen() {
                   employmentType={person.employmentType}
                   isLast={index === filteredPeople.length - 1}
                   name={getFullName(person)}
+                  navigable={navigable}
                   orgRole={person.orgRole}
                   onPress={() => {
-                    const isSelf =
-                      (currentEmployeeId !== null && person.id === currentEmployeeId) ||
-                      (currentUserId !== null &&
-                        person.userId !== null &&
-                        person.userId === currentUserId);
                     if (isSelf) {
                       router.push("/(tabs)/profile");
                       return;
@@ -509,47 +499,11 @@ function countPeopleInManagementDepartment(
     .length;
 }
 
-function SelectionSection({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{label}</Text>
-      <View style={styles.selectionList}>{children}</View>
-    </View>
-  );
-}
-
-function SelectionRow({
-  label,
-  detail,
-  selected,
-  onPress,
-}: {
-  label: string;
-  detail?: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.selectionRow, pressed && styles.selectionRowPressed]}
-    >
-      <View style={styles.selectionRowCopy}>
-        <Text style={styles.selectionRowTitle}>{label}</Text>
-        {detail ? <Text style={styles.selectionRowDetail}>{detail}</Text> : null}
-      </View>
-      {selected ? <Ionicons color={mobileColors.brand} name="checkmark" size={20} /> : null}
-    </Pressable>
-  );
-}
-
 function PersonRow({
   id,
   employmentType,
   name,
+  navigable,
   orgRole,
   subtitle,
   status,
@@ -561,6 +515,7 @@ function PersonRow({
   id: string;
   employmentType: MobilePerson["employmentType"];
   name: string;
+  navigable: boolean;
   orgRole: MobileOrgRole;
   subtitle: string;
   status: MobilePerson["status"];
@@ -569,6 +524,9 @@ function PersonRow({
   isLast: boolean;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
   const secondaryDetail = [
     employmentType === "part_time" ? "PT" : "FT",
     accessHint,
@@ -576,8 +534,8 @@ function PersonRow({
   ]
     .filter(Boolean)
     .join(" - ");
-  const avatarTone = getAvatarTone(id);
-  const orgRoleBadge = getMobileOrgRoleBadge(orgRole);
+  const avatarTone = getAvatarTone(id, resolvedTheme === "dark");
+  const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, orgRole);
   const initials =
     name
       .split(" ")
@@ -590,12 +548,14 @@ function PersonRow({
     <Pressable
       accessibilityLabel={name}
       accessibilityRole="button"
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+      accessibilityState={{ disabled: !navigable }}
+      android_ripple={navigable ? { color: "rgba(15, 23, 42, 0.08)" } : undefined}
+      disabled={!navigable}
       onPress={onPress}
       style={({ pressed }) => [
         styles.personRow,
         !isLast && styles.personRowDivider,
-        pressed && styles.personRowPressed,
+        navigable && pressed && styles.personRowPressed,
       ]}
     >
       <View
@@ -607,7 +567,7 @@ function PersonRow({
           },
         ]}
       >
-        <Text style={[styles.personAvatarText, { color: avatarTone.color }]}>{initials}</Text>
+        <Text style={[styles.personAvatarText, { color: avatarTone.textColor }]}>{initials}</Text>
       </View>
       <View style={styles.personCopy}>
         <View style={styles.personNameRow}>
@@ -629,167 +589,115 @@ function PersonRow({
           </Text>
         ) : null}
       </View>
-      <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+      {navigable ? (
+        <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
+      ) : null}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  section: {
-    gap: 10,
-  },
-  sectionTitle: {
-    ...mobileText.label,
-    color: mobileColors.textSubtle,
-    textTransform: "uppercase",
-  },
-  sheetTitle: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-  },
-  filterFooterSpacer: {
-    flex: 1,
-  },
-  searchBarRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-  },
-  filterButton: {
-    minHeight: 46,
-    alignItems: "center",
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 8,
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  filterButtonActive: {
-    backgroundColor: mobileColors.brand,
-    borderColor: mobileColors.brand,
-  },
-  filterButtonText: {
-    color: mobileColors.textSecondary,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  filterButtonTextActive: {
-    color: mobileColors.textInverse,
-  },
-  selectionList: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    overflow: "hidden",
-  },
-  selectionRow: {
-    minHeight: 58,
-    alignItems: "center",
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  selectionRowPressed: {
-    opacity: 0.64,
-  },
-  selectionRowCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  selectionRowTitle: {
-    ...mobileText.body,
-    color: mobileColors.textPrimary,
-  },
-  selectionRowDetail: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-  linkList: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    overflow: "hidden",
-  },
-  personRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    minHeight: 76,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  personRowDivider: {
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  rowDivider: {
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  requestRow: {
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  requestCopy: {
-    gap: 3,
-  },
-  requestActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  personRowPressed: {
-    opacity: 0.62,
-  },
-  personAvatar: {
-    alignItems: "center",
-    borderRadius: 22,
-    borderWidth: 1,
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  personAvatarText: {
-    ...mobileText.bodyStrong,
-  },
-  personCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  personNameRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-    minWidth: 0,
-  },
-  personName: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-    flexShrink: 1,
-  },
-  personSubtitle: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  personAccess: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
+    },
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    section: {
+      gap: 10,
+    },
+    sectionTitle: {
+      ...mobileText.label,
+      color: mobileColors.textSubtle,
+      textTransform: "uppercase",
+    },
+    searchBarRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
+    },
+    addPersonButton: {
+      alignItems: "center",
+      backgroundColor: mobileColors.brand,
+      borderRadius: mobileRadii.control,
+      height: 46,
+      justifyContent: "center",
+      width: 46,
+    },
+    linkList: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      overflow: "hidden",
+    },
+    personRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      minHeight: 76,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    personRowDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    rowDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    requestRow: {
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    requestCopy: {
+      gap: 3,
+    },
+    requestActions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    personRowPressed: {
+      opacity: 0.62,
+    },
+    personAvatar: {
+      alignItems: "center",
+      borderRadius: 22,
+      borderWidth: 1,
+      height: 44,
+      justifyContent: "center",
+      width: 44,
+    },
+    personAvatarText: {
+      ...mobileText.bodyStrong,
+    },
+    personCopy: {
+      flex: 1,
+      gap: 3,
+      minWidth: 0,
+    },
+    personNameRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      minWidth: 0,
+    },
+    personName: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      flexShrink: 1,
+    },
+    personSubtitle: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    personAccess: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+  });

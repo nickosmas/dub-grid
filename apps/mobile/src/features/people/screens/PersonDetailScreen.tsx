@@ -49,8 +49,9 @@ import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -115,6 +116,9 @@ function makeDraft(person: MobilePerson): EditDraft {
 }
 
 export default function PersonDetailScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
   const params = useLocalSearchParams<{ id?: string }>();
   const personId = Array.isArray(params.id) ? params.id[0] : params.id;
   const accessToken = useAccessToken();
@@ -424,9 +428,9 @@ export default function PersonDetailScreen() {
       ? (maps.certifications.get(person.certificationId) ?? "Unknown")
       : "None";
   const employmentLabel = person.employmentType === "part_time" ? "Part-time" : "Full-time";
-  const avatarTone = getAvatarTone(person.id);
+  const avatarTone = getAvatarTone(person.id, resolvedTheme === "dark");
   const fullName = getFullName(person);
-  const orgRoleBadge = getMobileOrgRoleBadge(person.orgRole);
+  const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, person.orgRole);
   const accessText = person.userId
     ? "Active app account"
     : person.pendingInvitation
@@ -516,7 +520,9 @@ export default function PersonDetailScreen() {
         }
       />
 
-      <Stack.Screen options={createDetailStackOptions(showCollapsedHeader ? fullName : "")} />
+      <Stack.Screen
+        options={createDetailStackOptions(mobileColors, showCollapsedHeader ? fullName : "")}
+      />
 
       <ProfileHero
         avatarStyle={{
@@ -524,7 +530,7 @@ export default function PersonDetailScreen() {
           borderColor: avatarTone.borderColor,
           borderWidth: 1,
         }}
-        avatarTextStyle={{ color: avatarTone.color }}
+        avatarTextStyle={{ color: avatarTone.textColor }}
         badge={orgRoleBadge?.label ?? formatStatusLabel(person.status)}
         badgeTone={orgRoleBadge?.tone}
         initials={getInitials(person)}
@@ -828,6 +834,8 @@ function AccountLinkChallengeModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [displayed, setDisplayed] = useState(challenge);
 
   useEffect(() => {
@@ -970,6 +978,8 @@ function EditPanel({
   onDiscard: () => void;
   onSave: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [focusedField, setFocusedField] = useState<
     "firstName" | "lastName" | "phone" | "email" | "contactNotes" | null
   >(null);
@@ -1170,84 +1180,85 @@ function EditPanel({
   );
 }
 
-const styles = StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  quickActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    paddingBottom: 16,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  noteText: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-  },
-  input: {
-    // Explicit regular weight — don't spread `mobileText.sectionTitle`,
-    // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
-    // Omitting `fontFamily` also avoids the Android EditText
-    // non-interactive bug when DM Sans hasn't loaded.
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: "400",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    color: mobileColors.textPrimary,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  actionStack: {
-    gap: 10,
-    paddingTop: 12,
-  },
-  actionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  sheetHeader: {
-    gap: 4,
-  },
-  sheetTitle: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-  },
-  sheetSubtitle: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  modalInfoPanel: {
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    gap: 8,
-    padding: 16,
-  },
-  modalInfoTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  modalInfoText: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-  },
-  modalActionStack: {
-    gap: 10,
-    paddingTop: 4,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
+    },
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    quickActions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+      paddingBottom: 16,
+    },
+    actionsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    noteText: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    input: {
+      // Explicit regular weight — don't spread `mobileText.sectionTitle`,
+      // which carries a bold `fontFamily` that wins over `fontWeight: "400"`.
+      // Omitting `fontFamily` also avoids the Android EditText
+      // non-interactive bug when DM Sans hasn't loaded.
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: "400",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      color: mobileColors.textPrimary,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+    },
+    actionStack: {
+      gap: 10,
+      paddingTop: 12,
+    },
+    actionRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    sheetHeader: {
+      gap: 4,
+    },
+    sheetTitle: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textPrimary,
+    },
+    sheetSubtitle: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    modalInfoPanel: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      gap: 8,
+      padding: 16,
+    },
+    modalInfoTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    modalInfoText: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    modalActionStack: {
+      gap: 10,
+      paddingTop: 4,
+    },
+  });

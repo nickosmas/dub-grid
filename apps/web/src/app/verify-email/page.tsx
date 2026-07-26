@@ -95,8 +95,8 @@ function VerifyEmailContent() {
             <button
               onClick={handleResend}
               disabled={resending || cooldown > 0}
-              className="dg-auth-submit dg-auth-submit--secondary"
-              style={{ marginBottom: "16px" }}
+              className="dg-btn dg-btn-secondary dg-btn-lg"
+              style={{ marginBottom: "16px", width: "100%" }}
             >
               <ButtonLoading
                 loading={resending}

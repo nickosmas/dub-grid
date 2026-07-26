@@ -200,7 +200,6 @@ describe("settings help cleanup", () => {
         certificationLabel="Certifications"
         onChange={vi.fn()}
         canManageScheduleDefinitions
-        shiftDisplayMode="name"
       />,
     );
 
@@ -258,7 +257,6 @@ describe("settings help cleanup", () => {
         coverageRequirements={[]}
         onCoverageRequirementsChange={vi.fn()}
         canEdit
-        shiftDisplayMode="name"
       />,
     );
 

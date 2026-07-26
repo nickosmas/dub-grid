@@ -87,6 +87,7 @@ CREATE TABLE public.organizations (
   sandbox_owner_user_id     UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   sandbox_source_org_id     UUID REFERENCES public.organizations(id) ON DELETE SET NULL,
   enforce_conflict_prevention   BOOLEAN NOT NULL DEFAULT false,
+  default_shift_enabled         BOOLEAN NOT NULL DEFAULT true,
   coverage_rule_config JSONB NOT NULL DEFAULT '{"mentoredCoverageCreditPercent":100}'::jsonb,
   open_shift_visibility JSONB NOT NULL DEFAULT '{"coverageGap":"matched","calloff":"matched"}'::jsonb,
   feature_overrides    JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -1173,6 +1174,10 @@ ALTER TABLE public.publish_history
 
 -- organizations
 CREATE INDEX idx_organizations_id ON public.organizations(id);
+-- Enforces the app-layer "one active sandbox per user" invariant at the DB
+-- level. Previously only enforced by a racy SELECT-then-INSERT in
+-- findActiveSandboxForUser/createSandboxForUser (features/test-sandbox/server.ts).
+CREATE UNIQUE INDEX organizations_one_active_sandbox_per_user ON public.organizations(sandbox_owner_user_id) WHERE workspace_kind = 'sandbox' AND archived_at IS NULL;
 
 -- profiles
 CREATE INDEX idx_profiles_org_id ON public.profiles(org_id);

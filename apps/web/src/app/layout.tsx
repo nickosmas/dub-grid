@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { Suspense } from "react";
 import { DM_Sans, DM_Mono } from "next/font/google";
-import { createWebCssVariables } from "@dubgrid/design-tokens";
+import { createStaticWebCssVariables, createThemedCssText } from "@dubgrid/design-tokens";
 import "./globals.css";
 import "@/lib/env";
 
@@ -48,37 +48,44 @@ import OnboardingGate from "@/components/onboarding/OnboardingGate";
 import PostHogProvider from "@/components/PostHogProvider";
 import AppToaster from "@/components/AppToaster";
 import WebVitals from "@/components/WebVitals";
+import ThemeProvider from "@/components/ThemeProvider";
 
-const webCssVariables = createWebCssVariables() as CSSProperties;
+const staticWebCssVariables = createStaticWebCssVariables() as CSSProperties;
+const themedCssText = createThemedCssText();
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
       suppressHydrationWarning
-      style={webCssVariables}
+      style={staticWebCssVariables}
       className={cn(dmSans.variable, dmMono.variable, "font-sans")}
     >
+      <head>
+        <style id="dg-theme-vars" dangerouslySetInnerHTML={{ __html: themedCssText }} />
+      </head>
       <body suppressHydrationWarning>
-        <AuthProvider>
-          <PostHogProvider>
-            <QueryProvider>
-              <Suspense fallback={null}>
-                <OnboardingGate>
-                  <MobileSubNavProvider>
-                    <TooltipProvider delay={TOOLTIP_DELAY_MS}>
-                      <AppShell>{children}</AppShell>
-                    </TooltipProvider>
-                  </MobileSubNavProvider>
-                </OnboardingGate>
-              </Suspense>
-            </QueryProvider>
-          </PostHogProvider>
-        </AuthProvider>
-        <AppToaster />
-        <CookieConsent />
-        <ConsentGatedAnalytics />
-        <WebVitals />
+        <ThemeProvider>
+          <AuthProvider>
+            <PostHogProvider>
+              <QueryProvider>
+                <Suspense fallback={null}>
+                  <OnboardingGate>
+                    <MobileSubNavProvider>
+                      <TooltipProvider delay={TOOLTIP_DELAY_MS}>
+                        <AppShell>{children}</AppShell>
+                      </TooltipProvider>
+                    </MobileSubNavProvider>
+                  </OnboardingGate>
+                </Suspense>
+              </QueryProvider>
+            </PostHogProvider>
+          </AuthProvider>
+          <AppToaster />
+          <CookieConsent />
+          <ConsentGatedAnalytics />
+          <WebVitals />
+        </ThemeProvider>
       </body>
     </html>
   );

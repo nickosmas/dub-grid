@@ -1,6 +1,6 @@
 "use client";
 
-import type { EmailOtpType, RealtimeChannel } from "@supabase/supabase-js";
+import type { EmailOtpType, RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import {
   clearSupabaseBrowserAuthState,
   getBrowserSession,
@@ -107,6 +107,17 @@ export async function resendBrowserSignupEmail(email: string) {
 
 export async function verifyBrowserOtp(input: { type: EmailOtpType; token_hash: string }) {
   return supabase.auth.verifyOtp(input);
+}
+
+/**
+ * Raw browser Supabase client, for realtime primitives (e.g.
+ * `@dubgrid/realtime-core`) that need to construct their own channels rather
+ * than going through `createBrowserRealtimeChannel`. This file is the one
+ * allowed `@/lib/supabase` import site in the UI layer — see
+ * architecture-boundaries.test.ts.
+ */
+export function getBrowserSupabaseClient(): SupabaseClient {
+  return supabase;
 }
 
 export function getBrowserRealtimeChannels(): BrowserRealtimeChannel[] {

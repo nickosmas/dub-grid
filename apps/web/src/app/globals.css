@@ -75,6 +75,8 @@
   --color-today-text: var(--dg-color-today-text);
   --color-today-border: var(--dg-color-today-border);
   --color-row-hover: var(--dg-color-row-hover);
+  --color-shadow: var(--dg-color-shadow);
+  --color-shadow-strong: var(--dg-color-shadow-strong);
 }
 
 *,
@@ -94,11 +96,21 @@ html,
 body {
   margin: 0;
   padding: 0;
+  /* Guarantees the background (a gradient in dark mode, see --color-bg in
+     packages/design-tokens) always covers at least one viewport, even when
+     page content is shorter than the screen — otherwise the box ends at
+     content height and whatever's below reads as unstyled browser canvas. */
+  min-height: 100dvh;
   background: var(--color-bg);
+  background-attachment: fixed;
   font-family: var(--font-dm-sans), "DM Sans", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overscroll-behavior: none; /* Prevent bounce effect */
+  /* Keeps the page backdrop in sync with foreground elements (cards,
+     sections) on theme toggle — without this, transparent wrappers snap
+     instantly while their children fade, so children look like they lag. */
+  transition: background-color var(--dg-duration-fast) ease;
 }
 
 button,
@@ -160,7 +172,7 @@ textarea {
 /* Primary */
 .dg-btn-primary {
   background: var(--color-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-on-brand-text);
   border: none;
 }
 
@@ -174,7 +186,7 @@ textarea {
 
 .dg-btn-brand {
   background: var(--color-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-on-brand-text);
   border: none;
 }
 
@@ -280,6 +292,24 @@ textarea {
   background: color-mix(in srgb, var(--color-text-inverse) 28%, transparent);
 }
 
+/* Buttons that sit ON a solid brand surface (e.g. the landing page closing CTA).
+   Uses --color-on-brand-surface (fixed white in both themes), not --color-surface
+   — the latter inverts to near-black in dark mode, which would kill contrast
+   against the still-blue CTA backdrop the button sits on. */
+.dg-btn-on-brand-solid {
+  background: var(--color-on-brand-surface);
+  color: var(--color-brand);
+  border: 1px solid var(--color-on-brand-surface);
+}
+
+.dg-btn-on-brand-solid:hover {
+  filter: brightness(0.92);
+}
+
+.dg-btn-on-brand-solid:active {
+  filter: brightness(0.85);
+}
+
 /* Warning filled (bench/attention CTA) */
 .dg-btn-warning-filled {
   background: var(--color-warning);
@@ -305,6 +335,20 @@ textarea {
 .dg-btn-dashed:hover {
   background: var(--color-bg-secondary);
   border-color: var(--color-text-muted);
+}
+
+/* Large variant (marketing/auth CTAs — landing page, login/auth submit buttons) */
+.dg-btn-lg {
+  font-size: var(--dg-fs-body);
+  height: var(--dg-btn-h-lg);
+  min-height: var(--dg-btn-h-lg);
+  padding: 0 28px;
+  gap: 10px;
+}
+
+.dg-btn-lg > svg {
+  width: 18px;
+  height: 18px;
 }
 
 /* Small variant */
@@ -426,7 +470,7 @@ textarea {
 
 .dg-segment-btn.active {
   background: var(--color-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-on-brand-text);
 }
 
 /* ── Span Tabs (pill-style period / filter selector) ────── */
@@ -468,7 +512,7 @@ textarea {
 
 .dg-span-tab.active {
   background: var(--color-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-on-brand-text);
 }
 
 /* Light variant — white container, dark active pill */
@@ -489,7 +533,7 @@ textarea {
 
 .dg-span-tabs--light .dg-span-tab.active {
   background: var(--color-brand);
-  color: var(--color-text-inverse);
+  color: var(--color-on-brand-text);
 }
 
 /* ── Scrollable Tabs (Apple-style chevrons + edge fade) ── */
@@ -1231,30 +1275,87 @@ textarea {
   color: var(--color-text-primary);
 }
 
-.dg-modal-close {
-  display: flex;
+/* Shared close/clear "X" button. Used by <CloseButton> (components/ui/CloseButton.tsx). */
+.dg-close-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--dg-radius-sm);
+  flex-shrink: 0;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
+  border-radius: var(--dg-radius-sm);
   transition:
     background var(--dg-duration-fast) ease,
-    color var(--dg-duration-fast) ease;
+    color var(--dg-duration-fast) ease,
+    border-color var(--dg-duration-fast) ease;
 }
 
-.dg-modal-close:hover {
-  background: var(--color-bg-secondary);
+.dg-close-btn:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 12%, transparent);
   color: var(--color-text-primary);
 }
 
-.dg-modal-close:focus-visible {
+.dg-close-btn:active {
+  background: color-mix(in srgb, var(--color-text-primary) 20%, transparent);
+}
+
+.dg-close-btn:focus-visible {
   outline: 2px solid var(--color-border-focus);
   outline-offset: -2px;
+}
+
+.dg-close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.dg-close-btn--xs {
+  width: 24px;
+  height: 24px;
+}
+
+.dg-close-btn--sm {
+  width: 26px;
+  height: 26px;
+}
+
+.dg-close-btn--md,
+.dg-close-btn--lg {
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.dg-close-btn--md {
+  width: 32px;
+  height: 32px;
+}
+
+.dg-close-btn--lg {
+  width: 40px;
+  height: 40px;
+}
+
+.dg-close-btn--md:hover,
+.dg-close-btn--lg:hover,
+.dg-close-btn--md:focus-visible,
+.dg-close-btn--lg:focus-visible {
+  border-color: var(--color-border);
+}
+
+@media (max-width: 767px) {
+  .dg-close-btn--xs,
+  .dg-close-btn--sm {
+    width: 32px;
+    height: 32px;
+  }
+
+  .dg-close-btn--lg {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 .dg-modal-section {
@@ -1310,7 +1411,7 @@ textarea {
   top: 46%;
   width: 5px;
   height: 9px;
-  border: solid var(--color-text-inverse);
+  border: solid var(--color-on-brand-text);
   border-width: 0 2px 2px 0;
   transform: translate(-50%, -50%) rotate(45deg);
 }
@@ -1509,7 +1610,7 @@ table tbody > tr:last-child > th {
   overflow: hidden;
   border-radius: var(--dg-radius-lg);
   border: 1px solid var(--color-border);
-  box-shadow: var(--dg-shadow-staff-detail);
+  box-shadow: var(--shadow-panel);
   z-index: 10001;
   animation: staff-detail-in var(--dg-duration-standard) cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -1548,34 +1649,6 @@ table tbody > tr:last-child > th {
   top: 0;
   background: var(--color-surface);
   z-index: 2;
-}
-
-.staff-detail-close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--color-text-faint);
-  transition:
-    background 120ms ease,
-    color 120ms ease;
-  flex-shrink: 0;
-  align-self: flex-end;
-}
-
-.staff-detail-close:hover {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-primary);
-}
-
-.staff-detail-close:focus-visible {
-  outline: 2px solid var(--color-border-focus);
-  outline-offset: -2px;
 }
 
 /* Mobile: full-screen panel */
@@ -1715,7 +1788,7 @@ table tbody > tr:last-child > th {
 
 .dg-grid-slot[data-leading-divider="split"] .dg-grid-slot__chrome::before,
 .dg-grid-cell[data-leading-divider="split"] .dg-grid-cell__chrome::before {
-  border-left: 1px solid var(--color-dark);
+  border-left: 1px solid var(--color-grid-divider-strong);
 }
 
 .dg-grid-cell[data-top-divider]::before,
@@ -2344,7 +2417,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
 /* ── Auth Form System ──────────────────────────────────── */
 .dg-auth-shell {
   min-height: 100vh;
-  background: var(--color-surface);
+  background: var(--color-auth-shell-bg);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2445,38 +2518,6 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   letter-spacing: 0.01em;
 }
 
-.dg-auth-submit {
-  width: 100%;
-  padding: 13px;
-  background: var(--color-brand);
-  color: var(--color-text-inverse);
-  border: none;
-  border-radius: 999px;
-  font-size: var(--dg-fs-body);
-  font-weight: 600;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-family: inherit;
-}
-
-.dg-auth-submit:disabled {
-  opacity: 0.85;
-  cursor: not-allowed;
-}
-
-/* Secondary auth button — same shape, low-emphasis fill */
-.dg-auth-submit--secondary {
-  background: var(--color-bg-secondary);
-  color: var(--color-text-muted);
-}
-
-.dg-auth-submit--secondary:disabled {
-  opacity: 0.6;
-}
-
 .dg-auth-link {
   background: none;
   border: none;
@@ -2484,6 +2525,16 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   font-size: var(--dg-fs-label);
   cursor: pointer;
   padding: 0;
+  text-decoration: underline;
+}
+
+/* Bare (non-sentence) auth footer links — underline only on hover */
+.dg-auth-footer-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.dg-auth-footer-link:hover {
   text-decoration: underline;
 }
 
@@ -2913,7 +2964,7 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
     justify-content: center;
     font-size: 12px;
     font-weight: 700;
-    color: var(--color-text-inverse);
+    color: var(--color-on-brand-text);
     flex-shrink: 0;
   }
 

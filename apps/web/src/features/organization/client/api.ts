@@ -70,8 +70,11 @@ export function fetchOrganizationBootstrap(options?: {
 
 export function fetchOrganizationDirectory(
   orgId: string,
-): Promise<{ directory: DirectoryPerson[]; truncated?: boolean; cap?: number }> {
+  page?: { limit?: number; offset?: number },
+): Promise<{ directory: DirectoryPerson[]; hasMore: boolean; nextOffset: number | null }> {
   const params = new URLSearchParams({ orgId });
+  if (page?.limit != null) params.set("limit", String(page.limit));
+  if (page?.offset != null) params.set("offset", String(page.offset));
   return requestOrganizationJson(`/api/organization/directory?${params}`);
 }
 

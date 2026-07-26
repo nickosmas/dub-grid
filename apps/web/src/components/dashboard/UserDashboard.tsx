@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { CalendarDays, Check, Clock3, MapPin, UserRound, Users } from "lucide-react";
+import { useTheme } from "next-themes";
+import { CalendarDays, Check, Clock3, Layers, MapPin, UserRound, Users } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
 import { formatDateKey, getAvatarInitials } from "@/lib/utils";
+import { resolveShiftPillColors } from "@/lib/colors";
+import { shouldShowJobOnGrid } from "@/lib/job-placement";
 import {
   getCurrentTimeValueInTimeZone,
   getIsoDateInTimeZone,
@@ -10,13 +13,17 @@ import {
   hasShiftStartedAtTimeRanges,
 } from "@dubgrid/schedule-core";
 import type { OpenShiftVisibility } from "@dubgrid/domain";
+import { getAvatarTone } from "@dubgrid/design-tokens";
+import { isEmployeeEligibleForOpenShift } from "@/app/schedule/_lib/open-shifts";
 import type {
   AbsenceType,
   AssignmentDefinition,
   Employee,
   FocusArea,
+  JobDefinition,
   ScheduleCellInput,
   ScheduleCellStateEntry,
+  ShiftCategory,
   ShiftJobSegment,
   ShiftMap,
   ShiftRequest,
@@ -63,12 +70,6 @@ type HeroStatus = "active" | "upcoming" | "scheduled" | "away" | "empty";
 type HeroTiming = {
   label: string;
   progress: number | null;
-};
-
-type AvatarTone = {
-  backgroundColor: string;
-  borderColor: string;
-  textColor: string;
 };
 
 type AvailableShiftItem =
@@ -122,11 +123,24 @@ const PANE_SCROLL_PADDING = 32;
 // container's clipping edge (a vertical scroll container also clips the x-axis).
 const PANE_SCROLL_GUTTER = 16;
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DASHBOARD_HERO_BG = "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
-const DASHBOARD_HERO_COLLABORATOR_BG = "rgba(255, 255, 255, 0.16)";
+// Matches the mobile hero gradient (apps/mobile ScheduleScreen.tsx
+// ME_HERO_CARD_GRADIENT_LIGHT/_DARK): dark mode keeps the same dark-navy
+// start but ends in the app's vivid dark-mode brand blue instead of a pale
+// periwinkle, which would read as a washed-out pastel blob on a near-black page.
+const DASHBOARD_HERO_BG_LIGHT =
+  "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
+const DASHBOARD_HERO_BG_DARK =
+  "linear-gradient(to top right, #0A1442 0%, #1D3AA0 55%, #2075FF 100%)";
+// Matches the mobile hero card's "Working with" pill (ScheduleScreen.tsx
+// ME_HERO_COLLABORATOR_BACKGROUND_LIGHT/_DARK) — a solid navy fill, not a
+// translucent white overlay, so the pill reads as a distinct block on the gradient.
+const DASHBOARD_HERO_COLLABORATOR_BG_LIGHT = "#3A55CB";
+const DASHBOARD_HERO_COLLABORATOR_BG_DARK = "#1E2F66";
 const DASHBOARD_HERO_AVATAR_OVERLAP = -10;
 
 export default function UserDashboard(props: DashboardContentProps) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const {
     allShifts,
     assignmentById,
@@ -138,6 +152,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     focusAreas,
     isMobile,
     isTablet,
+    jobs,
     openShifts,
     org,
     periodDates,
@@ -166,6 +181,7 @@ export default function UserDashboard(props: DashboardContentProps) {
     () => new Map(shiftCategories.map((shift) => [shift.id, shift])),
     [shiftCategories],
   );
+  const jobById = useMemo(() => new Map(jobs.map((job) => [job.id, job])), [jobs]);
   const employeeById = useMemo(
     () => new Map(employees.map((employee) => [employee.id, employee])),
     [employees],
@@ -178,9 +194,20 @@ export default function UserDashboard(props: DashboardContentProps) {
         currentPeriodShifts,
         employeeById,
         focusAreaById,
+        jobById,
         shiftById,
+        isDarkTheme,
       }),
-    [absenceTypeById, assignmentById, currentPeriodShifts, employeeById, focusAreaById, shiftById],
+    [
+      absenceTypeById,
+      assignmentById,
+      currentPeriodShifts,
+      employeeById,
+      focusAreaById,
+      jobById,
+      shiftById,
+      isDarkTheme,
+    ],
   );
   const myScheduleItems = useMemo(
     () => (currentEmpId ? allScheduleItems.filter((item) => item.employeeId === currentEmpId) : []),
@@ -198,9 +225,21 @@ export default function UserDashboard(props: DashboardContentProps) {
         currentPeriodShifts: allShifts,
         employeeById,
         focusAreaById,
+        jobById,
         shiftById,
+        isDarkTheme,
       }).filter((item) => item.dateKey >= todayKey),
-    [absenceTypeById, allShifts, assignmentById, employeeById, focusAreaById, shiftById, todayKey],
+    [
+      absenceTypeById,
+      allShifts,
+      assignmentById,
+      employeeById,
+      focusAreaById,
+      jobById,
+      shiftById,
+      todayKey,
+      isDarkTheme,
+    ],
   );
   const heroItems = useMemo(
     () => (currentEmpId ? upcomingAllItems.filter((item) => item.employeeId === currentEmpId) : []),
@@ -223,6 +262,11 @@ export default function UserDashboard(props: DashboardContentProps) {
     () => getHeroFollowUpItems(hero.item, heroItems),
     [hero.item, heroItems],
   );
+  const heroFollowUpTimings = useMemo(
+    () => heroFollowUpItems.map((item) => getHeroTiming(item, todayKey, nowMinutes)),
+    [heroFollowUpItems, nowMinutes, todayKey],
+  );
+  const heroSegmentCount = hero.item ? getWorkedSegments(hero.item.entry).length : 0;
   const weeklyHours = useMemo(
     () => currentHours.find((row) => row.empId === currentEmpId)?.totalHours ?? 0,
     [currentEmpId, currentHours],
@@ -251,13 +295,16 @@ export default function UserDashboard(props: DashboardContentProps) {
       buildAvailableShiftItems({
         assignmentById,
         currentEmpId,
+        currentEmployee,
         currentPeriodShifts,
+        jobs,
         openPickups: shiftRequests.openPickups,
         openShifts,
         now,
         periodEndKey,
         periodStartKey,
         shiftById,
+        shiftCategories,
         todayKey,
         timeZone: org.timezone ?? null,
         visibility: org.openShiftVisibility,
@@ -265,7 +312,9 @@ export default function UserDashboard(props: DashboardContentProps) {
     [
       assignmentById,
       currentEmpId,
+      currentEmployee,
       currentPeriodShifts,
+      jobs,
       now,
       openShifts,
       org.openShiftVisibility,
@@ -273,6 +322,7 @@ export default function UserDashboard(props: DashboardContentProps) {
       periodEndKey,
       periodStartKey,
       shiftById,
+      shiftCategories,
       shiftRequests.openPickups,
       todayKey,
     ],
@@ -341,8 +391,11 @@ export default function UserDashboard(props: DashboardContentProps) {
         >
           <MeHeroCard
             isCompact={isTablet}
+            isDarkTheme={isDarkTheme}
             followUpItems={heroFollowUpItems}
+            followUpTimings={heroFollowUpTimings}
             item={hero.item}
+            segmentCount={heroSegmentCount}
             shiftmates={heroShiftmates}
             status={hero.status}
             timing={heroTiming}
@@ -447,7 +500,14 @@ export default function UserDashboard(props: DashboardContentProps) {
               minWidth: 0,
               // Horizontal padding keeps card borders/shadows off the scroll
               // container's clipping edge (overflow-y:auto also clips x).
+              // The left side cancels its own padding with a matching
+              // negative margin (same trick as mobile's MyScheduleCard
+              // scrollView/scrollContent split) so the pane's content still
+              // lands flush with DashboardGreeting above it, which sits
+              // outside this pane and only gets contentStyle's own 16px —
+              // without the cancel, the hero card sat 16px further right.
               overflowY: "auto",
+              marginLeft: -PANE_SCROLL_GUTTER,
               paddingLeft: PANE_SCROLL_GUTTER,
               paddingRight: PANE_SCROLL_GUTTER,
               scrollbarWidth: "none",
@@ -514,7 +574,9 @@ function buildScheduleItemsFromShiftMap(input: {
   currentPeriodShifts: ShiftMap;
   employeeById: Map<string, Employee>;
   focusAreaById: Map<number, FocusArea>;
+  jobById: Map<number, JobDefinition>;
   shiftById: Map<number, { abbr?: string | null; name: string }>;
+  isDarkTheme: boolean;
 }): DashboardScheduleItem[] {
   const items: DashboardScheduleItem[] = [];
 
@@ -542,7 +604,7 @@ function buildScheduleItemsFromShiftMap(input: {
         employeeName,
         entry,
         key: `${key}:absence`,
-        segment: buildAbsenceSegment(entry, absence, parsedKey.dateKey),
+        segment: buildAbsenceSegment(entry, absence, parsedKey.dateKey, input.isDarkTheme),
         segmentIndex: 0,
       });
       continue;
@@ -555,10 +617,12 @@ function buildScheduleItemsFromShiftMap(input: {
         dateKey: parsedKey.dateKey,
         entry,
         focusAreaById: input.focusAreaById,
+        jobById: input.jobById,
         rawSegment,
         segmentCount: rawSegments.length,
         segmentIndex,
         shiftById: input.shiftById,
+        isDarkTheme: input.isDarkTheme,
       });
 
       if (!segment) {
@@ -612,12 +676,19 @@ function buildAbsenceSegment(
   entry: ScheduleCellStateEntry,
   absence: AbsenceType | null,
   dateKey: string,
+  isDarkTheme: boolean,
 ): DashboardScheduleSegment {
   const label = absence?.name ?? absence?.label ?? entry.label ?? "Away";
+  const resolved = absence
+    ? resolveShiftPillColors(
+        { color: absence.color, text: absence.text, border: absence.border },
+        isDarkTheme,
+      )
+    : null;
   return {
     assignment: null,
-    backgroundColor: absence?.color ?? "var(--color-bg-secondary)",
-    borderColor: absence?.border ?? "var(--color-border)",
+    backgroundColor: resolved?.color ?? "var(--color-bg-secondary)",
+    borderColor: resolved?.border ?? "var(--color-border)",
     chipLabel: label,
     dateKey,
     endTime: null,
@@ -634,7 +705,7 @@ function buildAbsenceSegment(
     shiftName: null,
     sortTime: "99:99:99",
     startTime: null,
-    textColor: absence?.text ?? "var(--color-text-secondary)",
+    textColor: resolved?.text ?? "var(--color-text-secondary)",
     title: label,
     typeLabel: "Absence",
   };
@@ -645,10 +716,12 @@ function buildWorkedSegment(input: {
   dateKey: string;
   entry: ScheduleCellStateEntry;
   focusAreaById: Map<number, FocusArea>;
+  jobById: Map<number, JobDefinition>;
   rawSegment: Partial<ShiftJobSegment>;
   segmentCount: number;
   segmentIndex: number;
   shiftById: Map<number, { abbr?: string | null; name: string }>;
+  isDarkTheme: boolean;
 }): DashboardScheduleSegment | null {
   const assignmentId =
     input.rawSegment.assignmentId ?? input.entry.assignmentIds[input.segmentIndex];
@@ -679,18 +752,21 @@ function buildWorkedSegment(input: {
     });
   const shiftName = input.rawSegment.shiftName ?? shift?.name ?? null;
   const shiftAbbr = input.rawSegment.shiftAbbr ?? shift?.abbr ?? null;
-  const jobName = input.rawSegment.jobName ?? null;
-  const jobAbbr = input.rawSegment.jobAbbr ?? null;
+  const resolvedJob = jobId != null ? (input.jobById.get(jobId) ?? null) : null;
+  // Hide the placeholder "Default shift job" (and any other job explicitly
+  // configured show_on_grid: false) the same way MyScheduleRow.tsx and the
+  // mobile app's own dashboard payload builder do — never surface its name,
+  // whether it arrives via the resolved job record or the raw segment's own
+  // (redundant) jobName/jobAbbr fields.
+  const showJobName = resolvedJob == null || shouldShowJobOnGrid(resolvedJob);
+  const jobName = showJobName ? (input.rawSegment.jobName ?? resolvedJob?.name ?? null) : null;
+  const jobAbbr = showJobName ? (input.rawSegment.jobAbbr ?? resolvedJob?.abbr ?? null) : null;
   const isGeneral = assignment?.isGeneral === true || (shiftId == null && shift == null);
   const rawChipLabel =
-    input.rawSegment.jobName ??
-    input.rawSegment.label ??
-    assignment?.label ??
-    input.entry.label ??
-    "Shift";
+    jobName ?? input.rawSegment.label ?? assignment?.label ?? input.entry.label ?? "Shift";
   const chipLabel = isGeneral
     ? rawChipLabel
-    : expandShiftDisplayLabel({
+    : deriveJobPillLabel({
         isShiftOnly: input.rawSegment.isShiftOnly === true,
         jobAbbr,
         jobName,
@@ -714,11 +790,17 @@ function buildWorkedSegment(input: {
   const startTime =
     customStartTime ?? input.rawSegment.startTime ?? assignment?.defaultStartTime ?? null;
   const endTime = customEndTime ?? input.rawSegment.endTime ?? assignment?.defaultEndTime ?? null;
+  const resolved = assignment
+    ? resolveShiftPillColors(
+        { color: assignment.color, text: assignment.text, border: assignment.border },
+        input.isDarkTheme,
+      )
+    : null;
 
   return {
     assignment,
-    backgroundColor: assignment?.color ?? "var(--color-bg-secondary)",
-    borderColor: assignment?.border ?? "var(--color-border)",
+    backgroundColor: resolved?.color ?? "var(--color-bg-secondary)",
+    borderColor: resolved?.border ?? "var(--color-border)",
     chipLabel: isGeneral ? chipLabel : chipLabel || title,
     dateKey: input.dateKey,
     endTime,
@@ -735,7 +817,7 @@ function buildWorkedSegment(input: {
     shiftName,
     sortTime: startTime ?? "99:99:99",
     startTime,
-    textColor: assignment?.text ?? "var(--color-text-primary)",
+    textColor: resolved?.text ?? "var(--color-text-primary)",
     title,
     typeLabel: isGeneral ? "General shift" : null,
   };
@@ -833,6 +915,38 @@ function expandShiftDisplayLabel(input: {
     input.jobName && labelsEqual(suffix, input.jobAbbr) ? input.jobName : suffix;
 
   return `${shiftName} · ${expandedSuffix}`;
+}
+
+// Job pill text (ShiftPill) shows only the job, never the shift — the shift
+// name is already the heading it sits under, so repeating it here would just
+// duplicate what the user already read a line above.
+function deriveJobPillLabel(input: {
+  isShiftOnly?: boolean;
+  jobAbbr?: string | null;
+  jobName?: string | null;
+  rawLabel: string;
+  shiftAbbr?: string | null;
+  shiftName?: string | null;
+}): string {
+  const jobName = input.jobName?.trim();
+  if (jobName) {
+    return jobName;
+  }
+
+  const rawLabel = input.rawLabel.trim();
+  const shiftAbbr = input.shiftAbbr?.trim() ?? "";
+  const shiftName = input.shiftName?.trim() ?? "";
+
+  if (!rawLabel || input.isShiftOnly || labelsEqual(rawLabel, shiftAbbr)) {
+    return shiftName || rawLabel;
+  }
+
+  const suffix = getLabelSuffixAfterShiftCode(rawLabel, shiftAbbr);
+  if (suffix == null) {
+    return rawLabel;
+  }
+
+  return suffix || shiftName || rawLabel;
 }
 
 function getLabelSuffixAfterShiftCode(rawLabel: string, shiftAbbr?: string | null): string | null {
@@ -1115,13 +1229,16 @@ function segmentsShareShiftAndFocusArea(
 function buildAvailableShiftItems(input: {
   assignmentById: Map<number, AssignmentDefinition>;
   currentEmpId: string | null;
+  currentEmployee: Employee | undefined;
   currentPeriodShifts: ShiftMap;
+  jobs: JobDefinition[];
   now: Date;
   openPickups: ShiftRequest[];
   openShifts: DashboardContentProps["openShifts"];
   periodEndKey: string;
   periodStartKey: string;
   shiftById: Map<number, { abbr?: string | null; name: string }>;
+  shiftCategories: ShiftCategory[];
   todayKey: string;
   timeZone?: string | null;
   visibility?: OpenShiftVisibility;
@@ -1131,10 +1248,24 @@ function buildAvailableShiftItems(input: {
     return [];
   }
 
+  const eligibilityContext = {
+    assignmentById: input.assignmentById,
+    shiftCategories: input.shiftCategories,
+    jobs: input.jobs,
+  };
+  const isEligible = (candidateAssignmentIds: number[]) =>
+    isEmployeeEligibleForOpenShift(
+      candidateAssignmentIds,
+      input.currentEmployee ?? null,
+      eligibilityContext,
+    );
+
   // Visibility governs the staff view only; this dashboard is never the
   // scheduler tool. `always` shows every open shift regardless of the viewer's
   // own schedule; `hidden` drops the source entirely; `matched` (default)
   // keeps the conflict filter so a user only sees shifts they could take.
+  // Either way, a shift the viewer isn't personally qualified for (focus
+  // area / role / certification) is never shown — they could never claim it.
   const coverageGapVisibility = input.visibility?.coverageGap ?? "matched";
   const calloffVisibility = input.visibility?.calloff ?? "matched";
 
@@ -1149,7 +1280,9 @@ function buildAvailableShiftItems(input: {
                 input.periodStartKey,
                 input.periodEndKey,
                 input.todayKey,
-              ) && !hasShiftRequestStarted(request, input.now, input.timeZone ?? null),
+              ) &&
+              !hasShiftRequestStarted(request, input.now, input.timeZone ?? null) &&
+              isEligible(request.requesterAssignmentDefinitionIds),
           )
           .map((request) => ({
             date: new Date(`${request.requesterShiftDate}T00:00:00`),
@@ -1186,6 +1319,12 @@ function buildAvailableShiftItems(input: {
                 timeZone: input.timeZone ?? null,
               })
             ) {
+              return false;
+            }
+            const candidateAssignmentIds = openShift.eligibleAssignmentDefinitionIds?.length
+              ? openShift.eligibleAssignmentDefinitionIds
+              : [openShift.preferredOpenAssignmentDefinitionId];
+            if (!isEligible(candidateAssignmentIds)) {
               return false;
             }
             if (coverageGapVisibility === "always") {
@@ -1360,16 +1499,22 @@ function isDateInCurrentOrFutureRange(
 
 function MeHeroCard({
   followUpItems,
+  followUpTimings,
   isCompact,
+  isDarkTheme,
   item,
+  segmentCount,
   shiftmates,
   status,
   stretch,
   timing,
 }: {
   followUpItems: DashboardScheduleItem[];
+  followUpTimings: Array<HeroTiming | null>;
   isCompact: boolean;
+  isDarkTheme: boolean;
   item: DashboardScheduleItem;
+  segmentCount: number;
   shiftmates: DashboardScheduleItem[];
   status: HeroStatus;
   stretch: boolean;
@@ -1382,7 +1527,7 @@ function MeHeroCard({
     <section
       data-testid="user-dashboard-hero"
       style={{
-        background: DASHBOARD_HERO_BG,
+        background: isDarkTheme ? DASHBOARD_HERO_BG_DARK : DASHBOARD_HERO_BG_LIGHT,
         borderRadius: "var(--dg-radius-xl)",
         boxShadow: "var(--shadow-md)",
         color: "#fff",
@@ -1432,18 +1577,30 @@ function MeHeroCard({
               {badgeLabel}
             </span>
           </div>
-          <h2
+          <div
             style={{
-              color: "#fff",
-              fontSize: isCompact ? "1.55rem" : "1.9rem",
-              fontWeight: 750,
-              letterSpacing: 0,
-              lineHeight: 1.08,
-              margin: 0,
+              alignItems: "center",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 10,
             }}
           >
-            {item.segment.title}
-          </h2>
+            <h2
+              style={{
+                color: "#fff",
+                fontSize: isCompact ? "1.55rem" : "1.9rem",
+                fontWeight: 750,
+                letterSpacing: 0,
+                lineHeight: 1.08,
+                margin: 0,
+              }}
+            >
+              {item.segment.title}
+            </h2>
+            {segmentCount > 1 ? (
+              <SplitShiftBadge inverse label={`Shift ${item.segmentIndex + 1}`} />
+            ) : null}
+          </div>
         </div>
 
         <div
@@ -1550,12 +1707,22 @@ function MeHeroCard({
             display: "flex",
             flexDirection: "column",
             gap: 12,
-            marginTop: "auto",
+            // Pinning to the bottom only reads right for a single shift — with
+            // a double shift there's more content to show, so let it flow
+            // naturally (the surrounding column's own gap:14 already spaces it
+            // from the progress bar above) instead of stacking an extra margin
+            // on top of that gap, which left far more space above the
+            // "Working with" pill than the gap:12 below it to the next segment.
+            marginTop: followUpItems.length > 0 ? 0 : "auto",
           }}
         >
           <ShiftmatesRow items={shiftmates} inverse />
-          {followUpItems.map((followUpItem) => (
-            <HeroFollowUpShiftCard item={followUpItem} key={followUpItem.key} />
+          {followUpItems.map((followUpItem, index) => (
+            <HeroSplitShiftSegment
+              item={followUpItem}
+              key={followUpItem.key}
+              timing={followUpTimings[index] ?? null}
+            />
           ))}
         </div>
       </div>
@@ -1600,10 +1767,14 @@ function HeroInfoRow({ icon, text }: { icon: ReactNode; text: string }) {
         minWidth: 0,
       }}
     >
-      <span style={{ display: "inline-flex", flexShrink: 0 }}>{icon}</span>
+      {/* lucide glyphs (MapPin especially) draw with a few px of empty margin
+          inside their own viewBox, so a flush icon reads as inset compared to
+          the solid-edged text/pills/bar above and below it in this column —
+          nudge left to compensate. */}
+      <span style={{ display: "inline-flex", flexShrink: 0, marginLeft: -2 }}>{icon}</span>
       <span
         style={{
-          fontSize: 14,
+          fontSize: 15,
           fontWeight: 650,
           minWidth: 0,
           overflow: "hidden",
@@ -1673,7 +1844,7 @@ function ShiftPill({ segment }: { segment: DashboardScheduleSegment }) {
         display: "inline-flex",
         fontSize: 12,
         fontWeight: 750,
-        lineHeight: 1,
+        lineHeight: 1.3,
         maxWidth: "100%",
         padding: "7px 10px",
       }}
@@ -1711,27 +1882,68 @@ function MentoredPill({ inverse = false }: { inverse?: boolean }) {
   );
 }
 
-function HeroFollowUpShiftCard({ item }: { item: DashboardScheduleItem }) {
+// A "Shift N" position label — inspired by the mobile split-shift badge
+// (SplitShiftBadge in apps/mobile/src/features/schedule/components/SplitShift.tsx),
+// but spelling out each segment's position instead of just a "N shifts"
+// count. `inverse` for the hero's gradient background; the default
+// (brand-token) styling matches mobile's own non-inverse badge for use on a
+// normal card surface (e.g. the "Your Week" list).
+function SplitShiftBadge({ inverse = false, label }: { inverse?: boolean; label: string }) {
+  return (
+    <span
+      style={{
+        alignItems: "center",
+        background: inverse ? "rgba(255,255,255,0.16)" : "var(--color-brand-bg)",
+        border: inverse
+          ? "1px solid rgba(255,255,255,0.28)"
+          : "1px solid var(--color-brand-border)",
+        borderRadius: 999,
+        color: inverse ? "#fff" : "var(--color-brand)",
+        display: "inline-flex",
+        flexShrink: 0,
+        fontSize: 13,
+        fontWeight: 700,
+        gap: 5,
+        padding: "6px 12px",
+      }}
+    >
+      <Layers size={14} />
+      {label}
+    </span>
+  );
+}
+
+// A same-day, later-segment shift (a "double shift"). Sits directly on the
+// hero gradient with a dashed divider above it, matching the mobile hero's
+// inline SplitShiftSegmentList (variant="hero") instead of a boxed sub-card.
+// Sized close to the featured segment above it (not a small caption) so the
+// card reads as one continuous shift, not a big headline plus fine print.
+function HeroSplitShiftSegment({
+  item,
+  timing,
+}: {
+  item: DashboardScheduleItem;
+  timing: HeroTiming | null;
+}) {
   const timeRange = formatSegmentTimeRange(item.segment);
 
   return (
     <div
       data-testid="user-dashboard-hero-secondary-shift"
       style={{
-        background: "rgba(255,255,255,0.1)",
-        border: "1px solid rgba(255,255,255,0.14)",
-        borderRadius: 16,
+        borderTop: "1px dashed rgba(255,255,255,0.24)",
         color: "rgba(255,255,255,0.86)",
         display: "flex",
         flexDirection: "column",
-        gap: 8,
-        padding: "12px 14px",
+        gap: 10,
+        paddingTop: 16,
       }}
     >
       <div
         style={{
-          alignItems: "center",
+          alignItems: "flex-start",
           display: "flex",
+          flexWrap: "wrap",
           gap: 10,
           justifyContent: "space-between",
           minWidth: 0,
@@ -1739,33 +1951,61 @@ function HeroFollowUpShiftCard({ item }: { item: DashboardScheduleItem }) {
       >
         <div
           style={{
-            color: "#fff",
-            fontSize: 15,
-            fontWeight: 760,
+            alignItems: "center",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
             minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
           }}
         >
-          {item.segment.title}
-        </div>
-        {timeRange ? (
           <span
             style={{
-              color: "rgba(255,255,255,0.72)",
-              flexShrink: 0,
-              fontSize: 12,
-              fontWeight: 700,
+              color: "#fff",
+              fontSize: 20,
+              fontWeight: 750,
+              lineHeight: 1.15,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
               whiteSpace: "nowrap",
             }}
           >
-            {timeRange}
+            {item.segment.title}
           </span>
+          <SplitShiftBadge inverse label={`Shift ${item.segmentIndex + 1}`} />
+        </div>
+        {timeRange || timing ? (
+          <div style={{ display: "flex", flexDirection: "column", flexShrink: 0, gap: 3 }}>
+            {timeRange ? (
+              <span
+                style={{
+                  color: "#fff",
+                  fontSize: 16,
+                  fontWeight: 700,
+                  textAlign: "right",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {timeRange}
+              </span>
+            ) : null}
+            {timing ? (
+              <span
+                style={{
+                  color: "rgba(255,255,255,0.78)",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  textAlign: "right",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {timing.label}
+              </span>
+            ) : null}
+          </div>
         ) : null}
       </div>
       {item.segment.focusAreaName ? (
-        <HeroInfoRow icon={<MapPin size={16} />} text={item.segment.focusAreaName} />
+        <HeroInfoRow icon={<MapPin size={18} />} text={item.segment.focusAreaName} />
       ) : null}
       <HeroPillRow segment={item.segment} inverse />
     </div>
@@ -1779,19 +2019,27 @@ function ShiftmatesRow({
   inverse?: boolean;
   items: DashboardScheduleItem[];
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
+
   if (items.length === 0) {
     return null;
   }
 
   const visibleItems = items.slice(0, 3);
   const overflowCount = items.length - visibleItems.length;
+  const collaboratorBackground = inverse
+    ? isDarkTheme
+      ? DASHBOARD_HERO_COLLABORATOR_BG_DARK
+      : DASHBOARD_HERO_COLLABORATOR_BG_LIGHT
+    : "var(--color-bg-secondary)";
 
   return (
     <div
       data-testid="user-dashboard-working-with"
       style={{
         alignItems: "center",
-        background: inverse ? DASHBOARD_HERO_COLLABORATOR_BG : "var(--color-bg-secondary)",
+        background: collaboratorBackground,
         border: inverse
           ? "1px solid rgba(255,255,255,0.14)"
           : "1px solid var(--color-border-light)",
@@ -1800,6 +2048,7 @@ function ShiftmatesRow({
         display: "flex",
         gap: 10,
         justifyContent: "space-between",
+        marginBottom: 6,
         marginTop: 6,
         padding: "9px 14px",
       }}
@@ -1818,8 +2067,8 @@ function ShiftmatesRow({
           style={{
             flexShrink: 1,
             fontSize: 15,
-            fontWeight: 750,
-            lineHeight: 1.2,
+            fontWeight: 600,
+            lineHeight: "21px",
           }}
         >
           Working with
@@ -1835,7 +2084,7 @@ function ShiftmatesRow({
         }}
       >
         {visibleItems.map((item, index) => {
-          const avatarTone = getAvatarTone(item.employeeId);
+          const avatarTone = getAvatarTone(item.employeeId, isDarkTheme);
 
           return (
             <span
@@ -1843,7 +2092,7 @@ function ShiftmatesRow({
               data-testid="user-dashboard-shiftmate-avatar-frame"
               title={item.employeeName}
               style={{
-                background: inverse ? DASHBOARD_HERO_COLLABORATOR_BG : "var(--color-bg-secondary)",
+                background: collaboratorBackground,
                 borderRadius: 999,
                 display: "inline-flex",
                 flexShrink: 0,
@@ -1862,10 +2111,11 @@ function ShiftmatesRow({
                   borderRadius: 19,
                   color: avatarTone.textColor,
                   display: "inline-flex",
-                  fontSize: 11,
-                  fontWeight: 700,
+                  fontSize: 13,
+                  fontWeight: 600,
                   height: 38,
                   justifyContent: "center",
+                  lineHeight: "18px",
                   width: 38,
                 }}
               >
@@ -1879,7 +2129,7 @@ function ShiftmatesRow({
             data-testid="user-dashboard-shiftmate-overflow-frame"
             style={{
               alignItems: "center",
-              background: inverse ? DASHBOARD_HERO_COLLABORATOR_BG : "var(--color-bg-secondary)",
+              background: collaboratorBackground,
               borderRadius: 999,
               display: "inline-flex",
               flexShrink: 0,
@@ -1898,8 +2148,8 @@ function ShiftmatesRow({
                 borderRadius: 19,
                 color: "#1D4ED8",
                 display: "inline-flex",
-                fontSize: 13,
-                fontWeight: 750,
+                fontSize: 14,
+                fontWeight: 600,
                 height: 38,
                 justifyContent: "center",
                 width: 38,
@@ -2162,7 +2412,7 @@ function MyWeekSection({
     <section className="dg-card" data-testid="user-dashboard-my-week" style={style}>
       <div className="dg-card-header">
         <div>
-          <div className="dg-card-title">{isTwoWeekView ? "My Schedule" : "My Week"}</div>
+          <div className="dg-card-title">{isTwoWeekView ? "Your Schedule" : "Your Week"}</div>
           <div className="dg-card-subtitle">
             {hoursLabel ?? `Your published shifts for ${periodLabel}`}
           </div>
@@ -2197,7 +2447,7 @@ function MyWeekSection({
                 {group.items.map((item, itemIndex) => (
                   <div key={item.key}>
                     {itemIndex > 0 ? <DashedDivider /> : null}
-                    <WeekShiftRow item={item} />
+                    <WeekShiftRow item={item} showSegmentLabel={group.items.length > 1} />
                   </div>
                 ))}
               </div>
@@ -2477,7 +2727,13 @@ function AvailableShiftActionCard({
   );
 }
 
-function WeekShiftRow({ item }: { item: DashboardScheduleItem }) {
+function WeekShiftRow({
+  item,
+  showSegmentLabel = false,
+}: {
+  item: DashboardScheduleItem;
+  showSegmentLabel?: boolean;
+}) {
   const timeRange = formatSegmentTimeRange(item.segment);
   return (
     <div
@@ -2493,24 +2749,38 @@ function WeekShiftRow({ item }: { item: DashboardScheduleItem }) {
           style={{
             alignItems: "center",
             display: "flex",
+            flexWrap: "wrap",
             gap: 10,
             justifyContent: "space-between",
           }}
         >
           <div
             style={{
-              color: "var(--color-text-primary)",
-              fontSize: 15,
-              fontWeight: 750,
+              alignItems: "center",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
               minWidth: 0,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
             }}
           >
-            {item.segment.isAbsence
-              ? (item.segment.typeLabel ?? item.segment.title)
-              : item.segment.title}
+            <div
+              style={{
+                color: "var(--color-text-primary)",
+                fontSize: 15,
+                fontWeight: 750,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {item.segment.isAbsence
+                ? (item.segment.typeLabel ?? item.segment.title)
+                : item.segment.title}
+            </div>
+            {showSegmentLabel && !item.segment.isAbsence ? (
+              <SplitShiftBadge label={`Shift ${item.segmentIndex + 1}`} />
+            ) : null}
           </div>
           {timeRange ? (
             <div
@@ -2896,26 +3166,6 @@ function getHeroStatusLabel(status: HeroStatus): string {
 
 function formatEmployeeName(employee: Employee): string {
   return `${employee.firstName} ${employee.lastName}`.trim() || "Staff";
-}
-
-function hashCode(value: string): number {
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
-  }
-
-  return Math.abs(hash);
-}
-
-function getAvatarTone(seed: string): AvatarTone {
-  const hue = hashCode(seed) % 360;
-
-  return {
-    backgroundColor: `hsl(${hue}, 70%, 92%)`,
-    borderColor: `hsl(${hue}, 70%, 85%)`,
-    textColor: `hsl(${hue}, 70%, 35%)`,
-  };
 }
 
 function formatHoursValue(hours: number): string {

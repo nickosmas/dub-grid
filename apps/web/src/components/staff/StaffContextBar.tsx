@@ -1,7 +1,9 @@
 "use client";
 
 import { Department, Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useIsInSandbox } from "@/hooks";
 import type {
   AccountLinkFilter,
   ContactPresenceFilter,
@@ -43,6 +45,7 @@ interface StaffContextBarProps {
   selectionCount: number;
   selectedIds: Set<string>;
   canManageEmployees: boolean;
+  canManageManagementAccess: boolean;
   displayList: Employee[];
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onBulkInvite: (employees: Employee[]) => void;
@@ -89,6 +92,7 @@ export function StaffContextBar({
   selectionCount,
   selectedIds,
   canManageEmployees,
+  canManageManagementAccess,
   displayList,
   pendingInviteByEmployeeId,
   onBulkInvite,
@@ -101,6 +105,7 @@ export function StaffContextBar({
   onSaveOrder,
   onCancelReorder,
 }: StaffContextBarProps) {
+  const isInSandbox = useIsInSandbox();
   const showFilters = hasActiveFilters && selectionCount === 0 && !isReordering;
   const showBulk = selectionCount > 0 && canManageEmployees && !isReordering;
   const showReorder = isReordering;
@@ -225,10 +230,14 @@ export function StaffContextBar({
             </span>
           </div>
           <div className="flex-1" />
-          {invitableEmployees.length > 0 && (
+          {invitableEmployees.length > 0 && canManageManagementAccess && (
             <button
               onClick={() => onBulkInvite(invitableEmployees)}
+              disabled={isInSandbox}
               className="dg-btn dg-btn-secondary dg-btn-sm"
+              title={
+                isInSandbox ? "Sending invitations isn't available in sandbox mode." : undefined
+              }
             >
               Invite ({invitableEmployees.length})
             </button>
@@ -271,15 +280,57 @@ export function StaffContextBar({
           <div className="flex items-center gap-3">
             <div
               className="flex items-center justify-center w-8 h-8 rounded-[var(--dg-radius-sm)]"
-              style={{ background: "var(--color-control-primary)" }}
+              style={{ background: "white" }}
             >
-              <svg width="16" height="16" viewBox="0 0 14 14" fill="white">
-                <rect x="3" y="1" width="2.5" height="2.5" rx="1.25" />
-                <rect x="8.5" y="1" width="2.5" height="2.5" rx="1.25" />
-                <rect x="3" y="5.75" width="2.5" height="2.5" rx="1.25" />
-                <rect x="8.5" y="5.75" width="2.5" height="2.5" rx="1.25" />
-                <rect x="3" y="10.5" width="2.5" height="2.5" rx="1.25" />
-                <rect x="8.5" y="10.5" width="2.5" height="2.5" rx="1.25" />
+              <svg width="16" height="16" viewBox="0 0 14 14">
+                <rect
+                  x="3"
+                  y="1"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
+                <rect
+                  x="8.5"
+                  y="1"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
+                <rect
+                  x="3"
+                  y="5.75"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
+                <rect
+                  x="8.5"
+                  y="5.75"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
+                <rect
+                  x="3"
+                  y="10.5"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
+                <rect
+                  x="8.5"
+                  y="10.5"
+                  width="2.5"
+                  height="2.5"
+                  rx="1.25"
+                  fill="var(--color-control-primary)"
+                />
               </svg>
             </div>
             <div>
@@ -311,25 +362,7 @@ function FilterPill({ label, onClear }: { label: string; onClear: () => void }) 
   return (
     <span className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border-light)] bg-[var(--color-bg-secondary)] px-2 py-0.5 text-[11px] font-medium text-[var(--color-text-secondary)] whitespace-nowrap">
       {label}
-      <button
-        onClick={onClear}
-        className="ml-0.5 p-0.5 rounded-sm text-[var(--color-text-faint)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-border-light)] transition-colors cursor-pointer"
-        aria-label={`Clear ${label}`}
-      >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
+      <CloseButton size="xs" onClick={onClear} aria-label={`Clear ${label}`} className="ml-0.5" />
     </span>
   );
 }

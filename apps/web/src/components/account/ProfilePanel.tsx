@@ -19,6 +19,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { formatClientLabel } from "@/lib/client-facing";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { SelectableTag } from "@/components/ui/selectable-tag";
 import {
   cancelOwnProfileChangeRequest,
   createOwnProfileChangeRequest,
@@ -30,7 +31,9 @@ import {
   type ProfileRequestedChanges,
   type SelfProfileRecord,
 } from "@/features/account/client";
-import type { Employee } from "@/types";
+import { updateAppOnlyUser } from "@/features/organization/client";
+import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
+import type { Department, Employee, FocusArea, NamedItem } from "@/types";
 import type { User } from "@supabase/supabase-js";
 import type { Dispatch, SetStateAction } from "react";
 
@@ -41,9 +44,32 @@ interface ProfilePanelProps {
   orgId: string | null;
   canEditProfileDirectly: boolean;
   isGridmaster: boolean;
+  /** Effective permission role (e.g. "user" / "admin" / "super_admin" / "gridmaster"). */
+  role: string;
+  departments: Department[];
+  isOnSchedule: boolean;
+  /** True for super_admin/gridmaster — the same gate the People directory
+   *  panels use before letting anyone edit a person's management access. */
+  canManageManagementAccess: boolean;
+  /** True when the viewer can manage employees — the same gate the People
+   *  directory panels use before showing "Add to Schedule". */
+  canManageScheduleEmployees: boolean;
+  focusAreas: FocusArea[];
+  certifications: NamedItem[];
+  roles: NamedItem[];
+  focusAreaLabel?: string;
+  certificationLabel?: string;
+  roleLabel?: string;
   setProfile: Dispatch<SetStateAction<SelfProfileRecord | null>>;
   setEmployee: Dispatch<SetStateAction<Employee | null>>;
 }
+
+const ROLE_LABELS: Record<string, string> = {
+  gridmaster: "Gridmaster",
+  super_admin: "Super Admin",
+  admin: "Admin",
+  user: "User",
+};
 
 type PendingConfirm = "account-details" | "name-change-request" | "account-deletion" | null;
 
@@ -72,6 +98,17 @@ export function ProfilePanel({
   orgId,
   canEditProfileDirectly,
   isGridmaster,
+  role,
+  departments,
+  isOnSchedule,
+  canManageManagementAccess,
+  canManageScheduleEmployees,
+  focusAreas,
+  certifications,
+  roles,
+  focusAreaLabel,
+  certificationLabel,
+  roleLabel,
   setProfile,
   setEmployee,
 }: ProfilePanelProps) {
@@ -125,6 +162,58 @@ export function ProfilePanel({
   const requestNoteError = getStaffNotesError(requestNote);
 
   const showDeletion = !isGridmaster && !canEditProfileDirectly;
+
+  const managementDepartmentIds = employee?.departmentIds ?? [];
+  const allManagementDepartments = departments.filter((d) => d.type === "management");
+  const managementDepartments = allManagementDepartments.filter((d) =>
+    managementDepartmentIds.includes(d.id),
+  );
+  const showManagementAccess = managementDepartmentIds.length > 0;
+
+  const [isEditingAccess, setIsEditingAccess] = useState(false);
+  const [editDeptIds, setEditDeptIds] = useState<number[]>([]);
+  const [savingAccess, setSavingAccess] = useState(false);
+
+  function startEditingAccess() {
+    setEditDeptIds(managementDepartmentIds);
+    setIsEditingAccess(true);
+  }
+
+  function cancelEditingAccess() {
+    setIsEditingAccess(false);
+  }
+
+  function toggleAccessDepartment(departmentId: number) {
+    setEditDeptIds((prev) =>
+      prev.includes(departmentId)
+        ? prev.filter((id) => id !== departmentId)
+        : [...prev, departmentId],
+    );
+  }
+
+  const accessHasChanges =
+    editDeptIds.length !== managementDepartmentIds.length ||
+    editDeptIds.some((id) => !managementDepartmentIds.includes(id));
+  const accessWouldOrphan = !isOnSchedule && editDeptIds.length === 0;
+
+  async function saveAccessChanges() {
+    if (!orgId || !user || savingAccess || accessWouldOrphan) return;
+    setSavingAccess(true);
+    try {
+      await updateAppOnlyUser(user.id, orgId, { departmentIds: editDeptIds });
+      setEmployee((prev) => (prev ? { ...prev, departmentIds: editDeptIds } : prev));
+      setIsEditingAccess(false);
+      toast.success("Management access updated.");
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Failed to update management access."));
+    } finally {
+      setSavingAccess(false);
+    }
+  }
+
+  const [showAddToSchedule, setShowAddToSchedule] = useState(false);
+  const canAddToSchedule =
+    canManageScheduleEmployees && !isOnSchedule && showManagementAccess && !!employee?.userId;
 
   useEffect(() => {
     // Both the name-change request UI and the account-deletion section need
@@ -461,6 +550,116 @@ export function ProfilePanel({
           )}
         </div>
       </SectionCard>
+
+      {showManagementAccess && (
+        <SectionCard>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+                  Management access
+                </div>
+                <div className="mt-1 text-[13px] text-[var(--color-text-muted)]">
+                  Your organization role and management department assignment.
+                </div>
+              </div>
+              {canManageManagementAccess && !isEditingAccess && (
+                <button
+                  type="button"
+                  onClick={startEditingAccess}
+                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                >
+                  Edit management access
+                </button>
+              )}
+            </div>
+
+            <Field label="Role" value={ROLE_LABELS[role] ?? role} />
+
+            {isEditingAccess ? (
+              <div className="flex flex-col gap-3 rounded-[var(--dg-radius-md)] border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+                <div>
+                  <label className="dg-label">Management departments</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {allManagementDepartments.map((department) => (
+                      <SelectableTag
+                        key={department.id}
+                        selected={editDeptIds.includes(department.id)}
+                        onClick={() => toggleAccessDepartment(department.id)}
+                      >
+                        {department.name}
+                      </SelectableTag>
+                    ))}
+                  </div>
+                  {accessWouldOrphan && (
+                    <p className="dg-form-error">
+                      You must stay assigned to at least one management department.
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={saveAccessChanges}
+                    disabled={savingAccess || !accessHasChanges || accessWouldOrphan}
+                    className="dg-btn dg-btn-primary dg-btn-sm"
+                  >
+                    <Check size={14} />
+                    {savingAccess ? "Saving..." : "Save changes"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelEditingAccess}
+                    disabled={savingAccess}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                  >
+                    <X size={14} />
+                    {getEditorDismissLabel({ hasUnsavedChanges: accessHasChanges })}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <Field
+                label="Management departments"
+                value={
+                  managementDepartments.length > 0
+                    ? managementDepartments.map((d) => d.name).join(", ")
+                    : null
+                }
+              />
+            )}
+
+            {canAddToSchedule && (
+              <button
+                type="button"
+                onClick={() => setShowAddToSchedule(true)}
+                className="dg-btn dg-btn-secondary dg-btn-sm self-start"
+              >
+                Add to Schedule
+              </button>
+            )}
+          </div>
+        </SectionCard>
+      )}
+
+      {showAddToSchedule && employee && orgId && (
+        <AddManagementUserToScheduleModal
+          orgId={orgId}
+          person={employee}
+          employee={employee}
+          focusAreas={focusAreas}
+          certifications={certifications}
+          roles={roles}
+          focusAreaLabel={focusAreaLabel}
+          certificationLabel={certificationLabel}
+          roleLabel={roleLabel}
+          onClose={() => setShowAddToSchedule(false)}
+          onAdded={(updated) => {
+            setEmployee(updated);
+            setShowAddToSchedule(false);
+          }}
+        />
+      )}
 
       {!canEditProfileDirectly && (
         <SectionCard>

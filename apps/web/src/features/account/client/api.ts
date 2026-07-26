@@ -87,6 +87,15 @@ export interface AccountOrgContext {
 
 export interface AccountPermissionsResponse {
   permissions: Permissions;
+  // Self-employment shape, used by web nav (Header.tsx) to detect
+  // "management-only, non-admin" accounts that should only see Schedule +
+  // People, never Dashboard. Defaults to false when the caller has no
+  // employees row for the effective org (gridmaster, unlinked super_admin).
+  isOnSchedule?: boolean;
+  isManagementUser?: boolean;
+  // True when the caller is admin/super_admin/gridmaster and has no
+  // verified TOTP factor — drives a dismissible nag banner, never a block.
+  mfaNagRequired?: boolean;
 }
 
 export interface AccessibleOrganization {
@@ -261,7 +270,8 @@ export function updateMfaStatus(enabled: boolean): Promise<{
 }
 
 export function fetchAccountSessions(): Promise<{
-  sessions: AccountSessionRecord[];
+  active: AccountSessionRecord[];
+  stale: AccountSessionRecord[];
 }> {
   return requestJson("/api/account/sessions");
 }

@@ -1,6 +1,7 @@
 import type {
   OperationsReportPayload,
   OperationsReportType,
+  ReportMetric,
 } from "@/features/reports/server/operations";
 
 export type OperationsReportCell = string | number | boolean | null | undefined;
@@ -87,6 +88,10 @@ function formatContactValue(value: string, emptyLabel: string): string {
   return value.trim() ? value : emptyLabel;
 }
 
+function formatEmployeeIdValue(value: number | null): string {
+  return value == null ? "-" : `#${value}`;
+}
+
 function formatAccountLinked(value: boolean): string {
   return value ? "Linked" : "Not linked";
 }
@@ -117,6 +122,7 @@ export function buildOperationsReportPreviewTable(
       return {
         title: "Employee directory",
         columns: [
+          { label: "Employee ID" },
           { label: "Employee" },
           { label: "Staff status" },
           { label: "Employment type" },
@@ -125,8 +131,10 @@ export function buildOperationsReportPreviewTable(
           { label: "Focus areas" },
           { label: "Roles" },
           { label: "Certification" },
+          { label: "Departments" },
         ],
         rows: payload.reports.employeeDirectory.map((row) => [
+          formatEmployeeIdValue(row.employeeNumber),
           row.employeeName,
           formatKnownReportValue(row.status),
           formatKnownReportValue(row.employmentType),
@@ -135,6 +143,7 @@ export function buildOperationsReportPreviewTable(
           formatListValue(row.focusAreas, "No focus areas"),
           formatListValue(row.roles, "No roles"),
           formatListValue(row.certification, "No certification"),
+          formatListValue(row.departments, "No departments"),
         ]),
         emptyText: "No staff records found.",
       };
@@ -246,6 +255,7 @@ export function buildOperationsReportPreviewTable(
       return {
         title: "Roster status",
         columns: [
+          { label: "Employee ID" },
           { label: "Employee" },
           { label: "Staff status" },
           { label: "Employment type" },
@@ -255,6 +265,7 @@ export function buildOperationsReportPreviewTable(
           { label: "Invitation status" },
         ],
         rows: payload.reports.rosterStatus.map((row) => [
+          formatEmployeeIdValue(row.employeeNumber),
           row.employeeName,
           formatKnownReportValue(row.status),
           formatKnownReportValue(row.employmentType),
@@ -269,6 +280,7 @@ export function buildOperationsReportPreviewTable(
       return {
         title: "Certifications and roles",
         columns: [
+          { label: "Employee ID" },
           { label: "Employee" },
           { label: "Staff status" },
           { label: "Certification" },
@@ -279,6 +291,7 @@ export function buildOperationsReportPreviewTable(
           { label: "Role status" },
         ],
         rows: payload.reports.certificationRoleMatrix.map((row) => [
+          formatEmployeeIdValue(row.employeeNumber),
           row.employeeName,
           formatKnownReportValue(row.status),
           formatListValue(row.certification, "No certification"),
@@ -294,6 +307,7 @@ export function buildOperationsReportPreviewTable(
       return {
         title: "Account access",
         columns: [
+          { label: "Employee ID" },
           { label: "Employee" },
           { label: "Staff status" },
           { label: "Email" },
@@ -302,6 +316,7 @@ export function buildOperationsReportPreviewTable(
           { label: "Access status" },
         ],
         rows: payload.reports.accountAccess.map((row) => [
+          formatEmployeeIdValue(row.employeeNumber),
           row.employeeName,
           formatKnownReportValue(row.status),
           formatContactValue(row.email, "No email"),
@@ -328,5 +343,102 @@ export function buildOperationsReportPreviewTable(
           ]),
         emptyText: "No published schedule for this range.",
       };
+  }
+}
+
+export function buildOperationsReportMetrics(
+  payload: OperationsReportPayload,
+  report: OperationsReportType,
+): ReportMetric[] {
+  const summary = payload.reports.shiftPeriodSummary;
+
+  switch (report) {
+    case "employee-directory":
+      return [
+        { label: "Staff records", value: String(payload.reports.employeeDirectory.length) },
+        {
+          label: "Active staff",
+          value: String(
+            payload.reports.employeeDirectory.filter((row) => row.status === "active").length,
+          ),
+        },
+      ];
+    case "staff-hours":
+      return [
+        { label: "Scheduled hours", value: String(summary.totalScheduledHours) },
+        { label: "Shifts", value: String(summary.totalShifts) },
+        { label: "Overtime alerts", value: String(summary.overtimeAlertCount) },
+      ];
+    case "coverage":
+      return [
+        {
+          label: "Coverage",
+          value: summary.coveragePct == null ? "Not available" : `${summary.coveragePct}%`,
+        },
+        { label: "Open slots", value: String(summary.openSlotCount) },
+      ];
+    case "shift-period-summary":
+      return [
+        { label: "Scheduled hours", value: String(summary.totalScheduledHours) },
+        { label: "Shifts", value: String(summary.totalShifts) },
+        {
+          label: "Coverage",
+          value: summary.coveragePct == null ? "Not available" : `${summary.coveragePct}%`,
+        },
+        { label: "Open slots", value: String(summary.openSlotCount) },
+        { label: "Requests", value: String(summary.requestCount) },
+        { label: "Overtime alerts", value: String(summary.overtimeAlertCount) },
+      ];
+    case "shift-requests":
+      return [{ label: "Requests", value: String(payload.reports.shiftRequests.length) }];
+    case "absences-calloffs":
+      return [
+        {
+          label: "Absences and call-offs",
+          value: String(payload.reports.absencesCalloffs.length),
+        },
+      ];
+    case "roster-status":
+      return [
+        { label: "Staff records", value: String(payload.reports.rosterStatus.length) },
+        {
+          label: "Pending invitations",
+          value: String(payload.reports.rosterStatus.filter((row) => row.pendingInvitation).length),
+        },
+      ];
+    case "certification-role-matrix":
+      return [
+        {
+          label: "Missing certifications",
+          value: String(
+            payload.reports.certificationRoleMatrix.filter((row) => row.missingCertification)
+              .length,
+          ),
+        },
+        {
+          label: "Missing roles",
+          value: String(
+            payload.reports.certificationRoleMatrix.filter((row) => row.missingRole).length,
+          ),
+        },
+      ];
+    case "account-access":
+      return [
+        {
+          label: "Unlinked staff",
+          value: String(payload.reports.accountAccess.filter((row) => !row.linkedAccount).length),
+        },
+        {
+          label: "Pending invitations",
+          value: String(
+            payload.reports.accountAccess.filter((row) => row.pendingInvitation).length,
+          ),
+        },
+      ];
+    case "schedule-matrix":
+      return [
+        { label: "Scheduled staff", value: String(summary.scheduledStaffCount) },
+        { label: "Schedule dates", value: String(payload.reports.scheduleMatrix.dates.length) },
+      ];
   }
 }

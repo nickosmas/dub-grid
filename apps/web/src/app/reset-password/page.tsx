@@ -246,9 +246,10 @@ function ResetPasswordContent() {
               <button
                 type="submit"
                 disabled={loading}
-                className="dg-auth-submit"
+                className="dg-btn dg-btn-primary dg-btn-lg"
                 style={{
                   marginTop: "4px",
+                  width: "100%",
                 }}
               >
                 <ButtonLoading

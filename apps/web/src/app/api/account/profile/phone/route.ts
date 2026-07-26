@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateSelfLinkedEmployeePhone } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import {
@@ -39,11 +40,13 @@ export async function PATCH(req: NextRequest) {
       return buildStaffValidationErrorResponse(getStaffFieldErrorsFromZod(parsed.error));
     }
 
+    const orgId = await resolveEffectiveOrgId(req, auth.user.id, parsed.data.orgId);
+
     return NextResponse.json(
       await updateSelfLinkedEmployeePhone({
         userId: auth.user.id,
         userEmail: auth.user.email ?? null,
-        orgId: parsed.data.orgId,
+        orgId,
         phone: parsed.data.phone,
         expectedVersion: parsed.data.expectedVersion,
       }),

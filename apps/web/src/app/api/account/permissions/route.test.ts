@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireAuthenticatedUserWithClaims = vi.fn();
 const getImpersonationFromCookie = vi.fn();
-const extractJwtClaims = vi.fn();
+const verifyImpersonationSession = vi.fn();
 const serviceFrom = vi.fn();
 
 vi.mock("@/lib/api-auth", () => ({
@@ -14,20 +14,13 @@ vi.mock("@/lib/impersonation", () => ({
   getImpersonationFromCookie: (cookie: string) => getImpersonationFromCookie(cookie),
 }));
 
+vi.mock("@/lib/impersonation-server", () => ({
+  verifyImpersonationSession: (...args: unknown[]) => verifyImpersonationSession(...args),
+}));
+
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({ from: serviceFrom }),
 }));
-
-// Keep the real buildPerms (so the returned permission shape is authentic) but
-// control extractJwtClaims, which is what the route trusts to derive the
-// caller's effective role + org from the access token.
-vi.mock("@/features/permissions/shared", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/features/permissions/shared")>();
-  return {
-    ...actual,
-    extractJwtClaims: (token: string) => extractJwtClaims(token),
-  };
-});
 
 import { GET } from "./route";
 
@@ -59,11 +52,30 @@ function makeQuery(table: string) {
   return query;
 }
 
-function makeAuth() {
+// The route derives orgId/effectiveRole from auth.claims — which
+// requireAuthenticatedUserWithClaims has already sandbox-rewritten (org_id ->
+// sandbox org, org_role -> "super_admin") by the time this route sees it.
+// Driving these tests through `claims` directly (rather than a separately
+// mocked JWT-decode helper) is what actually proves the route stays correct
+// under sandbox mode: there's no other place left where a raw token re-decode
+// could silently discard the sandbox rewrite (see account/permissions
+// previously calling extractJwtClaims(auth.session.access_token) directly,
+// which ignored auth.claims entirely).
+function makeAuth(opts?: {
+  factors?: Array<{ factor_type: string; status: string }>;
+  orgId?: string | null;
+  orgRole?: string;
+  platformRole?: string;
+}) {
   return {
-    user: { id: USER_ID, email: "user@example.com" },
+    user: { id: USER_ID, email: "user@example.com", factors: opts?.factors },
     session: { access_token: "test-token" },
-    claims: { sub: USER_ID, platform_role: "none" },
+    claims: {
+      sub: USER_ID,
+      platform_role: opts?.platformRole ?? "none",
+      org_id: opts?.orgId ?? null,
+      org_role: opts?.orgRole,
+    },
   };
 }
 
@@ -73,16 +85,18 @@ describe("GET /api/account/permissions", () => {
     tableResults.clear();
     requireAuthenticatedUserWithClaims.mockResolvedValue(makeAuth());
     getImpersonationFromCookie.mockReturnValue(null);
+    verifyImpersonationSession.mockResolvedValue(null);
     serviceFrom.mockImplementation((table: string) => makeQuery(table));
-    extractJwtClaims.mockReturnValue({ effectiveRole: "user", orgId: null });
   });
 
   function request() {
     return GET(new NextRequest("http://localhost/api/account/permissions"));
   }
 
-  it("resolves super_admin permissions straight from the JWT claims", async () => {
-    extractJwtClaims.mockReturnValue({ effectiveRole: "super_admin", orgId: ORG_ID });
+  it("resolves super_admin permissions straight from the sandbox-rewritten claims", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
+    );
 
     const response = await request();
 
@@ -91,15 +105,16 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.role).toBe("super_admin");
     expect(body.permissions.orgId).toBe(ORG_ID);
     expect(body.permissions.isSuperAdmin).toBe(true);
-    // Privileged roles are trusted from the JWT; no membership lookup.
-    expect(serviceFrom).not.toHaveBeenCalled();
+    // Permissions are trusted from claims; no membership lookup. Self-employment
+    // flags (isOnSchedule/isManagementUser) still require an employees read.
+    expect(serviceFrom).not.toHaveBeenCalledWith("organization_memberships");
+    expect(serviceFrom).toHaveBeenCalledWith("employees");
   });
 
-  it("uses the JWT org claim, not the profile default, when they diverge", async () => {
-    extractJwtClaims.mockReturnValue({
-      effectiveRole: "super_admin",
-      orgId: SECOND_ORG_ID,
-    });
+  it("uses claims.org_id (the sandbox-redirected org), not the profile default, when they diverge", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: SECOND_ORG_ID, orgRole: "super_admin" }),
+    );
 
     const response = await request();
 
@@ -108,8 +123,8 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.orgId).toBe(SECOND_ORG_ID);
   });
 
-  it("falls back to profile.org_id + live membership when the JWT lacks an org claim", async () => {
-    extractJwtClaims.mockReturnValue({ effectiveRole: "admin", orgId: null });
+  it("falls back to profile.org_id + live membership when claims lack an org id", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(makeAuth({ orgRole: "admin" }));
     enqueue("profiles", {
       data: { org_id: ORG_ID, platform_role: "none" },
     });
@@ -126,7 +141,7 @@ describe("GET /api/account/permissions", () => {
   });
 
   it("fails closed to user permissions when no live membership exists", async () => {
-    extractJwtClaims.mockReturnValue({ effectiveRole: "user", orgId: null });
+    requireAuthenticatedUserWithClaims.mockResolvedValue(makeAuth({ orgRole: "user" }));
     enqueue("profiles", {
       data: { org_id: ORG_ID, platform_role: "none" },
     });
@@ -143,7 +158,9 @@ describe("GET /api/account/permissions", () => {
   });
 
   it("drops an inactive admin to read-only permissions", async () => {
-    extractJwtClaims.mockReturnValue({ effectiveRole: "admin", orgId: ORG_ID });
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "admin" }),
+    );
     enqueue("employees", { data: { status: "inactive" } });
     enqueue("organization_memberships", {
       data: {
@@ -171,8 +188,25 @@ describe("GET /api/account/permissions", () => {
     expect(body.permissions.orgId).toBe(ORG_ID);
   });
 
-  it("does not consult employee status for super_admin or gridmaster", async () => {
-    extractJwtClaims.mockReturnValue({ effectiveRole: "super_admin", orgId: ORG_ID });
+  it("does not consult employee status for gridmaster", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, platformRole: "gridmaster" }),
+    );
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.permissions.isInactive).toBe(false);
+    // Gridmasters don't have an employees row in the org they're viewing.
+    expect(serviceFrom).not.toHaveBeenCalledWith("employees");
+  });
+
+  it("reports self-employment flags for a management-only super_admin", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
+    );
+    enqueue("employees", { data: { focus_area_ids: [], department_ids: [9] } });
 
     const response = await request();
 
@@ -180,7 +214,218 @@ describe("GET /api/account/permissions", () => {
     const body = await response.json();
     expect(body.permissions.isInactive).toBe(false);
     expect(body.permissions.canManageEmployees).toBe(true);
-    // No employees table read for privileged roles
-    expect(serviceFrom).not.toHaveBeenCalledWith("employees");
+    expect(body.isOnSchedule).toBe(false);
+    expect(body.isManagementUser).toBe(true);
+  });
+
+  it("reports isOnSchedule for a super_admin who is also scheduled", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
+    );
+    enqueue("employees", { data: { focus_area_ids: [5], department_ids: [9] } });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.isOnSchedule).toBe(true);
+    expect(body.isManagementUser).toBe(true);
+  });
+
+  it("reports isOnSchedule for a scheduled employee", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "user" }),
+    );
+    enqueue(
+      "employees",
+      { data: { status: "active", focus_area_ids: [5], department_ids: [] } },
+      { data: { status: "active", focus_area_ids: [5], department_ids: [] } },
+    );
+    enqueue("profiles", { data: { org_id: null, platform_role: "none" } });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.isOnSchedule).toBe(true);
+    expect(body.isManagementUser).toBe(false);
+  });
+
+  it("reports isManagementUser for a management-only employee", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "user" }),
+    );
+    enqueue(
+      "employees",
+      { data: { status: "active", focus_area_ids: [], department_ids: [9] } },
+      { data: { status: "active", focus_area_ids: [], department_ids: [9] } },
+    );
+    enqueue("profiles", { data: { org_id: null, platform_role: "none" } });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.isOnSchedule).toBe(false);
+    expect(body.isManagementUser).toBe(true);
+  });
+
+  it("reports both flags false when the caller has no employees row", async () => {
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "user" }),
+    );
+    enqueue("profiles", { data: { org_id: null, platform_role: "none" } });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.isOnSchedule).toBe(false);
+    expect(body.isManagementUser).toBe(false);
+  });
+
+  it("reports super_admin permissions for a sandboxed caller with no personal employee row", async () => {
+    // Mirrors the sandbox override in requireAuthenticatedUserWithClaims:
+    // org_id -> sandbox org, org_role -> "super_admin". Sandbox employee
+    // clones have user_id stripped, so the employees lookup finds nothing —
+    // this must resolve to {isOnSchedule: false, isManagementUser: false},
+    // never the caller's real schedule.
+    requireAuthenticatedUserWithClaims.mockResolvedValue(
+      makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
+    );
+    enqueue("employees", { data: null });
+
+    const response = await request();
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.permissions.role).toBe("super_admin");
+    expect(body.permissions.orgId).toBe(ORG_ID);
+    expect(body.isOnSchedule).toBe(false);
+    expect(body.isManagementUser).toBe(false);
+  });
+
+  describe("mfaNagRequired", () => {
+    it("nags a super_admin with no verified TOTP factor", async () => {
+      requireAuthenticatedUserWithClaims.mockResolvedValue(
+        makeAuth({ orgId: ORG_ID, orgRole: "super_admin" }),
+      );
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(true);
+    });
+
+    it("does not nag a super_admin who has a verified TOTP factor", async () => {
+      requireAuthenticatedUserWithClaims.mockResolvedValue(
+        makeAuth({
+          orgId: ORG_ID,
+          orgRole: "super_admin",
+          factors: [{ factor_type: "totp", status: "verified" }],
+        }),
+      );
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(false);
+    });
+
+    it("does not nag a super_admin whose only TOTP factor is unverified", async () => {
+      requireAuthenticatedUserWithClaims.mockResolvedValue(
+        makeAuth({
+          orgId: ORG_ID,
+          orgRole: "super_admin",
+          factors: [{ factor_type: "totp", status: "unverified" }],
+        }),
+      );
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(true);
+    });
+
+    it("does not nag a regular user without MFA", async () => {
+      requireAuthenticatedUserWithClaims.mockResolvedValue(
+        makeAuth({ orgId: ORG_ID, orgRole: "user" }),
+      );
+      enqueue("profiles", { data: { org_id: null, platform_role: "none" } });
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(false);
+    });
+
+    it("nags a gridmaster with no verified TOTP factor", async () => {
+      requireAuthenticatedUserWithClaims.mockResolvedValue(
+        makeAuth({ orgId: ORG_ID, platformRole: "gridmaster" }),
+      );
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(true);
+    });
+
+    it("reflects the impersonating gridmaster's own MFA status, not the target's", async () => {
+      getImpersonationFromCookie.mockReturnValue({
+        sessionId: "session-1",
+        targetOrgId: ORG_ID,
+        targetUserId: "target-user",
+        targetOrgRole: "user",
+      });
+      verifyImpersonationSession.mockResolvedValue({
+        targetOrgId: ORG_ID,
+        targetUserId: "target-user",
+      });
+      requireAuthenticatedUserWithClaims.mockResolvedValue(
+        makeAuth({
+          orgId: ORG_ID,
+          platformRole: "gridmaster",
+          factors: [{ factor_type: "totp", status: "verified" }],
+        }),
+      );
+      enqueue("organization_memberships", { data: { org_role: "user", admin_permissions: null } });
+
+      const response = await request();
+
+      const body = await response.json();
+      expect(body.mfaNagRequired).toBe(false);
+      expect(verifyImpersonationSession).toHaveBeenCalledWith(
+        expect.anything(),
+        "session-1",
+        USER_ID,
+      );
+    });
+
+    it("ignores an impersonation cookie whose session isn't verified, falling back to the caller's real permissions", async () => {
+      getImpersonationFromCookie.mockReturnValue({
+        sessionId: "forged-session",
+        targetOrgId: SECOND_ORG_ID,
+        targetUserId: "someone-elses-account",
+        targetOrgRole: "super_admin",
+      });
+      // No matching impersonation_sessions row (expired, ended, or never real).
+      verifyImpersonationSession.mockResolvedValue(null);
+      requireAuthenticatedUserWithClaims.mockResolvedValue(
+        makeAuth({
+          orgId: ORG_ID,
+          platformRole: "gridmaster",
+          factors: [{ factor_type: "totp", status: "verified" }],
+        }),
+      );
+
+      const response = await request();
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      // Falls through to the gridmaster's own (real) permissions, never the
+      // forged cookie's target org/role.
+      expect(body.permissions.role).toBe("gridmaster");
+      expect(body.permissions.orgId).not.toBe(SECOND_ORG_ID);
+    });
   });
 });

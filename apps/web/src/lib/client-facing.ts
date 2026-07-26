@@ -1,10 +1,12 @@
 import {
   formatClientErrorMessage as sharedFormatClientErrorMessage,
   getErrorMessage as sharedGetErrorMessage,
+  isSessionExpiredError as sharedIsSessionExpiredError,
 } from "@dubgrid/client-errors";
 
 export const formatClientErrorMessage = sharedFormatClientErrorMessage;
 export const extractRawErrorMessage = sharedGetErrorMessage;
+export const isSessionExpiredError = sharedIsSessionExpiredError;
 
 export function formatClientLabel(value: string | null | undefined): string {
   const normalized = value?.trim();

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { AccessibilityInfo, Animated, Easing, StyleSheet, View } from "react-native";
-import { mobileColors, mobileSpacing } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileSpacing, type MobileColors } from "../theme/tokens";
 
 const PULSE_DURATION_MS = 900;
 
@@ -16,6 +17,8 @@ export function SkeletonBlock({
   radius?: number;
   style?: StyleProp<ViewStyle>;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const pulse = useRef(new Animated.Value(0)).current;
   const [isReduceMotionEnabled, setIsReduceMotionEnabled] = useState(false);
 
@@ -94,6 +97,8 @@ export function SkeletonBlock({
 }
 
 export function HeroSkeleton() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View testID="hero-skeleton" style={styles.heroCard}>
       <SkeletonBlock height={16} width="34%" />
@@ -114,6 +119,8 @@ export function ListSkeleton({
   rows?: number;
   showSectionHeader?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View testID="list-skeleton" style={styles.section}>
       {showSectionHeader ? (
@@ -137,6 +144,8 @@ export function ListSkeleton({
 }
 
 export function DetailSkeleton({ sections = 2 }: { sections?: number }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View testID="detail-skeleton" style={styles.section}>
       <View style={styles.detailCard}>
@@ -165,66 +174,67 @@ export function DetailSkeleton({ sections = 2 }: { sections?: number }) {
   );
 }
 
-const styles = StyleSheet.create({
-  block: {
-    backgroundColor: mobileColors.borderSubtle,
-  },
-  section: {
-    gap: mobileSpacing.sectionGap,
-  },
-  heroCard: {
-    paddingVertical: 4,
-    gap: 12,
-  },
-  heroRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  heroButton: {
-    flex: 1,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
-  },
-  listCard: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: mobileColors.borderSubtle,
-    paddingVertical: 14,
-    gap: 10,
-  },
-  listRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  detailCard: {
-    paddingVertical: 4,
-    gap: 12,
-  },
-  detailHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  detailActionRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  detailAction: {
-    flex: 1,
-  },
-  detailSection: {
-    gap: 10,
-  },
-  detailListCard: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: mobileColors.borderSubtle,
-    paddingVertical: 14,
-    gap: 10,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    block: {
+      backgroundColor: mobileColors.borderSubtle,
+    },
+    section: {
+      gap: mobileSpacing.sectionGap,
+    },
+    heroCard: {
+      paddingVertical: 4,
+      gap: 12,
+    },
+    heroRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    heroButton: {
+      flex: 1,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
+    },
+    listCard: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: mobileColors.borderSubtle,
+      paddingVertical: 14,
+      gap: 10,
+    },
+    listRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    detailCard: {
+      paddingVertical: 4,
+      gap: 12,
+    },
+    detailHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    detailActionRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    detailAction: {
+      flex: 1,
+    },
+    detailSection: {
+      gap: 10,
+    },
+    detailListCard: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderColor: mobileColors.borderSubtle,
+      paddingVertical: 14,
+      gap: 10,
+    },
+  });

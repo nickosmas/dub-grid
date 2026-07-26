@@ -155,6 +155,7 @@ export function rowToOrganization(row: DbOrganization): Organization {
     sandboxOwnerUserId: row.sandbox_owner_user_id ?? null,
     sandboxSourceOrgId: row.sandbox_source_org_id ?? null,
     enforceConflictPrevention: row.enforce_conflict_prevention ?? false,
+    defaultShiftEnabled: row.default_shift_enabled ?? true,
     coverageRuleConfig: normalizeCoverageRuleConfig(row.coverage_rule_config),
     openShiftVisibility: normalizeOpenShiftVisibility(row.open_shift_visibility),
     stripeCustomerId: row.stripe_customer_id ?? null,

@@ -11,7 +11,8 @@ import * as Sentry from "@/lib/sentry";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { resolveJobColorsForShift } from "@/lib/job-placement";
-import { borderColor } from "@/lib/colors";
+import { useTheme } from "next-themes";
+import { borderColor, resolveShiftPillColors } from "@/lib/colors";
 
 const PREVIEW_DAYS = [
   { shortLabel: "Mon", dateNumber: "21" },
@@ -111,15 +112,20 @@ function DisplayModePreviewPill({
   sample: PreviewShift;
 }) {
   const showSecondaryLine = !!sample.secondaryLabel;
+  const { resolvedTheme } = useTheme();
+  const resolved = resolveShiftPillColors(
+    { color: sample.color, text: sample.text, border: sample.border },
+    resolvedTheme === "dark",
+  );
 
   return (
     <div
       data-shift-pill="single"
       style={{
-        background: sample.color,
-        border: `1px solid ${borderColor(sample.text)}`,
+        background: resolved.color,
+        border: `1px solid ${borderColor(resolved.text)}`,
         borderRadius: 8,
-        color: sample.text,
+        color: resolved.text,
         display: "flex",
         flex: 1,
         flexDirection: "column",
@@ -149,7 +155,7 @@ function DisplayModePreviewPill({
             : {
                 fontSize: "var(--dg-fs-title)",
                 fontWeight: 800,
-                lineHeight: 1,
+                lineHeight: 1.2,
                 maxWidth: "100%",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -164,7 +170,7 @@ function DisplayModePreviewPill({
           style={{
             fontSize: "var(--dg-fs-footnote)",
             fontWeight: 700,
-            lineHeight: 1,
+            lineHeight: 1.3,
             maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -334,8 +340,8 @@ export const DISPLAY_MODES: {
     description:
       "Display abbreviations like D, EVE, N on the grid. Best when your team scans the schedule by compact shift labels.",
     details: [
-      "The schedule grid shows short codes in each cell",
-      "Both the code and full name are visible when creating shifts",
+      "The schedule grid, monthly calendar, and recurring-pattern editor show short codes in each cell",
+      "Everywhere else in the app, shifts are always shown by their full name",
       "Compact display fits well in all views including 2-week",
     ],
   },
@@ -345,9 +351,8 @@ export const DISPLAY_MODES: {
     description:
       "Display descriptive names like Day Shift, Evening, Night on the grid. Best for organizations that don't use codes.",
     details: [
-      "The schedule grid shows the full shift name in each cell",
-      "Short codes are hidden throughout the app",
-      "When creating shifts, you only need to provide a name",
+      "The schedule grid, monthly calendar, and recurring-pattern editor show the full shift name in each cell",
+      "Shift cells take up more room to fit the longer text",
     ],
   },
 ];
@@ -436,7 +441,8 @@ export default function DisplayMode({
               lineHeight: 1.5,
             }}
           >
-            Select the visual language people should see across the schedule and related views.
+            Select how shifts appear in the schedule grid, monthly calendar, and recurring-pattern
+            editor. Everywhere else, shifts are always shown by their full name.
           </div>
         </div>
 

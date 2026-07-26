@@ -14,6 +14,13 @@ type PeopleStatusContext = {
   };
   permissions: {
     canManageEmployees: boolean;
+    // Gates syncing organization_memberships alongside employees.status —
+    // mirrors the tier DELETE /api/organizations/access requires on web, so
+    // a plain admin with only canManageEmployees can't use remove/activate as
+    // a side door to change org access they aren't allowed to touch directly.
+    // Gridmaster mobile access is blocked entirely at auth resolution, so
+    // super_admin is the only tier that needs checking here.
+    isSuperAdmin: boolean;
   };
   serviceClient: SupabaseClient;
   user: {
@@ -58,6 +65,24 @@ type InsertAuditLog = (
 
 type MapEmployeeToMobilePerson = (employee: Employee) => MobilePerson;
 
+type FetchActiveMembershipOrgRole = (
+  serviceClient: SupabaseClient,
+  orgId: string,
+  userId: string,
+) => Promise<string | null>;
+
+type CountActiveSuperAdmins = (serviceClient: SupabaseClient, orgId: string) => Promise<number>;
+
+type ArchiveOrganizationMembership = (
+  serviceClient: SupabaseClient,
+  input: { orgId: string; userId: string; archivedByUserId: string; archivedAt: string },
+) => Promise<void>;
+
+type RestoreOrganizationMembership = (
+  serviceClient: SupabaseClient,
+  input: { orgId: string; userId: string },
+) => Promise<void>;
+
 type PeopleStatusResult =
   | {
       kind: "not_found";
@@ -76,6 +101,11 @@ type PeopleStatusResult =
       error: string;
       code: typeof SELF_ACTION_FORBIDDEN_CODE;
       status: 403;
+    }
+  | {
+      kind: "cannot_remove_last_super_admin";
+      error: string;
+      status: 400;
     }
   | {
       kind: "latest_unavailable";
@@ -101,6 +131,10 @@ export async function updateMobilePersonStatus(
     updateEmployeeStatus: UpdateEmployeeStatus;
     insertAuditLog: InsertAuditLog;
     mapEmployeeToMobilePerson: MapEmployeeToMobilePerson;
+    fetchActiveMembershipOrgRole: FetchActiveMembershipOrgRole;
+    countActiveSuperAdmins: CountActiveSuperAdmins;
+    archiveOrganizationMembership: ArchiveOrganizationMembership;
+    restoreOrganizationMembership: RestoreOrganizationMembership;
   },
 ): Promise<PeopleStatusResult> {
   if (!auth.permissions.canManageEmployees) {
@@ -140,6 +174,33 @@ export async function updateMobilePersonStatus(
       person: deps.mapEmployeeToMobilePerson(currentEmployee),
       status: 409,
     };
+  }
+
+  // Removing staff already fully blocks login at the JWT hook regardless of
+  // org_role, so removing the org's only super_admin here would lock the org
+  // out just as surely as deleting their membership would — same guard as
+  // DELETE /api/organizations/access on web.
+  if (input.body.action === "remove" && currentEmployee.userId) {
+    const targetOrgRole = await deps.fetchActiveMembershipOrgRole(
+      auth.serviceClient,
+      auth.currentOrg.id,
+      currentEmployee.userId,
+    );
+
+    if (targetOrgRole === "super_admin") {
+      const superAdminCount = await deps.countActiveSuperAdmins(
+        auth.serviceClient,
+        auth.currentOrg.id,
+      );
+
+      if (superAdminCount <= 1) {
+        return {
+          kind: "cannot_remove_last_super_admin",
+          error: "Cannot remove the only super admin. Transfer ownership first.",
+          status: 400,
+        };
+      }
+    }
   }
 
   const now = new Date().toISOString();
@@ -190,6 +251,32 @@ export async function updateMobilePersonStatus(
       person: deps.mapEmployeeToMobilePerson(latestEmployee),
       status: 409,
     };
+  }
+
+  // Remove/activate a linked user's org membership in lockstep with their
+  // employees.status, in the same request that already committed the status
+  // change — not a second, separately-triggered call — so the two can't
+  // diverge. Gated to super_admin (gridmaster mobile access is blocked
+  // entirely at auth resolution) — the same tier DELETE
+  // /api/organizations/access requires on web.
+  if (
+    (input.body.action === "remove" || input.body.action === "activate") &&
+    currentEmployee.userId &&
+    auth.permissions.isSuperAdmin
+  ) {
+    if (input.body.action === "remove") {
+      await deps.archiveOrganizationMembership(auth.serviceClient, {
+        orgId: auth.currentOrg.id,
+        userId: currentEmployee.userId,
+        archivedByUserId: auth.user.id,
+        archivedAt: now,
+      });
+    } else {
+      await deps.restoreOrganizationMembership(auth.serviceClient, {
+        orgId: auth.currentOrg.id,
+        userId: currentEmployee.userId,
+      });
+    }
   }
 
   await deps.insertAuditLog(auth.serviceClient, {

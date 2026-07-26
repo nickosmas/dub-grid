@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   Animated,
   Dimensions,
@@ -11,7 +11,8 @@ import {
 } from "react-native";
 import { Button, type ButtonTone } from "./Button";
 import { hapticImpact } from "../lib/haptics";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
 const SHEET_TRAVEL = Dimensions.get("window").height;
@@ -44,6 +45,8 @@ export function ConfirmationModal({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDestructive = confirmTone === "danger" || confirmTone === "dangerFilled";
 
   const handleConfirm = () => {
@@ -107,49 +110,50 @@ export function ConfirmationModal({
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: mobileColors.overlay,
-  },
-  sheet: {
-    width: "100%",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: SHEET_BOTTOM_PADDING,
-    gap: 20,
-    shadowColor: mobileColors.textPrimary,
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
-    shadowRadius: 28,
-    elevation: 16,
-  },
-  grabber: {
-    alignSelf: "center",
-    width: 40,
-    height: 4,
-    borderRadius: mobileRadii.pill,
-    backgroundColor: mobileColors.border,
-    marginBottom: 6,
-  },
-  copy: {
-    gap: 8,
-  },
-  title: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-  },
-  actions: {
-    gap: 10,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: mobileColors.overlay,
+    },
+    sheet: {
+      width: "100%",
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+      paddingHorizontal: 20,
+      paddingTop: 10,
+      paddingBottom: SHEET_BOTTOM_PADDING,
+      gap: 20,
+      shadowColor: mobileColors.textPrimary,
+      shadowOffset: { width: 0, height: -8 },
+      shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
+      shadowRadius: 28,
+      elevation: 16,
+    },
+    grabber: {
+      alignSelf: "center",
+      width: 40,
+      height: 4,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.border,
+      marginBottom: 6,
+    },
+    copy: {
+      gap: 8,
+    },
+    title: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    actions: {
+      gap: 10,
+    },
+  });

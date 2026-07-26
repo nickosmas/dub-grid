@@ -39,8 +39,7 @@ export default function WizardShell({
         zIndex: 9999,
         display: "flex",
         flexDirection: "column",
-        background:
-          "linear-gradient(145deg, var(--color-bg) 0%, var(--color-brand-bg, #eff6ff) 100%)",
+        background: "var(--color-onboarding-shell-bg)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         overflow: "auto",
       }}

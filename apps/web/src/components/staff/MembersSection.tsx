@@ -1,15 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import Link from "next/link";
-import { getEmployeeProfileHref } from "@/lib/profile-links";
+import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import { useQueryClient } from "@tanstack/react-query";
-import { Import as ImportIcon, SlidersHorizontal, Upload } from "lucide-react";
+import { ChevronDown, Import as ImportIcon, SlidersHorizontal, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { queryKeys } from "@/lib/query-keys";
 import {
   fetchOrganizationInvitations,
-  removeUserFromOrganization,
   resendInvitation,
   revokeInvitation,
   updateAppOnlyUser,
@@ -17,6 +17,7 @@ import {
 } from "@/features/organization/client";
 import { updateEmployeeIdentity } from "@/features/employees/client";
 import { isSelfAction } from "@dubgrid/domain";
+import { getAvatarTone } from "@dubgrid/design-tokens";
 import { useAuth } from "@/components/AuthProvider";
 import * as Sentry from "@/lib/sentry";
 import {
@@ -36,6 +37,8 @@ import { useDirectory, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
+import { CloseButton } from "@/components/ui/CloseButton";
+import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { EmptyState } from "@/components/EmptyState";
 import { getAvatarInitials } from "@/lib/utils";
 import {
@@ -90,6 +93,10 @@ export interface MembersSectionProps {
   orgName?: string;
   isSuperAdmin?: boolean;
   isGridmaster?: boolean;
+  // Self signal: the viewer's own employees row has management department
+  // access. Widens visibility (view-only) of the Members/Management list to
+  // non-admin management-only users — see canSeeManagementUsers below.
+  isManagementUser?: boolean;
   departments?: Department[];
   departmentLabel?: string;
   managementDepartmentLabel?: string;
@@ -116,6 +123,7 @@ export function MembersSection({
   orgName,
   isSuperAdmin,
   isGridmaster,
+  isManagementUser,
   departments: departmentItems = [],
   departmentLabel = "Scheduled Departments",
   managementDepartmentLabel = "Management Departments",
@@ -124,10 +132,16 @@ export function MembersSection({
   const isTablet = useMediaQuery(TABLET);
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const currentUserId = currentUser?.id ?? null;
   const canManageManagementAccess = !!isSuperAdmin || !!isGridmaster;
   const canViewManagementUsers = canManageEmployees || canManageManagementAccess;
-  const directoryOrgId = canViewManagementUsers ? (orgId ?? null) : null;
+  // Broader, view-only gate: lets a non-admin management-only user see the
+  // Members/Management list and open a (read-only) detail panel, without
+  // granting any of the edit affordances that stay on canViewManagementUsers.
+  const canSeeManagementUsers = canViewManagementUsers || !!isManagementUser;
+  const directoryOrgId = canSeeManagementUsers ? (orgId ?? null) : null;
   const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef<HTMLButtonElement>(null);
@@ -136,6 +150,7 @@ export function MembersSection({
     employees,
     inactiveEmployees,
     removedEmployees,
+    focusAreas,
   });
   const {
     activeTab,
@@ -502,8 +517,9 @@ export function MembersSection({
 
   const {
     directory,
-    truncated: directoryTruncated,
-    cap: directoryCap,
+    hasMore: directoryHasMore,
+    loadingMore: directoryLoadingMore,
+    loadMore: loadMoreDirectory,
   } = useDirectory(directoryOrgId);
   // Access role (org_role) per linked employee, sourced from the directory.
   // Only populated when the viewer can load directory data; staff with no
@@ -609,6 +625,14 @@ export function MembersSection({
     [departmentItems],
   );
 
+  const scheduledDepts = useMemo(
+    () => departmentItems.filter((department) => department.type === "scheduled"),
+    [departmentItems],
+  );
+
+  const canAddScheduled = canManageEmployees;
+  const canAddManagement = canManageManagementAccess && managementDepts.length > 0;
+
   useEffect(() => {
     if (!showManagement) {
       setDeptFilterId(null);
@@ -617,13 +641,15 @@ export function MembersSection({
   }, [showManagement]);
 
   useEffect(() => {
-    if (!canViewManagementUsers && showManagement) {
+    if (!canSeeManagementUsers && showManagement) {
       setShowManagement(false);
     }
-  }, [canViewManagementUsers, showManagement]);
+  }, [canSeeManagementUsers, showManagement]);
 
   const [showManagementInvite, setShowManagementInvite] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
 
   function handleExport() {
     if (!orgId) return;
@@ -731,14 +757,6 @@ export function MembersSection({
       onSave(employee);
     },
     [onSave],
-  );
-
-  const handleRemove = useCallback(
-    (employeeId: string) => {
-      onRemove(employeeId);
-      setExpandedEmpId(null);
-    },
-    [onRemove],
   );
 
   const hasExportableStaffRows = employees.length > 0;
@@ -882,13 +900,24 @@ export function MembersSection({
             </p>
           </div>
 
-          {directoryTruncated && (
+          {directoryHasMore && (
             <div
-              role="alert"
-              className="rounded-md border border-amber-300/70 bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-100"
+              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-[13px]"
+              style={{
+                borderColor: "var(--color-border-light)",
+                background: "var(--color-muted)",
+                color: "var(--color-text-muted)",
+              }}
             >
-              Showing the first {directoryCap ?? 500} members. Use search or filters to find
-              specific people. Full pagination is coming soon.
+              <span>Not everyone is shown yet. Use search or filters to find specific people.</span>
+              <button
+                type="button"
+                className="dg-btn dg-btn-secondary"
+                onClick={loadMoreDirectory}
+                disabled={directoryLoadingMore}
+              >
+                {directoryLoadingMore ? "Loading…" : "Load more"}
+              </button>
             </div>
           )}
 
@@ -900,7 +929,7 @@ export function MembersSection({
 
           <div className="flex items-center gap-3 overflow-x-auto">
             <div className="flex min-w-0 items-center gap-2">
-              {canViewManagementUsers && managementDepts.length > 0 && (
+              {canSeeManagementUsers && managementDepts.length > 0 && (
                 <CustomSelect
                   value={showManagement ? "management" : "schedule"}
                   options={[
@@ -1126,8 +1155,26 @@ export function MembersSection({
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Search by name, email, or phone..."
-                  style={{ height: 32, paddingLeft: 32, fontSize: 13 }}
+                  style={{
+                    height: 32,
+                    paddingLeft: 32,
+                    paddingRight: searchQuery ? 30 : 12,
+                    fontSize: 13,
+                  }}
                 />
+                {searchQuery && (
+                  <CloseButton
+                    size="sm"
+                    onClick={() => setSearchQuery("")}
+                    aria-label="Clear search"
+                    style={{
+                      position: "absolute",
+                      right: 4,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                    }}
+                  />
+                )}
               </div>
             </div>
 
@@ -1153,10 +1200,66 @@ export function MembersSection({
                 </button>
               )}
 
-              {((showManagement && canManageManagementAccess) ||
-                (!showManagement && canManageEmployees)) && (
+              {canAddScheduled && canAddManagement && (
+                <>
+                  <button
+                    ref={addBtnRef}
+                    onClick={() => setAddMenuOpen((open) => !open)}
+                    aria-expanded={addMenuOpen}
+                    aria-haspopup="menu"
+                    className="dg-btn dg-btn-primary dg-btn-sm"
+                  >
+                    + Add
+                    <ChevronDown size={14} />
+                  </button>
+                  {addMenuOpen && (
+                    <Menu
+                      open
+                      onOpenChange={(nextOpen) => {
+                        if (!nextOpen) setAddMenuOpen(false);
+                      }}
+                    >
+                      <MenuContent
+                        anchor={addBtnRef}
+                        side="bottom"
+                        align="end"
+                        sideOffset={6}
+                        positionMethod="fixed"
+                        collisionPadding={8}
+                        finalFocus={addBtnRef}
+                        style={{ minWidth: 180 }}
+                      >
+                        <MenuItem
+                          onClick={() => {
+                            setAddMenuOpen(false);
+                            onAdd();
+                          }}
+                        >
+                          Scheduled staff
+                        </MenuItem>
+                        <MenuItem
+                          onClick={() => {
+                            setAddMenuOpen(false);
+                            setShowManagementInvite(true);
+                          }}
+                        >
+                          Management staff
+                        </MenuItem>
+                      </MenuContent>
+                    </Menu>
+                  )}
+                </>
+              )}
+
+              {canAddScheduled && !canAddManagement && (
+                <button onClick={onAdd} className="dg-btn dg-btn-primary dg-btn-sm">
+                  + Add
+                </button>
+              )}
+
+              {!canAddScheduled && canAddManagement && (
                 <button
-                  onClick={showManagement ? () => setShowManagementInvite(true) : onAdd}
+                  onClick={() => setShowManagementInvite(true)}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
                   + Add
@@ -1190,7 +1293,7 @@ export function MembersSection({
               focusAreas={focusAreas}
               certifications={certifications}
               roles={roles}
-              departments={departmentItems}
+              departments={scheduledDepts}
               focusAreaLabel={focusAreaLabel}
               certificationLabel={certificationLabel}
               roleLabel={roleLabel}
@@ -1198,6 +1301,7 @@ export function MembersSection({
               selectionCount={selectedIds.size}
               selectedIds={selectedIds}
               canManageEmployees={canManageEmployees}
+              canManageManagementAccess={canManageManagementAccess}
               displayList={displayList}
               pendingInviteByEmployeeId={pendingInviteByEmployeeId}
               onBulkInvite={(employeesToInvite) => {
@@ -1244,7 +1348,7 @@ export function MembersSection({
               focusAreas={focusAreas}
               certifications={certifications}
               roles={roles}
-              departments={departmentItems}
+              departments={scheduledDepts}
               focusAreaLabel={focusAreaLabel}
               certificationLabel={certificationLabel}
               roleLabel={roleLabel}
@@ -1478,7 +1582,7 @@ export function MembersSection({
               />
             ))}
 
-          {canViewManagementUsers &&
+          {canSeeManagementUsers &&
             showManagement &&
             (filteredDeptUsers.length > 0 ? (
               <div className="overflow-hidden rounded-[var(--dg-radius-md)] border border-[var(--color-border-light)] bg-[var(--color-surface)]">
@@ -1554,6 +1658,8 @@ export function MembersSection({
                           ? `${person.firstName} ${person.lastName}`.trim()
                           : person.email;
                       const initials = getAvatarInitials(displayName);
+                      const avatarTone = getAvatarTone(person.personId, isDarkTheme);
+                      const isYou = isSelfAction(currentUserId, person.userId);
 
                       return (
                         <UITableRow
@@ -1581,10 +1687,13 @@ export function MembersSection({
                                 style={{
                                   background: isPending
                                     ? "var(--color-surface)"
-                                    : "var(--color-control-active-bg)",
+                                    : avatarTone.backgroundColor,
                                   color: isPending
                                     ? "var(--color-text-muted)"
-                                    : "var(--color-control-active-text)",
+                                    : avatarTone.textColor,
+                                  border: isPending
+                                    ? "1px solid var(--color-border-light)"
+                                    : `1px solid ${avatarTone.borderColor}`,
                                 }}
                               >
                                 {initials}
@@ -1592,13 +1701,15 @@ export function MembersSection({
                               <div className="min-w-0">
                                 <div className="flex items-center gap-2">
                                   {/* Match the on-schedule roster: the name
-                                      links to the full profile page when an
-                                      employees row exists. Without an
-                                      employeeId (rare legacy data), fall back
-                                      to plain text. Stop row-click propagation
-                                      so the link doesn't also toggle the
-                                      expanded popover. */}
-                                  {person.employeeId ? (
+                                      links to the full profile page only for
+                                      staff managers (the /people/[id] page is
+                                      manager-only for management users); the
+                                      self link just goes to /profile. Stop
+                                      row-click propagation so the link doesn't
+                                      also toggle the expanded popover. */}
+                                  {person.employeeId &&
+                                  (canManageEmployees ||
+                                    isCurrentUsersEmployee(person.userId, currentUserId)) ? (
                                     <Link
                                       href={getEmployeeProfileHref(
                                         person.employeeId,
@@ -1613,6 +1724,11 @@ export function MembersSection({
                                   ) : (
                                     <span className="truncate text-[14px] font-medium text-[var(--color-text-primary)]">
                                       {displayName}
+                                    </span>
+                                  )}
+                                  {isYou && (
+                                    <span className="text-[10px] font-bold px-1.5 py-px rounded-full bg-[var(--color-control-active-bg)] text-[var(--color-control-active-text)] shrink-0">
+                                      You
                                     </span>
                                   )}
                                   {/* "On Schedule" reflects whether the person
@@ -1821,11 +1937,13 @@ export function MembersSection({
           orgId={orgId}
           pendingInviteByEmployeeId={pendingInviteByEmployeeId}
           onSave={handleSave}
-          onRemove={handleRemove}
+          onRemove={onRemove}
           onDeactivate={(employeeId, note) => onDeactivate(employeeId, note)}
           onActivate={(employeeId) => onActivate(employeeId)}
           onClose={() => setExpandedEmpId(null)}
-          onInvite={(employee) => setInviteEmployee(employee)}
+          onInvite={
+            canManageManagementAccess ? (employee) => setInviteEmployee(employee) : undefined
+          }
           canManageManagementAccess={canManageManagementAccess}
           hasManagementAccess={selectedEmployeeDirectoryPerson?.isManagementUser ?? false}
           hasPendingManagementInvite={
@@ -1840,21 +1958,6 @@ export function MembersSection({
               : undefined
           }
           onRevoke={handleRevokeInvitation}
-          onRevokeAccess={
-            isSuperAdmin && orgId
-              ? async (userId: string) => {
-                  try {
-                    await removeUserFromOrganization(userId, orgId);
-                    toast.success("App access revoked");
-                    void queryClient.invalidateQueries({
-                      queryKey: queryKeys.org.directory(orgId),
-                    });
-                  } catch {
-                    toast.error("Failed to revoke app access");
-                  }
-                }
-              : undefined
-          }
           orgRole={selectedEmployeeDirectoryPerson?.orgRole ?? null}
           adminPermissions={selectedEmployeeDirectoryPerson?.adminPermissions ?? null}
           onRoleChange={
@@ -1904,7 +2007,7 @@ export function MembersSection({
         />
       )}
 
-      {selectedPerson && canViewManagementUsers && (
+      {selectedPerson && canSeeManagementUsers && (
         <ManagementStaffPanel
           person={selectedPerson}
           departments={managementDepts}

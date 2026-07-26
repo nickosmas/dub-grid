@@ -23,6 +23,8 @@ import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useTheme } from "next-themes";
+import { resolveShiftPillColors, toDarkPillColors } from "@/lib/colors";
 import { toast } from "sonner";
 import {
   fetchAbsenceTypes,
@@ -2544,6 +2546,8 @@ function ConfigTab({
   indicatorTypes: IndicatorType[];
   organization: Organization;
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const activeFocusAreas = focusAreas.filter((fa) => !fa.archivedAt);
   const archivedFocusAreas = focusAreas.filter((fa) => fa.archivedAt);
   const activeShiftCategories = shiftCategories.filter((shift) => !shift.archivedAt);
@@ -2890,64 +2894,73 @@ function ConfigTab({
                 </tr>
               </thead>
               <tbody>
-                {activeAbsenceTypes.map((at) => (
-                  <tr key={at.id}>
-                    <td
-                      style={{
-                        padding: "8px 14px",
-                        borderBottom: "1px solid var(--color-border-light)",
-                      }}
-                    >
-                      <span
+                {activeAbsenceTypes.map((at0) => {
+                  const at = {
+                    ...at0,
+                    ...resolveShiftPillColors(
+                      { color: at0.color, text: at0.text, border: at0.border },
+                      isDarkTheme,
+                    ),
+                  };
+                  return (
+                    <tr key={at0.id}>
+                      <td
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          minWidth: 32,
-                          height: 26,
-                          padding: "0 8px",
-                          borderRadius: 8,
-                          fontSize: "var(--dg-fs-caption)",
-                          fontWeight: 700,
-                          background: at.color,
-                          color: at.text,
-                          border: `1.5px solid ${at.border}`,
+                          padding: "8px 14px",
+                          borderBottom: "1px solid var(--color-border-light)",
                         }}
                       >
-                        {at.label}
-                      </span>
-                    </td>
-                    <td
-                      style={{
-                        padding: "8px 14px",
-                        fontSize: "var(--dg-fs-label)",
-                        fontWeight: 600,
-                        color: "var(--color-text-primary)",
-                        borderBottom: "1px solid var(--color-border-light)",
-                      }}
-                    >
-                      {at.name}
-                    </td>
-                    <td
-                      style={{
-                        padding: "8px 14px",
-                        borderBottom: "1px solid var(--color-border-light)",
-                      }}
-                    >
-                      <span
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            minWidth: 32,
+                            height: 26,
+                            padding: "0 8px",
+                            borderRadius: 8,
+                            fontSize: "var(--dg-fs-caption)",
+                            fontWeight: 700,
+                            background: at.color,
+                            color: at.text,
+                            border: `1.5px solid ${at.border}`,
+                          }}
+                        >
+                          {at.label}
+                        </span>
+                      </td>
+                      <td
                         style={{
-                          display: "inline-block",
-                          width: 20,
-                          height: 20,
-                          borderRadius: 4,
-                          background: at.color,
-                          border: `1px solid ${at.border}`,
-                          verticalAlign: "middle",
+                          padding: "8px 14px",
+                          fontSize: "var(--dg-fs-label)",
+                          fontWeight: 600,
+                          color: "var(--color-text-primary)",
+                          borderBottom: "1px solid var(--color-border-light)",
                         }}
-                      />
-                    </td>
-                  </tr>
-                ))}
+                      >
+                        {at.name}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 14px",
+                          borderBottom: "1px solid var(--color-border-light)",
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: "inline-block",
+                            width: 20,
+                            height: 20,
+                            borderRadius: 4,
+                            background: at.color,
+                            border: `1px solid ${at.border}`,
+                            verticalAlign: "middle",
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -3050,7 +3063,7 @@ function ConfigTab({
                       width: 8,
                       height: 8,
                       borderRadius: "50%",
-                      background: ind.color,
+                      background: isDarkTheme ? toDarkPillColors(ind.color).bg : ind.color,
                       flexShrink: 0,
                     }}
                   />

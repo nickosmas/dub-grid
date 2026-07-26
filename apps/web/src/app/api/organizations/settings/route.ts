@@ -47,6 +47,7 @@ const bodySchema = z.object({
     .nullable()
     .optional(),
   enforceConflictPrevention: z.boolean().optional(),
+  defaultShiftEnabled: z.boolean().optional(),
   coverageRuleConfig: z
     .object({
       mentoredCoverageCreditPercent: z.number().int().min(0).max(100),
@@ -343,6 +344,7 @@ export async function PUT(req: NextRequest) {
           : currentOrg.payPeriodStartDate,
       enforceConflictPrevention:
         fields.enforceConflictPrevention ?? currentOrg.enforceConflictPrevention,
+      defaultShiftEnabled: fields.defaultShiftEnabled ?? currentOrg.defaultShiftEnabled,
       coverageRuleConfig: fields.coverageRuleConfig ?? currentOrg.coverageRuleConfig,
       openShiftVisibility: fields.openShiftVisibility ?? currentOrg.openShiftVisibility,
       dataRetentionDays: fields.dataRetentionDays ?? currentOrg.dataRetentionDays,
@@ -399,6 +401,9 @@ export async function PUT(req: NextRequest) {
     }
     if (changeKeys.has("enforceConflictPrevention")) {
       update.enforce_conflict_prevention = nextOrg.enforceConflictPrevention;
+    }
+    if (changeKeys.has("defaultShiftEnabled")) {
+      update.default_shift_enabled = nextOrg.defaultShiftEnabled;
     }
     if (changeKeys.has("coverageRuleConfig")) {
       update.coverage_rule_config = nextOrg.coverageRuleConfig;

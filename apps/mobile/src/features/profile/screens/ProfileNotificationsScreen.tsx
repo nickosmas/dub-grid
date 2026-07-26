@@ -12,7 +12,8 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -71,6 +72,8 @@ function normalizePrefs(input: unknown): PrefsShape {
 }
 
 export default function ProfileNotificationsScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
@@ -249,6 +252,8 @@ interface ChannelToggleProps {
 }
 
 function ChannelToggle({ icon, label, value, onValueChange }: ChannelToggleProps) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <Pressable
       accessibilityRole="switch"
@@ -263,64 +268,65 @@ function ChannelToggle({ icon, label, value, onValueChange }: ChannelToggleProps
   );
 }
 
-const styles = StyleSheet.create({
-  body: {
-    gap: 16,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 16,
-    padding: 16,
-  },
-  toggleCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  rowTitle: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  rowDescription: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-  },
-  categoryBlock: {
-    padding: 16,
-    gap: 8,
-  },
-  categoryDivider: {
-    borderBottomWidth: 1,
-    borderBottomColor: mobileColors.borderSubtle,
-  },
-  channelRow: {
-    flexDirection: "row",
-    gap: 10,
-    flexWrap: "wrap",
-    marginTop: 6,
-  },
-  channelChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-  },
-  channelLabel: {
-    ...mobileText.label,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  savingNote: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-    textAlign: "center",
-    paddingVertical: 4,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    body: {
+      gap: 16,
+    },
+    toggleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 16,
+      padding: 16,
+    },
+    toggleCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    rowTitle: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    rowDescription: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+    categoryBlock: {
+      padding: 16,
+      gap: 8,
+    },
+    categoryDivider: {
+      borderBottomWidth: 1,
+      borderBottomColor: mobileColors.borderSubtle,
+    },
+    channelRow: {
+      flexDirection: "row",
+      gap: 10,
+      flexWrap: "wrap",
+      marginTop: 6,
+    },
+    channelChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+    },
+    channelLabel: {
+      ...mobileText.label,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    savingNote: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+      paddingVertical: 4,
+    },
+  });

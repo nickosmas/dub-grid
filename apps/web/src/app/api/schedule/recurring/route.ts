@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbRecurringShift } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
@@ -8,10 +9,46 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { rowToRecurringShift } from "@/lib/db/mappers";
 import { RECURRING_SHIFT_COLS } from "@/lib/db/shared";
-import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import type { AuditAction, AuditResourceType } from "@/lib/audit";
+import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
+
+/** Fire-and-forget audit log write — never blocks or throws on the hot schedule-edit path. */
+function logScheduleAudit(
+  serviceClient: SupabaseClient,
+  entry: {
+    orgId: string;
+    actorId: string;
+    actorEmail: string | null;
+    action: AuditAction;
+    resourceType: AuditResourceType;
+    resourceId: string | null;
+    details: Record<string, unknown>;
+  },
+): void {
+  try {
+    void serviceClient
+      .from("audit_log")
+      .insert({
+        org_id: entry.orgId,
+        actor_id: entry.actorId,
+        actor_email: entry.actorEmail,
+        action: entry.action,
+        resource_type: entry.resourceType,
+        resource_id: entry.resourceId,
+        details: entry.details,
+      })
+      .then(({ error }) => {
+        if (error) {
+          logger.error({ error, action: entry.action }, "Schedule audit log write failed");
+        }
+      });
+  } catch (error) {
+    logger.error({ error, action: entry.action }, "Schedule audit log write failed");
+  }
+}
 
 const mapEntrySchema = z.array(z.tuple([z.number().int(), z.string()]));
 
@@ -260,13 +297,19 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        void dispatchNotificationEvent(auth.actor.id, {
-          action: "recurring_shift_updated",
+        logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
-          empId: data.employeeId,
-          mode: "upsert",
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "recurring_shift.upserted",
+          resourceType: "recurring_shift",
+          resourceId: `${data.employeeId}_${data.dayOfWeek}`,
+          details: {
+            dayOfWeek: data.dayOfWeek,
+            effectiveFrom: data.effectiveFrom,
+            input: data.input,
+          },
         });
-
         return NextResponse.json({ success: true });
       }
 
@@ -287,11 +330,14 @@ export async function POST(req: NextRequest) {
           throw error;
         }
 
-        void dispatchNotificationEvent(auth.actor.id, {
-          action: "recurring_shift_updated",
+        logScheduleAudit(auth.serviceClient, {
           orgId: data.orgId,
-          empId: data.employeeId,
-          mode: "delete",
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "recurring_shift.deleted",
+          resourceType: "recurring_shift",
+          resourceId: `${data.employeeId}_${data.dayOfWeek}`,
+          details: { dayOfWeek: data.dayOfWeek },
         });
 
         return NextResponse.json({ success: true });

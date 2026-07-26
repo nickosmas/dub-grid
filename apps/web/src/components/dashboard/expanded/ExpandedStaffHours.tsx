@@ -14,6 +14,9 @@ interface ExpandedStaffHoursProps {
   prevHours: EmployeeHours[];
   employees: Employee[];
   focusAreas: FocusArea[];
+  /** Whether rows link to the full /people/[id] details page. Mirrors the
+   * People table: only staff managers can navigate. */
+  canNavigateToDetailsPage: boolean;
   otThreshold?: number;
   onClose: () => void;
 }
@@ -23,6 +26,7 @@ export default function ExpandedStaffHours({
   prevHours,
   employees,
   focusAreas,
+  canNavigateToDetailsPage,
   otThreshold = 40,
   onClose,
 }: ExpandedStaffHoursProps) {
@@ -148,7 +152,94 @@ export default function ExpandedStaffHours({
               const prev = prevMap.get(h.empId);
               const delta = prev ? h.totalHours - prev.totalHours : 0;
 
-              return (
+              const row = (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "14px 16px",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--dg-radius-md)",
+                    background: "var(--color-bg)",
+                    marginBottom: 8,
+                  }}
+                >
+                  {/* Avatar */}
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: "var(--dg-radius-md)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      flexShrink: 0,
+                      background: h.isOvertime
+                        ? "var(--color-danger-bg)"
+                        : "var(--color-bg-secondary)",
+                      color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
+                    }}
+                  >
+                    {initials}
+                  </div>
+
+                  {/* Name + focus area */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "var(--color-text-primary)",
+                      }}
+                    >
+                      {emp.firstName} {emp.lastName}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
+                      {fa?.name ?? ""}
+                    </div>
+                  </div>
+
+                  {/* Week delta */}
+                  {delta !== 0 && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: delta > 0 ? "var(--color-danger)" : "var(--color-success)",
+                      }}
+                    >
+                      {delta > 0 ? "+" : ""}
+                      {Math.round(delta * 10) / 10}h
+                    </span>
+                  )}
+
+                  {/* Hours */}
+                  <div style={{ textAlign: "right", minWidth: 50 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-primary)",
+                      }}
+                    >
+                      {h.totalHours}h
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-subtle)",
+                      }}
+                    >
+                      {h.isOvertime ? `+${h.overtimeHours}h OT` : `of ${otThreshold}h`}
+                    </div>
+                  </div>
+                </div>
+              );
+
+              return canNavigateToDetailsPage ? (
                 <Link
                   key={h.empId}
                   href={`/people/${emp.id}`}
@@ -158,91 +249,10 @@ export default function ExpandedStaffHours({
                     color: "inherit",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "14px 16px",
-                      border: "1px solid var(--color-border)",
-                      borderRadius: "var(--dg-radius-md)",
-                      background: "var(--color-bg)",
-                      marginBottom: 8,
-                    }}
-                  >
-                    {/* Avatar */}
-                    <div
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: "var(--dg-radius-md)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        flexShrink: 0,
-                        background: h.isOvertime
-                          ? "var(--color-danger-bg)"
-                          : "var(--color-bg-secondary)",
-                        color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
-                      }}
-                    >
-                      {initials}
-                    </div>
-
-                    {/* Name + focus area */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: "var(--color-text-primary)",
-                        }}
-                      >
-                        {emp.firstName} {emp.lastName}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--color-text-subtle)" }}>
-                        {fa?.name ?? ""}
-                      </div>
-                    </div>
-
-                    {/* Week delta */}
-                    {delta !== 0 && (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          color: delta > 0 ? "var(--color-danger)" : "var(--color-success)",
-                        }}
-                      >
-                        {delta > 0 ? "+" : ""}
-                        {Math.round(delta * 10) / 10}h
-                      </span>
-                    )}
-
-                    {/* Hours */}
-                    <div style={{ textAlign: "right", minWidth: 50 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-primary)",
-                        }}
-                      >
-                        {h.totalHours}h
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 10,
-                          color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-subtle)",
-                        }}
-                      >
-                        {h.isOvertime ? `+${h.overtimeHours}h OT` : `of ${otThreshold}h`}
-                      </div>
-                    </div>
-                  </div>
+                  {row}
                 </Link>
+              ) : (
+                <div key={h.empId}>{row}</div>
               );
             })
           )}

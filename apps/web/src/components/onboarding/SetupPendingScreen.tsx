@@ -100,7 +100,7 @@ export default function SetupPendingScreen() {
               padding: "10px 24px",
               borderRadius: 10,
               border: "1px solid var(--color-border)",
-              background: "var(--color-bg-card, white)",
+              background: "var(--color-surface)",
               color: "var(--color-text-primary)",
               fontSize: 14,
               fontWeight: 600,

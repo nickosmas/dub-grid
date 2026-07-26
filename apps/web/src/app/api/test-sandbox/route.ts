@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     // from the auth user's profile instead.
     const { data: profile } = await serviceClient
       .from("profiles")
-      .select("org_id")
+      .select("org_id, platform_role")
       .eq("id", auth.user.id)
       .maybeSingle();
     const sourceOrgId = (profile?.org_id as string | undefined) ?? getClaimOrgId(auth.claims);
@@ -103,32 +103,38 @@ export async function POST(req: NextRequest) {
 
     const isReset = parsed.data.action === "reset";
 
-    // For "enter": reuse the existing sandbox if there is one (typical case is
-    // the user re-clicking enter from another tab and expecting their
-    // in-progress work back). For "reset": ignore it — we recreate below.
-    const existing = isReset ? null : await findActiveSandboxForUser(serviceClient, auth.user.id);
-
-    // Defense in depth: when we're about to CLONE (reset, or enter with no
-    // existing sandbox), clone only an org the user is an active member of.
-    // profile.org_id is system-set, but if a membership was archived without
-    // clearing the default it could otherwise point at an org the user no
-    // longer belongs to. Reusing an existing sandbox skips this — its source
-    // was already validated at creation.
-    if (!existing) {
-      const { data: membership } = await serviceClient
+    // Sandbox mode is admin+ only (mirrors Header.tsx's client-side
+    // canOpenSandbox gate) — enforce it server-side too. auth.claims.org_role
+    // can't be used for this: requireAuthenticatedUserWithClaims already
+    // widens it to "super_admin" once a sandbox cookie exists, which would
+    // let a user demoted after entering keep resetting their sandbox. Look
+    // the caller's real role in the source org up directly instead. This
+    // also replaces the old membership-existence-only check, since verifying
+    // org_role in ('admin','super_admin') already implies active membership.
+    const isGridmaster = profile?.platform_role === "gridmaster";
+    let sourceMembership: { org_role?: string } | null = null;
+    if (!isGridmaster) {
+      const { data } = await serviceClient
         .from("organization_memberships")
-        .select("id")
+        .select("org_role")
         .eq("user_id", auth.user.id)
         .eq("org_id", sourceOrgId)
         .is("archived_at", null)
         .maybeSingle();
-      if (!membership) {
+      sourceMembership = data;
+      const role = sourceMembership?.org_role as string | undefined;
+      if (role !== "admin" && role !== "super_admin") {
         return NextResponse.json(
-          { error: "You don't have access to that organization." },
+          { error: "You don't have permission to use sandbox mode." },
           { status: 403 },
         );
       }
     }
+
+    // For "enter": reuse the existing sandbox if there is one (typical case is
+    // the user re-clicking enter from another tab and expecting their
+    // in-progress work back). For "reset": ignore it — we recreate below.
+    const existing = isReset ? null : await findActiveSandboxForUser(serviceClient, auth.user.id);
 
     // For "reset": wipe any existing sandbox first so the recreate step gives
     // the user a truly fresh clone.

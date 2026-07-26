@@ -1,9 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Tabs } from "expo-router";
-import type { ComponentProps, ComponentType } from "react";
+import { useMemo, type ComponentProps, type ComponentType } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { mobileColors } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { type MobileColors } from "../theme/tokens";
 
 type TabBarRenderer = NonNullable<ComponentProps<typeof Tabs>["tabBar"]>;
 type BottomTabBarProps = Parameters<TabBarRenderer>[0];
@@ -51,6 +52,8 @@ const TAB_CONFIG: Record<
 };
 
 export function FloatingTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View
       style={[
@@ -123,56 +126,57 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    marginHorizontal: 16,
-    height: 68,
-    backgroundColor: mobileColors.surface,
-    borderRadius: 34,
-    paddingHorizontal: 8,
-    ...Platform.select({
-      android: {
-        elevation: 8,
-      },
-      default: {
-        shadowColor: "#000",
-        shadowOpacity: 0.12,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 4 },
-      },
-    }),
-  },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 6,
-  },
-  iconPill: {
-    width: 64,
-    height: 32,
-    borderRadius: 9999,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-  },
-  iconPillActive: {
-    backgroundColor: mobileColors.brandSoft,
-  },
-  label: {
-    marginTop: 2,
-    fontSize: 11,
-  },
-  labelActive: {
-    color: mobileColors.brand,
-    fontWeight: "700",
-  },
-  labelInactive: {
-    color: mobileColors.textSubtle,
-    fontWeight: "600",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    bar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-around",
+      marginHorizontal: 16,
+      height: 68,
+      backgroundColor: mobileColors.surface,
+      borderRadius: 34,
+      paddingHorizontal: 8,
+      ...Platform.select({
+        android: {
+          elevation: 8,
+        },
+        default: {
+          shadowColor: "#000",
+          shadowOpacity: 0.12,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 4 },
+        },
+      }),
+    },
+    tab: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 6,
+    },
+    iconPill: {
+      width: 64,
+      height: 32,
+      borderRadius: 9999,
+      overflow: "hidden",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "transparent",
+    },
+    iconPillActive: {
+      backgroundColor: mobileColors.brandSoft,
+    },
+    label: {
+      marginTop: 2,
+      fontSize: 11,
+    },
+    labelActive: {
+      color: mobileColors.brand,
+      fontWeight: "700",
+    },
+    labelInactive: {
+      color: mobileColors.textSubtle,
+      fontWeight: "600",
+    },
+  });

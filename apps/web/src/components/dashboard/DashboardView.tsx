@@ -7,12 +7,13 @@ import { useAuth } from "@/components/AuthProvider";
 import { useShiftRequests, useMediaQuery, MOBILE, TABLET } from "@/hooks";
 import { queryKeys } from "@/lib/query-keys";
 
-import type { Permissions } from "@/hooks";
+import type { Permissions, WebPermissions } from "@/hooks";
 import type {
   Organization,
   FocusArea,
   AssignmentDefinition,
   ShiftCategory,
+  JobDefinition,
   CoverageRequirement,
   Employee,
   AbsenceType,
@@ -97,6 +98,7 @@ interface DashboardViewProps {
   focusAreas: FocusArea[];
   assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
   coverageRequirements: CoverageRequirement[];
   assignmentLabelMap: Map<number, string>;
   assignmentById: Map<number, AssignmentDefinition>;
@@ -106,7 +108,7 @@ interface DashboardViewProps {
   orgRoles: NamedItem[];
   departments: Department[];
   employees: Employee[];
-  permissions: Permissions;
+  permissions: WebPermissions;
 }
 
 export function hasDashboardAdminCapability(permissions: Pick<Permissions, "level">): boolean {
@@ -185,6 +187,7 @@ export default function DashboardView({
   focusAreas,
   assignments,
   shiftCategories,
+  jobs,
   coverageRequirements,
   assignmentLabelMap,
   assignmentById,
@@ -877,7 +880,12 @@ export default function DashboardView({
     // bottom edge. The panes carry their own padding (incl. horizontal, so card
     // borders/shadows aren't clipped by the scroll container's edge). A small
     // outer gutter keeps the panes off the very screen edge.
-    padding: userLockLayout ? "16px 24px 0" : isMobile ? "16px" : isTablet ? "24px" : "32px 40px",
+    paddingTop: userLockLayout ? 16 : isMobile ? 16 : isTablet ? 24 : 32,
+    paddingRight: userLockLayout ? 24 : isMobile ? 16 : isTablet ? 24 : 40,
+    paddingBottom: userLockLayout ? 0 : isMobile ? 16 : isTablet ? 24 : 32,
+    // Flat 16px, matching Schedule's toolbar/grid padding and the header
+    // logo on both pages (see Header.tsx's isFlatPaddingRoute).
+    paddingLeft: 16,
     maxWidth: isUserDashboardMode ? 1560 : 1300,
     margin: "0 auto",
     width: "100%" as const,
@@ -921,6 +929,7 @@ export default function DashboardView({
     focusAreas,
     assignments,
     shiftCategories,
+    jobs,
     coverageRequirements,
     assignmentLabelMap,
     assignmentById,
@@ -1125,6 +1134,7 @@ export default function DashboardView({
             prevHours={prevHours}
             employees={activeEmployees}
             focusAreas={focusAreas}
+            canNavigateToDetailsPage={permissions.canManageEmployees}
             otThreshold={overtimeThreshold}
             onClose={closeExpanded}
           />
@@ -1148,6 +1158,8 @@ const stickyBarStyle = {
 };
 
 const toolbarContainerStyle = {
+  // Flat 16px, matching Schedule's toolbar and the header logo on both
+  // pages (see Header.tsx's isFlatPaddingRoute).
   padding: "12px 16px 0",
   borderBottom: "1px solid var(--color-border)",
 };

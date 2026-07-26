@@ -1,0 +1,123 @@
+import { describe, expect, it, vi } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { subscribeToPostgresChanges } from "./postgres-changes";
+
+function createMockChannel() {
+  let subscribeCallback: ((status: string, err?: Error) => void) | undefined;
+  const onCalls: Array<{ type: string; filter: Record<string, unknown> }> = [];
+
+  const channel = {
+    on: vi.fn((type: string, filter: Record<string, unknown>, _cb: () => void) => {
+      onCalls.push({ type, filter });
+      return channel;
+    }),
+    subscribe: vi.fn((cb: (status: string, err?: Error) => void) => {
+      subscribeCallback = cb;
+      return channel;
+    }),
+  };
+
+  return {
+    channel,
+    onCalls,
+    emitStatus: (status: string, err?: Error) => subscribeCallback?.(status, err),
+  };
+}
+
+function createMockClient(mockChannel: ReturnType<typeof createMockChannel>["channel"]) {
+  return {
+    channel: vi.fn(() => mockChannel),
+    removeChannel: vi.fn(),
+  } as unknown as SupabaseClient;
+}
+
+describe("subscribeToPostgresChanges", () => {
+  it("registers one postgres_changes listener per table with the given filter", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+
+    subscribeToPostgresChanges(client, "org-freshness:org-1", [
+      { table: "employees", filter: "org_id=eq.org-1", onEvent: vi.fn() },
+      { table: "jobs", filter: "org_id=eq.org-1", onEvent: vi.fn() },
+    ]);
+
+    expect(client.channel).toHaveBeenCalledWith("org-freshness:org-1");
+    expect(mock.onCalls).toEqual([
+      {
+        type: "postgres_changes",
+        filter: { event: "*", schema: "public", table: "employees", filter: "org_id=eq.org-1" },
+      },
+      {
+        type: "postgres_changes",
+        filter: { event: "*", schema: "public", table: "jobs", filter: "org_id=eq.org-1" },
+      },
+    ]);
+  });
+
+  it("defaults event to '*' and schema to 'public', but honors explicit overrides", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+
+    subscribeToPostgresChanges(client, "perms:m", [
+      {
+        table: "organization_memberships",
+        event: "UPDATE",
+        filter: "user_id=eq.user-1",
+        onEvent: vi.fn(),
+      },
+    ]);
+
+    expect(mock.onCalls[0]?.filter).toEqual({
+      event: "UPDATE",
+      schema: "public",
+      table: "organization_memberships",
+      filter: "user_id=eq.user-1",
+    });
+  });
+
+  it("invokes onEvent with the table name when the listener fires", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+    const onEvent = vi.fn();
+
+    subscribeToPostgresChanges(client, "ch", [
+      { table: "employees", filter: "org_id=eq.org-1", onEvent },
+    ]);
+
+    const handler = mock.channel.on.mock.calls[0]?.[2] as () => void;
+    handler();
+
+    expect(onEvent).toHaveBeenCalledWith("employees");
+  });
+
+  it("calls onError on CHANNEL_ERROR and onReconnectAfterError on the next SUBSCRIBED", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+    const onError = vi.fn();
+    const onReconnectAfterError = vi.fn();
+
+    subscribeToPostgresChanges(client, "ch", [], { onError, onReconnectAfterError });
+
+    const error = new Error("boom");
+    mock.emitStatus("CHANNEL_ERROR", error);
+    expect(onError).toHaveBeenCalledWith(error);
+    expect(onReconnectAfterError).not.toHaveBeenCalled();
+
+    mock.emitStatus("SUBSCRIBED");
+    expect(onReconnectAfterError).toHaveBeenCalledTimes(1);
+
+    // A later SUBSCRIBED with no intervening error shouldn't fire again.
+    mock.emitStatus("SUBSCRIBED");
+    expect(onReconnectAfterError).toHaveBeenCalledTimes(1);
+  });
+
+  it("cleanup removes the channel from the client", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+
+    const cleanup = subscribeToPostgresChanges(client, "ch", []);
+    cleanup();
+
+    expect(client.removeChannel).toHaveBeenCalledWith(mock.channel);
+  });
+});

@@ -5,12 +5,15 @@ import {
   mobileProfileSessionsResponseSchema,
 } from "@dubgrid/contracts";
 import {
-  fetchActiveUserSessionsForUser,
+  fetchUserSessionOverviewForUser,
   revokeUserSessionForUser,
 } from "@/features/account/server";
 import { requireMobileAuth } from "@/features/mobile/server";
 
-function mapSession(session: Awaited<ReturnType<typeof fetchActiveUserSessionsForUser>>[number]) {
+function mapSession(
+  session: Awaited<ReturnType<typeof fetchUserSessionOverviewForUser>>["active"][number],
+  currentSupabaseSessionId: string | undefined,
+) {
   return {
     id: session.id,
     platform: session.platform,
@@ -20,6 +23,8 @@ function mapSession(session: Awaited<ReturnType<typeof fetchActiveUserSessionsFo
     lastActiveAt: session.lastActiveAt,
     createdAt: session.createdAt,
     refreshTokenHash: session.refreshTokenHash,
+    isCurrent:
+      currentSupabaseSessionId != null && session.supabaseSessionId === currentSupabaseSessionId,
   };
 }
 
@@ -27,11 +32,13 @@ export async function GET(req: NextRequest) {
   const auth = await requireMobileAuth(req);
   if ("response" in auth) return auth.response;
 
-  const sessions = await fetchActiveUserSessionsForUser(auth.user.id);
+  const overview = await fetchUserSessionOverviewForUser(auth.user.id);
+  const currentSupabaseSessionId = auth.claims.session_id;
 
   return NextResponse.json(
     mobileProfileSessionsResponseSchema.parse({
-      sessions: sessions.map(mapSession),
+      active: overview.active.map((session) => mapSession(session, currentSupabaseSessionId)),
+      stale: overview.stale.map((session) => mapSession(session, currentSupabaseSessionId)),
     }),
   );
 }

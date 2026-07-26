@@ -233,14 +233,14 @@ const focusAreas: FocusArea[] = [
     orgId: "org-1",
     name: "North",
     sortOrder: 1,
-    departmentId: null,
+    departmentId: 10,
   },
   {
     id: 2,
     orgId: "org-1",
     name: "South",
     sortOrder: 2,
-    departmentId: null,
+    departmentId: 20,
   },
 ];
 

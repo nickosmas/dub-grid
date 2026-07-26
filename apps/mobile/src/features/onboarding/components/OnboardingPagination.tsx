@@ -5,7 +5,7 @@ import Animated, {
   useAnimatedStyle,
   type SharedValue,
 } from "react-native-reanimated";
-import { mobileColors } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 
 const DOT_SIZE = 8;
 const DOT_GAP = 8;
@@ -38,6 +38,7 @@ function Dot({
   pageWidth: number;
   scrollX: SharedValue<number>;
 }) {
+  const mobileColors = useMobileColors();
   const animatedStyle = useAnimatedStyle(() => {
     const progress = pageWidth > 0 ? scrollX.value / pageWidth : 0;
     const distance = Math.abs(progress - index);
@@ -51,7 +52,7 @@ function Dot({
     );
 
     return { width, backgroundColor };
-  }, [index, pageWidth]);
+  }, [index, pageWidth, mobileColors]);
 
   return <Animated.View style={[styles.dot, animatedStyle]} />;
 }

@@ -9,15 +9,17 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 
 export async function GET(req: NextRequest) {
   const auth = await requireAuthenticatedUser(req);
   if ("response" in auth) return auth.response;
 
-  const orgId = req.nextUrl.searchParams.get("orgId");
-  if (!orgId) {
+  const requestedOrgId = req.nextUrl.searchParams.get("orgId");
+  if (!requestedOrgId) {
     return NextResponse.json({ error: "Missing orgId" }, { status: 400 });
   }
+  const orgId = await resolveEffectiveOrgId(req, auth.user.id, requestedOrgId);
 
   const serviceClient = getServiceClient();
   const { data: membership } = await serviceClient
@@ -58,10 +60,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const orgId = await resolveEffectiveOrgId(req, auth.user.id, parsed.data.orgId);
     const request = await createProfileChangeRequest({
       serviceClient: getServiceClient(),
       user: auth.user,
-      orgId: parsed.data.orgId,
+      orgId,
       type: parsed.data.type,
       requestedChanges: parsed.data.requestedChanges,
       requestNote: parsed.data.requestNote,

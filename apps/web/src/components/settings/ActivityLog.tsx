@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
 import type { FullAuditLogEntry } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import {
   ACTIVITY_CATEGORIES,
@@ -120,7 +121,7 @@ function Toolbar({
           onChange={(e) => onSearchChange(e.target.value)}
           style={{
             width: "100%",
-            padding: "7px 12px 7px 32px",
+            padding: `7px ${searchQuery ? 30 : 12}px 7px 32px`,
             borderRadius: "var(--dg-radius-md, 8px)",
             border: "1px solid var(--color-border)",
             background: "var(--color-surface)",
@@ -129,6 +130,14 @@ function Toolbar({
             outline: "none",
           }}
         />
+        {searchQuery && (
+          <CloseButton
+            size="sm"
+            onClick={() => onSearchChange("")}
+            aria-label="Clear search"
+            style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+          />
+        )}
       </div>
       <CustomSelect
         value={categoryFilter}

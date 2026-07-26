@@ -1,6 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
-import { Platform } from "react-native";
-import * as SecureStore from "expo-secure-store";
+
+import { getStoredValue, removeStoredValue, setStoredValue } from "./local-storage";
 
 const SESSION_KEY = "dubgrid-mobile-session";
 const LAST_ORG_KEY = "dubgrid-mobile-last-org";
@@ -11,47 +11,6 @@ export type StoredPushDevice = {
   expoPushToken: string;
   platform: "ios" | "android";
 };
-
-function getWebStorage(): Storage | null {
-  if (Platform.OS !== "web" || typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-async function getStoredValue(key: string): Promise<string | null> {
-  const webStorage = getWebStorage();
-  if (webStorage) {
-    return webStorage.getItem(key);
-  }
-
-  return SecureStore.getItemAsync(key);
-}
-
-async function setStoredValue(key: string, value: string): Promise<void> {
-  const webStorage = getWebStorage();
-  if (webStorage) {
-    webStorage.setItem(key, value);
-    return;
-  }
-
-  await SecureStore.setItemAsync(key, value);
-}
-
-async function removeStoredValue(key: string): Promise<void> {
-  const webStorage = getWebStorage();
-  if (webStorage) {
-    webStorage.removeItem(key);
-    return;
-  }
-
-  await SecureStore.deleteItemAsync(key);
-}
 
 export const secureStoreAdapter = {
   getItem(key: string) {

@@ -162,7 +162,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
           <button
             type="submit"
             disabled={loading || code.length !== 6 || !factorId}
-            className="dg-auth-submit"
+            className="dg-btn dg-btn-primary dg-btn-lg"
             style={{ width: "100%", maxWidth: 280, marginTop: 4 }}
           >
             <ButtonLoading

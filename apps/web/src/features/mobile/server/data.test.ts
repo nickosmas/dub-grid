@@ -5,6 +5,7 @@ process.env.TZ = "UTC";
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  fetchMobileCoverageSummary,
   fetchMobileOpenShifts,
   fetchMobilePeople,
   fetchMobileScheduleEntries,
@@ -509,6 +510,7 @@ function createServiceClientForShiftRequests() {
 function createServiceClientForOpenShifts(options?: {
   minStaff?: number;
   shiftRequests?: unknown[];
+  scheduleCells?: unknown[];
 }) {
   const assignments = [
     {
@@ -622,7 +624,7 @@ function createServiceClientForOpenShifts(options?: {
     error: null,
   });
   const scheduleCellsQuery = createThenableQuery({
-    data: [],
+    data: options?.scheduleCells ?? [],
     error: null,
   });
   const shiftRequestsQuery = createThenableQuery({
@@ -1518,6 +1520,105 @@ describe("fetchMobileOpenShifts", () => {
       });
 
       expect(openShifts).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("fetchMobileCoverageSummary", () => {
+  // Regression test for the web-vs-mobile dashboard divergence: web's
+  // dashboard counts an admin's unpublished DRAFT edits toward coverage
+  // (apps/web/src/lib/schedule-cells.ts's `isScheduler ? (draft ?? published)
+  // : published`), but mobile's coverage engine used to be strictly
+  // published-only, so a gap filled only by a draft edit still showed as
+  // open on mobile while web showed it filled. buildMobileCoverageEngineInputs
+  // now fetches via fetchMobileEffectiveScheduleRows (draft-preferred),
+  // matching web.
+  it("counts a draft-only schedule cell (no published snapshot) toward coverage totals", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const draftOnlyScheduleCell = {
+        id: "cell-1",
+        emp_id: "196d610f-2283-486c-a9e0-197852969a31",
+        date: "2026-04-16",
+        org_id: "org-1",
+        focus_area_id: 12,
+        version: 1,
+        series_id: null,
+        from_recurring: false,
+        created_by: null,
+        updated_by: null,
+        created_at: null,
+        updated_at: null,
+        snapshots: [
+          {
+            id: "draft-snapshot",
+            cell_id: "cell-1",
+            org_id: "org-1",
+            snapshot_kind: "draft",
+            state_kind: "worked",
+            absence_type_id: null,
+            custom_start_time: null,
+            custom_end_time: null,
+            segments: [
+              {
+                id: "segment-0",
+                snapshot_id: "draft-snapshot",
+                org_id: "org-1",
+                position: 0,
+                shift_id: 101,
+                job_id: 91,
+                is_mentored: false,
+              },
+            ],
+          },
+        ],
+        employees: {
+          id: "196d610f-2283-486c-a9e0-197852969a31",
+          first_name: "Nic",
+          last_name: "Kosmas",
+          org_id: "org-1",
+        },
+      };
+      const serviceClient = createServiceClientForOpenShifts({
+        scheduleCells: [draftOnlyScheduleCell],
+      });
+
+      const summary = await fetchMobileCoverageSummary(serviceClient as never, {
+        orgId: "org-1",
+        showAll: true,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(summary.totals).toEqual({ totalRequired: 1, totalFilled: 1, pct: 100, openSlots: 0 });
+      expect(summary.openShifts).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports the same slot as an open gap when there is no draft or published snapshot at all", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T18:00:00.000Z"));
+
+    try {
+      const serviceClient = createServiceClientForOpenShifts();
+
+      const summary = await fetchMobileCoverageSummary(serviceClient as never, {
+        orgId: "org-1",
+        showAll: true,
+        startDate: "2026-04-16",
+        endDate: "2026-04-16",
+        timeZone: "America/Los_Angeles",
+      });
+
+      expect(summary.totals).toEqual({ totalRequired: 1, totalFilled: 0, pct: 0, openSlots: 1 });
+      expect(summary.openShifts).toHaveLength(1);
     } finally {
       vi.useRealTimers();
     }

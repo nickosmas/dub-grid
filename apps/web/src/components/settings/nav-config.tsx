@@ -12,7 +12,6 @@ import {
   AwardIcon,
   RolesIcon,
   IndicatorIcon,
-  ImpersonateIcon,
   ActivityIcon,
   DangerIcon,
   type NavIconProps,
@@ -34,7 +33,6 @@ export type SectionId =
   | "staff-roles"
   | "staff-departments"
   | "staff-indicators"
-  | "platform-impersonation"
   | "org-danger";
 
 export const VALID_SECTIONS: SectionId[] = [
@@ -52,7 +50,6 @@ export const VALID_SECTIONS: SectionId[] = [
   "staff-roles",
   "staff-departments",
   "staff-indicators",
-  "platform-impersonation",
   "org-danger",
 ];
 
@@ -65,7 +62,7 @@ const OLD_TO_NEW: Record<string, SectionId> = {
   coverage: "schedule-coverage",
   indicators: "staff-indicators",
   "staff-config": "staff-certifications",
-  impersonation: "platform-impersonation",
+  impersonation: "org-general",
   "staff-focus-areas": "staff-departments",
 };
 
@@ -280,23 +277,6 @@ export function buildNavGroups(
     });
   }
 
-  // Platform — gridmaster only
-  if (perms.isGridmaster) {
-    groups.push({
-      id: "platform",
-      label: "Platform",
-      items: [
-        {
-          id: "platform-impersonation",
-          label: "Impersonation",
-          Icon: ImpersonateIcon,
-          description:
-            "Temporarily access an organization's account as any of its users for support or debugging.",
-        },
-      ],
-    });
-  }
-
   // Danger zone — pinned to the sidebar footer
   if (perms.isSuperAdmin) {
     groups.push({
@@ -321,7 +301,7 @@ export function buildNavGroups(
 /** Get the first visible section ID based on permissions. */
 export function getDefaultSection(perms: NavPermissions): SectionId {
   const groups = buildNavGroups(perms);
-  return groups[0]?.items[0]?.id ?? "platform-impersonation";
+  return groups[0]?.items[0]?.id ?? "org-general";
 }
 
 /** Get max content width for a section. */

@@ -1,4 +1,5 @@
 export * from "./auth";
+export * from "./dashboard";
 export * from "./people-status";
 export * from "./push";
 export * from "./read";

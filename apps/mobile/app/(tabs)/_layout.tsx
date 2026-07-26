@@ -1,27 +1,33 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
-import { mobileColors } from "../../src/shared/theme/tokens";
+import { useMobileColors, useThemeMode } from "../../src/shared/providers/ThemeModeProvider";
 
 export default function TabsLayout() {
   const gate = useTabsGate();
+  const mobileColors = useMobileColors();
+  const { resolvedTheme } = useThemeMode();
 
   if (gate.kind === "blocked") {
     return gate.element;
   }
 
-  const { canViewTeamSchedule } = gate;
+  const { canViewTeamSchedule, canViewRequestsTab, canViewHomeTab } = gate;
 
   const tabTriggers = [
-    <NativeTabs.Trigger key="home" name="home">
-      <Label>Home</Label>
-      <Icon
-        src={{
-          default: <VectorIcon family={Ionicons} name="home-outline" />,
-          selected: <VectorIcon family={Ionicons} name="home" />,
-        }}
-      />
-    </NativeTabs.Trigger>,
+    ...(canViewHomeTab
+      ? [
+          <NativeTabs.Trigger key="home" name="home">
+            <Label>Home</Label>
+            <Icon
+              src={{
+                default: <VectorIcon family={Ionicons} name="home-outline" />,
+                selected: <VectorIcon family={Ionicons} name="home" />,
+              }}
+            />
+          </NativeTabs.Trigger>,
+        ]
+      : []),
     ...(canViewTeamSchedule
       ? [
           <NativeTabs.Trigger key="team" name="team">
@@ -36,19 +42,23 @@ export default function TabsLayout() {
           </NativeTabs.Trigger>,
         ]
       : []),
-    <NativeTabs.Trigger key="requests" name="requests">
-      <Label>Requests</Label>
-      <Icon
-        androidSrc={{
-          default: <VectorIcon family={Ionicons} name="swap-horizontal-outline" />,
-          selected: <VectorIcon family={Ionicons} name="swap-horizontal" />,
-        }}
-        sf={{
-          default: "arrow.left.arrow.right",
-          selected: "arrow.left.arrow.right.circle.fill",
-        }}
-      />
-    </NativeTabs.Trigger>,
+    ...(canViewRequestsTab
+      ? [
+          <NativeTabs.Trigger key="requests" name="requests">
+            <Label>Requests</Label>
+            <Icon
+              androidSrc={{
+                default: <VectorIcon family={Ionicons} name="swap-horizontal-outline" />,
+                selected: <VectorIcon family={Ionicons} name="swap-horizontal" />,
+              }}
+              sf={{
+                default: "arrow.left.arrow.right",
+                selected: "arrow.left.arrow.right.circle.fill",
+              }}
+            />
+          </NativeTabs.Trigger>,
+        ]
+      : []),
     <NativeTabs.Trigger key="people" name="people">
       <Label>People</Label>
       <Icon
@@ -78,7 +88,9 @@ export default function TabsLayout() {
     <NativeTabs
       backgroundColor={mobileColors.surface}
       badgeBackgroundColor={mobileColors.danger}
-      blurEffect="systemChromeMaterialLight"
+      blurEffect={
+        resolvedTheme === "dark" ? "systemChromeMaterialDark" : "systemChromeMaterialLight"
+      }
       disableTransparentOnScrollEdge
       iconColor={{
         default: mobileColors.textSubtle,

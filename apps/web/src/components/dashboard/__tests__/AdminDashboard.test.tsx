@@ -141,6 +141,26 @@ describe("AdminDashboard", () => {
     expect(coverageText.indexOf("Memory Care")).toBeGreaterThanOrEqual(0);
     expect(coverageText.indexOf("Memory Care")).toBeLessThan(coverageText.indexOf("Front Desk"));
     expect(container.querySelector('a[href="/schedule"]')).not.toBeNull();
+    // This admin lacks canManageEmployees, so staff names render as plain
+    // text — no link into the /people/[id] profile page.
+    expect(screen.getByText("A. Rivera")).toBeInTheDocument();
+    expect(container.querySelector('a[href="/people/emp-1"]')).toBeNull();
+  });
+
+  it("links staff names to their profile for admins who manage employees", () => {
+    const props = makeProps();
+    const { container } = render(
+      <AdminDashboard
+        {...props}
+        permissions={
+          {
+            ...props.permissions,
+            canManageEmployees: true,
+          } as DashboardContentProps["permissions"]
+        }
+      />,
+    );
+
     expect(container.querySelector('a[href="/people/emp-1"]')).not.toBeNull();
   });
 
@@ -186,5 +206,45 @@ describe("AdminDashboard", () => {
     );
 
     expect(screen.queryByRole("link", { name: "Configure coverage" })).not.toBeInTheDocument();
+  });
+
+  it("hides the schedule card for a management-only admin", () => {
+    render(
+      <AdminDashboard
+        {...makeProps({
+          permissions: {
+            ...buildPerms("admin", "org-1", false),
+            canApproveShiftRequests: true,
+            canEditShifts: true,
+            canViewDashboardAnalytics: true,
+            canViewSchedule: true,
+            isManagementUser: true,
+            isOnSchedule: false,
+          } as unknown as DashboardContentProps["permissions"],
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId("my-schedule-row")).not.toBeInTheDocument();
+  });
+
+  it("still shows the schedule card for a management admin who is also scheduled", () => {
+    render(
+      <AdminDashboard
+        {...makeProps({
+          permissions: {
+            ...buildPerms("admin", "org-1", false),
+            canApproveShiftRequests: true,
+            canEditShifts: true,
+            canViewDashboardAnalytics: true,
+            canViewSchedule: true,
+            isManagementUser: true,
+            isOnSchedule: true,
+          } as unknown as DashboardContentProps["permissions"],
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId("my-schedule-row")).toBeInTheDocument();
   });
 });

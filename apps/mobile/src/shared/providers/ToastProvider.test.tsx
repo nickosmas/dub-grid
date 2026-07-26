@@ -67,7 +67,6 @@ function ToastHarness() {
             tone: "error",
             title: "Network connection issue",
             message: "Check your internet connection and try again.",
-            durationMs: null,
             dedupeKey: "network-connection-error",
           });
         }}
@@ -120,7 +119,7 @@ describe("ToastProvider", () => {
     expect(screen.queryByText("Second toast")).not.toBeInTheDocument();
   });
 
-  it("keeps persistent network toasts visible until they are dismissed", () => {
+  it("coalesces duplicate network toasts and auto-dismisses after the default duration", () => {
     render(
       <ToastProvider>
         <ToastHarness />
@@ -134,9 +133,26 @@ describe("ToastProvider", () => {
     expect(screen.getAllByText("Network connection issue")).toHaveLength(1);
 
     act(() => {
-      vi.advanceTimersByTime(10_000);
+      vi.advanceTimersByTime(4000);
     });
 
+    expect(screen.getByText("Network connection issue")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    expect(screen.queryByText("Network connection issue")).not.toBeInTheDocument();
+  });
+
+  it("allows an upward swipe to dismiss a network toast early", () => {
+    render(
+      <ToastProvider>
+        <ToastHarness />
+      </ToastProvider>,
+    );
+
+    fireEvent.click(screen.getByText("Queue network"));
     expect(screen.getByText("Network connection issue")).toBeInTheDocument();
 
     const toast = screen.getByTestId("toast-notification");
@@ -146,6 +162,93 @@ describe("ToastProvider", () => {
     });
     fireEvent.touchEnd(toast, {
       changedTouches: [{ pageY: 72 }],
+    });
+
+    expect(screen.queryByText("Network connection issue")).not.toBeInTheDocument();
+  });
+
+  it("hides the offline banner via an upward swipe until offline is re-entered", () => {
+    useNetworkStatus.mockReturnValue({
+      hasResolvedState: true,
+      isOnline: false,
+      isOffline: true,
+    });
+
+    const { rerender } = render(
+      <ToastProvider>
+        <ToastHarness />
+      </ToastProvider>,
+    );
+
+    expect(screen.getByText("Network connection issue")).toBeInTheDocument();
+
+    const banner = screen.getByTestId("offline-toast");
+    fireEvent.touchStart(banner, {
+      changedTouches: [{ pageY: 120 }],
+      touches: [{ pageY: 120 }],
+    });
+    fireEvent.touchEnd(banner, {
+      changedTouches: [{ pageY: 72 }],
+    });
+
+    expect(screen.queryByText("Network connection issue")).not.toBeInTheDocument();
+
+    // Still offline — the dismissal should hold, not reappear on its own.
+    rerender(
+      <ToastProvider>
+        <ToastHarness />
+      </ToastProvider>,
+    );
+    expect(screen.queryByText("Network connection issue")).not.toBeInTheDocument();
+
+    useNetworkStatus.mockReturnValue({
+      hasResolvedState: true,
+      isOnline: true,
+      isOffline: false,
+    });
+    rerender(
+      <ToastProvider>
+        <ToastHarness />
+      </ToastProvider>,
+    );
+
+    useNetworkStatus.mockReturnValue({
+      hasResolvedState: true,
+      isOnline: false,
+      isOffline: true,
+    });
+    rerender(
+      <ToastProvider>
+        <ToastHarness />
+      </ToastProvider>,
+    );
+
+    expect(screen.getByText("Network connection issue")).toBeInTheDocument();
+  });
+
+  it("auto-dismisses the offline banner after the default duration", () => {
+    useNetworkStatus.mockReturnValue({
+      hasResolvedState: true,
+      isOnline: false,
+      isOffline: true,
+    });
+
+    render(
+      <ToastProvider>
+        <ToastHarness />
+      </ToastProvider>,
+    );
+
+    expect(screen.getByText("Network connection issue")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    expect(screen.getByText("Network connection issue")).toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(500);
     });
 
     expect(screen.queryByText("Network connection issue")).not.toBeInTheDocument();

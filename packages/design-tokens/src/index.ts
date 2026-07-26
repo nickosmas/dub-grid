@@ -9,7 +9,22 @@ export {
   type AnimatedLogoTiming,
 } from "./animated-logo";
 
-export const colorTokens = {
+export {
+  getAvatarTone,
+  getAvatarGradientTone,
+  type AvatarTone,
+  type AvatarGradientTone,
+} from "./avatar-tone";
+
+export {
+  getReadableTextColor,
+  borderColor,
+  toDarkPillColors,
+  resolveShiftPillColors,
+  type ShiftPillColors,
+} from "./pill-colors";
+
+export const lightColorTokens = {
   background: "#F8FAFC",
   surface: "#FFFFFF",
   surfaceSecondary: "#F1F5F9",
@@ -50,7 +65,78 @@ export const colorTokens = {
   rippleNeutral: "rgba(15, 23, 42, 0.06)",
   ripplePrimary: "rgba(255, 255, 255, 0.18)",
   rippleDanger: "rgba(239, 68, 68, 0.18)",
+  // Background for a "filled dark control" (e.g. an active segmented-control
+  // button). Kept distinct from textPrimary so dark mode can point this at a
+  // fixed dark neutral without also flipping body text to near-black.
+  controlPrimary: "#0F172A",
+  controlPrimaryHover: "#1E293B",
+  // Text/icon color for content placed on a --color-brand or --color-brand-light
+  // fill (e.g. .dg-btn-primary).
+  onBrandText: "#FFFFFF",
+  // Button/chip surface for controls placed on a brand-colored backdrop (e.g.
+  // .dg-btn-on-brand-solid on the landing page's CTA band). Fixed white in
+  // both themes — unlike --color-surface, which inverts to near-black in dark
+  // mode and would kill the button's contrast against the (still-blue) backdrop.
+  onBrandSurface: "#FFFFFF",
 } as const;
+
+export type ColorTokens = Record<keyof typeof lightColorTokens, string>;
+
+// Dark theme. `background` is very close to black with just a whisper of
+// blue tint, per product direction — deliberately kept darker than `surface`
+// (below) so cards/rows still read as clearly "raised" against the page.
+const darkBrandSoft = "#152238";
+export const darkColorTokens: ColorTokens = {
+  background: "#02070F",
+  surface: "#121214",
+  surfaceSecondary: "#1C1C1F",
+  surfaceMuted: "#0A0A0B",
+  border: "#2E2E33",
+  borderSubtle: "#2A2A2F",
+  textPrimary: "#F1F1F3",
+  textSecondary: "#D4D4D8",
+  textMuted: "#A1A1AA",
+  textSubtle: "#9797A0",
+  textInverse: "#FFFFFF",
+  brand: "#2075FF",
+  brandLight: "#4A9BFF",
+  brandSoft: darkBrandSoft,
+  brandBorder: "#1E3A5F",
+  success: "#22C55E",
+  successText: "#4ADE80",
+  successSoft: "#122118",
+  successBorder: "#1E4029",
+  warning: "#F59E0B",
+  warningText: "#FBBF24",
+  warningSoft: "#241C0B",
+  warningBorder: "#3F2F10",
+  danger: "#EF4444",
+  dangerText: "#FF5C5C",
+  dangerSoft: "#2A1414",
+  dangerBorder: "#4A1F1F",
+  shadow: "rgba(0, 0, 0, 0.55)",
+  shadowStrong: "rgba(0, 0, 0, 0.75)",
+  placeholderText: "#71717A",
+  inputBackground: "#1C1C1F",
+  inputBackgroundFocused: "#121214",
+  inputBackgroundError: "#2A1414",
+  inputBorder: "#2E2E33",
+  inputBorderFocused: "#4A9BFF",
+  inputBorderError: "#7F1D1D",
+  inputFocusRing: "rgba(74, 155, 255, 0.25)",
+  rippleNeutral: "rgba(255, 255, 255, 0.06)",
+  ripplePrimary: "rgba(255, 255, 255, 0.18)",
+  rippleDanger: "rgba(248, 113, 113, 0.18)",
+  // Inverted from light mode: the filled-control bg is a light-on-black chip
+  // here, so this stays a fixed dark neutral rather than following textPrimary.
+  controlPrimary: "#26262B",
+  controlPrimaryHover: "#323238",
+  onBrandText: "#FFFFFF",
+  onBrandSurface: "#FFFFFF",
+} as const;
+
+/** @deprecated Use `lightColorTokens` (or the theme-aware helpers) directly — this alias exists only for back-compat with existing static imports. */
+export const colorTokens = lightColorTokens;
 
 export const spacingTokens = {
   screenX: 16,
@@ -208,6 +294,20 @@ export const shadowTokens = {
   tooltip: "0 0 18px rgba(15, 23, 42, 0.14), 0 0 36px rgba(15, 23, 42, 0.1)",
 } as const;
 
+// A black shadow is nearly invisible against a black page — dark mode uses
+// deeper/higher-alpha shadows for surfaces that truly float (modal/panel/
+// tooltip); card/menu-level elevation additionally gets a hairline border in
+// globals.css since shadow alone won't read reliably on near-black surfaces.
+export const darkShadowTokens: Record<keyof typeof shadowTokens, string> = {
+  raised: "0 1px 4px rgba(0, 0, 0, 0.6)",
+  float: "0 4px 16px rgba(0, 0, 0, 0.7)",
+  menu: "0 8px 24px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.5)",
+  modal: "0 12px 48px rgba(0, 0, 0, 0.85)",
+  panel: "-8px 0 40px rgba(0, 0, 0, 0.8)",
+  drag: "0 8px 24px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.5)",
+  tooltip: "0 0 18px rgba(0, 0, 0, 0.6), 0 0 36px rgba(0, 0, 0, 0.5)",
+} as const;
+
 export const webLayoutTokens = {
   headerHeight: "56px",
   toolbarHeight: "38px",
@@ -285,39 +385,85 @@ export const toastTokens = {
   warningBorder: "#92400E",
 } as const;
 
-export const shadcnTokens = {
+export const lightShadcnTokens = {
   background: "oklch(1 0 0)",
   foreground: "oklch(0.145 0 0)",
   card: "oklch(1 0 0)",
   cardForeground: "oklch(0.145 0 0)",
   popover: "oklch(1 0 0)",
   popoverForeground: "oklch(0.145 0 0)",
-  primary: colorTokens.brand,
-  primaryForeground: colorTokens.textInverse,
+  primary: lightColorTokens.brand,
+  primaryForeground: lightColorTokens.textInverse,
   secondary: "oklch(0.97 0 0)",
   secondaryForeground: "oklch(0.205 0 0)",
   muted: "oklch(0.97 0 0)",
   mutedForeground: "oklch(0.556 0 0)",
   accent: "oklch(0.97 0 0)",
   accentForeground: "oklch(0.205 0 0)",
-  destructive: "oklch(0.577 0.245 27.325)",
+  destructive: lightColorTokens.danger,
   border: "oklch(0.922 0 0)",
   input: "oklch(0.922 0 0)",
-  ring: colorTokens.brandLight,
+  ring: lightColorTokens.brandLight,
   chart1: "oklch(0.87 0 0)",
   chart2: "oklch(0.556 0 0)",
   chart3: "oklch(0.439 0 0)",
   chart4: "oklch(0.371 0 0)",
   chart5: "oklch(0.269 0 0)",
   radius: "0.625rem",
-  sidebar: "oklch(0.985 0 0)",
+  sidebar: "oklch(1 0 0)",
   sidebarForeground: "oklch(0.145 0 0)",
-  sidebarPrimary: colorTokens.brand,
-  sidebarPrimaryForeground: colorTokens.textInverse,
-  sidebarAccent: colorTokens.brandSoft,
-  sidebarAccentForeground: colorTokens.brand,
+  sidebarPrimary: lightColorTokens.brand,
+  sidebarPrimaryForeground: lightColorTokens.textInverse,
+  sidebarAccent: lightColorTokens.brandSoft,
+  sidebarAccentForeground: lightColorTokens.brand,
   sidebarBorder: "oklch(0.922 0 0)",
-  sidebarRing: colorTokens.brandLight,
+  sidebarRing: lightColorTokens.brandLight,
+} as const;
+
+/** @deprecated Use `lightShadcnTokens` — this alias exists only for back-compat with existing static imports. */
+export const shadcnTokens = lightShadcnTokens;
+
+// Follows shadcn/ui's own documented dark-theme convention (near-black
+// background, low-chroma card/muted/accent surfaces) rather than inventing
+// new oklch values from scratch; `background` is pushed to true black to
+// match `darkColorTokens.background`.
+export const darkShadcnTokens: Record<keyof typeof lightShadcnTokens, string> = {
+  background: "oklch(0 0 0)",
+  foreground: "oklch(0.97 0 0)",
+  card: "oklch(0.09 0 0)",
+  cardForeground: "oklch(0.97 0 0)",
+  popover: "oklch(0.09 0 0)",
+  popoverForeground: "oklch(0.97 0 0)",
+  primary: darkColorTokens.brand,
+  primaryForeground: darkColorTokens.textInverse,
+  secondary: "oklch(0.17 0 0)",
+  secondaryForeground: "oklch(0.97 0 0)",
+  muted: "oklch(0.17 0 0)",
+  mutedForeground: "oklch(0.65 0 0)",
+  accent: "oklch(0.17 0 0)",
+  accentForeground: "oklch(0.97 0 0)",
+  destructive: darkColorTokens.danger,
+  border: "oklch(1 0 0 / 12%)",
+  input: "oklch(1 0 0 / 16%)",
+  ring: darkColorTokens.brandLight,
+  chart1: "oklch(0.55 0 0)",
+  chart2: "oklch(0.65 0 0)",
+  chart3: "oklch(0.75 0 0)",
+  chart4: "oklch(0.85 0 0)",
+  chart5: "oklch(0.92 0 0)",
+  radius: "0.625rem",
+  // Matches darkColorTokens.surface exactly — the shadcn <Sidebar> primitive's
+  // own `bg-sidebar` default class wins the cascade over any `bg-[var(--color-surface)]`
+  // className callers pass, so this token (not the caller's override) is what
+  // actually controls the rendered color.
+  sidebar: darkColorTokens.surface,
+  sidebarForeground: "oklch(0.97 0 0)",
+  sidebarPrimary: darkColorTokens.brand,
+  sidebarPrimaryForeground: darkColorTokens.textInverse,
+  sidebarAccent: darkColorTokens.brandSoft,
+  sidebarAccentForeground: darkColorTokens.brandLight,
+  sidebarBorder: "oklch(1 0 0 / 12%)",
+  sidebarRing: darkColorTokens.brandLight,
 } as const;
 
 export const webThemeTokens = {
@@ -398,147 +544,224 @@ export function borderColorFromText(textHex: string, opacity = 0.35): string {
   return `rgba(${r},${g},${b},${opacity})`;
 }
 
-export const mobileNavigationTheme = {
-  dark: false,
-  colors: {
-    primary: colorTokens.brand,
-    background: colorTokens.background,
-    card: colorTokens.surface,
-    text: colorTokens.textPrimary,
-    border: colorTokens.borderSubtle,
-    notification: colorTokens.danger,
+const mobileNavigationFonts = {
+  regular: {
+    fontFamily: "DMSans_400Regular",
+    fontWeight: "400",
   },
-  fonts: {
-    regular: {
-      fontFamily: "DMSans_400Regular",
-      fontWeight: "400",
-    },
-    medium: {
-      fontFamily: "DMSans_500Medium",
-      fontWeight: "500",
-    },
-    bold: {
-      fontFamily: "DMSans_600SemiBold",
-      fontWeight: "600",
-    },
-    heavy: {
-      fontFamily: "DMSans_700Bold",
-      fontWeight: "700",
-    },
+  medium: {
+    fontFamily: "DMSans_500Medium",
+    fontWeight: "500",
+  },
+  bold: {
+    fontFamily: "DMSans_600SemiBold",
+    fontWeight: "600",
+  },
+  heavy: {
+    fontFamily: "DMSans_700Bold",
+    fontWeight: "700",
   },
 } as const;
 
-export function createWebCssVariables(): Record<string, string> {
+export function getMobileNavigationTheme(isDark: boolean) {
+  const tokens = isDark ? darkColorTokens : lightColorTokens;
   return {
-    "--dg-color-bg": colorTokens.background,
-    "--dg-color-surface": colorTokens.surface,
-    "--dg-color-bg-secondary": colorTokens.surfaceSecondary,
-    "--dg-color-row-alt": colorTokens.surfaceMuted,
-    "--dg-color-row-hover": colorTokens.surfaceSecondary,
-    "--dg-color-border": colorTokens.border,
-    "--dg-color-border-light": colorTokens.borderSubtle,
-    "--dg-color-border-focus": colorTokens.brandLight,
-    "--dg-color-text-primary": colorTokens.textPrimary,
-    "--dg-color-text-secondary": colorTokens.textSecondary,
-    "--dg-color-text-muted": colorTokens.textMuted,
-    "--dg-color-text-subtle": colorTokens.textSubtle,
-    "--dg-color-text-faint": "#718096",
-    "--dg-color-text-inverse": colorTokens.textInverse,
-    "--dg-color-brand": colorTokens.brand,
-    "--dg-color-brand-light": colorTokens.brandLight,
-    "--dg-color-brand-bg": colorTokens.brandSoft,
-    "--dg-color-brand-border": colorTokens.brandBorder,
-    "--dg-color-primary": colorTokens.brand,
-    "--dg-color-link": colorTokens.brand,
-    "--dg-color-accent-text": colorTokens.brand,
-    "--dg-color-control-primary": colorTokens.textPrimary,
-    "--dg-color-control-primary-hover": colorTokens.textSecondary,
-    "--dg-color-control-primary-text": colorTokens.textInverse,
-    "--dg-color-control-active-bg": colorTokens.surfaceSecondary,
-    "--dg-color-control-active-border": colorTokens.border,
-    "--dg-color-control-active-text": colorTokens.textPrimary,
-    "--dg-color-control-active-hover": colorTokens.borderSubtle,
-    "--dg-color-success": colorTokens.success,
-    "--dg-color-success-bg": colorTokens.successSoft,
-    "--dg-color-success-text": "#166534",
-    "--dg-color-success-border": colorTokens.successBorder,
-    "--dg-color-warning": colorTokens.warning,
-    "--dg-color-warning-bg": colorTokens.warningSoft,
-    "--dg-color-warning-text": "#92400E",
-    "--dg-color-warning-border": colorTokens.warningBorder,
-    "--dg-color-danger": colorTokens.danger,
-    "--dg-color-danger-bg": colorTokens.dangerSoft,
-    "--dg-color-danger-text": "#B91C1C",
-    "--dg-color-danger-border": colorTokens.dangerBorder,
-    "--dg-color-danger-dark": "#991B1B",
-    "--dg-color-info": colorTokens.brandLight,
-    "--dg-color-info-bg": colorTokens.brandSoft,
-    "--dg-color-info-text": "#1D4ED8",
-    "--dg-color-info-border": colorTokens.brandBorder,
-    "--dg-color-dark": colorTokens.textPrimary,
-    "--dg-color-dark-elevated": colorTokens.textSecondary,
-    "--dg-color-today-bg": colorTokens.brandSoft,
-    "--dg-color-today-text": "#1D4ED8",
-    "--dg-color-today-border": "#93C5FD",
-    "--color-bg": colorTokens.background,
-    "--color-surface": colorTokens.surface,
-    "--color-bg-secondary": colorTokens.surfaceSecondary,
-    "--color-row-alt": colorTokens.surfaceMuted,
-    "--color-row-hover": colorTokens.surfaceSecondary,
-    "--color-border": colorTokens.border,
-    "--color-border-light": colorTokens.borderSubtle,
-    "--color-border-focus": colorTokens.brandLight,
-    "--color-text-primary": colorTokens.textPrimary,
-    "--color-text-secondary": colorTokens.textSecondary,
-    "--color-text-muted": colorTokens.textMuted,
-    "--color-text-subtle": colorTokens.textSubtle,
-    "--color-text-faint": "#718096",
-    "--color-text-inverse": colorTokens.textInverse,
-    "--color-brand": colorTokens.brand,
-    "--color-brand-light": colorTokens.brandLight,
-    "--color-brand-bg": colorTokens.brandSoft,
-    "--color-brand-border": colorTokens.brandBorder,
-    "--color-primary": colorTokens.brand,
-    "--color-link": colorTokens.brand,
-    "--color-accent-text": colorTokens.brand,
-    "--color-control-primary": colorTokens.textPrimary,
-    "--color-control-primary-hover": colorTokens.textSecondary,
-    "--color-control-primary-text": colorTokens.textInverse,
-    "--color-control-active-bg": colorTokens.surfaceSecondary,
-    "--color-control-active-border": colorTokens.border,
-    "--color-control-active-text": colorTokens.textPrimary,
-    "--color-control-active-hover": colorTokens.borderSubtle,
-    "--color-success": colorTokens.success,
-    "--color-success-bg": colorTokens.successSoft,
-    "--color-success-text": "#166534",
-    "--color-success-border": colorTokens.successBorder,
-    "--color-warning": colorTokens.warning,
-    "--color-warning-bg": colorTokens.warningSoft,
-    "--color-warning-text": "#92400E",
-    "--color-warning-border": colorTokens.warningBorder,
-    "--color-danger": colorTokens.danger,
-    "--color-danger-bg": colorTokens.dangerSoft,
-    "--color-danger-text": "#B91C1C",
-    "--color-danger-border": colorTokens.dangerBorder,
-    "--color-danger-dark": "#991B1B",
-    "--color-info": colorTokens.brandLight,
-    "--color-info-bg": colorTokens.brandSoft,
-    "--color-info-text": "#1D4ED8",
-    "--color-info-border": colorTokens.brandBorder,
-    "--color-dark": colorTokens.textPrimary,
-    "--color-dark-elevated": colorTokens.textSecondary,
-    "--color-today-bg": colorTokens.brandSoft,
-    "--color-today-text": "#1D4ED8",
-    "--color-today-border": "#93C5FD",
-    "--shadow-raised": shadowTokens.raised,
-    "--shadow-float": shadowTokens.float,
-    "--shadow-menu": shadowTokens.menu,
-    "--shadow-modal": shadowTokens.modal,
-    "--shadow-panel": shadowTokens.panel,
-    "--shadow-drag": shadowTokens.drag,
-    "--dg-shadow-sidebar-toggle": "0 1px 4px rgba(0,0,0,0.08)",
-    "--dg-shadow-staff-detail": "0 8px 40px rgba(0, 0, 0, 0.16), 0 2px 12px rgba(0, 0, 0, 0.08)",
-    "--dg-shadow-auth-card": "0 2px 16px rgba(0, 0, 0, 0.07)",
+    dark: isDark,
+    colors: {
+      primary: tokens.brand,
+      background: tokens.background,
+      card: tokens.surface,
+      text: tokens.textPrimary,
+      border: tokens.borderSubtle,
+      notification: tokens.danger,
+    },
+    fonts: mobileNavigationFonts,
+  } as const;
+}
+
+/** @deprecated Use `getMobileNavigationTheme(isDark)` — this alias exists only for back-compat with existing static imports and always resolves to the light theme. */
+export const mobileNavigationTheme = getMobileNavigationTheme(false);
+
+export type WebTheme = "light" | "dark";
+
+// Values that differ between the light and dark themes: color, shadow, and
+// shadcn tokens, plus a handful of one-off literals (text-faint, today-*,
+// info-text, danger-dark, and three ad hoc shadow values) that were
+// hardcoded alongside `colorTokens`-derived values in the original flat map.
+// `--dg-color-dark` / `--dg-color-dark-elevated` are deliberately NOT here —
+// they represent fixed "always dark" chrome (see `stateEffectTokens.onDark*`),
+// not the page theme, and live in `createStaticWebCssVariables` instead.
+// Shared by the login/onboarding shells' dark-mode background — see the
+// `--dg-color-auth-shell-bg` / `--dg-color-onboarding-shell-bg` entries below.
+const darkDiagonalShellGradient = "linear-gradient(135deg, #000000 0%, #000000 40%, #040E33 100%)";
+
+// Landing page's marketing CTA band ("Done with the spreadsheet?" — see
+// apps/web/src/app/page.tsx). Light mode keeps a flat brand-blue fill; dark
+// mode swaps to the same deep navy → app-blue sweep as the mobile app's
+// on-duty hero card gradient (MobileAppMockup.tsx / ScheduleScreen.tsx's
+// ME_HERO_CARD_GRADIENT_DARK) instead of reusing the unchanged light-mode
+// blue, so the band reads as dark-mode-native rather than a light panel
+// pasted onto a dark page.
+const darkCtaShellGradient = "linear-gradient(to top right, #0A1442 0%, #1D3AA0 55%, #2075FF 100%)";
+
+function themedWebCssVariables(theme: WebTheme): Record<string, string> {
+  const tokens = theme === "dark" ? darkColorTokens : lightColorTokens;
+  const shadows = theme === "dark" ? darkShadowTokens : shadowTokens;
+  const shadcn = theme === "dark" ? darkShadcnTokens : lightShadcnTokens;
+  const textFaint = theme === "dark" ? "#5B5B63" : "#718096";
+  const todayText = theme === "dark" ? "#93C5FD" : "#1D4ED8";
+  const todayBorder = theme === "dark" ? "#2C5282" : "#93C5FD";
+  const infoText = theme === "dark" ? "#93C5FD" : "#1D4ED8";
+  const dangerDark = theme === "dark" ? "#DC2626" : "#991B1B";
+
+  const colorVars: Record<string, string> = {
+    "--dg-color-bg": tokens.background,
+    "--dg-color-surface": tokens.surface,
+    "--dg-color-bg-secondary": tokens.surfaceSecondary,
+    "--dg-color-row-alt": tokens.surfaceMuted,
+    "--dg-color-row-hover": tokens.surfaceSecondary,
+    "--dg-color-border": tokens.border,
+    "--dg-color-border-light": tokens.borderSubtle,
+    "--dg-color-border-focus": tokens.brandLight,
+    "--dg-color-text-primary": tokens.textPrimary,
+    "--dg-color-text-secondary": tokens.textSecondary,
+    "--dg-color-text-muted": tokens.textMuted,
+    "--dg-color-text-subtle": tokens.textSubtle,
+    "--dg-color-text-faint": textFaint,
+    "--dg-color-text-inverse": tokens.textInverse,
+    "--dg-color-on-brand-text": tokens.onBrandText,
+    "--dg-color-on-brand-surface": tokens.onBrandSurface,
+    "--dg-color-brand": tokens.brand,
+    "--dg-color-brand-light": tokens.brandLight,
+    "--dg-color-brand-bg": tokens.brandSoft,
+    "--dg-color-brand-border": tokens.brandBorder,
+    "--dg-color-primary": tokens.brand,
+    "--dg-color-link": tokens.brand,
+    "--dg-color-accent-text": tokens.brand,
+    "--dg-color-control-primary": tokens.controlPrimary,
+    "--dg-color-control-primary-hover": tokens.controlPrimaryHover,
+    "--dg-color-control-primary-text": tokens.textInverse,
+    "--dg-color-control-active-bg": tokens.surfaceSecondary,
+    "--dg-color-control-active-border": tokens.border,
+    "--dg-color-control-active-text": tokens.textPrimary,
+    "--dg-color-control-active-hover": tokens.borderSubtle,
+    "--dg-color-success": tokens.success,
+    "--dg-color-success-bg": tokens.successSoft,
+    "--dg-color-success-text": tokens.successText,
+    "--dg-color-success-border": tokens.successBorder,
+    "--dg-color-warning": tokens.warning,
+    "--dg-color-warning-bg": tokens.warningSoft,
+    "--dg-color-warning-text": tokens.warningText,
+    "--dg-color-warning-border": tokens.warningBorder,
+    "--dg-color-danger": tokens.danger,
+    "--dg-color-danger-bg": tokens.dangerSoft,
+    "--dg-color-danger-text": tokens.dangerText,
+    "--dg-color-danger-border": tokens.dangerBorder,
+    "--dg-color-danger-dark": dangerDark,
+    "--dg-color-info": tokens.brandLight,
+    "--dg-color-info-bg": tokens.brandSoft,
+    "--dg-color-info-text": infoText,
+    "--dg-color-info-border": tokens.brandBorder,
+    "--dg-color-today-bg": tokens.brandSoft,
+    "--dg-color-today-text": todayText,
+    "--dg-color-today-border": todayBorder,
+    "--dg-color-shadow": tokens.shadow,
+    "--dg-color-shadow-strong": tokens.shadowStrong,
+    // Strong grid dividers (schedule header's bottom rule, week-split line):
+    // need to read as a heavier line than the regular day dividers in both
+    // themes, but `--color-dark` (fixed near-black chrome) is invisible
+    // against dark mode's near-black surfaces, so this tracks the theme
+    // instead.
+    "--dg-color-grid-divider-strong": theme === "dark" ? tokens.textMuted : tokens.textPrimary,
+    // Recurring-shifts table header's bottom rule (see
+    // RecurringScheduleSection.tsx): same fixed-`--color-dark`-is-invisible
+    // problem as the grid divider above, but this one needs full white in
+    // dark mode specifically to stand out against the header row.
+    "--dg-color-table-divider-strong": theme === "dark" ? "#FFFFFF" : tokens.textPrimary,
+    // Full-page background behind the login/onboarding auth card (see
+    // .dg-auth-shell) and the onboarding wizard shell (see WizardShell.tsx):
+    // a black-to-vibrant-blue diagonal sweep in dark mode instead of a flat
+    // surface fill, echoing the brand blue without competing with the card.
+    // Held at pure black through the first 40% so the sweep reads as a slow
+    // build into blue rather than an even 0-to-100 fade. Light mode keeps
+    // each shell's existing (non-vibrant) fill.
+    "--dg-color-auth-shell-bg": theme === "dark" ? darkDiagonalShellGradient : tokens.surface,
+    "--dg-color-onboarding-shell-bg":
+      theme === "dark"
+        ? darkDiagonalShellGradient
+        : `linear-gradient(145deg, ${tokens.background} 0%, ${tokens.brandSoft} 100%)`,
+    "--dg-color-cta-shell-bg": theme === "dark" ? darkCtaShellGradient : tokens.brand,
+  };
+
+  const colorAliasVars: Record<string, string> = {};
+  for (const [key, value] of Object.entries(colorVars)) {
+    colorAliasVars[key.replace(/^--dg-color-/, "--color-")] = value;
+  }
+
+  return {
+    ...colorVars,
+    ...colorAliasVars,
+    "--shadow-raised": shadows.raised,
+    "--shadow-float": shadows.float,
+    "--shadow-menu": shadows.menu,
+    "--shadow-modal": shadows.modal,
+    "--shadow-panel": shadows.panel,
+    "--shadow-drag": shadows.drag,
+    "--tooltip-shadow": shadows.tooltip,
+    "--dg-shadow-sidebar-toggle":
+      theme === "dark" ? "0 1px 4px rgba(0, 0, 0, 0.5)" : "0 1px 4px rgba(0,0,0,0.08)",
+    "--dg-shadow-staff-detail":
+      theme === "dark"
+        ? "0 8px 40px rgba(0, 0, 0, 0.7), 0 2px 12px rgba(0, 0, 0, 0.5)"
+        : "0 8px 40px rgba(0, 0, 0, 0.16), 0 2px 12px rgba(0, 0, 0, 0.08)",
+    "--dg-shadow-auth-card":
+      theme === "dark" ? "0 2px 16px rgba(0, 0, 0, 0.5)" : "0 2px 16px rgba(0, 0, 0, 0.07)",
+    "--background": shadcn.background,
+    "--foreground": shadcn.foreground,
+    "--card": shadcn.card,
+    "--card-foreground": shadcn.cardForeground,
+    "--popover": shadcn.popover,
+    "--popover-foreground": shadcn.popoverForeground,
+    "--primary": shadcn.primary,
+    "--primary-foreground": shadcn.primaryForeground,
+    "--secondary": shadcn.secondary,
+    "--secondary-foreground": shadcn.secondaryForeground,
+    "--muted": shadcn.muted,
+    "--muted-foreground": shadcn.mutedForeground,
+    "--accent": shadcn.accent,
+    "--accent-foreground": shadcn.accentForeground,
+    "--destructive": shadcn.destructive,
+    "--border": shadcn.border,
+    "--input": shadcn.input,
+    "--ring": shadcn.ring,
+    "--chart-1": shadcn.chart1,
+    "--chart-2": shadcn.chart2,
+    "--chart-3": shadcn.chart3,
+    "--chart-4": shadcn.chart4,
+    "--chart-5": shadcn.chart5,
+    "--radius": shadcn.radius,
+    "--sidebar": shadcn.sidebar,
+    "--sidebar-foreground": shadcn.sidebarForeground,
+    "--sidebar-primary": shadcn.sidebarPrimary,
+    "--sidebar-primary-foreground": shadcn.sidebarPrimaryForeground,
+    "--sidebar-accent": shadcn.sidebarAccent,
+    "--sidebar-accent-foreground": shadcn.sidebarAccentForeground,
+    "--sidebar-border": shadcn.sidebarBorder,
+    "--sidebar-ring": shadcn.sidebarRing,
+  };
+}
+
+// Values that are identical in both themes — spacing, typography, radius,
+// motion, layout dimensions, plus the "always dark" chrome colors and the
+// on-dark/toast/overlay state-effect tokens (see `themedWebCssVariables` for
+// why those specific color-named tokens stay fixed instead of following the
+// active theme). Safe to inject once as a static inline style.
+export function createStaticWebCssVariables(): Record<string, string> {
+  return {
+    "--dg-color-dark": lightColorTokens.textPrimary,
+    "--dg-color-dark-elevated": lightColorTokens.textSecondary,
+    "--color-dark": lightColorTokens.textPrimary,
+    "--color-dark-elevated": lightColorTokens.textSecondary,
     "--header-height": webLayoutTokens.headerHeight,
     "--dg-toolbar-h": webLayoutTokens.toolbarHeight,
     "--dg-btn-radius": buttonTokens.radius,
@@ -593,7 +816,6 @@ export function createWebCssVariables(): Record<string, string> {
     "--dg-grid-name-col-mobile": webResponsiveTokens.mobile.gridNameColumn,
     "--tooltip-font-size": "var(--dg-fs-label)",
     "--tooltip-border-radius": "var(--dg-radius-sm)",
-    "--tooltip-shadow": shadowTokens.tooltip,
     "--dg-duration-fast": motionTokens.fast,
     "--dg-duration-standard": motionTokens.standard,
     "--dg-radius-sm": webRadiusTokens.sm,
@@ -623,37 +845,46 @@ export function createWebCssVariables(): Record<string, string> {
     "--dg-toast-info-border": toastTokens.infoBorder,
     "--dg-toast-warning-bg": toastTokens.warningBackground,
     "--dg-toast-warning-border": toastTokens.warningBorder,
-    "--background": shadcnTokens.background,
-    "--foreground": shadcnTokens.foreground,
-    "--card": shadcnTokens.card,
-    "--card-foreground": shadcnTokens.cardForeground,
-    "--popover": shadcnTokens.popover,
-    "--popover-foreground": shadcnTokens.popoverForeground,
-    "--primary": shadcnTokens.primary,
-    "--primary-foreground": shadcnTokens.primaryForeground,
-    "--secondary": shadcnTokens.secondary,
-    "--secondary-foreground": shadcnTokens.secondaryForeground,
-    "--muted": shadcnTokens.muted,
-    "--muted-foreground": shadcnTokens.mutedForeground,
-    "--accent": shadcnTokens.accent,
-    "--accent-foreground": shadcnTokens.accentForeground,
-    "--destructive": shadcnTokens.destructive,
-    "--border": shadcnTokens.border,
-    "--input": shadcnTokens.input,
-    "--ring": shadcnTokens.ring,
-    "--chart-1": shadcnTokens.chart1,
-    "--chart-2": shadcnTokens.chart2,
-    "--chart-3": shadcnTokens.chart3,
-    "--chart-4": shadcnTokens.chart4,
-    "--chart-5": shadcnTokens.chart5,
-    "--radius": shadcnTokens.radius,
-    "--sidebar": shadcnTokens.sidebar,
-    "--sidebar-foreground": shadcnTokens.sidebarForeground,
-    "--sidebar-primary": shadcnTokens.sidebarPrimary,
-    "--sidebar-primary-foreground": shadcnTokens.sidebarPrimaryForeground,
-    "--sidebar-accent": shadcnTokens.sidebarAccent,
-    "--sidebar-accent-foreground": shadcnTokens.sidebarAccentForeground,
-    "--sidebar-border": shadcnTokens.sidebarBorder,
-    "--sidebar-ring": shadcnTokens.sidebarRing,
   };
+}
+
+/**
+ * Full flat CSS var map for a given theme (static + themed merged) —
+ * preserves the pre-dark-mode `createWebCssVariables()` contract (no-arg
+ * call defaults to light) for existing consumers like `tokens.test.ts`.
+ */
+export function createWebCssVariables(theme: WebTheme = "light"): Record<string, string> {
+  return {
+    ...createStaticWebCssVariables(),
+    ...themedWebCssVariables(theme),
+  };
+}
+
+/**
+ * Generates `:root { ... } .dark { ... } .dg-force-light { ... }` CSS text
+ * for the themed subset of variables, meant to be injected as a `<style>`
+ * tag in `apps/web/src/app/layout.tsx` alongside `createStaticWebCssVariables()`
+ * applied once as a static inline style on `<html>`.
+ *
+ * `.dg-force-light` re-pins every themed var back to its light value —
+ * apply it to a subtree (e.g. the public marketing page) that must always
+ * render light regardless of the visitor's system/selected theme. Custom
+ * properties resolve by nearest ancestor definition, so this wins over an
+ * inherited `.dark` on `<html>` without needing extra specificity.
+ *
+ * The trailing `@media print` block re-pins the same vars to light for
+ * every printed page and browser print-preview, regardless of the active
+ * theme — printed output should never come out dark-mode-styled. It's
+ * appended last so, at equal specificity, source order lets it win over
+ * `.dark` whenever the media query matches.
+ */
+export function createThemedCssText(): string {
+  const toDeclarations = (vars: Record<string, string>) =>
+    Object.entries(vars)
+      .map(([key, value]) => `  ${key}: ${value};`)
+      .join("\n");
+
+  const lightDeclarations = toDeclarations(themedWebCssVariables("light"));
+
+  return `:root {\n${lightDeclarations}\n}\n\n.dark {\n${toDeclarations(themedWebCssVariables("dark"))}\n}\n\n.dg-force-light {\n${lightDeclarations}\n}\n\n@media print {\n  :root,\n  .dark {\n${lightDeclarations}\n  }\n}\n`;
 }

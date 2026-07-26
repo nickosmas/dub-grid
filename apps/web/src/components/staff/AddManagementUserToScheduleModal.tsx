@@ -14,9 +14,24 @@ import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-pro
 import { updateEmployee } from "@/features/employees/client";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
+/** Only the read-only prefill fields this modal actually needs — satisfied by
+ *  both `DirectoryPerson` (People directory) and `Employee` (self/detail
+ *  views), so callers with just an `Employee` in scope can pass it directly. */
+type SchedulePrefillPerson = Pick<
+  DirectoryPerson,
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "phone"
+  | "certificationId"
+  | "focusAreaIds"
+  | "roleIds"
+  | "userId"
+>;
+
 interface AddManagementUserToScheduleModalProps {
   orgId: string;
-  person: DirectoryPerson;
+  person: SchedulePrefillPerson;
   /** The existing employees row for this management member. Every org member
    *  carries an employees row (post-Flow-B), so the parent always has one
    *  to pass; this modal patches its scheduling attributes in place rather

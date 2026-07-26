@@ -192,7 +192,6 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
           certificationLabel={org.certificationLabel || "Certifications"}
           onChange={setJobs}
           canManageScheduleDefinitions={true}
-          shiftDisplayMode={org.shiftDisplayMode}
         />
       </CompositeSection>
 

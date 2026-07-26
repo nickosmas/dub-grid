@@ -290,12 +290,6 @@ function PrintSection({
 
   // em-based name column; day columns fill the rest equally
   const nameColEm = 16;
-  const gridTemplate = `${nameColEm}em repeat(${dates.length}, 1fr)`;
-
-  const rowStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: gridTemplate,
-  };
 
   const cellH = `${fontSize * 3.4}px`;
   const tallyH = `${fontSize * 2.8}px`;
@@ -315,8 +309,12 @@ function PrintSection({
         {sectionName}
       </div>
 
-      <div
+      <table
         style={{
+          width: "100%",
+          tableLayout: "fixed",
+          borderCollapse: "separate",
+          borderSpacing: 0,
           background: "#fff",
           border: "1px solid #9EB4D4",
           borderRadius: "var(--dg-radius-md)",
@@ -324,371 +322,241 @@ function PrintSection({
           boxShadow: BOX_SHADOW_CARD,
         }}
       >
+        <colgroup>
+          <col style={{ width: `${nameColEm}em` }} />
+          {dates.map((date) => (
+            <col key={formatDateKey(date)} />
+          ))}
+        </colgroup>
+
         {/* Header row */}
-        <div style={{ ...rowStyle, borderBottom: "2px solid #0F1724" }}>
-          <div
-            style={{
-              padding: "0.5em 0.8em",
-              fontWeight: 700,
-              fontSize: "0.85em",
-              color: "#4D6080",
-              letterSpacing: "0.08em",
-              borderRight: "1px solid #C8D6EC",
-              background: "#F5F7FA",
-            }}
-          >
-            STAFF NAME
-          </div>
-          {dates.map((date, i) => {
-            const isSplit = splitAtIndex !== undefined && i === splitAtIndex;
-            return (
-              <div
-                key={formatDateKey(date)}
-                style={{
-                  textAlign: "center",
-                  padding: "0.4em 0",
-                  borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "0.8em",
-                    fontWeight: 600,
-                    color: "#94A3B8",
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  {DAY_LABELS[date.getDay()]}
-                </div>
-                <div
-                  style={{
-                    fontSize: "1.2em",
-                    fontWeight: 700,
-                    color: "#1A2640",
-                    lineHeight: 1.2,
-                    marginTop: "0.05em",
-                  }}
-                >
-                  {date.getDate()}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Employee rows */}
-        {employees.map((emp, ri) => {
-          const certAbbr = getCertAbbr(emp.certificationId, certifications);
-          const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
-
-          return (
-            <div
-              key={emp.id}
+        <thead>
+          <tr>
+            <th
               style={{
-                ...rowStyle,
-                background: "#fff",
-                alignItems: "stretch",
-                breakInside: "avoid",
-                pageBreakInside: "avoid",
+                textAlign: "left",
+                padding: "0.5em 0.8em",
+                fontWeight: 700,
+                fontSize: "0.85em",
+                color: "#4D6080",
+                letterSpacing: "0.08em",
+                borderRight: "1px solid #C8D6EC",
+                borderBottom: "2px solid #0F1724",
+                background: "#F5F7FA",
               }}
             >
-              {/* Name cell */}
-              <div
-                style={{
-                  padding: "0.3em 0.6em 0.3em 0.8em",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "0.4em",
-                  minWidth: 0,
-                  height: cellH,
-                  borderTop: ri > 0 ? "1px solid #C8D6EC" : undefined,
-                  borderRight: "1px solid #C8D6EC",
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.3em" }}>
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        color: "#1A2640",
-                        whiteSpace: "normal",
-                        overflowWrap: "break-word",
-                        lineHeight: 1.05,
-                        fontSize:
-                          getEmployeeDisplayName(emp).length > 25
-                            ? "0.85em"
-                            : getEmployeeDisplayName(emp).length > 18
-                              ? "0.95em"
-                              : "1em",
-                        display: "block",
-                        maxWidth: `${nameColEm - 4}em`,
-                      }}
-                    >
-                      {getEmployeeDisplayName(emp)}
-                    </span>
-                  </div>
-                  {emp.roleIds.length > 0 && (
-                    <div
-                      style={{
-                        fontSize: "0.8em",
-                        color: "#4D6080",
-                        marginTop: "0.1em",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
-                    </div>
-                  )}
-                </div>
-                {certAbbr && certAbbr !== "—" && (
-                  <span
+              STAFF NAME
+            </th>
+            {dates.map((date, i) => {
+              const isSplit = splitAtIndex !== undefined && i === splitAtIndex;
+              return (
+                <th
+                  key={formatDateKey(date)}
+                  style={{
+                    textAlign: "center",
+                    padding: "0.4em 0",
+                    fontWeight: 400,
+                    borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
+                    borderBottom: "2px solid #0F1724",
+                  }}
+                >
+                  <div
                     style={{
                       fontSize: "0.8em",
-                      fontWeight: 700,
-                      background: dc.bg,
-                      color: dc.text,
-                      padding: "0.15em 0.5em",
-                      borderRadius: 20,
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                      letterSpacing: "0.01em",
+                      fontWeight: 600,
+                      color: "#94A3B8",
+                      letterSpacing: "0.05em",
                     }}
                   >
-                    {certAbbr}
-                  </span>
-                )}
-              </div>
-
-              {/* Shift cells */}
-              {dates.map((date, di) => {
-                const isSplit = splitAtIndex !== undefined && di === splitAtIndex;
-                const assignment = shiftForKey(emp.id, date);
-                const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
-                const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
-
-                return (
+                    {DAY_LABELS[date.getDay()]}
+                  </div>
                   <div
-                    key={formatDateKey(date)}
                     style={{
-                      height: cellH,
+                      fontSize: "1.2em",
+                      fontWeight: 700,
+                      color: "#1A2640",
+                      lineHeight: 1.2,
+                      marginTop: "0.05em",
+                    }}
+                  >
+                    {date.getDate()}
+                  </div>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+
+        {/* Employee rows */}
+        <tbody>
+          {employees.map((emp, ri) => {
+            const certAbbr = getCertAbbr(emp.certificationId, certifications);
+            const dc = DESIGNATION_COLORS[certAbbr] ?? DEFAULT_DESIG_COLOR;
+
+            return (
+              <tr
+                key={emp.id}
+                style={{
+                  background: "#fff",
+                  breakInside: "avoid",
+                  pageBreakInside: "avoid",
+                }}
+              >
+                {/* Name cell */}
+                <td
+                  style={{
+                    padding: 0,
+                    borderTop: ri > 0 ? "1px solid #C8D6EC" : undefined,
+                    borderRight: "1px solid #C8D6EC",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "0.3em 0.6em 0.3em 0.8em",
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: "center",
-                      position: "relative",
-                      borderTop: ri > 0 && !isSplit ? "1px solid #C8D6EC" : undefined,
-                      boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 #C8D6EC" : undefined,
-                      borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
+                      justifyContent: "space-between",
+                      gap: "0.4em",
+                      minWidth: 0,
+                      height: cellH,
                     }}
                   >
-                    {assignment && assignment !== "OFF" ? (
-                      (() => {
-                        const labels = assignment.split("/");
-                        if (labels.length === 1) {
-                          const label = labels[0];
-                          const style = getStyleByIdOrLabel(label, cellCodeIds[0]);
-                          const codeEntry0 =
-                            cellCodeIds[0] != null ? assignmentById.get(cellCodeIds[0]) : undefined;
-                          const displayParts = getDisplayPartsByIdOrLabel(label, cellCodeIds[0]);
-                          const isCross =
-                            label !== "X" &&
-                            codeEntry0?.focusAreaId != null &&
-                            codeEntry0.focusAreaId !== focusAreaId;
-                          const crossHomeFa = isCross
-                            ? focusAreas.find((fa) => fa.id === codeEntry0!.focusAreaId)
-                            : undefined;
-                          const singleCrossFocusPill = isCross && crossHomeFa ? crossHomeFa : null;
-                          const singleCrossFocusPalette = getCrossFocusBadgePalette(style);
-                          const singleForegroundColor = isCross
-                            ? getReadableTextOnSurface(style.color, style.text)
-                            : style.text;
-                          const showSingleSecondaryLine = !!displayParts.secondaryLabel;
-                          const singleDisplayLabel = displayParts.primaryLabel;
-                          return (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: customTimes ? "0.25em" : "0.5em",
-                                right: "0.5em",
-                                bottom: customTimes ? "0.25em" : "0.5em",
-                                left: "0.5em",
-                                background: isCross ? "#ffffff" : style.color,
-                                border: `1px solid ${borderColor(singleForegroundColor)}`,
-                                borderRadius: 4,
-                                color: singleForegroundColor,
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                overflow: "hidden",
-                                padding: isNameMode ? "2px 4px" : "2px 3px",
-                                paddingLeft: singleCrossFocusPill
-                                  ? isNameMode
-                                    ? "1.75em"
-                                    : "1.45em"
-                                  : undefined,
-                              }}
-                            >
-                              {singleCrossFocusPill && (
-                                <span
-                                  style={{
-                                    position: "absolute",
-                                    top: 0,
-                                    bottom: 0,
-                                    left: 0,
-                                    display: "flex",
-                                    alignItems: "center",
-                                    fontSize: "1em",
-                                    fontWeight: 800,
-                                    lineHeight: 1,
-                                    background: singleCrossFocusPalette.background,
-                                    color: singleCrossFocusPalette.color,
-                                    borderRadius: "3px 0 0 3px",
-                                    padding: "0 0.3em",
-                                    letterSpacing: "0.02em",
-                                  }}
-                                >
-                                  {getFocusAreaInitials(singleCrossFocusPill.name)}
-                                </span>
-                              )}
-                              <MaybeHint content={isNameMode ? label : undefined} side="top">
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    gap: showSingleSecondaryLine ? "0.12em" : 0,
-                                    maxWidth: "100%",
-                                    minWidth: 0,
-                                  }}
-                                >
-                                  <span
-                                    style={{
-                                      fontWeight: 800,
-                                      lineHeight: 1,
-                                      ...(isNameMode
-                                        ? { textAlign: "center" as const, fontSize: "0.85em" }
-                                        : {
-                                            whiteSpace: "nowrap",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            maxWidth: "100%",
-                                          }),
-                                    }}
-                                  >
-                                    {isNameMode
-                                      ? pillText(singleDisplayLabel, 14)
-                                      : singleDisplayLabel}
-                                  </span>
-                                  {showSingleSecondaryLine ? (
-                                    <span
-                                      style={{
-                                        fontSize: "0.7em",
-                                        fontWeight: 700,
-                                        lineHeight: 1,
-                                        opacity: 0.78,
-                                        whiteSpace: "nowrap",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        maxWidth: "100%",
-                                      }}
-                                    >
-                                      {isNameMode
-                                        ? pillText(displayParts.secondaryLabel ?? "", 14)
-                                        : displayParts.secondaryLabel}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </MaybeHint>
-                              {customTimes && (
-                                <span
-                                  style={{
-                                    fontSize: "0.75em",
-                                    fontWeight: 500,
-                                    lineHeight: 1,
-                                    marginTop: "0.3em",
-                                    opacity: 0.7,
-                                    letterSpacing: "0.02em",
-                                  }}
-                                >
-                                  {fmt12hShort(customTimes.start)}–{fmt12hShort(customTimes.end)}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        }
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.3em" }}>
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: "#1A2640",
+                            whiteSpace: "normal",
+                            overflowWrap: "break-word",
+                            lineHeight: 1.05,
+                            fontSize:
+                              getEmployeeDisplayName(emp).length > 25
+                                ? "0.85em"
+                                : getEmployeeDisplayName(emp).length > 18
+                                  ? "0.95em"
+                                  : "1em",
+                            display: "block",
+                            maxWidth: `${nameColEm - 4}em`,
+                          }}
+                        >
+                          {getEmployeeDisplayName(emp)}
+                        </span>
+                      </div>
+                      {emp.roleIds.length > 0 && (
+                        <div
+                          style={{
+                            fontSize: "0.8em",
+                            color: "#4D6080",
+                            marginTop: "0.1em",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {getRoleAbbrs(emp.roleIds, orgRoles).join(", ")}
+                        </div>
+                      )}
+                    </div>
+                    {certAbbr && certAbbr !== "—" && (
+                      <span
+                        style={{
+                          fontSize: "0.8em",
+                          fontWeight: 700,
+                          background: dc.bg,
+                          color: dc.text,
+                          padding: "0.15em 0.5em",
+                          borderRadius: 20,
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                          letterSpacing: "0.01em",
+                        }}
+                      >
+                        {certAbbr}
+                      </span>
+                    )}
+                  </div>
+                </td>
 
-                        return (
-                          <div
-                            style={{
-                              position: "absolute",
-                              top: "0.25em",
-                              right: "0.5em",
-                              bottom: "0.25em",
-                              left: "0.5em",
-                              display: "flex",
-                              flexDirection: "row",
-                              gap: "0.15em",
-                              alignItems: "stretch",
-                            }}
-                          >
-                            {labels.map((label, li) => {
-                              const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
-                              const codeEntryLi =
-                                cellCodeIds[li] != null
-                                  ? assignmentById.get(cellCodeIds[li])
+                {/* Shift cells */}
+                {dates.map((date, di) => {
+                  const isSplit = splitAtIndex !== undefined && di === splitAtIndex;
+                  const assignment = shiftForKey(emp.id, date);
+                  const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
+                  const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
+
+                  return (
+                    <td
+                      key={formatDateKey(date)}
+                      style={{
+                        padding: 0,
+                        borderTop: ri > 0 && !isSplit ? "1px solid #C8D6EC" : undefined,
+                        boxShadow: isSplit && ri > 0 ? "inset 0 1px 0 #C8D6EC" : undefined,
+                        borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #C8D6EC",
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: cellH,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          position: "relative",
+                        }}
+                      >
+                        {assignment && assignment !== "OFF" ? (
+                          (() => {
+                            const labels = assignment.split("/");
+                            if (labels.length === 1) {
+                              const label = labels[0];
+                              const style = getStyleByIdOrLabel(label, cellCodeIds[0]);
+                              const codeEntry0 =
+                                cellCodeIds[0] != null
+                                  ? assignmentById.get(cellCodeIds[0])
                                   : undefined;
                               const displayParts = getDisplayPartsByIdOrLabel(
                                 label,
-                                cellCodeIds[li],
+                                cellCodeIds[0],
                               );
                               const isCross =
                                 label !== "X" &&
-                                codeEntryLi?.focusAreaId != null &&
-                                codeEntryLi.focusAreaId !== focusAreaId;
-                              const crossHomeFaLi = isCross
-                                ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
+                                codeEntry0?.focusAreaId != null &&
+                                codeEntry0.focusAreaId !== focusAreaId;
+                              const crossHomeFa = isCross
+                                ? focusAreas.find((fa) => fa.id === codeEntry0!.focusAreaId)
                                 : undefined;
-                              const multiCrossFocusPill =
-                                isCross && crossHomeFaLi ? crossHomeFaLi : null;
-                              const multiCrossFocusPalette = getCrossFocusBadgePalette(style);
-                              const multiForegroundColor = isCross
+                              const singleCrossFocusPill =
+                                isCross && crossHomeFa ? crossHomeFa : null;
+                              const singleCrossFocusPalette = getCrossFocusBadgePalette(style);
+                              const singleForegroundColor = isCross
                                 ? getReadableTextOnSurface(style.color, style.text)
                                 : style.text;
-                              const showMultiSecondaryLine = !!displayParts.secondaryLabel;
-                              const multiDisplayLabel = displayParts.primaryLabel;
-                              const pillTime =
-                                customTimes?.perPill?.[li] ??
-                                (li === 0 && !customTimes?.perPill ? customTimes : null);
-                              const hasTime = pillTime && (pillTime.start || pillTime.end);
-
+                              const showSingleSecondaryLine = !!displayParts.secondaryLabel;
+                              const singleDisplayLabel = displayParts.primaryLabel;
                               return (
                                 <div
-                                  key={li}
                                   style={{
-                                    flex: 1,
+                                    position: "absolute",
+                                    top: customTimes ? "0.25em" : "0.5em",
+                                    right: "0.5em",
+                                    bottom: customTimes ? "0.25em" : "0.5em",
+                                    left: "0.5em",
                                     background: isCross ? "#ffffff" : style.color,
-                                    border: `1px solid ${borderColor(multiForegroundColor)}`,
+                                    border: `1px solid ${borderColor(singleForegroundColor)}`,
                                     borderRadius: 4,
-                                    color: multiForegroundColor,
+                                    color: singleForegroundColor,
                                     display: "flex",
                                     flexDirection: "column",
                                     alignItems: "center",
                                     justifyContent: "center",
-                                    gap: 0,
-                                    fontWeight: 800,
-                                    position: "relative",
-                                    lineHeight: 1,
                                     overflow: "hidden",
-                                    padding: isNameMode ? "1px 3px" : "1px 2px",
-                                    paddingLeft: multiCrossFocusPill
+                                    padding: isNameMode ? "2px 4px" : "2px 3px",
+                                    paddingLeft: singleCrossFocusPill
                                       ? isNameMode
-                                        ? "1.35em"
-                                        : "1.15em"
+                                        ? "1.75em"
+                                        : "1.45em"
                                       : undefined,
                                   }}
                                 >
-                                  {multiCrossFocusPill && (
+                                  {singleCrossFocusPill && (
                                     <span
                                       style={{
                                         position: "absolute",
@@ -697,17 +565,17 @@ function PrintSection({
                                         left: 0,
                                         display: "flex",
                                         alignItems: "center",
-                                        fontSize: "0.75em",
+                                        fontSize: "1em",
                                         fontWeight: 800,
                                         lineHeight: 1,
-                                        background: multiCrossFocusPalette.background,
-                                        color: multiCrossFocusPalette.color,
-                                        borderRadius: "2px 0 0 2px",
-                                        padding: "0 0.2em",
+                                        background: singleCrossFocusPalette.background,
+                                        color: singleCrossFocusPalette.color,
+                                        borderRadius: "3px 0 0 3px",
+                                        padding: "0 0.3em",
                                         letterSpacing: "0.02em",
                                       }}
                                     >
-                                      {getFocusAreaInitials(multiCrossFocusPill.name)}
+                                      {getFocusAreaInitials(singleCrossFocusPill.name)}
                                     </span>
                                   )}
                                   <MaybeHint content={isNameMode ? label : undefined} side="top">
@@ -716,33 +584,35 @@ function PrintSection({
                                         display: "flex",
                                         flexDirection: "column",
                                         alignItems: "center",
-                                        gap: showMultiSecondaryLine ? "0.1em" : 0,
+                                        gap: showSingleSecondaryLine ? "0.12em" : 0,
                                         maxWidth: "100%",
                                         minWidth: 0,
                                       }}
                                     >
                                       <span
-                                        style={
-                                          isNameMode
+                                        style={{
+                                          fontWeight: 800,
+                                          lineHeight: 1.2,
+                                          ...(isNameMode
                                             ? { textAlign: "center" as const, fontSize: "0.85em" }
                                             : {
                                                 whiteSpace: "nowrap",
                                                 overflow: "hidden",
                                                 textOverflow: "ellipsis",
                                                 maxWidth: "100%",
-                                              }
-                                        }
+                                              }),
+                                        }}
                                       >
                                         {isNameMode
-                                          ? pillText(multiDisplayLabel, 8)
-                                          : multiDisplayLabel}
+                                          ? pillText(singleDisplayLabel, 14)
+                                          : singleDisplayLabel}
                                       </span>
-                                      {showMultiSecondaryLine ? (
+                                      {showSingleSecondaryLine ? (
                                         <span
                                           style={{
-                                            fontSize: "0.68em",
+                                            fontSize: "0.7em",
                                             fontWeight: 700,
-                                            lineHeight: 1,
+                                            lineHeight: 1.3,
                                             opacity: 0.78,
                                             whiteSpace: "nowrap",
                                             overflow: "hidden",
@@ -751,62 +621,228 @@ function PrintSection({
                                           }}
                                         >
                                           {isNameMode
-                                            ? pillText(displayParts.secondaryLabel ?? "", 8)
+                                            ? pillText(displayParts.secondaryLabel ?? "", 14)
                                             : displayParts.secondaryLabel}
                                         </span>
                                       ) : null}
                                     </div>
                                   </MaybeHint>
-                                  {hasTime && (
+                                  {customTimes && (
                                     <span
                                       style={{
-                                        fontSize: "0.7em",
+                                        fontSize: "0.75em",
                                         fontWeight: 500,
-                                        opacity: 0.7,
                                         lineHeight: 1,
+                                        marginTop: "0.3em",
+                                        opacity: 0.7,
+                                        letterSpacing: "0.02em",
                                       }}
                                     >
-                                      {fmt12hShort(pillTime!.start)}–{fmt12hShort(pillTime!.end)}
+                                      {fmt12hShort(customTimes.start)}–
+                                      {fmt12hShort(customTimes.end)}
                                     </span>
                                   )}
                                 </div>
                               );
-                            })}
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      <div
-                        style={{
-                          width: "1.2em",
-                          height: "0.18em",
-                          background: assignment === "OFF" ? "#9EB4D4" : "#C8D6EC",
-                          borderRadius: 2,
-                        }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+                            }
 
-        {/* Tally rows — one per active tally category for this section */}
-        {tallyRows.map((row, ci) => (
-          <TallyRow
-            key={row.id}
-            label={row.name}
-            bgColor="#fff"
-            gridTemplate={gridTemplate}
-            height={tallyH}
-            splitAtIndex={splitAtIndex}
-            dailyTallies={dailyTallies.map((t) => t[row.id] ?? {})}
-            isFirst={ci === 0}
-            isNameMode={isNameMode}
-          />
-        ))}
-      </div>
+                            return (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "0.25em",
+                                  right: "0.5em",
+                                  bottom: "0.25em",
+                                  left: "0.5em",
+                                  display: "flex",
+                                  flexDirection: "row",
+                                  gap: "0.15em",
+                                  alignItems: "stretch",
+                                }}
+                              >
+                                {labels.map((label, li) => {
+                                  const style = getStyleByIdOrLabel(label, cellCodeIds[li]);
+                                  const codeEntryLi =
+                                    cellCodeIds[li] != null
+                                      ? assignmentById.get(cellCodeIds[li])
+                                      : undefined;
+                                  const displayParts = getDisplayPartsByIdOrLabel(
+                                    label,
+                                    cellCodeIds[li],
+                                  );
+                                  const isCross =
+                                    label !== "X" &&
+                                    codeEntryLi?.focusAreaId != null &&
+                                    codeEntryLi.focusAreaId !== focusAreaId;
+                                  const crossHomeFaLi = isCross
+                                    ? focusAreas.find((fa) => fa.id === codeEntryLi!.focusAreaId)
+                                    : undefined;
+                                  const multiCrossFocusPill =
+                                    isCross && crossHomeFaLi ? crossHomeFaLi : null;
+                                  const multiCrossFocusPalette = getCrossFocusBadgePalette(style);
+                                  const multiForegroundColor = isCross
+                                    ? getReadableTextOnSurface(style.color, style.text)
+                                    : style.text;
+                                  const showMultiSecondaryLine = !!displayParts.secondaryLabel;
+                                  const multiDisplayLabel = displayParts.primaryLabel;
+                                  const pillTime =
+                                    customTimes?.perPill?.[li] ??
+                                    (li === 0 && !customTimes?.perPill ? customTimes : null);
+                                  const hasTime = pillTime && (pillTime.start || pillTime.end);
+
+                                  return (
+                                    <div
+                                      key={li}
+                                      style={{
+                                        flex: 1,
+                                        background: isCross ? "#ffffff" : style.color,
+                                        border: `1px solid ${borderColor(multiForegroundColor)}`,
+                                        borderRadius: 4,
+                                        color: multiForegroundColor,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        gap: 0,
+                                        fontWeight: 800,
+                                        position: "relative",
+                                        lineHeight: 1.2,
+                                        overflow: "hidden",
+                                        padding: isNameMode ? "1px 3px" : "1px 2px",
+                                        paddingLeft: multiCrossFocusPill
+                                          ? isNameMode
+                                            ? "1.35em"
+                                            : "1.15em"
+                                          : undefined,
+                                      }}
+                                    >
+                                      {multiCrossFocusPill && (
+                                        <span
+                                          style={{
+                                            position: "absolute",
+                                            top: 0,
+                                            bottom: 0,
+                                            left: 0,
+                                            display: "flex",
+                                            alignItems: "center",
+                                            fontSize: "0.75em",
+                                            fontWeight: 800,
+                                            lineHeight: 1,
+                                            background: multiCrossFocusPalette.background,
+                                            color: multiCrossFocusPalette.color,
+                                            borderRadius: "2px 0 0 2px",
+                                            padding: "0 0.2em",
+                                            letterSpacing: "0.02em",
+                                          }}
+                                        >
+                                          {getFocusAreaInitials(multiCrossFocusPill.name)}
+                                        </span>
+                                      )}
+                                      <MaybeHint
+                                        content={isNameMode ? label : undefined}
+                                        side="top"
+                                      >
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
+                                            gap: showMultiSecondaryLine ? "0.1em" : 0,
+                                            maxWidth: "100%",
+                                            minWidth: 0,
+                                          }}
+                                        >
+                                          <span
+                                            style={
+                                              isNameMode
+                                                ? {
+                                                    textAlign: "center" as const,
+                                                    fontSize: "0.85em",
+                                                  }
+                                                : {
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis",
+                                                    maxWidth: "100%",
+                                                  }
+                                            }
+                                          >
+                                            {isNameMode
+                                              ? pillText(multiDisplayLabel, 8)
+                                              : multiDisplayLabel}
+                                          </span>
+                                          {showMultiSecondaryLine ? (
+                                            <span
+                                              style={{
+                                                fontSize: "0.68em",
+                                                fontWeight: 700,
+                                                lineHeight: 1.3,
+                                                opacity: 0.78,
+                                                whiteSpace: "nowrap",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                maxWidth: "100%",
+                                              }}
+                                            >
+                                              {isNameMode
+                                                ? pillText(displayParts.secondaryLabel ?? "", 8)
+                                                : displayParts.secondaryLabel}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      </MaybeHint>
+                                      {hasTime && (
+                                        <span
+                                          style={{
+                                            fontSize: "0.7em",
+                                            fontWeight: 500,
+                                            opacity: 0.7,
+                                            lineHeight: 1,
+                                          }}
+                                        >
+                                          {fmt12hShort(pillTime!.start)}–
+                                          {fmt12hShort(pillTime!.end)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          <div
+                            style={{
+                              width: "1.2em",
+                              height: "0.18em",
+                              background: assignment === "OFF" ? "#9EB4D4" : "#C8D6EC",
+                              borderRadius: 2,
+                            }}
+                          />
+                        )}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+
+          {/* Tally rows — one per active tally category for this section */}
+          {tallyRows.map((row, ci) => (
+            <TallyRow
+              key={row.id}
+              label={row.name}
+              bgColor="#fff"
+              height={tallyH}
+              splitAtIndex={splitAtIndex}
+              dailyTallies={dailyTallies.map((t) => t[row.id] ?? {})}
+              isFirst={ci === 0}
+              isNameMode={isNameMode}
+            />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -814,7 +850,6 @@ function PrintSection({
 function TallyRow({
   label,
   bgColor,
-  gridTemplate,
   height,
   splitAtIndex,
   dailyTallies,
@@ -823,7 +858,6 @@ function TallyRow({
 }: {
   label: string;
   bgColor: string;
-  gridTemplate: string;
   height: string;
   splitAtIndex?: number;
   dailyTallies: Record<string, number>[];
@@ -831,48 +865,35 @@ function TallyRow({
   isNameMode?: boolean;
 }) {
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: gridTemplate,
-        background: bgColor,
-        borderTop: isFirst ? "2px solid #0F1724" : undefined,
-      }}
-    >
-      <div
+    <tr style={{ background: bgColor }}>
+      <td
         style={{
           padding: "0.3em 0.8em",
           fontSize: "0.8em",
           fontWeight: 700,
           color: "#1A2640",
           letterSpacing: "0.04em",
-          display: "flex",
-          alignItems: "center",
           height,
           borderRight: "1px solid #9EB4D4",
-          borderTop: !isFirst ? "1px solid #9EB4D4" : undefined,
+          borderTop: isFirst ? "2px solid #0F1724" : "1px solid #9EB4D4",
         }}
       >
         {label}
-      </div>
+      </td>
       {dailyTallies.map((tally, i) => {
         const entries = Object.entries(tally);
         const isSplit = splitAtIndex !== undefined && i === splitAtIndex;
         return (
-          <div
+          <td
             key={i}
             style={{
               textAlign: "center",
               padding: "0.2em 0.2em",
               borderLeft: isSplit ? "2px solid #0F1724" : "1px solid #9EB4D4",
-              borderTop: !isFirst ? "1px solid #9EB4D4" : undefined,
+              borderTop: isFirst ? "2px solid #0F1724" : "1px solid #9EB4D4",
               fontSize: "0.8em",
               fontWeight: 700,
               color: entries.length > 0 ? "#1A2640" : "#94A3B8",
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
               lineHeight: 1.3,
               height,
             }}
@@ -896,10 +917,10 @@ function TallyRow({
                     </span>
                   </MaybeHint>
                 ))}
-          </div>
+          </td>
         );
       })}
-    </div>
+    </tr>
   );
 }
 
@@ -1027,6 +1048,7 @@ export default function PrintScheduleView({
 
   return (
     <div
+      className="dg-force-light"
       style={{
         position: "fixed",
         inset: 0,

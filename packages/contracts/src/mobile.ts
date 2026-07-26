@@ -114,6 +114,10 @@ export const mobileOrgConfigSchema = z.object({
   name: z.string(),
   slug: z.string().nullable(),
   timezone: z.string().nullable(),
+  // Anchors the "2 weeks" dashboard period to the org's actual pay-period
+  // boundary (see @dubgrid/schedule-core's getDashboardPeriodStartIso) —
+  // null falls back to a plain Sunday-aligned window.
+  payPeriodStartDate: z.string().nullable().default(null),
   shiftDisplayMode: z.enum(["code", "name"]),
   labels: z.object({
     focusArea: z.string(),
@@ -137,6 +141,7 @@ export const mobileLinkedEmployeeSchema = z
     lastName: z.string(),
     status: z.enum(["active", "inactive", "removed"]),
     focusAreaIds: z.array(z.number().int()).default([]),
+    departmentIds: z.array(z.number().int()).default([]),
   })
   .nullable();
 
@@ -148,7 +153,6 @@ export const mobileProfileLinkedEmployeeSchema = mobileLinkedEmployeeSchema
     email: z.string().default(""),
     certificationId: z.number().int().nullable().default(null),
     roleIds: z.array(z.number().int()).default([]),
-    departmentIds: z.array(z.number().int()).default([]),
     contactNotes: z.string().default(""),
     version: z.number().int().nonnegative().default(0),
   })
@@ -231,6 +235,14 @@ export const mobileProfilePhoneUpdateBodySchema = z.object({
 
 export const mobileProfilePhoneUpdateResponseSchema = z.object({
   linkedEmployee: mobileProfileLinkedEmployeeSchema,
+});
+
+export const mobileProfileMfaStatusUpdateBodySchema = z.object({
+  enabled: z.boolean(),
+});
+
+export const mobileProfileMfaStatusUpdateResponseSchema = z.object({
+  user: mobileProfileUserSchema,
 });
 
 export const mobileProfileChangeRequestTypeSchema = z.enum(["profile_update", "account_deletion"]);
@@ -346,10 +358,12 @@ export const mobileProfileSessionSchema = z.object({
   lastActiveAt: z.string(),
   createdAt: z.string(),
   refreshTokenHash: z.string().min(1),
+  isCurrent: z.boolean(),
 });
 
 export const mobileProfileSessionsResponseSchema = z.object({
-  sessions: z.array(mobileProfileSessionSchema),
+  active: z.array(mobileProfileSessionSchema),
+  stale: z.array(mobileProfileSessionSchema),
 });
 
 export const mobileProfileSessionRevokeBodySchema = z.object({
@@ -364,7 +378,7 @@ export const MAX_MOBILE_SCHEDULE_RANGE_DAYS = 31;
 const MS_PER_DAY = 86_400_000;
 
 function parseMobileIsoDate(value: string): Date {
-  return new Date(`${value}T00:00:00`);
+  return new Date(`${value}T00:00:00Z`);
 }
 
 function countInclusiveMobileRangeDays(startDate: string, endDate: string): number {
@@ -414,7 +428,7 @@ export function normalizeMobileScheduleRange(input?: MobileScheduleQuery): {
   const today = new Date();
   const start = input?.startDate
     ? parseMobileIsoDate(input.startDate)
-    : new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    : new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
   const end = input?.endDate
     ? parseMobileIsoDate(input.endDate)
     : new Date(start.getTime() + 13 * MS_PER_DAY);
@@ -505,12 +519,20 @@ export const mobileShiftRequestSchema = z.object({
   updatedAt: z.string(),
 });
 
+// Same thresholds as web's computeOpenShifts (apps/web/src/lib/
+// dashboard-stats.ts, via @dubgrid/schedule-core's classifyOpenShiftUrgency):
+// "high" -> today/tomorrow, "medium" -> within 3 days, else "low". Nullable/
+// defaulted so this stays additive against an older shipped mobile client
+// during a staged rollout.
+export const mobileOpenShiftUrgencySchema = z.enum(["high", "medium", "low"]);
+
 export const mobileOpenShiftSchema = z.object({
   id: z.string(),
   date: z.string().date(),
   focusAreaId: z.number().int(),
   focusAreaName: z.string().nullable(),
   needed: z.number().int().positive(),
+  urgency: mobileOpenShiftUrgencySchema.nullable().default(null),
   state: scheduleCellStateSchema,
   presentation: resolvedSchedulePresentationSchema,
   canVolunteer: z.boolean().default(true),
@@ -520,6 +542,84 @@ export const mobileOpenShiftSchema = z.object({
 export const mobileShiftRequestsResponseSchema = z.object({
   requests: z.array(mobileShiftRequestSchema),
   openShifts: z.array(mobileOpenShiftSchema).default([]),
+});
+
+// ── Admin/super_admin dashboard (mobile home view) ──────────────────────────
+// Deliberately leaner than web's SuperAdminDashboard/AdminDashboard: coverage
+// is summarized as open-slot counts per section rather than a full
+// required-vs-filled daily grid, and activity is publish events only (no
+// shift-request/invitation events yet). See dashboard-stats.ts on web for the
+// full reference implementation this is a scoped-down mobile port of.
+
+export const mobileDashboardCoverageSectionSchema = z.object({
+  focusAreaId: z.number().int(),
+  focusAreaName: z.string(),
+  requiredTotal: z.number().int(),
+  filledTotal: z.number().int(),
+  pct: z.number().int(),
+  openSlots: z.number().int(),
+});
+
+// Same 4 event types as web's dashboard activity feed (apps/web/src/lib/
+// dashboard-stats.ts's buildActivityFeed) — powers the mobile expanded
+// activity screen's type filter.
+export const mobileDashboardActivityTypeSchema = z.enum([
+  "publish",
+  "shift_change",
+  "request",
+  "user_signup",
+]);
+
+export const mobileDashboardActivityItemSchema = z.object({
+  id: z.string(),
+  type: mobileDashboardActivityTypeSchema,
+  description: z.string(),
+  timestamp: z.string(),
+});
+
+export const mobileDashboardStaffHoursEntrySchema = z.object({
+  employeeId: z.string().uuid(),
+  employeeName: z.string(),
+  totalHours: z.number(),
+  overtimeHours: z.number(),
+  // The focus area the employee logged the most hours in this period —
+  // powers the mobile expanded "Overtime watch" screen's focus-area filter,
+  // matching web's ExpandedStaffHours.tsx.
+  focusAreaId: z.number().int().nullable().default(null),
+  focusAreaName: z.string().nullable().default(null),
+});
+
+// Simplified port of web's DashboardHero: a headline/description summary plus
+// a handful of top-line metrics. Coverage % is derived from coverage_requirements
+// vs. open-shift gaps (day-of-week matched, no coverage-rule-config credit
+// resolution) — a reasonable approximation, not the exact engine computation
+// web's schedule-logic.ts uses. There is no "draft shifts" metric yet: that
+// needs draft-vs-published schedule diffing, which mobile doesn't fetch.
+export const mobileDashboardHeroSummarySchema = z.object({
+  statusLabel: z.string(),
+  title: z.string(),
+  description: z.string(),
+});
+
+export const mobileDashboardMetricsSchema = z.object({
+  coveragePct: z.number().int().nullable(),
+  openGapCount: z.number().int(),
+  pendingApprovalsCount: z.number().int(),
+});
+
+export const mobileDashboardResponseSchema = z.object({
+  range: z.object({
+    startDate: z.string().date(),
+    endDate: z.string().date(),
+  }),
+  overtimeThresholdHours: z.number().int().positive(),
+  heroSummary: mobileDashboardHeroSummarySchema,
+  metrics: mobileDashboardMetricsSchema,
+  coverageBySection: z.array(mobileDashboardCoverageSectionSchema),
+  openShifts: z.array(mobileOpenShiftSchema),
+  activity: z.array(mobileDashboardActivityItemSchema),
+  staffHours: z.array(mobileDashboardStaffHoursEntrySchema),
+  actionQueue: z.array(mobileShiftRequestSchema),
 });
 
 export const mobileCreateShiftRequestBodySchema = z
@@ -668,6 +768,38 @@ export const mobilePersonUpdateBodySchema = z.object({
 export const mobilePersonUpdateResponseSchema = z.object({
   success: z.literal(true),
   person: mobilePersonSchema,
+});
+
+export const mobilePersonCreateBodySchema = z.object({
+  firstName: staffNameSchema,
+  lastName: staffNameSchema,
+  employmentType: z.enum(["full_time", "part_time"]).default("full_time"),
+  certificationId: z.number().int().nullable(),
+  focusAreaIds: z.array(z.number().int()).min(1),
+  email: optionalStaffEmailSchema,
+});
+
+export const mobilePersonCreateResponseSchema = z.object({
+  success: z.literal(true),
+  person: mobilePersonSchema,
+});
+
+export const mobileBillingAccessStateSchema = z.enum([
+  "active",
+  "trial_pending",
+  "trialing",
+  "trial_ending_soon",
+  "trial_grace",
+  "payment_attention_required",
+  "locked",
+  "suspended",
+]);
+
+export const mobileOrgStatusResponseSchema = z.object({
+  state: mobileBillingAccessStateSchema,
+  isLocked: z.boolean(),
+  trialGraceEndsAt: z.string().nullable(),
+  orgRole: mobileRoleSchema,
 });
 
 export const mobilePersonStatusUpdateBodySchema = z.object({
@@ -837,6 +969,11 @@ export type MobileBootstrapResponse = z.infer<typeof mobileBootstrapResponseSche
 export type MobileProfileResponse = z.infer<typeof mobileProfileResponseSchema>;
 export type MobileProfileAccountUpdateBody = z.infer<typeof mobileProfileAccountUpdateBodySchema>;
 export type MobileProfilePhoneUpdateBody = z.infer<typeof mobileProfilePhoneUpdateBodySchema>;
+export type MobileProfileMfaStatusUpdateBody = z.infer<
+  typeof mobileProfileMfaStatusUpdateBodySchema
+>;
+export type MobilePersonCreateBody = z.infer<typeof mobilePersonCreateBodySchema>;
+export type MobileOrgStatusResponse = z.infer<typeof mobileOrgStatusResponseSchema>;
 export type MobileProfileChangeRequest = z.infer<typeof mobileProfileChangeRequestSchema>;
 export type MobileProfileChangeRequestCreateBody = z.infer<
   typeof mobileProfileChangeRequestCreateBodySchema
@@ -858,6 +995,7 @@ export type MobileScheduleEntrySegment = z.infer<typeof mobileScheduleEntrySegme
 export type MobileScheduleEntry = z.infer<typeof mobileScheduleEntrySchema>;
 export type MobileShiftRequest = z.infer<typeof mobileShiftRequestSchema>;
 export type MobileOpenShift = z.infer<typeof mobileOpenShiftSchema>;
+export type MobileDashboardResponse = z.infer<typeof mobileDashboardResponseSchema>;
 export type MobileNotification = z.infer<typeof mobileNotificationSchema>;
 export type MobileNotificationPriority = z.infer<typeof mobileNotificationPrioritySchema>;
 export type MobileNotificationsQuery = z.infer<typeof mobileNotificationsQuerySchema>;

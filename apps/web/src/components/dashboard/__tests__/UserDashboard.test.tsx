@@ -133,6 +133,7 @@ const org: Organization = {
   timezone: "UTC",
   payPeriodStartDate: null,
   enforceConflictPrevention: true,
+  defaultShiftEnabled: true,
   openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
   coverageRuleConfig: { mentoredCoverageCreditPercent: 50 },
   dataRetentionDays: 365,
@@ -305,6 +306,7 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
     focusAreas: [focusArea],
     isMobile: false,
     isTablet: false,
+    jobs: [],
     onExpandPanel: vi.fn(),
     openShifts: [openShift],
     org,
@@ -319,7 +321,12 @@ function makeProps(overrides: Partial<DashboardContentProps> = {}): DashboardCon
       staffScheduled: { delta: 0, prevScheduled: 0, scheduled: 1, total: 2 },
       totalShifts: { delta: 0, prevValue: 0, value: 1 },
     },
-    permissions: buildPerms("user", "org-1", false),
+    permissions: {
+      ...buildPerms("user", "org-1", false),
+      isOnSchedule: true,
+      isManagementUser: false,
+      mfaNagRequired: false,
+    },
     prevHours: [],
     prevPeriodLabel: "last week",
     publishHistory: null,
@@ -415,7 +422,7 @@ describe("UserDashboard", () => {
     const shiftmateAvatarFrames = screen.getAllByTestId("user-dashboard-shiftmate-avatar-frame");
 
     expect(workingWith).toHaveStyle({
-      background: "rgba(255, 255, 255, 0.16)",
+      background: "#3A55CB",
       borderRadius: "16px",
       justifyContent: "space-between",
     });
@@ -450,7 +457,7 @@ describe("UserDashboard", () => {
         name: "Volunteer",
       }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText("My Week")).toBeInTheDocument();
+    expect(screen.getByText("Your Week")).toBeInTheDocument();
     const myWeek = screen.getByTestId("user-dashboard-my-week");
     const todayDateTile = screen.getByTestId("user-dashboard-date-tile-today");
     const weekPills = within(myWeek).getAllByTestId("user-dashboard-week-pills");
@@ -499,7 +506,7 @@ describe("UserDashboard", () => {
     });
   });
 
-  it("keeps Working with at the hero bottom and places split follow-up shifts below it", () => {
+  it("flows Working with and split follow-up shifts naturally instead of pinning to the hero bottom", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-08T10:00:00.000Z"));
 
@@ -604,7 +611,11 @@ describe("UserDashboard", () => {
         "user-dashboard-hero-secondary-shift",
       );
 
-      expect(heroBottomStack).toHaveStyle({ marginTop: "auto" });
+      // Double shift: more content follows, so it flows naturally instead of
+      // being pinned to the bottom of the (possibly much taller) hero card —
+      // relying on the surrounding column's own gap rather than an extra
+      // margin that would crowd the gap below "Working with" out of balance.
+      expect(heroBottomStack).toHaveStyle({ marginTop: "0px" });
       expect(
         Array.from(heroBottomStack.children).map((child) => child.getAttribute("data-testid")),
       ).toEqual(["user-dashboard-working-with", "user-dashboard-hero-secondary-shift"]);
@@ -1221,7 +1232,7 @@ describe("UserDashboard", () => {
     expect(screen.queryByText(/^D$/)).not.toBeInTheDocument();
   });
 
-  it("does not repeat general or absence labels in My Week rows", () => {
+  it("does not repeat general or absence labels in Your Week rows", () => {
     const periodStart = getWeekStart(new Date());
     const periodDates = getDatesInRange(periodStart, 7);
     const generalDate = formatDateKey(periodDates[0] ?? new Date());
@@ -1305,7 +1316,7 @@ describe("UserDashboard", () => {
     expect(within(myWeek).queryAllByTestId("user-dashboard-week-pills")).toHaveLength(1);
   });
 
-  it("uses one empty-week message without repeating a blank My Week card", () => {
+  it("uses one empty-week message without repeating a blank Your Week card", () => {
     const props = makeProps();
 
     render(
@@ -1342,7 +1353,7 @@ describe("UserDashboard", () => {
     expect(emptyState).not.toHaveTextContent("No Shift");
     expect(emptyState).not.toHaveTextContent("No shift scheduled");
     expect(emptyState).not.toHaveTextContent("Published shifts for this week will appear here.");
-    expect(screen.queryByText("My Week")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your Week")).not.toBeInTheDocument();
     expect(screen.queryByText("No shifts this week")).not.toBeInTheDocument();
     expect(screen.queryByText("Published shifts will appear here.")).not.toBeInTheDocument();
   });

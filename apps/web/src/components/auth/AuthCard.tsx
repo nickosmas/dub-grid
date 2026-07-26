@@ -3,7 +3,18 @@
 import Link from "next/link";
 import { openConsentPreferences } from "@/components/CookieConsent";
 
-export function PageShell({ children }: { children: React.ReactNode }) {
+export function PageShell({
+  children,
+  signInDisclaimer = false,
+}: {
+  children: React.ReactNode;
+  /** Swap the Privacy Policy / Terms of Service links for the full
+   * "By continuing, I agree to..." sign-in disclaimer — used on the login
+   * pages instead of the bare links shown everywhere else. */
+  signInDisclaimer?: boolean;
+}) {
+  const sentenceLinkStyle = { color: "inherit", textDecoration: "underline" };
+
   return (
     <div className="dg-auth-shell">
       {children}
@@ -21,40 +32,83 @@ export function PageShell({ children }: { children: React.ReactNode }) {
           color: "var(--color-text-faint)",
         }}
       >
-        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-          <Link
-            href="/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "var(--color-text-faint)", textDecoration: "none" }}
-          >
-            Privacy Policy
-          </Link>
-          <span style={{ margin: "0 4px" }}>·</span>
-          <Link
-            href="/terms"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "var(--color-text-faint)", textDecoration: "none" }}
-          >
-            Terms of Service
-          </Link>
-          <span style={{ margin: "0 4px" }}>·</span>
-          <button
-            type="button"
-            onClick={openConsentPreferences}
-            style={{
-              color: "var(--color-text-faint)",
-              textDecoration: "none",
-              background: "none",
-              border: "none",
-              padding: 0,
-              cursor: "pointer",
-              font: "inherit",
-            }}
-          >
-            Cookie preferences
-          </button>
+        <div
+          style={{
+            display: "flex",
+            gap: "4px",
+            alignItems: "center",
+            flexWrap: "wrap",
+            justifyContent: "center",
+          }}
+        >
+          {signInDisclaimer ? (
+            <span>
+              By continuing, I agree to DubGrid&apos;s{" "}
+              <Link
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={sentenceLinkStyle}
+              >
+                Terms of Service
+              </Link>
+              ,{" "}
+              <Link
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={sentenceLinkStyle}
+              >
+                Privacy Policy
+              </Link>
+              , and{" "}
+              <Link
+                href="/cookie-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={sentenceLinkStyle}
+              >
+                Cookie Policy
+              </Link>
+              .
+            </span>
+          ) : (
+            <>
+              <Link
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="dg-auth-footer-link"
+              >
+                Privacy Policy
+              </Link>
+              <span style={{ margin: "0 4px" }}>·</span>
+              <Link
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="dg-auth-footer-link"
+              >
+                Terms of Service
+              </Link>
+              <span style={{ margin: "0 4px" }}>·</span>
+              <button
+                type="button"
+                onClick={openConsentPreferences}
+                className="dg-auth-footer-link"
+                style={{
+                  color: "var(--color-text-faint)",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  font: "inherit",
+                }}
+              >
+                Cookie preferences
+              </button>
+            </>
+          )}
         </div>
       </footer>
     </div>

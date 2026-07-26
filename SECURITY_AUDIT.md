@@ -27,10 +27,19 @@ idempotency, and an immutable audit trail. The custom JWT hook strips org claims
 for archived/suspended orgs and deactivated users. API routes layer
 authentication, authorization, Zod validation, CSRF origin checks, and
 production rate limiting on top. No SQL injection, no `dangerouslySetInnerHTML`,
-no `eval`, no committed secrets, and no broken tenant isolation were found.
+no `eval`, and no committed secrets were found.
 
 All seven original findings are now closed (F-5 was withdrawn as already
 implemented; the rest are fixed). `npm audit` is 0 critical / 0 high / 0 low.
+
+> **Correction (2026-07-25):** the line above originally read "...and no
+> broken tenant isolation were found." A follow-up audit focused
+> specifically on tenant data isolation (see **[2026-07-25 — Tenant
+> Isolation Follow-Up Audit](#2026-07-25--tenant-isolation-follow-up-audit)**
+> below) found that claim was no longer accurate: a High-severity RBAC
+> bypass and a genuine cross-tenant gap in four RPCs were identified and
+> fixed. Both are closed as of this update; the corrected claim is that no
+> broken tenant isolation remains open, not that none was ever found.
 
 ### Findings
 
@@ -276,3 +285,235 @@ auth.uid()`), self-action guard, admin-tier guard (admins cannot touch
 - ❌ **F-5** — Withdrawn; already implemented (5-minute refresh lock + session wipe on gridmaster demotion/deactivation).
 
 **All seven findings closed (F-5 withdrawn).**
+
+---
+
+## 2026-07-25 — Tenant Isolation Follow-Up Audit
+
+**Scope:** Tenant (organization) data isolation specifically — the guarantee
+that one org's data can never be read, written, or corrupted by another org.
+**Method:** Three parallel deep-dive passes: (1) all 4 migration files —
+every org-scoped table's RLS policies, and every `SECURITY DEFINER` RPC's
+org-scoping logic; (2) every API Route Handler's `orgId` trust boundary
+(client-supplied vs. re-derived server-side); (3) middleware, the JWT hook,
+session/sandbox/impersonation cookie handling. Every reported item was
+confirmed in code and fixed in the same pass.
+
+**Result:** the prior executive summary's "no broken tenant isolation" claim
+did not hold up. A High-severity RBAC bypass and a genuine cross-tenant gap
+in four RPCs were found. Everything below is now fixed.
+
+### Findings
+
+| ID   | Severity      | Title                                                                                             | Status   |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------- | -------- |
+| F-8  | **High**      | `/api/test-sandbox` had no server-side role gate (privilege escalation)                           | ✅ Fixed |
+| F-9  | **Medium**    | Cross-tenant gap in 4 shift-request RPCs                                                          | ✅ Fixed |
+| F-10 | Medium        | `organizations/app-only-user` skipped the sandbox-effective-org redirect                          | ✅ Fixed |
+| F-11 | Low           | `stripe_processed_events` had RLS disabled entirely                                               | ✅ Fixed |
+| F-12 | Low           | `remove_focus_area_from_employees` had no permission check                                        | ✅ Fixed |
+| F-13 | Low           | `purge_expired_data()` referenced a nonexistent `shifts` table                                    | ✅ Fixed |
+| F-14 | Low           | `schedule/actor-names` resolved profile names without org-scoping ids                             | ✅ Fixed |
+| F-15 | Informational | Impersonation cookie wasn't cross-validated against `impersonation_sessions`                      | ✅ Fixed |
+| F-16 | **High**      | `organizations/app-only-user` let any org admin overwrite an arbitrary user's global profile name | ✅ Fixed |
+
+### Findings detail
+
+#### F-8 — `/api/test-sandbox` had no server-side role gate — **High** — ✅ Fixed
+
+**Location:** `apps/web/src/app/api/test-sandbox/route.ts`;
+`apps/web/src/features/test-sandbox/server.ts`.
+
+**Root cause:** the route only checked that the caller had _any_ active
+membership in the source org — no `org_role`/`platform_role` check. The only
+gate was client-side (`Header.tsx`'s `canOpenSandbox = actualLevel >= 2`).
+`createSandboxForUser` then inserted a real `organization_memberships` row
+granting the caller `super_admin` in the new sandbox org and cloned the full
+employee roster, including `contactNotes`/`statusNote`/`phone`/`email`.
+
+**Impact:** any plain `user`-role employee could call
+`POST /api/test-sandbox {"action":"enter"}` directly (bypassing the menu),
+receive a real `super_admin` membership over a full clone of their
+employer's employee PII, and use every admin-gated endpoint against it.
+
+**Fix confirmed:** the route now looks up the caller's real `org_role` in
+the source org (or `platform_role === 'gridmaster'`) via
+`organization_memberships`, and returns 403 unless it is `admin` or
+`super_admin`. Critically, this check does **not** use
+`auth.claims.org_role` — once inside a sandbox, that claim is already
+widened to `"super_admin"` by `requireAuthenticatedUserWithClaims`, which
+would have let a since-demoted user keep resetting their sandbox
+indefinitely; the real membership row is queried directly instead. Covered
+by `route.test.ts` (12 tests, including a demoted-user-on-reset case).
+
+#### F-9 — Cross-tenant gap in 4 shift-request RPCs — **Medium** — ✅ Fixed
+
+**Location:** `supabase/migrations/002_functions_triggers.sql` —
+`create_shift_request`, `claim_shift_request`, `cancel_shift_request`,
+`volunteer_for_open_shift`.
+
+**Root cause:** each function's admin-bypass branch authorized on
+`public.caller_org_role()` — the caller's role in their _current session_
+org — without ever comparing it to the target row's actual `org_id`. The
+sibling function `resolve_shift_request` did this correctly
+(`IF v_request.org_id != public.caller_org_id() ...`); these four did not.
+
+**Impact:** an admin/super_admin of Org A who knew or guessed a valid Org-B
+`employees.id`/`shift_requests.id` could create, claim, cancel, or
+volunteer for Org B's shift requests.
+
+**Fix confirmed:** all four now require
+`(public.caller_org_id() = <target org> OR public.is_own_sandbox_org(<target org>)) AND public.caller_org_role() IN ('super_admin','admin')`
+before allowing the bypass, mirroring `resolve_shift_request`'s pattern
+(and additionally recognizing the caller's own Test Sandbox org, consistent
+with how the schedule-mutation RPCs already handle sandbox). Gridmaster and
+self-service (acting on one's own employee record) paths are unchanged.
+`cancel_shift_request`'s employee lookup was also tightened to filter by
+`org_id = v_request.org_id`, closing a secondary gap where it looked up
+`p_emp_id` with no org filter at all.
+
+#### F-10 — `organizations/app-only-user` skipped the sandbox-effective-org redirect — **Medium** — ✅ Fixed
+
+**Location:** `apps/web/src/app/api/organizations/app-only-user/route.ts`.
+
+**Root cause:** unlike its siblings `employees/identity` and
+`employees/status` (both previously fixed for this exact class of bug,
+tracked as "H-1" in `POTENTIAL_BUGS.md`), this route took `orgId` straight
+from the request body and never called `resolveEffectiveOrgId`. Because
+`canManageEmployees` re-verifies real membership, this was not a
+cross-tenant break, but it reopened the "sandbox mutations silently hit the
+real org" hole H-1 was meant to close everywhere.
+
+**Fix confirmed:** the route now calls
+`resolveEffectiveOrgId(req, user.id, orgId)` before the permission check,
+matching `employees/identity/route.ts` exactly. Covered by a new
+`route.test.ts` (3 tests) proving the permission check and mutation both
+route to the sandbox-effective org, not the raw body org.
+
+#### F-11 — `stripe_processed_events` had RLS disabled entirely — **Low** — ✅ Fixed
+
+**Location:** `supabase/migrations/003_rls_policies.sql`.
+
+**Root cause:** RLS was never enabled on this table, so the blanket
+`GRANT ... ON ALL TABLES IN SCHEMA public TO authenticated` in
+`004_grants.sql` let any authenticated user read/insert/delete rows
+directly — a malicious user could pre-insert a real Stripe `event_id` to
+make the webhook handler treat a billing-critical event as
+already-processed and silently skip it.
+
+**Fix confirmed:** `ALTER TABLE public.stripe_processed_events ENABLE ROW
+LEVEL SECURITY` plus a deny-all policy for `authenticated`/`anon`. The
+service-role webhook handler is unaffected (bypasses RLS).
+
+#### F-12 — `remove_focus_area_from_employees` had no permission check — **Low** — ✅ Fixed
+
+**Location:** `supabase/migrations/002_functions_triggers.sql`.
+
+**Root cause:** the function correctly scoped its `UPDATE` to
+`org_id = public.caller_org_id()` (no cross-tenant leak) but had no
+`check_admin_permission` gate — any regular `user`-role member could strip
+a focus area from every employee in their own org.
+
+**Fix confirmed:** the function now raises unless
+`public.check_admin_permission('canManageFocusAreas')` — the same
+permission already used by the `focus_areas` table's own RLS policies.
+
+#### F-13 — `purge_expired_data()` referenced a nonexistent `shifts` table — **Low (compliance)** — ✅ Fixed
+
+**Location:** `supabase/migrations/002_functions_triggers.sql`.
+
+**Root cause:** a leftover `DELETE FROM shifts ...` predating the schema
+consolidation (schedule data lives in `schedule_cells`, not `shifts`).
+Every invocation raised `relation "shifts" does not exist`, silently
+breaking the GDPR/data-retention purge job for every org, every run.
+
+**Fix confirmed:** the query now targets `public.schedule_cells`, comparing
+`date` (a native `DATE` column) directly instead of the old broken
+`::TEXT` cast. `schedule_cell_snapshots`/`schedule_cell_segments` cascade
+via existing `ON DELETE CASCADE` foreign keys, so no separate cleanup step
+was needed for those tables.
+
+#### F-14 — `schedule/actor-names` resolved profile names without org-scoping ids — **Low** — ✅ Fixed
+
+**Location:** `apps/web/src/app/api/schedule/actor-names/route.ts`.
+
+**Root cause:** the route verified the caller belonged to the requested
+`orgId`, then queried the global `profiles` table with `.in("id", ids)`
+where `ids` came straight from the request body (up to 200 UUIDs) — no
+filter on which ids could be looked up. Any org member could submit UUIDs
+belonging to users in other orgs and get their first/last name back.
+
+**Fix confirmed:** the route now queries `organization_memberships` first
+to determine which of the requested ids are actually active members of
+`orgId`, and only queries `profiles` for that filtered set. Covered by
+`route.test.ts`, including a new test asserting `profiles.in(...)` is never
+called with a cross-org id even when one is requested.
+
+#### F-15 — Impersonation cookie not cross-validated against `impersonation_sessions` — **Informational** — ✅ Fixed
+
+**Location:** `apps/web/src/lib/impersonation.ts`; consumers in
+`middleware.ts`, `api/organization/bootstrap/route.ts`,
+`api/account/permissions/route.ts`.
+
+**Root cause:** the impersonation cookie is client-writable (set via
+`document.cookie`, not `HttpOnly`) and populated mostly from client-held
+state rather than the `start_impersonation` RPC's return value. Every
+consumer trusted the cookie's own `expiresAt`/`targetOrgId`/`targetUserId`
+without checking `impersonation_sessions` for a matching, active row. This
+did **not** grant cross-tenant access — every consumer still gated on the
+real, JWT-verified `platform_role === "gridmaster"` claim, and a genuine
+gridmaster already has full cross-org access — but it let a gridmaster
+bypass the mandatory justification, audit row, and target-user notification
+that `start_impersonation` normally enforces.
+
+**Fix confirmed:** added `verifyImpersonationSession()`
+(`apps/web/src/lib/impersonation-server.ts`), which looks up
+`impersonation_sessions` by `session_id` + `gridmaster_id`, requiring
+`ended_at IS NULL AND expires_at > now()`, and returns the row's
+authoritative `target_org_id`/`target_user_id`. All three consumers now
+call this before honoring the cookie; on no match, they fall back to the
+caller's real context (middleware clears the cookie; the two API routes
+fall through to non-impersonated resolution) instead of trusting any
+cookie field. Covered by updated tests in `middleware.test.ts` and
+`account/permissions/route.test.ts`, including cases proving a forged
+`sessionId` is rejected.
+
+#### F-16 — `organizations/app-only-user` let any org admin overwrite an arbitrary user's global profile name — **High** — ✅ Fixed
+
+**Location:** `apps/web/src/app/api/organizations/app-only-user/route.ts`.
+
+**Found by:** a post-fix security review pass over this same batch of
+changes (the F-10 fix touched this route but didn't cover this separate
+issue).
+
+**Root cause:** the F-10 fix correctly resolved `orgId` through
+`resolveEffectiveOrgId` before the `canManageEmployees(serviceClient,
+user.id, orgId)` permission check, but the route's `userId` — the target of
+the mutation, taken straight from the request body — was never validated
+as belonging to `orgId` anywhere. The `organization_memberships` update
+(phone/department fields) was already scoped by `.eq("org_id", orgId)`,
+but the `profiles` table update (first/last name) ran with only
+`.eq("id", userId)` — no org filter at all — against the service-role
+client, which bypasses RLS.
+
+**Impact:** any admin/super_admin (or per-person `canManageEmployees`
+holder) of Org A could send `PATCH /api/organizations/app-only-user` with
+`{ orgId: <Org A>, userId: <any user UUID>, firstName: "..." }` and
+overwrite that user's global profile name, regardless of which org — or
+none — they actually belonged to. This is exactly the class of
+cross-tenant data corruption this audit set out to close.
+
+**Fix confirmed:** the route now looks up `organization_memberships` for
+`(userId, orgId)` with `archived_at IS NULL` before performing any
+mutation, returning 404 if the target isn't an active member — matching
+the existing "User membership not found" pattern used by
+`organizations/access/route.ts`. Covered by a new test in `route.test.ts`
+asserting the `profiles` table is never touched when the target isn't a
+member of the resolved org.
+
+### Remediation status
+
+All nine findings (F-8 through F-16) are fixed as of this update. F-16 was
+caught by a follow-up security-review pass over this same set of changes
+rather than the original three-agent audit — see the note at the top of
+this section.

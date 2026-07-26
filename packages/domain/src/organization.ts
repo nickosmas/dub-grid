@@ -81,6 +81,7 @@ export interface Organization {
   sandboxOwnerUserId: string | null;
   sandboxSourceOrgId: string | null;
   enforceConflictPrevention: boolean;
+  defaultShiftEnabled: boolean;
   coverageRuleConfig?: CoverageRuleConfig;
   openShiftVisibility: OpenShiftVisibility;
   stripeCustomerId?: string | null;

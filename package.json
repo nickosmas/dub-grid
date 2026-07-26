@@ -32,6 +32,7 @@
     "test:e2e:ui": "playwright test --ui",
     "seed": "npx tsx --env-file=.env.local seed.ts",
     "db:reset": "supabase db reset && FORCE_LOCAL_DB=1 npm run seed",
+    "db:reset:mobile": "npm run db:reset && node scripts/reset-mobile-android-storage.mjs",
     "db:reset:remote": "npx tsx --env-file=.env.remote scripts/reset-remote-db.ts && npx tsx --env-file=.env.remote seed.ts",
     "test:load": "k6 run load-tests/schedule-load.js",
     "test:load:auth": "k6 run load-tests/auth-flow.js",
@@ -42,7 +43,7 @@
     "use:mobile:remote": "cp apps/mobile/.env.remote apps/mobile/.env.local && echo 'Switched mobile app to the remote backend in apps/mobile/.env.local'",
     "use:remote": "ln -sf .env.remote .env.local && echo 'Switched to remote Supabase'",
     "gen:types": "npx supabase gen types --lang=typescript --local > apps/web/src/lib/database.types.ts",
-    "build:packages": "turbo run build --filter=@dubgrid/authz --filter=@dubgrid/domain --filter=@dubgrid/schedule-core --filter=@dubgrid/design-tokens --filter=@dubgrid/api-client --filter=@dubgrid/db-types --filter=@dubgrid/data-access --filter=@dubgrid/mobile-api-core --filter=@dubgrid/contracts --filter=@dubgrid/client-errors"
+    "build:packages": "turbo run build --filter=@dubgrid/authz --filter=@dubgrid/domain --filter=@dubgrid/schedule-core --filter=@dubgrid/design-tokens --filter=@dubgrid/api-client --filter=@dubgrid/db-types --filter=@dubgrid/data-access --filter=@dubgrid/mobile-api-core --filter=@dubgrid/contracts --filter=@dubgrid/client-errors --filter=@dubgrid/realtime-core"
   },
   "overrides": {
     "@hono/node-server": "1.19.14",

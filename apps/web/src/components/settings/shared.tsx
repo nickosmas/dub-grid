@@ -1,7 +1,13 @@
 "use client";
 
 import React, { useId, useRef, useState } from "react";
-import { PREDEFINED_COLOR_GROUPS, getPresetByBg, PredefinedColor } from "@/lib/colors";
+import { useTheme } from "next-themes";
+import {
+  PREDEFINED_COLOR_GROUPS,
+  getPresetByBg,
+  toDarkPillColors,
+  PredefinedColor,
+} from "@/lib/colors";
 import { sectionStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
 import { parseTo12h, to24h } from "@/lib/utils";
 import CustomSelect from "@/components/CustomSelect";
@@ -68,10 +74,18 @@ export function PresetColorPicker({
   onChange: (c: PredefinedColor) => void;
   disabled?: boolean;
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const active = getPresetByBg(valueBg);
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const popupId = useId();
+
+  // Swatches preview as they'll actually render in the schedule grid, so
+  // picking a color in dark mode shows the same dark-mode-adapted chip.
+  const toDisplay = (preset: PredefinedColor): { bg: string; text: string } =>
+    isDarkTheme ? toDarkPillColors(preset.bg) : { bg: preset.bg, text: preset.text };
+  const activeDisplay = toDisplay(active);
 
   return (
     <>
@@ -105,9 +119,9 @@ export function PresetColorPicker({
                 width: "100%",
                 height: "100%",
                 borderRadius: "9999px",
-                background: active.bg,
-                border: `1px solid ${active.text}`,
-                boxShadow: open ? `inset 0 0 0 1px ${active.text}` : undefined,
+                background: activeDisplay.bg,
+                border: `1px solid ${activeDisplay.text}`,
+                boxShadow: open ? `inset 0 0 0 1px ${activeDisplay.text}` : undefined,
               }}
             />
           </button>
@@ -139,10 +153,10 @@ export function PresetColorPicker({
               overflowY: "auto",
               overscrollBehavior: "contain",
               padding: 14,
-              borderRadius: "var(--dg-radius-md)",
+              borderRadius: "var(--dg-radius-lg)",
               background: "var(--color-surface)",
               border: "1px solid var(--color-border)",
-              boxShadow: "var(--shadow-float)",
+              boxShadow: "var(--shadow-menu)",
             }}
           >
             <div
@@ -182,9 +196,9 @@ export function PresetColorPicker({
                   width: 34,
                   height: 34,
                   borderRadius: "9999px",
-                  background: active.bg,
-                  border: `1px solid ${active.text}`,
-                  boxShadow: `inset 0 0 0 1px ${active.text}`,
+                  background: activeDisplay.bg,
+                  border: `1px solid ${activeDisplay.text}`,
+                  boxShadow: `inset 0 0 0 1px ${activeDisplay.text}`,
                 }}
               />
             </div>
@@ -210,49 +224,54 @@ export function PresetColorPicker({
                       gap: 8,
                     }}
                   >
-                    {group.colors.map((color) => (
-                      <MaybeHint key={color.id} content={color.name} side="top">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (disabled) return;
-                            onChange(color);
-                            setOpen(false);
-                          }}
-                          disabled={disabled}
-                          title={color.name}
-                          aria-label={color.name}
-                          style={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: "9999px",
-                            background: color.bg,
-                            border:
-                              active.id === color.id
-                                ? `2px solid ${color.text}`
-                                : "1px solid var(--color-border)",
-                            cursor: disabled ? "not-allowed" : "pointer",
-                            padding: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            boxShadow:
-                              active.id === color.id ? `0 0 0 1px ${color.text}` : undefined,
-                          }}
-                        >
-                          {active.id === color.id && (
-                            <span
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: "9999px",
-                                background: color.text,
-                              }}
-                            />
-                          )}
-                        </button>
-                      </MaybeHint>
-                    ))}
+                    {group.colors.map((color) => {
+                      const colorDisplay = toDisplay(color);
+                      return (
+                        <MaybeHint key={color.id} content={color.name} side="top">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (disabled) return;
+                              onChange(color);
+                              setOpen(false);
+                            }}
+                            disabled={disabled}
+                            title={color.name}
+                            aria-label={color.name}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: "9999px",
+                              background: colorDisplay.bg,
+                              border:
+                                active.id === color.id
+                                  ? `2px solid ${colorDisplay.text}`
+                                  : "1px solid var(--color-border)",
+                              cursor: disabled ? "not-allowed" : "pointer",
+                              padding: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow:
+                                active.id === color.id
+                                  ? `0 0 0 1px ${colorDisplay.text}`
+                                  : undefined,
+                            }}
+                          >
+                            {active.id === color.id && (
+                              <span
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: "9999px",
+                                  background: colorDisplay.text,
+                                }}
+                              />
+                            )}
+                          </button>
+                        </MaybeHint>
+                      );
+                    })}
                   </div>
                 </div>
               ))}

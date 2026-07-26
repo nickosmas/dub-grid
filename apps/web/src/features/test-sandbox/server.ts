@@ -195,7 +195,7 @@ export async function createSandboxForUser(input: {
   const { data: sourceOrg, error: sourceErr } = await serviceClient
     .from("organizations")
     .select(
-      "name, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, logo_url, app_name, meta_description, theme_config, landing_page_config, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, data_retention_days, enforce_conflict_prevention, coverage_rule_config, feature_overrides",
+      "name, address, address_line_1, address_line_2, address_city, address_state, address_postal_code, address_country, phone, employee_count, logo_url, app_name, meta_description, theme_config, landing_page_config, focus_area_label, certification_label, role_label, department_label, shift_display_mode, timezone, pay_period_start_date, data_retention_days, enforce_conflict_prevention, default_shift_enabled, coverage_rule_config, feature_overrides",
     )
     .eq("id", sourceOrgId)
     .maybeSingle();
@@ -241,6 +241,7 @@ export async function createSandboxForUser(input: {
         // Operational config
         data_retention_days: sourceOrg?.data_retention_days ?? 365,
         enforce_conflict_prevention: sourceOrg?.enforce_conflict_prevention ?? false,
+        default_shift_enabled: sourceOrg?.default_shift_enabled ?? true,
         coverage_rule_config: sourceOrg?.coverage_rule_config ?? {
           mentoredCoverageCreditPercent: 100,
         },
@@ -257,10 +258,23 @@ export async function createSandboxForUser(input: {
       createdSlug = (orgRow.slug as string | null) ?? slug;
       break;
     }
-    lastError = insertErr;
-    if (insertErr?.code !== "23505") {
-      throw insertErr;
+    if (insertErr?.code === "23505") {
+      // Two constraints can raise 23505 here: the slug uniqueness constraint
+      // (retry with a new slug, handled by the loop continuing below) or
+      // organizations_one_active_sandbox_per_user (a concurrent enter/reset
+      // for this same user won the race). Retrying can't resolve the latter
+      // — reuse whatever the winner created instead.
+      if (insertErr.message?.includes("organizations_one_active_sandbox_per_user")) {
+        const winner = await findActiveSandboxForUser(serviceClient, actor.id);
+        if (winner) {
+          return { id: winner.id, slug: winner.slug ?? "" };
+        }
+      }
+      lastError = insertErr;
+      continue;
     }
+    lastError = insertErr;
+    throw insertErr;
   }
   if (!createdOrgId || !createdSlug) {
     throw lastError ?? new Error("Could not allocate a sandbox organization.");

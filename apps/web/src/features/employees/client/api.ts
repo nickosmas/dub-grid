@@ -48,6 +48,16 @@ export class EmployeeContactConflictError extends Error {
   }
 }
 
+/** The server refused the read outright (403) — e.g. a management user's
+ * profile requested by a viewer without staff-manager rights. Callers can
+ * redirect instead of rendering a dead-end error state. */
+export class EmployeeAccessDeniedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EmployeeAccessDeniedError";
+  }
+}
+
 function resolveClientUrl(path: string): string {
   if (/^https?:\/\//.test(path)) {
     return path;
@@ -79,6 +89,11 @@ async function requestEmployeesJson<T>(input: string, init?: RequestInit): Promi
     throw new EmployeeContactConflictError(
       payload.message ?? payload.error ?? "Contact details are already in use.",
       payload.field,
+    );
+  }
+  if (response.status === 403) {
+    throw new EmployeeAccessDeniedError(
+      formatClientErrorMessage(payload?.error, "You don't have permission to do that."),
     );
   }
   if (!response.ok) {

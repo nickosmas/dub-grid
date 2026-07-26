@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useTheme } from "next-themes";
 import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@/lib/utils";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
+import { toDarkPillColors, resolveShiftPillColors } from "@/lib/colors";
 import { indefiniteArticle } from "@dubgrid/domain";
 import type { TimeRange } from "@/lib/schedule-logic";
 import {
@@ -30,6 +32,7 @@ import ConfirmDialog from "./ConfirmDialog";
 import RepeatForm, { type RepeatFormHandle } from "./RepeatForm";
 import { ButtonLoading } from "./ButtonSpinner";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { Hint, MaybeHint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Switch } from "@/components/ui/switch";
@@ -162,6 +165,8 @@ interface ShiftEditPanelProps {
   overlapWarnings?: string[];
   /** When true, overlap warnings block saving (admin can override). */
   enforceConflicts?: boolean;
+  /** Whether the org allows shift-only ("default shift") assignments in the picker. */
+  defaultShiftEnabled?: boolean;
   /** Controls shift display: 'code' shows short labels, 'name' shows full names. */
   shiftDisplayMode?: ShiftDisplayMode;
 }
@@ -902,8 +907,11 @@ export default function ShiftEditPanel({
   overlapWarnings = [],
   enforceConflicts = false,
   shiftDisplayMode = "code",
+  defaultShiftEnabled = true,
 }: ShiftEditPanelProps) {
   const isNameMode = shiftDisplayMode === "name";
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const assignableShiftDisplayMap = useMemo(
     () =>
       buildAssignableShiftDisplayMap({
@@ -911,9 +919,9 @@ export default function ShiftEditPanel({
         shiftCategories,
         jobs,
         focusAreas: focusAreas ?? [],
-        shiftDisplayMode,
+        shiftDisplayMode: "name",
       }),
-    [focusAreas, jobs, shiftCategories, assignments, shiftDisplayMode],
+    [focusAreas, jobs, shiftCategories, assignments],
   );
   const isMobile = useMediaQuery(MOBILE);
   const [seriesScope, setSeriesScope] = useState<SeriesScope>("this");
@@ -1048,7 +1056,7 @@ export default function ShiftEditPanel({
         resolveAbsenceLabel: (absenceTypeId) => {
           const absenceType = absenceTypes.find((item) => item.id === absenceTypeId);
           if (!absenceType) return "?";
-          return isNameMode ? absenceType.name || absenceType.label : absenceType.label;
+          return absenceType.name || absenceType.label;
         },
       }),
     [
@@ -1067,7 +1075,6 @@ export default function ShiftEditPanel({
       customEndTime,
       assignableShiftDisplayMap,
       absenceTypes,
-      isNameMode,
     ],
   );
 
@@ -1114,7 +1121,7 @@ export default function ShiftEditPanel({
         if (absId != null) {
           const at = absenceTypes.find((a) => a.id === absId);
           if (!at) return null;
-          return isNameMode ? at.name || at.label : `${at.name} (${at.label})`;
+          return at.name || at.label;
         }
         return shift && shift !== "OFF" ? shift : null;
       };
@@ -3219,7 +3226,7 @@ export default function ShiftEditPanel({
                 width: 8,
                 height: 8,
                 borderRadius: "50%",
-                background: ind.color,
+                background: isDarkTheme ? toDarkPillColors(ind.color).bg : ind.color,
                 border: "1px solid rgba(255,255,255,0.8)",
                 flexShrink: 0,
               }}
@@ -3269,17 +3276,21 @@ export default function ShiftEditPanel({
     if (isAbsence) {
       const at = absenceTypes.find((a) => a.id === currentAbsenceTypeId);
       if (!at) return null;
-      const absenceLabel = isNameMode ? at.name || at.label : at.label;
+      const absenceLabel = at.name || at.label;
+      const atResolved = resolveShiftPillColors(
+        { color: at.color, text: at.text, border: at.border },
+        isDarkTheme,
+      );
       return (
         <div
           style={{
-            background: at.color,
+            background: atResolved.color,
             border: getPanelDiffBorder({
               diffKind: cellBorderKind,
               fallback:
-                at.border === "transparent"
-                  ? `1.5px solid ${darkenColor(at.color, 0.25)}`
-                  : `1.5px solid ${at.border}`,
+                atResolved.border === "transparent"
+                  ? `1.5px solid ${darkenColor(atResolved.color, 0.25)}`
+                  : `1.5px solid ${atResolved.border}`,
             }),
             borderRadius: "var(--dg-radius-md)",
             minHeight: 56,
@@ -3299,8 +3310,8 @@ export default function ShiftEditPanel({
               style={{
                 fontWeight: 800,
                 fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
-                color: at.text,
-                lineHeight: isNameMode ? 1.3 : 1,
+                color: atResolved.text,
+                lineHeight: isNameMode ? 1.3 : 1.2,
                 maxWidth: "90%",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -3318,31 +3329,17 @@ export default function ShiftEditPanel({
               {absenceLabel}
             </span>
           </MaybeHint>
-          {!isNameMode && at.name && (
-            <span
-              style={{
-                fontSize: "var(--dg-fs-footnote)",
-                color: at.text,
-                opacity: 0.7,
-                lineHeight: 1,
-                maxWidth: "90%",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {at.name}
-            </span>
-          )}
         </div>
       );
     }
 
     if (currentLabels.length === 1) {
       const preview = resolveShiftPreview(currentAssignmentIds[0], currentLabels[0], "name");
-      const s =
+      const s0 =
         preview.assignment ??
         getAssignmentDefinitionStyle(currentLabels[0], currentAssignmentIds[0]);
+      const darkS = isDarkTheme ? toDarkPillColors(s0.color) : null;
+      const s = { color: darkS?.bg ?? s0.color, text: darkS?.text ?? s0.text };
       const previewLabel = formatPreviewLabel(preview.displayParts);
       const focusAreaLabel =
         preview.assignment?.focusAreaId != null
@@ -3375,7 +3372,7 @@ export default function ShiftEditPanel({
                 fontWeight: 800,
                 fontSize: isNameMode ? "var(--dg-fs-body)" : "var(--dg-fs-card-title)",
                 color: s.text,
-                lineHeight: isNameMode ? 1.3 : 1,
+                lineHeight: isNameMode ? 1.3 : 1.2,
                 maxWidth: "90%",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -3400,7 +3397,7 @@ export default function ShiftEditPanel({
                   fontSize: "var(--dg-fs-footnote)",
                   color: s.text,
                   opacity: 0.7,
-                  lineHeight: 1,
+                  lineHeight: 1.3,
                   maxWidth: "90%",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -3417,7 +3414,7 @@ export default function ShiftEditPanel({
                 fontSize: "var(--dg-fs-footnote)",
                 color: s.text,
                 opacity: 0.78,
-                lineHeight: 1,
+                lineHeight: 1.3,
                 maxWidth: "90%",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -3437,8 +3434,10 @@ export default function ShiftEditPanel({
       <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 14 }}>
         {currentLabels.map((label, i) => {
           const preview = resolveShiftPreview(currentAssignmentIds[i], label, "name");
-          const s =
+          const s0 =
             preview.assignment ?? getAssignmentDefinitionStyle(label, currentAssignmentIds[i]);
+          const darkS = isDarkTheme ? toDarkPillColors(s0.color) : null;
+          const s = { color: darkS?.bg ?? s0.color, text: darkS?.text ?? s0.text };
           const previewLabel = formatPreviewLabel(preview.displayParts);
           const assignment =
             preview.assignment ??
@@ -3496,7 +3495,7 @@ export default function ShiftEditPanel({
                         fontWeight: 800,
                         fontSize: isNameMode ? "var(--dg-fs-body-sm)" : "var(--dg-fs-heading)",
                         color: s.text,
-                        lineHeight: isNameMode ? 1.3 : 1,
+                        lineHeight: isNameMode ? 1.3 : 1.2,
                         display: isNameMode ? "-webkit-box" : "block",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -3519,7 +3518,7 @@ export default function ShiftEditPanel({
                           fontSize: "var(--dg-fs-badge)",
                           color: s.text,
                           opacity: 0.65,
-                          lineHeight: 1,
+                          lineHeight: 1.3,
                           marginTop: 4,
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -3873,26 +3872,7 @@ export default function ShiftEditPanel({
                 })}
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="dg-btn dg-btn-ghost"
-              style={{ padding: 6, borderRadius: 8, lineHeight: 1 }}
-              aria-label="Close"
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            <CloseButton size="md" onClick={onClose} aria-label="Close" />
           </div>
           <div
             style={{
@@ -4031,21 +4011,7 @@ export default function ShiftEditPanel({
               )}
             </div>
           </div>
-          {!isMobile && (
-            <button
-              onClick={onClose}
-              className="dg-btn dg-btn-ghost"
-              style={{
-                border: "1px solid var(--color-border)",
-                padding: "4px 8px",
-                fontSize: "var(--dg-fs-body)",
-                lineHeight: 1,
-              }}
-              aria-label="Close"
-            >
-              ×
-            </button>
-          )}
+          {!isMobile && <CloseButton size="md" onClick={onClose} aria-label="Close" />}
         </div>
 
         {/* Scrollable content */}
@@ -4069,7 +4035,6 @@ export default function ShiftEditPanel({
               assignments={assignments}
               shiftCategories={shiftCategories}
               jobs={jobs}
-              shiftDisplayMode={shiftDisplayMode}
               onConfirm={onRepeatConfirm}
               absenceType={
                 isAbsence ? absenceTypes?.find((at) => at.id === currentAbsenceTypeId) : undefined
@@ -4552,6 +4517,7 @@ export default function ShiftEditPanel({
                       isMentored: segment.isMentored ?? false,
                     }))}
                     currentAbsenceTypeId={currentAbsenceTypeId}
+                    defaultShiftEnabled={defaultShiftEnabled}
                     onSelect={(segments) => {
                       onSelect(
                         buildPanelInput({
@@ -4582,7 +4548,6 @@ export default function ShiftEditPanel({
                     initialTab={modal.activeFocusAreaId}
                     multiSelect={true}
                     closeOnSelect={false}
-                    shiftDisplayMode={shiftDisplayMode}
                   />
                 </div>
               )}

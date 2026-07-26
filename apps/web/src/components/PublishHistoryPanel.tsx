@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { fetchPublishHistory } from "@/features/schedule/client";
@@ -461,43 +462,77 @@ export default function PublishHistoryPanel({
 
   if (!open) return null;
 
-  const panelWidth = isMobile ? "100vw" : 440;
+  const subtitle = loading ? (
+    <span
+      className="dg-skeleton"
+      style={{ display: "inline-block", width: 88, height: 10, borderRadius: 4 }}
+    />
+  ) : (
+    `${entries.length} publish${entries.length !== 1 ? "es" : ""}`
+  );
 
   return (
     <>
       <div className="dg-panel-overlay" onClick={onClose} />
       <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          width: panelWidth,
-          height: "100vh",
-          background: "var(--color-surface)",
-          boxShadow: "-4px 0 24px rgba(0,0,0,0.08)",
-          zIndex: 10001,
-          display: "flex",
-          flexDirection: "column",
-          animation: "slideInRight 0.2s ease-out",
+        className="dg-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Publish history"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onClose();
         }}
       >
         {/* Header */}
         <div
           style={{
-            padding: "16px 20px",
+            padding: isMobile ? "12px 16px" : "16px 20px",
             borderBottom: "1px solid var(--color-border)",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
+            gap: 12,
             flexShrink: 0,
+            background: "var(--color-surface)",
           }}
         >
-          <div>
+          {isMobile && (
+            <button
+              onClick={onClose}
+              aria-label="Back"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 36,
+                height: 36,
+                background: "transparent",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+                padding: 0,
+                flexShrink: 0,
+              }}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="var(--color-text-primary)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 700,
-                color: "var(--color-text-primary)",
+                color: "var(--color-text-secondary)",
               }}
             >
               Publish History
@@ -505,41 +540,20 @@ export default function PublishHistoryPanel({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--color-text-subtle)",
                 marginTop: 2,
-                minHeight: 14,
               }}
             >
-              {loading ? (
-                <span
-                  className="dg-skeleton"
-                  style={{ display: "inline-block", width: 88, height: 10, borderRadius: 4 }}
-                />
-              ) : (
-                `${entries.length} publish${entries.length !== 1 ? "es" : ""}`
-              )}
+              {subtitle}
             </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: 4,
-              color: "var(--color-text-muted)",
-              fontSize: 18,
-            }}
-            aria-label="Close"
-          >
-            ✕
-          </button>
+          {!isMobile && <CloseButton size="md" onClick={onClose} aria-label="Close" />}
         </div>
 
         <ProgressBar loading={loading} />
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "20px 24px" }}>
           {loading && entries.length === 0 && (
             <div
               aria-hidden

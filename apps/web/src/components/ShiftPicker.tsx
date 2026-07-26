@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Fragment } from "react";
+import { useTheme } from "next-themes";
 import { Check } from "lucide-react";
 import {
   AssignableShiftOption,
@@ -8,13 +9,12 @@ import {
   AbsenceType,
   FocusArea,
   ScheduleCellSegmentInput,
-  ShiftDisplayMode,
   ShiftCategory,
   JobDefinition,
   NamedItem,
 } from "@/types";
 import { buildAssignableShiftOptions } from "@/lib/assignable-shifts";
-import { borderColor } from "@/lib/colors";
+import { borderColor, toDarkPillColors } from "@/lib/colors";
 import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { MaybeHint } from "@/components/ui/hint";
@@ -41,7 +41,7 @@ interface ShiftPickerProps {
   /** If true, closes the picker immediately on select (usually for single-select). */
   closeOnSelect?: boolean;
   onClose?: () => void;
-  shiftDisplayMode?: ShiftDisplayMode;
+  defaultShiftEnabled?: boolean;
 }
 
 export default function ShiftPicker({
@@ -64,9 +64,10 @@ export default function ShiftPicker({
   multiSelect = false,
   closeOnSelect = true,
   onClose,
-  shiftDisplayMode = "code",
+  defaultShiftEnabled = true,
 }: ShiftPickerProps) {
-  const isNameMode = shiftDisplayMode === "name";
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const assignableOptions = buildAssignableShiftOptions({
     assignments,
     shiftCategories,
@@ -80,6 +81,7 @@ export default function ShiftPicker({
       roleIds: empRoleIds,
     },
     shiftDisplayMode: "name",
+    defaultShiftEnabled,
   });
   const visibleAssignableOptions = assignableOptions.filter(
     (option) => option.showJobOnGrid || option.isShiftless || option.isShiftOnly,
@@ -203,10 +205,15 @@ export default function ShiftPicker({
     border: string,
     isActive: boolean,
   ): React.CSSProperties {
+    // `color`/`text` are already dark-resolved by the caller; re-derive the
+    // border from the resolved text rather than trusting the raw stored
+    // border, unless it's the literal "transparent" sentinel.
+    const effectiveBorder =
+      border === "transparent" ? "transparent" : isDarkTheme ? borderColor(text) : border;
     return {
       background: color,
       border: isActive
-        ? `1.5px solid ${border === "transparent" ? text : border}`
+        ? `1.5px solid ${effectiveBorder === "transparent" ? text : effectiveBorder}`
         : `1px solid ${borderColor(text)}`,
       borderRadius: 8,
       padding: "8px 10px 6px",
@@ -227,6 +234,9 @@ export default function ShiftPicker({
     const isActive = selectedSegments.some(
       (selected) => buildShiftJobPairKey(selected.shiftId, selected.jobId) === optionKey,
     );
+    const darkOption = isDarkTheme ? toDarkPillColors(option.color) : null;
+    const optionColor = darkOption?.bg ?? option.color;
+    const optionText = darkOption?.text ?? option.text;
 
     const handleToggle = () => {
       let nextSegments: ScheduleCellSegmentInput[];
@@ -279,7 +289,7 @@ export default function ShiftPicker({
         onClick={handleToggle}
         aria-pressed={isActive}
         aria-label={`${option.primaryLabel}${option.secondaryLabel ? ` - ${option.secondaryLabel}` : ""}`}
-        style={getOptionButtonStyle(option.color, option.text, option.border, isActive)}
+        style={getOptionButtonStyle(optionColor, optionText, option.border, isActive)}
         onMouseEnter={(e) => {
           if (!isActive) {
             e.currentTarget.style.boxShadow = "0 3px 10px rgba(0,0,0,0.1)";
@@ -304,7 +314,7 @@ export default function ShiftPicker({
               width: 18,
               height: 18,
               borderRadius: "50%",
-              background: option.text,
+              background: optionText,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -325,7 +335,7 @@ export default function ShiftPicker({
           <div
             style={{
               ...primaryTextStyle,
-              color: option.text,
+              color: optionText,
               display: "flex",
               alignItems: "center",
               gap: 3,
@@ -340,7 +350,7 @@ export default function ShiftPicker({
             <div
               style={{
                 ...secondaryTextStyle,
-                color: option.text,
+                color: optionText,
                 opacity: 0.82,
                 marginTop: 3,
                 overflow: "hidden",
@@ -524,6 +534,9 @@ export default function ShiftPicker({
             >
               {absenceTypes.map((at) => {
                 const isActive = currentAbsenceTypeId === at.id;
+                const darkAt = isDarkTheme ? toDarkPillColors(at.color) : null;
+                const atColor = darkAt?.bg ?? at.color;
+                const atText = darkAt?.text ?? at.text;
                 return (
                   <button
                     key={at.id}
@@ -533,7 +546,7 @@ export default function ShiftPicker({
                     }}
                     aria-pressed={isActive}
                     aria-label={`${at.label} - ${at.name}`}
-                    style={getOptionButtonStyle(at.color, at.text, at.border, isActive)}
+                    style={getOptionButtonStyle(atColor, atText, at.border, isActive)}
                     onMouseEnter={(e) => {
                       if (!isActive) {
                         e.currentTarget.style.boxShadow = "0 3px 10px rgba(0,0,0,0.1)";
@@ -558,7 +571,7 @@ export default function ShiftPicker({
                           width: 18,
                           height: 18,
                           borderRadius: "50%",
-                          background: at.text,
+                          background: atText,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -567,54 +580,21 @@ export default function ShiftPicker({
                         <Check size={10} color="#fff" strokeWidth={3.5} />
                       </div>
                     )}
-                    {isNameMode ? (
-                      <MaybeHint content={at.name || at.label} side="left">
-                        <div
-                          style={{
-                            ...primaryTextStyle,
-                            color: at.text,
-                            lineHeight: 1.25,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            paddingRight: isActive ? 20 : 0,
-                          }}
-                        >
-                          {at.name || at.label}
-                        </div>
-                      </MaybeHint>
-                    ) : (
-                      <>
-                        <div
-                          style={{
-                            ...primaryTextStyle,
-                            color: at.text,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 3,
-                            paddingRight: isActive ? 20 : 0,
-                          }}
-                        >
-                          {at.label}
-                        </div>
-                        <MaybeHint content={at.name} side="left">
-                          <div
-                            style={{
-                              ...secondaryTextStyle,
-                              color: at.text,
-                              opacity: 0.82,
-                              marginTop: 3,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                              paddingRight: isActive ? 20 : 0,
-                            }}
-                          >
-                            {at.name}
-                          </div>
-                        </MaybeHint>
-                      </>
-                    )}
+                    <MaybeHint content={at.name || at.label} side="left">
+                      <div
+                        style={{
+                          ...primaryTextStyle,
+                          color: atText,
+                          lineHeight: 1.25,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          paddingRight: isActive ? 20 : 0,
+                        }}
+                      >
+                        {at.name || at.label}
+                      </div>
+                    </MaybeHint>
                   </button>
                 );
               })}

@@ -87,20 +87,26 @@
 
 ## 8. Design-System Conventions
 
-Two parallel button/input vocabularies exist by design — they are not interchangeable:
+Buttons are unified on **`dg-btn-*`** everywhere — the authenticated app, the
+public auth flows (login, forgot-password, reset-password, accept-invite,
+verify-email), and the landing page all use `<button className="dg-btn dg-btn-primary">`
+/ `dg-btn-secondary` / etc. There is no separate auth-only button class; the old
+`dg-auth-submit` pill was retired in favor of this.
 
-- **`dg-btn-*` / `dg-input` / `dg-label` / `dg-form-error`** — used everywhere
-  inside the authenticated app (settings, profile, schedule, people, dashboard,
-  reports). Form fields should always use `<input className="dg-input" />` plus
+Inputs/labels still have two parallel vocabularies by design — they are not
+interchangeable:
+
+- **`dg-input` / `dg-label` / `dg-form-error`** — used everywhere inside the
+  authenticated app (settings, profile, schedule, people, dashboard, reports).
+  Form fields should always use `<input className="dg-input" />` plus
   `<label className="dg-label" />`; never re-derive these via inline styles or
   bespoke Tailwind chains.
 
-- **`dg-auth-submit` / `dg-auth-input` / `dg-auth-link` / `dg-auth-heading`** —
-  used only by the public auth flows (login, forgot-password, reset-password,
-  accept-invite, verify-email). They render at a larger size for the auth
+- **`dg-auth-input` / `dg-auth-link` / `dg-auth-heading`** — used only by the
+  public auth flows listed above. They render at a larger size for the auth
   card and pair with the `<PageShell>` / `<Card>` primitives in
-  `components/auth/AuthCard.tsx`. Do not mix `dg-auth-*` with `dg-btn-*` on
-  the same surface.
+  `components/auth/AuthCard.tsx`. These stay auth-specific; only the button
+  class converged.
 
 Shared primitives to reach for before inventing a layout:
 

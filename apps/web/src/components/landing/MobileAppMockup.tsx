@@ -4,14 +4,24 @@
    through a single `transform: scale()` so every interior value stays the
    exact React Native unit. Sources:
      · packages/design-tokens/src/index.ts         . Colour / type / radius
-     · apps/mobile/src/shared/components/Screen.tsx . Screen wrapper
+     · apps/mobile/src/shared/components/Screen.tsx . Screen wrapper, Card
      · apps/mobile/src/shared/components/Button.tsx . Buttons
-     · apps/mobile/app/(tabs)/_layout.tsx           . Bottom tab bar
+     · apps/mobile/app/(tabs)/_layout.tsx           . Tab set, active tab
+       (real bar is now Expo Router `NativeTabs` — OS-rendered, no literal
+       icon size to match; the 28px custom icons here are an approximation)
      · apps/mobile/src/features/schedule/screens/ScheduleScreen.tsx
      · apps/mobile/src/features/shift-requests/screens/RequestsScreen.tsx
-   Phone 1. "My Schedule" (Me) with an in-progress (On Duty) hero shift.
-   Phone 2. The shift-requests "Available" tab. Calm Haven seed data. ── */
+     · apps/mobile/src/features/dashboard/screens/AdminHomeScreen.tsx
+     · apps/mobile/src/features/dashboard/components/DashboardHeader.tsx,
+       DashboardHeroCard.tsx, PeriodToggle.tsx, ActionQueueCard.tsx,
+       CountBadge.tsx
+   Phone 1. The admin/super_admin "Home" dashboard — period toggle, schedule
+     health metrics, coverage by wings. Calm Haven seed data throughout.
+   Phone 2. "My Schedule" (Me) with an in-progress (On Duty) hero shift.
+   Phone 3. The shift-requests "Available" tab. ── */
 
+import { Fragment } from "react";
+import { useTheme } from "next-themes";
 import {
   Home,
   Calendar,
@@ -23,27 +33,62 @@ import {
   Bell,
   MapPin,
   Clock,
+  ShieldCheck,
+  AlertCircle,
+  CheckCheck,
+  BarChart3,
 } from "lucide-react";
 
-/* ── colorTokens (design-tokens) ── */
+/* ── colorTokens (design-tokens) ──
+   Same light/dark values as `lightColorTokens`/`darkColorTokens` in
+   packages/design-tokens, referenced here as CSS custom properties so the
+   phone screens follow the page theme like every other landing mockup. ── */
 const C = {
-  background: "#F8FAFC",
-  surface: "#FFFFFF",
-  surfaceSecondary: "#F1F5F9",
-  surfaceMuted: "#FAFBFC",
-  border: "#CBD5E1",
-  borderSubtle: "#E2E8F0",
-  textPrimary: "#0F172A",
-  textSecondary: "#1E293B",
-  textMuted: "#475569",
-  textSubtle: "#64748B",
-  textInverse: "#FFFFFF",
-  brand: "#2563EB",
-  brandSoft: "#EFF6FF",
-  brandBorder: "#BFDBFE",
-  danger: "#EF4444",
-  shadow: "rgba(15, 23, 42, 0.08)",
+  background: "var(--color-bg)",
+  surface: "var(--color-surface)",
+  surfaceSecondary: "var(--color-bg-secondary)",
+  surfaceMuted: "var(--color-row-alt)",
+  border: "var(--color-border)",
+  borderSubtle: "var(--color-border-light)",
+  textPrimary: "var(--color-text-primary)",
+  textSecondary: "var(--color-text-secondary)",
+  textMuted: "var(--color-text-muted)",
+  textSubtle: "var(--color-text-subtle)",
+  textInverse: "var(--color-text-inverse)",
+  brand: "var(--color-brand)",
+  brandSoft: "var(--color-brand-bg)",
+  brandBorder: "var(--color-brand-border)",
+  success: "var(--color-success)",
+  successText: "var(--color-success-text)",
+  successSoft: "var(--color-success-bg)",
+  successBorder: "var(--color-success-border)",
+  warning: "var(--color-warning)",
+  warningText: "var(--color-warning-text)",
+  warningSoft: "var(--color-warning-bg)",
+  warningBorder: "var(--color-warning-border)",
+  danger: "var(--color-danger)",
+  dangerText: "var(--color-danger-text)",
+  dangerSoft: "var(--color-danger-bg)",
+  dangerBorder: "var(--color-danger-border)",
+  shadow: "var(--color-shadow)",
+  shadowStrong: "var(--color-shadow-strong)",
 };
+
+/* ── ScheduleScreen.tsx's ME_HERO_CARD_GRADIENT_LIGHT/_DARK + matching
+   shadow — the "On Duty" hero card is the one place the real app swaps a
+   literal (non-token) color set between themes, so it needs its own JS
+   theme read rather than a CSS var. ── */
+function useMockupIsDark(): boolean {
+  const { resolvedTheme } = useTheme();
+  return resolvedTheme === "dark";
+}
+
+const ME_HERO_GRADIENT_LIGHT =
+  "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
+const ME_HERO_GRADIENT_DARK =
+  "linear-gradient(to top right, #0A1442 0%, #1D3AA0 55%, #2075FF 100%)";
+const ME_HERO_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
+const ME_HERO_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
 /* ── mobileTypographyTokens.text — { fontSize, lineHeight, fontWeight } ── */
 const heroMetric = { fontSize: 24, lineHeight: "30px", fontWeight: 700 };
@@ -205,8 +250,15 @@ function StatusBar() {
   );
 }
 
-/* ── Phone frame — native iPhone 17 Pro Max, rendered through transform: scale ── */
+/* ── Phone frame — native iPhone 17 Pro Max, rendered through transform: scale.
+   Bezel is near-black in both themes on a real device, but that reads as
+   invisible against this page's near-black dark-mode background, so the
+   bezel itself switches to a lighter chassis gray in dark mode. ── */
+const BEZEL_LIGHT = "#0A0A0C";
+const BEZEL_DARK = "#3F3F46";
+
 function Phone({ active, children }: { active: string; children: React.ReactNode }) {
+  const isDark = useMockupIsDark();
   const outerW = SCREEN_W + BEZEL * 2;
   const outerH = SCREEN_H + BEZEL * 2;
   return (
@@ -224,7 +276,7 @@ function Phone({ active, children }: { active: string; children: React.ReactNode
           transform: `scale(${SCALE})`,
           transformOrigin: "top left",
           borderRadius: 62,
-          background: "#0A0A0C",
+          background: isDark ? BEZEL_DARK : BEZEL_LIGHT,
           padding: BEZEL,
           boxShadow: "0 30px 80px rgba(15,23,42,0.28), 0 6px 18px rgba(15,23,42,0.14)",
         }}
@@ -282,6 +334,121 @@ function IconControlButton({ children }: { children: React.ReactNode }) {
   );
 }
 
+/* ── Tone palette for status pills / badges / icon chips — mirrors
+   Screen.tsx's CARD_ICON_TONE and CountBadge.tsx's TONE_STYLES (icon and
+   badge-text color are identical per tone in both real components) ── */
+type Tone = "brand" | "success" | "warning" | "danger";
+const TONE: Record<Tone, { bg: string; border: string; text: string }> = {
+  brand: { bg: C.brandSoft, border: C.brandBorder, text: C.brand },
+  success: { bg: C.successSoft, border: C.successBorder, text: C.successText },
+  warning: { bg: C.warningSoft, border: C.warningBorder, text: C.warningText },
+  danger: { bg: C.dangerSoft, border: C.dangerBorder, text: C.dangerText },
+};
+
+/* ── CountBadge.tsx — radius 999, border 1, paddingH 8, paddingV 3 ── */
+function Pill({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+  const t = TONE[tone];
+  return (
+    <div
+      style={{
+        alignSelf: "flex-start",
+        borderRadius: 999,
+        border: `1px solid ${t.border}`,
+        background: t.bg,
+        paddingLeft: 8,
+        paddingRight: 8,
+        paddingTop: 3,
+        paddingBottom: 3,
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ ...badge, color: t.text }}>{children}</span>
+    </div>
+  );
+}
+
+/* ── Screen.tsx Card icon frame — 32×32, radius 10, border 1 ── */
+function IconChip({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+  const t = TONE[tone];
+  return (
+    <div
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 10,
+        border: `1px solid ${t.border}`,
+        background: t.bg,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ── Screen.tsx Card shell — surface, radius 16, padding 18, gap 10, border
+   borderSubtle, shadow (h8 r20 shadowStrong) ── */
+function MockCard({
+  icon: Icon,
+  iconTone = "brand",
+  title,
+  headerRight,
+  children,
+}: {
+  icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  iconTone?: Tone;
+  title: string;
+  headerRight?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const t = TONE[iconTone];
+  return (
+    <div
+      style={{
+        background: C.surface,
+        borderRadius: 16,
+        padding: 18,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        border: `1px solid ${C.borderSubtle}`,
+        boxShadow: `0 8px 20px ${C.shadowStrong}`,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+          <IconChip tone={iconTone}>
+            <Icon size={16} color={t.text} strokeWidth={2} />
+          </IconChip>
+          <span style={{ ...sectionTitle, color: C.textPrimary }}>{title}</span>
+        </div>
+        {headerRight}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ── ExpandableList.tsx "See all N" — Button compact tone="link": full-width,
+   content centered, label bodyStrong colored brand ── */
+function SeeAllLink({ count }: { count: number }) {
+  return (
+    <div style={{ minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <span style={{ ...bodyStrong, color: C.brand }}>See all {count}</span>
+    </div>
+  );
+}
+
 /* ─────────────────────────────────────────────────────────────────────
    Screen 1. My Schedule (the "Me" tab), in-progress hero shift
    ───────────────────────────────────────────────────────────────────── */
@@ -301,9 +468,31 @@ const UPCOMING = [
     area: "Skilled Nursing",
     time: "7:00 AM – 3:30 PM",
   },
+  {
+    weekday: "SAT",
+    day: "17",
+    title: "Day Shift",
+    area: "Skilled Nursing",
+    time: "7:00 AM – 3:30 PM",
+  },
+  {
+    weekday: "MON",
+    day: "19",
+    title: "Evening Shift",
+    area: "Memory Care",
+    time: "3:00 PM – 11:00 PM",
+  },
+  {
+    weekday: "TUE",
+    day: "20",
+    title: "Day Shift",
+    area: "Skilled Nursing",
+    time: "7:00 AM – 3:30 PM",
+  },
 ];
 
 function ScheduleScreen() {
+  const isDark = useMockupIsDark();
   return (
     <>
       {/* ── Sticky header. Screen.stickyHeaderShell + meWeekNavigator ── */}
@@ -384,56 +573,69 @@ function ScheduleScreen() {
         }}
       >
         {/* ── MeHeroCard. Status "active" (on duty / in progress).
-              Real gradient ME_HERO_CARD_GRADIENT goes bottom-left → top-right,
-              colors #142579 → #2C49CC → #6E90FF at stops 0 / 0.55 / 1. ── */}
+              Real gradient goes bottom-left → top-right; ScheduleScreen.tsx
+              swaps to a deeper navy/app-blue set (+ dimmer shadow) in dark
+              mode (ME_HERO_CARD_GRADIENT_DARK / ME_HERO_CARD_SHADOW_DARK). ── */}
         <div
           style={{
-            background: "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)",
+            background: isDark ? ME_HERO_GRADIENT_DARK : ME_HERO_GRADIENT_LIGHT,
             borderRadius: 24,
             paddingLeft: 18,
             paddingRight: 18,
             paddingTop: 18,
             paddingBottom: 18,
-            boxShadow: "0 14px 28px rgba(37, 99, 235, 0.3)",
+            boxShadow: `0 14px 28px ${isDark ? ME_HERO_SHADOW_DARK : ME_HERO_SHADOW_LIGHT}`,
           }}
         >
           {/* meHeroContent: gap 11 */}
           <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
-            {/* meHeroHeader: row, alignItems flex-end, justify space-between, gap 12 */}
+            {/* meHeroHeader: row, alignItems flex-start, justify space-between, gap 12.
+                Badge + title share a meHeroHeaderCopy column so the title sits directly
+                under the badge instead of trailing the (taller) date tile's own height. */}
             <div
               style={{
                 display: "flex",
-                alignItems: "flex-end",
+                alignItems: "flex-start",
                 justifyContent: "space-between",
                 gap: 12,
               }}
             >
-              {/* meHeroBadge. Status "active" → meHeroBadgeDotActive (#86EFAC) */}
+              {/* meHeroHeaderCopy: column, gap 10 */}
               <div
-                style={{
-                  alignSelf: "flex-start",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
+                style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 0 }}
               >
+                {/* meHeroBadge. Status "active" → meHeroBadgeDotActive (#86EFAC) */}
                 <div
                   style={{
-                    width: 9,
-                    height: 9,
-                    borderRadius: 4.5,
-                    background: "#86EFAC",
-                  }}
-                />
-                <span
-                  style={{
-                    ...label,
-                    color: C.textInverse,
-                    textTransform: "uppercase",
+                    alignSelf: "flex-start",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
                   }}
                 >
-                  On Duty
-                </span>
+                  <div
+                    style={{
+                      width: 9,
+                      height: 9,
+                      borderRadius: 4.5,
+                      background: "#86EFAC",
+                    }}
+                  />
+                  <span
+                    style={{
+                      ...label,
+                      color: C.textInverse,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    On Duty
+                  </span>
+                </div>
+
+                {/* meHeroTitleRow → meHeroTitle */}
+                <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                  <span style={{ ...heroMetric, color: C.textInverse }}>Day Shift</span>
+                </div>
               </div>
               {/* meHeroDateTile */}
               <div
@@ -458,11 +660,6 @@ function ScheduleScreen() {
               </div>
             </div>
 
-            {/* meHeroTitleRow → meHeroTitle */}
-            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-              <span style={{ ...heroMetric, color: C.textInverse }}>Day Shift</span>
-            </div>
-
             {/* meHeroAreaRow: marginTop 2 */}
             <div
               style={{
@@ -478,14 +675,18 @@ function ScheduleScreen() {
               </span>
             </div>
 
-            {/* meHeroRoleRow → MeTypePill → JobPill (compact). "Mentor" job chip */}
+            {/* meHeroRoleRow → MeTypePill → JobPill (compact). "Mentor" job chip.
+                buildJobChip's mentor/trainer branch: bg/border track the shared
+                warning token, but text stays a bespoke light-mode amber
+                (#B45309, darker than warningText) and only swaps to the token's
+                warningText in dark mode. */}
             <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
               <div
                 style={{
                   alignSelf: "flex-start",
                   borderRadius: 8,
-                  border: "1px solid #FED7AA",
-                  background: "#FFF7ED",
+                  border: `1px solid ${C.warningBorder}`,
+                  background: C.warningSoft,
                   paddingLeft: 9,
                   paddingRight: 9,
                   paddingTop: 5,
@@ -499,7 +700,7 @@ function ScheduleScreen() {
                     lineHeight: "14px",
                     fontWeight: 700,
                     textTransform: "uppercase",
-                    color: "#B45309",
+                    color: isDark ? C.warningText : "#B45309",
                   }}
                 >
                   Mentor
@@ -583,7 +784,7 @@ function ScheduleScreen() {
                 color: C.textPrimary,
               }}
             >
-              My Week
+              Your Week
             </span>
             {/* upcomingHoursBadge */}
             <div
@@ -743,24 +944,95 @@ function ScheduleScreen() {
    Screen 2. Shift Requests ("Available" tab)
    ───────────────────────────────────────────────────────────────────── */
 
+// Real tab set (RequestsScreen.tsx `tabs` array) is Available/All/Mine/
+// Approval/History, filtered by permission — an admin viewer sees all 5.
 const REQ_TABS = [
-  { label: "Available", count: 2, active: true },
-  { label: "Mine", count: 1, active: false },
+  { label: "Available", count: 7, active: true },
+  { label: "All", count: 0, active: false },
+  { label: "Mine", count: 0, active: false },
+  { label: "Approval", count: 0, active: false },
   { label: "History", count: 3, active: false },
 ];
 
-const OPEN_SHIFTS = [
+// Date groups use formatScheduleDayLabel (schedule-core): "Today, {date}" /
+// "Tomorrow, {date}" / else "{weekday short}, {month short} {day}" — not
+// full weekday names. Two shifts include the real
+// volunteerBlockReason/canVolunteer=false state (disabled Volunteer button
+// + block-reason line) for a viewer not assigned to that focus area.
+const OPEN_SHIFT_GROUPS = [
   {
-    title: "Day Shift",
-    time: "7:00 AM – 3:30 PM",
-    area: "Skilled Nursing",
-    needed: "1 teammate needed",
+    date: "Today, Jul 12",
+    shifts: [
+      {
+        title: "Day Shift",
+        time: "7:00 AM – 3:30 PM",
+        area: "Skilled Nursing",
+        needed: "1 teammate needed",
+        blocked: false,
+      },
+      {
+        title: "Evening Shift",
+        time: "3:00 PM – 11:00 PM",
+        area: "Sheltered Care",
+        needed: "2 teammates needed",
+        blocked: false,
+      },
+    ],
   },
   {
-    title: "Evening Shift",
-    time: "3:00 PM – 11:00 PM",
-    area: "Sheltered Care",
-    needed: "2 teammates needed",
+    date: "Tomorrow, Jul 13",
+    shifts: [
+      {
+        title: "Night Shift",
+        time: "12:00 AM – 8:00 AM",
+        area: "Memory Care",
+        needed: "1 teammate needed",
+        blocked: true,
+      },
+    ],
+  },
+  {
+    date: "Tue, Jul 14",
+    shifts: [
+      {
+        title: "Day Shift",
+        time: "7:00 AM – 3:30 PM",
+        area: "Rehab Therapy",
+        needed: "1 teammate needed",
+        blocked: false,
+      },
+      {
+        title: "Night Shift",
+        time: "12:00 AM – 8:00 AM",
+        area: "Night Shift",
+        needed: "1 teammate needed",
+        blocked: true,
+      },
+    ],
+  },
+  {
+    date: "Wed, Jul 15",
+    shifts: [
+      {
+        title: "Night Shift",
+        time: "12:00 AM – 8:00 AM",
+        area: "Skilled Nursing",
+        needed: "1 teammate needed",
+        blocked: true,
+      },
+    ],
+  },
+  {
+    date: "Thu, Jul 16",
+    shifts: [
+      {
+        title: "Day Shift",
+        time: "7:00 AM – 3:30 PM",
+        area: "Visiting CSNS",
+        needed: "1 teammate needed",
+        blocked: false,
+      },
+    ],
   },
 ];
 
@@ -832,150 +1104,688 @@ function RequestsScreen() {
               >
                 {t.label}
               </span>
-              {/* tabBadge */}
-              <div
-                style={{
-                  minWidth: 20,
-                  paddingLeft: 6,
-                  paddingRight: 6,
-                  paddingTop: 3,
-                  paddingBottom: 3,
-                  borderRadius: 999,
-                  background: t.active ? "rgba(255, 255, 255, 0.22)" : C.surfaceSecondary,
-                  textAlign: "center",
-                }}
-              >
-                <span
+              {/* tabBadge — hidden when count is 0 (count > 0 ? badge : null) */}
+              {t.count > 0 ? (
+                <div
                   style={{
-                    ...badge,
-                    color: t.active ? C.textInverse : C.textMuted,
+                    minWidth: 20,
+                    paddingLeft: 6,
+                    paddingRight: 6,
+                    paddingTop: 3,
+                    paddingBottom: 3,
+                    borderRadius: 999,
+                    background: t.active ? "rgba(255, 255, 255, 0.22)" : C.surfaceSecondary,
+                    textAlign: "center",
                   }}
                 >
-                  {t.count}
-                </span>
-              </div>
+                  <span
+                    style={{
+                      ...badge,
+                      color: t.active ? C.textInverse : C.textMuted,
+                    }}
+                  >
+                    {t.count}
+                  </span>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
 
-        {/* section: gap 10 → dateGroup: gap 10 */}
+        {/* section: gap 18 → repeated dateGroup blocks (gap 10 each) */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 10,
+            gap: 18,
             paddingLeft: 16,
             paddingRight: 16,
           }}
         >
-          {/* dateGroupLabel: bodyStrong, textMuted */}
-          <span style={{ ...bodyStrong, color: C.textMuted }}>Saturday, May 17</span>
-          {/* dateGroupItems: gap 10 */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {OPEN_SHIFTS.map((s) => (
-              <div
-                key={s.title}
-                /* requestCard + openShiftCard: bg surface, radius 16, border 1
-                   borderSubtle, padding 18, gap 12, shadow (h8 r18) */
-                style={{
-                  background: C.surface,
-                  borderRadius: 16,
-                  border: `1px solid ${C.borderSubtle}`,
-                  padding: 18,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 12,
-                  boxShadow: `0 8px 18px ${C.shadow}`,
-                }}
-              >
-                {/* requestHeaderRow: row, justify space-between, align flex-start, gap 12 */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    justifyContent: "space-between",
-                    gap: 12,
-                  }}
-                >
-                  {/* shiftTitleTimeRow: flex 1, row, alignItems baseline, justify space-between, gap 12 */}
+          {OPEN_SHIFT_GROUPS.map((group) => (
+            <div key={group.date} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* dateGroupLabel: bodyStrong, textMuted */}
+              <span style={{ ...bodyStrong, color: C.textMuted }}>{group.date}</span>
+              {/* dateGroupItems: gap 10 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {group.shifts.map((s) => (
                   <div
+                    key={`${group.date}-${s.title}-${s.area}`}
+                    /* requestCard + openShiftCard: bg surface, radius 16, border 1
+                       borderSubtle, padding 18, gap 12 — no shadow. List cards use
+                       a flat border only; shadows are reserved for singular hero
+                       cards (DashboardHeroCard), not repeated list items. */
                     style={{
-                      flex: 1,
-                      minWidth: 0,
+                      background: C.surface,
+                      borderRadius: 16,
+                      border: `1px solid ${C.borderSubtle}`,
+                      padding: 18,
                       display: "flex",
-                      alignItems: "baseline",
-                      justifyContent: "space-between",
+                      flexDirection: "column",
                       gap: 12,
                     }}
                   >
-                    {/* openShiftTitle: sectionTitle, textPrimary */}
-                    <span style={{ ...sectionTitle, color: C.textPrimary }}>{s.title}</span>
-                    {/* shiftTitleTimeText: rowTitle → fontWeight 500, textMuted */}
-                    <span style={{ ...rowTitle, fontWeight: 500, color: C.textMuted }}>
-                      {s.time}
-                    </span>
-                  </div>
-                  {/* statusChip */}
-                  <div
-                    style={{
-                      borderRadius: 999,
-                      border: `1px solid ${C.border}`,
-                      background: C.surfaceSecondary,
-                      paddingLeft: 10,
-                      paddingRight: 10,
-                      paddingTop: 6,
-                      paddingBottom: 6,
-                      alignSelf: "flex-start",
-                    }}
-                  >
-                    {/* statusChipText: caption → fontWeight 600, textSecondary */}
-                    <span
+                    {/* openShiftTitleRow: row, justify space-between, align CENTER,
+                       gap 12 — pairs the title/time line with the status pill only;
+                       everything else below flows as separate stacked siblings
+                       (OpenShiftCard has no icon column to indent under). */}
+                    <div
                       style={{
-                        ...caption,
-                        fontWeight: 600,
-                        color: C.textSecondary,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
                       }}
                     >
-                      Open shift
-                    </span>
+                      {/* shiftTitleTimeRow: flex 1, row, alignItems baseline, justify space-between, gap 12 */}
+                      <div
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          display: "flex",
+                          alignItems: "baseline",
+                          justifyContent: "space-between",
+                          gap: 12,
+                        }}
+                      >
+                        {/* openShiftTitle: sectionTitle, textPrimary */}
+                        <span style={{ ...sectionTitle, color: C.textPrimary }}>{s.title}</span>
+                        {/* shiftTitleTimeText: rowTitle → fontWeight 500, textMuted */}
+                        <span style={{ ...rowTitle, fontWeight: 500, color: C.textMuted }}>
+                          {s.time}
+                        </span>
+                      </div>
+                      {/* statusChip, tone-colored via OPEN_SHIFT_CHIP_TONE
+                         (= STATUS_CHIP_TONES.open) — brand, same semantic as an
+                         `open` request: "this is available/actionable" */}
+                      <div
+                        style={{
+                          borderRadius: 999,
+                          border: `1px solid ${TONE.brand.border}`,
+                          background: TONE.brand.bg,
+                          paddingLeft: 10,
+                          paddingRight: 10,
+                          paddingTop: 6,
+                          paddingBottom: 6,
+                          alignSelf: "flex-start",
+                        }}
+                      >
+                        {/* statusChipText: caption → fontWeight 600, tone text color */}
+                        <span
+                          style={{
+                            ...caption,
+                            fontWeight: 600,
+                            color: TONE.brand.text,
+                          }}
+                        >
+                          Open shift
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* openShiftContextStack: gap 8. Focus area only
+                       (open shifts don't surface a job/designation chip) */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {/* openShiftContextText: rowTitle, textSecondary */}
+                      <span style={{ ...rowTitle, color: C.textSecondary }}>{s.area}</span>
+                    </div>
+
+                    {/* metaText: body, textMuted */}
+                    <span style={{ ...body, color: C.textMuted }}>{s.needed}</span>
+
+                    {/* volunteerBlockReason metaText — shown when
+                        openShift.canVolunteer === false */}
+                    {s.blocked ? (
+                      <span style={{ ...body, color: C.textMuted }}>
+                        You are not assigned to the focus area required for this shift.
+                      </span>
+                    ) : null}
+
+                    {/* cardActions — flexWrap wrap, justifyContent flex-start, gap 8,
+                       paddingTop 10, hairline top border. Base cardActions has
+                       marginLeft 42 to indent under a card's icon column; OpenShiftCard
+                       has no icon, so cardActionsFlush overrides that back to 0. */}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        justifyContent: "flex-start",
+                        gap: 8,
+                        paddingTop: 10,
+                        borderTop: `1px solid ${C.borderSubtle}`,
+                      }}
+                    >
+                      <div
+                        style={{
+                          minHeight: 44,
+                          borderRadius: 12,
+                          paddingLeft: 14,
+                          paddingRight: 14,
+                          paddingTop: 10,
+                          paddingBottom: 10,
+                          border: `1px solid ${C.brandBorder}`,
+                          background: C.brandSoft,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          opacity: s.blocked ? 0.5 : 1,
+                        }}
+                      >
+                        {/* label: bodyStrong, labelSecondary color brand */}
+                        <span style={{ ...bodyStrong, color: C.brand }}>Volunteer</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
 
-                {/* openShiftContextStack: gap 8. Focus area only
-                   (open shifts don't surface a job/designation chip) */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {/* openShiftContextText: rowTitle, textSecondary */}
-                  <span style={{ ...rowTitle, color: C.textSecondary }}>{s.area}</span>
-                </div>
+/* ─────────────────────────────────────────────────────────────────────
+   Screen 3. Admin dashboard ("Home" tab for admin/super_admin roles)
+   ───────────────────────────────────────────────────────────────────── */
 
-                {/* metaText: body, textMuted */}
-                <span style={{ ...body, color: C.textMuted }}>{s.needed}</span>
+const PERIOD_MODES = [
+  { label: "Day", active: false },
+  { label: "Week", active: true },
+  { label: "2 Weeks", active: false },
+];
 
-                {/* actions → Button compact tone="secondary" */}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  <div
+// Jul 12–18, 2026 week — Sun/Mon/Tue confirmed from the real screenshot,
+// Wed–Sat continue plausibly (not visible in the source screenshot).
+const WEEK_SCHEDULE: Array<{
+  weekday: string;
+  day: string;
+  shift: { name: string; time: string } | null;
+}> = [
+  { weekday: "SUN", day: "12", shift: null },
+  { weekday: "MON", day: "13", shift: { name: "Day Shift", time: "7:00 AM – 3:30 PM" } },
+  { weekday: "TUE", day: "14", shift: { name: "Day Shift", time: "7:00 AM – 3:30 PM" } },
+  { weekday: "WED", day: "15", shift: { name: "Evening Shift", time: "3:00 PM – 11:00 PM" } },
+  { weekday: "THU", day: "16", shift: null },
+  { weekday: "FRI", day: "17", shift: { name: "Day Shift", time: "7:00 AM – 3:30 PM" } },
+  { weekday: "SAT", day: "18", shift: { name: "Evening Shift", time: "3:00 PM – 11:00 PM" } },
+];
+
+function coverageColor(pct: number): string {
+  if (pct >= 90) return C.success;
+  if (pct >= 70) return C.warning;
+  return C.danger;
+}
+
+// The 4 real "Coverage by wings" sections — filled/required confirmed from
+// the real screenshot (percentages and the "20 open" header badge both
+// derive exactly from these values, not hardcoded separately).
+const COVERAGE_SECTIONS = [
+  { name: "Night Shift", filled: 12, required: 21 },
+  { name: "Skilled Nursing", filled: 41, required: 49 },
+  { name: "Sheltered Care", filled: 12, required: 14 },
+  { name: "Visiting CSNS", filled: 6, required: 7 },
+].map((s) => ({ ...s, pct: Math.round((s.filled / s.required) * 100) }));
+
+// Area names match the 4 real "Coverage by wings" sections above.
+const ADMIN_OPEN_SHIFTS = [
+  { area: "Skilled Nursing", meta: "Jul 12 · D · 7:00 AM – 3:30 PM", needed: "1" },
+  { area: "Sheltered Care", meta: "Jul 12 · E · 3:00 PM – 11:00 PM", needed: "2" },
+  { area: "Night Shift", meta: "Jul 13 · N · 11:00 PM – 7:00 AM", needed: "2" },
+  { area: "Skilled Nursing", meta: "Jul 13 · D · 7:00 AM – 3:30 PM", needed: "1" },
+  { area: "Visiting CSNS", meta: "Jul 14 · D · 7:00 AM – 3:30 PM", needed: "1" },
+  { area: "Night Shift", meta: "Jul 14 · N · 11:00 PM – 7:00 AM", needed: "1" },
+];
+
+const STAFF_HOURS = [
+  { name: "Jordan Reyes", total: 44, ot: 4 },
+  { name: "Priya Shah", total: 42, ot: 2 },
+  { name: "Marcus Webb", total: 46, ot: 6 },
+  { name: "Alicia Chen", total: 41, ot: 1 },
+  { name: "Devon Brooks", total: 43, ot: 3 },
+  { name: "Sam Whitfield", total: 45, ot: 5 },
+];
+
+const ACTIVITY: Array<{ type: string; tone: Tone; time: string; desc: string }> = [
+  {
+    type: "Published",
+    tone: "brand",
+    time: "2h ago",
+    desc: "Published the schedule for Jul 12–18",
+  },
+  {
+    type: "Shift change",
+    tone: "warning",
+    time: "4h ago",
+    desc: "Marcus Webb picked up Jordan Reyes's Day shift on Jul 13",
+  },
+  {
+    type: "Request",
+    tone: "success",
+    time: "6h ago",
+    desc: "Priya Shah requested a swap for Jul 14",
+  },
+  { type: "Sign-up", tone: "success", time: "1d ago", desc: "Sam Whitfield joined Calm Haven" },
+  {
+    type: "Shift change",
+    tone: "warning",
+    time: "1d ago",
+    desc: "Devon Brooks called off for Jul 14",
+  },
+  { type: "Published", tone: "brand", time: "2d ago", desc: "Published the schedule for Jul 5–11" },
+];
+
+function AdminHomeScreenMockup() {
+  return (
+    <>
+      {/* ── Sticky header. Screen.stickyHeaderShell + DashboardHeader ── */}
+      <div
+        style={{
+          background: C.background,
+          paddingLeft: 16,
+          paddingRight: 16,
+          paddingTop: 4,
+          paddingBottom: 14,
+          borderBottom: `1px solid ${C.borderSubtle}`,
+          flexShrink: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+        }}
+      >
+        {/* DashboardHeader.styles.greeting: screenTitle, textPrimary */}
+        <span style={{ fontSize: 22, lineHeight: "28px", fontWeight: 700, color: C.textPrimary }}>
+          Good morning, Nic!
+        </span>
+        {/* DashboardHeader.styles.meta: body, textSecondary */}
+        <span style={{ ...body, color: C.textSecondary }}>
+          Calm Haven · 1:39 AM PDT | Jul 12–18, 2026
+        </span>
+      </div>
+
+      {/* ── Content. Screen.content (paddingHorizontal 16, gap 16) +
+            contentWithStickyHeader (paddingTop 16) ── */}
+      <div
+        style={{
+          flex: 1,
+          overflow: "hidden",
+          paddingLeft: 16,
+          paddingRight: 16,
+          paddingTop: 16,
+          display: "flex",
+          flexDirection: "column",
+          gap: 16,
+        }}
+      >
+        {/* ── DashboardHeroCard. styles.card: surface, radius 16, padding 18,
+              gap 16, border borderSubtle, shadow (h8 r20 shadowStrong) ── */}
+        <div
+          style={{
+            background: C.surface,
+            borderRadius: 16,
+            padding: 18,
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+            border: `1px solid ${C.borderSubtle}`,
+            boxShadow: `0 8px 20px ${C.shadowStrong}`,
+          }}
+        >
+          {/* headerRow: row, justify space-between, align flex-start, gap 12 */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 12,
+            }}
+          >
+            {/* headerCopy: flexShrink 1, gap 6. statusPill: STATUS_TONE maps
+                "Attention" → danger tone */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 1 }}>
+              <Pill tone="danger">Attention</Pill>
+              {/* title: sectionTitle, textPrimary */}
+              <span style={{ ...sectionTitle, color: C.textPrimary }}>6 coverage gaps</span>
+            </div>
+
+            {/* PeriodToggle. track: row, alignSelf flex-start, surfaceSecondary,
+                radius 999, border borderSubtle, padding 2 */}
+            <div
+              style={{
+                display: "flex",
+                alignSelf: "flex-start",
+                background: C.surfaceSecondary,
+                borderRadius: 999,
+                border: `1px solid ${C.borderSubtle}`,
+                padding: 2,
+                flexShrink: 0,
+              }}
+            >
+              {PERIOD_MODES.map((mode) => (
+                <div
+                  key={mode.label}
+                  style={{
+                    paddingLeft: 9,
+                    paddingRight: 9,
+                    paddingTop: 3,
+                    paddingBottom: 3,
+                    borderRadius: 999,
+                    background: mode.active ? C.brand : "transparent",
+                  }}
+                >
+                  <span
                     style={{
-                      minHeight: 44,
-                      borderRadius: 12,
-                      paddingLeft: 14,
-                      paddingRight: 14,
-                      paddingTop: 10,
-                      paddingBottom: 10,
-                      border: `1px solid ${C.brandBorder}`,
-                      background: C.brandSoft,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
+                      ...caption,
+                      fontWeight: mode.active ? 700 : 400,
+                      color: mode.active ? C.textInverse : C.textMuted,
                     }}
                   >
-                    {/* label: bodyStrong, labelSecondary color brand */}
-                    <span style={{ ...bodyStrong, color: C.brand }}>Volunteer</span>
-                  </div>
+                    {mode.label}
+                  </span>
                 </div>
+              ))}
+            </div>
+          </div>
+
+          {/* tileRow: row, wrap, gap 10 */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {[
+              {
+                label: "Coverage",
+                value: "78%",
+                detail: "Current staffing coverage",
+                tone: "brand" as const,
+                Icon: ShieldCheck,
+              },
+              {
+                // tone: openGapCount > 0 ? "danger" : "success"
+                label: "Open gaps",
+                value: "6",
+                detail: "Staffing gaps this period",
+                tone: "danger" as const,
+                Icon: AlertCircle,
+              },
+              {
+                // tone: pendingApprovalsCount > 0 ? "warning" : "success"
+                label: "Pending approvals",
+                value: "0",
+                detail: "Requests waiting for review",
+                tone: "success" as const,
+                Icon: CheckCheck,
+              },
+            ].map((tile) => {
+              const t = TONE[tile.tone];
+              return (
+                <div
+                  key={tile.label}
+                  style={{
+                    flexGrow: 1,
+                    flexBasis: "30%",
+                    minWidth: 0,
+                    overflow: "hidden",
+                    background: C.surfaceSecondary,
+                    borderRadius: 12,
+                    border: `1px solid ${C.borderSubtle}`,
+                    padding: 12,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                  }}
+                >
+                  {/* tileHeader: row, align flex-start, justify space-between, gap 6 */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 6,
+                    }}
+                  >
+                    <span style={{ ...caption, color: C.textMuted, flex: 1 }}>{tile.label}</span>
+                    {/* tileIconFrame: 26×26, radius 13, border, nudged -4/-4 */}
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: 13,
+                        border: `1px solid ${t.border}`,
+                        background: t.bg,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                        marginTop: -4,
+                        marginRight: -4,
+                      }}
+                    >
+                      <tile.Icon size={16} color={t.text} strokeWidth={2} />
+                    </div>
+                  </div>
+                  <span style={{ ...heroMetric, color: C.textPrimary }}>{tile.value}</span>
+                  <span style={{ ...caption, color: C.textMuted }}>{tile.detail}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* No ActionQueueCard — AdminHomeScreen.tsx only renders it for
+              role === "admin"; this viewer is super_admin (matches
+              pendingApprovalsCount: 0 above, and the real screenshot showing
+              "Your schedule" immediately after the hero card). */}
+
+        {/* ── MyScheduleCard. Horizontal 7-day strip — scrollView marginHorizontal
+              -18 (bleed) + scrollContent paddingHorizontal 18 (padded ends),
+              matching the real edge-bleed-with-padded-ends fix ── */}
+        <div
+          style={{
+            background: C.surface,
+            borderRadius: 16,
+            padding: 18,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            border: `1px solid ${C.borderSubtle}`,
+            boxShadow: `0 8px 20px ${C.shadowStrong}`,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <IconChip tone="brand">
+              <Calendar size={16} color={C.brand} strokeWidth={2} />
+            </IconChip>
+            <span style={{ ...sectionTitle, color: C.textPrimary }}>Your schedule</span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              overflow: "hidden",
+              marginLeft: -18,
+              marginRight: -18,
+              paddingLeft: 18,
+              paddingRight: 18,
+            }}
+          >
+            {WEEK_SCHEDULE.map((d) => (
+              <div
+                key={d.day}
+                style={{
+                  width: 132,
+                  flexShrink: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  background: C.surfaceSecondary,
+                  borderRadius: 12,
+                  border: `1px solid ${C.borderSubtle}`,
+                  padding: 12,
+                }}
+              >
+                <span style={{ ...label, color: C.textMuted }}>
+                  {d.weekday} {d.day}
+                </span>
+                {d.shift ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ ...bodyStrong, color: C.textPrimary }}>{d.shift.name}</span>
+                    <span style={{ ...caption, color: C.textMuted }}>{d.shift.time}</span>
+                  </div>
+                ) : (
+                  // isAbsence ? "Off" : "—" — these two rest days are modeled
+                  // as absence records, matching real usage.
+                  <div style={{ minHeight: 36, display: "flex", alignItems: "center" }}>
+                    <span style={{ ...body, color: C.textSubtle }}>Off</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
+
+        {/* ── CoverageBySectionCard. 6 rows — progress bars, coverageColor
+              (>=90 success / >=70 warning / else danger). Icon: real card
+              uses Ionicons "stats-chart-outline" → lucide BarChart3 ── */}
+        <MockCard
+          icon={BarChart3}
+          iconTone="brand"
+          title="Coverage by wings"
+          headerRight={
+            <Pill tone="warning">
+              {COVERAGE_SECTIONS.reduce((sum, s) => sum + (s.required - s.filled), 0)} open
+            </Pill>
+          }
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {COVERAGE_SECTIONS.slice(0, 5).map((s) => {
+              const pctColor = coverageColor(s.pct);
+              return (
+                <div key={s.name} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                      gap: 8,
+                    }}
+                  >
+                    <span style={{ ...body, color: C.textPrimary, flexShrink: 1 }}>{s.name}</span>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexShrink: 0 }}>
+                      <span style={{ ...caption, color: C.textSubtle }}>
+                        {s.filled} / {s.required} filled
+                      </span>
+                      <span style={{ ...bodyStrong, color: pctColor }}>{s.pct}%</span>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      height: 6,
+                      borderRadius: 3,
+                      background: C.borderSubtle,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: "100%",
+                        borderRadius: 3,
+                        background: pctColor,
+                        width: `${s.pct}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+            {/* hasMore = items.length > collapsedCount(5) — 4 real sections,
+                so no "See all" link (matches the real screenshot). */}
+            {COVERAGE_SECTIONS.length > 5 ? <SeeAllLink count={COVERAGE_SECTIONS.length} /> : null}
+          </div>
+        </MockCard>
+
+        {/* ── OpenShiftsCard. 6 rows — 5 visible + "See all 6" ── */}
+        <MockCard
+          icon={Calendar}
+          iconTone="brand"
+          title="Open shifts"
+          headerRight={<Pill tone="brand">{ADMIN_OPEN_SHIFTS.length}</Pill>}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {ADMIN_OPEN_SHIFTS.slice(0, 5).map((s) => (
+              <div
+                key={`${s.area}-${s.meta}`}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 1 }}>
+                  <span style={{ ...body, color: C.textPrimary }}>{s.area}</span>
+                  <span style={{ ...caption, color: C.textMuted }}>{s.meta}</span>
+                </div>
+                <Pill tone="brand">{s.needed} needed</Pill>
+              </div>
+            ))}
+            {ADMIN_OPEN_SHIFTS.length > 5 ? <SeeAllLink count={ADMIN_OPEN_SHIFTS.length} /> : null}
+          </div>
+        </MockCard>
+
+        {/* ── StaffHoursCard ("Overtime watch"). 6 rows — 5 visible + "See all 6" ── */}
+        <MockCard
+          icon={AlertCircle}
+          iconTone="danger"
+          title="Overtime watch"
+          headerRight={<Pill tone="danger">{STAFF_HOURS.length}</Pill>}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {STAFF_HOURS.slice(0, 5).map((entry) => (
+              <div
+                key={entry.name}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ ...body, color: C.textPrimary }}>{entry.name}</span>
+                  <span style={{ ...caption, color: C.textMuted }}>{entry.total}h total</span>
+                </div>
+                <Pill tone="danger">+{entry.ot}h OT</Pill>
+              </div>
+            ))}
+            {STAFF_HOURS.length > 5 ? <SeeAllLink count={STAFF_HOURS.length} /> : null}
+          </div>
+        </MockCard>
+
+        {/* ── ActivityFeedCard. 6 rows — 5 visible + "See all 6", divider
+              between rows (not before the first) ── */}
+        <MockCard icon={Clock} iconTone="brand" title="Recent activity">
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {ACTIVITY.slice(0, 5).map((item, i) => (
+              <Fragment key={item.desc}>
+                {i > 0 ? <div style={{ height: 1, background: C.borderSubtle }} /> : null}
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                    }}
+                  >
+                    <Pill tone={item.tone}>{item.type}</Pill>
+                    <span style={{ ...caption, color: C.textMuted }}>{item.time}</span>
+                  </div>
+                  <span style={{ ...body, color: C.textPrimary }}>{item.desc}</span>
+                </div>
+              </Fragment>
+            ))}
+            {ACTIVITY.length > 5 ? <SeeAllLink count={ACTIVITY.length} /> : null}
+          </div>
+        </MockCard>
       </div>
     </>
   );
@@ -993,6 +1803,9 @@ export default function MobileAppMockup() {
       }}
     >
       <Phone active="Home">
+        <AdminHomeScreenMockup />
+      </Phone>
+      <Phone active="Schedule">
         <ScheduleScreen />
       </Phone>
       <Phone active="Requests">

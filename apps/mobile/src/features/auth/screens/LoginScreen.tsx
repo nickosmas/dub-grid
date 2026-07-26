@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { ApiResponseError } from "@dubgrid/api-client";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
@@ -17,9 +17,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { AppSplashScreen } from "../../../shared/components/AppSplashScreen";
 import { Button } from "../../../shared/components/Button";
 import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
-import { LoadingScreen } from "../../../shared/components/LoadingScreen";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
 import {
   loginToOrganization,
@@ -29,11 +29,16 @@ import {
 } from "../../../shared/lib/api";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
-import { loadLastOrgSlug, saveLastOrgSlug } from "../../../shared/lib/session";
+import {
+  loadLastOrgSlug,
+  saveHasSeenOnboarding,
+  saveLastOrgSlug,
+} from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 type Stage = "organization" | "credentials" | "mfa";
 
@@ -64,6 +69,8 @@ function getOrgSuffixLabel(apiBaseUrl: string) {
 }
 
 function InlineError({ message }: { message: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View style={styles.errorRow}>
       <Ionicons color={mobileColors.dangerText} name="alert-circle" size={16} />
@@ -96,6 +103,8 @@ function withSessionHandoffTimeout<T>(promise: Promise<T>): Promise<T> {
 }
 
 export default function LoginScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { accessToken, isLoading } = useSessionState();
   const insets = useSafeAreaInsets();
   const emailInputRef = useRef<TextInput>(null);
@@ -152,12 +161,7 @@ export default function LoginScreen() {
   }, []);
 
   if (isLoading) {
-    return (
-      <LoadingScreen
-        title="Checking your session"
-        body="Hang tight while we check if you're already signed in."
-      />
-    );
+    return <AppSplashScreen />;
   }
 
   if (accessToken) {
@@ -308,9 +312,27 @@ export default function LoginScreen() {
 
   const orgLabel = orgName ?? orgSlug;
 
+  // `__DEV__` is a Metro/RN global that isn't defined outside the app
+  // runtime (e.g. under vitest), so guard the lookup rather than reference
+  // it directly.
+  const isDevBuild = typeof __DEV__ !== "undefined" && __DEV__;
+
+  // Dev-only: long-press the wordmark to re-show onboarding after a local
+  // `db:reset`, since `hasSeenOnboarding` lives in device storage and a DB
+  // reset has no way to reach it.
+  async function handleDevResetOnboarding() {
+    if (!isDevBuild) return;
+    await saveHasSeenOnboarding(false);
+    pushToast({ title: "Onboarding reset", message: "Showing onboarding again.", tone: "info" });
+    router.replace("/(auth)/onboarding");
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.brandHeader}>
+      <Pressable
+        style={styles.brandHeader}
+        onLongPress={isDevBuild ? () => void handleDevResetOnboarding() : undefined}
+      >
         <Image
           accessibilityIgnoresInvertColors
           accessibilityLabel="DubGrid logo"
@@ -318,7 +340,7 @@ export default function LoginScreen() {
           style={styles.brandMark}
         />
         <DubGridWordmark fontSize={20} color={mobileColors.textPrimary} />
-      </View>
+      </Pressable>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardArea}
@@ -332,6 +354,7 @@ export default function LoginScreen() {
           ]}
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           <View style={styles.column}>
             {stage === "organization" ? (
@@ -593,164 +616,165 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: mobileColors.background,
-  },
-  keyboardArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    // `justifyContent: "center"` causes the centered column to re-center
-    // as the keyboard opens — the available height shrinks and content
-    // jumps upward. Pin to the top with a generous offset so the layout
-    // is stable on focus.
-    flexGrow: 1,
-    justifyContent: "flex-start",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 72,
-  },
-  column: {
-    width: "100%",
-    maxWidth: MAX_COLUMN_WIDTH,
-    gap: 36,
-  },
-  brandHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  brandMark: {
-    width: 28,
-    height: 28,
-  },
-  stage: {
-    gap: 24,
-  },
-  header: {
-    gap: 6,
-  },
-  title: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-    fontSize: 30,
-    lineHeight: 36,
-  },
-  subtitle: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  subtitleStrong: {
-    color: mobileColors.textPrimary,
-    fontWeight: "700",
-  },
-  fields: {
-    gap: 12,
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    minHeight: 54,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1.5,
-    borderColor: mobileColors.inputBorder,
-    backgroundColor: mobileColors.surface,
-  },
-  inputRowFocused: {
-    borderColor: mobileColors.inputBorderFocused,
-  },
-  inputRowError: {
-    borderColor: mobileColors.inputBorderError,
-  },
-  codeRow: {
-    minHeight: 62,
-  },
-  input: {
-    // No fontFamily: an explicit DM Sans family on TextInput breaks
-    // Android EditText interactivity when the font hasn't loaded yet.
-    // System font keeps the input safe; surrounding Text stays DM Sans.
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: "400",
-    color: mobileColors.textPrimary,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  inputFlex: {
-    flex: 1,
-  },
-  codeInput: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 26,
-    letterSpacing: 10,
-    fontWeight: "600",
-  },
-  suffix: {
-    alignSelf: "stretch",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-    borderLeftWidth: 1,
-    borderLeftColor: mobileColors.borderSubtle,
-  },
-  suffixText: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textMuted,
-  },
-  eyeButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-    alignSelf: "stretch",
-  },
-  actions: {
-    gap: 16,
-  },
-  link: {
-    alignSelf: "center",
-    minHeight: 36,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    justifyContent: "center",
-  },
-  linkText: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  linkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  linkSeparator: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  helperText: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    textAlign: "center",
-  },
-  helperStrong: {
-    ...mobileText.meta,
-    fontWeight: "700",
-    color: mobileColors.textPrimary,
-  },
-  errorRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    paddingHorizontal: 4,
-  },
-  errorText: {
-    ...mobileText.meta,
-    color: mobileColors.dangerText,
-    flex: 1,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: mobileColors.background,
+    },
+    keyboardArea: {
+      flex: 1,
+    },
+    scrollContent: {
+      // `justifyContent: "center"` causes the centered column to re-center
+      // as the keyboard opens — the available height shrinks and content
+      // jumps upward. Pin to the top with a generous offset so the layout
+      // is stable on focus.
+      flexGrow: 1,
+      justifyContent: "flex-start",
+      alignItems: "center",
+      paddingHorizontal: 24,
+      paddingTop: 72,
+    },
+    column: {
+      width: "100%",
+      maxWidth: MAX_COLUMN_WIDTH,
+      gap: 36,
+    },
+    brandHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingHorizontal: 24,
+      paddingTop: 8,
+      paddingBottom: 4,
+    },
+    brandMark: {
+      width: 28,
+      height: 28,
+    },
+    stage: {
+      gap: 24,
+    },
+    header: {
+      gap: 6,
+    },
+    title: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textPrimary,
+      fontSize: 30,
+      lineHeight: 36,
+    },
+    subtitle: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    subtitleStrong: {
+      color: mobileColors.textPrimary,
+      fontWeight: "700",
+    },
+    fields: {
+      gap: 12,
+    },
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      minHeight: 54,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1.5,
+      borderColor: mobileColors.inputBorder,
+      backgroundColor: mobileColors.surface,
+    },
+    inputRowFocused: {
+      borderColor: mobileColors.inputBorderFocused,
+    },
+    inputRowError: {
+      borderColor: mobileColors.inputBorderError,
+    },
+    codeRow: {
+      minHeight: 62,
+    },
+    input: {
+      // No fontFamily: an explicit DM Sans family on TextInput breaks
+      // Android EditText interactivity when the font hasn't loaded yet.
+      // System font keeps the input safe; surrounding Text stays DM Sans.
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: "400",
+      color: mobileColors.textPrimary,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    inputFlex: {
+      flex: 1,
+    },
+    codeInput: {
+      flex: 1,
+      textAlign: "center",
+      fontSize: 26,
+      letterSpacing: 10,
+      fontWeight: "600",
+    },
+    suffix: {
+      alignSelf: "stretch",
+      justifyContent: "center",
+      paddingHorizontal: 14,
+      borderLeftWidth: 1,
+      borderLeftColor: mobileColors.borderSubtle,
+    },
+    suffixText: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textMuted,
+    },
+    eyeButton: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 14,
+      alignSelf: "stretch",
+    },
+    actions: {
+      gap: 16,
+    },
+    link: {
+      alignSelf: "center",
+      minHeight: 36,
+      paddingVertical: 6,
+      paddingHorizontal: 4,
+      justifyContent: "center",
+    },
+    linkText: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    linkRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+    },
+    linkSeparator: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    helperText: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+    },
+    helperStrong: {
+      ...mobileText.meta,
+      fontWeight: "700",
+      color: mobileColors.textPrimary,
+    },
+    errorRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+      paddingHorizontal: 4,
+    },
+    errorText: {
+      ...mobileText.meta,
+      color: mobileColors.dangerText,
+      flex: 1,
+    },
+  });

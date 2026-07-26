@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { Redirect } from "expo-router";
 import { AppState } from "react-native";
-import { LoadingScreen } from "../../../shared/components/LoadingScreen";
+import { AppSplashScreen } from "../../../shared/components/AppSplashScreen";
 import { useBootstrap } from "./useBootstrap";
 import { OrganizationLockedScreen } from "../screens/OrganizationLockedScreen";
 import { usePushRegistration } from "../../notifications/hooks/usePushRegistration";
@@ -9,9 +9,20 @@ import { usePushResponseHandler } from "../../notifications/hooks/usePushRespons
 import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
 import { getOrgUnavailableMessage } from "../../../shared/lib/errors";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
+import { isManagementOnly, isOnSchedule } from "./employmentStatus";
 
 export type TabsGateResult =
-  { kind: "blocked"; element: ReactNode } | { kind: "ready"; canViewTeamSchedule: boolean };
+  | { kind: "blocked"; element: ReactNode }
+  | {
+      kind: "ready";
+      canViewTeamSchedule: boolean;
+      canViewRequestsTab: boolean;
+      canViewHomeTab: boolean;
+    };
+
+export function isAdminHomeRole(role: string | undefined): boolean {
+  return role === "admin" || role === "super_admin";
+}
 
 export function useTabsGate(): TabsGateResult {
   const { accessToken, isLoading } = useSessionState();
@@ -39,12 +50,7 @@ export function useTabsGate(): TabsGateResult {
   if (isLoading) {
     return {
       kind: "blocked",
-      element: (
-        <LoadingScreen
-          title="Loading your organization"
-          body="Getting your schedule and mobile tools ready."
-        />
-      ),
+      element: <AppSplashScreen />,
     };
   }
 
@@ -57,6 +63,7 @@ export function useTabsGate(): TabsGateResult {
       kind: "blocked",
       element: (
         <OrganizationLockedScreen
+          accessToken={accessToken}
           isRetrying={bootstrapQuery.isFetching}
           message={lockedMessage}
           onRetry={() => {
@@ -70,8 +77,21 @@ export function useTabsGate(): TabsGateResult {
     };
   }
 
+  const focusAreaIds = bootstrapQuery.data?.linkedEmployee?.focusAreaIds ?? [];
+  const departmentIds = bootstrapQuery.data?.linkedEmployee?.departmentIds ?? [];
+  // A management-only regular user (not admin/super_admin) has no personal
+  // schedule and no admin dashboard to show — the personal-schedule Home tab
+  // is irrelevant to them, so it's hidden and the Schedule (team) tab becomes
+  // their first tab instead.
+  const isManagementOnlyUser =
+    bootstrapQuery.data?.effectiveRole === "user" && isManagementOnly(focusAreaIds, departmentIds);
+
   return {
     kind: "ready",
     canViewTeamSchedule: bootstrapQuery.data?.permissions.canViewSchedule ?? false,
+    canViewRequestsTab:
+      isOnSchedule(focusAreaIds) ||
+      Boolean(bootstrapQuery.data?.permissions.canApproveShiftRequests),
+    canViewHomeTab: !isManagementOnlyUser,
   };
 }

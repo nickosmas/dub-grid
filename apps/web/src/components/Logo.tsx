@@ -27,7 +27,7 @@ export function DubGridLogo({ size = 48, color = "#2563EB" }: { size?: number; c
 
 export function DubGridWordmark({
   fontSize = 26,
-  color = "#111827",
+  color = "var(--color-text-primary)",
   className,
 }: {
   fontSize?: number;

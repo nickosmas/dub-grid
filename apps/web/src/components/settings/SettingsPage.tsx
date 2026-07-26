@@ -21,7 +21,6 @@ import {
   saveOrganizationRoles,
 } from "@/features/settings/client";
 import { toast } from "sonner";
-import ImpersonationPanel from "@/components/ImpersonationPanel";
 import {
   type SectionId,
   resolveSection,
@@ -300,7 +299,8 @@ export default function SettingsPage({
             certificationLabel={certificationLabel}
             onChange={onJobsChange}
             canManageScheduleDefinitions={canManageScheduleDefinitions}
-            shiftDisplayMode={organization.shiftDisplayMode}
+            organization={organization}
+            onOrganizationSave={onOrganizationSave}
           />
         )}
 
@@ -327,7 +327,7 @@ export default function SettingsPage({
             coverageRequirements={coverageRequirements}
             onCoverageRequirementsChange={onCoverageRequirementsChange}
             canEdit={canManageCoverageRequirements}
-            shiftDisplayMode={organization.shiftDisplayMode}
+            defaultShiftEnabled={organization.defaultShiftEnabled}
           />
         )}
 
@@ -417,10 +417,6 @@ export default function SettingsPage({
             canManageIndicatorTypes={canManageIndicatorTypes}
           />
         )}
-
-      {/* ── Platform group ──────────────────────────────────── */}
-
-      {activeSection === "platform-impersonation" && isGridmaster && <ImpersonationPanel />}
 
       {/* ── Danger Zone group ───────────────────────────────── */}
 

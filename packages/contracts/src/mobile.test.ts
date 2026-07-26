@@ -76,6 +76,24 @@ describe("mobile contracts", () => {
     });
   });
 
+  it("normalizes mobile schedule ranges the same regardless of server timezone", () => {
+    const originalTz = process.env.TZ;
+    try {
+      process.env.TZ = "Etc/GMT-3"; // UTC+3, e.g. Africa/Nairobi
+      expect(
+        normalizeMobileScheduleRange({
+          startDate: "2026-07-05",
+          endDate: "2026-07-11",
+        }),
+      ).toEqual({
+        startDate: "2026-07-05",
+        endDate: "2026-07-11",
+      });
+    } finally {
+      process.env.TZ = originalTz;
+    }
+  });
+
   it("accepts a valid organization lookup response", () => {
     const result = mobileOrganizationLookupResponseSchema.safeParse({
       organization: {
@@ -299,7 +317,7 @@ describe("mobile contracts", () => {
       },
     });
     const sessionsResult = mobileProfileSessionsResponseSchema.safeParse({
-      sessions: [
+      active: [
         {
           id: "44444444-4444-4444-8444-444444444444",
           platform: "ios",
@@ -309,8 +327,10 @@ describe("mobile contracts", () => {
           lastActiveAt: "2024-01-03T00:00:00.000Z",
           createdAt: "2024-01-01T00:00:00.000Z",
           refreshTokenHash: "hash",
+          isCurrent: true,
         },
       ],
+      stale: [],
     });
 
     expect(prefsResult.success).toBe(true);
@@ -612,6 +632,96 @@ describe("mobile contracts", () => {
 
     expect(result.success).toBe(true);
     expect(result.data?.linkedEmployee?.focusAreaIds).toEqual([]);
+    expect(result.data?.linkedEmployee?.departmentIds).toEqual([]);
+  });
+
+  it("parses a linked employee's departmentIds when present", () => {
+    const result = mobileBootstrapResponseSchema.safeParse({
+      user: {
+        id: "11111111-1111-4111-8111-111111111111",
+        email: "alex@example.com",
+        firstName: "Alex",
+        lastName: "North",
+      },
+      currentOrg: {
+        id: "22222222-2222-4222-8222-222222222222",
+        name: "Acme Care",
+        slug: "acme",
+        timezone: "America/Los_Angeles",
+        shiftDisplayMode: "code",
+        labels: {
+          focusArea: "Focus Areas",
+          certification: "Certifications",
+          role: "Roles",
+          department: "Departments",
+        },
+        featureFlags: {
+          disable_realtime: true,
+        },
+      },
+      memberships: [
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          name: "Acme Care",
+          slug: "acme",
+          orgRole: "admin",
+          platformRole: "none",
+          isCurrent: true,
+        },
+      ],
+      effectiveRole: "admin",
+      permissions: {
+        canViewSchedule: true,
+        canEditShifts: false,
+        canPublishSchedule: false,
+        canApplyRecurringSchedule: false,
+        canEditNotes: false,
+        canEditScheduleIndicators: false,
+        canViewRecurringShifts: false,
+        canManageRecurringShifts: false,
+        canManageShiftSeries: false,
+        canViewStaff: true,
+        canViewEmployeeDetails: true,
+        canManageEmployees: false,
+        canViewFocusAreas: false,
+        canManageFocusAreas: false,
+        canViewScheduleDefinitions: false,
+        canManageScheduleDefinitions: false,
+        canViewIndicatorTypes: false,
+        canManageIndicatorTypes: false,
+        canManageOrgSettings: false,
+        canViewOrgLabels: false,
+        canManageOrgLabels: false,
+        canViewCoverageRequirements: false,
+        canManageCoverageRequirements: false,
+        canApproveShiftRequests: true,
+        canViewDashboardAnalytics: true,
+      },
+      linkedEmployee: {
+        id: "33333333-3333-4333-8333-333333333333",
+        firstName: "Alex",
+        lastName: "North",
+        status: "active",
+        focusAreaIds: [],
+        departmentIds: [9],
+      },
+      absenceTypes: [
+        {
+          id: 1,
+          label: "Sick",
+        },
+      ],
+      focusAreas: [
+        {
+          id: 1,
+          name: "Emergency",
+        },
+      ],
+      unreadNotificationCount: 3,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data?.linkedEmployee?.departmentIds).toEqual([9]);
   });
 
   it("accepts notification types that mobile already receives pushes for but previously had no schema entry", () => {

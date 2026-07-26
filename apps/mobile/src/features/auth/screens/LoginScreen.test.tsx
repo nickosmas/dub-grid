@@ -413,7 +413,6 @@ describe("LoginScreen", () => {
         tone: "error",
         title: "Network connection issue",
         message: "Check your internet connection and try again.",
-        durationMs: null,
         dedupeKey: "network-connection-error",
       });
     });
@@ -479,7 +478,6 @@ describe("LoginScreen", () => {
       tone: "error",
       title: "Network connection issue",
       message: "Check your internet connection and try again.",
-      durationMs: null,
       dedupeKey: "network-connection-error",
     });
     expect(routerReplace).not.toHaveBeenCalled();

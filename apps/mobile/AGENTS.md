@@ -17,6 +17,12 @@ Feature code in `apps/mobile/src`.
 - Android: `npm --workspace @dubgrid/mobile run android`
 - Root mobile + contracts tests: `npm run test:mobile`
 
+`hasSeenOnboarding` is device-local storage (`shared/lib/session.ts`), not DB
+state — `npm run db:reset` never clears it. After a local reset, either
+long-press the wordmark on the login screen (`__DEV__`-only, routes back to
+onboarding) or run `npm run db:reset:mobile` from the repo root, which
+best-effort clears app storage on a booted Android emulator via `adb`.
+
 ## Directory Map
 
 ```
@@ -58,6 +64,15 @@ apps/mobile/
 - Android package: `com.dubgrid.mobile`
 - `app.json`, `metro.config.js`, `babel.config.js`, EAS/OTA settings, native build
   config, and Expo scheme are all high-risk. Explain changes before applying.
+
+## Deliberately Web-Only Feature Areas
+
+Reports, billing/subscription management, the Gridmaster portal, the
+permissions editor, and org-level settings panels (departments, jobs,
+absence types, schedule rules, coverage, activity log) have no mobile
+surface, front or backend, by design — these are admin/config-heavy
+workflows that reasonably stay desktop-only. Don't treat their absence as
+a gap to fill; confirm with the user before adding any of them to mobile.
 
 ## Platform Rules
 

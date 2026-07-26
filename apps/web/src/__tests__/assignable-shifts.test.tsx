@@ -435,12 +435,77 @@ describe("assignable shift resolution", () => {
         onSelect={vi.fn()}
         empFocusAreaIds={[1]}
         empRoleIds={[7]}
-        shiftDisplayMode="name"
       />,
     );
 
     expect(screen.getByRole("button", { name: "Day Shift" })).toBeInTheDocument();
     expect(screen.queryByText("Default shift job")).not.toBeInTheDocument();
+  });
+
+  it("excludes shift-only default-shift-job options when defaultShiftEnabled is false", () => {
+    const defaultShiftJob: JobDefinition = {
+      ...jobs[0]!,
+      id: 104,
+      name: "Default shift job",
+      abbr: "SHIFT",
+      showOnGrid: false,
+      eligibleRoleIds: [],
+      systemKey: DEFAULT_SHIFT_JOB_SYSTEM_KEY,
+    };
+    const generatedAssignments = buildScheduleAssignmentOptions({
+      orgId: "org-1",
+      focusAreas,
+      shiftCategories,
+      jobs: [defaultShiftJob],
+    });
+
+    const optionsWhenEnabled = buildAssignableShiftOptions({
+      assignments: generatedAssignments,
+      shiftCategories,
+      jobs: [defaultShiftJob],
+      focusAreas,
+      orgRoles,
+      employee: {
+        certificationId: null,
+        focusAreaIds: [1],
+        roleIds: [],
+      },
+      shiftDisplayMode: "name",
+      defaultShiftEnabled: true,
+    });
+    expect(optionsWhenEnabled).toHaveLength(1);
+
+    const optionsWhenDisabled = buildAssignableShiftOptions({
+      assignments: generatedAssignments,
+      shiftCategories,
+      jobs: [defaultShiftJob],
+      focusAreas,
+      orgRoles,
+      employee: {
+        certificationId: null,
+        focusAreaIds: [1],
+        roleIds: [],
+      },
+      shiftDisplayMode: "name",
+      defaultShiftEnabled: false,
+    });
+    expect(optionsWhenDisabled).toEqual([]);
+
+    render(
+      <ShiftPicker
+        assignments={generatedAssignments}
+        shiftCategories={shiftCategories}
+        jobs={[defaultShiftJob]}
+        orgRoles={orgRoles}
+        focusAreas={focusAreas}
+        onSelect={vi.fn()}
+        empFocusAreaIds={[1]}
+        empRoleIds={[]}
+        defaultShiftEnabled={false}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Day Shift" })).not.toBeInTheDocument();
   });
 
   it("filters specialty jobs by combined role and certification eligibility", () => {
@@ -608,7 +673,6 @@ describe("ShiftPicker combined options", () => {
         empFocusAreaIds={[1]}
         empCertificationId={null}
         empRoleIds={[]}
-        shiftDisplayMode="code"
       />,
     );
 
@@ -632,7 +696,6 @@ describe("ShiftPicker combined options", () => {
         empFocusAreaIds={[1]}
         empCertificationId={null}
         empRoleIds={[]}
-        shiftDisplayMode="name"
       />,
     );
 
@@ -682,7 +745,6 @@ describe("ShiftPicker combined options", () => {
         empFocusAreaIds={[1]}
         empCertificationId={null}
         empRoleIds={[]}
-        shiftDisplayMode="name"
       />,
     );
 
@@ -722,7 +784,6 @@ describe("ShiftPicker combined options", () => {
         empFocusAreaIds={[1]}
         empCertificationId={2}
         empRoleIds={[7, 9]}
-        shiftDisplayMode="name"
       />,
     );
 

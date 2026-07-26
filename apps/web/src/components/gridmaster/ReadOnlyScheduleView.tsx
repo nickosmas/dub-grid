@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
+import { resolveShiftPillColors } from "@/lib/colors";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
 import { addDays, formatDateKey } from "@/lib/utils";
@@ -25,11 +27,29 @@ function formatDate(d: string) {
   });
 }
 
-function getAssignmentStyle(assignment: ShiftRow["assignmentDetails"][number]) {
+function getAssignmentStyle(
+  assignment: ShiftRow["assignmentDetails"][number],
+  isDarkTheme: boolean,
+) {
+  if (!assignment.color) {
+    return {
+      background: "var(--color-bg-secondary)",
+      borderColor: assignment.border ?? "var(--color-border)",
+      color: assignment.text ?? "var(--color-text-primary)",
+    };
+  }
+  const resolved = resolveShiftPillColors(
+    {
+      color: assignment.color,
+      text: assignment.text ?? "var(--color-text-primary)",
+      border: assignment.border ?? "var(--color-border)",
+    },
+    isDarkTheme,
+  );
   return {
-    background: assignment.color ?? "var(--color-bg-secondary)",
-    borderColor: assignment.border ?? "var(--color-border)",
-    color: assignment.text ?? "var(--color-text-primary)",
+    background: resolved.color,
+    borderColor: resolved.border,
+    color: resolved.text,
   };
 }
 
@@ -45,6 +65,8 @@ export default function ReadOnlyScheduleView({
   orgId: string;
   payPeriodStartDate: string | null;
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const [periodOffset, setPeriodOffset] = useState(0);
 
   const { startDate, endDate } = useMemo(() => {
@@ -199,7 +221,7 @@ export default function ReadOnlyScheduleView({
                                   fontSize: "var(--dg-fs-caption)",
                                   fontWeight: 700,
                                   border: "1px solid",
-                                  ...getAssignmentStyle(assignment),
+                                  ...getAssignmentStyle(assignment, isDarkTheme),
                                 }}
                               >
                                 {assignment.label}

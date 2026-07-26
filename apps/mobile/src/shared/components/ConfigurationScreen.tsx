@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import type { MobileEnvValidation } from "../lib/env";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenBottomPadding } from "./screen-layout";
 
 function getIssueTitle(key: string): string {
@@ -42,6 +44,8 @@ export function ConfigurationScreen({
 }: {
   validation: Extract<MobileEnvValidation, { status: "invalid" }>;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const insets = useSafeAreaInsets();
 
   return (
@@ -53,6 +57,7 @@ export function ConfigurationScreen({
             paddingBottom: getScreenBottomPadding("stack", insets.bottom),
           },
         ]}
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
           <Text style={styles.eyebrow}>DubGrid Mobile Setup</Text>
@@ -80,61 +85,62 @@ export function ConfigurationScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: mobileColors.background,
-  },
-  content: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 20,
-    paddingBottom: 20,
-    gap: 16,
-  },
-  card: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    padding: 18,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-  },
-  eyebrow: {
-    ...mobileText.label,
-    color: mobileColors.brand,
-    textTransform: "uppercase",
-  },
-  title: {
-    ...mobileText.heroMetric,
-    fontSize: 28,
-    lineHeight: 34,
-    color: mobileColors.textPrimary,
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  step: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.brand,
-  },
-  sectionTitle: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  issue: {
-    gap: 4,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-  },
-  issueKey: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textPrimary,
-  },
-  issueMessage: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: mobileColors.background,
+    },
+    content: {
+      flexGrow: 1,
+      justifyContent: "center",
+      padding: 20,
+      paddingBottom: 20,
+      gap: 16,
+    },
+    card: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      padding: 18,
+      gap: 12,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+    },
+    eyebrow: {
+      ...mobileText.label,
+      color: mobileColors.brand,
+      textTransform: "uppercase",
+    },
+    title: {
+      ...mobileText.heroMetric,
+      fontSize: 28,
+      lineHeight: 34,
+      color: mobileColors.textPrimary,
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    step: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.brand,
+    },
+    sectionTitle: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    issue: {
+      gap: 4,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+    },
+    issueKey: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textPrimary,
+    },
+    issueMessage: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+  });

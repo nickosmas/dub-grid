@@ -4,12 +4,12 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
-import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import { isCallerInactive, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { rowToEmployee } from "@/lib/db/mappers";
 import type { DbEmployee } from "@/lib/db/types";
-import { EMPLOYEE_COLS } from "@/lib/db/shared";
+import { EMPLOYEE_COLS, cacheDel, CacheKey } from "@/lib/db/shared";
 import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
 
     // ── Permission check ──────────────────────────────────────────────
     const serviceClient = getServiceClient();
-    const [{ data: membership }, { data: profile }] = await Promise.all([
+    const [{ data: membership }, { data: profile }, inactive] = await Promise.all([
       serviceClient
         .from("organization_memberships")
         .select("org_role, admin_permissions")
@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
         .eq("org_id", orgId)
         .maybeSingle(),
       serviceClient.from("profiles").select("platform_role").eq("id", user.id).single(),
+      isCallerInactive(serviceClient, user.id, orgId),
     ]);
 
     const isGridmaster = profile?.platform_role === "gridmaster";
@@ -107,11 +108,16 @@ export async function POST(req: NextRequest) {
     const isAdmin = membership?.org_role === "admin";
     const adminPerms = membership?.admin_permissions as Record<string, boolean> | null;
 
+    // Inactive employees keep their session but lose every manage capability —
+    // mirrors requireOrgPermissions / resolveMobileAuthContext. Gridmaster/super_admin
+    // bypass: those tiers aren't meant to be sidelined by a stale employees.status row.
     const hasPermission =
-      isGridmaster || isSuperAdmin || (isAdmin && adminPerms?.canManageEmployees === true);
+      isGridmaster ||
+      isSuperAdmin ||
+      (isAdmin && !inactive && adminPerms?.canManageEmployees === true);
 
     if (!hasPermission) {
-      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+      return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }
 
     const { data: currentRow, error: currentError } = await serviceClient
@@ -136,6 +142,37 @@ export async function POST(req: NextRequest) {
 
     if (currentEmployee.version !== expectedVersion) {
       return buildConflictResponse(currentEmployee);
+    }
+
+    // Removing staff already fully blocks login at the JWT hook regardless of
+    // org_role (see 002_functions_triggers.sql), so removing the org's only
+    // super_admin here would lock the org out just as surely as deleting their
+    // membership would — the same guard DELETE /api/organizations/access
+    // applies before letting a super_admin be removed.
+    if (action === "remove" && currentEmployee.userId) {
+      const { data: targetMembership } = await serviceClient
+        .from("organization_memberships")
+        .select("org_role")
+        .eq("user_id", currentEmployee.userId)
+        .eq("org_id", orgId)
+        .is("archived_at", null)
+        .maybeSingle();
+
+      if (targetMembership?.org_role === "super_admin") {
+        const { count } = await serviceClient
+          .from("organization_memberships")
+          .select("*", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .eq("org_role", "super_admin")
+          .is("archived_at", null);
+
+        if ((count ?? 0) <= 1) {
+          return NextResponse.json(
+            { error: "Cannot remove the only super admin. Transfer ownership first." },
+            { status: 400 },
+          );
+        }
+      }
     }
 
     const now = new Date().toISOString();
@@ -207,6 +244,50 @@ export async function POST(req: NextRequest) {
     }
 
     const updatedEmployee = rowToEmployee(updatedRow as DbEmployee);
+
+    // Remove/activate a linked user's org membership in lockstep with their
+    // employees.status, in the same request that already committed the status
+    // change — not as a second, separately-triggered client call — so the two
+    // can't diverge (e.g. the status update fails but access is revoked
+    // anyway, or status flips back to active while access stays revoked).
+    // Gated to gridmaster/super_admin — the same tier required by
+    // DELETE /api/organizations/access — so a plain admin with only
+    // canManageEmployees can't use Remove/Activate as a side door to change
+    // org access they aren't allowed to touch directly.
+    if (
+      (action === "remove" || action === "activate") &&
+      currentEmployee.userId &&
+      (isGridmaster || isSuperAdmin)
+    ) {
+      const { error: membershipError } =
+        action === "remove"
+          ? await serviceClient
+              .from("organization_memberships")
+              .update({ archived_at: now, archived_by: user.id })
+              .eq("user_id", currentEmployee.userId)
+              .eq("org_id", orgId)
+              .is("archived_at", null)
+          : await serviceClient
+              .from("organization_memberships")
+              .update({ archived_at: null, archived_by: null })
+              .eq("user_id", currentEmployee.userId)
+              .eq("org_id", orgId)
+              .not("archived_at", "is", null);
+
+      if (membershipError) {
+        logger.error(
+          { error: membershipError, orgId, empId, userId: currentEmployee.userId, action },
+          "Failed to sync organization membership with employee status change",
+        );
+      } else {
+        await cacheDel(
+          CacheKey.orgUsers(orgId),
+          CacheKey.orgDirectory(orgId),
+          CacheKey.employees(orgId),
+          CacheKey.allUsers(),
+        );
+      }
+    }
 
     const { error: auditError } = await serviceClient.from("audit_log").insert({
       org_id: orgId,

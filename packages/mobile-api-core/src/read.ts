@@ -272,6 +272,7 @@ export async function loadMobileBootstrapPayload(
           lastName: linkedEmployee.lastName,
           status: linkedEmployee.status,
           focusAreaIds: linkedEmployee.focusAreaIds,
+          departmentIds: linkedEmployee.departmentIds,
         }
       : null,
     absenceTypes,
@@ -318,6 +319,7 @@ export async function loadMobileMeSchedulePayload(
       lastName: linkedEmployee.lastName,
       status: linkedEmployee.status,
       focusAreaIds: linkedEmployee.focusAreaIds,
+      departmentIds: linkedEmployee.departmentIds,
     },
     range,
     entries,
@@ -382,13 +384,14 @@ export async function loadMobilePeoplePayload(
       // The caller already knows their own auth id; nulling it here just
       // breaks self-lookup. Other rows still get the link stripped so
       // view-only callers can't map employee → auth account.
+      // managementDepartmentIds stays: the app uses it to tell management
+      // users apart, since their full profile view is manager-only.
       const isSelf = mobilePerson.userId === auth.user.id;
       return {
         ...mobilePerson,
         contactNotes: "",
         deptAdminIds: [],
         departmentIds: [],
-        managementDepartmentIds: [],
         managementDeptAdminIds: [],
         pendingInvitation: null,
         roleIds: [],

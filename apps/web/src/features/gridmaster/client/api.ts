@@ -247,11 +247,30 @@ export function fetchGridmasterSecurity(): Promise<GridmasterSecuritySummary> {
   return requestGridmasterJson("/api/gridmaster/security");
 }
 
-export function fetchGridmasterSessions(): Promise<{
+export function fetchGridmasterSessions(options?: {
+  orgId?: string;
+  platform?: "web" | "ios" | "android" | "unknown";
+  limit?: number;
+  offset?: number;
+}): Promise<{
   sessions: GridmasterUserSession[];
   gridmasterSessions: GridmasterUserSession[];
 }> {
-  return requestGridmasterJson("/api/gridmaster/security/sessions");
+  const params = new URLSearchParams();
+  if (options?.orgId) {
+    params.set("orgId", options.orgId);
+  }
+  if (options?.platform) {
+    params.set("platform", options.platform);
+  }
+  if (typeof options?.limit === "number") {
+    params.set("limit", String(options.limit));
+  }
+  if (typeof options?.offset === "number") {
+    params.set("offset", String(options.offset));
+  }
+  const suffix = params.toString();
+  return requestGridmasterJson(`/api/gridmaster/security/sessions${suffix ? `?${suffix}` : ""}`);
 }
 
 export function fetchGridmasterBilling(): Promise<GridmasterBillingSummary> {

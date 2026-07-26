@@ -26,6 +26,7 @@ const defaultProps = {
   spanWeeks: 1 as const,
   activeFocusArea: null as number | null,
   staffSearch: "",
+  sortBy: "seniority" as const,
   focusAreas: defaultFocusAreas,
   onPrev: vi.fn(),
   onNext: vi.fn(),
@@ -33,6 +34,7 @@ const defaultProps = {
   onSpanChange: vi.fn(),
   onFocusAreaChange: vi.fn(),
   onStaffSearchChange: vi.fn(),
+  onSortByChange: vi.fn(),
 };
 
 beforeEach(() => {
@@ -71,6 +73,36 @@ describe("Toolbar — schedule mode rendering", () => {
   it("renders staff search input with placeholder Search staff…", () => {
     render(<Toolbar {...defaultProps} />);
     expect(screen.getByPlaceholderText("Search staff…")).toBeInTheDocument();
+  });
+});
+
+describe("Toolbar — Sort menu", () => {
+  it("opens a dropdown with Seniority and Alphabetical options", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: "Sort Staff" }));
+    expect(screen.getByRole("menuitem", { name: /Seniority/i })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Alphabetical/i })).toBeInTheDocument();
+  });
+
+  it("marks the active sort option with a checkmark", async () => {
+    const user = userEvent.setup();
+    render(<Toolbar {...defaultProps} sortBy="name" />);
+    await user.click(screen.getByRole("button", { name: "Sort Staff" }));
+    const seniorityItem = screen.getByRole("menuitem", { name: /Seniority/i });
+    const alphabeticalItem = screen.getByRole("menuitem", { name: /Alphabetical/i });
+    expect(alphabeticalItem.querySelector(".lucide-check")).toBeInTheDocument();
+    expect(seniorityItem.querySelector(".lucide-check")).not.toBeInTheDocument();
+  });
+
+  it("calls onSortByChange with the selected option and closes the menu", async () => {
+    const user = userEvent.setup();
+    const onSortByChange = vi.fn();
+    render(<Toolbar {...defaultProps} sortBy="seniority" onSortByChange={onSortByChange} />);
+    await user.click(screen.getByRole("button", { name: "Sort Staff" }));
+    await user.click(screen.getByRole("menuitem", { name: /Alphabetical/i }));
+    expect(onSortByChange).toHaveBeenCalledExactlyOnceWith("name");
+    expect(screen.queryByRole("menuitem", { name: /Alphabetical/i })).not.toBeInTheDocument();
   });
 });
 
@@ -324,20 +356,20 @@ describe("Toolbar — callbacks", () => {
 });
 
 describe("Toolbar — staff search", () => {
-  it("× clear button appears when staffSearch is non-empty", () => {
+  it("clear button appears when staffSearch is non-empty", () => {
     render(<Toolbar {...defaultProps} staffSearch="Alice" />);
-    expect(screen.getByRole("button", { name: "×" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear search" })).toBeInTheDocument();
   });
 
-  it("× clear button is absent when staffSearch is empty", () => {
+  it("clear button is absent when staffSearch is empty", () => {
     render(<Toolbar {...defaultProps} staffSearch="" />);
-    expect(screen.queryByRole("button", { name: "×" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear search" })).not.toBeInTheDocument();
   });
 
-  it("clicking × calls onStaffSearchChange with empty string", async () => {
+  it("clicking clear button calls onStaffSearchChange with empty string", async () => {
     const user = userEvent.setup();
     render(<Toolbar {...defaultProps} staffSearch="Alice" />);
-    await user.click(screen.getByRole("button", { name: "×" }));
+    await user.click(screen.getByRole("button", { name: "Clear search" }));
     expect(defaultProps.onStaffSearchChange).toHaveBeenCalledWith("");
   });
 

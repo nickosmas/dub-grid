@@ -79,13 +79,18 @@ export function AuthStateCard({
         (primaryCta.href ? (
           <Link
             href={primaryCta.href}
-            className="dg-auth-submit"
-            style={{ textDecoration: "none" }}
+            className="dg-btn dg-btn-primary dg-btn-lg"
+            style={{ width: "100%" }}
           >
             {primaryCta.label}
           </Link>
         ) : (
-          <button type="button" onClick={primaryCta.onClick} className="dg-auth-submit">
+          <button
+            type="button"
+            onClick={primaryCta.onClick}
+            className="dg-btn dg-btn-primary dg-btn-lg"
+            style={{ width: "100%" }}
+          >
             {primaryCta.label}
           </button>
         ))}

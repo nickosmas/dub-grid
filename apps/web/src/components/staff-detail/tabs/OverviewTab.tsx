@@ -8,7 +8,6 @@ import type {
   ShiftCategory,
   NamedItem,
   FocusArea,
-  ShiftDisplayMode,
   Invitation,
 } from "@/types";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
@@ -32,7 +31,6 @@ interface OverviewTabProps {
   orgRoles: NamedItem[];
   pendingInvite: Invitation | null;
   thisWeekHours: EmployeeHours | null;
-  shiftDisplayMode?: ShiftDisplayMode;
 }
 
 export function OverviewTab({
@@ -46,9 +44,7 @@ export function OverviewTab({
   orgRoles,
   pendingInvite,
   thisWeekHours,
-  shiftDisplayMode,
 }: OverviewTabProps) {
-  const isNameMode = shiftDisplayMode === "name";
   const hoursHistory = useMemo(
     () =>
       computeEmployeeHoursHistory(
@@ -161,7 +157,7 @@ export function OverviewTab({
             danger={overtimeSummary.weeksWithOT > 0}
           />
           <MetricCell
-            value={topCode ? (isNameMode ? topCode.name || topCode.label : topCode.label) : "—"}
+            value={topCode ? topCode.name || topCode.label : "—"}
             label={topCode ? `${topCode.percentage}% of shifts` : "Top Code"}
           />
         </div>
@@ -259,7 +255,7 @@ export function OverviewTab({
             <div>
               <div className="dg-card-title flex items-center gap-2">
                 <Layers className="h-4 w-4 text-[var(--color-text-muted)]" />
-                {isNameMode ? "Assignments" : "Assignment Labels"}
+                Assignments
               </div>
               <div className="dg-card-subtitle">
                 Most common shift and job patterns across recent schedule history.

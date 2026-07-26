@@ -57,16 +57,36 @@ export async function POST(req: NextRequest) {
     if (auth.claims.platform_role !== "gridmaster") {
       const hasAccess = await ensureViewerCanAccessOrg(parsed.data.orgId, auth.user.id);
       if (!hasAccess) {
-        return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+        return NextResponse.json({ error: API_ERRORS.NOT_ORG_MEMBER }, { status: 403 });
       }
     }
 
     const ids = Array.from(new Set(parsed.data.ids));
     const serviceClient = getServiceClient();
-    const { data: profiles, error: profileError } = await serviceClient
-      .from("profiles")
-      .select("id, first_name, last_name")
-      .in("id", ids);
+
+    // profiles is a global (not per-org) table, so scope the lookup to ids
+    // that are actually members of orgId first — otherwise any org member
+    // could submit arbitrary UUIDs and resolve names of users in other orgs.
+    const { data: memberships, error: membershipError } = await serviceClient
+      .from("organization_memberships")
+      .select("user_id")
+      .eq("org_id", parsed.data.orgId)
+      .in("user_id", ids)
+      .is("archived_at", null);
+
+    if (membershipError) {
+      throw membershipError;
+    }
+
+    const orgMemberIds = (memberships ?? []).map((row) => row.user_id as string);
+
+    const { data: profiles, error: profileError } =
+      orgMemberIds.length > 0
+        ? await serviceClient
+            .from("profiles")
+            .select("id, first_name, last_name")
+            .in("id", orgMemberIds)
+        : { data: [], error: null };
 
     if (profileError) {
       throw profileError;

@@ -23,15 +23,37 @@ import { GET } from "./route";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
 
+function makeSessionsBuilder(rows: Record<string, unknown>[]) {
+  let filtered = rows;
+  const builder: Record<string, unknown> = {
+    then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
+      Promise.resolve({ data: filtered, error: null }).then(resolve, reject),
+  };
+  builder.not = vi.fn(() => builder);
+  builder.order = vi.fn(() => builder);
+  builder.range = vi.fn(() => builder);
+  builder.gte = vi.fn((column: string, value: string) => {
+    filtered = filtered.filter((row) => String(row[column] ?? "") >= value);
+    return builder;
+  });
+  builder.eq = vi.fn((column: string, value: unknown) => {
+    filtered = filtered.filter((row) => row[column] === value);
+    return builder;
+  });
+  builder.is = vi.fn((column: string, value: unknown) => {
+    filtered = filtered.filter((row) => (row[column] ?? null) === value);
+    return builder;
+  });
+  builder.in = vi.fn((column: string, values: unknown[]) => {
+    filtered = filtered.filter((row) => values.includes(row[column]));
+    return builder;
+  });
+  return { select: vi.fn(() => builder) };
+}
+
 function makeServiceBuilder(table: string, rows: Record<string, unknown>[]) {
   if (table === "user_sessions") {
-    return {
-      select: vi.fn(() => ({
-        not: vi.fn(() => ({
-          order: vi.fn().mockResolvedValue({ data: rows, error: null }),
-        })),
-      })),
-    };
+    return makeSessionsBuilder(rows);
   }
   if (table === "organization_memberships") {
     return {

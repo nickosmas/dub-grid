@@ -2,17 +2,18 @@ import { describe, expect, it } from "vitest";
 import { getMobileRealtimeInvalidationKeys } from "../lib/mobile-realtime-invalidation";
 
 describe("getMobileRealtimeInvalidationKeys", () => {
-  it("refreshes bootstrap, profile, schedule, and requests for org settings changes", () => {
+  it("refreshes bootstrap, profile, schedule, requests, and the dashboard for org settings changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "organizations")).toEqual([
       ["mobile", "bootstrap", "token-1"],
       ["mobile", "profile", "token-1"],
       ["mobile", "schedule"],
       ["mobile", "requests"],
       ["mobile", "person", "token-1"],
+      ["mobile", "dashboard"],
     ]);
   });
 
-  it("refreshes people-facing caches for employee changes", () => {
+  it("refreshes people-facing caches and the dashboard for employee changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "employees")).toEqual([
       ["mobile", "bootstrap", "token-1"],
       ["mobile", "profile", "token-1"],
@@ -20,6 +21,8 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       ["mobile", "person", "token-1"],
       ["mobile", "schedule"],
       ["mobile", "requests"],
+      ["mobile", "dashboard"],
+      ["mobile", "shift-swap-options"],
     ]);
   });
 
@@ -30,11 +33,14 @@ describe("getMobileRealtimeInvalidationKeys", () => {
       ["mobile", "people", "token-1"],
       ["mobile", "person", "token-1"],
     ]);
+    // invitations also feeds the dashboard's activity feed (accepted
+    // invitations show up as "user_signup" activity items).
     expect(getMobileRealtimeInvalidationKeys("token-1", "invitations")).toEqual([
       ["mobile", "bootstrap", "token-1"],
       ["mobile", "profile", "token-1"],
       ["mobile", "people", "token-1"],
       ["mobile", "person", "token-1"],
+      ["mobile", "dashboard"],
     ]);
   });
 
@@ -47,16 +53,19 @@ describe("getMobileRealtimeInvalidationKeys", () => {
     ]);
   });
 
-  it("refreshes schedule and derived request availability for schedule cell changes", () => {
+  it("refreshes schedule, derived request availability, and the dashboard for schedule cell changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "schedule_cells")).toEqual([
       ["mobile", "schedule"],
       ["mobile", "requests"],
+      ["mobile", "dashboard"],
+      ["mobile", "shift-swap-options"],
     ]);
   });
 
   it("refreshes the profile-change-requests queue when a request row changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "profile_change_requests")).toEqual([
       ["mobile", "profile-change-requests"],
+      ["mobile", "profile", "change-requests", "token-1"],
     ]);
   });
 
@@ -68,16 +77,19 @@ describe("getMobileRealtimeInvalidationKeys", () => {
     ]);
   });
 
-  it("refreshes schedule + requests when recurring shifts change", () => {
+  it("refreshes schedule + requests + the dashboard when recurring shifts change", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "recurring_shifts")).toEqual([
       ["mobile", "schedule"],
       ["mobile", "requests"],
+      ["mobile", "dashboard"],
+      ["mobile", "shift-swap-options"],
     ]);
   });
 
-  it("refreshes schedule on publish history changes", () => {
+  it("refreshes schedule and the dashboard on publish history changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "publish_history")).toEqual([
       ["mobile", "schedule"],
+      ["mobile", "dashboard"],
     ]);
   });
 

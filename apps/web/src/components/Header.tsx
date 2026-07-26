@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import {
   DashboardIcon,
@@ -179,7 +180,7 @@ function HeaderBillingNotice({ orgId, compact = false }: { orgId: string; compac
         color: colors.text,
         fontSize: "var(--dg-fs-caption)",
         fontWeight: 800,
-        lineHeight: 1,
+        lineHeight: 1.3,
         textDecoration: "none",
         whiteSpace: "nowrap",
         overflow: "hidden",
@@ -246,7 +247,13 @@ export default function Header({ orgName }: HeaderProps) {
     isImpersonating,
     isUserViewActive,
     actualLevel,
+    isOnSchedule,
+    isManagementUser,
   } = usePermissions();
+  // Management-only, non-admin accounts (management department access, no
+  // scheduled focus area) only get Schedule + People — see DashboardPageContent
+  // for the matching redirect if they land on /dashboard directly.
+  const isManagementOnlyUser = role === "user" && isManagementUser && !isOnSchedule;
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
 
@@ -265,8 +272,24 @@ export default function Header({ orgName }: HeaderProps) {
             ? "settings"
             : "";
 
+  // Schedule owns the full viewport for grid space and always uses a flat
+  // 16px, not the wider clamp. Dashboard matches Schedule's padding rather
+  // than the wider Reports/Alerts clamp so the two calendar-style pages
+  // (and their in-page toolbars) share the same horizontal rhythm.
+  const isFlatPaddingRoute = pathname.startsWith("/schedule") || pathname.startsWith("/dashboard");
+
+  // Routes with their own collapsible sidebar (People/Settings/Profile all
+  // share the same `SettingsShell` or sidebar chrome) keep the logo centered
+  // over the collapsed icon rail (9px). Everywhere else, the logo aligns with
+  // that page's own content edge instead — see PageContainer's padding.
+  const hasSidebarChrome =
+    pathname.startsWith("/people") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/profile") ||
+    pathname.startsWith("/account");
+
   const visibleNavItems = NAV_ITEMS.filter((item) => {
-    if (item.id === "dashboard") return true;
+    if (item.id === "dashboard") return !isManagementOnlyUser;
     if (item.id === "schedule") return true;
     if (item.id === "people") return canViewStaff;
     if (item.id === "reports") {
@@ -279,6 +302,7 @@ export default function Header({ orgName }: HeaderProps) {
   });
 
   const { user: authUser } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -500,7 +524,15 @@ export default function Header({ orgName }: HeaderProps) {
       <div
         style={{
           background: "var(--color-surface)",
-          padding: isTablet ? "0 16px" : "0 24px",
+          // On pages with a collapsible sidebar (People/Settings/Profile),
+          // 9px centers the logo over the collapsed (icon-only) rail
+          // (--sidebar-width-icon is 3rem in components/ui/sidebar.tsx), so
+          // it stays aligned with it when the sidebar collapses. Schedule and
+          // Dashboard stay flat 16px to match their own toolbar padding.
+          // Everywhere else, the logo aligns with that page's own content
+          // edge, which uses the same clamp(16px, 3vw, 40px) as PageContainer.
+          paddingLeft: hasSidebarChrome ? 9 : isFlatPaddingRoute ? 16 : "clamp(16px, 3vw, 40px)",
+          paddingRight: 16,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -808,6 +840,47 @@ export default function Header({ orgName }: HeaderProps) {
                   </button>
                 </>
               )}
+              <div className="dg-menu-divider" />
+              <div style={{ padding: "6px 10px 4px" }}>
+                <div
+                  style={{
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    color: "var(--color-text-subtle)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                    marginBottom: 6,
+                  }}
+                >
+                  Theme
+                </div>
+                <div className="dg-segment" style={{ display: "flex" }}>
+                  <button
+                    type="button"
+                    className={`dg-segment-btn${theme === "light" ? " active" : ""}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setTheme("light")}
+                  >
+                    Light
+                  </button>
+                  <button
+                    type="button"
+                    className={`dg-segment-btn${theme === "dark" ? " active" : ""}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setTheme("dark")}
+                  >
+                    Dark
+                  </button>
+                  <button
+                    type="button"
+                    className={`dg-segment-btn${theme === "system" ? " active" : ""}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setTheme("system")}
+                  >
+                    System
+                  </button>
+                </div>
+              </div>
               <div className="dg-menu-divider" />
               <button
                 className="dg-menu-item dg-menu-item--danger"

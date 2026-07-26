@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import {
   Award,
@@ -14,15 +15,9 @@ import {
   UserCircle,
 } from "lucide-react";
 import type { Employee, FocusArea, NamedItem } from "@/types";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
-
-function hashCode(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
+import { getAvatarTone, borderColorFromText } from "@dubgrid/design-tokens";
 
 interface StaffReadOnlyDetailPanelProps {
   employee: Employee;
@@ -67,7 +62,8 @@ export function StaffReadOnlyDetailPanel({
   departmentLabel,
   onClose,
 }: StaffReadOnlyDetailPanelProps) {
-  const hue = hashCode(employee.id) % 360;
+  const { resolvedTheme } = useTheme();
+  const avatarTone = getAvatarTone(employee.id, resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
   const onCloseRef = useRef(onClose);
@@ -119,29 +115,16 @@ export function StaffReadOnlyDetailPanel({
         <div
           className="staff-detail-header"
           style={{
-            background: `linear-gradient(180deg, hsl(${hue}, 70%, 97%) 0%, var(--color-surface) 100%)`,
+            background: `linear-gradient(180deg, ${avatarTone.backgroundColor} 0%, var(--color-surface) 100%)`,
             borderBottom: "1px solid var(--color-border)",
           }}
         >
-          <button
-            className="staff-detail-close"
+          <CloseButton
+            size="md"
+            className="self-end"
             onClick={closePanel}
             aria-label="Close detail panel"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          />
 
           <div
             style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", paddingTop: 8 }}
@@ -151,16 +134,16 @@ export function StaffReadOnlyDetailPanel({
                 width: 56,
                 height: 56,
                 borderRadius: "50%",
-                background: `hsl(${hue}, 65%, 92%)`,
+                background: avatarTone.backgroundColor,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 18,
                 fontWeight: 800,
-                color: `hsl(${hue}, 60%, 35%)`,
+                color: avatarTone.textColor,
                 flexShrink: 0,
-                border: `2px solid hsl(${hue}, 55%, 82%)`,
-                boxShadow: `0 2px 8px hsla(${hue}, 60%, 50%, 0.15)`,
+                border: `2px solid ${avatarTone.borderColor}`,
+                boxShadow: `0 2px 8px ${borderColorFromText(avatarTone.textColor, 0.15)}`,
               }}
             >
               {initials}

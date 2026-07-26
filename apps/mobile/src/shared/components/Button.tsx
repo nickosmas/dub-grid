@@ -1,7 +1,9 @@
 import type { PropsWithChildren, ReactNode } from "react";
+import { useMemo } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { hapticSelection } from "../lib/haptics";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 export type ButtonTone =
   | "primary"
@@ -32,6 +34,8 @@ export function Button({
   loading?: boolean;
   onPress: () => void;
 }>) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const content = children ?? label;
   const isDisabled = disabled || loading;
   const spinnerColor =
@@ -102,97 +106,98 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
-  button: {
-    minHeight: 48,
-    borderRadius: mobileRadii.control,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    justifyContent: "center",
-  },
-  buttonCompact: {
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  buttonPressed: {
-    transform: [{ scale: 0.98 }],
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonPrimary: {
-    backgroundColor: mobileColors.brand,
-    borderColor: mobileColors.brand,
-  },
-  buttonSecondary: {
-    backgroundColor: mobileColors.brandSoft,
-    borderColor: mobileColors.brandBorder,
-  },
-  buttonNeutral: {
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-  },
-  buttonDanger: {
-    backgroundColor: mobileColors.dangerSoft,
-    borderColor: mobileColors.dangerBorder,
-  },
-  buttonDangerFilled: {
-    backgroundColor: mobileColors.danger,
-    borderColor: mobileColors.danger,
-  },
-  buttonWarningFilled: {
-    backgroundColor: mobileColors.warning,
-    borderColor: mobileColors.warning,
-  },
-  buttonSuccess: {
-    backgroundColor: mobileColors.successSoft,
-    borderColor: mobileColors.successBorder,
-  },
-  buttonLink: {
-    backgroundColor: "transparent",
-    borderColor: "transparent",
-  },
-  buttonGhost: {
-    backgroundColor: "transparent",
-    borderColor: "transparent",
-  },
-  content: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  leadingAccessory: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  label: {
-    ...mobileText.bodyStrong,
-  },
-  labelPrimary: {
-    color: mobileColors.textInverse,
-  },
-  labelSecondary: {
-    color: mobileColors.brand,
-  },
-  labelNeutral: {
-    color: mobileColors.textSecondary,
-  },
-  labelDanger: {
-    color: mobileColors.dangerText,
-  },
-  labelFilled: {
-    color: mobileColors.textInverse,
-  },
-  labelSuccess: {
-    color: mobileColors.successText,
-  },
-  labelLink: {
-    color: mobileColors.brand,
-  },
-  labelGhost: {
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    button: {
+      minHeight: 48,
+      borderRadius: mobileRadii.control,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderWidth: 1,
+      justifyContent: "center",
+    },
+    buttonCompact: {
+      minHeight: 44,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    buttonPressed: {
+      transform: [{ scale: 0.98 }],
+    },
+    buttonDisabled: {
+      opacity: 0.5,
+    },
+    buttonPrimary: {
+      backgroundColor: mobileColors.brand,
+      borderColor: mobileColors.brand,
+    },
+    buttonSecondary: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+    },
+    buttonNeutral: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+    },
+    buttonDanger: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+    },
+    buttonDangerFilled: {
+      backgroundColor: mobileColors.danger,
+      borderColor: mobileColors.danger,
+    },
+    buttonWarningFilled: {
+      backgroundColor: mobileColors.warning,
+      borderColor: mobileColors.warning,
+    },
+    buttonSuccess: {
+      backgroundColor: mobileColors.successSoft,
+      borderColor: mobileColors.successBorder,
+    },
+    buttonLink: {
+      backgroundColor: "transparent",
+      borderColor: "transparent",
+    },
+    buttonGhost: {
+      backgroundColor: "transparent",
+      borderColor: "transparent",
+    },
+    content: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    leadingAccessory: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    label: {
+      ...mobileText.bodyStrong,
+    },
+    labelPrimary: {
+      color: mobileColors.textInverse,
+    },
+    labelSecondary: {
+      color: mobileColors.brand,
+    },
+    labelNeutral: {
+      color: mobileColors.textSecondary,
+    },
+    labelDanger: {
+      color: mobileColors.dangerText,
+    },
+    labelFilled: {
+      color: mobileColors.textInverse,
+    },
+    labelSuccess: {
+      color: mobileColors.successText,
+    },
+    labelLink: {
+      color: mobileColors.brand,
+    },
+    labelGhost: {
+      color: mobileColors.textMuted,
+    },
+  });

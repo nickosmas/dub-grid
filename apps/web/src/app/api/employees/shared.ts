@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { createNameMismatchResponseBody } from "@/lib/account-linking";
 import { getServiceClient } from "@/lib/supabase-service";
+import { isCallerInactive } from "@/app/api/shared/permissions";
 import type { NameMismatchDetails } from "@/types";
 
 export type ServiceClient = ReturnType<typeof getServiceClient>;
@@ -30,20 +31,22 @@ export async function canManageEmployees(
   actorId: string,
   orgId: string,
 ): Promise<boolean> {
-  const [{ data: membership }, { data: profile }, { data: organization }] = await Promise.all([
-    serviceClient
-      .from("organization_memberships")
-      .select("org_role, admin_permissions")
-      .eq("user_id", actorId)
-      .eq("org_id", orgId)
-      .maybeSingle(),
-    serviceClient.from("profiles").select("platform_role").eq("id", actorId).single(),
-    serviceClient
-      .from("organizations")
-      .select("suspended_at, subscription_status, trial_ends_at")
-      .eq("id", orgId)
-      .maybeSingle(),
-  ]);
+  const [{ data: membership }, { data: profile }, { data: organization }, inactive] =
+    await Promise.all([
+      serviceClient
+        .from("organization_memberships")
+        .select("org_role, admin_permissions")
+        .eq("user_id", actorId)
+        .eq("org_id", orgId)
+        .maybeSingle(),
+      serviceClient.from("profiles").select("platform_role").eq("id", actorId).single(),
+      serviceClient
+        .from("organizations")
+        .select("suspended_at, subscription_status, trial_ends_at")
+        .eq("id", orgId)
+        .maybeSingle(),
+      isCallerInactive(serviceClient, actorId, orgId),
+    ]);
 
   const isGridmaster = profile?.platform_role === "gridmaster";
   const isSuperAdmin = membership?.org_role === "super_admin";
@@ -54,6 +57,13 @@ export async function canManageEmployees(
     trialEndsAt: organization?.trial_ends_at ?? null,
   });
   if (billingAccess.isLocked && !isGridmaster && !isSuperAdmin) {
+    return false;
+  }
+
+  // Inactive employees keep their session but lose every manage capability —
+  // mirrors requireOrgPermissions / resolveMobileAuthContext. Gridmaster/super_admin
+  // bypass: those tiers aren't meant to be sidelined by a stale employees.status row.
+  if (inactive && !isGridmaster && !isSuperAdmin) {
     return false;
   }
 

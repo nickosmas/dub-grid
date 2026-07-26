@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import type { OrganizationRole, PlatformRole } from "@dubgrid/domain";
 import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -24,6 +25,15 @@ const MEMBERSHIP_SELECT = "user_id, org_id, org_role, archived_at";
 const ORG_SELECT = "id, name, slug";
 const PROFILE_SELECT = "id, first_name, last_name";
 const RECENT_SESSION_WINDOW_MS = 30 * 86_400_000;
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
+
+const querySchema = z.object({
+  orgId: z.string().uuid().optional(),
+  platform: z.enum(["web", "ios", "android", "unknown"]).optional(),
+  limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
 
 export async function GET(req: NextRequest) {
   try {
@@ -32,8 +42,40 @@ export async function GET(req: NextRequest) {
       return auth.response;
     }
 
+    const parsed = querySchema.safeParse({
+      orgId: req.nextUrl.searchParams.get("orgId") ?? undefined,
+      platform: req.nextUrl.searchParams.get("platform") ?? undefined,
+      limit: req.nextUrl.searchParams.get("limit") ?? undefined,
+      offset: req.nextUrl.searchParams.get("offset") ?? undefined,
+    });
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+    }
+
+    const limit = parsed.data.limit ?? DEFAULT_PAGE_SIZE;
+    const offset = parsed.data.offset ?? 0;
+
     const requestClient = createRequestSupabaseClient(req);
     const serviceClient = getServiceClient();
+
+    let sessionsQuery = serviceClient
+      .from("user_sessions")
+      .select(SESSION_SELECT)
+      // Skip transient rows inserted by the JWT hook / switch_org before
+      // track-session fills in device + org. Matches the filter used by
+      // fetchUserSessions and fetchUserSessionsForUser.
+      .not("refresh_token_hash", "is", null)
+      .order("last_active_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (parsed.data.orgId) {
+      sessionsQuery = sessionsQuery.eq("org_id", parsed.data.orgId);
+    }
+    if (parsed.data.platform === "unknown") {
+      sessionsQuery = sessionsQuery.is("platform", null);
+    } else if (parsed.data.platform) {
+      sessionsQuery = sessionsQuery.eq("platform", parsed.data.platform);
+    }
 
     const [
       usersResult,
@@ -45,14 +87,7 @@ export async function GET(req: NextRequest) {
     ] = await Promise.all([
       requestClient.rpc("get_all_users_with_profiles"),
       requestClient.rpc("get_gridmaster_accounts"),
-      serviceClient
-        .from("user_sessions")
-        .select(SESSION_SELECT)
-        // Skip transient rows inserted by the JWT hook / switch_org before
-        // track-session fills in device + org. Matches the filter used by
-        // fetchUserSessions and fetchUserSessionsForUser.
-        .not("refresh_token_hash", "is", null)
-        .order("last_active_at", { ascending: false }),
+      sessionsQuery,
       serviceClient
         .from("organization_memberships")
         .select(MEMBERSHIP_SELECT)
@@ -74,19 +109,42 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const sessions = mapSessions({
-      sessions: (sessionsResult.data ?? []) as Row[],
+    // Platform-account sessions are few (a handful of gridmaster operators),
+    // so they're fetched separately and in full rather than paginated - the
+    // "Gridmaster sessions" panel should never look truncated.
+    const gridmasterUserIds = ((gridmasterAccountsResult.data ?? []) as Row[])
+      .map((row) => stringOrNull(row.id))
+      .filter((id): id is string => Boolean(id));
+
+    let gridmasterSessionRows: Row[] = [];
+    if (gridmasterUserIds.length > 0) {
+      const { data, error } = await serviceClient
+        .from("user_sessions")
+        .select(SESSION_SELECT)
+        .not("refresh_token_hash", "is", null)
+        .in("user_id", gridmasterUserIds)
+        .order("last_active_at", { ascending: false });
+      if (error) {
+        throw error;
+      }
+      gridmasterSessionRows = (data ?? []) as Row[];
+    }
+
+    const mapArgs = {
       users: (usersResult.data ?? []) as Row[],
       gridmasterAccounts: (gridmasterAccountsResult.data ?? []) as Row[],
       memberships: (membershipsResult.data ?? []) as Row[],
       organizations: (orgsResult.data ?? []) as Row[],
       profiles: (profilesResult.data ?? []) as Row[],
       now: new Date(),
-    });
+    };
+
+    const sessions = mapSessions({ sessions: (sessionsResult.data ?? []) as Row[], ...mapArgs });
+    const gridmasterSessions = mapSessions({ sessions: gridmasterSessionRows, ...mapArgs });
 
     return NextResponse.json({
       sessions: sessions.filter((session) => session.userPlatformRole !== "gridmaster"),
-      gridmasterSessions: sessions.filter((session) => session.userPlatformRole === "gridmaster"),
+      gridmasterSessions,
     });
   } catch (error) {
     console.error("gridmaster security sessions GET failed", error);

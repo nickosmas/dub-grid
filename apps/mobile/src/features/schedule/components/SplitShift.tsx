@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useMemo, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileScheduleEntrySegment } from "@dubgrid/contracts";
@@ -7,7 +7,8 @@ import {
   getSplitShiftBadgeLabel,
   getSplitShiftSegmentLabel,
 } from "../lib/schedule";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 
 type SplitShiftVariant = "compact" | "hero" | "detail" | "supporting";
 const SPLIT_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
@@ -23,6 +24,8 @@ export function SplitShiftBadge({
   inverse?: boolean;
   label?: string | null;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const label = customLabel ?? getSplitShiftBadgeLabel(count);
   if (!label) {
     return null;
@@ -78,6 +81,8 @@ export function SplitShiftSegmentList({
   suppressCountAccessibilityLabel?: boolean;
   variant: SplitShiftVariant;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   if (segments.length <= 1 && !showWhenSingle) {
     return null;
   }
@@ -247,6 +252,8 @@ function getHeroSegmentCaption(segment: MobileScheduleEntrySegment): string | nu
 }
 
 function SplitShiftDashedDivider({ inverse }: { inverse: boolean }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View
       pointerEvents="none"
@@ -266,184 +273,185 @@ function SplitShiftDashedDivider({ inverse }: { inverse: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
-  badge: {
-    alignSelf: "flex-start",
-    alignItems: "center",
-    backgroundColor: mobileColors.brandSoft,
-    borderColor: mobileColors.brandBorder,
-    borderRadius: mobileRadii.pill,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  badgeCompact: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  badgeInverse: {
-    backgroundColor: "rgba(255, 255, 255, 0.16)",
-    borderColor: "rgba(255, 255, 255, 0.28)",
-  },
-  badgeText: {
-    ...mobileText.badge,
-    color: mobileColors.brand,
-    textTransform: "none",
-  },
-  badgeTextCompact: {
-    fontSize: 11,
-  },
-  badgeTextInverse: {
-    color: mobileColors.textInverse,
-  },
-  segmentList: {
-    gap: 10,
-  },
-  segmentListHero: {
-    gap: 12,
-  },
-  segmentListDetail: {
-    gap: 12,
-  },
-  segmentBlock: {
-    gap: 5,
-  },
-  segmentBlockHero: {
-    gap: 6,
-    width: "100%",
-  },
-  segmentBlockDetail: {
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-  },
-  segmentBlockSupporting: {
-    gap: 4,
-  },
-  segmentDivider: {
-    borderTopColor: mobileColors.borderSubtle,
-    borderTopWidth: 1,
-    paddingTop: 10,
-  },
-  segmentDividerHero: {
-    borderTopColor: "rgba(255, 255, 255, 0.18)",
-    borderTopWidth: 1,
-    paddingTop: 12,
-  },
-  segmentDashedDivider: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  segmentDashedDividerSegment: {
-    flex: 1,
-    height: 1,
-    borderRadius: 999,
-    backgroundColor: mobileColors.borderSubtle,
-  },
-  segmentDashedDividerSegmentInverse: {
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
-  },
-  segmentHeroBody: {
-    width: "100%",
-    gap: 6,
-  },
-  segmentHeroMainRow: {
-    width: "100%",
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  segmentHeroCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 6,
-  },
-  segmentHeroTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  segmentHeroTitleText: {
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  segmentHeroMetaStack: {
-    flexShrink: 1,
-    maxWidth: "44%",
-    alignItems: "flex-end",
-    gap: 4,
-  },
-  segmentHeroMetaText: {
-    textAlign: "right",
-  },
-  segmentHeroPrimaryText: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  segmentHeroPrimaryTextInverse: {
-    color: mobileColors.textInverse,
-  },
-  segmentHeroCaptionText: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  segmentHeroCaptionTextInverse: {
-    color: "rgba(255, 255, 255, 0.82)",
-  },
-  segmentEyebrow: {
-    ...mobileText.micro,
-    color: mobileColors.brand,
-  },
-  segmentTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-  },
-  segmentTitleDetail: {
-    ...mobileText.sectionTitle,
-    fontWeight: "800",
-  },
-  segmentTitleHero: {
-    ...mobileText.sectionTitle,
-  },
-  segmentTitleInverse: {
-    color: mobileColors.textInverse,
-  },
-  segmentTitleSupporting: {
-    ...mobileText.meta,
-    color: mobileColors.textSecondary,
-    fontWeight: "700",
-  },
-  segmentMeta: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  segmentMetaHero: {
-    ...mobileText.body,
-  },
-  segmentMetaInverse: {
-    color: "rgba(255, 255, 255, 0.82)",
-  },
-  segmentTiming: {
-    ...mobileText.meta,
-    color: mobileColors.brand,
-    fontWeight: "700",
-  },
-  segmentTimingHero: {
-    ...mobileText.body,
-  },
-  segmentTimingInverse: {
-    color: mobileColors.textInverse,
-  },
-  segmentChipRow: {
-    alignItems: "flex-start",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    badge: {
+      alignSelf: "flex-start",
+      alignItems: "center",
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    badgeCompact: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    badgeInverse: {
+      backgroundColor: "rgba(255, 255, 255, 0.16)",
+      borderColor: "rgba(255, 255, 255, 0.28)",
+    },
+    badgeText: {
+      ...mobileText.badge,
+      color: mobileColors.brand,
+      textTransform: "none",
+    },
+    badgeTextCompact: {
+      fontSize: 11,
+    },
+    badgeTextInverse: {
+      color: mobileColors.textInverse,
+    },
+    segmentList: {
+      gap: 10,
+    },
+    segmentListHero: {
+      gap: 12,
+    },
+    segmentListDetail: {
+      gap: 12,
+    },
+    segmentBlock: {
+      gap: 5,
+    },
+    segmentBlockHero: {
+      gap: 6,
+      width: "100%",
+    },
+    segmentBlockDetail: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: 12,
+      borderWidth: 1,
+      padding: 12,
+    },
+    segmentBlockSupporting: {
+      gap: 4,
+    },
+    segmentDivider: {
+      borderTopColor: mobileColors.borderSubtle,
+      borderTopWidth: 1,
+      paddingTop: 10,
+    },
+    segmentDividerHero: {
+      borderTopColor: "rgba(255, 255, 255, 0.18)",
+      borderTopWidth: 1,
+      paddingTop: 12,
+    },
+    segmentDashedDivider: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    segmentDashedDividerSegment: {
+      flex: 1,
+      height: 1,
+      borderRadius: 999,
+      backgroundColor: mobileColors.borderSubtle,
+    },
+    segmentDashedDividerSegmentInverse: {
+      backgroundColor: "rgba(255, 255, 255, 0.18)",
+    },
+    segmentHeroBody: {
+      width: "100%",
+      gap: 6,
+    },
+    segmentHeroMainRow: {
+      width: "100%",
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    segmentHeroCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 6,
+    },
+    segmentHeroTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    segmentHeroTitleText: {
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    segmentHeroMetaStack: {
+      flexShrink: 1,
+      maxWidth: "44%",
+      alignItems: "flex-end",
+      gap: 4,
+    },
+    segmentHeroMetaText: {
+      textAlign: "right",
+    },
+    segmentHeroPrimaryText: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    segmentHeroPrimaryTextInverse: {
+      color: mobileColors.textInverse,
+    },
+    segmentHeroCaptionText: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    segmentHeroCaptionTextInverse: {
+      color: "rgba(255, 255, 255, 0.82)",
+    },
+    segmentEyebrow: {
+      ...mobileText.micro,
+      color: mobileColors.brand,
+    },
+    segmentTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    segmentTitleDetail: {
+      ...mobileText.sectionTitle,
+      fontWeight: "800",
+    },
+    segmentTitleHero: {
+      ...mobileText.sectionTitle,
+    },
+    segmentTitleInverse: {
+      color: mobileColors.textInverse,
+    },
+    segmentTitleSupporting: {
+      ...mobileText.meta,
+      color: mobileColors.textSecondary,
+      fontWeight: "700",
+    },
+    segmentMeta: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    segmentMetaHero: {
+      ...mobileText.body,
+    },
+    segmentMetaInverse: {
+      color: "rgba(255, 255, 255, 0.82)",
+    },
+    segmentTiming: {
+      ...mobileText.meta,
+      color: mobileColors.brand,
+      fontWeight: "700",
+    },
+    segmentTimingHero: {
+      ...mobileText.body,
+    },
+    segmentTimingInverse: {
+      color: mobileColors.textInverse,
+    },
+    segmentChipRow: {
+      alignItems: "flex-start",
+    },
+  });

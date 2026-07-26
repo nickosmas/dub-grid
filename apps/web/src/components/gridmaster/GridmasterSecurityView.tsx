@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import CustomSelect from "@/components/CustomSelect";
 import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
 import { fetchGridmasterSecurity, fetchGridmasterSessions } from "@/features/gridmaster/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { EmptyState } from "@/components/EmptyState";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
@@ -93,6 +94,37 @@ function formatRelative(value: string | null | undefined): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
   return formatDateTime(value);
+}
+
+function formatDateGroupLabel(value: string | null | undefined): string {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "Unknown date";
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86_400_000);
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function groupSessionsByDate(
+  sessions: GridmasterUserSession[],
+): { dateLabel: string; sessions: GridmasterUserSession[] }[] {
+  const groups: { dateLabel: string; sessions: GridmasterUserSession[] }[] = [];
+  for (const session of sessions) {
+    const dateLabel = formatDateGroupLabel(session.lastActiveAt);
+    const currentGroup = groups[groups.length - 1];
+    if (currentGroup && currentGroup.dateLabel === dateLabel) {
+      currentGroup.sessions.push(session);
+    } else {
+      groups.push({ dateLabel, sessions: [session] });
+    }
+  }
+  return groups;
 }
 
 function statusBadge(status: GridmasterUserSession["status"]) {
@@ -184,30 +216,13 @@ function SessionDetailPanel({
   onClose: () => void;
 }) {
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Session details"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 80,
-        background: "rgba(15, 23, 42, 0.32)",
-        display: "flex",
-        justifyContent: "flex-end",
-      }}
-      onClick={onClose}
-    >
+    <>
+      <div className="staff-detail-overlay" onClick={onClose} />
       <div
-        style={{
-          width: "min(520px, 100%)",
-          height: "100%",
-          background: "var(--color-surface)",
-          boxShadow: "-16px 0 48px rgba(15, 23, 42, 0.18)",
-          display: "flex",
-          flexDirection: "column",
-        }}
-        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Session details"
+        className="staff-detail-pane"
       >
         <div
           style={{
@@ -238,9 +253,7 @@ function SessionDetailPanel({
               {session.userName ?? session.userEmail ?? "Unknown user"} / {sessionOrgLabel(session)}
             </div>
           </div>
-          <button type="button" onClick={onClose} className="dg-btn dg-btn-ghost dg-btn-sm">
-            Close
-          </button>
+          <CloseButton size="md" onClick={onClose} aria-label="Close session details" />
         </div>
         <div style={{ padding: "8px 20px 24px", overflowY: "auto" }}>
           <DetailRow label="Status" value={statusBadge(session.status)} />
@@ -264,7 +277,7 @@ function SessionDetailPanel({
           <DetailRow label="Created" value={formatDateTime(session.createdAt)} />
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -331,59 +344,87 @@ function SessionsTable({
             </tr>
           )}
           {!isLoading &&
-            sessions.map((session) => (
-              <tr
-                key={session.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Open session details for ${session.userEmail ?? "unknown user"}`}
-                onClick={() => onOpen(session)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onOpen(session);
-                  }
-                }}
-                style={{ cursor: "pointer" }}
-              >
-                <td style={tdStyle}>{statusBadge(session.status)}</td>
-                <td style={{ ...tdStyle, minWidth: 220 }}>
-                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>
-                    {session.userName ?? "Unknown user"}
-                  </div>
-                  <div
-                    style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}
-                  >
-                    {session.userEmail ?? "Unknown email"}
-                  </div>
-                </td>
-                <td style={{ ...tdStyle, minWidth: 180 }}>
-                  <div
+            groupSessionsByDate(sessions).map((group) => (
+              <Fragment key={`group-${group.dateLabel}-${group.sessions[0]?.id}`}>
+                <tr>
+                  <td
+                    colSpan={7}
                     style={{
-                      color:
-                        session.org || session.userPlatformRole === "gridmaster"
-                          ? "var(--color-text-primary)"
-                          : "var(--color-text-muted)",
+                      padding: "8px 12px",
+                      background: "var(--color-bg-secondary)",
+                      fontSize: "var(--dg-fs-footnote)",
+                      fontWeight: 800,
+                      color: "var(--color-text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
+                      borderTop: "1px solid var(--color-border-light)",
+                      borderBottom: "1px solid var(--color-border-light)",
                     }}
                   >
-                    {sessionOrgLabel(session)}
-                  </div>
-                </td>
-                <td style={{ ...tdStyle, minWidth: 190 }}>
-                  <div style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>
-                    {session.deviceLabel ?? "Unknown device"}
-                  </div>
-                  <div
-                    style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}
+                    {group.dateLabel}
+                  </td>
+                </tr>
+                {group.sessions.map((session) => (
+                  <tr
+                    key={session.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open session details for ${session.userEmail ?? "unknown user"}`}
+                    onClick={() => onOpen(session)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onOpen(session);
+                      }
+                    }}
+                    style={{ cursor: "pointer" }}
                   >
-                    {session.platform ?? "unknown"}
-                    {session.appVersion ? ` / ${session.appVersion}` : ""}
-                  </div>
-                </td>
-                <td style={tdStyle}>{session.ipAddress ?? "—"}</td>
-                <td style={tdStyle}>{formatRelative(session.lastActiveAt)}</td>
-                <td style={tdStyle}>{formatDateTime(session.createdAt)}</td>
-              </tr>
+                    <td style={tdStyle}>{statusBadge(session.status)}</td>
+                    <td style={{ ...tdStyle, minWidth: 220 }}>
+                      <div style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>
+                        {session.userName ?? "Unknown user"}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
+                        {session.userEmail ?? "Unknown email"}
+                      </div>
+                    </td>
+                    <td style={{ ...tdStyle, minWidth: 180 }}>
+                      <div
+                        style={{
+                          color:
+                            session.org || session.userPlatformRole === "gridmaster"
+                              ? "var(--color-text-primary)"
+                              : "var(--color-text-muted)",
+                        }}
+                      >
+                        {sessionOrgLabel(session)}
+                      </div>
+                    </td>
+                    <td style={{ ...tdStyle, minWidth: 190 }}>
+                      <div style={{ fontWeight: 700, color: "var(--color-text-primary)" }}>
+                        {session.deviceLabel ?? "Unknown device"}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
+                        {session.platform ?? "unknown"}
+                        {session.appVersion ? ` / ${session.appVersion}` : ""}
+                      </div>
+                    </td>
+                    <td style={tdStyle}>{session.ipAddress ?? "—"}</td>
+                    <td style={tdStyle}>{formatRelative(session.lastActiveAt)}</td>
+                    <td style={tdStyle}>{formatDateTime(session.createdAt)}</td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
         </tbody>
       </table>
@@ -391,15 +432,45 @@ function SessionsTable({
   );
 }
 
+const SESSIONS_PAGE_SIZE = 50;
+
 function GridmasterSessionsPanel({ organizations }: { organizations: Organization[] }) {
   const [search, setSearch] = useState("");
   const [orgFilter, setOrgFilter] = useState("all");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(0);
   const [selectedSession, setSelectedSession] = useState<GridmasterUserSession | null>(null);
+
+  function updateOrgFilter(value: string) {
+    setOrgFilter(value);
+    setPage(0);
+  }
+  function updatePlatformFilter(value: string) {
+    setPlatformFilter(value);
+    setPage(0);
+  }
+  function updateStatusFilter(value: string) {
+    setStatusFilter(value);
+    setPage(0);
+  }
+
   const sessionsQuery = useQuery({
-    queryKey: queryKeys.gridmaster.sessions(),
-    queryFn: fetchGridmasterSessions,
+    queryKey: queryKeys.gridmaster.sessions(
+      page,
+      SESSIONS_PAGE_SIZE,
+      `${orgFilter}:${platformFilter}`,
+    ),
+    queryFn: () =>
+      fetchGridmasterSessions({
+        orgId: orgFilter === "all" ? undefined : orgFilter,
+        platform:
+          platformFilter === "all"
+            ? undefined
+            : (platformFilter as "web" | "ios" | "android" | "unknown"),
+        limit: SESSIONS_PAGE_SIZE,
+        offset: page * SESSIONS_PAGE_SIZE,
+      }),
     staleTime: 30_000,
   });
   const sessions = sessionsQuery.data?.sessions ?? [];
@@ -409,23 +480,12 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
     () =>
       sessions.filter((session) => {
         if (!sessionMatchesSearch(session, normalizedSearch)) return false;
-        if (orgFilter !== "all" && session.org?.orgId !== orgFilter) {
-          return false;
-        }
-        if (platformFilter !== "all") {
-          if (platformFilter === "unknown" && session.platform !== null) {
-            return false;
-          }
-          if (platformFilter !== "unknown" && session.platform !== platformFilter) {
-            return false;
-          }
-        }
         if (statusFilter !== "all" && session.status !== statusFilter) {
           return false;
         }
         return true;
       }),
-    [sessions, normalizedSearch, orgFilter, platformFilter, statusFilter],
+    [sessions, normalizedSearch, statusFilter],
   );
 
   return (
@@ -458,7 +518,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
                 color: "var(--color-text-muted)",
               }}
             >
-              All tracked web and mobile session records.
+              All tracked web and mobile session records, newest first.
             </div>
           </div>
           <span
@@ -467,9 +527,12 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               fontSize: "var(--dg-fs-caption)",
               color: "var(--color-text-muted)",
               whiteSpace: "nowrap",
+              fontFamily: "var(--font-dm-mono), monospace",
             }}
           >
-            Showing {filteredSessions.length} of {sessions.length}
+            {sessions.length === 0
+              ? "0 sessions"
+              : `${page * SESSIONS_PAGE_SIZE + 1}–${page * SESSIONS_PAGE_SIZE + sessions.length}`}
           </span>
         </div>
 
@@ -502,7 +565,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               { value: "all", label: "All Organizations" },
               ...organizations.map((org) => ({ value: org.id, label: org.name })),
             ]}
-            onChange={setOrgFilter}
+            onChange={updateOrgFilter}
             style={{ width: "auto", minWidth: 170 }}
             fontSize={12}
           />
@@ -515,7 +578,7 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               { value: "android", label: "Android" },
               { value: "unknown", label: "Unknown" },
             ]}
-            onChange={setPlatformFilter}
+            onChange={updatePlatformFilter}
             style={{ width: "auto", minWidth: 140 }}
             fontSize={12}
           />
@@ -527,24 +590,38 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               { value: "recent", label: "Recent" },
               { value: "stale", label: "Stale" },
             ]}
-            onChange={setStatusFilter}
+            onChange={updateStatusFilter}
             style={{ width: "auto", minWidth: 130 }}
             fontSize={12}
           />
           <div style={{ flex: 1 }} />
-          <input
-            className="dg-input"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search sessions..."
-            aria-label="Search sessions"
-            style={{
-              flex: "1 1 220px",
-              maxWidth: 300,
-              minWidth: 180,
-              fontSize: "var(--dg-fs-caption)",
-            }}
-          />
+          <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 300, minWidth: 180 }}>
+            <input
+              className="dg-input"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search sessions..."
+              aria-label="Search sessions"
+              style={{
+                width: "100%",
+                paddingRight: search ? 30 : undefined,
+                fontSize: "var(--dg-fs-caption)",
+              }}
+            />
+            {search && (
+              <CloseButton
+                size="sm"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                }}
+              />
+            )}
+          </div>
         </div>
 
         <SessionsTable
@@ -553,6 +630,43 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
           emptyMessage="No user sessions match those filters"
           onOpen={setSelectedSession}
         />
+
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "12px 16px",
+            borderTop: "1px solid var(--color-border-light)",
+          }}
+        >
+          <button
+            type="button"
+            className="dg-btn dg-btn-secondary dg-btn-sm"
+            disabled={page === 0}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+          >
+            Previous
+          </button>
+          <span
+            style={{
+              fontSize: "var(--dg-fs-caption)",
+              color: "var(--color-text-muted)",
+              fontFamily: "var(--font-dm-mono), monospace",
+            }}
+          >
+            Page {page + 1}
+          </span>
+          <button
+            type="button"
+            className="dg-btn dg-btn-secondary dg-btn-sm"
+            disabled={sessions.length < SESSIONS_PAGE_SIZE}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </button>
+        </div>
       </div>
       <div style={{ ...sectionStyle, marginBottom: 24 }}>
         <div

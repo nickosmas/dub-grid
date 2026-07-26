@@ -112,6 +112,7 @@ vi.mock("@/lib/supabase-service", () => ({
             const query = {
               eq: vi.fn(() => query),
               is: vi.fn(() => query),
+              maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
               then: vi.fn((resolve, reject) =>
                 Promise.resolve({
                   data: setupRowsByTable[table],

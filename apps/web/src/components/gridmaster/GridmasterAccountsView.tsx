@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
+import Modal from "@/components/Modal";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { MaybeHint } from "@/components/ui/hint";
 import {
   demoteGridmasterAccount,
@@ -301,14 +303,28 @@ export default function GridmasterAccountsView({
         >
           Showing {filtered.length} of {accounts.length}
         </span>
-        <input
-          className="dg-input"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search..."
-          aria-label="Search gridmaster accounts"
-          style={{ maxWidth: 220, fontSize: "var(--dg-fs-caption)" }}
-        />
+        <div style={{ position: "relative", maxWidth: 220 }}>
+          <input
+            className="dg-input"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search..."
+            aria-label="Search gridmaster accounts"
+            style={{
+              width: "100%",
+              paddingRight: search ? 30 : undefined,
+              fontSize: "var(--dg-fs-caption)",
+            }}
+          />
+          {search && (
+            <CloseButton
+              size="sm"
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+              style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+            />
+          )}
+        </div>
       </form>
 
       {filtered.length > 0 ? (
@@ -526,99 +542,73 @@ export default function GridmasterAccountsView({
       )}
 
       {demoteTarget && (
-        <>
-          <div className="staff-detail-overlay" onClick={() => setDemoteTarget(null)} />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Demote gridmaster account"
+        <Modal
+          title="Demote Gridmaster"
+          onClose={() => setDemoteTarget(null)}
+          style={{ maxWidth: 460 }}
+        >
+          <p
             style={{
-              position: "fixed",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: "min(460px, calc(100vw - 32px))",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "var(--dg-radius-lg)",
-              boxShadow: "0 20px 60px rgba(15, 23, 42, 0.25)",
-              zIndex: 2000,
-              padding: 20,
+              margin: "0 0 16px",
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--color-text-muted)",
             }}
           >
-            <h3
+            Move {demoteTarget.email ?? "this account"} into an organization as a normal org user.
+          </p>
+          <div style={{ display: "grid", gap: 12 }}>
+            <label
               style={{
-                margin: "0 0 8px",
-                fontSize: "var(--dg-fs-body-sm)",
-                fontWeight: 700,
+                display: "grid",
+                gap: 6,
+                fontSize: "var(--dg-fs-label)",
+                fontWeight: 600,
                 color: "var(--color-text-primary)",
               }}
             >
-              Demote Gridmaster
-            </h3>
-            <p
+              Organization
+              <CustomSelect
+                value={demoteOrgId}
+                options={organizations.map((org) => ({ value: org.id, label: org.name }))}
+                onChange={setDemoteOrgId}
+                style={{ width: "100%" }}
+              />
+            </label>
+            <label
               style={{
-                margin: "0 0 16px",
+                display: "grid",
+                gap: 6,
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                fontWeight: 600,
+                color: "var(--color-text-primary)",
               }}
             >
-              Move {demoteTarget.email ?? "this account"} into an organization as a normal org user.
-            </p>
-            <div style={{ display: "grid", gap: 12 }}>
-              <label
-                style={{
-                  display: "grid",
-                  gap: 6,
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 600,
-                  color: "var(--color-text-primary)",
-                }}
-              >
-                Organization
-                <CustomSelect
-                  value={demoteOrgId}
-                  options={organizations.map((org) => ({ value: org.id, label: org.name }))}
-                  onChange={setDemoteOrgId}
-                  style={{ width: "100%" }}
-                />
-              </label>
-              <label
-                style={{
-                  display: "grid",
-                  gap: 6,
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 600,
-                  color: "var(--color-text-primary)",
-                }}
-              >
-                Organization Role
-                <CustomSelect
-                  value={demoteOrgRole}
-                  options={[
-                    { value: "user", label: "User" },
-                    { value: "admin", label: "Admin" },
-                    { value: "super_admin", label: "Super Admin" },
-                  ]}
-                  onChange={(value) => setDemoteOrgRole(value as AssignableOrganizationRole)}
-                  style={{ width: "100%" }}
-                />
-              </label>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-              <button className="dg-btn dg-btn-secondary" onClick={() => setDemoteTarget(null)}>
-                Cancel
-              </button>
-              <button
-                className="dg-btn dg-btn-danger"
-                onClick={handleDemote}
-                disabled={!demoteOrgId || actionLoading === demoteTarget.id}
-              >
-                {actionLoading === demoteTarget.id ? "Demoting..." : "Demote"}
-              </button>
-            </div>
+              Organization Role
+              <CustomSelect
+                value={demoteOrgRole}
+                options={[
+                  { value: "user", label: "User" },
+                  { value: "admin", label: "Admin" },
+                  { value: "super_admin", label: "Super Admin" },
+                ]}
+                onChange={(value) => setDemoteOrgRole(value as AssignableOrganizationRole)}
+                style={{ width: "100%" }}
+              />
+            </label>
           </div>
-        </>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
+            <button className="dg-btn dg-btn-secondary" onClick={() => setDemoteTarget(null)}>
+              Cancel
+            </button>
+            <button
+              className="dg-btn dg-btn-danger"
+              onClick={handleDemote}
+              disabled={!demoteOrgId || actionLoading === demoteTarget.id}
+            >
+              {actionLoading === demoteTarget.id ? "Demoting..." : "Demote"}
+            </button>
+          </div>
+        </Modal>
       )}
     </>
   );

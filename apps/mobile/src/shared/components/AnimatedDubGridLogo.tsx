@@ -16,7 +16,7 @@ import {
   BRAND_ANIMATED_LOGO_SIZE,
   generateAnimatedLogoTimings,
 } from "@dubgrid/design-tokens";
-import { mobileColors } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
 
 const ROWS = [0, 1, 2, 3] as const;
 const COLS = [0, 1, 2, 3] as const;
@@ -34,11 +34,13 @@ const COLS = [0, 1, 2, 3] as const;
  */
 export function AnimatedDubGridLogo({
   size = BRAND_ANIMATED_LOGO_SIZE,
-  color = mobileColors.brand,
+  color,
 }: {
   size?: number;
   color?: string;
 }) {
+  const mobileColors = useMobileColors();
+  const resolvedColor = color ?? mobileColors.brand;
   const reducedMotion = useReducedMotion();
   const timings = useMemo(() => generateAnimatedLogoTimings(), []);
   const cell = size / 4;
@@ -63,7 +65,7 @@ export function AnimatedDubGridLogo({
             width: inner,
             height: inner,
             borderRadius: radius,
-            backgroundColor: color,
+            backgroundColor: resolvedColor,
           };
 
           if (reducedMotion) {

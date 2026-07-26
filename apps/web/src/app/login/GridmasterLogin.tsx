@@ -134,7 +134,7 @@ export default function GridmasterLogin() {
 
   return (
     <PublicRoute>
-      <PageShell>
+      <PageShell signInDisclaimer>
         <Card>
           <a href={landingUrl} className="dg-auth-logo-block">
             <DubGridLogo size={52} />

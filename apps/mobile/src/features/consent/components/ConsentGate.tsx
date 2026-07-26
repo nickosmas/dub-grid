@@ -1,7 +1,8 @@
-import { useEffect, useState, type PropsWithChildren } from "react";
+import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { LEGAL_URLS, needsConsentDecision, setStoredConsent } from "../lib/consent";
 
 const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
@@ -12,6 +13,8 @@ const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
  * Shown again only when the stored choice predates the current consent version.
  */
 export function ConsentGate({ children }: PropsWithChildren) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   // null = still checking storage; once resolved we know whether to prompt.
   const [needsDecision, setNeedsDecision] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
@@ -84,47 +87,48 @@ export function ConsentGate({ children }: PropsWithChildren) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: mobileColors.overlay,
-  },
-  sheet: {
-    width: "100%",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: SHEET_BOTTOM_PADDING,
-    gap: 20,
-    shadowColor: mobileColors.textPrimary,
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
-    shadowRadius: 28,
-    elevation: 16,
-  },
-  copy: {
-    gap: 8,
-  },
-  title: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textSecondary,
-  },
-  link: {
-    ...mobileText.body,
-    color: mobileColors.brand,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  actions: {
-    gap: 10,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: mobileColors.overlay,
+    },
+    sheet: {
+      width: "100%",
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+      paddingHorizontal: 20,
+      paddingTop: 24,
+      paddingBottom: SHEET_BOTTOM_PADDING,
+      gap: 20,
+      shadowColor: mobileColors.textPrimary,
+      shadowOffset: { width: 0, height: -8 },
+      shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
+      shadowRadius: 28,
+      elevation: 16,
+    },
+    copy: {
+      gap: 8,
+    },
+    title: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textSecondary,
+    },
+    link: {
+      ...mobileText.body,
+      color: mobileColors.brand,
+      fontWeight: "600",
+      marginTop: 4,
+    },
+    actions: {
+      gap: 10,
+    },
+  });

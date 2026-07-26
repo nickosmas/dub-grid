@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { ComponentProps, ReactNode } from "react";
+import { useMemo, type ComponentProps, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -11,7 +11,8 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -63,6 +64,9 @@ export function ProfileHero({
   style?: StyleProp<ViewStyle>;
   children?: ReactNode;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={[styles.hero, style]}>
       <View style={styles.heroTop}>
@@ -105,6 +109,9 @@ export function ProfileHero({
 }
 
 export function ProfileHeroMeta({ label, value }: { label: string; value: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.heroMetaItem}>
       <Text style={styles.heroMetaLabel}>{label}</Text>
@@ -124,6 +131,9 @@ export function ProfileSection({
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={[styles.section, style]}>
       {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
@@ -140,6 +150,9 @@ export function ProfilePanel({
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return <View style={[styles.panel, style]}>{children}</View>;
 }
 
@@ -150,6 +163,9 @@ export function ProfileList({
   children: ReactNode;
   variant?: "framed" | "plain";
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return <View style={variant === "plain" ? styles.listPlain : styles.list}>{children}</View>;
 }
 
@@ -166,6 +182,9 @@ export function ProfileInfoRow({
   detail?: string;
   isLast?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={[styles.row, !isLast && styles.rowDivider]}>
       {iconName ? <ProfileIcon name={iconName} /> : null}
@@ -197,6 +216,9 @@ export function ProfileNavRow({
   isLast?: boolean;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -239,6 +261,8 @@ export function ProfileTextInput({
   containerStyle?: StyleProp<ViewStyle>;
   inputStyle?: StyleProp<TextStyle>;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { style: textInputStyle, ...resolvedInputProps } = inputProps;
 
   return (
@@ -280,7 +304,7 @@ export function ProfileTextInput({
   );
 }
 
-export function ProfileChoiceGroup({
+export function ProfileChoiceGroup<TId extends string | number>({
   label,
   items,
   selectedIds,
@@ -288,11 +312,14 @@ export function ProfileChoiceGroup({
   onToggle,
 }: {
   label: string;
-  items: Array<{ id: number; name: string; abbr?: string | null }>;
-  selectedIds: number[];
+  items: Array<{ id: TId; name: string; abbr?: string | null }>;
+  selectedIds: TId[];
   error?: string | null;
-  onToggle: (id: number) => void;
+  onToggle: (id: TId) => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.chipGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -331,6 +358,9 @@ export function ProfileIcon({
   name: IconName;
   tone?: "neutral" | "brand" | "danger" | "success";
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View
       style={[
@@ -357,300 +387,307 @@ export function ProfileIcon({
   );
 }
 
-export const profilePrimitiveStyles = StyleSheet.create({
-  actionsStack: {
-    gap: 10,
-  },
-  supportingText: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  subtleText: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-  },
-});
+const createProfilePrimitiveStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    actionsStack: {
+      gap: 10,
+    },
+    supportingText: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    subtleText: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+    },
+  });
 
-const styles = StyleSheet.create({
-  hero: {
-    gap: 14,
-    paddingTop: 4,
-  },
-  heroTop: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 14,
-  },
-  avatar: {
-    alignItems: "center",
-    backgroundColor: mobileColors.brand,
-    borderRadius: 32,
-    height: 64,
-    justifyContent: "center",
-    width: 64,
-  },
-  avatarText: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textInverse,
-  },
-  heroCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  heroTitleRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-    minWidth: 0,
-  },
-  heroTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  heroSubtitle: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  heroBadge: {
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: mobileColors.brandSoft,
-    borderColor: mobileColors.brandBorder,
-    borderRadius: mobileRadii.pill,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  heroBadgeText: {
-    ...mobileText.caption,
-    color: mobileColors.brand,
-    fontWeight: "600",
-  },
-  heroBadgeContrast: {
-    backgroundColor: mobileColors.textPrimary,
-    borderColor: mobileColors.textPrimary,
-  },
-  heroBadgeTextContrast: {
-    color: mobileColors.textInverse,
-  },
-  heroBadgeWarning: {
-    backgroundColor: mobileColors.warningSoft,
-    borderColor: mobileColors.warningBorder,
-  },
-  heroBadgeTextWarning: {
-    color: mobileColors.warningText,
-  },
-  heroDetail: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  heroMetaItem: {
-    flex: 1,
-    gap: 3,
-    minWidth: 120,
-  },
-  heroMetaLabel: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-  },
-  heroMetaValue: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  section: {
-    gap: 10,
-  },
-  sectionTitle: {
-    ...mobileText.label,
-    color: mobileColors.textSubtle,
-    fontWeight: "500",
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
-  sectionDescription: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    marginTop: -4,
-  },
-  panel: {
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    gap: 14,
-    padding: 16,
-  },
-  list: {
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    overflow: "hidden",
-  },
-  listPlain: {
-    gap: 0,
-  },
-  row: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    minHeight: 66,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  navRow: {
-    minHeight: 70,
-  },
-  rowPressed: {
-    opacity: 0.64,
-  },
-  rowDivider: {
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  rowCopy: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0,
-  },
-  rowLabel: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-  },
-  rowValue: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  rowDetail: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  navLabel: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  field: {
-    gap: 7,
-  },
-  fieldLabel: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-    fontWeight: "500",
-  },
-  input: {
-    // Explicit regular weight — don't spread a `mobileText.*` token that
-    // carries a bold `fontFamily`, since the named family overrides
-    // `fontWeight: "400"`. Omitting `fontFamily` also avoids the Android
-    // EditText non-interactive bug when DM Sans hasn't loaded.
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: "400",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    color: mobileColors.textPrimary,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  inputShell: {
-    alignItems: "center",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    flexDirection: "row",
-    minHeight: 48,
-  },
-  inputInShell: {
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    flex: 1,
-    minHeight: 46,
-    paddingRight: 8,
-  },
-  inputAccessory: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingRight: 6,
-  },
-  inputMultiline: {
-    minHeight: 96,
-    textAlignVertical: "top",
-  },
-  inputFocused: {
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.brand,
-  },
-  inputError: {
-    borderColor: mobileColors.dangerText,
-  },
-  errorText: {
-    ...mobileText.caption,
-    color: mobileColors.dangerText,
-  },
-  chipGroup: {
-    gap: 8,
-  },
-  chipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  chip: {
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  chipSelected: {
-    backgroundColor: mobileColors.brandSoft,
-    borderColor: mobileColors.brand,
-  },
-  chipPressed: {
-    opacity: 0.64,
-  },
-  chipText: {
-    ...mobileText.caption,
-    color: mobileColors.textSecondary,
-    fontWeight: "500",
-  },
-  chipTextSelected: {
-    color: mobileColors.brand,
-    fontWeight: "600",
-  },
-  iconBadge: {
-    alignItems: "center",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: 16,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: "center",
-    width: 32,
-  },
-  iconBadgeBrand: {
-    backgroundColor: mobileColors.brandSoft,
-    borderColor: mobileColors.brandBorder,
-  },
-  iconBadgeDanger: {
-    backgroundColor: mobileColors.dangerSoft,
-    borderColor: mobileColors.dangerBorder,
-  },
-  iconBadgeSuccess: {
-    backgroundColor: mobileColors.successSoft,
-    borderColor: mobileColors.successBorder,
-  },
-});
+export function useProfilePrimitiveStyles() {
+  const mobileColors = useMobileColors();
+  return useMemo(() => createProfilePrimitiveStyles(mobileColors), [mobileColors]);
+}
+
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    hero: {
+      gap: 14,
+      paddingTop: 4,
+    },
+    heroTop: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 14,
+    },
+    avatar: {
+      alignItems: "center",
+      backgroundColor: mobileColors.brand,
+      borderRadius: 32,
+      height: 64,
+      justifyContent: "center",
+      width: 64,
+    },
+    avatarText: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textInverse,
+    },
+    heroCopy: {
+      flex: 1,
+      gap: 3,
+      minWidth: 0,
+    },
+    heroTitleRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      minWidth: 0,
+    },
+    heroTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    heroSubtitle: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    heroBadge: {
+      alignItems: "center",
+      alignSelf: "flex-start",
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      flexDirection: "row",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    heroBadgeText: {
+      ...mobileText.caption,
+      color: mobileColors.brand,
+      fontWeight: "600",
+    },
+    heroBadgeContrast: {
+      backgroundColor: mobileColors.textPrimary,
+      borderColor: mobileColors.textPrimary,
+    },
+    heroBadgeTextContrast: {
+      color: mobileColors.textInverse,
+    },
+    heroBadgeWarning: {
+      backgroundColor: mobileColors.warningSoft,
+      borderColor: mobileColors.warningBorder,
+    },
+    heroBadgeTextWarning: {
+      color: mobileColors.warningText,
+    },
+    heroDetail: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    heroMetaItem: {
+      flex: 1,
+      gap: 3,
+      minWidth: 120,
+    },
+    heroMetaLabel: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
+    heroMetaValue: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    section: {
+      gap: 10,
+    },
+    sectionTitle: {
+      ...mobileText.label,
+      color: mobileColors.textSubtle,
+      fontWeight: "500",
+      letterSpacing: 0.4,
+      textTransform: "uppercase",
+    },
+    sectionDescription: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      marginTop: -4,
+    },
+    panel: {
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      gap: 14,
+      padding: 16,
+    },
+    list: {
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      overflow: "hidden",
+    },
+    listPlain: {
+      gap: 0,
+    },
+    row: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      minHeight: 66,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    navRow: {
+      minHeight: 70,
+    },
+    rowPressed: {
+      opacity: 0.64,
+    },
+    rowDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    rowCopy: {
+      flex: 1,
+      gap: 2,
+      minWidth: 0,
+    },
+    rowLabel: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
+    rowValue: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    rowDetail: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    navLabel: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    field: {
+      gap: 7,
+    },
+    fieldLabel: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+      fontWeight: "500",
+    },
+    input: {
+      // Explicit regular weight — don't spread a `mobileText.*` token that
+      // carries a bold `fontFamily`, since the named family overrides
+      // `fontWeight: "400"`. Omitting `fontFamily` also avoids the Android
+      // EditText non-interactive bug when DM Sans hasn't loaded.
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: "400",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      color: mobileColors.textPrimary,
+      minHeight: 48,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    inputShell: {
+      alignItems: "center",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      flexDirection: "row",
+      minHeight: 48,
+    },
+    inputInShell: {
+      backgroundColor: "transparent",
+      borderWidth: 0,
+      flex: 1,
+      minHeight: 46,
+      paddingRight: 8,
+    },
+    inputAccessory: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingRight: 6,
+    },
+    inputMultiline: {
+      minHeight: 96,
+      textAlignVertical: "top",
+    },
+    inputFocused: {
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.brand,
+    },
+    inputError: {
+      borderColor: mobileColors.dangerText,
+    },
+    errorText: {
+      ...mobileText.caption,
+      color: mobileColors.dangerText,
+    },
+    chipGroup: {
+      gap: 8,
+    },
+    chipRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    chip: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    chipSelected: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brand,
+    },
+    chipPressed: {
+      opacity: 0.64,
+    },
+    chipText: {
+      ...mobileText.caption,
+      color: mobileColors.textSecondary,
+      fontWeight: "500",
+    },
+    chipTextSelected: {
+      color: mobileColors.brand,
+      fontWeight: "600",
+    },
+    iconBadge: {
+      alignItems: "center",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: 16,
+      borderWidth: 1,
+      height: 32,
+      justifyContent: "center",
+      width: 32,
+    },
+    iconBadgeBrand: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+    },
+    iconBadgeDanger: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+    },
+    iconBadgeSuccess: {
+      backgroundColor: mobileColors.successSoft,
+      borderColor: mobileColors.successBorder,
+    },
+  });

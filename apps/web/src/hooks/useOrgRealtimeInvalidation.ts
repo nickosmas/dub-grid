@@ -2,13 +2,11 @@
 
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
+import { subscribeOrgScopedRealtime } from "@dubgrid/realtime-core";
 import * as Sentry from "@/lib/sentry";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  createBrowserRealtimeChannel,
-  removeBrowserRealtimeChannel,
-} from "@/features/account/client";
+import { getBrowserSupabaseClient } from "@/features/account/client";
 
 type OrgRealtimeTable =
   | "organizations"
@@ -33,7 +31,8 @@ type OrgRealtimeTable =
   | "invitations"
   | "recurring_shifts"
   | "publish_history"
-  | "audit_log";
+  | "audit_log"
+  | "role_change_log";
 
 const ORG_FILTER_TABLES: OrgRealtimeTable[] = [
   "focus_areas",
@@ -58,6 +57,7 @@ const ORG_FILTER_TABLES: OrgRealtimeTable[] = [
   "recurring_shifts",
   "publish_history",
   "audit_log",
+  "role_change_log",
 ];
 
 function uniqueKeys(keys: readonly (readonly unknown[])[]): readonly unknown[][] {
@@ -140,6 +140,7 @@ export function getOrgRealtimeInvalidationKeys(
         queryKeys.org.employeeCount(orgId),
         queryKeys.org.directory(orgId),
         queryKeys.shiftRequests.all(orgId),
+        queryKeys.reports.operationsAll(orgId),
       ]);
     case "organization_memberships":
       return uniqueKeys([queryKeys.org.users(orgId), queryKeys.org.directory(orgId)]);
@@ -148,7 +149,11 @@ export function getOrgRealtimeInvalidationKeys(
     case "schedule_cells":
     case "schedule_cell_snapshots":
     case "schedule_cell_segments":
-      return uniqueKeys([queryKeys.shifts.all(orgId), queryKeys.shiftRequests.all(orgId)]);
+      return uniqueKeys([
+        queryKeys.shifts.all(orgId),
+        queryKeys.shiftRequests.all(orgId),
+        queryKeys.reports.operationsAll(orgId),
+      ]);
     case "schedule_notes":
       return uniqueKeys([queryKeys.shifts.all(orgId)]);
     case "profile_change_requests":
@@ -161,11 +166,21 @@ export function getOrgRealtimeInvalidationKeys(
         queryKeys.org.employeeCount(orgId),
       ]);
     case "recurring_shifts":
-      return uniqueKeys([queryKeys.recurringShifts.all(orgId), queryKeys.shifts.all(orgId)]);
+      return uniqueKeys([
+        queryKeys.recurringShifts.all(orgId),
+        queryKeys.shifts.all(orgId),
+        queryKeys.reports.operationsAll(orgId),
+      ]);
     case "publish_history":
-      return uniqueKeys([queryKeys.org.publishHistory(orgId), queryKeys.shifts.all(orgId)]);
+      return uniqueKeys([
+        queryKeys.org.publishHistory(orgId),
+        queryKeys.shifts.all(orgId),
+        queryKeys.reports.operationsAll(orgId),
+      ]);
     case "audit_log":
       return uniqueKeys([queryKeys.org.auditLog(orgId)]);
+    case "role_change_log":
+      return uniqueKeys([queryKeys.org.auditLog(orgId), queryKeys.org.roleHistory(orgId)]);
   }
 }
 
@@ -192,74 +207,32 @@ export function useOrgRealtimeInvalidation({
   useEffect(() => {
     if (!orgId || disabled) return;
 
-    let hadError = false;
-    const channelId = `org-freshness:${orgId}:${Date.now()}:${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const channel = createBrowserRealtimeChannel(channelId);
-
-    // Coalesce bursts: a bulk save (e.g. saving N departments) emits one
-    // postgres_changes event per row. Rather than running the full
-    // invalidation set N times — and broadcasting it to every other tab N
-    // times — accumulate the affected tables and flush once on a short
-    // debounce. Correctness is unchanged: each changed table is still
-    // invalidated, just once per burst.
-    const pendingTables = new Set<OrgRealtimeTable>();
-    let flushTimer: ReturnType<typeof setTimeout> | null = null;
-    const flush = () => {
-      flushTimer = null;
-      const tables = [...pendingTables];
-      pendingTables.clear();
-      for (const table of tables) {
-        invalidateOrgRealtimeQueries(queryClient, orgId, table);
-      }
-    };
-    const handleChange = (table: OrgRealtimeTable) => {
-      pendingTables.add(table);
-      if (flushTimer === null) {
-        flushTimer = setTimeout(flush, 150);
-      }
-    };
-
-    channel.on(
-      "postgres_changes" as "system",
-      {
-        event: "*",
-        schema: "public",
-        table: "organizations",
-        filter: `id=eq.${orgId}`,
-      } as Record<string, unknown>,
-      () => handleChange("organizations"),
-    );
-
-    for (const table of ORG_FILTER_TABLES) {
-      channel.on(
-        "postgres_changes" as "system",
-        {
-          event: "*",
-          schema: "public",
-          table,
-          filter: `org_id=eq.${orgId}`,
-        } as Record<string, unknown>,
-        () => handleChange(table),
-      );
-    }
-
-    channel.subscribe((status: string, err?: Error) => {
-      if (status === "SUBSCRIBED" && hadError) {
-        hadError = false;
+    return subscribeOrgScopedRealtime<OrgRealtimeTable>({
+      client: getBrowserSupabaseClient(),
+      orgId,
+      tables: ORG_FILTER_TABLES,
+      rowScopedTable: "organizations",
+      // Coalesce bursts: a bulk save (e.g. saving N departments) emits one
+      // postgres_changes event per row. Rather than running the full
+      // invalidation set N times — and broadcasting it to every other tab N
+      // times — accumulate the affected tables and flush once on a short
+      // debounce. Correctness is unchanged: each changed table is still
+      // invalidated, just once per burst.
+      debounceMs: 150,
+      channelNamePrefix: `org-freshness:${orgId}`,
+      onFlush: (tables) => {
+        for (const table of tables) {
+          invalidateOrgRealtimeQueries(queryClient, orgId, table);
+        }
+      },
+      onReconnectAfterError: () => {
         void queryClient.invalidateQueries({
           queryKey: queryKeys.org.bootstrapAll(),
         });
-      } else if (status === "CHANNEL_ERROR") {
-        hadError = true;
-        Sentry.captureException(err ?? new Error("org freshness channel error"));
-      }
+      },
+      onError: (error) => {
+        Sentry.captureException(error);
+      },
     });
-
-    return () => {
-      if (flushTimer !== null) clearTimeout(flushTimer);
-      void removeBrowserRealtimeChannel(channel);
-    };
   }, [disabled, orgId, queryClient]);
 }

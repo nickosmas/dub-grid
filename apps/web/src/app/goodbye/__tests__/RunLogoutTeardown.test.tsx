@@ -11,6 +11,15 @@ const mockGetChannels = vi.fn();
 const mockUntrackChannel = vi.fn();
 const mockRemoveChannel = vi.fn();
 const mockHistoryReplaceState = vi.fn();
+const mockToastInfo = vi.fn();
+const mockToastDismiss = vi.fn();
+
+vi.mock("sonner", () => ({
+  toast: {
+    info: (...args: unknown[]) => mockToastInfo(...args),
+    dismiss: (...args: unknown[]) => mockToastDismiss(...args),
+  },
+}));
 
 vi.mock("@/features/account/client", () => ({
   signOutFromBrowser: (...args: unknown[]) => mockSignOutFromBrowser(...args),
@@ -182,5 +191,43 @@ describe("RunLogoutTeardown", () => {
     unmount();
 
     expect(mockSignOutFromBrowser).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires a persistent inactivity toast when reason='inactivity'", async () => {
+    renderWithClient(<RunLogoutTeardown scope={null} reason="inactivity" />);
+
+    expect(mockToastInfo).toHaveBeenCalledWith(
+      "You were signed out after 30 minutes of inactivity.",
+      { duration: Infinity },
+    );
+  });
+
+  it("dismisses the inactivity toast when the user navigates away (e.g. clicks Sign back in)", async () => {
+    const toastId = "toast-1";
+    mockToastInfo.mockReturnValue(toastId);
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { unmount } = render(
+      <QueryClientProvider client={queryClient}>
+        <RunLogoutTeardown scope={null} reason="inactivity" />
+      </QueryClientProvider>,
+    );
+
+    expect(mockToastDismiss).not.toHaveBeenCalled();
+
+    // Navigating away (clicking "Sign back in" or any other in-app link)
+    // unmounts this component — the toast should go with it.
+    unmount();
+
+    expect(mockToastDismiss).toHaveBeenCalledWith(toastId);
+  });
+
+  it("omits the inactivity toast and links straight to /login when reason is absent", async () => {
+    renderWithClient(<RunLogoutTeardown scope={null} />);
+
+    expect(mockToastInfo).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: /sign back in/i })).toHaveAttribute("href", "/login");
   });
 });

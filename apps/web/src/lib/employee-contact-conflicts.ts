@@ -1,4 +1,4 @@
-export type EmployeeContactConflictField = "email" | "phone";
+export type EmployeeContactConflictField = "email" | "phone" | "name";
 
 export const EMPLOYEE_CONTACT_CONFLICT_CODE = "EMPLOYEE_CONTACT_CONFLICT";
 
@@ -43,6 +43,15 @@ export function getEmployeeContactConflict(error: unknown): EmployeeContactConfl
       error: "That phone number is already used by another person.",
       field: "phone",
       message: "That phone number is already used by another person.",
+    };
+  }
+
+  if (text.includes("employees_org_name_active_unique")) {
+    return {
+      code: EMPLOYEE_CONTACT_CONFLICT_CODE,
+      error: "An employee with that name already exists.",
+      field: "name",
+      message: "An employee with that name already exists.",
     };
   }
 

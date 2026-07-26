@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import * as Sentry from "@/lib/sentry";
@@ -26,8 +27,9 @@ interface RunLogoutTeardownProps {
   scope: LogoutScope | null;
   /**
    * Why the sign-out happened, from `?reason=` on the URL. When "inactivity",
-   * the "Sign back in" link carries `?error=inactivity_timeout` so the login
-   * page can surface a neutral explanatory toast.
+   * this page surfaces a persistent explanatory toast that stays up until the
+   * user dismisses it, clicks "Sign back in", or navigates elsewhere (any of
+   * which unmounts this component and clears the toast).
    */
   reason?: "inactivity" | null;
 }
@@ -50,12 +52,23 @@ interface RunLogoutTeardownProps {
  */
 export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownProps) {
   const queryClient = useQueryClient();
-  const signInHref = reason === "inactivity" ? "/login?error=inactivity_timeout" : "/login";
   // StrictMode + Turbopack dev double-mount guard. Without this we call
   // signOutFromBrowser twice and recreate the lock contention the redesign
   // exists to avoid.
   const ranRef = useRef(false);
   const [done, setDone] = useState(scope === null);
+
+  useEffect(() => {
+    if (reason !== "inactivity") return;
+    const id = toast.info("You were signed out after 30 minutes of inactivity.", {
+      duration: Infinity,
+    });
+    // Clear it the moment the user leaves /goodbye — clicking "Sign back in"
+    // or navigating anywhere else unmounts this component.
+    return () => {
+      toast.dismiss(id);
+    };
+  }, [reason]);
 
   useEffect(() => {
     if (ranRef.current) return;
@@ -100,17 +113,6 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
   // Keep the same label throughout — text-swapping from "Signing you out…"
   // to "Sign back in" reads as a flash. The disabled button shares the same
   // visual footprint as the Link so there's no layout shift either.
-  const primaryStyle = {
-    padding: "16px 36px",
-    width: "auto",
-    whiteSpace: "nowrap" as const,
-    display: "inline-flex" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    textDecoration: "none" as const,
-    fontSize: "var(--dg-fs-body)",
-  };
-
   return (
     <div
       style={{
@@ -120,17 +122,11 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
       }}
     >
       {done ? (
-        <Link href={signInHref} className="dg-auth-submit" style={primaryStyle}>
+        <Link href="/login" className="dg-btn dg-btn-primary dg-btn-lg">
           Sign back in
         </Link>
       ) : (
-        <button
-          type="button"
-          className="dg-auth-submit"
-          disabled
-          aria-busy="true"
-          style={primaryStyle}
-        >
+        <button type="button" className="dg-btn dg-btn-primary dg-btn-lg" disabled aria-busy="true">
           Sign back in
         </button>
       )}

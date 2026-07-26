@@ -15,6 +15,7 @@ import {
   buildPublishedDateSet,
   filterPublishedDates,
   getPublishedWindowState,
+  filterAndSortEmployees,
 } from "@/lib/schedule-logic";
 import {
   makeEmployee,
@@ -24,6 +25,45 @@ import {
   makeCoverageRequirement,
 } from "./factories";
 import { formatDateKey } from "@/lib/utils";
+
+// ── filterAndSortEmployees ───────────────────────────────────────────────────
+
+describe("filterAndSortEmployees", () => {
+  const bob = makeEmployee({ id: "bob", firstName: "Bob", lastName: "Zephyr", seniority: 3 });
+  const alice = makeEmployee({ id: "alice", firstName: "Alice", lastName: "Young", seniority: 1 });
+  const charlie = makeEmployee({
+    id: "charlie",
+    firstName: "Charlie",
+    lastName: "Xavier",
+    seniority: 2,
+  });
+  const employees = [bob, alice, charlie];
+
+  it("defaults to sorting by seniority (ascending) when sortBy is omitted", () => {
+    const result = filterAndSortEmployees(employees, null);
+    expect(result.map((e) => e.id)).toEqual(["alice", "charlie", "bob"]);
+  });
+
+  it("sorts by seniority (ascending) when sortBy is 'seniority'", () => {
+    const result = filterAndSortEmployees(employees, null, "seniority");
+    expect(result.map((e) => e.id)).toEqual(["alice", "charlie", "bob"]);
+  });
+
+  it("sorts alphabetically by first then last name when sortBy is 'name'", () => {
+    const result = filterAndSortEmployees(employees, null, "name");
+    expect(result.map((e) => e.id)).toEqual(["alice", "bob", "charlie"]);
+  });
+
+  it("still excludes employees with no focus areas and applies the focus-area filter under both sort modes", () => {
+    const noFocusArea = makeEmployee({ id: "no-focus", focusAreaIds: [] });
+    const otherFocusArea = makeEmployee({ id: "other-focus", focusAreaIds: [2] });
+    const inFocusArea = makeEmployee({ id: "in-focus", focusAreaIds: [1] });
+    const pool = [noFocusArea, otherFocusArea, inFocusArea];
+
+    expect(filterAndSortEmployees(pool, 1, "name").map((e) => e.id)).toEqual(["in-focus"]);
+    expect(filterAndSortEmployees(pool, 1, "seniority").map((e) => e.id)).toEqual(["in-focus"]);
+  });
+});
 
 // ── isEmployeeQualified ──────────────────────────────────────────────────────
 
