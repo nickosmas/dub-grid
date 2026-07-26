@@ -60,6 +60,12 @@ vi.mock("@supabase/ssr", () => ({
   }),
 }));
 
+// ── Mock @/lib/impersonation-server ─────────────────────────────────────────
+const mockVerifyImpersonationSession = vi.fn();
+vi.mock("@/lib/impersonation-server", () => ({
+  verifyImpersonationSession: (...args: unknown[]) => mockVerifyImpersonationSession(...args),
+}));
+
 // ── Mock @/lib/cache ────────────────────────────────────────────────────────
 // Pass-through mock: cacheThrough just calls the fetcher directly.
 vi.mock("@/lib/cache", () => ({
@@ -80,6 +86,8 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
   process.env.NEXT_PUBLIC_BASE_DOMAIN = "localhost";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+  mockVerifyImpersonationSession.mockResolvedValue(null);
   mockSupabaseFrom.mockImplementation((table: string) => ({
     select: vi.fn(() => ({
       eq: vi.fn(() => ({
@@ -649,6 +657,10 @@ describe("middleware: impersonation", () => {
       org_role: "user",
       sub: "gm-1",
     });
+    mockVerifyImpersonationSession.mockResolvedValue({
+      targetUserId: "u-2",
+      targetOrgId: "org-2",
+    });
     const impData = {
       sessionId: "s-1",
       targetUserId: "u-2",
@@ -670,6 +682,33 @@ describe("middleware: impersonation", () => {
     expect((res as { headers: Headers }).headers.get("x-dubgrid-role")).toBe("admin");
     expect((res as { headers: Headers }).headers.get("x-dubgrid-impersonating")).toBe("true");
     expect((res as { headers: Headers }).headers.get("x-dubgrid-org-id")).toBe("org-2");
+    expect(mockVerifyImpersonationSession).toHaveBeenCalledWith(expect.anything(), "s-1", "gm-1");
+  });
+
+  it("clears the cookie and does not override claims when the session isn't verified (forged or expired)", async () => {
+    mockSessionWithClaims({
+      platform_role: "gridmaster",
+      org_role: "user",
+      sub: "gm-1",
+    });
+    mockVerifyImpersonationSession.mockResolvedValue(null);
+    const impData = {
+      sessionId: "forged-session",
+      targetUserId: "u-2",
+      targetOrgId: "org-2",
+      targetOrgSlug: "acme",
+      targetOrgRole: "super_admin",
+      targetEmail: "test@example.com",
+      targetOrgName: "Acme",
+      justification: "debug",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    const rawCookie = `dubgrid-impersonation=${encodeURIComponent(JSON.stringify(impData))}`;
+    const req = makeNextRequest("http://localhost:3000/schedule", { rawCookie });
+    const res = await runMiddleware(req);
+    expect((res as { headers: Headers }).headers.get("x-dubgrid-impersonating")).not.toBe("true");
+    const cookieJar = (res as { cookies: { _jar: Record<string, unknown> } }).cookies._jar;
+    expect(cookieJar["dubgrid-impersonation"]).toBeDefined();
   });
 
   it("clears expired impersonation cookie", async () => {

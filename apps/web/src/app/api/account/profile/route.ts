@@ -5,7 +5,7 @@ import {
 } from "@/features/account/server";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { extractJwtClaims } from "@/features/permissions/shared";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
   buildStaffValidationErrorResponse,
@@ -35,8 +35,16 @@ export async function PATCH(req: NextRequest) {
     }
 
     const serviceClient = getServiceClient();
-    const { effectiveRole, orgId: claimOrgId } = extractJwtClaims(auth.session.access_token);
-    const targetOrgId = parsed.data.orgId ?? claimOrgId ?? null;
+    // auth.claims is already sandbox-rewritten by requireAuthenticatedUserWithClaims
+    // (org_id -> sandbox org, org_role -> "super_admin") — derive from it directly
+    // rather than re-decoding the raw access token, which would ignore sandbox mode.
+    const claimOrgId = typeof auth.claims.org_id === "string" ? auth.claims.org_id : null;
+    const claimOrgRole = (auth.claims.org_role as string) || "user";
+    const effectiveRole = auth.claims.platform_role === "gridmaster" ? "gridmaster" : claimOrgRole;
+    const requestedOrgId = parsed.data.orgId ?? claimOrgId;
+    const targetOrgId = requestedOrgId
+      ? await resolveEffectiveOrgId(req, auth.user.id, requestedOrgId)
+      : null;
     const canEditDirectly =
       effectiveRole === "gridmaster" ||
       (targetOrgId

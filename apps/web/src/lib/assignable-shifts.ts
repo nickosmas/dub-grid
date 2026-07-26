@@ -32,6 +32,7 @@ type BuildAssignableShiftOptionsInput = {
   certifications?: NamedItem[];
   employee?: EmployeeEligibilityInput | null;
   shiftDisplayMode?: ShiftDisplayMode;
+  defaultShiftEnabled?: boolean;
 };
 
 function createStableScheduleOptionId(
@@ -643,6 +644,7 @@ export function buildAssignableShiftOptions({
   certifications = [],
   employee,
   shiftDisplayMode = "code",
+  defaultShiftEnabled = true,
 }: BuildAssignableShiftOptionsInput): AssignableShiftOption[] {
   const resolvedAssignmentDefinitions = assignments ?? [];
   const shiftById = new Map(shiftCategories.map((shift) => [shift.id, shift]));
@@ -705,6 +707,10 @@ export function buildAssignableShiftOptions({
         ? (focusAreaNameById.get(focusAreaId) ?? assignment.name ?? assignment.label)
         : "General");
     const groupSortOrder = shift?.sortOrder ?? assignment.sortOrder;
+
+    if (!defaultShiftEnabled && displayParts.isShiftOnly && isDefaultShiftSystemJob(job)) {
+      continue;
+    }
 
     options.push({
       id: `shift-code:${assignment.id}`,

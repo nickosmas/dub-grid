@@ -1,5 +1,50 @@
-import type { CoverageGap, Employee, GridOpenShift, ShiftRequest } from "@/types";
+import type {
+  AssignmentDefinition,
+  CoverageGap,
+  Employee,
+  GridOpenShift,
+  JobDefinition,
+  NamedItem,
+  ShiftCategory,
+  ShiftRequest,
+} from "@/types";
 import { formatDateKey } from "@/lib/utils";
+import { isEmployeeQualifiedForAssignmentDefinition } from "@/lib/assignable-shifts";
+
+type EmployeeEligibilityInput = Pick<Employee, "certificationId" | "focusAreaIds" | "roleIds">;
+
+interface IsEmployeeEligibleForOpenShiftContext {
+  assignmentById: Map<number, AssignmentDefinition>;
+  shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
+  orgRoles?: NamedItem[];
+}
+
+/**
+ * Whether an employee is personally qualified (focus area + role + cert) for
+ * at least one of the given assignment definitions. Used to gate both open
+ * shift visibility (for plain staff) and claim-flow click routing (for
+ * scheduler/admin viewers who see every open shift but may not be personally
+ * eligible for a specific one).
+ */
+export function isEmployeeEligibleForOpenShift(
+  candidateAssignmentIds: number[],
+  employee: EmployeeEligibilityInput | null,
+  context: IsEmployeeEligibleForOpenShiftContext,
+): boolean {
+  if (!employee) return false;
+
+  return candidateAssignmentIds.some((assignmentId) => {
+    const assignment = context.assignmentById.get(assignmentId);
+    if (!assignment) return false;
+    return isEmployeeQualifiedForAssignmentDefinition(employee, {
+      assignment,
+      shiftCategories: context.shiftCategories,
+      jobs: context.jobs,
+      orgRoles: context.orgRoles,
+    });
+  });
+}
 
 interface SelectVisibleCoverageGapsInput {
   allCoverageGaps: CoverageGap[];

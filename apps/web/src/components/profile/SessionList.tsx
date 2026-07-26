@@ -25,6 +25,11 @@ interface UserSession {
   isCurrent: boolean;
 }
 
+interface SessionOverview {
+  active: UserSession[];
+  stale: UserSession[];
+}
+
 function parseDeviceLabel(
   label: string,
   platform: UserSession["platform"],
@@ -40,16 +45,8 @@ function parseDeviceLabel(
   return { icon: "desktop", label };
 }
 
-function formatRelative(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Active now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+function formatDateTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleString();
 }
 
 function extractSupabaseSessionId(accessToken: string): string | null {
@@ -66,6 +63,136 @@ function extractSupabaseSessionId(accessToken: string): string | null {
   }
 }
 
+function SessionRow({
+  session,
+  onRevoke,
+  revoking,
+  showRevoke,
+  muted,
+  isLast,
+}: {
+  session: UserSession;
+  onRevoke: (session: UserSession) => void;
+  revoking: boolean;
+  showRevoke: boolean;
+  muted: boolean;
+  isLast: boolean;
+}) {
+  const device = parseDeviceLabel(session.deviceLabel, session.platform);
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "11px 16px",
+        borderBottom: isLast ? "none" : "1px solid var(--color-border-light)",
+        opacity: muted ? 0.65 : 1,
+      }}
+    >
+      <div style={{ color: "var(--color-text-muted)", flexShrink: 0 }}>
+        {device.icon === "mobile" ? <Smartphone size={17} /> : <Monitor size={17} />}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: "var(--dg-fs-caption)",
+            fontWeight: muted ? 500 : 600,
+            color: "var(--color-text-primary)",
+          }}
+        >
+          {device.label}
+          {session.isCurrent && (
+            <span
+              style={{
+                fontSize: "var(--dg-fs-footnote)",
+                fontWeight: 700,
+                color: "var(--color-text-inverse)",
+                background: "var(--color-brand)",
+                padding: "1px 7px",
+                borderRadius: 999,
+                lineHeight: 1.5,
+              }}
+            >
+              Current
+            </span>
+          )}
+        </div>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--color-text-muted)",
+            marginTop: 2,
+          }}
+        >
+          Last active {formatDateTime(session.lastActiveAt)}
+        </div>
+        <div
+          style={{
+            fontSize: "var(--dg-fs-footnote)",
+            color: "var(--color-text-subtle)",
+            marginTop: 2,
+          }}
+        >
+          {session.ipAddress === "::1" ? "localhost" : (session.ipAddress ?? "Unknown IP")}
+        </div>
+      </div>
+      {showRevoke && (
+        <button
+          onClick={() => onRevoke(session)}
+          disabled={revoking}
+          className="dg-btn dg-btn-ghost dg-btn-xs"
+          style={{ color: "var(--color-danger)", flexShrink: 0 }}
+        >
+          <ButtonLoading loading={revoking} spinnerSize={14}>
+            Sign out
+          </ButtonLoading>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SectionHeading({ children, count }: { children: React.ReactNode; count: number }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "8px 16px",
+        background: "var(--color-bg-secondary)",
+        borderBottom: "1px solid var(--color-border-light)",
+      }}
+    >
+      <span
+        style={{
+          fontSize: "var(--dg-fs-footnote)",
+          fontWeight: 700,
+          color: "var(--color-text-subtle)",
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+        }}
+      >
+        {children}
+      </span>
+      <span
+        style={{
+          fontSize: "var(--dg-fs-footnote)",
+          fontWeight: 600,
+          color: "var(--color-text-subtle)",
+          fontFamily: "var(--font-dm-mono), monospace",
+        }}
+      >
+        {count}
+      </span>
+    </div>
+  );
+}
+
 export function SessionList() {
   const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
@@ -73,14 +200,14 @@ export function SessionList() {
 
   const sessionsQuery = useQuery({
     queryKey: user ? queryKeys.account.sessions(user.id) : ["account", "anon", "sessions"],
-    queryFn: async () => {
-      const rows = (await fetchAccountSessions()).sessions;
+    queryFn: async (): Promise<SessionOverview> => {
+      const { active, stale } = await fetchAccountSessions();
       const currentSession = await getBrowserAuthSession();
       const currentSupabaseSessionId = currentSession?.access_token
         ? extractSupabaseSessionId(currentSession.access_token)
         : null;
 
-      return rows.map<UserSession>((row) => ({
+      const toUserSession = (row: (typeof active)[number]): UserSession => ({
         id: row.id,
         supabaseSessionId: row.supabaseSessionId,
         platform: row.platform,
@@ -90,7 +217,12 @@ export function SessionList() {
         refreshTokenHash: row.refreshTokenHash,
         isCurrent:
           currentSupabaseSessionId != null && row.supabaseSessionId === currentSupabaseSessionId,
-      }));
+      });
+
+      return {
+        active: active.map(toUserSession),
+        stale: stale.map(toUserSession),
+      };
     },
     enabled: !authLoading && !!user,
   });
@@ -101,7 +233,8 @@ export function SessionList() {
     }
   }, [sessionsQuery.isError]);
 
-  const sessions = sessionsQuery.data ?? [];
+  const active = sessionsQuery.data?.active ?? [];
+  const stale = sessionsQuery.data?.stale ?? [];
   const loading = authLoading || sessionsQuery.isPending;
 
   const revokeMutation = useMutation({
@@ -109,8 +242,8 @@ export function SessionList() {
       revokeAccountSession(session.refreshTokenHash).then(() => session),
     onSuccess: (session) => {
       if (user) {
-        queryClient.setQueryData<UserSession[]>(queryKeys.account.sessions(user.id), (prev) =>
-          (prev ?? []).filter((s) => s.id !== session.id),
+        queryClient.setQueryData<SessionOverview>(queryKeys.account.sessions(user.id), (prev) =>
+          prev ? { ...prev, active: prev.active.filter((s) => s.id !== session.id) } : prev,
         );
       }
       toast.success("Session revoked");
@@ -129,104 +262,72 @@ export function SessionList() {
     revokeMutation.mutate(session);
   }
 
+  const emptyStateBoxStyle = {
+    padding: "24px 16px",
+    textAlign: "center" as const,
+    color: "var(--color-text-muted)",
+    fontSize: "var(--dg-fs-label)",
+    borderRadius: "var(--dg-radius-md)",
+    border: "1px solid var(--color-border-light)",
+    background: "var(--color-surface)",
+  };
+
   if (loading) {
-    return (
-      <div
-        style={{
-          padding: 24,
-          textAlign: "center",
-          color: "var(--color-text-muted)",
-          fontSize: "var(--dg-fs-label)",
-        }}
-      >
-        Loading sessions...
-      </div>
-    );
+    return <div style={emptyStateBoxStyle}>Loading sessions...</div>;
   }
 
-  if (sessions.length === 0) {
-    return (
-      <div
-        style={{
-          padding: "24px 16px",
-          textAlign: "center",
-          color: "var(--color-text-muted)",
-          fontSize: "var(--dg-fs-label)",
-        }}
-      >
-        No active sessions
-      </div>
-    );
+  if (active.length === 0 && stale.length === 0) {
+    return <div style={emptyStateBoxStyle}>No active sessions</div>;
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      {sessions.map((s) => {
-        const device = parseDeviceLabel(s.deviceLabel, s.platform);
-        return (
-          <div
-            key={s.id}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: "12px 16px",
-              background: s.isCurrent ? "var(--color-brand-bg)" : "transparent",
-              borderBottom: "1px solid var(--color-border-light)",
-            }}
-          >
-            <div style={{ color: "var(--color-text-muted)", flexShrink: 0 }}>
-              {device.icon === "mobile" ? <Smartphone size={18} /> : <Monitor size={18} />}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-caption)",
-                  fontWeight: 600,
-                  color: "var(--color-text-primary)",
-                }}
-              >
-                {device.label}
-                {s.isCurrent && (
-                  <span
-                    style={{
-                      marginLeft: 8,
-                      fontSize: "var(--dg-fs-footnote)",
-                      fontWeight: 700,
-                      color: "var(--color-brand)",
-                      background: "var(--color-brand-bg)",
-                      padding: "1px 6px",
-                      borderRadius: 4,
-                    }}
-                  >
-                    Current
-                  </span>
-                )}
-              </div>
-              <div
-                style={{
-                  fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-text-muted)",
-                  marginTop: 2,
-                }}
-              >
-                {s.ipAddress === "::1" ? "localhost" : (s.ipAddress ?? "Unknown IP")} &middot;{" "}
-                {formatRelative(s.lastActiveAt)}
-              </div>
-            </div>
-            <button
-              onClick={() => handleRevoke(s)}
-              disabled={revokingId === s.id}
-              className="dg-btn dg-btn-ghost dg-btn-xs"
-              style={{ color: "var(--color-danger)" }}
-            >
-              <ButtonLoading loading={revokingId === s.id} spinnerSize={14}>
-                Sign out
-              </ButtonLoading>
-            </button>
-          </div>
-        );
-      })}
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {active.length > 0 && (
+        <div
+          style={{
+            overflow: "hidden",
+            borderRadius: "var(--dg-radius-md)",
+            border: "1px solid var(--color-border-light)",
+            background: "var(--color-surface)",
+          }}
+        >
+          <SectionHeading count={active.length}>Active sessions</SectionHeading>
+          {active.map((session, index) => (
+            <SessionRow
+              key={session.id}
+              session={session}
+              onRevoke={handleRevoke}
+              revoking={revokingId === session.id}
+              showRevoke
+              muted={false}
+              isLast={index === active.length - 1}
+            />
+          ))}
+        </div>
+      )}
+      {stale.length > 0 && (
+        <div
+          style={{
+            overflow: "hidden",
+            borderRadius: "var(--dg-radius-md)",
+            border: "1px solid var(--color-border-light)",
+            background: "var(--color-surface)",
+          }}
+        >
+          <SectionHeading count={stale.length}>Stale sessions</SectionHeading>
+          {stale.map((session, index) => (
+            <SessionRow
+              key={session.id}
+              session={session}
+              onRevoke={handleRevoke}
+              revoking={false}
+              showRevoke={false}
+              muted
+              isLast={index === stale.length - 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

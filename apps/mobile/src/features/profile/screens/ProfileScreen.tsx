@@ -1,5 +1,5 @@
 import { router, Stack } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -38,8 +38,9 @@ import {
 import { getMobileQueryContentState, getQueryErrorMessage } from "../../../shared/lib/query-state";
 import { loadStoredPushDevice, saveLastOrgSlug } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
+import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -54,7 +55,7 @@ import {
   formatProfileStatus,
   formatProfileValue,
   getProfileInitials,
-  profilePrimitiveStyles,
+  useProfilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
 import { PendingRequestsCard } from "../components/PendingRequestsCard";
 
@@ -85,6 +86,10 @@ function formatDate(value: string | null): string {
 }
 
 export default function ProfileScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const profilePrimitiveStyles = useProfilePrimitiveStyles();
+  const { resolvedTheme } = useThemeMode();
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -146,10 +151,10 @@ export default function ProfileScreen() {
       .filter((value): value is string => Boolean(value)) ?? [];
   const memberships = bootstrapQuery.data?.memberships ?? [];
   const canSwitchOrganizations = memberships.length > 1;
-  const orgRoleBadge = getMobileOrgRoleBadge(profile?.effectiveRole);
+  const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, profile?.effectiveRole);
   const roleLabel = orgRoleBadge?.label ?? ROLE_LABELS[profile?.effectiveRole ?? ""] ?? "User";
   const avatarSeed = profile?.linkedEmployee?.id ?? profile?.user.id ?? "";
-  const avatarTone = avatarSeed ? getAvatarTone(avatarSeed) : null;
+  const avatarTone = avatarSeed ? getAvatarTone(avatarSeed, resolvedTheme === "dark") : null;
   const staffStatusLabel = formatProfileStatus(profile?.linkedEmployee?.status);
 
   async function handleLogout() {
@@ -276,7 +281,9 @@ export default function ProfileScreen() {
       onScroll={handleScroll}
       scrollEventThrottle={16}
     >
-      <Stack.Screen options={createDetailStackOptions(showCollapsedHeader ? displayName : "")} />
+      <Stack.Screen
+        options={createDetailStackOptions(mobileColors, showCollapsedHeader ? displayName : "")}
+      />
       {contentState.kind === "loading" ? (
         <View style={styles.loadingState}>
           <Text style={styles.loadingTitle}>Loading profile</Text>
@@ -330,7 +337,7 @@ export default function ProfileScreen() {
                   }
                 : undefined
             }
-            avatarTextStyle={avatarTone ? { color: avatarTone.color } : undefined}
+            avatarTextStyle={avatarTone ? { color: avatarTone.textColor } : undefined}
             badge={roleLabel}
             badgeTone={orgRoleBadge?.tone}
             initials={getProfileInitials(displayName)}
@@ -413,9 +420,14 @@ export default function ProfileScreen() {
               />
               <ProfileNavRow
                 iconName="shield-outline"
-                isLast
                 label="Privacy & data"
                 onPress={() => router.push("/(tabs)/profile/privacy")}
+              />
+              <ProfileNavRow
+                iconName="color-palette-outline"
+                isLast
+                label="Appearance"
+                onPress={() => router.push("/(tabs)/profile/appearance")}
               />
             </ProfileList>
           </ProfileSection>
@@ -535,6 +547,8 @@ function OrganizationOptionRow({
   isLast: boolean;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const disabled = membership.isCurrent || switching;
   const statusLabel = membership.isCurrent
     ? "Selected"
@@ -578,55 +592,56 @@ function OrganizationOptionRow({
   );
 }
 
-const styles = StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  orgOptionRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    minHeight: 70,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  orgOptionCurrent: {
-    backgroundColor: mobileColors.surfaceSecondary,
-  },
-  orgOptionPressed: {
-    opacity: 0.64,
-  },
-  orgOptionDivider: {
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  orgOptionIcon: {
-    alignItems: "center",
-    height: 32,
-    justifyContent: "center",
-    width: 32,
-  },
-  orgOptionCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  orgOptionName: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  orgOptionMeta: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  orgOptionStatus: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-    fontWeight: "500",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
+    },
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    orgOptionRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      minHeight: 70,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    orgOptionCurrent: {
+      backgroundColor: mobileColors.surfaceSecondary,
+    },
+    orgOptionPressed: {
+      opacity: 0.64,
+    },
+    orgOptionDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    orgOptionIcon: {
+      alignItems: "center",
+      height: 32,
+      justifyContent: "center",
+      width: 32,
+    },
+    orgOptionCopy: {
+      flex: 1,
+      gap: 3,
+      minWidth: 0,
+    },
+    orgOptionName: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    orgOptionMeta: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    orgOptionStatus: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+      fontWeight: "500",
+    },
+  });

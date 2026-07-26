@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import type {
   Department,
   FocusArea,
@@ -8,6 +9,7 @@ import type {
   JobEligibilityMode,
   JobShiftTimeOverride,
   NamedItem,
+  Organization,
   ShiftCategory,
   ShiftDisplayMode,
 } from "@/types";
@@ -17,16 +19,27 @@ import {
   upsertJobDefinition,
 } from "@/features/settings/client";
 import type { DependencyInfo } from "@/features/settings/client";
+import {
+  OrganizationSettingsConflictError,
+  updateOrganizationSettings,
+} from "@/features/organization/client";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { Switch } from "@/components/ui/switch";
 import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { PresetColorPicker, TimeInput12h, inputStyle, labelStyle } from "./shared";
-import { PREDEFINED_COLORS, TRANSPARENT_BORDER, borderColor, getPresetByBg } from "@/lib/colors";
+import {
+  PREDEFINED_COLORS,
+  TRANSPARENT_BORDER,
+  borderColor,
+  getPresetByBg,
+  toDarkPillColors,
+} from "@/lib/colors";
 import { calcTimeDuration, fmt12h } from "@/lib/utils";
 import { getQualificationSeniorityRank } from "@/lib/assignable-shifts";
 import {
@@ -299,7 +312,10 @@ function ShiftPreviewPill({
   mode?: ShiftDisplayMode;
   previewId?: string;
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const preset = getPresetByBg(bg);
+  const display = isDarkTheme ? toDarkPillColors(preset.bg) : preset;
   const isNameMode = mode === "name";
 
   return (
@@ -310,9 +326,9 @@ function ShiftPreviewPill({
         maxWidth: isNameMode ? 172 : undefined,
         padding: isNameMode ? "10px 14px" : "8px 10px",
         borderRadius: 10,
-        background: preset.bg,
-        border: `1px solid ${borderColor(preset.text)}`,
-        color: preset.text,
+        background: display.bg,
+        border: `1px solid ${borderColor(display.text)}`,
+        color: display.text,
         display: "inline-flex",
         flexDirection: "column",
         alignItems: "center",
@@ -339,7 +355,7 @@ function ShiftPreviewPill({
             : {
                 fontSize: "var(--dg-fs-title)",
                 fontWeight: 800,
-                lineHeight: 1,
+                lineHeight: 1.2,
                 maxWidth: "100%",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -612,12 +628,118 @@ function buildSectionHeaderText(section: JobSection): { title: string; descripti
   };
 }
 
+function DefaultShiftToggle({
+  organization,
+  onOrganizationSave,
+  disabled,
+}: {
+  organization: Organization;
+  onOrganizationSave: (o: Organization) => void;
+  disabled: boolean;
+}) {
+  const [enabled, setEnabled] = useState(organization.defaultShiftEnabled);
+  const [saving, setSaving] = useState(false);
+  const [pendingValue, setPendingValue] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    setEnabled(organization.defaultShiftEnabled);
+  }, [organization.defaultShiftEnabled]);
+
+  const handleConfirm = useCallback(async () => {
+    if (pendingValue === null) return;
+    const next = pendingValue;
+
+    if (!organization.updatedAt) {
+      toast.error("Organization data is out of date. Refresh and try again.");
+      setPendingValue(null);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const updated = await updateOrganizationSettings({
+        orgId: organization.id,
+        expectedUpdatedAt: organization.updatedAt,
+        defaultShiftEnabled: next,
+      });
+      setEnabled(next);
+      onOrganizationSave(updated);
+      toast.success(next ? "Shift-only assignments enabled" : "Shift-only assignments disabled");
+    } catch (err) {
+      if (err instanceof OrganizationSettingsConflictError) {
+        onOrganizationSave(err.latestOrganization);
+        setEnabled(err.latestOrganization.defaultShiftEnabled);
+        toast.error("This setting changed elsewhere. Review the latest value and try again.");
+      } else {
+        toast.error("Failed to update setting");
+      }
+    } finally {
+      setSaving(false);
+      setPendingValue(null);
+    }
+  }, [pendingValue, organization.id, organization.updatedAt, onOrganizationSave]);
+
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ textAlign: "right" }}>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-caption)",
+              fontWeight: 600,
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            Shift-only assignments
+          </div>
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+            Let staff be scheduled with just a shift, no job attached
+          </div>
+        </div>
+        <Switch
+          checked={enabled}
+          onChange={(next) => setPendingValue(next)}
+          disabled={disabled || saving}
+          ariaLabel="Shift-only assignments"
+        />
+      </div>
+      {pendingValue !== null ? (
+        <ConfirmDialog
+          title={
+            pendingValue ? "Enable shift-only assignments?" : "Disable shift-only assignments?"
+          }
+          message={
+            pendingValue ? (
+              <>
+                Staff can be scheduled with just a shift, no job attached. The{" "}
+                <strong>Default Shift Job</strong> appears in Jobs settings.
+              </>
+            ) : (
+              <>
+                Staff can no longer be scheduled with just a shift going forward, and the{" "}
+                <strong>Default Shift Job</strong> is hidden from Jobs settings. Shifts and coverage
+                requirements that already use it keep working as before.
+              </>
+            )
+          }
+          confirmLabel={pendingValue ? "Enable" : "Disable"}
+          variant={pendingValue ? "info" : "warning"}
+          isLoading={saving}
+          onConfirm={() => void handleConfirm()}
+          onCancel={() => setPendingValue(null)}
+        />
+      ) : null}
+    </>
+  );
+}
+
 function JobSectionCard({
   section,
   rows,
   canManageScheduleDefinitions,
   onAdd,
   hideAddButton = false,
+  headerAction,
   children,
 }: {
   section: JobSection;
@@ -625,6 +747,7 @@ function JobSectionCard({
   canManageScheduleDefinitions: boolean;
   onAdd: () => void;
   hideAddButton?: boolean;
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const header = buildSectionHeaderText(section);
@@ -643,28 +766,32 @@ function JobSectionCard({
           padding: "12px 16px",
           borderBottom: "1px solid var(--color-border-light)",
           display: "flex",
-          flexDirection: "column",
-          gap: 4,
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 16,
         }}
       >
-        <div
-          style={{
-            fontWeight: 700,
-            fontSize: "var(--dg-fs-label)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          {header.title}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--color-text-secondary)",
+            }}
+          >
+            {header.title}
+          </div>
+          <div
+            style={{
+              fontSize: "var(--dg-fs-caption)",
+              color: "var(--color-text-muted)",
+              lineHeight: 1.45,
+            }}
+          >
+            {header.description}
+          </div>
         </div>
-        <div
-          style={{
-            fontSize: "var(--dg-fs-caption)",
-            color: "var(--color-text-muted)",
-            lineHeight: 1.45,
-          }}
-        >
-          {header.description}
-        </div>
+        {headerAction ? <div style={{ flexShrink: 0 }}>{headerAction}</div> : null}
       </div>
 
       {rows.length > 0 ? (
@@ -721,7 +848,6 @@ function JobRow({
   onDeleted,
   canManageScheduleDefinitions,
   allJobs,
-  shiftDisplayMode,
   isLast,
 }: {
   job: JobDefinition & { isNew?: boolean };
@@ -738,7 +864,6 @@ function JobRow({
   onDeleted: (id: number) => void;
   canManageScheduleDefinitions: boolean;
   allJobs: Array<JobDefinition & { isNew?: boolean }>;
-  shiftDisplayMode: ShiftDisplayMode;
   isLast?: boolean;
 }) {
   const isMobile = useMediaQuery(MOBILE);
@@ -1296,10 +1421,10 @@ function JobRow({
                       primary={getJobPreviewLabel({
                         jobName: form.name,
                         jobAbbr: form.abbr,
-                        shiftDisplayMode,
+                        shiftDisplayMode: "name",
                       })}
                       bg={form.color}
-                      mode={shiftDisplayMode}
+                      mode="name"
                     />
                   </div>
                 </div>
@@ -1851,14 +1976,14 @@ function JobRow({
                     const previewPrimary = getShiftPreviewPrimaryLabel({
                       shiftName: shift.name,
                       shiftAbbr: shift.abbr,
-                      shiftDisplayMode,
+                      shiftDisplayMode: "name",
                     });
                     const previewSecondary = isDefaultShiftJob
                       ? null
                       : getJobPreviewLabel({
                           jobName: form.name,
                           jobAbbr: form.abbr,
-                          shiftDisplayMode,
+                          shiftDisplayMode: "name",
                         });
                     const resolvedTimes = resolveJobTimesForShift(
                       {
@@ -1918,7 +2043,7 @@ function JobRow({
                             primary={previewPrimary}
                             secondary={previewSecondary}
                             bg={resolvedColor}
-                            mode={shiftDisplayMode}
+                            mode="name"
                             previewId={String(shift.id)}
                           />
                         </div>
@@ -2358,7 +2483,8 @@ export default function JobsSettings({
   certificationLabel,
   onChange,
   canManageScheduleDefinitions,
-  shiftDisplayMode = "code",
+  organization,
+  onOrganizationSave,
 }: {
   jobs: JobDefinition[];
   orgId: string;
@@ -2371,10 +2497,12 @@ export default function JobsSettings({
   certificationLabel: string;
   onChange: (jobs: JobDefinition[]) => void;
   canManageScheduleDefinitions: boolean;
-  shiftDisplayMode?: ShiftDisplayMode;
+  organization?: Organization;
+  onOrganizationSave?: (o: Organization) => void;
 }) {
   const [local, setLocal] = useState<Array<JobDefinition & { isNew?: boolean }>>(jobs);
   const nextTmpId = useRef(-1);
+  const defaultShiftEnabled = organization?.defaultShiftEnabled ?? true;
 
   useEffect(() => {
     setLocal((previous) => {
@@ -2475,8 +2603,8 @@ export default function JobsSettings({
         compareJobsByQualificationSeniority(left, right, orgRoles, certifications),
       );
     const drafts = scheduled.filter((job) => job.isNew);
-    return [...defaultShiftRows, ...persisted, ...drafts];
-  }, [certifications, defaultShiftRows, orgRoles, visibleRows]);
+    return [...(defaultShiftEnabled ? defaultShiftRows : []), ...persisted, ...drafts];
+  }, [certifications, defaultShiftEnabled, defaultShiftRows, orgRoles, visibleRows]);
   const shiftlessRows = useMemo(() => {
     const shiftless = visibleRows.filter((job) => getJobSection(job) === "shiftless");
     const persisted = shiftless
@@ -2635,6 +2763,15 @@ export default function JobsSettings({
         rows={scheduledRows}
         canManageScheduleDefinitions={canManageScheduleDefinitions && canCreateScheduledJob}
         onAdd={handleAddScheduledJob}
+        headerAction={
+          organization && onOrganizationSave ? (
+            <DefaultShiftToggle
+              organization={organization}
+              onOrganizationSave={onOrganizationSave}
+              disabled={!canManageScheduleDefinitions}
+            />
+          ) : undefined
+        }
       >
         {scheduledRows.map((job, jobIndex) => (
           <JobRow
@@ -2653,7 +2790,6 @@ export default function JobsSettings({
             onDeleted={handleDeleted}
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             allJobs={visibleRows}
-            shiftDisplayMode={shiftDisplayMode}
             isLast={jobIndex === scheduledRows.length - 1}
           />
         ))}
@@ -2696,7 +2832,6 @@ export default function JobsSettings({
             onDeleted={handleDeleted}
             canManageScheduleDefinitions={canManageScheduleDefinitions}
             allJobs={visibleRows}
-            shiftDisplayMode={shiftDisplayMode}
             isLast={jobIndex === shiftlessRows.length - 1}
           />
         ))}

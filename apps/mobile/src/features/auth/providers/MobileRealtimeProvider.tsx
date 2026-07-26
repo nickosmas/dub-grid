@@ -4,12 +4,14 @@ import { useMobileAccountRealtimeInvalidation } from "../../../shared/hooks/useM
 import { queryClient } from "../../../shared/lib/query-client";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useBootstrap } from "../hooks/useBootstrap";
+import { useMobilePermissionsRealtime } from "../hooks/useMobilePermissionsRealtime";
 
 export function MobileRealtimeProvider({ children }: PropsWithChildren) {
   const { accessToken, session } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
   const currentOrg = bootstrapQuery.data?.currentOrg ?? null;
   const disabled = currentOrg?.featureFlags.disable_realtime === true;
+  const userId = session?.user?.id ?? null;
 
   useMobileRealtimeInvalidation({
     accessToken,
@@ -20,7 +22,14 @@ export function MobileRealtimeProvider({ children }: PropsWithChildren) {
 
   useMobileAccountRealtimeInvalidation({
     accessToken,
-    userId: session?.user?.id ?? null,
+    userId,
+    disabled,
+    queryClient,
+  });
+
+  useMobilePermissionsRealtime({
+    accessToken,
+    userId,
     disabled,
     queryClient,
   });

@@ -99,6 +99,58 @@ AS $$
 $$;
 
 
+-- ── Sandbox-aware org authorization ─────────────────────────────────────────
+-- The sandbox flow (apps/web/src/lib/api-auth.ts, middleware.ts,
+-- requireOrgPermissions) deliberately never refreshes the caller's JWT, so
+-- caller_org_id() always returns the user's REAL org even while they're
+-- inside a Test Sandbox. These helpers extend the org/permission checks used
+-- by schedule-mutating RPCs to also accept the caller's own sandbox org,
+-- mirroring the ownership check already used at the app layer.
+CREATE OR REPLACE FUNCTION public.is_own_sandbox_org(p_org_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.organizations o
+    WHERE o.id = p_org_id
+      AND o.workspace_kind = 'sandbox'
+      AND o.sandbox_owner_user_id = auth.uid()
+      AND o.archived_at IS NULL
+  );
+$$;
+
+
+CREATE OR REPLACE FUNCTION public.is_authorized_org(p_org_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT
+    public.is_gridmaster()
+    OR public.caller_org_id() = p_org_id
+    OR public.is_own_sandbox_org(p_org_id);
+$$;
+
+
+-- Sandbox-aware companion to check_admin_permission(). Does not replace it —
+-- check_admin_permission() is used broadly by RLS policies elsewhere and
+-- stays real-org-only. Only schedule-mutating RPCs call this variant. A
+-- sandbox owner is unconditionally treated as authorized within their own
+-- sandbox, matching the app layer's widening of org_role to "super_admin"
+-- inside sandbox mode (api-auth.ts requireAuthenticatedUserWithClaims).
+CREATE OR REPLACE FUNCTION public.check_admin_permission_for_org(p_permission TEXT, p_org_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL STABLE SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+  SELECT
+    public.is_gridmaster()
+    OR (public.caller_org_id() = p_org_id AND public.check_admin_permission(p_permission))
+    OR public.is_own_sandbox_org(p_org_id);
+$$;
+
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 2. CUSTOM ACCESS TOKEN HOOK (JWT Claims)
 --
@@ -1468,12 +1520,12 @@ DECLARE
   v_lock_key_tgt  TEXT;
 BEGIN
   -- Permission check
-  IF NOT public.check_admin_permission('canEditShifts') THEN
+  IF NOT public.check_admin_permission_for_org('canEditShifts', p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: missing canEditShifts permission';
   END IF;
 
   -- Org scoping: caller must belong to p_org_id (gridmaster exempt)
-  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+  IF NOT public.is_authorized_org(p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: org mismatch';
   END IF;
 
@@ -1802,11 +1854,11 @@ DECLARE
   v_include BOOLEAN;
   v_existing_version BIGINT;
 BEGIN
-  IF NOT public.check_admin_permission('canManageShiftSeries') THEN
+  IF NOT public.check_admin_permission_for_org('canManageShiftSeries', p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: missing canManageShiftSeries permission';
   END IF;
 
-  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+  IF NOT public.is_authorized_org(p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: org mismatch';
   END IF;
 
@@ -1930,11 +1982,11 @@ DECLARE
   v_state RECORD;
   r RECORD;
 BEGIN
-  IF NOT public.check_admin_permission('canManageShiftSeries') THEN
+  IF NOT public.check_admin_permission_for_org('canManageShiftSeries', p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: missing canManageShiftSeries permission';
   END IF;
 
-  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+  IF NOT public.is_authorized_org(p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: org mismatch';
   END IF;
 
@@ -1991,11 +2043,11 @@ DECLARE
   v_has_published BOOLEAN;
   r RECORD;
 BEGIN
-  IF NOT public.check_admin_permission('canManageShiftSeries') THEN
+  IF NOT public.check_admin_permission_for_org('canManageShiftSeries', p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: missing canManageShiftSeries permission';
   END IF;
 
-  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+  IF NOT public.is_authorized_org(p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: org mismatch';
   END IF;
 
@@ -2077,11 +2129,11 @@ DECLARE
   v_recurring_shift_id UUID;
   v_state RECORD;
 BEGIN
-  IF NOT public.check_admin_permission('canManageRecurringShifts') THEN
+  IF NOT public.check_admin_permission_for_org('canManageRecurringShifts', p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: missing canManageRecurringShifts permission';
   END IF;
 
-  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+  IF NOT public.is_authorized_org(p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: org mismatch';
   END IF;
 
@@ -2331,11 +2383,11 @@ DECLARE
   v_existing_version BIGINT;
 BEGIN
   -- Permission gates: same as every other draft-write path.
-  IF NOT public.check_admin_permission('canEditShifts') THEN
+  IF NOT public.check_admin_permission_for_org('canEditShifts', p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: missing canEditShifts permission';
   END IF;
 
-  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+  IF NOT public.is_authorized_org(p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: org mismatch';
   END IF;
 
@@ -4312,10 +4364,17 @@ BEGIN
     RAISE EXCEPTION 'Employee not found or archived';
   END IF;
 
-  -- Validate caller is the requester (employee's linked user) or admin+
+  -- Validate caller is the requester (employee's linked user) or admin+ IN
+  -- THIS org (or their own sandbox). caller_org_role() alone reflects the
+  -- caller's role in their *current session* org, which can differ from
+  -- p_org_id — checking it without an org match let an admin of one org
+  -- act on another org's shift requests.
   IF v_requester_employee.user_id IS DISTINCT FROM auth.uid()
      AND NOT public.is_gridmaster()
-     AND public.caller_org_role()::TEXT NOT IN ('super_admin', 'admin') THEN
+     AND NOT (
+       (public.caller_org_id() = p_org_id OR public.is_own_sandbox_org(p_org_id))
+       AND public.caller_org_role()::TEXT IN ('super_admin', 'admin')
+     ) THEN
     RAISE EXCEPTION 'Unauthorized: you can only create requests for your own shifts';
   END IF;
 
@@ -4785,10 +4844,14 @@ BEGIN
     RAISE EXCEPTION 'Claimer employee is not active';
   END IF;
 
-  -- Validate caller is the claimer
+  -- Validate caller is the claimer, or admin+ IN THIS org (or their own
+  -- sandbox) — see create_shift_request for why the org match is required.
   IF v_claimer.user_id IS DISTINCT FROM auth.uid()
      AND NOT public.is_gridmaster()
-     AND public.caller_org_role()::TEXT NOT IN ('super_admin', 'admin') THEN
+     AND NOT (
+       (public.caller_org_id() = v_request.org_id OR public.is_own_sandbox_org(v_request.org_id))
+       AND public.caller_org_role()::TEXT IN ('super_admin', 'admin')
+     ) THEN
     RAISE EXCEPTION 'Unauthorized: you can only claim requests for yourself';
   END IF;
 
@@ -6530,7 +6593,9 @@ BEGIN
   END IF;
 
   -- Validate caller is the requester
-  SELECT id, user_id INTO v_emp FROM public.employees WHERE id = p_emp_id;
+  SELECT id, user_id INTO v_emp
+  FROM public.employees
+  WHERE id = p_emp_id AND org_id = v_request.org_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Employee not found';
   END IF;
@@ -6538,9 +6603,14 @@ BEGIN
     RAISE EXCEPTION 'Only the requester can cancel this request';
   END IF;
 
+  -- Or admin+ IN THIS org (or their own sandbox) — see create_shift_request
+  -- for why the org match is required.
   IF v_emp.user_id IS DISTINCT FROM auth.uid()
      AND NOT public.is_gridmaster()
-     AND public.caller_org_role()::TEXT NOT IN ('super_admin', 'admin') THEN
+     AND NOT (
+       (public.caller_org_id() = v_request.org_id OR public.is_own_sandbox_org(v_request.org_id))
+       AND public.caller_org_role()::TEXT IN ('super_admin', 'admin')
+     ) THEN
     RAISE EXCEPTION 'Unauthorized';
   END IF;
 
@@ -6613,10 +6683,14 @@ BEGIN
     RAISE EXCEPTION 'Employee is not active';
   END IF;
 
-  -- Validate caller is the employee or admin+
+  -- Validate caller is the employee, or admin+ IN THIS org (or their own
+  -- sandbox) — see create_shift_request for why the org match is required.
   IF v_employee.user_id IS DISTINCT FROM auth.uid()
      AND NOT public.is_gridmaster()
-     AND public.caller_org_role()::TEXT NOT IN ('super_admin', 'admin') THEN
+     AND NOT (
+       (public.caller_org_id() = p_org_id OR public.is_own_sandbox_org(p_org_id))
+       AND public.caller_org_role()::TEXT IN ('super_admin', 'admin')
+     ) THEN
     RAISE EXCEPTION 'Unauthorized: you can only volunteer for yourself';
   END IF;
 
@@ -6935,11 +7009,16 @@ BEGIN
     )
     SELECT count(*) INTO e_count FROM deleted;
 
-    -- Purge old shifts (beyond retention period from their date)
+    -- Purge old schedule cells (beyond retention period from their date).
+    -- schedule_cell_snapshots/schedule_cell_segments cascade via FK
+    -- (ON DELETE CASCADE), so no separate cleanup is needed for those.
+    -- (There is no "shifts" table in this schema — schedule data lives in
+    -- schedule_cells; the old reference here predates the schema
+    -- consolidation and made this loop error out on every invocation.)
     WITH deleted AS (
-      DELETE FROM shifts s
+      DELETE FROM schedule_cells s
       WHERE s.org_id = org.id
-        AND s.date < (CURRENT_DATE - org.data_retention_days)::TEXT
+        AND s.date < (CURRENT_DATE - org.data_retention_days)
       RETURNING 1
     )
     SELECT count(*) INTO s_count FROM deleted;
@@ -7243,12 +7322,19 @@ BEGIN
       SELECT om.org_id, COUNT(*) AS cnt
       FROM public.organization_memberships om
       JOIN public.profiles p ON p.id = om.user_id
+      JOIN public.organizations o ON o.id = om.org_id AND o.workspace_kind = 'real'
       WHERE om.archived_at IS NULL
         AND p.platform_role <> 'gridmaster'
       GROUP BY om.org_id
     ) m
   FULL OUTER JOIN
-    (SELECT emp.org_id, COUNT(*) AS cnt FROM public.employees emp WHERE emp.archived_at IS NULL GROUP BY emp.org_id) e
+    (
+      SELECT emp.org_id, COUNT(*) AS cnt
+      FROM public.employees emp
+      JOIN public.organizations o ON o.id = emp.org_id AND o.workspace_kind = 'real'
+      WHERE emp.archived_at IS NULL
+      GROUP BY emp.org_id
+    ) e
   ON m.org_id = e.org_id;
 END;
 $$;
@@ -7266,13 +7352,25 @@ WHERE
 -- Batch remove a focus area ID from all employee focus_area_ids arrays (replaces N+1 loop)
 CREATE OR REPLACE FUNCTION public.remove_focus_area_from_employees(p_focus_area_id BIGINT)
 RETURNS VOID
-LANGUAGE SQL SECURITY DEFINER
+LANGUAGE PLPGSQL SECURITY DEFINER
 SET search_path = 'public'
 AS $$
+BEGIN
+  -- service_role is a trusted backend caller (settings/config/route.ts calls
+  -- this after its own requireOrgPermissions('canManageFocusAreas') check via
+  -- the service client, which carries no auth.uid()/JWT org context) —
+  -- mirrors the same service_role carve-out used by send_invitation and
+  -- get_org_directory.
+  IF (auth.jwt() ->> 'role') <> 'service_role'
+     AND NOT public.check_admin_permission('canManageFocusAreas') THEN
+    RAISE EXCEPTION 'Unauthorized: you do not have permission to manage focus areas';
+  END IF;
+
   UPDATE public.employees
   SET focus_area_ids = array_remove(focus_area_ids, p_focus_area_id)
   WHERE focus_area_ids @> ARRAY[p_focus_area_id]
     AND org_id = public.caller_org_id();
+END;
 $$;
 
 COMMENT ON FUNCTION public.remove_focus_area_from_employees IS 'Removes a focus area ID from all employee arrays in a single UPDATE.';
@@ -7280,7 +7378,11 @@ COMMENT ON FUNCTION public.remove_focus_area_from_employees IS 'Removes a focus 
 
 -- ── People Directory (union of employees + app-only users) ──────────────────
 
-CREATE OR REPLACE FUNCTION public.get_org_directory(p_org_id UUID)
+CREATE OR REPLACE FUNCTION public.get_org_directory(
+  p_org_id UUID,
+  p_limit INT DEFAULT 50,
+  p_offset INT DEFAULT 0
+)
 RETURNS TABLE (
   person_id               TEXT,
   source                  TEXT,
@@ -7455,11 +7557,11 @@ BEGIN
     AND inv3.revoked_at IS NULL
 
   ORDER BY seniority NULLS LAST, first_name, last_name
-  LIMIT 501;
+  LIMIT p_limit OFFSET p_offset;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_org_directory(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_org_directory(UUID, INT, INT) TO authenticated;
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -7918,11 +8020,11 @@ BEGIN
     RAISE EXCEPTION 'Invalid state kind: %', p_state_kind;
   END IF;
 
-  IF NOT public.check_admin_permission('canEditShifts') THEN
+  IF NOT public.check_admin_permission_for_org('canEditShifts', p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: missing canEditShifts permission';
   END IF;
 
-  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+  IF NOT public.is_authorized_org(p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: org mismatch';
   END IF;
 
@@ -8272,11 +8374,11 @@ DECLARE
   v_has_published BOOLEAN := FALSE;
   v_next_version BIGINT := 0;
 BEGIN
-  IF NOT public.check_admin_permission('canEditShifts') THEN
+  IF NOT public.check_admin_permission_for_org('canEditShifts', p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: missing canEditShifts permission';
   END IF;
 
-  IF NOT public.is_gridmaster() AND public.caller_org_id() != p_org_id THEN
+  IF NOT public.is_authorized_org(p_org_id) THEN
     RAISE EXCEPTION 'Unauthorized: org mismatch';
   END IF;
 

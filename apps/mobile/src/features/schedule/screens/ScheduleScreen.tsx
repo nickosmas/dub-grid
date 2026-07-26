@@ -51,21 +51,28 @@ import {
   getShiftRequests,
   updateShiftRequest,
 } from "../../../shared/lib/api";
+import { getAvatarTone, resolveShiftPillColors, type AvatarTone } from "@dubgrid/design-tokens";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import {
+  useIsDarkMode,
+  useMobileColors,
+  useThemeMode,
+} from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
-  mobileColors,
   mobileBorderColorFromText,
   mobileRadii,
   mobileSpacing,
   mobileText,
+  type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { useMobileShiftRequestsRealtime } from "../../shift-requests/hooks/useMobileShiftRequestsRealtime";
 import {
   type MobileRequestActionFeedback,
   getMobileRequestActionFeedback,
@@ -147,13 +154,21 @@ const MONTH_EXPAND_TIMING = {
   duration: 240,
   easing: Easing.out(Easing.cubic),
 };
-const ME_HERO_CARD_BACKGROUND = "#2946C7";
-const ME_HERO_COLLABORATOR_BACKGROUND = "#3A55CB";
-// Matches the web hero gradient: dark bottom-left → light top-right.
-const ME_HERO_CARD_GRADIENT = ["#142579", "#2C49CC", "#6E90FF"] as const;
+const ME_HERO_CARD_BACKGROUND_LIGHT = "#2946C7";
+const ME_HERO_CARD_BACKGROUND_DARK = "#152238";
+const ME_HERO_COLLABORATOR_BACKGROUND_LIGHT = "#3A55CB";
+const ME_HERO_COLLABORATOR_BACKGROUND_DARK = "#1E2F66";
+// Matches the web hero gradient: dark bottom-left → light top-right. The
+// dark-mode variant keeps the same dark navy start but ends in the app's
+// own vivid dark-mode brand blue instead of a pale periwinkle, which would
+// read as a washed-out pastel blob against a near-black page.
+const ME_HERO_CARD_GRADIENT_LIGHT = ["#142579", "#2C49CC", "#6E90FF"] as const;
+const ME_HERO_CARD_GRADIENT_DARK = ["#0A1442", "#1D3AA0", "#2075FF"] as const;
 const ME_HERO_CARD_GRADIENT_LOCATIONS = [0, 0.55, 1] as const;
 const ME_HERO_CARD_GRADIENT_START = { x: 0, y: 1 } as const;
 const ME_HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
+const ME_HERO_CARD_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
+const ME_HERO_CARD_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
 if (
   Platform.OS === "android" &&
@@ -166,11 +181,6 @@ type ScheduleScope = "mine" | "team";
 type ShiftTimeRange = {
   start: string;
   end: string;
-};
-type AvatarTone = {
-  backgroundColor: string;
-  borderColor: string;
-  textColor: string;
 };
 type RequestActionBody =
   | { action: "claim"; claimerEmpId: string }
@@ -205,35 +215,6 @@ type TeamScheduleShiftGroup = {
   timeRange: string | null;
   title: string;
 };
-
-function getFirstDateForFocusArea(
-  entries: MobileScheduleEntry[],
-  focusAreaKey: string,
-): string | null {
-  const matchingEntries = filterTeamScheduleEntriesByFocusArea(entries, focusAreaKey);
-
-  if (matchingEntries.length === 0) {
-    return null;
-  }
-
-  return (
-    [...matchingEntries].sort((left, right) => {
-      if (left.date !== right.date) {
-        return left.date.localeCompare(right.date);
-      }
-
-      const leftTime =
-        getScheduleEntryStartTime(left) ?? getScheduleEntryCustomStartTime(left) ?? "99:99:99";
-      const rightTime =
-        getScheduleEntryStartTime(right) ?? getScheduleEntryCustomStartTime(right) ?? "99:99:99";
-      if (leftTime !== rightTime) {
-        return leftTime.localeCompare(rightTime);
-      }
-
-      return left.employeeName.localeCompare(right.employeeName);
-    })[0]?.date ?? null
-  );
-}
 
 function formatScheduleHeaderDate(date: string): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -790,18 +771,32 @@ function getOpenShiftAbsenceTypeId(openShift: MobileOpenShift): number | null {
   return openShift.state.kind === "absence" ? (openShift.state.absenceTypeId ?? null) : null;
 }
 
-function getOpenShiftJobChip(openShift: MobileOpenShift): JobChip | null {
+function getOpenShiftJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  openShift: MobileOpenShift,
+): JobChip | null {
   if (getOpenShiftAbsenceTypeId(openShift) != null) {
-    return buildAbsenceChip(getOpenShiftShiftName(openShift), openShift.presentation);
+    return buildAbsenceChip(
+      mobileColors,
+      isDark,
+      getOpenShiftShiftName(openShift),
+      openShift.presentation,
+    );
   }
 
   const primarySegment = getOpenShiftPrimarySegment(openShift);
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(getOpenShiftShiftName(openShift), primarySegment);
+    return buildGeneralShiftChip(
+      mobileColors,
+      isDark,
+      getOpenShiftShiftName(openShift),
+      primarySegment,
+    );
   }
 
   const jobSegment = openShift.presentation.segments.find((segment) => segment.jobName);
-  return buildJobChip(jobSegment?.jobName ?? null, jobSegment ?? null);
+  return buildJobChip(mobileColors, isDark, jobSegment?.jobName ?? null, jobSegment ?? null);
 }
 
 function formatOpenShiftCardCountLabel(count: number): string {
@@ -904,6 +899,8 @@ function isCommittedWeekSwipe(input: {
 }
 
 export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -967,6 +964,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const refetchSchedule = scheduleQuery.refetch;
   const refetchMeTeamSchedule = meTeamScheduleQuery.refetch;
   const refetchRequests = requestsQuery.refetch;
+  const handleShiftRequestsRealtimeChange = useCallback(() => {
+    if (canLoadRequests) {
+      void refetchRequests();
+    }
+  }, [canLoadRequests, refetchRequests]);
+  useMobileShiftRequestsRealtime({
+    orgId: bootstrapQuery.data?.currentOrg.id ?? null,
+    onChange: handleShiftRequestsRealtimeChange,
+  });
   const refetchScreenContent = useCallback(async () => {
     const refreshes: Array<Promise<unknown>> = [refetchBootstrap()];
 
@@ -1648,23 +1654,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
   function handleSelectFocusArea(nextFocusAreaKey: string) {
     setSelectedTeamFocusAreaKey(nextFocusAreaKey);
-
-    const nextSelectedDayEntries = filterTeamScheduleEntriesByFocusArea(
-      selectedDayTeamEntries,
-      nextFocusAreaKey,
-    );
-
-    if (nextSelectedDayEntries.length === 0) {
-      const firstMatchingDate = getFirstDateForFocusArea(scheduleEntries, nextFocusAreaKey);
-
-      if (firstMatchingDate && firstMatchingDate !== selectedDate) {
-        commitSelectedDate(firstMatchingDate);
-        // See the matching comment in handleSelectDate: not redundant with
-        // closeCalendarExpansion's reset, which no-ops while collapsed.
-        setCalendarMonthAnchor(getScheduleMonthStartDate(firstMatchingDate));
-      }
-    }
-
     closeCalendarExpansion();
   }
 
@@ -2164,6 +2153,9 @@ function MonthDayCell({
   // grid, so they're excluded from the accessibility tree.
   accessible?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityLabel={accessible ? `Select date ${day.date}` : undefined}
@@ -2209,6 +2201,9 @@ function IconControlButton({
   iconSize?: number;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
@@ -2227,6 +2222,9 @@ function IconControlButton({
 }
 
 function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityLabel="Open alerts"
@@ -2338,7 +2336,30 @@ function normalizeScheduleLabel(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+// User-picked / hardcoded-preset hex colors are tuned for a white page and
+// read as blown-out or washed-out on a dark surface — remap through the
+// shared HSV darkener. Theme tokens (mobileColors.*) are already
+// theme-correct and must NOT be passed through this a second time.
+function darkenTone(
+  tone: { backgroundColor: string; borderColor: string; textColor: string },
+  isDark: boolean,
+): { backgroundColor: string; borderColor: string; textColor: string } {
+  if (!isDark) return tone;
+
+  const resolved = resolveShiftPillColors(
+    { color: tone.backgroundColor, text: tone.textColor, border: tone.borderColor },
+    true,
+  );
+  return {
+    backgroundColor: resolved.color,
+    borderColor: resolved.border,
+    textColor: resolved.text,
+  };
+}
+
 function buildAbsenceChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: AbsenceColorSource | null,
 ): JobChip | null {
@@ -2351,13 +2372,29 @@ function buildAbsenceChip(
     return null;
   }
 
+  if (absenceColor) {
+    return {
+      kind: "absence",
+      eyebrowLabel: "Absence",
+      label: trimmedLabel,
+      ...darkenTone(
+        {
+          backgroundColor: absenceColor,
+          borderColor: absenceBorderColor ?? absenceColor,
+          textColor: absenceTextColor ?? mobileColors.textMuted,
+        },
+        isDark,
+      ),
+    };
+  }
+
   return {
     kind: "absence",
     eyebrowLabel: "Absence",
     label: trimmedLabel,
-    backgroundColor: absenceColor ?? mobileColors.surfaceSecondary,
-    borderColor: absenceBorderColor ?? mobileColors.border,
-    textColor: absenceTextColor ?? mobileColors.textMuted,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textMuted,
   };
 }
 
@@ -2368,6 +2405,9 @@ function hasMentoredSegments(
 }
 
 function MentoredPill() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
       <Text style={styles.mentoredPillText}>Mentored</Text>
@@ -2376,10 +2416,12 @@ function MentoredPill() {
 }
 
 function buildGeneralShiftChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
-  const chip = buildJobChip(label, colorSource);
+  const chip = buildJobChip(mobileColors, isDark, label, colorSource);
 
   if (!chip) {
     return null;
@@ -2401,6 +2443,8 @@ function isGeneralShiftSegment(segment: { shiftId?: number | null } | null | und
 }
 
 function buildJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
@@ -2417,9 +2461,14 @@ function buildJobChip(
     return {
       kind: "job",
       label: trimmedLabel,
-      backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
-      borderColor: jobBorderColor ?? mobileColors.border,
-      textColor: jobTextColor ?? mobileColors.textMuted,
+      ...darkenTone(
+        {
+          backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
+          borderColor: jobBorderColor ?? mobileColors.border,
+          textColor: jobTextColor ?? mobileColors.textMuted,
+        },
+        isDark,
+      ),
       isMentored: colorSource?.isMentored === true,
     };
   }
@@ -2429,25 +2478,31 @@ function buildJobChip(
     normalizedLabel.includes("supervisor") ||
     normalizedLabel.includes("lead") ||
     normalizedLabel.includes("manager")
-      ? {
-          backgroundColor: "#FCE7F3",
-          borderColor: "#FBCFE8",
-          textColor: "#BE185D",
-        }
+      ? darkenTone(
+          {
+            backgroundColor: "#FCE7F3",
+            borderColor: "#FBCFE8",
+            textColor: "#BE185D",
+          },
+          isDark,
+        )
       : normalizedLabel.includes("mentor") || normalizedLabel.includes("trainer")
         ? {
             backgroundColor: mobileColors.warningSoft,
             borderColor: mobileColors.warningBorder,
-            textColor: "#B45309",
+            textColor: isDark ? mobileColors.warningText : "#B45309",
           }
         : normalizedLabel.includes("nurse") ||
             normalizedLabel.includes("rn") ||
             normalizedLabel.includes("lpn")
-          ? {
-              backgroundColor: "#ECFEFF",
-              borderColor: "#A5F3FC",
-              textColor: "#0E7490",
-            }
+          ? darkenTone(
+              {
+                backgroundColor: "#ECFEFF",
+                borderColor: "#A5F3FC",
+                textColor: "#0E7490",
+              },
+              isDark,
+            )
           : {
               backgroundColor: mobileColors.surfaceSecondary,
               borderColor: mobileColors.border,
@@ -2462,37 +2517,63 @@ function buildJobChip(
   };
 }
 
-function getScheduleItemJobChip(item: FeaturedMeScheduleSegment["item"]): JobChip | null {
+function getScheduleItemJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  item: FeaturedMeScheduleSegment["item"],
+): JobChip | null {
   if (!item) {
     return null;
   }
 
   if (getScheduleEntryAbsenceTypeId(item.entry) != null) {
-    return buildAbsenceChip(getScheduleItemShiftName(item), item.entry.presentation);
+    return buildAbsenceChip(
+      mobileColors,
+      isDark,
+      getScheduleItemShiftName(item),
+      item.entry.presentation,
+    );
   }
 
   if (isGeneralShiftSegment(item.segment)) {
-    return buildGeneralShiftChip(getScheduleItemShiftName(item), item.segment);
+    return buildGeneralShiftChip(
+      mobileColors,
+      isDark,
+      getScheduleItemShiftName(item),
+      item.segment,
+    );
   }
 
   const jobName = getScheduleItemJobName(item);
-  return buildJobChip(jobName, item.segment);
+  return buildJobChip(mobileColors, isDark, jobName, item.segment);
 }
 
-function getSegmentJobChip(segment: MobileScheduleEntrySegment): JobChip | null {
+function getSegmentJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  segment: MobileScheduleEntrySegment,
+): JobChip | null {
   if (isGeneralShiftSegment(segment)) {
-    return buildGeneralShiftChip(segment.shiftName ?? segment.label, segment);
+    return buildGeneralShiftChip(mobileColors, isDark, segment.shiftName ?? segment.label, segment);
   }
 
-  return buildJobChip(segment.jobName ?? null, segment);
+  return buildJobChip(mobileColors, isDark, segment.jobName ?? null, segment);
 }
 
-function getScheduleItemTypeChip(item: FeaturedMeScheduleSegment["item"]): JobChip | null {
-  return getScheduleItemJobChip(item);
+function getScheduleItemTypeChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  item: FeaturedMeScheduleSegment["item"],
+): JobChip | null {
+  return getScheduleItemJobChip(mobileColors, isDark, item);
 }
 
-function getVisibleScheduleItemTypeChip(item: FeaturedMeScheduleSegment["item"]): JobChip | null {
-  const typeChip = getScheduleItemTypeChip(item);
+function getVisibleScheduleItemTypeChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  item: FeaturedMeScheduleSegment["item"],
+): JobChip | null {
+  const typeChip = getScheduleItemTypeChip(mobileColors, isDark, item);
 
   if (!item || !typeChip) {
     return typeChip;
@@ -2700,24 +2781,36 @@ function getRequestDateLabel(request: MobileShiftRequest): string {
 }
 
 function getRequestJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   request: MobileShiftRequest,
   which: "requester" | "target",
 ): JobChip | null {
   if (getRequestAbsenceTypeId(request, which) != null) {
     const presentation =
       which === "requester" ? request.requesterPresentation : request.targetPresentation;
-    return buildAbsenceChip(getRequestShiftName(request, which), presentation);
+    return buildAbsenceChip(
+      mobileColors,
+      isDark,
+      getRequestShiftName(request, which),
+      presentation,
+    );
   }
 
   const primarySegment = getRequestPrimarySegment(request, which);
 
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(getRequestShiftName(request, which), primarySegment);
+    return buildGeneralShiftChip(
+      mobileColors,
+      isDark,
+      getRequestShiftName(request, which),
+      primarySegment,
+    );
   }
 
   const segment = getRequestSegments(request, which).find((item) => item.jobName) ?? null;
   const jobName = getRequestJobName(request, which);
-  return buildJobChip(jobName, segment);
+  return buildJobChip(mobileColors, isDark, jobName, segment);
 }
 
 function MeSectionHeader({
@@ -2729,6 +2822,9 @@ function MeSectionHeader({
   actionLabel?: string;
   onAction?: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.meSectionHeader}>
       <View style={styles.meSectionHeaderCopy}>
@@ -2754,6 +2850,9 @@ function JobPill({
   eyebrowDisplay?: "inside" | "outside";
   isMentored?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -2841,6 +2940,9 @@ function MeTypePill({
   titleScale?: "hero" | "row";
   isMentored?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -2866,28 +2968,39 @@ function MeTypePill({
 }
 
 function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
+
   if (entries.length === 0) {
     return null;
   }
 
   const visibleEntries = entries.slice(0, 3);
   const overflowCount = entries.length - visibleEntries.length;
+  const isDark = resolvedTheme === "dark";
+  const collaboratorBackground = {
+    backgroundColor: isDark
+      ? ME_HERO_COLLABORATOR_BACKGROUND_DARK
+      : ME_HERO_COLLABORATOR_BACKGROUND_LIGHT,
+  };
 
   return (
-    <View style={styles.meHeroCollaborators}>
+    <View style={[styles.meHeroCollaborators, collaboratorBackground]}>
       <View style={styles.meHeroCollaboratorLabelRow}>
         <Ionicons color="rgba(255, 255, 255, 0.76)" name="people-outline" size={22} />
         <Text style={styles.meHeroCollaboratorLabel}>Working with</Text>
       </View>
       <View style={styles.meHeroAvatarStack}>
         {visibleEntries.map((entry, index) => {
-          const avatarTone = getAvatarTone(entry.employeeId);
+          const avatarTone = getAvatarTone(entry.employeeId, isDark);
 
           return (
             <View
               key={`${entry.employeeId}-${entry.date}`}
               style={[
                 styles.meHeroCollaboratorAvatarFrame,
+                collaboratorBackground,
                 index > 0 && styles.meHeroCollaboratorAvatarFrameOverlap,
               ]}
             >
@@ -2913,6 +3026,7 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
           <View
             style={[
               styles.meHeroCollaboratorAvatarFrame,
+              collaboratorBackground,
               visibleEntries.length > 0 && styles.meHeroCollaboratorAvatarFrameOverlap,
             ]}
           >
@@ -2943,6 +3057,10 @@ function MeHeroCard({
   shiftmates: MobileScheduleEntry[];
   onPress?: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+
   if (!featuredItem) {
     return (
       <View style={styles.meSectionBlock} testID="me-empty-schedule-state">
@@ -2966,7 +3084,7 @@ function MeHeroCard({
   const heroDateLabel = formatCompactScheduleDate(featuredItem.date);
   const heroDateParts = getCompactScheduleDateParts(featuredItem.date);
   const shiftName = getScheduleItemShiftName(featuredItem);
-  const typeChip = getVisibleScheduleItemTypeChip(featuredItem);
+  const typeChip = getVisibleScheduleItemTypeChip(mobileColors, isDark, featuredItem);
   const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
   const focusAreaName = getScheduleItemFocusArea(featuredItem);
   const timeRange = getScheduleItemTimeRange(featuredItem);
@@ -2989,27 +3107,29 @@ function MeHeroCard({
 
   const cardContent = (
     <View style={styles.meHeroContent}>
-      {badgeLabel || heroDateParts ? (
+      {badgeLabel || heroDateParts || shouldShowShiftName || shouldShowHeroSplitBadge ? (
         <View style={styles.meHeroHeader}>
-          {badgeLabel ? (
-            <View style={styles.meHeroBadge}>
-              <View style={[styles.meHeroBadgeDot, badgeDotStyle]} />
-              <Text style={styles.meHeroBadgeText}>{badgeLabel}</Text>
-            </View>
-          ) : null}
+          <View style={styles.meHeroHeaderCopy}>
+            {badgeLabel ? (
+              <View style={styles.meHeroBadge}>
+                <View style={[styles.meHeroBadgeDot, badgeDotStyle]} />
+                <Text style={styles.meHeroBadgeText}>{badgeLabel}</Text>
+              </View>
+            ) : null}
+            {shouldShowShiftName || shouldShowHeroSplitBadge ? (
+              <View style={styles.meHeroTitleRow}>
+                {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{shiftName}</Text> : null}
+                {shouldShowHeroSplitBadge ? (
+                  <SplitShiftBadge count={splitShiftCount} inverse label={heroSplitShiftLabel} />
+                ) : null}
+              </View>
+            ) : null}
+          </View>
           {heroDateParts ? (
             <View accessibilityLabel={heroDateLabel ?? undefined} style={styles.meHeroDateTile}>
               <Text style={styles.meHeroDateWeekday}>{heroDateParts.weekdayLabel}</Text>
               <Text style={styles.meHeroDateDay}>{heroDateParts.dayLabel}</Text>
             </View>
-          ) : null}
-        </View>
-      ) : null}
-      {shouldShowShiftName || shouldShowHeroSplitBadge ? (
-        <View style={styles.meHeroTitleRow}>
-          {shouldShowShiftName ? <Text style={styles.meHeroTitle}>{shiftName}</Text> : null}
-          {shouldShowHeroSplitBadge ? (
-            <SplitShiftBadge count={splitShiftCount} inverse label={heroSplitShiftLabel} />
           ) : null}
         </View>
       ) : null}
@@ -3059,7 +3179,7 @@ function MeHeroCard({
           leadingDivider
           renderSegmentChip={(segment) => (
             <JobPill
-              chip={getSegmentJobChip(segment)}
+              chip={getSegmentJobChip(mobileColors, isDark, segment)}
               compact
               eyebrowDisplay="outside"
               isMentored={segment.isMentored === true}
@@ -3088,7 +3208,7 @@ function MeHeroCard({
 
   const heroGradient = (
     <LinearGradient
-      colors={ME_HERO_CARD_GRADIENT}
+      colors={isDark ? ME_HERO_CARD_GRADIENT_DARK : ME_HERO_CARD_GRADIENT_LIGHT}
       locations={ME_HERO_CARD_GRADIENT_LOCATIONS}
       start={ME_HERO_CARD_GRADIENT_START}
       end={ME_HERO_CARD_GRADIENT_END}
@@ -3096,6 +3216,10 @@ function MeHeroCard({
       style={StyleSheet.absoluteFill}
     />
   );
+  const heroCardThemeStyle = {
+    backgroundColor: isDark ? ME_HERO_CARD_BACKGROUND_DARK : ME_HERO_CARD_BACKGROUND_LIGHT,
+    shadowColor: isDark ? ME_HERO_CARD_SHADOW_DARK : ME_HERO_CARD_SHADOW_LIGHT,
+  };
 
   return (
     <View style={styles.meSectionBlock}>
@@ -3103,14 +3227,18 @@ function MeHeroCard({
         <Pressable
           accessibilityRole="button"
           onPress={onPress}
-          style={({ pressed }) => [styles.meHeroCard, pressed && styles.meHeroCardPressed]}
+          style={({ pressed }) => [
+            styles.meHeroCard,
+            heroCardThemeStyle,
+            pressed && styles.meHeroCardPressed,
+          ]}
           testID="me-hero-card"
         >
           {heroGradient}
           {cardContent}
         </Pressable>
       ) : (
-        <View style={styles.meHeroCard} testID="me-hero-card">
+        <View style={[styles.meHeroCard, heroCardThemeStyle]} testID="me-hero-card">
           {heroGradient}
           {cardContent}
         </View>
@@ -3130,6 +3258,10 @@ function UpcomingShiftsSection({
   summary: WeeklyHoursSummary | null;
   todayDate: string;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+
   if (items.length === 0) {
     return null;
   }
@@ -3161,7 +3293,7 @@ function UpcomingShiftsSection({
   return (
     <View style={styles.upcomingSectionBlock}>
       <View style={styles.upcomingSectionHeader}>
-        <Text style={styles.upcomingSectionTitle}>My Week</Text>
+        <Text style={styles.upcomingSectionTitle}>Your Week</Text>
         {hoursLabel ? (
           <View style={styles.upcomingHoursBadge}>
             <Text style={styles.upcomingHoursBadgeText}>{hoursLabel}</Text>
@@ -3203,7 +3335,7 @@ function UpcomingShiftsSection({
 
               <View style={styles.upcomingDateShiftStack}>
                 {group.items.map((item, itemIndex) => {
-                  const typeChip = getScheduleItemTypeChip(item);
+                  const typeChip = getScheduleItemTypeChip(mobileColors, isDark, item);
                   const shiftName = getScheduleItemShiftName(item);
                   const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, typeChip);
                   const focusAreaName = getScheduleItemFocusArea(item);
@@ -3239,7 +3371,7 @@ function UpcomingShiftsSection({
                                   <Ionicons
                                     color={mobileColors.textMuted}
                                     name="time-outline"
-                                    size={18}
+                                    size={14}
                                   />
                                   <Text style={styles.upcomingShiftTimeText}>{timeRange}</Text>
                                 </View>
@@ -3259,7 +3391,7 @@ function UpcomingShiftsSection({
                               <Ionicons
                                 color={mobileColors.textMuted}
                                 name="time-outline"
-                                size={18}
+                                size={14}
                               />
                               <Text style={styles.upcomingShiftTimeText}>{timeRange}</Text>
                             </View>
@@ -3287,6 +3419,9 @@ function UpcomingShiftsSection({
 }
 
 function UpcomingShiftDashedDivider() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View
       pointerEvents="none"
@@ -3332,6 +3467,9 @@ function OpenShiftsSection({
   onVolunteer: (openShift: MobileOpenShift) => void;
   onSeeAll: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [stackCardHeights, setStackCardHeights] = useState<Record<string, number>>({});
   const availableOpenShiftFeed = useMemo(
@@ -3396,7 +3534,7 @@ function OpenShiftsSection({
       const isVolunteerLoading =
         volunteerBody != null &&
         pendingAction?.key === getMobileRequestActionKey(item.openShift.id, volunteerBody);
-      const jobChip = getOpenShiftJobChip(item.openShift);
+      const jobChip = getOpenShiftJobChip(mobileColors, isDark, item.openShift);
       const isMentored = hasMentoredSegments(item.openShift.presentation.segments);
       const shiftName = getOpenShiftShiftName(item.openShift);
       const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
@@ -3422,7 +3560,7 @@ function OpenShiftsSection({
               <SplitShiftSegmentList
                 renderSegmentChip={(segment) => (
                   <JobPill
-                    chip={getSegmentJobChip(segment)}
+                    chip={getSegmentJobChip(mobileColors, isDark, segment)}
                     compact
                     eyebrowDisplay="outside"
                     isMentored={segment.isMentored === true}
@@ -3512,7 +3650,7 @@ function OpenShiftsSection({
     const isClaimLoading =
       claimBody != null &&
       pendingAction?.key === getMobileRequestActionKey(item.request.id, claimBody);
-    const jobChip = getRequestJobChip(item.request, "requester");
+    const jobChip = getRequestJobChip(mobileColors, isDark, item.request, "requester");
     const isMentored = hasMentoredSegments(getRequestSegments(item.request, "requester"));
     const shiftName = getRequestShiftName(item.request, "requester");
     const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
@@ -3726,6 +3864,10 @@ function ShiftCoverRequestsSection({
   requestsError: unknown;
   onRespond: (requestId: string, accept: boolean) => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
+
   if (!isLoading && !requestsError && requests.length === 0) {
     return null;
   }
@@ -3744,8 +3886,13 @@ function ShiftCoverRequestsSection({
       ) : (
         <View style={styles.requestList}>
           {requests.map((request) => {
-            const avatarTone = getAvatarTone(request.requesterEmpId);
-            const jobChip = getRequestJobChip(request, "requester");
+            const avatarTone = getAvatarTone(request.requesterEmpId, resolvedTheme === "dark");
+            const jobChip = getRequestJobChip(
+              mobileColors,
+              resolvedTheme === "dark",
+              request,
+              "requester",
+            );
             const shiftName = getRequestShiftName(request, "requester");
             const shouldShowShiftName = shouldShowMePrimaryTitle(shiftName, jobChip);
             const focusAreaName = getRequestFocusAreaName(request, "requester");
@@ -3844,12 +3991,15 @@ function TeamShiftMemberRow({
   row: TeamScheduleShiftRow;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
   const { entry, segment } = row;
-  const avatarTone = getAvatarTone(entry.employeeId);
+  const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");
   const memberName = entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
   const memberTimeRange = getTeamShiftRowTimeRange(row, groupTimeRange);
   const alternateShiftLabel = formatAlternateShiftTitles(row.alternateShiftTitles);
-  const roleChip = getTeamMemberRoleChip(entry, segment);
+  const roleChip = getTeamMemberRoleChip(mobileColors, resolvedTheme === "dark", entry, segment);
   const isMentored = segment
     ? segment.isMentored === true
     : hasMentoredSegments(getScheduleEntrySegments(entry));
@@ -3900,24 +4050,31 @@ function TeamShiftMemberRow({
 }
 
 function getTeamMemberRoleChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   entry: MobileScheduleEntry,
   segment?: MobileScheduleEntrySegment | null,
 ): JobChip | null {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
-    return buildAbsenceChip(getScheduleEntryTitle(entry), entry.presentation);
+    return buildAbsenceChip(mobileColors, isDark, getScheduleEntryTitle(entry), entry.presentation);
   }
 
   if (segment) {
-    return getSegmentJobChip(segment);
+    return getSegmentJobChip(mobileColors, isDark, segment);
   }
 
   const primarySegment = getScheduleEntrySegments(entry)[0] ?? null;
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(getScheduleEntryTitle(entry), primarySegment);
+    return buildGeneralShiftChip(
+      mobileColors,
+      isDark,
+      getScheduleEntryTitle(entry),
+      primarySegment,
+    );
   }
 
   const jobSegment = getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
-  return buildJobChip(jobSegment?.jobName ?? null, jobSegment);
+  return buildJobChip(mobileColors, isDark, jobSegment?.jobName ?? null, jobSegment);
 }
 
 function getInitials(name: string): string {
@@ -3933,1513 +4090,1497 @@ function getInitials(name: string): string {
   return `${first}${last}` || "?";
 }
 
-function hashCode(value: string): number {
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
-  }
-
-  return Math.abs(hash);
-}
-
-function getAvatarTone(seed: string): AvatarTone {
-  const hue = hashCode(seed) % 360;
-
-  return {
-    backgroundColor: `hsl(${hue}, 70%, 92%)`,
-    borderColor: `hsl(${hue}, 70%, 85%)`,
-    textColor: `hsl(${hue}, 70%, 35%)`,
-  };
-}
-
-const styles = StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  loadingBody: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  stickyControlsSection: {
-    gap: 16,
-  },
-  scheduleCalendarStickyHeaderShell: {
-    backgroundColor: mobileColors.borderSubtle,
-    borderBottomWidth: 0.5,
-    borderBottomColor: mobileColors.border,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 2,
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
     },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  mePage: {
-    gap: 22,
-    paddingTop: 8,
-  },
-  mePageEmpty: {
-    justifyContent: "center",
-    paddingTop: 0,
-  },
-  meTopStack: {
-    gap: 18,
-  },
-  meWelcomeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 16,
-  },
-  meWelcomeCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  meWelcomeDate: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textSubtle,
-  },
-  meWelcomeTitle: {
-    ...mobileText.sectionTitle,
-    fontSize: 20,
-    lineHeight: 25,
-    color: mobileColors.textPrimary,
-  },
-  meWeekNavigator: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 14,
-    paddingVertical: 2,
-  },
-  meWeekNavigatorCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 4,
-  },
-  meWeekNavigatorTitle: {
-    ...mobileText.sectionTitle,
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: "800",
-    color: mobileColors.textPrimary,
-  },
-  meWeekNavigatorRangeLabel: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textSecondary,
-  },
-  meWeekNavigatorActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flexShrink: 0,
-  },
-  meWeekRangeControlGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexShrink: 0,
-    gap: 8,
-  },
-  meTodayButton: {
-    minHeight: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-    backgroundColor: mobileColors.brandSoft,
-    justifyContent: "center",
-    paddingHorizontal: 14,
-  },
-  meTodayButtonPressed: {
-    opacity: 0.82,
-  },
-  meTodayButtonText: {
-    ...mobileText.meta,
-    color: mobileColors.brand,
-    fontFamily: "DMSans_700Bold",
-    fontWeight: "700",
-  },
-  meHeroCard: {
-    position: "relative",
-    overflow: "hidden",
-    backgroundColor: ME_HERO_CARD_BACKGROUND,
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
-    shadowColor: "rgba(37, 99, 235, 0.3)",
-    shadowOffset: {
-      width: 0,
-      height: 14,
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
     },
-    shadowOpacity: 1,
-    shadowRadius: 28,
-    elevation: 5,
-  },
-  meHeroCardMuted: {
-    backgroundColor: "#E2E8F0",
-    shadowColor: mobileColors.shadow,
-  },
-  meHeroCardPressed: {
-    opacity: 0.94,
-  },
-  meHeroGlow: {
-    position: "absolute",
-    borderRadius: 999,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
-  },
-  meHeroGlowLarge: {
-    width: 180,
-    height: 180,
-    top: -72,
-    right: -58,
-  },
-  meHeroGlowSmall: {
-    width: 140,
-    height: 140,
-    bottom: -64,
-    left: -24,
-    backgroundColor: "rgba(15, 23, 42, 0.08)",
-  },
-  meHeroGlowMuted: {
-    backgroundColor: "rgba(255, 255, 255, 0.22)",
-  },
-  meHeroContent: {
-    gap: 11,
-  },
-  meHeroHeader: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  meHeroHeaderCopy: {
-    flex: 1,
-    gap: 10,
-  },
-  meHeroStatusStack: {
-    flex: 1,
-    minWidth: 0,
-    gap: 6,
-  },
-  meHeroBadge: {
-    alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  meHeroBadgeMuted: {
-    backgroundColor: "rgba(255, 255, 255, 0.55)",
-  },
-  meHeroBadgeDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-  },
-  meHeroBadgeDotActive: {
-    backgroundColor: "#86EFAC",
-  },
-  meHeroBadgeDotScheduled: {
-    backgroundColor: "#BFDBFE",
-  },
-  meHeroBadgeDotMuted: {
-    backgroundColor: mobileColors.textMuted,
-  },
-  meHeroBadgeText: {
-    ...mobileText.label,
-    color: mobileColors.textInverse,
-    textTransform: "uppercase",
-  },
-  meHeroBadgeTextMuted: {
-    color: mobileColors.textPrimary,
-  },
-  meHeroDateTile: {
-    minWidth: 58,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.22)",
-    backgroundColor: "rgba(255, 255, 255, 0.14)",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  meHeroDateWeekday: {
-    ...mobileText.label,
-    color: "rgba(255, 255, 255, 0.72)",
-  },
-  meHeroDateDay: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textInverse,
-  },
-  meHeroDateText: {
-    ...mobileText.meta,
-    alignSelf: "flex-start",
-    color: "rgba(255, 255, 255, 0.86)",
-    fontWeight: "600",
-  },
-  meHeroTitle: {
-    flexShrink: 1,
-    minWidth: 0,
-    ...mobileText.heroMetric,
-    color: mobileColors.textInverse,
-  },
-  meHeroTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  meHeroHeading: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textInverse,
-  },
-  meHeroHeadingMuted: {
-    color: mobileColors.textSecondary,
-  },
-  meHeroTitleMuted: {
-    color: mobileColors.textPrimary,
-  },
-  meHeroSupportingText: {
-    ...mobileText.body,
-    color: "rgba(255, 255, 255, 0.84)",
-    fontWeight: "500",
-  },
-  meHeroSupportingTextMuted: {
-    color: mobileColors.textMuted,
-  },
-  meHeroAreaLabel: {
-    ...mobileText.rowTitle,
-    color: "rgba(255, 255, 255, 0.86)",
-  },
-  meHeroAreaLabelMuted: {
-    color: mobileColors.textSecondary,
-  },
-  meHeroMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  meHeroAreaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 2,
-  },
-  meHeroRoleRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  meTypePillStack: {
-    alignSelf: "flex-start",
-    gap: 4,
-  },
-  meTypePillLabel: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textMuted,
-  },
-  meTypePillLabelRow: {
-    fontSize: 17,
-    lineHeight: 22,
-  },
-  meTypePillLabelHero: {
-    fontSize: 24,
-    lineHeight: 30,
-  },
-  meTypePillLabelInverse: {
-    color: "rgba(255, 255, 255, 0.82)",
-  },
-  meHeroScheduleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 6,
-  },
-  meHeroTimeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    gap: 9,
-    minWidth: 0,
-  },
-  meHeroTimeText: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textInverse,
-    flexShrink: 1,
-  },
-  meHeroTimePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(29, 78, 216, 0.22)",
-    borderRadius: mobileRadii.control,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  meHeroTimePillMuted: {
-    backgroundColor: "rgba(255, 255, 255, 0.58)",
-  },
-  meHeroTimePillText: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textInverse,
-  },
-  meHeroTimePillTextMuted: {
-    color: mobileColors.textSecondary,
-  },
-  meHeroActionIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
-  },
-  meHeroActionIconMuted: {
-    backgroundColor: "rgba(255, 255, 255, 0.55)",
-  },
-  meHeroEmptyText: {
-    ...mobileText.body,
-    color: "rgba(255, 255, 255, 0.84)",
-    fontWeight: "500",
-  },
-  meHeroEmptyBlock: {
-    gap: 10,
-  },
-  meHeroEmptyTextMuted: {
-    color: mobileColors.textSecondary,
-  },
-  meHeroDetails: {
-    gap: 8,
-  },
-  meHeroDetailText: {
-    color: "rgba(255, 255, 255, 0.88)",
-    fontSize: 14,
-    fontWeight: "600",
-    lineHeight: 20,
-  },
-  meHeroDetailTextMuted: {
-    color: mobileColors.textSecondary,
-  },
-  meHeroProgressBlock: {
-    gap: 10,
-    marginTop: 4,
-  },
-  meHeroProgressRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  meHeroProgressLabel: {
-    ...mobileText.rowTitle,
-    color: "rgba(255, 255, 255, 0.86)",
-    flexShrink: 0,
-  },
-  meHeroProgressTrack: {
-    height: 7,
-    borderRadius: 999,
-    backgroundColor: "rgba(15, 23, 42, 0.24)",
-    overflow: "hidden",
-  },
-  meHeroProgressFill: {
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor: "#42E878",
-  },
-  meHeroCollaborators: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.14)",
-    backgroundColor: ME_HERO_COLLABORATOR_BACKGROUND,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    marginTop: 6,
-  },
-  meHeroCollaboratorLabelRow: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-  meHeroCollaboratorLabel: {
-    ...mobileText.rowTitle,
-    color: "rgba(255, 255, 255, 0.84)",
-    flexShrink: 1,
-  },
-  meHeroAvatarStack: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexShrink: 0,
-  },
-  meHeroCollaboratorAvatarFrame: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: ME_HERO_COLLABORATOR_BACKGROUND,
-    padding: 2,
-  },
-  meHeroCollaboratorAvatarFrameOverlap: {
-    marginLeft: ME_HERO_AVATAR_FRAME_OVERLAP,
-  },
-  meHeroCollaboratorAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: "#2946C7",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  meHeroCollaboratorAvatarText: {
-    ...mobileText.meta,
-    fontWeight: "600",
-  },
-  meHeroCollaboratorOverflow: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: "#93C5FD",
-    backgroundColor: "#DBEAFE",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  meHeroCollaboratorOverflowText: {
-    ...mobileText.bodyStrong,
-    color: "#1D4ED8",
-  },
-  meSectionBlock: {
-    gap: 12,
-  },
-  upcomingSectionBlock: {
-    gap: 18,
-  },
-  upcomingSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 14,
-  },
-  upcomingSectionTitle: {
-    ...mobileText.sectionTitle,
-    fontSize: 18,
-    lineHeight: 24,
-    flex: 1,
-    color: mobileColors.textPrimary,
-  },
-  upcomingHoursBadge: {
-    borderRadius: 12,
-    backgroundColor: mobileColors.brandSoft,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  upcomingHoursBadgeText: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.brand,
-  },
-  upcomingShiftsCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    paddingHorizontal: 20,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: {
-      width: 0,
+    loadingBody: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    stickyControlsSection: {
+      gap: 16,
+    },
+    scheduleCalendarStickyHeaderShell: {
+      backgroundColor: mobileColors.borderSubtle,
+      borderBottomWidth: 0.5,
+      borderBottomColor: mobileColors.border,
+      shadowColor: mobileColors.shadow,
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    mePage: {
+      gap: 22,
+      paddingTop: 8,
+    },
+    mePageEmpty: {
+      justifyContent: "center",
+      paddingTop: 0,
+    },
+    meTopStack: {
+      gap: 18,
+    },
+    meWelcomeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 16,
+    },
+    meWelcomeCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    meWelcomeDate: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textSubtle,
+    },
+    meWelcomeTitle: {
+      ...mobileText.sectionTitle,
+      fontSize: 20,
+      lineHeight: 25,
+      color: mobileColors.textPrimary,
+    },
+    meWeekNavigator: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 14,
+      paddingVertical: 2,
+    },
+    meWeekNavigatorCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 4,
+    },
+    meWeekNavigatorTitle: {
+      ...mobileText.sectionTitle,
+      fontSize: 26,
+      lineHeight: 32,
+      fontWeight: "800",
+      color: mobileColors.textPrimary,
+    },
+    meWeekNavigatorRangeLabel: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textSecondary,
+    },
+    meWeekNavigatorActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flexShrink: 0,
+    },
+    meWeekRangeControlGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexShrink: 0,
+      gap: 8,
+    },
+    meTodayButton: {
+      minHeight: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      backgroundColor: mobileColors.brandSoft,
+      justifyContent: "center",
+      paddingHorizontal: 14,
+    },
+    meTodayButtonPressed: {
+      opacity: 0.82,
+    },
+    meTodayButtonText: {
+      ...mobileText.meta,
+      color: mobileColors.brand,
+      fontFamily: "DMSans_700Bold",
+      fontWeight: "700",
+    },
+    meHeroCard: {
+      position: "relative",
+      overflow: "hidden",
+      borderRadius: 24,
+      paddingHorizontal: 18,
+      paddingVertical: 18,
+      shadowOffset: {
+        width: 0,
+        height: 14,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 28,
+      elevation: 5,
+    },
+    meHeroCardMuted: {
+      backgroundColor: "#E2E8F0",
+      shadowColor: mobileColors.shadow,
+    },
+    meHeroCardPressed: {
+      opacity: 0.94,
+    },
+    meHeroGlow: {
+      position: "absolute",
+      borderRadius: 999,
+      backgroundColor: "rgba(255, 255, 255, 0.12)",
+    },
+    meHeroGlowLarge: {
+      width: 180,
+      height: 180,
+      top: -72,
+      right: -58,
+    },
+    meHeroGlowSmall: {
+      width: 140,
+      height: 140,
+      bottom: -64,
+      left: -24,
+      backgroundColor: "rgba(15, 23, 42, 0.08)",
+    },
+    meHeroGlowMuted: {
+      backgroundColor: "rgba(255, 255, 255, 0.22)",
+    },
+    meHeroContent: {
+      gap: 11,
+    },
+    meHeroHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    meHeroHeaderCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 10,
+    },
+    meHeroBadge: {
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    meHeroBadgeMuted: {
+      backgroundColor: "rgba(255, 255, 255, 0.55)",
+    },
+    meHeroBadgeDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 4.5,
+    },
+    meHeroBadgeDotActive: {
+      backgroundColor: "#86EFAC",
+    },
+    meHeroBadgeDotScheduled: {
+      backgroundColor: "#BFDBFE",
+    },
+    meHeroBadgeDotMuted: {
+      backgroundColor: mobileColors.textMuted,
+    },
+    meHeroBadgeText: {
+      ...mobileText.label,
+      color: mobileColors.textInverse,
+      textTransform: "uppercase",
+    },
+    meHeroBadgeTextMuted: {
+      color: mobileColors.textPrimary,
+    },
+    meHeroDateTile: {
+      minWidth: 58,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.22)",
+      backgroundColor: "rgba(255, 255, 255, 0.14)",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    meHeroDateWeekday: {
+      ...mobileText.label,
+      color: "rgba(255, 255, 255, 0.72)",
+    },
+    meHeroDateDay: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textInverse,
+    },
+    meHeroDateText: {
+      ...mobileText.meta,
+      alignSelf: "flex-start",
+      color: "rgba(255, 255, 255, 0.86)",
+      fontWeight: "600",
+    },
+    meHeroTitle: {
+      flexShrink: 1,
+      minWidth: 0,
+      ...mobileText.heroMetric,
+      color: mobileColors.textInverse,
+    },
+    meHeroTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    meHeroHeading: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textInverse,
+    },
+    meHeroHeadingMuted: {
+      color: mobileColors.textSecondary,
+    },
+    meHeroTitleMuted: {
+      color: mobileColors.textPrimary,
+    },
+    meHeroSupportingText: {
+      ...mobileText.body,
+      color: "rgba(255, 255, 255, 0.84)",
+      fontWeight: "500",
+    },
+    meHeroSupportingTextMuted: {
+      color: mobileColors.textMuted,
+    },
+    meHeroAreaLabel: {
+      ...mobileText.rowTitle,
+      color: "rgba(255, 255, 255, 0.86)",
+    },
+    meHeroAreaLabelMuted: {
+      color: mobileColors.textSecondary,
+    },
+    meHeroMetaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    meHeroAreaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 2,
+    },
+    meHeroRoleRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+    },
+    meTypePillStack: {
+      alignSelf: "flex-start",
+      gap: 4,
+    },
+    meTypePillLabel: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textMuted,
+    },
+    meTypePillLabelRow: {
+      fontSize: 17,
+      lineHeight: 22,
+    },
+    meTypePillLabelHero: {
+      fontSize: 24,
+      lineHeight: 30,
+    },
+    meTypePillLabelInverse: {
+      color: "rgba(255, 255, 255, 0.82)",
+    },
+    meHeroScheduleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 10,
+      marginTop: 6,
+    },
+    meHeroTimeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+      gap: 9,
+      minWidth: 0,
+    },
+    meHeroTimeText: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textInverse,
+      flexShrink: 1,
+    },
+    meHeroTimePill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      alignSelf: "flex-start",
+      backgroundColor: "rgba(29, 78, 216, 0.22)",
+      borderRadius: mobileRadii.control,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    meHeroTimePillMuted: {
+      backgroundColor: "rgba(255, 255, 255, 0.58)",
+    },
+    meHeroTimePillText: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textInverse,
+    },
+    meHeroTimePillTextMuted: {
+      color: mobileColors.textSecondary,
+    },
+    meHeroActionIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(255, 255, 255, 0.18)",
+    },
+    meHeroActionIconMuted: {
+      backgroundColor: "rgba(255, 255, 255, 0.55)",
+    },
+    meHeroEmptyText: {
+      ...mobileText.body,
+      color: "rgba(255, 255, 255, 0.84)",
+      fontWeight: "500",
+    },
+    meHeroEmptyBlock: {
+      gap: 10,
+    },
+    meHeroEmptyTextMuted: {
+      color: mobileColors.textSecondary,
+    },
+    meHeroDetails: {
+      gap: 8,
+    },
+    meHeroDetailText: {
+      color: "rgba(255, 255, 255, 0.88)",
+      fontSize: 14,
+      fontWeight: "600",
+      lineHeight: 20,
+    },
+    meHeroDetailTextMuted: {
+      color: mobileColors.textSecondary,
+    },
+    meHeroProgressBlock: {
+      gap: 10,
+      marginTop: 4,
+    },
+    meHeroProgressRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    meHeroProgressLabel: {
+      ...mobileText.rowTitle,
+      color: "rgba(255, 255, 255, 0.86)",
+      flexShrink: 0,
+    },
+    meHeroProgressTrack: {
+      height: 7,
+      borderRadius: 999,
+      backgroundColor: "rgba(15, 23, 42, 0.24)",
+      overflow: "hidden",
+    },
+    meHeroProgressFill: {
+      height: "100%",
+      borderRadius: 999,
+      backgroundColor: "#42E878",
+    },
+    meHeroCollaborators: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.14)",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      marginTop: 6,
+      marginBottom: 6,
+    },
+    meHeroCollaboratorLabelRow: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+    },
+    meHeroCollaboratorLabel: {
+      ...mobileText.rowTitle,
+      color: "rgba(255, 255, 255, 0.84)",
+      flexShrink: 1,
+    },
+    meHeroAvatarStack: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexShrink: 0,
+    },
+    meHeroCollaboratorAvatarFrame: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      padding: 2,
+    },
+    meHeroCollaboratorAvatarFrameOverlap: {
+      marginLeft: ME_HERO_AVATAR_FRAME_OVERLAP,
+    },
+    meHeroCollaboratorAvatar: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      borderWidth: 1,
+      borderColor: "#2946C7",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    meHeroCollaboratorAvatarText: {
+      ...mobileText.meta,
+      fontWeight: "600",
+    },
+    meHeroCollaboratorOverflow: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      borderWidth: 1,
+      borderColor: "#93C5FD",
+      backgroundColor: "#DBEAFE",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    meHeroCollaboratorOverflowText: {
+      ...mobileText.bodyStrong,
+      color: "#1D4ED8",
+    },
+    meSectionBlock: {
+      gap: 12,
+    },
+    upcomingSectionBlock: {
+      gap: 18,
+    },
+    upcomingSectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 14,
+    },
+    upcomingSectionTitle: {
+      ...mobileText.sectionTitle,
+      fontSize: 18,
+      lineHeight: 24,
+      flex: 1,
+      color: mobileColors.textPrimary,
+    },
+    upcomingHoursBadge: {
+      borderRadius: 12,
+      backgroundColor: mobileColors.brandSoft,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+    },
+    upcomingHoursBadgeText: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.brand,
+    },
+    upcomingShiftsCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      paddingHorizontal: 20,
+      shadowColor: mobileColors.shadow,
+      shadowOffset: {
+        width: 0,
+        height: 12,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 24,
+      elevation: 3,
+    },
+    upcomingDateGroup: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: 18,
+      marginHorizontal: -20,
+      paddingHorizontal: 20,
+    },
+    upcomingDateColumn: {
+      width: 60,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 18,
+    },
+    upcomingDateShiftStack: {
+      flex: 1,
+      minWidth: 0,
+    },
+    upcomingShiftRow: {
+      minHeight: 132,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 18,
+      paddingVertical: 18,
+    },
+    upcomingShiftRowBorder: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+    },
+    upcomingShiftDashedDivider: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    upcomingShiftDashedDividerSegment: {
+      flex: 1,
+      height: 1,
+      borderRadius: 999,
+      backgroundColor: mobileColors.border,
+    },
+    upcomingShiftRowToday: {
+      backgroundColor: mobileColors.brandSoft,
+    },
+    upcomingShiftRowTodayFirst: {
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+    },
+    upcomingShiftRowTodayLast: {
+      borderBottomLeftRadius: 28,
+      borderBottomRightRadius: 28,
+    },
+    upcomingDateTile: {
+      width: 60,
+      height: 68,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surfaceMuted,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+    },
+    upcomingDateWeekday: {
+      ...mobileText.micro,
+      color: mobileColors.textSubtle,
+      fontSize: 11,
+    },
+    upcomingDateDay: {
+      ...mobileText.sectionTitle,
+      fontSize: 20,
+      lineHeight: 24,
+      color: mobileColors.textSecondary,
+    },
+    upcomingDateTodayDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 999,
+      backgroundColor: mobileColors.danger,
+      marginTop: 1,
+    },
+    upcomingShiftCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 9,
+    },
+    upcomingShiftTitleRow: {
+      // flex-start (not center) so the time stays pinned to the title's first
+      // line instead of drifting to the vertical middle when a long shift name
+      // wraps to two lines.
+      alignItems: "flex-start",
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 8,
+    },
+    upcomingShiftTitleMeta: {
+      flex: 1,
+      minWidth: 0,
+      alignItems: "center",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    upcomingShiftTitle: {
+      flexShrink: 1,
+      minWidth: 0,
+      ...mobileText.sectionTitle,
+      fontSize: 17,
+      color: mobileColors.textPrimary,
+    },
+    upcomingShiftArea: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textSecondary,
+    },
+    upcomingShiftTime: {
+      flexShrink: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      // upcomingShiftTitle's line-height (sectionTitle preset) adds leading
+      // space above its glyphs that this shorter icon+text row doesn't have —
+      // nudge down so it lines up with the title's actual text, not its box top.
+      paddingTop: 3,
+    },
+    // Smaller and lighter than upcomingShiftTitle (17px) — the time is
+    // secondary to the shift name, not competing with it for attention.
+    upcomingShiftTimeText: {
+      ...mobileText.caption,
+      fontSize: 13,
+      color: mobileColors.textSubtle,
+    },
+    upcomingShiftAction: {
+      width: 24,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    meSectionHeader: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    meSectionHeaderCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    meSectionTitle: {
+      ...mobileText.sectionTitle,
+      fontSize: 18,
+      color: mobileColors.textPrimary,
+    },
+    meSectionLink: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.brand,
+    },
+    meSurfaceCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 18,
+      shadowColor: mobileColors.shadow,
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 18,
+      elevation: 2,
+    },
+    meSectionBody: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    scheduleListRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 16,
+      paddingVertical: 16,
+    },
+    scheduleListRowBorder: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+    },
+    scheduleListCopy: {
+      flex: 1,
+      gap: 8,
+    },
+    scheduleRowDate: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textMuted,
+    },
+    scheduleRowTitle: {
+      ...mobileText.sectionTitle,
+      fontSize: 17,
+      color: mobileColors.textPrimary,
+    },
+    scheduleRowTitleWithBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    scheduleRowMeta: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textSecondary,
+    },
+    scheduleRowContext: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    scheduleRowContextStack: {
+      gap: 8,
+    },
+    scheduleRowTime: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    scheduleRowTimeText: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    scheduleRowArrow: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surfaceSecondary,
+    },
+    openShiftCarousel: {
+      marginHorizontal: -OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+    },
+    openShiftCarouselContent: {
+      gap: 14,
+      paddingHorizontal: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+      paddingTop: 4,
+      paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+      paddingRight: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE + 4,
+    },
+    openShiftDateCard: {
+      width: 320,
+      gap: 12,
+    },
+    openShiftDateHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    openShiftDateCardItems: {
+      gap: 14,
+      paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+    },
+    openShiftDateCardItemsStacked: {
+      gap: 0,
+      minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
+      position: "relative",
+    },
+    openShiftCountBadge: {
+      minWidth: 28,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      backgroundColor: mobileColors.brandSoft,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    openShiftCountBadgeText: {
+      ...mobileText.badge,
+      color: mobileColors.brand,
+    },
+    openShiftCard: {
+      minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
+      gap: 12,
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 18,
+      shadowColor: mobileColors.shadow,
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 18,
+      elevation: 2,
+    },
+    openShiftCardSurface: {
+      gap: 12,
+    },
+    openShiftSplitPanel: {
+      gap: 10,
+    },
+    openShiftCardLead: {
+      zIndex: MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS + 1,
+    },
+    openShiftCardStacked: {
+      position: "absolute",
+      shadowRadius: 14,
+    },
+    requestList: {
+      gap: 14,
+    },
+    requestCard: {
+      gap: 14,
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 18,
+      shadowColor: mobileColors.shadow,
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 18,
+      elevation: 2,
+    },
+    requestHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    requestHeaderCopy: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    requestAvatar: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    requestAvatarText: {
+      ...mobileText.bodyStrong,
+    },
+    requestHeaderText: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    requestHeaderTextStack: {
+      flex: 1,
+      gap: 2,
+    },
+    requestHeaderSubtext: {
+      ...mobileText.meta,
+      color: mobileColors.textSecondary,
+      fontWeight: "600",
+    },
+    requestDateText: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textMuted,
+    },
+    requestActions: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    jobPill: {
+      alignSelf: "flex-start",
+      borderRadius: 8,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    jobPillCompact: {
+      borderRadius: 8,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+    },
+    jobPillTextStack: {
+      gap: 2,
+    },
+    jobPillInlineTextRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    jobPillEyebrowText: {
+      ...mobileText.micro,
+    },
+    jobPillEyebrowTextCompact: {
+      fontSize: 9,
+    },
+    jobPillText: {
+      ...mobileText.badge,
+      textTransform: "uppercase",
+    },
+    jobPillMentoredText: {
+      textTransform: "none",
+    },
+    jobPillTextCompact: {
+      fontSize: 12,
+    },
+    jobPillValueText: {
+      ...mobileText.meta,
+      fontWeight: "600",
+    },
+    jobPillValueTextCompact: {
+      fontSize: 12,
+    },
+    mentoredPill: {
+      alignSelf: "flex-start",
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surfaceSecondary,
+      minHeight: 28,
+      justifyContent: "center",
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    mentoredPillText: {
+      ...mobileText.badge,
+      color: mobileColors.textSecondary,
+    },
+    meCollaboratorList: {
+      gap: 0,
+    },
+    meCollaboratorRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+      paddingVertical: 12,
+    },
+    meCollaboratorRowBorder: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+    },
+    meCollaboratorAvatar: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: mobileColors.brandSoft,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    meCollaboratorAvatarText: {
+      ...mobileText.meta,
+      color: mobileColors.brand,
+      fontWeight: "600",
+    },
+    meCollaboratorCopy: {
+      flex: 1,
+      gap: 8,
+    },
+    meCollaboratorName: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textPrimary,
+    },
+    timelineList: {
+      gap: 18,
+    },
+    timelineSection: {
+      gap: 12,
+      paddingLeft: 18,
+      marginLeft: 4,
+      borderLeftWidth: 2,
+      borderLeftColor: mobileColors.borderSubtle,
+    },
+    timelineSectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      marginLeft: -25,
+    },
+    timelineDot: {
+      width: 12,
       height: 12,
+      borderRadius: 6,
+      borderWidth: 3,
+      borderColor: mobileColors.background,
+      backgroundColor: mobileColors.brand,
     },
-    shadowOpacity: 1,
-    shadowRadius: 24,
-    elevation: 3,
-  },
-  upcomingDateGroup: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: 18,
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
-  },
-  upcomingDateColumn: {
-    width: 60,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 18,
-  },
-  upcomingDateShiftStack: {
-    flex: 1,
-    minWidth: 0,
-  },
-  upcomingShiftRow: {
-    minHeight: 132,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 18,
-    paddingVertical: 18,
-  },
-  upcomingShiftRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-  },
-  upcomingShiftDashedDivider: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  upcomingShiftDashedDividerSegment: {
-    flex: 1,
-    height: 1,
-    borderRadius: 999,
-    backgroundColor: mobileColors.border,
-  },
-  upcomingShiftRowToday: {
-    backgroundColor: mobileColors.brandSoft,
-  },
-  upcomingShiftRowTodayFirst: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-  },
-  upcomingShiftRowTodayLast: {
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-  },
-  upcomingDateTile: {
-    width: 60,
-    height: 68,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surfaceMuted,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  upcomingDateWeekday: {
-    ...mobileText.micro,
-    color: mobileColors.textSubtle,
-    fontSize: 11,
-  },
-  upcomingDateDay: {
-    ...mobileText.sectionTitle,
-    fontSize: 20,
-    lineHeight: 24,
-    color: mobileColors.textSecondary,
-  },
-  upcomingDateTodayDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: mobileColors.danger,
-    marginTop: 1,
-  },
-  upcomingShiftCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 9,
-  },
-  upcomingShiftTitleRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  upcomingShiftTitleMeta: {
-    flex: 1,
-    minWidth: 0,
-    alignItems: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  upcomingShiftTitle: {
-    flexShrink: 1,
-    minWidth: 0,
-    ...mobileText.sectionTitle,
-    fontSize: 17,
-    color: mobileColors.textPrimary,
-  },
-  upcomingShiftArea: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textSecondary,
-  },
-  upcomingShiftTime: {
-    flexShrink: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  upcomingShiftTimeText: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textSubtle,
-  },
-  upcomingShiftAction: {
-    width: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  meSectionHeader: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  meSectionHeaderCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  meSectionTitle: {
-    ...mobileText.sectionTitle,
-    fontSize: 18,
-    color: mobileColors.textPrimary,
-  },
-  meSectionLink: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.brand,
-  },
-  meSurfaceCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 18,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 8,
+    timelineSectionTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
     },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 2,
-  },
-  meSectionBody: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  scheduleListRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-    paddingVertical: 16,
-  },
-  scheduleListRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-  },
-  scheduleListCopy: {
-    flex: 1,
-    gap: 8,
-  },
-  scheduleRowDate: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textMuted,
-  },
-  scheduleRowTitle: {
-    ...mobileText.sectionTitle,
-    fontSize: 17,
-    color: mobileColors.textPrimary,
-  },
-  scheduleRowTitleWithBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  scheduleRowMeta: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textSecondary,
-  },
-  scheduleRowContext: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  scheduleRowContextStack: {
-    gap: 8,
-  },
-  scheduleRowTime: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  scheduleRowTimeText: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  scheduleRowArrow: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surfaceSecondary,
-  },
-  openShiftCarousel: {
-    marginHorizontal: -OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
-  },
-  openShiftCarouselContent: {
-    gap: 14,
-    paddingHorizontal: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
-    paddingTop: 4,
-    paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
-    paddingRight: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE + 4,
-  },
-  openShiftDateCard: {
-    width: 320,
-    gap: 12,
-  },
-  openShiftDateHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  openShiftDateCardItems: {
-    gap: 14,
-    paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
-  },
-  openShiftDateCardItemsStacked: {
-    gap: 0,
-    minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
-    position: "relative",
-  },
-  openShiftCountBadge: {
-    minWidth: 28,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: mobileRadii.pill,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-    backgroundColor: mobileColors.brandSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  openShiftCountBadgeText: {
-    ...mobileText.badge,
-    color: mobileColors.brand,
-  },
-  openShiftCard: {
-    minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
-    gap: 12,
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 18,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 8,
+    timelineSectionEntries: {
+      gap: 10,
     },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 2,
-  },
-  openShiftCardSurface: {
-    gap: 12,
-  },
-  openShiftSplitPanel: {
-    gap: 10,
-  },
-  openShiftCardLead: {
-    zIndex: MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS + 1,
-  },
-  openShiftCardStacked: {
-    position: "absolute",
-    shadowRadius: 14,
-  },
-  requestList: {
-    gap: 14,
-  },
-  requestCard: {
-    gap: 14,
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 18,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 8,
+    timelineEntryCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 16,
+      shadowColor: mobileColors.shadow,
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 14,
+      elevation: 2,
     },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 2,
-  },
-  requestHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  requestHeaderCopy: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  requestAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  requestAvatarText: {
-    ...mobileText.bodyStrong,
-  },
-  requestHeaderText: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-  },
-  requestHeaderTextStack: {
-    flex: 1,
-    gap: 2,
-  },
-  requestHeaderSubtext: {
-    ...mobileText.meta,
-    color: mobileColors.textSecondary,
-    fontWeight: "600",
-  },
-  requestDateText: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textMuted,
-  },
-  requestActions: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  jobPill: {
-    alignSelf: "flex-start",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  jobPillCompact: {
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  jobPillTextStack: {
-    gap: 2,
-  },
-  jobPillInlineTextRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  jobPillEyebrowText: {
-    ...mobileText.micro,
-  },
-  jobPillEyebrowTextCompact: {
-    fontSize: 9,
-  },
-  jobPillText: {
-    ...mobileText.badge,
-    textTransform: "uppercase",
-  },
-  jobPillMentoredText: {
-    textTransform: "none",
-  },
-  jobPillTextCompact: {
-    fontSize: 12,
-  },
-  jobPillValueText: {
-    ...mobileText.meta,
-    fontWeight: "600",
-  },
-  jobPillValueTextCompact: {
-    fontSize: 12,
-  },
-  mentoredPill: {
-    alignSelf: "flex-start",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surfaceSecondary,
-    minHeight: 28,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  mentoredPillText: {
-    ...mobileText.badge,
-    color: mobileColors.textSecondary,
-  },
-  meCollaboratorList: {
-    gap: 0,
-  },
-  meCollaboratorRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    paddingVertical: 12,
-  },
-  meCollaboratorRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-  },
-  meCollaboratorAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: mobileColors.brandSoft,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  meCollaboratorAvatarText: {
-    ...mobileText.meta,
-    color: mobileColors.brand,
-    fontWeight: "600",
-  },
-  meCollaboratorCopy: {
-    flex: 1,
-    gap: 8,
-  },
-  meCollaboratorName: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textPrimary,
-  },
-  timelineList: {
-    gap: 18,
-  },
-  timelineSection: {
-    gap: 12,
-    paddingLeft: 18,
-    marginLeft: 4,
-    borderLeftWidth: 2,
-    borderLeftColor: mobileColors.borderSubtle,
-  },
-  timelineSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginLeft: -25,
-  },
-  timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 3,
-    borderColor: mobileColors.background,
-    backgroundColor: mobileColors.brand,
-  },
-  timelineSectionTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-  },
-  timelineSectionEntries: {
-    gap: 10,
-  },
-  timelineEntryCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 16,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 6,
+    timelineEntryCardPressed: {
+      opacity: 0.92,
     },
-    shadowOpacity: 1,
-    shadowRadius: 14,
-    elevation: 2,
-  },
-  timelineEntryCardPressed: {
-    opacity: 0.92,
-  },
-  meHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  meHeaderActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  teamHeaderUtilityRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    justifyContent: "space-between",
-  },
-  teamHeaderActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginLeft: "auto",
-    flexShrink: 0,
-    overflow: "visible",
-  },
-  teamHeaderTitleArea: {
-    flex: 1,
-    minWidth: 0,
-  },
-  meSelectedDateTitle: {
-    ...mobileText.sectionTitle,
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: "800",
-    flex: 1,
-    color: mobileColors.textPrimary,
-    textAlign: "left",
-  },
-  teamHeaderTitle: {
-    ...mobileText.sectionTitle,
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: "800",
-    color: mobileColors.textPrimary,
-    textAlign: "left",
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  focusAreaPillList: {
-    marginHorizontal: -mobileSpacing.screenX,
-  },
-  focusAreaPillListContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: mobileSpacing.screenX,
-    paddingVertical: 2,
-  },
-  focusAreaPill: {
-    minHeight: 36,
-    maxWidth: 180,
-    borderRadius: mobileRadii.pill,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  focusAreaPillActive: {
-    borderColor: mobileColors.brand,
-    backgroundColor: mobileColors.brand,
-  },
-  focusAreaPillPressed: {
-    opacity: 0.62,
-  },
-  focusAreaPillText: {
-    color: mobileColors.textSecondary,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  focusAreaPillTextActive: {
-    color: mobileColors.textInverse,
-  },
-  iconControlButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: mobileColors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 6,
+    meHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
     },
-    shadowOpacity: 1,
-    shadowRadius: 14,
-    elevation: 2,
-  },
-  iconControlButtonPressed: {
-    opacity: 0.82,
-  },
-  calendarBlock: {
-    gap: MONTH_EXPAND_SECTION_GAP,
-  },
-  weekStripFrame: {
-    overflow: "hidden",
-  },
-  calendarDragHandleRow: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 2,
-  },
-  calendarDragHandleBar: {
-    width: 36,
-    height: 5,
-    borderRadius: mobileRadii.pill,
-    backgroundColor: mobileColors.textSubtle,
-  },
-  weekSwipeRowClip: {
-    overflow: "hidden",
-  },
-  weekStripTrack: {
-    flexDirection: "row",
-  },
-  monthCalendarWeekdays: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  monthCalendarWeekdayLabel: {
-    flex: 1,
-    color: mobileColors.textSubtle,
-    fontSize: 12,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  monthCalendarWeeks: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-  },
-  monthSwipeTrack: {
-    flexDirection: "row",
-  },
-  monthGridColumn: {
-    gap: MONTH_GRID_ROW_GAP,
-  },
-  monthCalendarWeek: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  monthCalendarDaySlot: {
-    flex: 1,
-    minHeight: WEEK_STRIP_ROW_HEIGHT,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dateHighlightCircle: {
-    width: DATE_HIGHLIGHT_SIZE,
-    height: DATE_HIGHLIGHT_SIZE,
-    borderRadius: DATE_HIGHLIGHT_SIZE / 2,
-    borderWidth: 1,
-    borderColor: "transparent",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
-  },
-  dateHighlightSelected: {
-    backgroundColor: mobileColors.brand,
-    borderColor: mobileColors.brand,
-  },
-  dateHighlightTodaySelected: {
-    backgroundColor: mobileColors.danger,
-    borderColor: mobileColors.danger,
-  },
-  dateHighlightToday: {
-    backgroundColor: mobileColors.dangerSoft,
-    borderColor: mobileColors.dangerBorder,
-  },
-  dateHighlightOutsideMonth: {
-    opacity: 0.4,
-  },
-  dateHighlightText: {
-    color: mobileColors.textPrimary,
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  dateHighlightTextSelected: {
-    color: mobileColors.textInverse,
-  },
-  dateHighlightTextToday: {
-    color: mobileColors.danger,
-  },
-  dateHighlightTextTodaySelected: {
-    color: mobileColors.textInverse,
-  },
-  alertBadge: {
-    position: "absolute",
-    top: 3,
-    right: -2,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 999,
-    paddingHorizontal: 4,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: mobileColors.danger,
-  },
-  alertBadgeText: {
-    color: mobileColors.textInverse,
-    fontSize: 10,
-    fontWeight: "700",
-  },
-  groupsList: {
-    gap: mobileSpacing.sectionGap,
-  },
-  shiftGroupsList: {
-    gap: 28,
-    paddingTop: 24,
-  },
-  shiftGroupBlock: {
-    gap: 12,
-  },
-  shiftGroupDivider: {
-    height: 1,
-    backgroundColor: mobileColors.borderSubtle,
-  },
-  shiftGroupHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 8,
-  },
-  shiftGroupTitle: {
-    flex: 1,
-    minWidth: 0,
-    ...mobileText.sectionTitle,
-    fontSize: 18,
-    lineHeight: 23,
-    color: mobileColors.textPrimary,
-  },
-  shiftGroupTime: {
-    flexShrink: 0,
-    ...mobileText.bodyStrong,
-    color: mobileColors.textSubtle,
-    textAlign: "right",
-  },
-  weekDaySection: {
-    gap: 12,
-  },
-  weekDayHeader: {
-    gap: 4,
-  },
-  weekDayTitle: {
-    ...mobileText.sectionTitle,
-    fontSize: 17,
-    color: mobileColors.textPrimary,
-  },
-  weekDayEmptyState: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  weekDayEmptyText: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    fontWeight: "600",
-  },
-  groupEntries: {
-    gap: 10,
-  },
-  teamGroupCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    shadowColor: mobileColors.shadowStrong,
-    shadowOffset: {
-      width: 0,
-      height: 8,
+    meHeaderActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
     },
-    shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 2,
-  },
-  teamGroupMembers: {
-    marginTop: 0,
-  },
-  teamMemberRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-    minHeight: 72,
-    paddingVertical: 16,
-  },
-  teamMemberRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-  },
-  teamMemberAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: mobileColors.brandSoft,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  teamMemberAvatarText: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.brand,
-  },
-  teamMemberMain: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  teamMemberCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 5,
-  },
-  teamMemberNameRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  teamMemberName: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  teamMemberTime: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textSubtle,
-  },
-  teamMemberSplitBadgeRow: {
-    alignItems: "flex-start",
-  },
-  teamMemberRoleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  teamMemberRoleChip: {
-    borderWidth: 1,
-    borderRadius: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  teamMemberRoleChipTextStack: {
-    gap: 2,
-  },
-  teamMemberRoleChipEyebrowText: {
-    ...mobileText.micro,
-  },
-  teamMemberRoleChipText: {
-    ...mobileText.badge,
-    textTransform: "uppercase",
-  },
-  teamMemberRoleChipValueText: {
-    ...mobileText.caption,
-    fontWeight: "600",
-  },
-  compactSegmentList: {
-    gap: 8,
-  },
-  compactSegmentBlock: {
-    gap: 3,
-  },
-  compactSegmentDivider: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-    paddingTop: 8,
-  },
-  compactSegmentTitle: {
-    color: mobileColors.textSecondary,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  compactSegmentMeta: {
-    color: mobileColors.textMuted,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  heroSegmentList: {
-    gap: 12,
-  },
-  heroSegmentBlock: {
-    gap: 6,
-  },
-  heroSegmentDivider: {
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255, 255, 255, 0.18)",
-    paddingTop: 12,
-  },
-  heroSegmentTitle: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textInverse,
-  },
-  heroSegmentMeta: {
-    ...mobileText.body,
-    color: "rgba(255, 255, 255, 0.84)",
-    fontWeight: "500",
-  },
-  timelineSegmentList: {
-    gap: 12,
-  },
-  timelineSegmentBlock: {
-    gap: 4,
-  },
-  timelineSegmentDivider: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-    paddingTop: 12,
-  },
-  timelineSegmentTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-  },
-  timelineSegmentMeta: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  entryCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 16,
-    gap: 12,
-  },
-  entrySegmentList: {
-    gap: 12,
-  },
-  entrySegmentBlock: {
-    gap: 6,
-  },
-  entrySegmentDivider: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-    paddingTop: 12,
-  },
-  entryTitle: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  entryMetaText: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-});
+    teamHeaderUtilityRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      justifyContent: "space-between",
+    },
+    teamHeaderActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      marginLeft: "auto",
+      flexShrink: 0,
+      overflow: "visible",
+    },
+    teamHeaderTitleArea: {
+      flex: 1,
+      minWidth: 0,
+    },
+    meSelectedDateTitle: {
+      ...mobileText.sectionTitle,
+      fontSize: 26,
+      lineHeight: 32,
+      fontWeight: "800",
+      flex: 1,
+      color: mobileColors.textPrimary,
+      textAlign: "left",
+    },
+    teamHeaderTitle: {
+      ...mobileText.sectionTitle,
+      fontSize: 26,
+      lineHeight: 32,
+      fontWeight: "800",
+      color: mobileColors.textPrimary,
+      textAlign: "left",
+      flexShrink: 1,
+      minWidth: 0,
+    },
+    focusAreaPillList: {
+      marginHorizontal: -mobileSpacing.screenX,
+    },
+    focusAreaPillListContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: mobileSpacing.screenX,
+      paddingVertical: 2,
+    },
+    focusAreaPill: {
+      minHeight: 36,
+      maxWidth: 180,
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    focusAreaPillActive: {
+      borderColor: mobileColors.brand,
+      backgroundColor: mobileColors.brand,
+    },
+    focusAreaPillPressed: {
+      opacity: 0.62,
+    },
+    focusAreaPillText: {
+      color: mobileColors.textSecondary,
+      fontSize: 14,
+      fontWeight: "700",
+    },
+    focusAreaPillTextActive: {
+      color: mobileColors.textInverse,
+    },
+    iconControlButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: mobileColors.shadow,
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 14,
+      elevation: 2,
+    },
+    iconControlButtonPressed: {
+      opacity: 0.82,
+    },
+    calendarBlock: {
+      gap: MONTH_EXPAND_SECTION_GAP,
+    },
+    weekStripFrame: {
+      overflow: "hidden",
+    },
+    calendarDragHandleRow: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 2,
+    },
+    calendarDragHandleBar: {
+      width: 36,
+      height: 5,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.textSubtle,
+    },
+    weekSwipeRowClip: {
+      overflow: "hidden",
+    },
+    weekStripTrack: {
+      flexDirection: "row",
+    },
+    monthCalendarWeekdays: {
+      flexDirection: "row",
+      gap: 6,
+    },
+    monthCalendarWeekdayLabel: {
+      flex: 1,
+      color: mobileColors.textSubtle,
+      fontSize: 12,
+      fontWeight: "700",
+      textAlign: "center",
+    },
+    monthCalendarWeeks: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+    },
+    monthSwipeTrack: {
+      flexDirection: "row",
+    },
+    monthGridColumn: {
+      gap: MONTH_GRID_ROW_GAP,
+    },
+    monthCalendarWeek: {
+      flexDirection: "row",
+      gap: 6,
+    },
+    monthCalendarDaySlot: {
+      flex: 1,
+      minHeight: WEEK_STRIP_ROW_HEIGHT,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dateHighlightCircle: {
+      width: DATE_HIGHLIGHT_SIZE,
+      height: DATE_HIGHLIGHT_SIZE,
+      borderRadius: DATE_HIGHLIGHT_SIZE / 2,
+      borderWidth: 1,
+      borderColor: "transparent",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "transparent",
+    },
+    dateHighlightSelected: {
+      backgroundColor: mobileColors.brand,
+      borderColor: mobileColors.brand,
+    },
+    dateHighlightTodaySelected: {
+      backgroundColor: mobileColors.danger,
+      borderColor: mobileColors.danger,
+    },
+    dateHighlightToday: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+    },
+    dateHighlightOutsideMonth: {
+      opacity: 0.4,
+    },
+    dateHighlightText: {
+      color: mobileColors.textPrimary,
+      fontSize: 15,
+      fontWeight: "700",
+    },
+    dateHighlightTextSelected: {
+      color: mobileColors.textInverse,
+    },
+    dateHighlightTextToday: {
+      color: mobileColors.danger,
+    },
+    dateHighlightTextTodaySelected: {
+      color: mobileColors.textInverse,
+    },
+    alertBadge: {
+      position: "absolute",
+      top: 3,
+      right: -2,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 999,
+      paddingHorizontal: 4,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.danger,
+    },
+    alertBadgeText: {
+      color: mobileColors.textInverse,
+      fontSize: 10,
+      fontWeight: "700",
+    },
+    groupsList: {
+      gap: mobileSpacing.sectionGap,
+    },
+    shiftGroupsList: {
+      gap: 28,
+      paddingTop: 24,
+    },
+    shiftGroupBlock: {
+      gap: 12,
+    },
+    shiftGroupDivider: {
+      height: 1,
+      backgroundColor: mobileColors.borderSubtle,
+    },
+    shiftGroupHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      paddingHorizontal: 8,
+    },
+    shiftGroupTitle: {
+      flex: 1,
+      minWidth: 0,
+      ...mobileText.sectionTitle,
+      fontSize: 18,
+      lineHeight: 23,
+      color: mobileColors.textPrimary,
+    },
+    shiftGroupTime: {
+      flexShrink: 0,
+      ...mobileText.bodyStrong,
+      color: mobileColors.textSubtle,
+      textAlign: "right",
+    },
+    weekDaySection: {
+      gap: 12,
+    },
+    weekDayHeader: {
+      gap: 4,
+    },
+    weekDayTitle: {
+      ...mobileText.sectionTitle,
+      fontSize: 17,
+      color: mobileColors.textPrimary,
+    },
+    weekDayEmptyState: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    weekDayEmptyText: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      fontWeight: "600",
+    },
+    groupEntries: {
+      gap: 10,
+    },
+    teamGroupCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      shadowColor: mobileColors.shadowStrong,
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 20,
+      elevation: 2,
+    },
+    teamGroupMembers: {
+      marginTop: 0,
+    },
+    teamMemberRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 16,
+      minHeight: 72,
+      paddingVertical: 16,
+    },
+    teamMemberRowBorder: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+    },
+    teamMemberAvatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: mobileColors.brandSoft,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    teamMemberAvatarText: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.brand,
+    },
+    teamMemberMain: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    teamMemberCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 5,
+    },
+    teamMemberNameRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    teamMemberName: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    teamMemberTime: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textSubtle,
+    },
+    teamMemberSplitBadgeRow: {
+      alignItems: "flex-start",
+    },
+    teamMemberRoleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    teamMemberRoleChip: {
+      borderWidth: 1,
+      borderRadius: 7,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    teamMemberRoleChipTextStack: {
+      gap: 2,
+    },
+    teamMemberRoleChipEyebrowText: {
+      ...mobileText.micro,
+    },
+    teamMemberRoleChipText: {
+      ...mobileText.badge,
+      textTransform: "uppercase",
+    },
+    teamMemberRoleChipValueText: {
+      ...mobileText.caption,
+      fontWeight: "600",
+    },
+    compactSegmentList: {
+      gap: 8,
+    },
+    compactSegmentBlock: {
+      gap: 3,
+    },
+    compactSegmentDivider: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: 8,
+    },
+    compactSegmentTitle: {
+      color: mobileColors.textSecondary,
+      fontSize: 13,
+      fontWeight: "700",
+    },
+    compactSegmentMeta: {
+      color: mobileColors.textMuted,
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    heroSegmentList: {
+      gap: 12,
+    },
+    heroSegmentBlock: {
+      gap: 6,
+    },
+    heroSegmentDivider: {
+      borderTopWidth: 1,
+      borderTopColor: "rgba(255, 255, 255, 0.18)",
+      paddingTop: 12,
+    },
+    heroSegmentTitle: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textInverse,
+    },
+    heroSegmentMeta: {
+      ...mobileText.body,
+      color: "rgba(255, 255, 255, 0.84)",
+      fontWeight: "500",
+    },
+    timelineSegmentList: {
+      gap: 12,
+    },
+    timelineSegmentBlock: {
+      gap: 4,
+    },
+    timelineSegmentDivider: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: 12,
+    },
+    timelineSegmentTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    timelineSegmentMeta: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    entryCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 16,
+      gap: 12,
+    },
+    entrySegmentList: {
+      gap: 12,
+    },
+    entrySegmentBlock: {
+      gap: 6,
+    },
+    entrySegmentDivider: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: 12,
+    },
+    entryTitle: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    entryMetaText: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+  });

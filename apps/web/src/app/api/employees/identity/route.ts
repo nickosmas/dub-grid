@@ -98,7 +98,7 @@ export async function PATCH(req: NextRequest) {
 
     const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
     if (!hasPermission) {
-      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+      return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }
 
     const { data: currentRow, error: currentError } = await serviceClient
@@ -178,10 +178,12 @@ export async function PATCH(req: NextRequest) {
         org_id: orgId,
         actor_id: user.id,
         actor_email: user.email ?? null,
-        action: "employee.identity_updated",
+        action: "employee.updated",
         resource_type: "employee",
         resource_id: employeeId,
         details: {
+          firstName,
+          lastName,
           changedFields,
           from: {
             firstName: currentEmployee.firstName,

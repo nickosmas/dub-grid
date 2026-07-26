@@ -3,7 +3,7 @@
 import { useCallback, useRef, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import React from "react";
-import { useMediaQuery, MOBILE } from "@/hooks";
+import { CloseButton } from "@/components/ui/CloseButton";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -52,7 +52,6 @@ export default function Modal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const closingRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const isMobile = useMediaQuery(MOBILE);
   const [closing, setClosing] = useState(false);
 
   // Auto-focus first interactive child, fall back to dialog container
@@ -144,20 +143,7 @@ export default function Modal({
         <div style={headerStyle}>
           <span style={titleStyle}>{title}</span>
           {showCloseButton ? (
-            <button
-              onClick={handleClose}
-              aria-label="Close modal"
-              className="dg-btn dg-btn-ghost"
-              style={{
-                fontSize: "var(--dg-fs-card-title)",
-                lineHeight: 1,
-                padding: isMobile ? "8px 10px" : "2px 6px",
-                minWidth: isMobile ? 44 : undefined,
-                minHeight: isMobile ? 44 : undefined,
-              }}
-            >
-              &times;
-            </button>
+            <CloseButton size="lg" onClick={handleClose} aria-label="Close modal" />
           ) : null}
         </div>
         {children}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTheme } from "next-themes";
 import type { Employee, AuditLogEntry, Invitation } from "@/types";
 import { formatRelativeTime, getEmployeeDisplayName } from "@/lib/utils";
 import { formatOrganizationRoleLabel } from "@/lib/client-facing";
@@ -14,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ROLE_BADGE_COLORS } from "@/lib/styles";
+import { toDarkPillColors } from "@/lib/colors";
 import { UserCheck, UserPlus, UserX, Mail, Clock, History } from "lucide-react";
 
 interface ActivityTabProps {
@@ -236,7 +238,19 @@ function EventIcon({ type }: { type: TimelineEvent["type"] }) {
 }
 
 function RoleBadge({ role }: { role: string }) {
-  const colors = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
+  const { resolvedTheme } = useTheme();
+  const colors0 = ROLE_BADGE_COLORS[role] ?? ROLE_BADGE_COLORS.user;
+  // Only the "gridmaster" entry is a literal hex triple (others are already
+  // var(--color-*) tokens, which toDarkPillColors can't parse as hex).
+  const isDarkTheme = resolvedTheme === "dark";
+  const colors =
+    isDarkTheme && colors0.bg.startsWith("#")
+      ? {
+          bg: toDarkPillColors(colors0.bg).bg,
+          text: toDarkPillColors(colors0.bg).text,
+          border: colors0.border,
+        }
+      : colors0;
 
   return (
     <Badge

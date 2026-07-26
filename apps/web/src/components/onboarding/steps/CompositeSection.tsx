@@ -45,7 +45,7 @@ export default function CompositeSection({
       </div>
       <div
         style={{
-          background: "var(--color-bg-card, white)",
+          background: "var(--color-surface)",
           borderRadius: "var(--dg-radius-xl)",
           border: "1px solid var(--color-border)",
           padding: "20px",

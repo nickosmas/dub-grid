@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useTheme } from "next-themes";
 import { ShiftCategory, FocusArea } from "@/types";
 import {
   checkShiftCategoryDependencies,
@@ -28,6 +29,7 @@ import {
   PREDEFINED_COLORS,
   borderColor,
   getPresetByBg,
+  toDarkPillColors,
 } from "@/lib/colors";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 
@@ -72,6 +74,8 @@ function ShiftCategoriesSettings({
   onChange: (categories: ShiftCategory[]) => void;
   canManageScheduleDefinitions: boolean;
 }) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
   const [local, setLocal] = useState<(ShiftCategory & { isNew?: boolean })[]>(shiftCategories);
   const [saving, setSaving] = useState<number | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
@@ -386,6 +390,7 @@ function ShiftCategoriesSettings({
       );
     const previewColor = cat.color ?? DEFAULT_PREDEFINED_COLOR_BG;
     const previewPreset = getPresetByBg(previewColor);
+    const previewDisplay = isDarkTheme ? toDarkPillColors(previewPreset.bg) : previewPreset;
     const rawPreviewLabel = normalizedCode ?? "";
     const previewLabel = (rawPreviewLabel || "S").toUpperCase();
 
@@ -418,9 +423,9 @@ function ShiftCategoriesSettings({
                 height: 30,
                 padding: "0 8px",
                 borderRadius: "var(--dg-radius-sm)",
-                background: previewPreset.bg,
-                border: `1px solid ${borderColor(previewPreset.text)}`,
-                color: previewPreset.text,
+                background: previewDisplay.bg,
+                border: `1px solid ${borderColor(previewDisplay.text)}`,
+                color: previewDisplay.text,
                 fontSize: "var(--dg-fs-caption)",
                 fontWeight: 800,
                 lineHeight: 1,
@@ -588,9 +593,9 @@ function ShiftCategoriesSettings({
                 height: 34,
                 padding: "0 12px",
                 borderRadius: "var(--dg-radius-sm)",
-                background: previewPreset.bg,
-                border: `1px solid ${borderColor(previewPreset.text)}`,
-                color: previewPreset.text,
+                background: previewDisplay.bg,
+                border: `1px solid ${borderColor(previewDisplay.text)}`,
+                color: previewDisplay.text,
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 800,
               }}

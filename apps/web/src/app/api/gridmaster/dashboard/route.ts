@@ -15,7 +15,11 @@ export async function GET(req: NextRequest) {
     const service = getServiceClient();
     const userClient = createRequestSupabaseClient(req);
     const [organizationsResult, statsResult, platformUsersResult] = await Promise.all([
-      service.from("organizations").select(ORGANIZATION_WITH_BILLING_COLS).order("name"),
+      service
+        .from("organizations")
+        .select(ORGANIZATION_WITH_BILLING_COLS)
+        .eq("workspace_kind", "real")
+        .order("name"),
       userClient.rpc("get_tenant_stats"),
       service
         .from("profiles")

@@ -53,7 +53,10 @@ export async function POST(req: NextRequest) {
   const isGridmaster = claims.platform_role === "gridmaster";
   const isSuperAdmin = claims.org_role === "super_admin";
   if (!isGridmaster && !isSuperAdmin) {
-    return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
+    return NextResponse.json(
+      { success: false, error: API_ERRORS.SUPER_ADMIN_OR_GRIDMASTER_ONLY },
+      { status: 403 },
+    );
   }
 
   // ── Config check ────────────────────────────────────────────────────

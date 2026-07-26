@@ -6,6 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import Header from "@/components/Header";
 import ImpersonationBanner from "@/components/ImpersonationBanner";
 import UserViewBanner from "@/components/UserViewBanner";
+import InactiveAccountBanner from "@/components/InactiveAccountBanner";
+import MfaNagBanner from "@/components/MfaNagBanner";
 import TrialWelcomeModal from "@/components/TrialWelcomeModal";
 import InactivityGuard from "@/components/InactivityGuard";
 import { fetchOrganizationBilling } from "@/features/billing/client";
@@ -71,7 +73,6 @@ function AppHeader() {
     <div
       style={{
         background: "var(--color-bg)",
-        boxShadow: "var(--shadow-raised)",
       }}
     >
       <Header orgName={org?.name} />
@@ -140,6 +141,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       >
         <ImpersonationBanner />
         <UserViewBanner />
+        <InactiveAccountBanner />
+        <MfaNagBanner />
         {showHeader && <AppHeader />}
       </div>
       <div key={effectiveOrgKey} style={{ display: "contents" }}>

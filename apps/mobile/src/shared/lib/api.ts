@@ -2,12 +2,14 @@ import {
   mobileAuthLoginResponseSchema,
   mobileBootstrapResponseSchema,
   mobileCreateShiftRequestResponseSchema,
+  mobileDashboardResponseSchema,
   mobileMeScheduleResponseSchema,
   mobileNotificationPreferencesResponseSchema,
   mobileProfileChangeRequestActionResponseSchema,
   mobileProfileChangeRequestCreateResponseSchema,
   mobileProfileChangeRequestsResponseSchema,
   mobileProfileAccountUpdateResponseSchema,
+  mobileProfileMfaStatusUpdateResponseSchema,
   mobileProfilePhoneUpdateResponseSchema,
   mobileProfileResponseSchema,
   mobileProfileSessionRevokeResponseSchema,
@@ -18,6 +20,7 @@ import {
   mobileNotificationsResponseSchema,
   mobileOrgScheduleResponseSchema,
   mobilePersonResponseSchema,
+  mobilePersonCreateResponseSchema,
   mobilePeopleResponseSchema,
   mobilePersonInvitationResponseSchema,
   mobilePersonStatusUpdateResponseSchema,
@@ -27,16 +30,20 @@ import {
   mobileShiftSwapOptionsResponseSchema,
   mobileUpdateShiftRequestResponseSchema,
   mobileOrganizationLookupResponseSchema,
+  mobileOrgStatusResponseSchema,
   type MobileAuthSession,
   type MobileAuthLoginResponse,
   type MobileCreateShiftRequestBody,
   type MobileBootstrapResponse,
+  type MobileOrgStatusResponse,
   type MobilePersonInvitationActionBody,
+  type MobilePersonCreateBody,
   type MobilePersonInvitationCreateBody,
   type MobileNotificationPreferences,
   type MobileProfileChangeRequestActionBody,
   type MobileProfileChangeRequestCreateBody,
   type MobileProfileAccountUpdateBody,
+  type MobileProfileMfaStatusUpdateBody,
   type MobileProfilePhoneUpdateBody,
   type MobileProfileResponse,
   type MobilePersonStatusUpdateBody,
@@ -287,6 +294,12 @@ export function getBootstrap(accessToken: string): Promise<MobileBootstrapRespon
   );
 }
 
+export function getOrgStatus(accessToken: string): Promise<MobileOrgStatusResponse> {
+  return mobileApiRequest("/api/mobile/v1/org-status", accessToken, { method: "GET" }, (value) =>
+    mobileOrgStatusResponseSchema.parse(value),
+  );
+}
+
 export function getProfile(accessToken: string): Promise<MobileProfileResponse> {
   return mobileApiRequest("/api/mobile/v1/profile", accessToken, { method: "GET" }, (value) =>
     mobileProfileResponseSchema.parse(value),
@@ -314,6 +327,21 @@ export function updateProfileAccount(accessToken: string, body: MobileProfileAcc
       body: JSON.stringify(body),
     },
     (value) => mobileProfileAccountUpdateResponseSchema.parse(value),
+  );
+}
+
+export function updateProfileMfaStatus(
+  accessToken: string,
+  body: MobileProfileMfaStatusUpdateBody,
+) {
+  return mobileApiRequest(
+    "/api/mobile/v1/profile/mfa-status",
+    accessToken,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    },
+    (value) => mobileProfileMfaStatusUpdateResponseSchema.parse(value),
   );
 }
 
@@ -545,6 +573,15 @@ export function getOrgSchedule(accessToken: string, query?: MobileScheduleRange)
   );
 }
 
+export function getDashboard(accessToken: string, query?: MobileScheduleRange) {
+  return mobileApiRequest(
+    withQuery("/api/mobile/v1/dashboard", query),
+    accessToken,
+    { method: "GET" },
+    (value) => mobileDashboardResponseSchema.parse(value),
+  );
+}
+
 export function getShiftRequests(accessToken: string, query?: MobileScheduleRange) {
   return mobileApiRequest(
     withQuery("/api/mobile/v1/shift-requests", query),
@@ -679,6 +716,18 @@ export function bulkUpdateNotifications(
 export function getPeople(accessToken: string) {
   return mobileApiRequest("/api/mobile/v1/people", accessToken, { method: "GET" }, (value) =>
     mobilePeopleResponseSchema.parse(value),
+  );
+}
+
+export function createMobilePerson(accessToken: string, body: MobilePersonCreateBody) {
+  return mobileApiRequest(
+    "/api/mobile/v1/people",
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    (value) => mobilePersonCreateResponseSchema.parse(value),
   );
 }
 

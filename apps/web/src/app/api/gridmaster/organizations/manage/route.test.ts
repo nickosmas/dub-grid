@@ -10,6 +10,7 @@ const organizationUpdate = vi.fn();
 const organizationInsert = vi.fn();
 const organizationEq = vi.fn();
 const auditInsert = vi.fn();
+const organizationWorkspaceKindMaybeSingle = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -101,9 +102,21 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     });
     requestRpc.mockResolvedValue({ error: null });
     auditInsert.mockResolvedValue({ error: null });
+    // Every action targeting an existing org id is preceded by a
+    // workspace_kind guard (sandbox orgs aren't managed here). Default to a
+    // real org so the existing action-specific tests are unaffected.
+    organizationWorkspaceKindMaybeSingle.mockResolvedValue({
+      data: { workspace_kind: "real" },
+      error: null,
+    });
     serviceFrom.mockImplementation((table: string) => {
       if (table === "organizations") {
         return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: organizationWorkspaceKindMaybeSingle,
+            })),
+          })),
           update: organizationUpdate,
           insert: organizationInsert,
         };
@@ -157,6 +170,18 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     expect(response.status).toBe(400);
     expect(requestRpc).not.toHaveBeenCalled();
     expect(serviceFrom).not.toHaveBeenCalled();
+  });
+
+  it("refuses to act on a sandbox organization", async () => {
+    organizationWorkspaceKindMaybeSingle.mockResolvedValue({
+      data: { workspace_kind: "sandbox" },
+      error: null,
+    });
+
+    const response = await POST(makeRequest({ action: "archiveOrganization", orgId: ORG_ID }));
+
+    expect(response.status).toBe(400);
+    expect(organizationUpdate).not.toHaveBeenCalled();
   });
 
   it("archives an organization and writes an audit event", async () => {

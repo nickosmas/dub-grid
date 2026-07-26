@@ -103,6 +103,7 @@ describe("mobile me-schedule route", () => {
       lastName: "Kim",
       status: "active",
       focusAreaIds: [2],
+      departmentIds: [],
     });
     fetchMobileScheduleEntries.mockResolvedValue([]);
 
@@ -122,6 +123,7 @@ describe("mobile me-schedule route", () => {
         lastName: "Kim",
         status: "active",
         focusAreaIds: [2],
+        departmentIds: [],
       },
       range: {
         startDate: "2026-04-16",

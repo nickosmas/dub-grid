@@ -6,6 +6,7 @@ const validateCsrfOrigin = vi.fn();
 const getServiceClient = vi.fn();
 const listOwnProfileChangeRequests = vi.fn();
 const createProfileChangeRequest = vi.fn();
+const resolveEffectiveOrgId = vi.fn();
 const apiErrorResponse = vi.fn((_err: unknown, fallback: string, status: number) =>
   NextResponse.json({ error: fallback }, { status }),
 );
@@ -18,6 +19,9 @@ vi.mock("@/lib/csrf", () => ({
 }));
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => getServiceClient(),
+}));
+vi.mock("@/app/api/shared/permissions", () => ({
+  resolveEffectiveOrgId: (...args: unknown[]) => resolveEffectiveOrgId(...args),
 }));
 vi.mock("@/lib/error-handling", () => ({
   apiErrorResponse: (...args: unknown[]) =>
@@ -54,6 +58,7 @@ vi.mock("@/features/account/server", () => ({
 import { GET, POST } from "./route";
 
 const ORG_ID = "11111111-1111-1111-1111-111111111111";
+const SANDBOX_ORG_ID = "99999999-9999-4999-8999-999999999999";
 
 type MembershipRow = { user_id: string } | null;
 
@@ -77,6 +82,8 @@ beforeEach(() => {
   validateCsrfOrigin.mockReturnValue(null);
   listOwnProfileChangeRequests.mockResolvedValue([]);
   createProfileChangeRequest.mockResolvedValue({ id: "req-1" });
+  // Default: no sandbox cookie, effective org == requested org.
+  resolveEffectiveOrgId.mockImplementation((_req, _userId, orgId) => Promise.resolve(orgId));
 });
 
 describe("GET /api/account/change-requests", () => {
@@ -122,6 +129,26 @@ describe("GET /api/account/change-requests", () => {
     );
     expect(res.status).toBe(401);
     expect(getServiceClient).not.toHaveBeenCalled();
+  });
+
+  it("lists requests for the effective (sandbox-redirected) org, not the raw query org id", async () => {
+    resolveEffectiveOrgId.mockResolvedValue(SANDBOX_ORG_ID);
+    const sc = buildServiceClient({ user_id: "user-1" });
+    getServiceClient.mockReturnValue(sc);
+
+    const res = await GET(
+      new NextRequest(`http://localhost/api/account/change-requests?orgId=${ORG_ID}`),
+    );
+
+    expect(res.status).toBe(200);
+    expect(resolveEffectiveOrgId).toHaveBeenCalledWith(expect.anything(), "user-1", ORG_ID);
+    // The membership check and the listing must both use the effective org.
+    expect(sc.eqOrg).toHaveBeenCalledWith("org_id", SANDBOX_ORG_ID);
+    expect(listOwnProfileChangeRequests).toHaveBeenCalledWith({
+      serviceClient: sc,
+      userId: "user-1",
+      orgId: SANDBOX_ORG_ID,
+    });
   });
 });
 
@@ -172,5 +199,24 @@ describe("POST /api/account/change-requests", () => {
     );
     expect(res.status).toBe(403);
     expect(createProfileChangeRequest).not.toHaveBeenCalled();
+  });
+
+  it("creates the request against the effective (sandbox-redirected) org, not the raw body org id", async () => {
+    resolveEffectiveOrgId.mockResolvedValue(SANDBOX_ORG_ID);
+    createProfileChangeRequest.mockResolvedValueOnce({ id: "req-3", type: "name" });
+
+    const res = await POST(
+      postBody({
+        orgId: ORG_ID,
+        type: "name",
+        requestedChanges: { firstName: "Jane" },
+      }),
+    );
+
+    expect(res.status).toBe(201);
+    expect(resolveEffectiveOrgId).toHaveBeenCalledWith(expect.anything(), "user-1", ORG_ID);
+    expect(createProfileChangeRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ orgId: SANDBOX_ORG_ID }),
+    );
   });
 });

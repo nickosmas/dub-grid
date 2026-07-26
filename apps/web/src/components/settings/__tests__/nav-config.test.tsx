@@ -91,6 +91,13 @@ describe("settings nav config", () => {
     expect(groups[groups.length - 1]?.id).toBe("danger");
   });
 
+  it("does not expose a Platform/Impersonation group in Settings (lives in the Gridmaster portal only)", () => {
+    const groups = buildNavGroups({ ...fullSettingsPermissions, isGridmaster: true });
+    expect(groups.find((g) => g.id === "platform")).toBeUndefined();
+    const allIds = groups.flatMap((group) => group.items.map((item) => item.id));
+    expect(allIds).not.toContain("platform-impersonation");
+  });
+
   it("hides the activity log and danger zone from non-super-admins", () => {
     const adminPermissions: NavPermissions = {
       ...fullSettingsPermissions,
@@ -102,11 +109,5 @@ describe("settings nav config", () => {
     expect(allIds).not.toContain("org-activity");
     expect(allIds).not.toContain("org-danger");
     expect(groups.find((group) => group.id === "danger")).toBeUndefined();
-  });
-
-  it("shows the Platform group with Impersonation for gridmasters", () => {
-    const groups = buildNavGroups({ ...fullSettingsPermissions, isGridmaster: true });
-    const platform = groups.find((g) => g.id === "platform");
-    expect(platform?.items.map((item) => item.id)).toEqual(["platform-impersonation"]);
   });
 });

@@ -1,10 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  createQueryStateCardModule,
-  createReactNativeModule,
-  createScreenModule,
-} from "../../../test/native";
+import { createReactNativeModule, createScreenModule } from "../../../test/native";
 
 const useMutation = vi.fn();
 const useQuery = vi.fn();
@@ -44,10 +40,6 @@ vi.mock("expo-router", () => ({
 }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
-
-vi.mock("../../../shared/components/QueryStateCard", async () =>
-  createQueryStateCardModule(await import("react")),
-);
 
 vi.mock("../../auth/hooks/useAccessToken", () => ({
   useAccessToken,
@@ -210,6 +202,22 @@ describe("PeopleScreen", () => {
       pathname: "/(tabs)/people/[id]",
       params: { id: "emp-1" },
     });
+  });
+
+  it("navigates to the add-person screen for admins who can manage employees", () => {
+    useQuery.mockReturnValue({
+      data: { people: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Add person"));
+
+    expect(routerPush).toHaveBeenCalledWith("/people/add");
   });
 
   it("sorts the directory by seniority by default", () => {
@@ -404,6 +412,90 @@ describe("PeopleScreen", () => {
     expect(screen.queryByText(/Active 1/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Inactive/)).not.toBeInTheDocument();
     expect(screen.queryByText("No app access")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Add person")).not.toBeInTheDocument();
+  });
+
+  it("shows management users to regular users without opening their profile", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+        permissions: {
+          canManageEmployees: false,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          {
+            id: "emp-1",
+            firstName: "Mina",
+            lastName: "Diaz",
+            phone: "555-0100",
+            email: "mina@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [2],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            managementDepartmentIds: [],
+            managementDeptAdminIds: [],
+            seniority: 1,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 7,
+          },
+          {
+            id: "emp-2",
+            firstName: "Ava",
+            lastName: "Cole",
+            orgRole: "admin",
+            phone: "555-0102",
+            email: "ava@dubgrid.com",
+            status: "active",
+            certificationId: null,
+            focusAreaIds: [],
+            roleIds: [],
+            departmentIds: [],
+            deptAdminIds: [],
+            managementDepartmentIds: [10],
+            managementDeptAdminIds: [],
+            seniority: 2,
+            userId: null,
+            pendingInvitation: null,
+            contactNotes: "",
+            statusChangedAt: "2026-04-24T12:00:00.000Z",
+            statusNote: "",
+            version: 3,
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    expect(screen.getByText("Ava Cole")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Ava Cole"));
+    expect(routerPush).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("Mina Diaz"));
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/people/[id]",
+      params: { id: "emp-1" },
+    });
   });
 
   it("filters the directory by focus area from the filter button", () => {

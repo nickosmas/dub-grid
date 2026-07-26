@@ -37,7 +37,22 @@ export const API_ERRORS = {
   INVALID_INPUT: "Some of the details look off. Please review and try again.",
   INVALID_BODY: "We couldn't read that request. Please try again.",
   UNAUTHORIZED: "Please sign in to continue.",
+  // Generic fallback — used by CLIENT_FRIENDLY_ERROR_PATTERNS' catch-all regex
+  // for any forbidden/unauthorized error that isn't one of the specific
+  // causes below. Prefer a specific constant at new call sites.
   FORBIDDEN: "You don't have permission to do that.",
+  NOT_ORG_MEMBER: "You don't have access to this organization.",
+  INSUFFICIENT_PERMISSION:
+    "You don't have permission to perform this action. Ask an admin for help.",
+  CANNOT_MANAGE_EMPLOYEES:
+    "You don't have permission to manage employees. Ask an admin to make this change.",
+  CANNOT_ASSIGN_SUPER_ADMIN: "Only a super admin or gridmaster can assign the super admin role.",
+  SUPER_ADMIN_OR_GRIDMASTER_ONLY: "Only a super admin or gridmaster can send invitations.",
+  GRIDMASTER_ONLY: "This action is restricted to gridmaster accounts.",
+  SUPER_ADMIN_ONLY: "Only a super admin can do this.",
+  CANNOT_ACT_FOR_OTHERS: "You can only do this for your own shift requests.",
+  CANNOT_VIEW_EMPLOYEE_DETAILS: "You don't have permission to view this employee's details.",
+  CANNOT_VIEW_MANAGEMENT_PROFILE: "You don't have permission to view management profiles.",
 } as const;
 
 // ── Pattern tables ───────────────────────────────────────────────────────────
@@ -62,6 +77,24 @@ export const NETWORK_ERROR_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * Matches any raw error shape (Supabase's own strings, or this app's own 401
+ * body text like "Your session expired. Please sign in again.") that means the
+ * caller needs a fresh sign-in. Single source of truth — callers that need to
+ * react to session expiry (e.g. by signing out and redirecting) should test
+ * against this instead of hand-rolling their own substring list, which drifts
+ * from the copy below and misses cases silently.
+ */
+export const SESSION_EXPIRED_PATTERN =
+  /jwt expired|refresh token not found|invalid refresh token|invalid session|unauthenticated|session expired/i;
+
+/** True when the raw error message indicates the session needs a fresh sign-in. */
+export function isSessionExpiredError(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  if (!message) return false;
+  return SESSION_EXPIRED_PATTERN.test(message);
+}
+
+/**
  * Raw error messages rewritten into friendly, user-facing copy. The union of
  * the web and mobile pattern tables, with overlapping auth/session patterns
  * reconciled to a single canonical message each. Evaluated in order — the first
@@ -76,8 +109,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
     message: "Check your email and password and try again.",
   },
   {
-    pattern:
-      /jwt expired|refresh token not found|invalid refresh token|invalid session|unauthenticated|session expired/i,
+    pattern: SESSION_EXPIRED_PATTERN,
     message: "Your session expired. Sign in again to continue.",
   },
   {

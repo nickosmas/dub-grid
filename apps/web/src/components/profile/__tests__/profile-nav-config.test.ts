@@ -9,12 +9,17 @@ import {
 } from "@/components/profile/profile-nav-config";
 
 describe("profile nav config", () => {
-  it("always renders the Account group with Profile/Security/Alerts", () => {
+  it("always renders the Account group with Profile/Security/Alerts/Appearance", () => {
     for (const isOnSchedule of [true, false]) {
       const groups = buildProfileNavGroups({ isOnSchedule });
       const account = groups.find((g) => g.id === "account");
       expect(account?.label).toBe("Account");
-      expect(account?.items.map((i) => i.id)).toEqual(["profile", "security", "notifications"]);
+      expect(account?.items.map((i) => i.id)).toEqual([
+        "profile",
+        "security",
+        "notifications",
+        "appearance",
+      ]);
     }
   });
 

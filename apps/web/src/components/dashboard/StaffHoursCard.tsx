@@ -9,6 +9,9 @@ interface StaffHoursCardProps {
   employeeHours: EmployeeHours[];
   employees: Employee[];
   focusAreas: FocusArea[];
+  /** Whether names link to the full /people/[id] details page. Mirrors the
+   * People table: only staff managers can navigate. */
+  canNavigateToDetailsPage: boolean;
   otThreshold?: number;
   maxVisible?: number;
   heading?: string;
@@ -21,6 +24,7 @@ export default function StaffHoursCard({
   employeeHours,
   employees,
   focusAreas,
+  canNavigateToDetailsPage,
   otThreshold = 40,
   maxVisible = 5,
   heading = "Staff hours",
@@ -64,7 +68,82 @@ export default function StaffHoursCard({
             const fa = faId != null ? faMap.get(faId) : undefined;
             const initials = getAvatarInitials(`${emp.firstName} ${emp.lastName}`);
 
-            return (
+            const row = (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "14px 16px",
+                  borderBottom: "1px solid var(--color-border-light)",
+                  margin: "0 16px",
+                }}
+              >
+                {/* Avatar */}
+                <div
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 7,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                    background: h.isOvertime
+                      ? "var(--color-danger-bg)"
+                      : "var(--color-bg-secondary)",
+                    color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
+                  }}
+                >
+                  {initials}
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {emp.firstName.charAt(0)}. {emp.lastName}
+                  </div>
+                  <div style={{ fontSize: 10, color: "var(--color-text-subtle)" }}>
+                    {fa?.name ?? ""}
+                  </div>
+                </div>
+
+                {/* Hours */}
+                <div style={{ textAlign: "right" }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
+                      color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
+                    }}
+                  >
+                    {h.totalHours}h
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-subtle)",
+                    }}
+                  >
+                    {h.isOvertime ? `+${h.overtimeHours}h OT` : `of ${otThreshold}h`}
+                  </div>
+                </div>
+              </div>
+            );
+
+            return canNavigateToDetailsPage ? (
               <Link
                 key={h.empId}
                 href={`/people/${emp.id}`}
@@ -74,79 +153,10 @@ export default function StaffHoursCard({
                   color: "inherit",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "14px 16px",
-                    borderBottom: "1px solid var(--color-border-light)",
-                    margin: "0 16px",
-                  }}
-                >
-                  {/* Avatar */}
-                  <div
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: 7,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      flexShrink: 0,
-                      background: h.isOvertime
-                        ? "var(--color-danger-bg)"
-                        : "var(--color-bg-secondary)",
-                      color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
-                    }}
-                  >
-                    {initials}
-                  </div>
-
-                  {/* Info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: "var(--color-text-primary)",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {emp.firstName.charAt(0)}. {emp.lastName}
-                    </div>
-                    <div style={{ fontSize: 10, color: "var(--color-text-subtle)" }}>
-                      {fa?.name ?? ""}
-                    </div>
-                  </div>
-
-                  {/* Hours */}
-                  <div style={{ textAlign: "right" }}>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 700,
-                        fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-                        color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-secondary)",
-                      }}
-                    >
-                      {h.totalHours}h
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: h.isOvertime ? "var(--color-danger)" : "var(--color-text-subtle)",
-                      }}
-                    >
-                      {h.isOvertime ? `+${h.overtimeHours}h OT` : `of ${otThreshold}h`}
-                    </div>
-                  </div>
-                </div>
+                {row}
               </Link>
+            ) : (
+              <div key={h.empId}>{row}</div>
             );
           })}
           {remainingCount > 0 && (

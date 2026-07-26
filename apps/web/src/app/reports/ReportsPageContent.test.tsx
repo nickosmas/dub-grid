@@ -130,11 +130,11 @@ const payload = {
       "2026-05-09",
     ],
   },
-  metrics: [{ label: "Scheduled hours", value: "8" }],
   reports: {
     employeeDirectory: [
       {
         employeeId: "emp-1",
+        employeeNumber: 1001,
         employeeName: "Avery Ng",
         status: "active",
         employmentType: "full_time",
@@ -193,6 +193,7 @@ const payload = {
     certificationRoleMatrix: [
       {
         employeeId: "emp-1",
+        employeeNumber: 1001,
         employeeName: "Avery Ng",
         status: "active",
         certification: "CNA",
@@ -206,6 +207,7 @@ const payload = {
     accountAccess: [
       {
         employeeId: "emp-1",
+        employeeNumber: 1001,
         employeeName: "Avery Ng",
         status: "active",
         email: "avery@example.com",
@@ -282,7 +284,7 @@ describe("ReportsPageContent", () => {
     });
     expect(
       Array.from(runActions.querySelectorAll("button")).map((button) => button.textContent?.trim()),
-    ).toEqual(["Refresh", "Generate report"]);
+    ).toEqual(["Refresh", "Close", "Generate report"]);
     expect(screen.getByLabelText("Report")).toBeInTheDocument();
     expect(screen.getByLabelText("Range")).toHaveTextContent(currentWeekOptionLabel);
     fireEvent.click(screen.getByLabelText("Range"));

@@ -31,6 +31,20 @@ describe("getEmployeeContactConflict", () => {
     });
   });
 
+  it("maps active employee name uniqueness violations", () => {
+    expect(
+      getEmployeeContactConflict({
+        code: "23505",
+        constraint: "employees_org_name_active_unique",
+      }),
+    ).toEqual({
+      code: "EMPLOYEE_CONTACT_CONFLICT",
+      error: "An employee with that name already exists.",
+      field: "name",
+      message: "An employee with that name already exists.",
+    });
+  });
+
   it("ignores unrelated database errors", () => {
     expect(
       getEmployeeContactConflict({

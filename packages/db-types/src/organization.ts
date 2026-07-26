@@ -27,6 +27,7 @@ export interface DbOrganization {
   sandbox_owner_user_id: string | null;
   sandbox_source_org_id: string | null;
   enforce_conflict_prevention: boolean;
+  default_shift_enabled: boolean;
   coverage_rule_config?: Record<string, unknown> | null;
   open_shift_visibility?: Record<string, unknown> | null;
   stripe_customer_id: string | null;

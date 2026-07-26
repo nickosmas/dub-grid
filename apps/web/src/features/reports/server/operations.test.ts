@@ -8,6 +8,7 @@ import {
   type OperationsReportType,
   type OperationsReportSourceData,
 } from "./operations";
+import { buildOperationsReportMetrics } from "@/features/reports/shared/table";
 import { resolvePublishedScheduleEntry } from "@/lib/published-shifts";
 
 const ORG_ID = "11111111-1111-4111-8111-111111111111";
@@ -184,12 +185,14 @@ describe("operations reports", () => {
       endDate: "2026-05-04",
     });
 
-    expect(payload.metrics).toEqual(
+    expect(buildOperationsReportMetrics(payload, "shift-period-summary")).toEqual(
       expect.arrayContaining([
         { label: "Scheduled hours", value: "8" },
         { label: "Open slots", value: "1" },
-        { label: "Unlinked staff", value: "1" },
       ]),
+    );
+    expect(buildOperationsReportMetrics(payload, "account-access")).toEqual(
+      expect.arrayContaining([{ label: "Unlinked staff", value: "1" }]),
     );
     expect(payload.reports.employeeDirectory[0]).toMatchObject({
       employeeName: "Avery Ng",
@@ -303,6 +306,124 @@ describe("operations reports", () => {
     expect(payload.reports.absencesCalloffs).toEqual([
       expect.objectContaining({ kind: "calloff", employeeName: "Avery Ng" }),
     ]);
+  });
+
+  it("keeps management-only staff (no focus area) in roster reports but not schedule reports, even with a focus area filter", () => {
+    const source = buildSource({
+      departments: [
+        { id: 40, name: "Care", abbr: "CAR" },
+        { id: 41, name: "HR", abbr: "HR" },
+      ],
+      employees: [
+        ...buildSource().employees,
+        {
+          id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          employee_number: 1003,
+          first_name: "Casey",
+          last_name: "Lee",
+          employment_type: "full_time",
+          email: "casey@example.com",
+          phone: "555-0103",
+          status: "active",
+          seniority: 3,
+          focus_area_ids: [],
+          certification_id: null,
+          role_ids: [],
+          department_ids: [41],
+          user_id: null,
+        },
+      ],
+    });
+
+    const payload = buildOperationsReportPayload(
+      source,
+      { startDate: "2026-05-03", endDate: "2026-05-04" },
+      { focusAreaIds: [10] },
+    );
+
+    expect(payload.reports.employeeDirectory.map((row) => row.employeeName)).toContain("Casey Lee");
+    expect(payload.reports.rosterStatus.map((row) => row.employeeName)).toContain("Casey Lee");
+    expect(payload.reports.certificationRoleMatrix.map((row) => row.employeeName)).toContain(
+      "Casey Lee",
+    );
+    expect(payload.reports.accountAccess.map((row) => row.employeeName)).toContain("Casey Lee");
+    expect(payload.reports.staffHours.map((row) => row.employeeName)).not.toContain("Casey Lee");
+    expect(payload.reports.scheduleMatrix.rows.map((row) => row.employeeName)).not.toContain(
+      "Casey Lee",
+    );
+
+    const directoryRow = payload.reports.employeeDirectory.find(
+      (row) => row.employeeName === "Casey Lee",
+    );
+    expect(directoryRow).toMatchObject({
+      employeeNumber: 1003,
+      departments: "HR",
+      focusAreas: "",
+    });
+  });
+
+  it("resolves a scheduled department from the employee's focus area, not just department_ids", () => {
+    const source = buildSource({
+      focusAreas: [{ id: 10, name: "North", department_id: 41 }],
+      departments: [
+        { id: 40, name: "Care", abbr: "CAR" },
+        { id: 41, name: "Nursing", abbr: "NUR" },
+      ],
+      employees: buildSource().employees.map((employee) =>
+        employee.id === "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+          ? { ...employee, department_ids: [] }
+          : employee,
+      ),
+    });
+
+    const payload = buildOperationsReportPayload(source, {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+
+    expect(payload.reports.employeeDirectory[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+    expect(payload.reports.rosterStatus[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+    expect(payload.reports.certificationRoleMatrix[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+  });
+
+  it("shows the scheduled department, not a department-admin grant, when an employee has both", () => {
+    const source = buildSource({
+      focusAreas: [{ id: 10, name: "North", department_id: 41 }],
+      departments: [
+        { id: 40, name: "Care", abbr: "CAR" },
+        { id: 41, name: "Nursing", abbr: "NUR" },
+      ],
+      // employees[0] already has department_ids: [40] ("Care" — a department-admin
+      // permission grant unrelated to where they work) and focus_area_ids: [10]
+      // (scheduled "Nursing" via the focus area above, where they actually work).
+    });
+
+    const payload = buildOperationsReportPayload(source, {
+      startDate: "2026-05-03",
+      endDate: "2026-05-04",
+    });
+
+    expect(payload.reports.employeeDirectory[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+    expect(payload.reports.rosterStatus[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
+    expect(payload.reports.certificationRoleMatrix[0]).toMatchObject({
+      employeeName: "Avery Ng",
+      departments: "Nursing",
+    });
   });
 
   it("computes segmented hours and coverage from matching schedule segments", () => {
@@ -452,11 +573,11 @@ describe("operations reports", () => {
     );
     const employeeDirectoryCsv = buildOperationsReportCsv(payload, "employee-directory");
     expect(employeeDirectoryCsv).toContain(
-      "Employee,Staff status,Employment type,Email,Phone,Focus areas,Roles,Certification\r\nAvery Ng,Active,Full-time,avery@example.com,555-0101,North,RN,CNA",
+      "Employee ID,Employee,Staff status,Employment type,Email,Phone,Focus areas,Roles,Certification,Departments\r\n#1001,Avery Ng,Active,Full-time,avery@example.com,555-0101,North,RN,CNA,Care",
     );
     expect(employeeDirectoryCsv).not.toContain("full_time");
     expect(buildOperationsReportCsv(payload, "account-access")).toContain(
-      "Blake Diaz,Inactive,blake@example.com,Not linked,Pending invitation (blake@example.com),Invitation pending",
+      "#1002,Blake Diaz,Inactive,blake@example.com,Not linked,Pending invitation (blake@example.com),Invitation pending",
     );
     expect(buildOperationsReportCsv(payload, "schedule-matrix")).toContain(
       'Employee,"May 3, 2026","May 4, 2026"',
@@ -476,6 +597,7 @@ describe("operations reports", () => {
       {
         report: "employee-directory",
         headers: [
+          "Employee ID",
           "Employee",
           "Staff status",
           "Employment type",
@@ -484,8 +606,10 @@ describe("operations reports", () => {
           "Focus areas",
           "Roles",
           "Certification",
+          "Departments",
         ],
         firstRow: [
+          "#1001",
           "Avery Ng",
           "Active",
           "Full-time",
@@ -494,6 +618,7 @@ describe("operations reports", () => {
           "North",
           "RN",
           "CNA",
+          "Care",
         ],
       },
       {
@@ -538,6 +663,7 @@ describe("operations reports", () => {
       {
         report: "roster-status",
         headers: [
+          "Employee ID",
           "Employee",
           "Staff status",
           "Employment type",
@@ -547,6 +673,7 @@ describe("operations reports", () => {
           "Invitation status",
         ],
         firstRow: [
+          "#1001",
           "Avery Ng",
           "Active",
           "Full-time",
@@ -559,6 +686,7 @@ describe("operations reports", () => {
       {
         report: "certification-role-matrix",
         headers: [
+          "Employee ID",
           "Employee",
           "Staff status",
           "Certification",
@@ -569,6 +697,7 @@ describe("operations reports", () => {
           "Role status",
         ],
         firstRow: [
+          "#1001",
           "Avery Ng",
           "Active",
           "CNA",
@@ -582,6 +711,7 @@ describe("operations reports", () => {
       {
         report: "account-access",
         headers: [
+          "Employee ID",
           "Employee",
           "Staff status",
           "Email",
@@ -590,6 +720,7 @@ describe("operations reports", () => {
           "Access status",
         ],
         firstRow: [
+          "#1001",
           "Avery Ng",
           "Active",
           "avery@example.com",

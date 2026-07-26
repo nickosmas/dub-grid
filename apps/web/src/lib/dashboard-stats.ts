@@ -20,7 +20,11 @@ import {
   createCoverageCreditResolver,
   computeCoverageCategorySnapshots,
 } from "@/lib/schedule-logic";
-import { hasShiftStartedAtTimeRanges } from "@dubgrid/schedule-core";
+import {
+  classifyOpenShiftUrgency,
+  hasShiftStartedAtTimeRanges,
+  summarizeCoverageTotals,
+} from "@dubgrid/schedule-core";
 import type { CoverageRuleConfig } from "@dubgrid/domain";
 import { formatDateKey } from "@/lib/utils";
 
@@ -452,15 +456,7 @@ export function computeCoveragePctAndSlots(
     undefined,
     coverageCreditForKey,
   );
-  let totalRequired = 0;
-  let totalFilled = 0;
-
-  for (const snapshot of snapshots) {
-    totalRequired += snapshot.status.required;
-    totalFilled += Math.min(snapshot.status.actual, snapshot.status.required);
-  }
-
-  const pct = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
+  const { totalRequired, totalFilled, pct } = summarizeCoverageTotals(snapshots);
   return { pct, openSlots: totalRequired - totalFilled, totalRequired };
 }
 
@@ -558,8 +554,6 @@ export function computeCoverageBySection(
     const faEmps = empsByFa.get(fa.id) ?? [];
     const faCodes = codesByFa.get(fa.id) ?? new Set();
     const faSnapshots = snapshots.filter((snapshot) => snapshot.focusAreaId === fa.id);
-    let totalFilled = 0;
-    let totalRequired = 0;
 
     const daily: SectionCoverage["daily"] = weekDates.map((date) => {
       const dateKey = formatDateKey(date);
@@ -571,9 +565,6 @@ export function computeCoverageBySection(
         dayRequired += snapshot.status.required;
         dayFilled += Math.min(snapshot.status.actual, snapshot.status.required);
       }
-
-      totalFilled += dayFilled;
-      totalRequired += dayRequired;
 
       // Heatmap: count unique staff working in this section today
       let staffCount = 0;
@@ -597,7 +588,7 @@ export function computeCoverageBySection(
       };
     });
 
-    const pct = totalRequired > 0 ? Math.round((totalFilled / totalRequired) * 100) : 100;
+    const { totalFilled, totalRequired, pct } = summarizeCoverageTotals(faSnapshots);
 
     return {
       focusAreaId: fa.id,
@@ -677,9 +668,7 @@ export function computeOpenShifts(
     }
     const requirementAssignmentDefinitionId = snapshot.preferredOpenAssignmentDefinitionId;
 
-    const daysUntil = Math.floor((snapshot.date.getTime() - today.getTime()) / 86400000);
-    const urgency: OpenShift["urgency"] =
-      daysUntil < 0 ? "low" : daysUntil <= 1 ? "high" : daysUntil <= 3 ? "medium" : "low";
+    const urgency: OpenShift["urgency"] = classifyOpenShiftUrgency(snapshot.date, today);
 
     let timeRange = "";
     if (sc.defaultStartTime && sc.defaultEndTime) {

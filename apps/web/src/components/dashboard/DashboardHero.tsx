@@ -25,28 +25,28 @@ function getMetricAccent(label: string): AccentTone {
 
   if (key.includes("coverage")) {
     return {
-      iconBg: "#EFF6FF",
-      iconColor: "#2563EB",
+      iconBg: "var(--color-brand-bg)",
+      iconColor: "var(--color-brand)",
     };
   }
 
   if (key.includes("gap")) {
     return {
-      iconBg: "#fee2e2",
-      iconColor: "#b91c1c",
+      iconBg: "var(--color-danger-bg)",
+      iconColor: "var(--color-danger-text)",
     };
   }
 
   if (key.includes("approval")) {
     return {
-      iconBg: "#fef3c7",
-      iconColor: "#b45309",
+      iconBg: "var(--color-warning-bg)",
+      iconColor: "var(--color-warning-text)",
     };
   }
 
   return {
-    iconBg: "#dbeafe",
-    iconColor: "#1d4ed8",
+    iconBg: "var(--color-info-bg)",
+    iconColor: "var(--color-info)",
   };
 }
 

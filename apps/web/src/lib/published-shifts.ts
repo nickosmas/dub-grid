@@ -174,7 +174,7 @@ function buildPublishedSegmentDetails(input: {
     const displayParts = buildShiftDisplayParts({
       shift,
       job,
-      shiftDisplayMode: "code",
+      shiftDisplayMode: "name",
     });
 
     detailsByPair.set(buildShiftJobPairKey(shift?.id ?? null, job.id), {

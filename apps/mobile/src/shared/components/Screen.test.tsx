@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const nativeScrollTo = vi.fn();
 
 function pickDomProps(input: Record<string, any>) {
   const output: Record<string, any> = {};
@@ -16,7 +18,9 @@ function pickDomProps(input: Record<string, any>) {
       key === "automaticallyAdjustsScrollIndicatorInsets" ||
       key === "keyboardDismissMode" ||
       key === "scrollEventThrottle" ||
-      key === "onLayout"
+      key === "onLayout" ||
+      key === "contentInset" ||
+      key === "contentOffset"
     ) {
       continue;
     }
@@ -85,11 +89,11 @@ vi.mock("react-native", async () => {
     React.createElement("span", pickDomProps(props), children as React.ReactNode);
 
   const ScrollView = React.forwardRef<{ scrollTo: () => void }, Record<string, any>>(
-    ({ children, contentContainerStyle, ...props }, ref) => {
+    ({ children, contentContainerStyle, contentInset, contentOffset, ...props }, ref) => {
       React.useImperativeHandle(
         ref,
         () => ({
-          scrollTo: () => undefined,
+          scrollTo: nativeScrollTo,
         }),
         [],
       );
@@ -99,6 +103,8 @@ vi.mock("react-native", async () => {
         {
           ...pickDomProps(props),
           "data-content-container-style": JSON.stringify(contentContainerStyle),
+          "data-content-inset": JSON.stringify(contentInset ?? null),
+          "data-content-offset": JSON.stringify(contentOffset ?? null),
           "data-content-inset-adjustment-behavior": props.contentInsetAdjustmentBehavior,
           "data-automatically-adjust-content-insets": props.automaticallyAdjustContentInsets
             ? "true"
@@ -149,12 +155,19 @@ vi.mock("react-native-safe-area-context", async () => {
 });
 
 let Screen: (typeof import("./Screen"))["Screen"];
+let Card: (typeof import("./Screen"))["Card"];
 
 beforeAll(async () => {
-  Screen = (await import("./Screen")).Screen;
+  const screenModule = await import("./Screen");
+  Screen = screenModule.Screen;
+  Card = screenModule.Card;
 });
 
 describe("Screen", () => {
+  beforeEach(() => {
+    nativeScrollTo.mockClear();
+  });
+
   it("exposes the scroll view as the top-level element for native header scroll tracking", () => {
     const { container } = render(
       <Screen>
@@ -226,5 +239,97 @@ describe("Screen", () => {
     );
 
     expect(screen.getByText("Overlay 100")).toBeInTheDocument();
+  });
+
+  it("uses a native content inset/offset instead of padding to clear the sticky header on iOS, so pull-to-refresh isn't hidden behind it", () => {
+    render(
+      <Screen refreshing={false} onRefresh={() => undefined} stickyHeader={<span>Header</span>}>
+        <div>Body</div>
+      </Screen>,
+    );
+
+    const scrollView = screen.getByTestId("screen-scroll-view");
+    const contentStyle = JSON.parse(
+      scrollView.getAttribute("data-content-container-style") ?? "{}",
+    );
+
+    // The mocked header's onLayout reports height: 100 (see the View mock
+    // above) — that value should drive a native inset/offset, not a JS
+    // paddingTop, since paddingTop doesn't move the ScrollView's own frame
+    // origin that the RefreshControl's pull reveal is anchored to.
+    expect(JSON.parse(scrollView.getAttribute("data-content-inset") ?? "null")).toEqual({
+      top: 100,
+      left: 0,
+      bottom: 0,
+      right: 0,
+    });
+    expect(JSON.parse(scrollView.getAttribute("data-content-offset") ?? "null")).toEqual({
+      x: 0,
+      y: -100,
+    });
+    expect(contentStyle.paddingTop).toBe(0);
+  });
+
+  it("translates an imperative scrollTo(y: 0) via scrollViewRef to sit below the sticky header on iOS", () => {
+    const scrollViewRef: {
+      current: { scrollTo: (opts: { y?: number; animated?: boolean }) => void } | null;
+    } = { current: null };
+
+    render(
+      <Screen scrollViewRef={scrollViewRef as any} stickyHeader={<span>Header</span>}>
+        <div>Body</div>
+      </Screen>,
+    );
+
+    // A caller scrolling "to the top" (y: 0) — e.g. ScheduleScreen resetting
+    // position when the visible date range changes — must not land content
+    // behind the floating header: on iOS the header is implemented via
+    // contentInset, so the true top of content is native y: -headerHeight,
+    // not y: 0. The mocked header's onLayout reports height: 100.
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+
+    expect(nativeScrollTo).toHaveBeenCalledWith({ y: -100, animated: true });
+  });
+
+  it("self-corrects position the moment the sticky header's height is first measured, with no caller involved", () => {
+    // Regression for a race where a caller's scrollTo(y: 0) fires before the
+    // header's onLayout has reported a height (e.g. on a warm cache, where
+    // data — and so a caller's own "scroll to top" effect — can resolve in
+    // the same tick as mount, ahead of this native layout callback). At that
+    // moment there's nothing yet to subtract, so the translated call is a
+    // no-op, leaving content under the header with no visible correction.
+    // Screen itself must self-correct once the real height becomes known,
+    // regardless of whether any caller already (ineffectively) tried.
+    render(
+      <Screen stickyHeader={<span>Header</span>}>
+        <div>Body</div>
+      </Screen>,
+    );
+
+    expect(nativeScrollTo).toHaveBeenCalledWith({ x: 0, y: -100, animated: false });
+  });
+});
+
+describe("Card", () => {
+  it("renders without an icon by default", () => {
+    render(<Card title="Plain card" body="Some body text" />);
+
+    expect(screen.getByText("Plain card")).toBeInTheDocument();
+    expect(screen.getByText("Some body text")).toBeInTheDocument();
+  });
+
+  it("renders a leading icon chip when an icon is provided", () => {
+    const { container } = render(
+      <Card title="With icon" icon="alert-circle-outline" iconTone="warning" />,
+    );
+
+    expect(screen.getByText("With icon")).toBeInTheDocument();
+    expect(container.querySelector('[data-icon-name="alert-circle-outline"]')).toBeTruthy();
+  });
+
+  it("renders header accessory content", () => {
+    render(<Card title="With accessory" headerAccessory={<span>Badge</span>} />);
+
+    expect(screen.getByText("Badge")).toBeInTheDocument();
   });
 });

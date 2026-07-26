@@ -396,26 +396,14 @@ export default function RequestDemoPage() {
             <button
               type="submit"
               disabled={loading || hasValidationErrors}
-              style={{
-                width: "100%",
-                marginTop: "28px",
-                padding: "13px",
-                background: "var(--color-brand)",
-                color: "#fff",
-                border: "none",
-                borderRadius: "999px",
-                fontSize: "var(--dg-fs-body)",
-                fontWeight: 600,
-                cursor: loading ? "not-allowed" : "pointer",
-                fontFamily: "inherit",
-                transition: "background 0.15s ease",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: loading ? 0.85 : 1,
-              }}
+              className="dg-btn dg-btn-primary dg-btn-lg"
+              style={{ width: "100%", marginTop: "28px" }}
             >
-              <ButtonLoading loading={loading} spinnerColor="#fff" spinnerSize={28}>
+              <ButtonLoading
+                loading={loading}
+                spinnerColor="var(--color-text-inverse)"
+                spinnerSize={28}
+              >
                 Submit Request
               </ButtonLoading>
             </button>

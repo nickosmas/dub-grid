@@ -12,8 +12,12 @@ export function getMobileAccountRealtimeInvalidationKeys(
   // Prefix-only key — matches every variant of the profile namespace
   // (sessions, notification-preferences, etc.).
   const profileAll = ["mobile", "profile"] as const;
+  const notificationPreferences = ["mobile", "notification-preferences", accessToken] as const;
   const notifications = ["mobile", "notifications-infinite"] as const;
   const notificationFacets = ["mobile", "notification-facets", accessToken] as const;
+  // Prefix-only key — matches the deep-link fallback query for any
+  // notification id (["mobile", "notification-detail", accessToken, id]).
+  const notificationDetail = ["mobile", "notification-detail"] as const;
 
   switch (table) {
     case "profiles":
@@ -21,9 +25,9 @@ export function getMobileAccountRealtimeInvalidationKeys(
     case "user_sessions":
       return [profileAll];
     case "notification_preferences":
-      return [profileAll];
+      return [profileAll, notificationPreferences];
     case "notifications":
-      return [notifications, bootstrap, notificationFacets];
+      return [notifications, bootstrap, notificationFacets, notificationDetail];
   }
 }
 

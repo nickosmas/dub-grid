@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
@@ -14,8 +15,9 @@ import {
 import { isSelfAction } from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
-import { getEmployeeProfileHref } from "@/lib/profile-links";
+import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
 import InlineEditEmployee, { type EditEmployeePanelHandle } from "@/components/EditEmployeePanel";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -23,19 +25,14 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
 import { StatusPill, type StatusPillTone } from "@/components/ui/status-pill";
+import { EmployeeStatusActions } from "@/components/staff-detail/EmployeeStatusActions";
+import { getAvatarTone } from "@dubgrid/design-tokens";
+import { useIsInSandbox } from "@/hooks";
 
 function statusTone(status: Employee["status"]): StatusPillTone {
   if (status === "inactive") return "warning";
   if (status === "removed") return "danger";
   return "success";
-}
-
-function hashCode(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
 }
 
 interface StaffDetailPanelProps {
@@ -52,7 +49,7 @@ interface StaffDetailPanelProps {
   orgId?: string;
   pendingInviteByEmployeeId: Map<string, Invitation>;
   onSave: (emp: Employee) => void;
-  onRemove: (empId: string) => void;
+  onRemove: (empId: string, note?: string) => void;
   onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onClose: () => void;
@@ -62,7 +59,6 @@ interface StaffDetailPanelProps {
   hasPendingManagementInvite?: boolean;
   onManageManagementAccess?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
-  onRevokeAccess?: (userId: string) => void;
   orgRole?: OrganizationRole | null;
   adminPermissions?: AdminPermissions | null;
   onRoleChange?: (newRole: OrganizationRole) => Promise<void>;
@@ -93,15 +89,16 @@ export function StaffDetailPanel({
   hasPendingManagementInvite,
   onManageManagementAccess,
   onRevoke,
-  onRevokeAccess,
   orgRole,
   adminPermissions,
   onRoleChange,
   onPermissionsChange,
 }: StaffDetailPanelProps) {
   const { user: currentUser } = useAuth();
+  const { resolvedTheme } = useTheme();
+  const isInSandbox = useIsInSandbox();
   const isSelf = isSelfAction(currentUser?.id, employee.userId);
-  const hue = hashCode(employee.id) % 360;
+  const avatarTone = getAvatarTone(employee.id, resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<EditEmployeePanelHandle>(null);
   const [closing, setClosing] = useState(false);
@@ -129,6 +126,10 @@ export function StaffDetailPanel({
   );
   const showAccountAccessActions = showInviteActions || showManagementAccessAction;
   const profileHref = getEmployeeProfileHref(employee.id, employee.userId, currentUser?.id ?? null);
+  // Only staff managers can open the full /people/[id] page (mirrors the
+  // table's name-link gate); the self link just goes to /profile.
+  const showProfileLink =
+    canManageEmployees || isCurrentUsersEmployee(employee.userId, currentUser?.id ?? null);
 
   const closePanel = useCallback(() => {
     setClosing(true);
@@ -198,25 +199,12 @@ export function StaffDetailPanel({
       <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
         {/* Panel header */}
         <div className="staff-detail-header">
-          <button
-            className="staff-detail-close"
+          <CloseButton
+            size="md"
+            className="self-end"
             onClick={handleRequestClose}
             aria-label="Close detail panel"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          />
 
           {/* Profile card area */}
           <div
@@ -227,15 +215,15 @@ export function StaffDetailPanel({
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
-                background: `hsl(${hue}, 65%, 94%)`,
+                background: avatarTone.backgroundColor,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "var(--dg-fs-body)",
                 fontWeight: 800,
-                color: `hsl(${hue}, 60%, 38%)`,
+                color: avatarTone.textColor,
                 flexShrink: 0,
-                border: `2px solid hsl(${hue}, 55%, 86%)`,
+                border: `2px solid ${avatarTone.borderColor}`,
               }}
             >
               {getInitials(getEmployeeDisplayName(employee))}
@@ -289,33 +277,46 @@ export function StaffDetailPanel({
                   </span>
                 )}
               </div>
-              <Link
-                href={profileHref}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  marginTop: 4,
-                  fontSize: "var(--dg-fs-footnote)",
-                  fontWeight: 600,
-                  color: "var(--color-link)",
-                  textDecoration: "none",
-                }}
-              >
-                View full profile
-                <svg
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+              {showProfileLink && (
+                <Link
+                  href={profileHref}
+                  onClick={(event) => {
+                    // Close the panel as part of this click instead of
+                    // leaving it for the route swap to yank away — same
+                    // unsaved-changes guard as the X button/Escape.
+                    if (hasUnsavedChanges) {
+                      event.preventDefault();
+                      handleRequestClose();
+                      return;
+                    }
+                    closePanel();
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    marginTop: 4,
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    color: "var(--color-link)",
+                    textDecoration: "none",
+                  }}
                 >
-                  <polyline points="9 6 15 12 9 18" />
-                </svg>
-              </Link>
+                  View full profile
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="9 6 15 12 9 18" />
+                  </svg>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -417,12 +418,17 @@ export function StaffDetailPanel({
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                     {onInvite && (
                       <button
-                        disabled={revokingInvite}
+                        disabled={revokingInvite || isInSandbox}
                         onClick={() => setPendingInvitationAction("reinvite")}
                         className="dg-btn dg-btn-ghost dg-btn-xs"
                         style={{
                           color: "var(--color-link)",
                         }}
+                        title={
+                          isInSandbox
+                            ? "Sending invitations isn't available in sandbox mode."
+                            : undefined
+                        }
                       >
                         <ButtonLoading loading={revokingInvite} spinnerSize={12}>
                           Reinvite
@@ -431,12 +437,17 @@ export function StaffDetailPanel({
                     )}
                     {onRevoke && (
                       <button
-                        disabled={revokingInvite}
+                        disabled={revokingInvite || isInSandbox}
                         onClick={() => setPendingInvitationAction("revoke")}
                         className="dg-btn dg-btn-ghost dg-btn-xs"
                         style={{
                           color: "var(--color-danger)",
                         }}
+                        title={
+                          isInSandbox
+                            ? "Revoking invitations isn't available in sandbox mode."
+                            : undefined
+                        }
                       >
                         <ButtonLoading loading={revokingInvite} spinnerSize={12}>
                           Revoke
@@ -450,11 +461,17 @@ export function StaffDetailPanel({
                 onInvite && (
                   <button
                     onClick={() => onInvite(employee)}
+                    disabled={isInSandbox}
                     className="dg-btn dg-btn-secondary"
                     style={{
                       width: "100%",
                       justifyContent: "center",
                     }}
+                    title={
+                      isInSandbox
+                        ? "Sending invitations isn't available in sandbox mode."
+                        : undefined
+                    }
                   >
                     <svg
                       width="13"
@@ -490,6 +507,37 @@ export function StaffDetailPanel({
                 onRoleChange={onRoleChange}
                 onPermissionsChange={onPermissionsChange}
                 isSelf={isSelf}
+              />
+            </div>
+          )}
+          {canManageEmployees && (
+            <div
+              style={{
+                padding: "0 24px 24px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "var(--dg-fs-footnote)",
+                  fontWeight: 700,
+                  color: "var(--color-text-subtle)",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Staff status
+              </div>
+              <EmployeeStatusActions
+                employee={employee}
+                canEdit={canManageEmployees}
+                isSelf={isSelf}
+                onDeactivate={onDeactivate}
+                onActivate={onActivate}
+                onRemove={onRemove}
+                variant="panel"
               />
             </div>
           )}

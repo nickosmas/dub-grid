@@ -19,7 +19,6 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
 
   const isSuperAdmin = role === "super_admin";
   const isSaOrientation = isSuperAdmin && (isOrgSetup ?? false);
-  const isUser = role === "user";
 
   const heading =
     isSuperAdmin && !isSaOrientation ? "Your Organization is Ready!" : "You\u2019re All Set!";
@@ -28,25 +27,11 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
     ? "You have full super admin access. Head to the dashboard to see how things are running."
     : isSuperAdmin
       ? "Everything is configured and ready to go. Next, head to the People page to add your employees and start building schedules."
-      : isUser
-        ? "You\u2019re all set up. Head to the schedule to see your upcoming shifts."
-        : "Your account is set up and ready. Head to the dashboard to get started.";
+      : "Your account is set up and ready. Head to the dashboard to get started.";
 
-  const ctaLabel = isSaOrientation
-    ? "Go to Dashboard"
-    : isSuperAdmin
-      ? "Go to People"
-      : isUser
-        ? "View My Schedule"
-        : "Go to Dashboard";
+  const ctaLabel = isSuperAdmin && !isSaOrientation ? "Go to People" : "Go to Dashboard";
 
-  const destination = isSaOrientation
-    ? "/dashboard"
-    : isUser
-      ? "/schedule"
-      : isSuperAdmin
-        ? "/people"
-        : "/dashboard";
+  const destination = isSuperAdmin && !isSaOrientation ? "/people" : "/dashboard";
 
   async function handleComplete() {
     setLoading(true);

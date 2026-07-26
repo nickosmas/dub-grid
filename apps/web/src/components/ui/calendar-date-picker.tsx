@@ -288,7 +288,7 @@ export default function CalendarDatePicker({
                       <span
                         className={cn(
                           "absolute bottom-1 h-1 w-1 rounded-full",
-                          isSelected ? "bg-white" : "bg-[var(--color-brand)]",
+                          isSelected ? "bg-[var(--color-text-inverse)]" : "bg-[var(--color-brand)]",
                         )}
                       />
                     ) : null}

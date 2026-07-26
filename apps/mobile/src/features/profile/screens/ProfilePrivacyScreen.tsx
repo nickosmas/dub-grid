@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, Switch, Text, View } from "react-native";
 import { Screen } from "../../../shared/components/Screen";
-import { mobileColors, mobileText } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { getStoredConsent, LEGAL_URLS, setStoredConsent } from "../../consent/lib/consent";
 import {
   ProfileList,
@@ -11,6 +12,8 @@ import {
 } from "../components/ProfilePrimitives";
 
 export default function ProfilePrivacyScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [analytics, setAnalytics] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -85,25 +88,26 @@ export default function ProfilePrivacyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  toggleRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-  },
-  toggleCopy: {
-    flex: 1,
-    gap: 3,
-    minWidth: 0,
-  },
-  toggleLabel: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  toggleDescription: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    toggleRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      justifyContent: "space-between",
+    },
+    toggleCopy: {
+      flex: 1,
+      gap: 3,
+      minWidth: 0,
+    },
+    toggleLabel: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    toggleDescription: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+  });

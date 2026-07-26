@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { X } from "lucide-react";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { Switch } from "@/components/ui/switch";
 
 const STORAGE_KEY = "dubgrid-cookie-consent";
@@ -216,21 +216,13 @@ export default function CookieConsent() {
         boxShadow: "0 -4px 24px rgba(0, 0, 0, 0.08)",
       }}
     >
-      <button
-        type="button"
+      <CloseButton
+        size="lg"
         onClick={handleClose}
         aria-label="Close and keep essential cookies only"
         title="Close"
-        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-md sm:right-3 sm:top-3"
-        style={{
-          color: "var(--color-text-muted)",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        <X size={18} />
-      </button>
+        className="absolute right-2 top-2 sm:right-3 sm:top-3"
+      />
       {view === "summary" ? (
         <>
           <p

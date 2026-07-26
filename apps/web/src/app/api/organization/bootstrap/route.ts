@@ -15,6 +15,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { parseHost } from "@/lib/subdomain";
 import { getImpersonationFromCookie, IMPERSONATION_COOKIE_NAME } from "@/lib/impersonation";
+import { verifyImpersonationSession } from "@/lib/impersonation-server";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
 import {
@@ -58,8 +59,19 @@ async function resolveOrganizationId(
     ? getImpersonationFromCookie(`${IMPERSONATION_COOKIE_NAME}=${impersonationCookie}`)
     : null;
 
-  if (impersonation?.targetOrgId) {
-    return { orgId: impersonation.targetOrgId, isGridmaster: false };
+  // The cookie is client-writable — only a real (JWT-verified) gridmaster
+  // gets to use it, and only when its sessionId matches a still-active
+  // impersonation_sessions row owned by them. Use the row's target_org_id,
+  // not the cookie's copy.
+  if (impersonation?.targetOrgId && claims.platform_role === "gridmaster" && userId) {
+    const verified = await verifyImpersonationSession(
+      getServiceClient(),
+      impersonation.sessionId,
+      userId,
+    );
+    if (verified) {
+      return { orgId: verified.targetOrgId, isGridmaster: false };
+    }
   }
 
   // Sandbox mode: when the user has an active sandbox cookie matching

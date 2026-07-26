@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
+import { subscribeOrgScopedRealtime } from "@dubgrid/realtime-core";
 import {
   invalidateMobileRealtimeQueries,
   type MobileRealtimeTable,
@@ -54,46 +55,29 @@ export function useMobileRealtimeInvalidation({
     ) {
       return;
     }
-    const channelId = `mobile-freshness:${orgId}:${Date.now()}:${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const channel = supabase.channel(channelId);
-    const handleChange = (table: MobileRealtimeTable) => {
-      invalidateMobileRealtimeQueries(queryClient, accessToken, table);
-    };
 
-    channel.on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "organizations",
-        filter: `id=eq.${orgId}`,
+    return subscribeOrgScopedRealtime<MobileRealtimeTable>({
+      client: supabase,
+      orgId,
+      tables: ORG_FILTER_TABLES,
+      rowScopedTable: "organizations",
+      // Coalesce bursts of postgres_changes events (e.g. a bulk save) into
+      // one invalidation flush per window, matching web's org-freshness hook.
+      debounceMs: 150,
+      channelNamePrefix: `mobile-freshness:${orgId}`,
+      onFlush: (tables) => {
+        for (const table of tables) {
+          invalidateMobileRealtimeQueries(queryClient, accessToken, table);
+        }
       },
-      () => handleChange("organizations"),
-    );
-
-    for (const table of ORG_FILTER_TABLES) {
-      channel.on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table,
-          filter: `org_id=eq.${orgId}`,
-        },
-        () => handleChange(table),
-      );
-    }
-
-    channel.subscribe((status) => {
-      if (status === "CHANNEL_ERROR") {
-        console.warn("Mobile realtime freshness channel error");
-      }
+      onReconnectAfterError: () => {
+        void queryClient.invalidateQueries({
+          queryKey: ["mobile", "bootstrap", accessToken],
+        });
+      },
+      onError: (error) => {
+        console.error("Mobile realtime freshness channel error", error);
+      },
     });
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
   }, [accessToken, disabled, orgId, queryClient]);
 }

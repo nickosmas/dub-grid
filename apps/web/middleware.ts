@@ -4,6 +4,7 @@ import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
+import { verifyImpersonationSession } from "@/lib/impersonation-server";
 import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
@@ -360,15 +361,48 @@ export async function middleware(req: NextRequest) {
             maxAge: 0,
           });
         } else {
-          // Active impersonation — override context to target user
-          isImpersonating = true;
-          claims = {
-            ...claims,
-            org_id: impData.targetOrgId,
-            org_slug: impData.targetOrgSlug,
-            org_role: impData.targetOrgRole,
-          };
-          effectiveRole = impData.targetOrgRole ?? "user";
+          // The cookie is client-writable and populated mostly from
+          // client-held state, not start_impersonation's return value — cross
+          // -check its sessionId against the authoritative impersonation_
+          // sessions row before trusting targetOrgId/targetUserId, the same
+          // way the sandbox cookie is re-verified against the DB below.
+          const supabaseUrl3 = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const serviceKey3 = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          const verified =
+            typeof impData.sessionId === "string" && supabaseUrl3 && serviceKey3
+              ? await timer.time("mw_impersonation_verify", () =>
+                  verifyImpersonationSession(
+                    createClient(supabaseUrl3, serviceKey3, {
+                      auth: { autoRefreshToken: false, persistSession: false },
+                    }),
+                    impData.sessionId,
+                    session.user.id,
+                  ),
+                )
+              : null;
+
+          if (verified) {
+            // Active impersonation — override context to target user. Use
+            // the DB-verified org id, not the cookie's copy; org_slug/
+            // org_role are display-only for route gating during
+            // impersonation and stay sourced from the cookie.
+            isImpersonating = true;
+            claims = {
+              ...claims,
+              org_id: verified.targetOrgId,
+              org_slug: impData.targetOrgSlug,
+              org_role: impData.targetOrgRole,
+            };
+            effectiveRole = impData.targetOrgRole ?? "user";
+          } else {
+            // No matching active session — the cookie doesn't correspond to
+            // a real, still-active impersonation. Clear it rather than
+            // trusting any of its fields.
+            res.cookies.set("dubgrid-impersonation", "", {
+              path: "/",
+              maxAge: 0,
+            });
+          }
         }
       } catch {
         // Malformed cookie — clear it

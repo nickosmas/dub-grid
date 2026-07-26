@@ -611,9 +611,9 @@ describe("ShiftEditPanel", () => {
       expect(matches.length).toBeGreaterThanOrEqual(1);
     });
 
-    it("renders a close button (×)", () => {
+    it("renders a close button", () => {
       renderPanel();
-      const closeButtons = screen.getAllByText("×");
+      const closeButtons = screen.getAllByRole("button", { name: "Close" });
       expect(closeButtons.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -652,7 +652,7 @@ describe("ShiftEditPanel", () => {
   describe("Close interactions", () => {
     it("clicking close button calls onClose", () => {
       const { onClose } = renderPanel();
-      const closeButton = screen.getByText("×");
+      const closeButton = screen.getAllByRole("button", { name: "Close" })[0];
       fireEvent.click(closeButton);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
@@ -974,7 +974,7 @@ describe("ShiftEditPanel", () => {
       });
 
       expect(container.querySelector('[data-shift-diff-badge="modified"]')?.textContent).toBe(
-        "Was D · SUPV",
+        "Was Day Shift · Supervisor",
       );
     });
   });

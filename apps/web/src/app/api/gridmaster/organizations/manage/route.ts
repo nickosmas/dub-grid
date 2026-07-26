@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
 import type { DbOrganization } from "@dubgrid/db-types";
 import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
@@ -11,12 +11,22 @@ import { cacheDel, CacheKey } from "@/lib/cache";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { registerOrgDomain } from "@/lib/vercel";
+import * as Sentry from "@/lib/sentry";
+import { clientEnv, serverEnv } from "@/lib/env";
+import { isValidOrgSlug } from "@/lib/subdomain";
 
 export const dynamic = "force-dynamic";
 
 const createSetupSchema = z.object({
   name: z.string().trim().min(1),
-  slug: z.string().trim().optional(),
+  slug: z
+    .string()
+    .trim()
+    .optional()
+    .refine((slug) => !slug || isValidOrgSlug(slug), {
+      message: "Subdomain must be lowercase alphanumeric with hyphens, and not a reserved word",
+    }),
   addressLine1: z.string().trim(),
   addressLine2: z.string().trim(),
   addressCity: z.string().trim(),
@@ -90,6 +100,28 @@ export async function POST(req: NextRequest) {
 
   const requestClient = createRequestSupabaseClient(req);
   const serviceClient = getServiceClient();
+
+  // Defense in depth: the gridmaster dashboard's organization list already
+  // excludes sandbox orgs (workspace_kind = 'real' filter), so this should
+  // be unreachable via the UI — but guard the API directly in case a
+  // sandbox org id ever reaches this route. Sandbox lifecycle is owned by
+  // the user + the cron cleanup job, not gridmaster tooling.
+  if (parsed.data.action !== "createOrganizationSetup") {
+    const { data: targetOrg, error: targetOrgError } = await serviceClient
+      .from("organizations")
+      .select("workspace_kind")
+      .eq("id", parsed.data.orgId)
+      .maybeSingle();
+    if (targetOrgError) {
+      return apiErrorResponse(targetOrgError, "Gridmaster organization request failed");
+    }
+    if (targetOrg?.workspace_kind === "sandbox") {
+      return NextResponse.json(
+        { error: "Sandbox organizations aren't managed here." },
+        { status: 400 },
+      );
+    }
+  }
 
   try {
     switch (parsed.data.action) {
@@ -261,6 +293,7 @@ export async function POST(req: NextRequest) {
         }
 
         const org = rowToOrganization(row as DbOrganization);
+
         const email = input.superAdminEmail?.trim() ?? "";
         const firstName = input.superAdminFirstName?.trim() ?? "";
         const lastName = input.superAdminLastName?.trim() ?? "";
@@ -365,6 +398,30 @@ export async function POST(req: NextRequest) {
           },
           request: req,
         });
+
+        // Fired last in this case, after every other DB write has succeeded, so a
+        // later failure (e.g. the audit log write) can no longer leave a live
+        // Vercel domain registered for an org whose creation was reported as failed.
+        // Gated to real production deploys — VERCEL_ENV distinguishes that from
+        // Preview (both have NODE_ENV=production on Vercel), so Preview/local runs
+        // never register domains against the real project.
+        if (serverEnv?.VERCEL_ENV === "production" && org.slug) {
+          const baseDomain = clientEnv?.NEXT_PUBLIC_BASE_DOMAIN;
+          if (baseDomain) {
+            after(() =>
+              registerOrgDomain(`${org.slug}.${baseDomain}`).catch((err) =>
+                Sentry.captureException(err, {
+                  extra: { context: "org-domain-registration", orgId: org.id },
+                }),
+              ),
+            );
+          } else {
+            Sentry.captureMessage(
+              `Skipped org domain registration for org ${org.id}: NEXT_PUBLIC_BASE_DOMAIN unavailable`,
+              "warning",
+            );
+          }
+        }
 
         return NextResponse.json({
           success: true,

@@ -12,6 +12,7 @@ import WelcomeStep from "./steps/WelcomeStep";
 import IdentityStep from "./steps/IdentityStep";
 import StructureStep from "./steps/StructureStep";
 import ScheduleStep from "./steps/ScheduleStep";
+import InviteTeamStep from "./steps/InviteTeamStep";
 import AdminOrientationStep from "./steps/AdminOrientationStep";
 import SuperAdminOrientationStep from "./steps/SuperAdminOrientationStep";
 import CompletionStep from "./steps/CompletionStep";
@@ -28,6 +29,7 @@ const SUPER_ADMIN_STEPS: StepConfig[] = [
   { id: "identity", label: "Identity" },
   { id: "structure", label: "Structure" },
   { id: "schedule", label: "Schedule" },
+  { id: "invite-team", label: "Invite Team" },
   { id: "completion", label: "Done" },
 ];
 
@@ -99,6 +101,8 @@ export default function OnboardingWizard({
         return <StructureStep onNext={goNext} onBack={goBack} />;
       case "schedule":
         return <ScheduleStep onNext={goNext} onBack={goBack} />;
+      case "invite-team":
+        return <InviteTeamStep onNext={goNext} onBack={goBack} />;
       case "orientation":
         return <AdminOrientationStep onNext={goNext} onBack={goBack} />;
       case "sa-orientation":

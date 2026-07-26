@@ -5,6 +5,7 @@ const requireAuthenticatedUser = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const updateSelfLinkedEmployeePhone = vi.fn();
 const getEmployeeContactConflict = vi.fn();
+const resolveEffectiveOrgId = vi.fn();
 const apiErrorResponse = vi.fn((_err: unknown, fallback: string, status: number) =>
   NextResponse.json({ error: fallback }, { status }),
 );
@@ -20,6 +21,9 @@ vi.mock("@/lib/csrf", () => ({
 }));
 vi.mock("@/features/account/server", () => ({
   updateSelfLinkedEmployeePhone: (...args: unknown[]) => updateSelfLinkedEmployeePhone(...args),
+}));
+vi.mock("@/app/api/shared/permissions", () => ({
+  resolveEffectiveOrgId: (...args: unknown[]) => resolveEffectiveOrgId(...args),
 }));
 vi.mock("@/lib/employee-contact-conflicts", () => ({
   getEmployeeContactConflict: (...args: unknown[]) => getEmployeeContactConflict(...args),
@@ -39,6 +43,7 @@ vi.mock("@/lib/client-facing", () => ({
 import { PATCH } from "./route";
 
 const ORG_ID = "11111111-1111-1111-1111-111111111111";
+const SANDBOX_ORG_ID = "99999999-9999-4999-8999-999999999999";
 
 function patch(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/account/profile/phone", {
@@ -55,6 +60,7 @@ beforeEach(() => {
   validateCsrfOrigin.mockReturnValue(null);
   getEmployeeContactConflict.mockReturnValue(null);
   updateSelfLinkedEmployeePhone.mockResolvedValue({ phone: "+15555550100" });
+  resolveEffectiveOrgId.mockImplementation((_req, _userId, orgId) => Promise.resolve(orgId));
 });
 
 describe("PATCH /api/account/profile/phone", () => {
@@ -108,5 +114,17 @@ describe("PATCH /api/account/profile/phone", () => {
     const res = await PATCH(patch({ orgId: ORG_ID, phone: null }));
     expect(res.status).toBe(403);
     expect(updateSelfLinkedEmployeePhone).not.toHaveBeenCalled();
+  });
+
+  it("updates the phone against the effective (sandbox-redirected) org, not the raw body org id", async () => {
+    resolveEffectiveOrgId.mockResolvedValue(SANDBOX_ORG_ID);
+
+    const res = await PATCH(patch({ orgId: ORG_ID, phone: "+15555550100", expectedVersion: 3 }));
+
+    expect(res.status).toBe(200);
+    expect(resolveEffectiveOrgId).toHaveBeenCalledWith(expect.anything(), "user-1", ORG_ID);
+    expect(updateSelfLinkedEmployeePhone).toHaveBeenCalledWith(
+      expect.objectContaining({ orgId: SANDBOX_ORG_ID }),
+    );
   });
 });

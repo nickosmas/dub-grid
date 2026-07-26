@@ -192,6 +192,18 @@ export function createReactNativeModule(React: ReactModule) {
       ...domProps,
     });
   });
+  const Switch = ({ value, onValueChange, disabled, ...props }: Record<string, any>) =>
+    React.createElement("input", {
+      type: "checkbox",
+      role: "switch",
+      checked: Boolean(value),
+      disabled,
+      onChange: (event: Event) => {
+        const target = event.target as HTMLInputElement | null;
+        onValueChange?.(Boolean(target?.checked));
+      },
+      ...pickDomProps(props),
+    });
   const Modal = ({ children, visible = true, ...props }: Record<string, any>) =>
     visible
       ? React.createElement("div", pickDomProps(props), children as ReactType.ReactNode)
@@ -243,6 +255,16 @@ export function createReactNativeModule(React: ReactModule) {
       alert: alertMock,
     },
     Animated,
+    Appearance: {
+      getColorScheme: () => "light",
+      setColorScheme: () => undefined,
+      addChangeListener: () => ({
+        remove() {
+          return undefined;
+        },
+      }),
+    },
+    useColorScheme: () => "light",
     AppState: {
       currentState: "active",
       addEventListener: () => ({
@@ -298,6 +320,7 @@ export function createReactNativeModule(React: ReactModule) {
       },
       create: <T,>(value: T) => value,
     },
+    Switch,
     Text,
     TextInput,
     UIManager: {
@@ -396,37 +419,5 @@ export function createScreenModule(React: ReactModule) {
         children,
       );
     },
-  };
-}
-
-export function createQueryStateCardModule(React: ReactModule) {
-  return {
-    QueryStateCard: ({
-      title,
-      body,
-      actionLabel,
-      onAction,
-    }: {
-      title: string;
-      body: string;
-      actionLabel?: string;
-      onAction?: () => void;
-    }) =>
-      React.createElement(
-        "article",
-        {},
-        React.createElement("h2", {}, title),
-        React.createElement("p", {}, body),
-        actionLabel && onAction
-          ? React.createElement(
-              "button",
-              {
-                type: "button",
-                onClick: onAction,
-              },
-              actionLabel,
-            )
-          : null,
-      ),
   };
 }

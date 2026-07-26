@@ -70,7 +70,6 @@ export function createNetworkErrorToast(): ToastInput {
     tone: "error",
     title: NETWORK_ERROR_TITLE,
     message: NETWORK_ERROR_MESSAGE,
-    durationMs: null,
     dedupeKey: NETWORK_ERROR_TOAST_KEY,
   };
 }

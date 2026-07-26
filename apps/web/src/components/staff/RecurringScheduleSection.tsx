@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "sonner";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
@@ -12,7 +14,12 @@ import ProgressBar from "@/components/ProgressBar";
 import ShiftPicker from "@/components/ShiftPicker";
 import { BOX_SHADOW_CARD, DAY_LABELS } from "@/lib/constants";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
-import { borderColor, DESIGNATION_COLORS, DEFAULT_DESIG_COLOR } from "@/lib/colors";
+import {
+  borderColor,
+  DESIGNATION_COLORS,
+  DEFAULT_DESIG_COLOR,
+  toDarkPillColors,
+} from "@/lib/colors";
 import {
   deleteRecurringDraft,
   deleteRecurringShift,
@@ -58,6 +65,7 @@ type ShiftCellPopoverProps = {
   onAbsenceSelect?: (absenceType: AbsenceType) => void;
   currentAbsenceTypeId?: number | null;
   shiftDisplayMode?: ShiftDisplayMode;
+  defaultShiftEnabled?: boolean;
 };
 
 function ShiftCellPopover({
@@ -78,6 +86,7 @@ function ShiftCellPopover({
   onAbsenceSelect,
   currentAbsenceTypeId,
   shiftDisplayMode,
+  defaultShiftEnabled = true,
 }: ShiftCellPopoverProps) {
   const isMobileView = useMediaQuery(MOBILE);
   const {
@@ -159,26 +168,7 @@ function ShiftCellPopover({
             >
               Select Shift
             </span>
-            <button
-              onClick={onClose}
-              className="dg-btn dg-btn-ghost"
-              style={{ padding: 4, lineHeight: 0 }}
-              aria-label="Close"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            <CloseButton size="md" onClick={onClose} aria-label="Close" />
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
             <ShiftPicker
@@ -198,6 +188,7 @@ function ShiftCellPopover({
                 position: segment.position ?? index,
               }))}
               currentAbsenceTypeId={currentAbsenceTypeId}
+              defaultShiftEnabled={defaultShiftEnabled}
               onSelect={(segments) => {
                 onSelect(
                   segments.length > 0
@@ -227,7 +218,6 @@ function ShiftCellPopover({
               empRoleIds={empRoleIds}
               multiSelect={false}
               closeOnSelect={true}
-              shiftDisplayMode={shiftDisplayMode}
             />
             {(currentSegments.length > 0 || currentAbsenceTypeId) && (
               <button
@@ -355,6 +345,9 @@ function RecurringShiftPill({
   isDirty,
   shiftDisplayMode,
 }: RecurringShiftPillProps) {
+  const { resolvedTheme } = useTheme();
+  const isDarkTheme = resolvedTheme === "dark";
+
   if (!assignment && !absenceType) {
     return (
       <div
@@ -383,11 +376,16 @@ function RecurringShiftPill({
   }
 
   const isNameMode = shiftDisplayMode === "name";
-  const pillBackground = assignment?.color ?? absenceType!.color;
-  const pillText = assignment?.text ?? absenceType!.text;
-  const fallbackBorder = absenceType
-    ? `1px solid ${absenceType.border}`
-    : `1px solid ${borderColor(pillText)}`;
+  const rawPillBackground = assignment?.color ?? absenceType!.color;
+  const rawPillText = assignment?.text ?? absenceType!.text;
+  const darkPill = isDarkTheme ? toDarkPillColors(rawPillBackground) : null;
+  const pillBackground = darkPill?.bg ?? rawPillBackground;
+  const pillText = darkPill?.text ?? rawPillText;
+  const fallbackBorder = darkPill
+    ? `1px solid ${borderColor(pillText)}`
+    : absenceType
+      ? `1px solid ${absenceType.border}`
+      : `1px solid ${borderColor(pillText)}`;
   const displayParts = assignment
     ? buildShiftDisplayParts({
         shift: shiftCategory,
@@ -450,7 +448,7 @@ function RecurringShiftPill({
               : {
                   fontSize: "var(--dg-fs-title)",
                   fontWeight: 800,
-                  lineHeight: 1,
+                  lineHeight: 1.2,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -465,7 +463,7 @@ function RecurringShiftPill({
             style={{
               fontSize: "var(--dg-fs-footnote)",
               fontWeight: 700,
-              lineHeight: 1,
+              lineHeight: 1.3,
               opacity: 0.78,
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -495,6 +493,7 @@ export interface RecurringScheduleSectionProps {
   certifications: NamedItem[];
   absenceTypes?: AbsenceType[];
   shiftDisplayMode?: ShiftDisplayMode;
+  defaultShiftEnabled?: boolean;
 }
 
 export function RecurringScheduleSection({
@@ -511,6 +510,7 @@ export function RecurringScheduleSection({
   certifications,
   absenceTypes = [],
   shiftDisplayMode = "code",
+  defaultShiftEnabled = true,
 }: RecurringScheduleSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isNameMode = shiftDisplayMode === "name";
@@ -1037,7 +1037,7 @@ export function RecurringScheduleSection({
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             style={{
-              padding: "7px 10px 7px 32px",
+              padding: `7px ${searchQuery ? 30 : 10}px 7px 32px`,
               border: "1px solid var(--color-border)",
               borderRadius: "var(--dg-btn-radius)",
               fontSize: "var(--dg-fs-caption)",
@@ -1054,6 +1054,14 @@ export function RecurringScheduleSection({
               event.currentTarget.style.borderColor = "var(--color-border)";
             }}
           />
+          {searchQuery && (
+            <CloseButton
+              size="sm"
+              onClick={() => setSearchQuery("")}
+              aria-label="Clear search"
+              style={{ position: "absolute", right: 4, top: "50%", transform: "translateY(-50%)" }}
+            />
+          )}
         </div>
       </div>
 
@@ -1113,7 +1121,7 @@ export function RecurringScheduleSection({
               minWidth: isMobile ? 448 : undefined,
               gridTemplateColumns: `${isMobile ? 140 : 220}px repeat(7, minmax(${isMobile ? 44 : 72}px, 1fr))`,
               background: "var(--color-bg)",
-              borderBottom: "1px solid var(--color-dark)",
+              borderBottom: "1px solid var(--color-table-divider-strong)",
             }}
           >
             <div
@@ -1357,6 +1365,7 @@ export function RecurringScheduleSection({
               empCertificationId={activeCellEmp.certificationId}
               empRoleIds={activeCellEmp.roleIds}
               shiftDisplayMode={shiftDisplayMode}
+              defaultShiftEnabled={defaultShiftEnabled}
             />
           );
         })()}

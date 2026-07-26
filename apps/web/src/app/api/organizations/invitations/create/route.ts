@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
   try {
     const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
     if (!hasPermission) {
-      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+      return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
     }
 
     // Tier guard: only super_admin or gridmaster can hand out the super_admin
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
     if (role === "super_admin") {
       const allowed = await isOrgSuperAdminOrGridmaster(serviceClient, user.id, orgId);
       if (!allowed) {
-        return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+        return NextResponse.json({ error: API_ERRORS.CANNOT_ASSIGN_SUPER_ADMIN }, { status: 403 });
       }
     }
 

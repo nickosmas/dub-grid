@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { Factor } from "@supabase/supabase-js";
+import * as LocalAuthentication from "expo-local-authentication";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { DetailSkeleton } from "../../../shared/components/Skeleton";
@@ -9,12 +11,17 @@ import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
+  appLockUnsupported,
+  loadAppLockEnabled,
+  setAppLockEnabled,
+} from "../../../shared/lib/app-lock";
+import {
   createProfileChangeRequest,
   getProfile,
   getProfileSessions,
   revokeProfileSession,
+  updateProfileMfaStatus,
 } from "../../../shared/lib/api";
-import { getMobileEnvConfig } from "../../../shared/lib/env";
 import {
   getInlineErrorMessageOrToast,
   pushClientFriendlyErrorToast,
@@ -22,8 +29,9 @@ import {
 import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileColors, mobileRadii, mobileText } from "../../../shared/theme/tokens";
+import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
@@ -32,10 +40,26 @@ import {
   ProfilePanel,
   ProfileSection,
   ProfileTextInput,
-  profilePrimitiveStyles,
+  useProfilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
 
 const PENDING_ACCOUNT_DELETION_MESSAGE = "An account deletion request is pending admin review.";
+
+const MOBILE_TOTP_FRIENDLY_NAME = "DubGrid Mobile Authenticator";
+
+function isVerifiedTotpFactor(factor: Factor): boolean {
+  return factor.factor_type === "totp" && factor.status === "verified";
+}
+
+function isStaleMobileTotpFactor(factor: Factor): boolean {
+  return (
+    factor.factor_type === "totp" &&
+    factor.status === "unverified" &&
+    factor.friendly_name === MOBILE_TOTP_FRIENDLY_NAME
+  );
+}
+
+type MfaStep = "idle" | "enrolling";
 
 const PASSWORD_STRENGTH_RULES = [
   {
@@ -68,7 +92,8 @@ type SecurityConfirmation =
   | { kind: "deletion" }
   | { kind: "password" }
   | { kind: "sessionScope"; scope: "others" | "global" }
-  | { kind: "revokeSession"; refreshTokenHash: string; label: string };
+  | { kind: "revokeSession"; refreshTokenHash: string; label: string }
+  | { kind: "mfaDisable" };
 
 function formatSessionPlatform(platform: string | null) {
   if (platform === "ios") return "iOS";
@@ -105,6 +130,8 @@ function getPasswordStrengthLevel(password: string) {
 }
 
 function PasswordStrengthHints({ password }: { password: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const hints = getPasswordStrengthHints(password);
   const level = getPasswordStrengthLevel(password);
   const hasStartedTyping = password.length > 0;
@@ -148,6 +175,9 @@ function PasswordVisibilityToggle({
   label: string;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityLabel={`${isVisible ? "Hide" : "Show"} ${label}`}
@@ -166,6 +196,9 @@ function PasswordVisibilityToggle({
 }
 
 export default function ProfileSecurityScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const profilePrimitiveStyles = useProfilePrimitiveStyles();
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [sessionScopeLoading, setSessionScopeLoading] = useState<"others" | "global" | null>(null);
@@ -184,6 +217,51 @@ export default function ProfileSecurityScreen() {
     confirmPassword: false,
   });
   const [pendingConfirmation, setPendingConfirmation] = useState<SecurityConfirmation | null>(null);
+  const [mfaStep, setMfaStep] = useState<MfaStep>("idle");
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [mfaSecret, setMfaSecret] = useState<string | null>(null);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaVerifyCode, setMfaVerifyCode] = useState("");
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const [appLockEnabled, setAppLockEnabledState] = useState(false);
+  const [appLockToggling, setAppLockToggling] = useState(false);
+
+  useEffect(() => {
+    if (appLockUnsupported) return;
+    let active = true;
+    void loadAppLockEnabled().then((value) => {
+      if (active) setAppLockEnabledState(value);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function toggleAppLock(next: boolean) {
+    if (appLockToggling) return;
+    setAppLockToggling(true);
+    try {
+      if (next) {
+        const [hasHardware, isEnrolled] = await Promise.all([
+          LocalAuthentication.hasHardwareAsync(),
+          LocalAuthentication.isEnrolledAsync(),
+        ]);
+        if (!hasHardware || !isEnrolled) {
+          pushToast({
+            tone: "error",
+            title: "Could not enable app lock",
+            message: "Set up a passcode or biometrics in your device settings first.",
+          });
+          return;
+        }
+      }
+      await setAppLockEnabled(next);
+      setAppLockEnabledState(next);
+    } finally {
+      setAppLockToggling(false);
+    }
+  }
+
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
     queryFn: () => getProfile(accessToken!),
@@ -409,8 +487,135 @@ export default function ProfileSecurityScreen() {
     }
   }
 
-  function openWebProfile() {
-    void Linking.openURL(`${getMobileEnvConfig().apiBaseUrl}/profile`);
+  function resetMfaEnrollment() {
+    setMfaStep("idle");
+    setMfaSecret(null);
+    setMfaFactorId(null);
+    setMfaVerifyCode("");
+    setMfaError(null);
+  }
+
+  async function startMfaEnrollment() {
+    if (mfaLoading) return;
+    setMfaLoading(true);
+    setMfaError(null);
+    try {
+      const { data: factorsData, error: listError } =
+        await getSupabaseClient().auth.mfa.listFactors();
+      if (listError) throw listError;
+
+      const existingVerifiedTotp = factorsData.all.find(isVerifiedTotpFactor);
+      if (existingVerifiedTotp) {
+        if (accessToken) await updateProfileMfaStatus(accessToken, { enabled: true });
+        await profileQuery.refetch();
+        pushToast({
+          tone: "success",
+          title: "Two-factor authentication",
+          message: "Already enabled on this account.",
+        });
+        resetMfaEnrollment();
+        return;
+      }
+
+      const staleFactors = factorsData.all.filter(isStaleMobileTotpFactor);
+      for (const factor of staleFactors) {
+        const { error: unenrollError } = await getSupabaseClient().auth.mfa.unenroll({
+          factorId: factor.id,
+        });
+        if (unenrollError) throw unenrollError;
+      }
+
+      const { data, error } = await getSupabaseClient().auth.mfa.enroll({
+        factorType: "totp",
+        friendlyName: MOBILE_TOTP_FRIENDLY_NAME,
+      });
+      if (error) throw error;
+
+      setMfaSecret(data.totp.secret);
+      setMfaFactorId(data.id);
+      setMfaStep("enrolling");
+    } catch (error) {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not start setup",
+        fallbackMessage: "We couldn't start two-factor setup right now.",
+      });
+    } finally {
+      setMfaLoading(false);
+    }
+  }
+
+  async function verifyMfaEnrollment() {
+    if (!mfaFactorId || mfaVerifyCode.length !== 6 || mfaLoading) return;
+    setMfaLoading(true);
+    setMfaError(null);
+    try {
+      const { error } = await getSupabaseClient().auth.mfa.challengeAndVerify({
+        factorId: mfaFactorId,
+        code: mfaVerifyCode,
+      });
+      if (error) throw error;
+
+      if (accessToken) await updateProfileMfaStatus(accessToken, { enabled: true });
+      await profileQuery.refetch();
+      pushToast({
+        tone: "success",
+        title: "Two-factor authentication enabled",
+        message: "Your account is now protected.",
+      });
+      resetMfaEnrollment();
+    } catch (error) {
+      setMfaError(
+        getInlineErrorMessageOrToast(pushToast, {
+          error,
+          fallbackMessage: "Invalid verification code. Please try again.",
+        }),
+      );
+    } finally {
+      setMfaLoading(false);
+    }
+  }
+
+  function cancelMfaEnrollment() {
+    if (mfaFactorId) {
+      getSupabaseClient()
+        .auth.mfa.unenroll({ factorId: mfaFactorId })
+        .catch(() => {});
+    }
+    resetMfaEnrollment();
+  }
+
+  async function disableMfa() {
+    if (mfaLoading) return;
+    setMfaLoading(true);
+    try {
+      const { data: factorsData, error: listError } =
+        await getSupabaseClient().auth.mfa.listFactors();
+      if (listError) throw listError;
+
+      const verifiedTotp = factorsData.totp.filter((factor) => factor.status === "verified");
+      for (const factor of verifiedTotp) {
+        const { error } = await getSupabaseClient().auth.mfa.unenroll({ factorId: factor.id });
+        if (error) throw error;
+      }
+
+      if (accessToken) await updateProfileMfaStatus(accessToken, { enabled: false });
+      await profileQuery.refetch();
+      pushToast({
+        tone: "success",
+        title: "Two-factor authentication disabled",
+        message: "You can re-enable it any time.",
+      });
+      resetMfaEnrollment();
+    } catch (error) {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not disable",
+        fallbackMessage: "We couldn't disable two-factor authentication right now.",
+      });
+    } finally {
+      setMfaLoading(false);
+    }
   }
 
   function confirmDeletionRequest() {
@@ -429,6 +634,9 @@ export default function ProfileSecurityScreen() {
     } else if (action.kind === "sessionScope") {
       setPendingConfirmation(null);
       void handleSessionAction(action.scope);
+    } else if (action.kind === "mfaDisable") {
+      setPendingConfirmation(null);
+      void disableMfa();
     } else {
       setPendingConfirmation(null);
       void revokeMutation.mutateAsync(action.refreshTokenHash);
@@ -444,7 +652,9 @@ export default function ProfileSecurityScreen() {
           ? "Sign out all devices?"
           : pendingConfirmation?.kind === "sessionScope"
             ? "Sign out other sessions?"
-            : "Revoke session?";
+            : pendingConfirmation?.kind === "mfaDisable"
+              ? "Disable two-factor authentication?"
+              : "Revoke session?";
   const confirmationBody =
     pendingConfirmation?.kind === "deletion"
       ? "Your admin will be notified to start the deletion process."
@@ -454,7 +664,9 @@ export default function ProfileSecurityScreen() {
           ? "Every device, including this one, will be signed out."
           : pendingConfirmation?.kind === "sessionScope"
             ? "Every device except this one will be signed out."
-            : `${pendingConfirmation?.label ?? "This device"} will lose access immediately.`;
+            : pendingConfirmation?.kind === "mfaDisable"
+              ? "This will make your account less secure."
+              : `${pendingConfirmation?.label ?? "This device"} will lose access immediately.`;
   const confirmationLabel =
     pendingConfirmation?.kind === "deletion"
       ? "Request"
@@ -464,7 +676,62 @@ export default function ProfileSecurityScreen() {
           ? "Sign Out"
           : pendingConfirmation?.kind === "sessionScope"
             ? "Sign Out"
-            : "Revoke";
+            : pendingConfirmation?.kind === "mfaDisable"
+              ? "Disable"
+              : "Revoke";
+
+  function renderSessionRow(
+    session: NonNullable<typeof sessionsQuery.data>["active"][number],
+    options: { isLast: boolean; showRevoke: boolean },
+  ) {
+    return (
+      <View
+        key={session.id}
+        style={[styles.sessionItem, !options.isLast && styles.sessionItemDivider]}
+      >
+        <View style={styles.sessionRow}>
+          <View style={styles.sessionIcon}>
+            <Text style={styles.sessionIconText}>{formatSessionPlatform(session.platform)}</Text>
+          </View>
+          <View style={styles.sessionCopy}>
+            <View style={styles.sessionTitleRow}>
+              <Text style={styles.sessionTitle}>
+                {session.deviceLabel || session.platform || "Unknown device"}
+              </Text>
+              {session.isCurrent && (
+                <View style={styles.sessionCurrentBadge}>
+                  <Text style={styles.sessionCurrentBadgeText}>Current</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.sessionBody}>
+              Last active {new Date(session.lastActiveAt).toLocaleString()}
+            </Text>
+            {session.appVersion || session.ipAddress ? (
+              <Text style={styles.sessionMeta}>
+                {[session.appVersion, session.ipAddress].filter(Boolean).join(" - ")}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        {options.showRevoke && (
+          <Button
+            compact
+            disabled={revokeMutation.isPending}
+            label="Revoke"
+            onPress={() => {
+              setPendingConfirmation({
+                kind: "revokeSession",
+                refreshTokenHash: session.refreshTokenHash,
+                label: session.deviceLabel || session.platform || "this device",
+              });
+            }}
+            tone="neutral"
+          />
+        )}
+      </View>
+    );
+  }
 
   return (
     <Screen refreshing={manualRefresh.isRefreshing} onRefresh={manualRefresh.refresh}>
@@ -581,16 +848,99 @@ export default function ProfileSecurityScreen() {
           </ProfileSection>
 
           <ProfileSection title="Two-factor authentication">
-            <ProfileList>
-              <ProfileInfoRow
-                iconName="shield-outline"
-                isLast
-                label="Status"
-                value={profileQuery.data.user.mfaEnabled ? "Enabled" : "Not enabled"}
-              />
-            </ProfileList>
-            <Button compact label="Open web profile" onPress={openWebProfile} tone="secondary" />
+            {mfaStep === "enrolling" ? (
+              <>
+                {mfaError ? <StatusBanner body={mfaError} title="Could not verify code" /> : null}
+                <Text style={styles.mfaInstructions}>
+                  Add a new entry in your authenticator app (Google Authenticator, Authy, 1Password,
+                  etc.) using this key, then enter the 6-digit code it generates.
+                </Text>
+                {mfaSecret ? (
+                  <View style={styles.mfaSecretRow}>
+                    <Text selectable style={styles.mfaSecretText}>
+                      {mfaSecret}
+                    </Text>
+                  </View>
+                ) : null}
+                <ProfileTextInput
+                  accessibilityLabel="6-digit verification code"
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  keyboardType="number-pad"
+                  label="Verification code"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={mfaVerifyCode}
+                  onChangeText={(text) => {
+                    setMfaVerifyCode(text.replace(/\D/g, "").slice(0, 6));
+                    setMfaError(null);
+                  }}
+                />
+                <View style={styles.actionsRow}>
+                  <Button
+                    compact
+                    disabled={mfaLoading || mfaVerifyCode.length !== 6}
+                    label={mfaLoading ? "Verifying..." : "Verify & enable"}
+                    onPress={() => void verifyMfaEnrollment()}
+                  />
+                  <Button
+                    compact
+                    disabled={mfaLoading}
+                    label="Cancel"
+                    onPress={cancelMfaEnrollment}
+                    tone="neutral"
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                <ProfileList>
+                  <ProfileInfoRow
+                    iconName="shield-outline"
+                    isLast
+                    label="Status"
+                    value={profileQuery.data.user.mfaEnabled ? "Enabled" : "Not enabled"}
+                  />
+                </ProfileList>
+                {profileQuery.data.user.mfaEnabled ? (
+                  <Button
+                    compact
+                    disabled={mfaLoading}
+                    label="Disable 2FA"
+                    onPress={() => setPendingConfirmation({ kind: "mfaDisable" })}
+                    tone="danger"
+                  />
+                ) : (
+                  <Button
+                    compact
+                    disabled={mfaLoading}
+                    label={mfaLoading ? "Starting..." : "Enable 2FA"}
+                    onPress={() => void startMfaEnrollment()}
+                  />
+                )}
+              </>
+            )}
           </ProfileSection>
+
+          {!appLockUnsupported ? (
+            <ProfileSection title="App lock">
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleCopy}>
+                  <Text style={styles.rowTitle}>Require unlock on this device</Text>
+                  <Text style={styles.rowDescription}>
+                    Ask for Face ID, fingerprint, or your device passcode whenever you return to
+                    DubGrid.
+                  </Text>
+                </View>
+                <Switch
+                  accessibilityLabel="App lock"
+                  disabled={appLockToggling}
+                  value={appLockEnabled}
+                  onValueChange={(next) => void toggleAppLock(next)}
+                />
+              </View>
+            </ProfileSection>
+          ) : null}
 
           {!canEditProfileDirectly ? (
             <ProfileSection title="Account deletion">
@@ -654,51 +1004,28 @@ export default function ProfileSecurityScreen() {
                 }}
               />
             ) : (
-              <View style={styles.sessionList}>
-                {(sessionsQuery.data?.sessions ?? []).map((session, index, sessions) => (
-                  <View
-                    key={session.id}
-                    style={[
-                      styles.sessionItem,
-                      index < sessions.length - 1 && styles.sessionItemDivider,
-                    ]}
-                  >
-                    <View style={styles.sessionRow}>
-                      <View style={styles.sessionIcon}>
-                        <Text style={styles.sessionIconText}>
-                          {formatSessionPlatform(session.platform)}
-                        </Text>
-                      </View>
-                      <View style={styles.sessionCopy}>
-                        <Text style={styles.sessionTitle}>
-                          {session.deviceLabel || session.platform || "Unknown device"}
-                        </Text>
-                        <Text style={styles.sessionBody}>
-                          Last active {new Date(session.lastActiveAt).toLocaleString()}
-                        </Text>
-                        {session.appVersion || session.ipAddress ? (
-                          <Text style={styles.sessionMeta}>
-                            {[session.appVersion, session.ipAddress].filter(Boolean).join(" - ")}
-                          </Text>
-                        ) : null}
-                      </View>
-                    </View>
-                    <Button
-                      compact
-                      disabled={revokeMutation.isPending}
-                      label="Revoke"
-                      onPress={() => {
-                        setPendingConfirmation({
-                          kind: "revokeSession",
-                          refreshTokenHash: session.refreshTokenHash,
-                          label: session.deviceLabel || session.platform || "this device",
-                        });
-                      }}
-                      tone="neutral"
-                    />
+              <>
+                <View style={styles.sessionList}>
+                  <Text style={styles.sessionGroupHeading}>Active sessions</Text>
+                  {(sessionsQuery.data?.active ?? []).map((session, index, sessions) =>
+                    renderSessionRow(session, {
+                      isLast: index === sessions.length - 1,
+                      showRevoke: true,
+                    }),
+                  )}
+                </View>
+                {(sessionsQuery.data?.stale.length ?? 0) > 0 ? (
+                  <View style={styles.sessionList}>
+                    <Text style={styles.sessionGroupHeading}>Stale sessions</Text>
+                    {(sessionsQuery.data?.stale ?? []).map((session, index, sessions) =>
+                      renderSessionRow(session, {
+                        isLast: index === sessions.length - 1,
+                        showRevoke: false,
+                      }),
+                    )}
                   </View>
-                ))}
-              </View>
+                ) : null}
+              </>
             )}
           </ProfileSection>
         </>
@@ -710,6 +1037,7 @@ export default function ProfileSecurityScreen() {
           pendingConfirmation?.kind === "deletion" ||
           pendingConfirmation?.kind === "password" ||
           pendingConfirmation?.kind === "revokeSession" ||
+          pendingConfirmation?.kind === "mfaDisable" ||
           (pendingConfirmation?.kind === "sessionScope" && pendingConfirmation.scope === "global")
             ? "dangerFilled"
             : "primary"
@@ -718,7 +1046,8 @@ export default function ProfileSecurityScreen() {
           deletionRequestMutation.isPending ||
           revokeMutation.isPending ||
           passwordSaving ||
-          sessionScopeLoading != null
+          sessionScopeLoading != null ||
+          (pendingConfirmation?.kind === "mfaDisable" && mfaLoading)
         }
         onCancel={() => setPendingConfirmation(null)}
         onConfirm={confirmSecurityAction}
@@ -729,131 +1058,197 @@ export default function ProfileSecurityScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  actionsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  actionButtonSlot: {
-    flex: 1,
-    minWidth: 0,
-  },
-  passwordStrength: {
-    gap: 8,
-  },
-  passwordStrengthHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-    justifyContent: "space-between",
-  },
-  passwordStrengthTitle: {
-    ...mobileText.caption,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  passwordStrengthLevel: {
-    ...mobileText.caption,
-    fontWeight: "600",
-  },
-  passwordStrengthLevelShort: {
-    color: mobileColors.dangerText,
-  },
-  passwordStrengthLevelMedium: {
-    color: mobileColors.warningText,
-  },
-  passwordStrengthLevelStrong: {
-    color: mobileColors.successText,
-  },
-  passwordHintList: {
-    gap: 6,
-  },
-  passwordHintRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  passwordHintDot: {
-    backgroundColor: mobileColors.border,
-    borderRadius: 3,
-    height: 6,
-    width: 6,
-  },
-  passwordHintDotMet: {
-    backgroundColor: mobileColors.success,
-  },
-  passwordHintText: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    flexShrink: 1,
-  },
-  passwordHintTextMet: {
-    color: mobileColors.successText,
-    fontWeight: "500",
-  },
-  passwordVisibilityButton: {
-    alignItems: "center",
-    borderRadius: 20,
-    height: 40,
-    justifyContent: "center",
-    width: 40,
-  },
-  signOutNotice: {
-    ...mobileText.meta,
-    color: mobileColors.danger,
-    fontWeight: "500",
-  },
-  sessionList: {
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    gap: 0,
-    overflow: "hidden",
-  },
-  sessionItem: {
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  sessionItemDivider: {
-    borderBottomColor: mobileColors.borderSubtle,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  sessionRow: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-  },
-  sessionIcon: {
-    alignItems: "center",
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.borderSubtle,
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: "center",
-    width: 36,
-  },
-  sessionIconText: {
-    ...mobileText.micro,
-    color: mobileColors.textSecondary,
-  },
-  sessionCopy: {
-    flex: 1,
-    gap: 4,
-  },
-  sessionTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-    fontWeight: "500",
-  },
-  sessionBody: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  sessionMeta: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    actionsRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    actionButtonSlot: {
+      flex: 1,
+      minWidth: 0,
+    },
+    passwordStrength: {
+      gap: 8,
+    },
+    passwordStrengthHeader: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
+      justifyContent: "space-between",
+    },
+    passwordStrengthTitle: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    passwordStrengthLevel: {
+      ...mobileText.caption,
+      fontWeight: "600",
+    },
+    passwordStrengthLevelShort: {
+      color: mobileColors.dangerText,
+    },
+    passwordStrengthLevelMedium: {
+      color: mobileColors.warningText,
+    },
+    passwordStrengthLevelStrong: {
+      color: mobileColors.successText,
+    },
+    passwordHintList: {
+      gap: 6,
+    },
+    passwordHintRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+    },
+    passwordHintDot: {
+      backgroundColor: mobileColors.border,
+      borderRadius: 3,
+      height: 6,
+      width: 6,
+    },
+    passwordHintDotMet: {
+      backgroundColor: mobileColors.success,
+    },
+    passwordHintText: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      flexShrink: 1,
+    },
+    passwordHintTextMet: {
+      color: mobileColors.successText,
+      fontWeight: "500",
+    },
+    passwordVisibilityButton: {
+      alignItems: "center",
+      borderRadius: 20,
+      height: 40,
+      justifyContent: "center",
+      width: 40,
+    },
+    signOutNotice: {
+      ...mobileText.meta,
+      color: mobileColors.danger,
+      fontWeight: "500",
+    },
+    mfaInstructions: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    toggleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 16,
+    },
+    toggleCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    rowTitle: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    rowDescription: {
+      ...mobileText.caption,
+      color: mobileColors.textMuted,
+    },
+    mfaSecretRow: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    mfaSecretText: {
+      ...mobileText.body,
+      color: mobileColors.textPrimary,
+      fontFamily: "monospace",
+      letterSpacing: 1,
+    },
+    sessionList: {
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      gap: 0,
+      overflow: "hidden",
+    },
+    sessionItem: {
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    sessionItemDivider: {
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    sessionRow: {
+      flexDirection: "row",
+      gap: 12,
+      alignItems: "center",
+    },
+    sessionIcon: {
+      alignItems: "center",
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.borderSubtle,
+      borderRadius: 18,
+      borderWidth: 1,
+      height: 36,
+      justifyContent: "center",
+      width: 36,
+    },
+    sessionIconText: {
+      ...mobileText.micro,
+      color: mobileColors.textSecondary,
+    },
+    sessionCopy: {
+      flex: 1,
+      gap: 4,
+    },
+    sessionTitleRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+    },
+    sessionTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+      fontWeight: "500",
+    },
+    sessionCurrentBadge: {
+      backgroundColor: mobileColors.brand,
+      borderRadius: 999,
+      paddingHorizontal: 7,
+      paddingVertical: 1,
+    },
+    sessionCurrentBadgeText: {
+      ...mobileText.micro,
+      color: mobileColors.textInverse,
+      fontWeight: "700",
+    },
+    sessionBody: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    sessionMeta: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+    },
+    sessionGroupHeading: {
+      ...mobileText.caption,
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderBottomColor: mobileColors.borderSubtle,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      color: mobileColors.textMuted,
+      fontWeight: "600",
+      letterSpacing: 0.4,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      textTransform: "uppercase",
+    },
+  });

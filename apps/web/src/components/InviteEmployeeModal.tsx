@@ -280,10 +280,10 @@ export default function InviteEmployeeModal({
           <div
             style={{
               padding: "12px 16px",
-              background: "var(--color-bg-hover, #F5F7FA)",
+              background: "var(--color-bg-secondary)",
               borderRadius: 8,
               fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--color-text-secondary, #334766)",
+              color: "var(--color-text-secondary)",
             }}
           >
             {isManagementInvite ? (

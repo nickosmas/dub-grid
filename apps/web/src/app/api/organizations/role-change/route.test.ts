@@ -9,6 +9,8 @@ const createRequestSupabaseClient = vi.fn();
 const apiErrorResponse = vi.fn((_err: unknown, fallback: string, status: number) =>
   NextResponse.json({ error: fallback }, { status }),
 );
+const profileMaybeSingle = vi.fn();
+const auditInsert = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -27,6 +29,28 @@ vi.mock("@/app/api/shared/permissions", () => ({
 vi.mock("@/lib/error-handling", () => ({
   apiErrorResponse: (...args: unknown[]) =>
     apiErrorResponse(...(args as [unknown, string, number])),
+}));
+vi.mock("@/lib/logger", () => ({
+  default: { error: vi.fn() },
+}));
+vi.mock("@/lib/supabase-service", () => ({
+  getServiceClient: () => ({
+    from: (table: string) => {
+      if (table === "profiles") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: profileMaybeSingle,
+            })),
+          })),
+        };
+      }
+      if (table === "audit_log") {
+        return { insert: auditInsert };
+      }
+      throw new Error(`Unexpected table in role-change test: ${table}`);
+    },
+  }),
 }));
 
 const USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -55,6 +79,8 @@ beforeEach(() => {
   createRequestSupabaseClient.mockReturnValue({
     rpc: vi.fn(async () => ({ data: { status: "success" }, error: null })),
   });
+  profileMaybeSingle.mockResolvedValue({ data: { email: "target@dubgrid.test" }, error: null });
+  auditInsert.mockResolvedValue({ error: null });
 });
 
 async function importRoute() {
@@ -101,6 +127,15 @@ describe("POST /api/organizations/role-change", () => {
       expect.objectContaining({
         p_target_user_id: TARGET_ID,
         p_org_id: SANDBOX_ID,
+      }),
+    );
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        org_id: SANDBOX_ID,
+        action: "role.changed",
+        resource_type: "role",
+        resource_id: TARGET_ID,
+        details: expect.objectContaining({ targetEmail: "target@dubgrid.test", newRole: "admin" }),
       }),
     );
   });

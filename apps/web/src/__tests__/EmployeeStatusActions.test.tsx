@@ -65,7 +65,6 @@ describe("EmployeeStatusActions", () => {
   it("switches the modal to Remove, keeps the note field, and calls onRemove with the trimmed note", async () => {
     const user = userEvent.setup();
     const onRemove = vi.fn();
-    const onRevokeAccess = vi.fn();
 
     render(
       <EmployeeStatusActions
@@ -74,7 +73,6 @@ describe("EmployeeStatusActions", () => {
         onDeactivate={vi.fn()}
         onActivate={vi.fn()}
         onRemove={onRemove}
-        onRevokeAccess={onRevokeAccess}
         variant="panel"
       />,
     );
@@ -86,15 +84,13 @@ describe("EmployeeStatusActions", () => {
 
     // Primary button verb flips with the radio.
     expect(within(dialog).getByRole("button", { name: "Remove" })).toBeInTheDocument();
-    // Note field is shown for Remove too, alongside the revoke-access checkbox.
+    // Note field is shown for Remove too.
     const noteInput = within(dialog).getByPlaceholderText(/Reason \(optional\)/);
     await user.type(noteInput, "  Left the company  ");
 
-    await user.click(within(dialog).getByRole("checkbox", { name: /also revoke app access/i }));
     await user.click(within(dialog).getByRole("button", { name: "Remove" }));
 
     expect(onRemove).toHaveBeenCalledWith("emp-1", "Left the company");
-    expect(onRevokeAccess).toHaveBeenCalledWith("user-1");
   });
 
   it("activates inactive employees from the shared action area", async () => {
@@ -118,6 +114,38 @@ describe("EmployeeStatusActions", () => {
     const dialog = screen.getByRole("dialog", { name: "Activate Staff Member?" });
     await user.click(within(dialog).getByRole("button", { name: "Activate" }));
     expect(onActivate).toHaveBeenCalledWith("emp-1");
+  });
+
+  it("only mentions the schedule when the employee has a focus area (management-only employees don't)", async () => {
+    const user = userEvent.setup();
+
+    const { rerender } = render(
+      <EmployeeStatusActions
+        employee={makeEmployee({ focusAreaIds: [] })}
+        canEdit
+        onDeactivate={vi.fn()}
+        onActivate={vi.fn()}
+        onRemove={vi.fn()}
+        variant="panel"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Deactivate" }));
+    expect(screen.getByText(/lose management access/i)).toBeInTheDocument();
+    expect(screen.queryByText(/off the schedule/i)).not.toBeInTheDocument();
+
+    rerender(
+      <EmployeeStatusActions
+        employee={makeEmployee({ focusAreaIds: [1] })}
+        canEdit
+        onDeactivate={vi.fn()}
+        onActivate={vi.fn()}
+        onRemove={vi.fn()}
+        variant="panel"
+      />,
+    );
+
+    expect(screen.getByText(/temporarily off the schedule/i)).toBeInTheDocument();
   });
 
   it("uses the shared filled warning treatment for the Deactivate entry point", () => {

@@ -1,26 +1,38 @@
 import { Redirect, Tabs } from "expo-router";
-import { LoadingScreen } from "../../src/shared/components/LoadingScreen";
+import { AppSplashScreen } from "../../src/shared/components/AppSplashScreen";
 import { useBootstrap } from "../../src/features/auth/hooks/useBootstrap";
 import { OrganizationLockedScreen } from "../../src/features/auth/screens/OrganizationLockedScreen";
 import { handleExpiredMobileSession } from "../../src/shared/lib/auth-reset";
 import { getOrgUnavailableMessage } from "../../src/shared/lib/errors";
 import { useSessionState } from "../../src/shared/providers/AuthSessionProvider";
-import { mobileColors } from "../../src/shared/theme/tokens";
+import { useMobileColors } from "../../src/shared/providers/ThemeModeProvider";
+import { isManagementOnly, isOnSchedule } from "../../src/features/auth/hooks/employmentStatus";
 
 export default function TabsLayoutWeb() {
+  const mobileColors = useMobileColors();
   const { accessToken, isLoading } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
   const lockedMessage = getOrgUnavailableMessage(bootstrapQuery.error);
   const canViewTeamSchedule =
     bootstrapQuery.data && !lockedMessage ? bootstrapQuery.data.permissions.canViewSchedule : false;
+  const canViewRequestsTab =
+    bootstrapQuery.data && !lockedMessage
+      ? isOnSchedule(bootstrapQuery.data.linkedEmployee?.focusAreaIds ?? []) ||
+        Boolean(bootstrapQuery.data.permissions.canApproveShiftRequests)
+      : false;
+  const canViewHomeTab =
+    bootstrapQuery.data && !lockedMessage
+      ? !(
+          bootstrapQuery.data.effectiveRole === "user" &&
+          isManagementOnly(
+            bootstrapQuery.data.linkedEmployee?.focusAreaIds ?? [],
+            bootstrapQuery.data.linkedEmployee?.departmentIds ?? [],
+          )
+        )
+      : true;
 
   if (isLoading) {
-    return (
-      <LoadingScreen
-        title="Loading your organization"
-        body="Getting your schedule and mobile tools ready."
-      />
-    );
+    return <AppSplashScreen />;
   }
 
   if (!accessToken) {
@@ -58,9 +70,9 @@ export default function TabsLayoutWeb() {
         },
       }}
     >
-      <Tabs.Screen name="home" options={{ title: "Home" }} />
+      {canViewHomeTab ? <Tabs.Screen name="home" options={{ title: "Home" }} /> : null}
       {canViewTeamSchedule ? <Tabs.Screen name="team" options={{ title: "Schedule" }} /> : null}
-      <Tabs.Screen name="requests" options={{ title: "Requests" }} />
+      {canViewRequestsTab ? <Tabs.Screen name="requests" options={{ title: "Requests" }} /> : null}
       <Tabs.Screen name="people" options={{ title: "People" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>

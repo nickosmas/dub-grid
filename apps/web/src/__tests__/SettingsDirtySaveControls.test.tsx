@@ -113,6 +113,7 @@ const baseOrganization: Organization = {
   timezone: "America/Los_Angeles",
   payPeriodStartDate: null,
   enforceConflictPrevention: true,
+  defaultShiftEnabled: true,
   openShiftVisibility: { coverageGap: "matched", calloff: "matched" },
   dataRetentionDays: 90,
   featureOverrides: {},
@@ -2046,7 +2047,7 @@ describe("settings dirty save controls", () => {
     await user.type(screen.getByPlaceholderText("e.g. Supervisor"), "Draft Lead");
     await user.type(screen.getByPlaceholderText("e.g. SUP"), "DRF");
 
-    const draftRow = screen.getByText("Draft Lead");
+    const draftRow = screen.getAllByText("Draft Lead")[0]!;
     expect(
       mentorRow.compareDocumentPosition(draftRow) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -2370,7 +2371,7 @@ describe("settings dirty save controls", () => {
     expect(screen.getByRole("button", { name: /^save$/i })).toBeEnabled();
   });
 
-  it("scheduled job previews follow the current shift display mode", async () => {
+  it("scheduled job previews always spell out the full shift and job name", async () => {
     const user = userEvent.setup();
     const department = makeDepartment({
       id: 1,
@@ -2421,32 +2422,6 @@ describe("settings dirty save controls", () => {
       archivedAt: null,
     };
 
-    const { unmount } = render(
-      <JobsSettings
-        jobs={[job]}
-        orgId="org-1"
-        orgRoles={[]}
-        certifications={[]}
-        departments={[department]}
-        focusAreas={[focusArea]}
-        shiftCategories={[shiftCategory]}
-        roleLabel="Roles"
-        certificationLabel="Certifications"
-        onChange={vi.fn()}
-        canManageScheduleDefinitions
-        shiftDisplayMode="code"
-      />,
-    );
-
-    await user.click(screen.getByText(/1 department.*1 focus area.*1 shift/i));
-
-    const codePreview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
-    expect(codePreview).not.toBeNull();
-    expect(within(codePreview!).getByText(/^D$/)).toBeInTheDocument();
-    expect(within(codePreview!).getByText(/^SUP$/)).toBeInTheDocument();
-
-    unmount();
-
     render(
       <JobsSettings
         jobs={[job]}
@@ -2460,7 +2435,6 @@ describe("settings dirty save controls", () => {
         certificationLabel="Certifications"
         onChange={vi.fn()}
         canManageScheduleDefinitions
-        shiftDisplayMode="name"
       />,
     );
 
@@ -2474,7 +2448,7 @@ describe("settings dirty save controls", () => {
     expect(within(namePreview!).queryByText(/^SUP$/)).not.toBeInTheDocument();
   });
 
-  it("default shift job previews only show the shift label for each display mode", async () => {
+  it("default shift job previews only show the shift's full name", async () => {
     const user = userEvent.setup();
     const department = makeDepartment({
       id: 1,
@@ -2525,34 +2499,6 @@ describe("settings dirty save controls", () => {
       archivedAt: null,
     };
 
-    const { unmount } = render(
-      <JobsSettings
-        jobs={[defaultShiftJob]}
-        orgId="org-1"
-        orgRoles={[]}
-        certifications={[]}
-        departments={[department]}
-        focusAreas={[focusArea]}
-        shiftCategories={[shiftCategory]}
-        roleLabel="Roles"
-        certificationLabel="Certifications"
-        onChange={vi.fn()}
-        canManageScheduleDefinitions
-        shiftDisplayMode="code"
-      />,
-    );
-
-    expect(screen.queryByText("Default Shift Job")).not.toBeInTheDocument();
-    await user.click(screen.getByText("Default shift job"));
-
-    const codePreview = document.querySelector<HTMLElement>('[data-job-shift-preview="10"]');
-    expect(codePreview).not.toBeNull();
-    expect(within(codePreview!).getByText(/^D$/)).toBeInTheDocument();
-    expect(within(codePreview!).queryByText(/^SHIFT$/)).not.toBeInTheDocument();
-    expect(within(codePreview!).queryByText(/^Default shift job$/)).not.toBeInTheDocument();
-
-    unmount();
-
     render(
       <JobsSettings
         jobs={[defaultShiftJob]}
@@ -2566,7 +2512,6 @@ describe("settings dirty save controls", () => {
         certificationLabel="Certifications"
         onChange={vi.fn()}
         canManageScheduleDefinitions
-        shiftDisplayMode="name"
       />,
     );
 

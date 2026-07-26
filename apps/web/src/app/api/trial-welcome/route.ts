@@ -140,7 +140,10 @@ export async function POST(req: NextRequest) {
   const { claims } = auth;
 
   if (claims.org_role !== "super_admin" || !claims.org_id) {
-    return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
+    return NextResponse.json(
+      { success: false, error: API_ERRORS.SUPER_ADMIN_ONLY },
+      { status: 403 },
+    );
   }
 
   const service = getServiceClient();

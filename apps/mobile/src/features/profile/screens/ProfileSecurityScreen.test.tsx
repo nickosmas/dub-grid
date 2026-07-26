@@ -36,11 +36,14 @@ vi.mock("../../auth/hooks/useBootstrap", () => ({
   useBootstrap,
 }));
 
+const updateProfileMfaStatus = vi.fn();
+
 vi.mock("../../../shared/lib/api", () => ({
   createProfileChangeRequest: vi.fn(),
   getProfile: vi.fn(),
   getProfileSessions: vi.fn(),
   revokeProfileSession: vi.fn(),
+  updateProfileMfaStatus: (...args: unknown[]) => updateProfileMfaStatus(...args),
 }));
 
 vi.mock("../../../shared/lib/env", () => ({
@@ -61,6 +64,15 @@ vi.mock("../../../shared/providers/ToastProvider", () => ({
   useToast: () => ({
     pushToast,
   }),
+}));
+
+const hasHardwareAsync = vi.fn();
+const isEnrolledAsync = vi.fn();
+
+vi.mock("expo-local-authentication", () => ({
+  hasHardwareAsync: (...args: unknown[]) => hasHardwareAsync(...args),
+  isEnrolledAsync: (...args: unknown[]) => isEnrolledAsync(...args),
+  authenticateAsync: vi.fn(),
 }));
 
 let ProfileSecurityScreen: (typeof import("./ProfileSecurityScreen"))["default"];
@@ -86,6 +98,12 @@ describe("ProfileSecurityScreen", () => {
     getSupabaseClient.mockReset();
     handleExpiredMobileSession.mockReset();
     pushToast.mockReset();
+    updateProfileMfaStatus.mockReset();
+    updateProfileMfaStatus.mockResolvedValue({ user: { mfaEnabled: true } });
+    hasHardwareAsync.mockReset();
+    isEnrolledAsync.mockReset();
+    hasHardwareAsync.mockResolvedValue(true);
+    isEnrolledAsync.mockResolvedValue(true);
 
     useAccessToken.mockReturnValue("token-123");
     useBootstrap.mockReturnValue({
@@ -102,7 +120,7 @@ describe("ProfileSecurityScreen", () => {
       const key = queryKey.join(":");
       if (key.includes("sessions")) {
         return {
-          data: { sessions: [] },
+          data: { active: [], stale: [] },
           error: null,
           isLoading: false,
           refetch: vi.fn(),
@@ -203,6 +221,139 @@ describe("ProfileSecurityScreen", () => {
       expect(handleExpiredMobileSession).toHaveBeenCalledWith({
         skipSignOut: true,
       });
+    });
+  });
+
+  it("enrolls in two-factor authentication with a manually-entered secret", async () => {
+    const listFactors = vi.fn().mockResolvedValue({
+      data: { all: [], totp: [] },
+      error: null,
+    });
+    const enroll = vi.fn().mockResolvedValue({
+      data: { id: "factor-1", totp: { secret: "SECRET123" } },
+      error: null,
+    });
+    const challengeAndVerify = vi.fn().mockResolvedValue({ data: {}, error: null });
+    getSupabaseClient.mockReturnValue({
+      auth: {
+        mfa: { listFactors, enroll, challengeAndVerify, unenroll: vi.fn() },
+      },
+    } as never);
+
+    render(<ProfileSecurityScreen />);
+
+    expect(screen.getByText("Not enabled")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
+
+    await waitFor(() => {
+      expect(enroll).toHaveBeenCalledWith({
+        factorType: "totp",
+        friendlyName: "DubGrid Mobile Authenticator",
+      });
+    });
+
+    expect(await screen.findByText("SECRET123")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("6-digit verification code"), {
+      target: { value: "123456" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Verify & enable" }));
+
+    await waitFor(() => {
+      expect(challengeAndVerify).toHaveBeenCalledWith({ factorId: "factor-1", code: "123456" });
+      expect(updateProfileMfaStatus).toHaveBeenCalledWith("token-123", { enabled: true });
+    });
+  });
+
+  it("disables two-factor authentication after confirming", async () => {
+    const unenroll = vi.fn().mockResolvedValue({ error: null });
+    const listFactors = vi.fn().mockResolvedValue({
+      data: {
+        all: [{ id: "factor-1", factor_type: "totp", status: "verified" }],
+        totp: [{ id: "factor-1", factor_type: "totp", status: "verified" }],
+      },
+      error: null,
+    });
+    getSupabaseClient.mockReturnValue({
+      auth: {
+        mfa: { listFactors, unenroll, enroll: vi.fn(), challengeAndVerify: vi.fn() },
+      },
+    } as never);
+    useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      const key = queryKey.join(":");
+      if (key.includes("sessions")) {
+        return {
+          data: { active: [], stale: [] },
+          error: null,
+          isLoading: false,
+          refetch: vi.fn(),
+        };
+      }
+
+      return {
+        data: {
+          user: { email: "mina@dubgrid.com", mfaEnabled: true },
+          pendingAccountDeletionRequest: false,
+        },
+        error: null,
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+    });
+
+    render(<ProfileSecurityScreen />);
+
+    expect(screen.getByText("Enabled")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Disable 2FA" }));
+
+    expect(screen.getByText("Disable two-factor authentication?")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Disable" }));
+    });
+
+    await waitFor(() => {
+      expect(unenroll).toHaveBeenCalledWith({ factorId: "factor-1" });
+      expect(updateProfileMfaStatus).toHaveBeenCalledWith("token-123", { enabled: false });
+    });
+  });
+
+  it("turns on app lock when the device has biometrics enrolled", async () => {
+    render(<ProfileSecurityScreen />);
+
+    const appLockSwitch = screen.getByLabelText("App lock");
+    expect(appLockSwitch).not.toBeChecked();
+
+    await act(async () => {
+      fireEvent.click(appLockSwitch);
+    });
+
+    await waitFor(() => {
+      expect(hasHardwareAsync).toHaveBeenCalled();
+      expect(isEnrolledAsync).toHaveBeenCalled();
+      expect(appLockSwitch).toBeChecked();
+    });
+  });
+
+  it("refuses to enable app lock when the device has no biometrics/passcode enrolled", async () => {
+    isEnrolledAsync.mockResolvedValue(false);
+
+    render(<ProfileSecurityScreen />);
+
+    const appLockSwitch = screen.getByLabelText("App lock");
+
+    await act(async () => {
+      fireEvent.click(appLockSwitch);
+    });
+
+    await waitFor(() => {
+      expect(pushToast).toHaveBeenCalledWith(
+        expect.objectContaining({ tone: "error", title: "Could not enable app lock" }),
+      );
+      expect(appLockSwitch).not.toBeChecked();
     });
   });
 });

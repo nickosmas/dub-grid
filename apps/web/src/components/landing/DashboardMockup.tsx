@@ -42,12 +42,14 @@ const HERO_METRICS: Metric[] = [
   },
 ];
 
-/* ── Metric icon accents — match DashboardHero.tsx getMetricAccent ── */
+/* ── Metric icon accents — match DashboardHero.tsx getMetricAccent.
+   Token-driven (not the raw pastel hex the real component used to hardcode)
+   so these follow the page theme instead of blowing out in dark mode. ── */
 const METRIC_ACCENTS: Record<Metric["icon"], { iconBg: string; iconColor: string }> = {
-  coverage: { iconBg: "#EFF6FF", iconColor: "#2563EB" },
-  gap: { iconBg: "#fee2e2", iconColor: "#b91c1c" },
-  approval: { iconBg: "#fef3c7", iconColor: "#b45309" },
-  bars: { iconBg: "#dbeafe", iconColor: "#1d4ed8" },
+  coverage: { iconBg: "var(--color-brand-bg)", iconColor: "var(--color-brand)" },
+  gap: { iconBg: "var(--color-danger-bg)", iconColor: "var(--color-danger-text)" },
+  approval: { iconBg: "var(--color-warning-bg)", iconColor: "var(--color-warning-text)" },
+  bars: { iconBg: "var(--color-info-bg)", iconColor: "var(--color-info)" },
 };
 
 function MetricGlyph({ icon, color }: { icon: Metric["icon"]; color: string }) {

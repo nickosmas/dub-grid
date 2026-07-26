@@ -16,6 +16,7 @@ import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { CloseButton } from "@/components/ui/CloseButton";
 import * as Sentry from "@/lib/sentry";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -289,13 +290,28 @@ export default function EnhancedImpersonation({
         <div style={sectionStyle}>
           <div style={sectionHeaderStyle}>1. Select Organization</div>
           <div style={sectionBodyStyle}>
-            <input
-              className="dg-input"
-              value={orgSearch}
-              onChange={(e) => setOrgSearch(e.target.value)}
-              placeholder="Search organizations…"
-              style={{ marginBottom: 12 }}
-            />
+            <div style={{ position: "relative", marginBottom: 12 }}>
+              <input
+                className="dg-input"
+                value={orgSearch}
+                onChange={(e) => setOrgSearch(e.target.value)}
+                placeholder="Search organizations…"
+                style={{ width: "100%", paddingRight: orgSearch ? 30 : undefined }}
+              />
+              {orgSearch && (
+                <CloseButton
+                  size="sm"
+                  onClick={() => setOrgSearch("")}
+                  aria-label="Clear search"
+                  style={{
+                    position: "absolute",
+                    right: 4,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                  }}
+                />
+              )}
+            </div>
             <div style={{ maxHeight: 200, overflowY: "auto" }}>
               {filteredOrgs.length === 0 ? (
                 <div
@@ -548,13 +564,28 @@ export default function EnhancedImpersonation({
             2. Select User{selectedOrg ? ` in ${selectedOrg.name}` : ""}
           </div>
           <div style={sectionBodyStyle}>
-            <input
-              className="dg-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by email…"
-              style={{ marginBottom: 12 }}
-            />
+            <div style={{ position: "relative", marginBottom: 12 }}>
+              <input
+                className="dg-input"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by email…"
+                style={{ width: "100%", paddingRight: search ? 30 : undefined }}
+              />
+              {search && (
+                <CloseButton
+                  size="sm"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                  style={{
+                    position: "absolute",
+                    right: 4,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                  }}
+                />
+              )}
+            </div>
 
             {usersQuery.isLoading ? (
               <div

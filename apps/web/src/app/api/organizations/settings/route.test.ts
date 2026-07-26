@@ -92,6 +92,18 @@ vi.mock("@/lib/supabase-service", () => ({
         };
       }
 
+      if (table === "employees") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+              })),
+            })),
+          })),
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     },
   }),

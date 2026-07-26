@@ -123,10 +123,6 @@ vi.mock("@/components/settings/Indicators", () => ({
   default: () => <div>Indicators</div>,
 }));
 
-vi.mock("@/components/ImpersonationPanel", () => ({
-  default: () => <div>Impersonation</div>,
-}));
-
 import SettingsPage from "@/components/settings/SettingsPage";
 
 const organization = {

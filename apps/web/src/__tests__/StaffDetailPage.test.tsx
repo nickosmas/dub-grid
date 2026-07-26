@@ -17,9 +17,13 @@ const mockUsePermissions = vi.fn();
 const mockUseOrganizationData = vi.fn();
 const mockUseDirectory = vi.fn();
 const mockInvalidateQueries = vi.fn();
+// A single stable router object — the real useRouter is referentially stable,
+// and StaffDetailPage lists it in effect deps, so a fresh object per render
+// would re-run the fetch effect forever.
+const mockRouter = { replace: mockReplace, push: vi.fn(), back: vi.fn() };
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: mockReplace, push: vi.fn(), back: vi.fn() }),
+  useRouter: () => mockRouter,
 }));
 
 vi.mock("sonner", () => ({

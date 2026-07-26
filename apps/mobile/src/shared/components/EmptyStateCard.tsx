@@ -1,7 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useMemo } from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Button } from "./Button";
-import { mobileColors, mobileText } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileText, type MobileColors } from "../theme/tokens";
 
 export function EmptyStateCard({
   iconName = "sparkles-outline",
@@ -20,6 +22,9 @@ export function EmptyStateCard({
   compact?: boolean;
   fillScreen?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const compactStyles = useMemo(() => createCompactStyles(mobileColors), [mobileColors]);
   const variant = compact ? compactStyles : styles;
   const { height: windowHeight } = useWindowDimensions();
   const fillStyle =
@@ -47,75 +52,77 @@ export function EmptyStateCard({
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    paddingHorizontal: 4,
-    paddingVertical: 32,
-    gap: 16,
-    alignItems: "center",
-  },
-  iconFrame: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: mobileColors.brandSoft,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  copy: {
-    gap: 6,
-    alignItems: "center",
-  },
-  title: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-    textAlign: "center",
-  },
-  body: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    textAlign: "center",
-    maxWidth: 320,
-  },
-  actionRow: {
-    alignItems: "center",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    card: {
+      paddingHorizontal: 4,
+      paddingVertical: 32,
+      gap: 16,
+      alignItems: "center",
+    },
+    iconFrame: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: mobileColors.brandSoft,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    copy: {
+      gap: 6,
+      alignItems: "center",
+    },
+    title: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+      textAlign: "center",
+    },
+    body: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+      maxWidth: 320,
+    },
+    actionRow: {
+      alignItems: "center",
+    },
+  });
 
-const compactStyles = StyleSheet.create({
-  card: {
-    paddingHorizontal: 4,
-    paddingVertical: 12,
-    gap: 10,
-    alignItems: "center",
-  },
-  iconFrame: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: mobileColors.brandSoft,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  copy: {
-    gap: 4,
-    alignItems: "center",
-  },
-  title: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textPrimary,
-    textAlign: "center",
-  },
-  body: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    textAlign: "center",
-  },
-  actionRow: {
-    alignItems: "center",
-  },
-});
+const createCompactStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    card: {
+      paddingHorizontal: 4,
+      paddingVertical: 12,
+      gap: 10,
+      alignItems: "center",
+    },
+    iconFrame: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: mobileColors.brandSoft,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    copy: {
+      gap: 4,
+      alignItems: "center",
+    },
+    title: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textPrimary,
+      textAlign: "center",
+    },
+    body: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+    },
+    actionRow: {
+      alignItems: "center",
+    },
+  });

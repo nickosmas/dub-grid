@@ -2,13 +2,11 @@
 
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
+import { createRealtimeChannelName, subscribeToPostgresChanges } from "@dubgrid/realtime-core";
 import * as Sentry from "@/lib/sentry";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  createBrowserRealtimeChannel,
-  removeBrowserRealtimeChannel,
-} from "@/features/account/client";
+import { getBrowserSupabaseClient } from "@/features/account/client";
 
 type AccountRealtimeTable = "profiles" | "user_sessions" | "notification_preferences";
 
@@ -52,62 +50,32 @@ export function useAccountRealtimeInvalidation({
   useEffect(() => {
     if (!userId || disabled) return;
 
-    let hadError = false;
-    const channelId = `account-freshness:${userId}:${Date.now()}:${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const channel = createBrowserRealtimeChannel(channelId);
     const handleChange = (table: AccountRealtimeTable) => {
       invalidateAccountRealtimeQueries(queryClient, userId, table);
     };
 
-    channel.on(
-      "postgres_changes" as "system",
+    return subscribeToPostgresChanges<AccountRealtimeTable>(
+      getBrowserSupabaseClient(),
+      createRealtimeChannelName(`account-freshness:${userId}`),
+      [
+        { table: "profiles", filter: `id=eq.${userId}`, onEvent: handleChange },
+        { table: "user_sessions", filter: `user_id=eq.${userId}`, onEvent: handleChange },
+        {
+          table: "notification_preferences",
+          filter: `user_id=eq.${userId}`,
+          onEvent: handleChange,
+        },
+      ],
       {
-        event: "*",
-        schema: "public",
-        table: "profiles",
-        filter: `id=eq.${userId}`,
-      } as Record<string, unknown>,
-      () => handleChange("profiles"),
+        onReconnectAfterError: () => {
+          void queryClient.invalidateQueries({
+            queryKey: ["account", userId],
+          });
+        },
+        onError: (error) => {
+          Sentry.captureException(error);
+        },
+      },
     );
-
-    channel.on(
-      "postgres_changes" as "system",
-      {
-        event: "*",
-        schema: "public",
-        table: "user_sessions",
-        filter: `user_id=eq.${userId}`,
-      } as Record<string, unknown>,
-      () => handleChange("user_sessions"),
-    );
-
-    channel.on(
-      "postgres_changes" as "system",
-      {
-        event: "*",
-        schema: "public",
-        table: "notification_preferences",
-        filter: `user_id=eq.${userId}`,
-      } as Record<string, unknown>,
-      () => handleChange("notification_preferences"),
-    );
-
-    channel.subscribe((status: string, err?: Error) => {
-      if (status === "SUBSCRIBED" && hadError) {
-        hadError = false;
-        void queryClient.invalidateQueries({
-          queryKey: ["account", userId],
-        });
-      } else if (status === "CHANNEL_ERROR") {
-        hadError = true;
-        Sentry.captureException(err ?? new Error("account freshness channel error"));
-      }
-    });
-
-    return () => {
-      void removeBrowserRealtimeChannel(channel);
-    };
   }, [disabled, queryClient, userId]);
 }

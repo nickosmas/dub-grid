@@ -9,10 +9,12 @@ import {
   type PropsWithChildren,
 } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { NETWORK_ERROR_MESSAGE, NETWORK_ERROR_TITLE } from "@dubgrid/client-errors";
 import { StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetworkStatus } from "./NetworkStateProvider";
-import { mobileColors, mobileRadii, mobileText } from "../theme/tokens";
+import { useMobileColors } from "./ThemeModeProvider";
+import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
 export type ToastTone = "error" | "success" | "info" | "warning";
 
@@ -29,37 +31,36 @@ type ToastDescriptor = ToastInput & {
 };
 
 const DEFAULT_TOAST_DURATION_MS = 4500;
-const OFFLINE_TOAST_TITLE = "Network connection issue";
-const OFFLINE_TOAST_MESSAGE = "Check your internet connection and try again.";
 const TOAST_MESSAGE_COLOR = "rgba(255, 255, 255, 0.82)";
 const TOAST_SWIPE_DISMISS_THRESHOLD = 32;
 
-const TOAST_TONE = {
-  error: {
-    backgroundColor: "#DC2626",
-    borderColor: "#B91C1C",
-    iconColor: mobileColors.textInverse,
-    iconName: "alert-circle" as const,
-  },
-  success: {
-    backgroundColor: "#16A34A",
-    borderColor: "#166534",
-    iconColor: mobileColors.textInverse,
-    iconName: "checkmark-circle" as const,
-  },
-  info: {
-    backgroundColor: "#1D4ED8",
-    borderColor: "#1E3A8A",
-    iconColor: mobileColors.textInverse,
-    iconName: "information-circle" as const,
-  },
-  warning: {
-    backgroundColor: "#D97706",
-    borderColor: "#92400E",
-    iconColor: mobileColors.textInverse,
-    iconName: "warning" as const,
-  },
-} as const;
+const createToastTone = (mobileColors: MobileColors) =>
+  ({
+    error: {
+      backgroundColor: "#DC2626",
+      borderColor: "#B91C1C",
+      iconColor: mobileColors.textInverse,
+      iconName: "alert-circle" as const,
+    },
+    success: {
+      backgroundColor: "#16A34A",
+      borderColor: "#166534",
+      iconColor: mobileColors.textInverse,
+      iconName: "checkmark-circle" as const,
+    },
+    info: {
+      backgroundColor: "#1D4ED8",
+      borderColor: "#1E3A8A",
+      iconColor: mobileColors.textInverse,
+      iconName: "information-circle" as const,
+    },
+    warning: {
+      backgroundColor: "#D97706",
+      borderColor: "#92400E",
+      iconColor: mobileColors.textInverse,
+      iconName: "warning" as const,
+    },
+  }) as const;
 
 const ToastContext = createContext<{
   pushToast: (toast: ToastInput) => void;
@@ -90,12 +91,16 @@ function getTouchEventY(event: GestureResponderEvent): number | null {
 }
 
 export function ToastProvider({ children }: PropsWithChildren) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const toastTone = useMemo(() => createToastTone(mobileColors), [mobileColors]);
   const insets = useSafeAreaInsets();
   const { isOffline } = useNetworkStatus();
   const idRef = useRef(0);
   const swipeStartYRef = useRef<number | null>(null);
   const [queue, setQueue] = useState<ToastDescriptor[]>([]);
   const [activeToast, setActiveToast] = useState<ToastDescriptor | null>(null);
+  const [isOfflineBannerDismissed, setIsOfflineBannerDismissed] = useState(false);
 
   const dismissToast = useCallback((targetToastId?: number) => {
     setActiveToast((current) => {
@@ -165,7 +170,20 @@ export function ToastProvider({ children }: PropsWithChildren) {
     swipeStartYRef.current = null;
     setActiveToast(null);
     setQueue([]);
+    setIsOfflineBannerDismissed(false);
   }, [isOffline]);
+
+  useEffect(() => {
+    if (!isOffline || isOfflineBannerDismissed) {
+      return;
+    }
+
+    const timeout = setTimeout(() => setIsOfflineBannerDismissed(true), DEFAULT_TOAST_DURATION_MS);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [isOffline, isOfflineBannerDismissed]);
 
   function handleToastTouchStart(event: GestureResponderEvent) {
     swipeStartYRef.current = getTouchEventY(event);
@@ -193,6 +211,32 @@ export function ToastProvider({ children }: PropsWithChildren) {
     }
   }
 
+  function handleOfflineBannerTouchStart(event: GestureResponderEvent) {
+    swipeStartYRef.current = getTouchEventY(event);
+  }
+
+  function handleOfflineBannerTouchCancel() {
+    swipeStartYRef.current = null;
+  }
+
+  function handleOfflineBannerTouchEnd(event: GestureResponderEvent) {
+    const startY = swipeStartYRef.current;
+    swipeStartYRef.current = null;
+
+    if (startY == null) {
+      return;
+    }
+
+    const endY = getTouchEventY(event);
+    if (endY == null) {
+      return;
+    }
+
+    if (endY - startY <= -TOAST_SWIPE_DISMISS_THRESHOLD) {
+      setIsOfflineBannerDismissed(true);
+    }
+  }
+
   const value = useMemo(
     () => ({
       pushToast,
@@ -200,15 +244,19 @@ export function ToastProvider({ children }: PropsWithChildren) {
     [pushToast],
   );
 
-  const palette = activeToast ? TOAST_TONE[activeToast.tone] : null;
-  const offlinePalette = TOAST_TONE.error;
+  const palette = activeToast ? toastTone[activeToast.tone] : null;
+  const offlinePalette = toastTone.error;
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {isOffline ? (
-        <View pointerEvents="none" style={styles.host}>
+      {isOffline && !isOfflineBannerDismissed ? (
+        <View pointerEvents="box-none" style={styles.host}>
           <View
+            testID="offline-toast"
+            onTouchCancel={handleOfflineBannerTouchCancel}
+            onTouchEnd={handleOfflineBannerTouchEnd}
+            onTouchStart={handleOfflineBannerTouchStart}
             style={[
               styles.toast,
               {
@@ -221,8 +269,8 @@ export function ToastProvider({ children }: PropsWithChildren) {
             <View style={styles.toastMain}>
               <Ionicons color={offlinePalette.iconColor} name={offlinePalette.iconName} size={20} />
               <View style={styles.toastCopy}>
-                <Text style={styles.toastTitle}>{OFFLINE_TOAST_TITLE}</Text>
-                <Text style={styles.toastMessage}>{OFFLINE_TOAST_MESSAGE}</Text>
+                <Text style={styles.toastTitle}>{NETWORK_ERROR_TITLE}</Text>
+                <Text style={styles.toastMessage}>{NETWORK_ERROR_MESSAGE}</Text>
               </View>
             </View>
           </View>
@@ -270,47 +318,48 @@ export function useToast() {
   return context;
 }
 
-const styles = StyleSheet.create({
-  host: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    paddingHorizontal: 20,
-    zIndex: 100,
-    elevation: 100,
-  },
-  toast: {
-    width: "100%",
-    maxWidth: 520,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    paddingVertical: 14,
-    paddingLeft: 20,
-    paddingRight: 20,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  toastMain: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  toastCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  toastTitle: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textInverse,
-  },
-  toastMessage: {
-    ...mobileText.meta,
-    color: TOAST_MESSAGE_COLOR,
-    fontWeight: "500",
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    host: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      alignItems: "center",
+      paddingHorizontal: 20,
+      zIndex: 100,
+      elevation: 100,
+    },
+    toast: {
+      width: "100%",
+      maxWidth: 520,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      paddingVertical: 14,
+      paddingLeft: 20,
+      paddingRight: 20,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    toastMain: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    toastCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    toastTitle: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textInverse,
+    },
+    toastMessage: {
+      ...mobileText.meta,
+      color: TOAST_MESSAGE_COLOR,
+      fontWeight: "500",
+    },
+  });

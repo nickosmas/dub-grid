@@ -17,6 +17,7 @@
     "test": "vitest run --config vitest.config.ts src"
   },
   "dependencies": {
-    "@dubgrid/contracts": "0.1.0"
+    "@dubgrid/contracts": "0.1.0",
+    "@dubgrid/domain": "0.1.0"
   }
 }

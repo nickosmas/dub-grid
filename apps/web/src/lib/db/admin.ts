@@ -79,6 +79,7 @@ export async function createOrganization(data: Omit<Organization, "id">): Promis
       // logs in (the start_trial_for_org RPC, called from the login flow, starts
       // the clock then).
       enforce_conflict_prevention: data.enforceConflictPrevention ?? false,
+      default_shift_enabled: data.defaultShiftEnabled ?? true,
       coverage_rule_config: data.coverageRuleConfig ?? { mentoredCoverageCreditPercent: 100 },
       data_retention_days: data.dataRetentionDays ?? 365,
       feature_overrides: data.featureOverrides ?? {},
@@ -396,68 +397,6 @@ export async function fetchOrgActivityMetrics(orgId: string): Promise<OrgActivit
     invitationsPending: pendingInvResult.count ?? 0,
     invitationsAccepted30d: acceptedInvResult.count ?? 0,
   };
-}
-
-export async function deleteOrganizationPermanently(orgId: string): Promise<void> {
-  // Audit BEFORE deletion since audit entries for this org will be removed
-  void logAudit("org.deleted", "organization", orgId, { permanent: true }, orgId);
-
-  try {
-    // Delete in dependency order — children before parents.
-    // Keep in sync with /api/gridmaster/delete-org/route.ts
-    const tables = [
-      "schedule_notes",
-      "shifts",
-      "recurring_shifts",
-      "shift_series",
-      "coverage_requirements",
-      "shift_categories",
-      "absence_types",
-      "focus_areas",
-      "certifications",
-      "organization_roles",
-      "indicator_types",
-      "employees",
-      "invitations",
-      "notifications",
-      "schedule_draft_sessions",
-      "publish_history",
-      "organization_memberships",
-      "subscriptions",
-      "shift_requests",
-    ];
-
-    for (const table of tables) {
-      await supabase.from(table).delete().eq("org_id", orgId);
-    }
-
-    // Audit log entries for this org
-    await supabase.from("audit_log").delete().eq("org_id", orgId);
-
-    // The organization itself
-    const { error } = await supabase.from("organizations").delete().eq("id", orgId);
-    if (error) throw error;
-
-    await cacheDel(
-      CacheKey.organization(orgId),
-      CacheKey.allOrganizations(),
-      CacheKey.tenantStats(),
-      CacheKey.employees(orgId),
-      CacheKey.orgUsers(orgId),
-      CacheKey.invitations(orgId),
-      CacheKey.focusAreas(orgId),
-      CacheKey.assignments(orgId),
-      CacheKey.shiftCategories(orgId),
-      CacheKey.indicatorTypes(orgId),
-      CacheKey.certifications(orgId),
-      CacheKey.orgRoles(orgId),
-      CacheKey.coverageReqs(orgId),
-      CacheKey.absenceTypes(orgId),
-    );
-  } catch (err) {
-    console.error("Failed to permanently delete organization", orgId, err);
-    throw err;
-  }
 }
 
 export async function fetchOrgSubscription(orgId: string): Promise<Subscription | null> {

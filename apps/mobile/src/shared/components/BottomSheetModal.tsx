@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   Animated,
   Dimensions,
@@ -9,7 +9,8 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { mobileColors, mobileRadii } from "../theme/tokens";
+import { mobileRadii, type MobileColors } from "../theme/tokens";
+import { useMobileColors } from "../providers/ThemeModeProvider";
 
 const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
 const SHEET_TRAVEL = Dimensions.get("window").height;
@@ -32,6 +33,8 @@ export function BottomSheetModal({
   footer?: ReactNode;
   children: ReactNode;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const translateY = useRef(new Animated.Value(SHEET_TRAVEL)).current;
 
   useEffect(() => {
@@ -81,53 +84,54 @@ export function BottomSheetModal({
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: mobileColors.overlay,
-  },
-  sheet: {
-    width: "100%",
-    maxHeight: MAX_HEIGHT,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-    paddingTop: 10,
-    shadowColor: mobileColors.textPrimary,
-    shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
-    shadowRadius: 28,
-    elevation: 16,
-  },
-  grabber: {
-    alignSelf: "center",
-    width: 40,
-    height: 4,
-    borderRadius: mobileRadii.pill,
-    backgroundColor: mobileColors.border,
-    marginBottom: 6,
-  },
-  scrollArea: {
-    flexShrink: 1,
-  },
-  body: {
-    paddingHorizontal: 20,
-    paddingBottom: SHEET_BOTTOM_PADDING,
-    gap: 16,
-  },
-  bodyWithFooter: {
-    paddingBottom: 16,
-  },
-  footer: {
-    flexDirection: "row",
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: SHEET_BOTTOM_PADDING,
-  },
-});
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: mobileColors.overlay,
+    },
+    sheet: {
+      width: "100%",
+      maxHeight: MAX_HEIGHT,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+      paddingTop: 10,
+      shadowColor: mobileColors.textPrimary,
+      shadowOffset: { width: 0, height: -8 },
+      shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
+      shadowRadius: 28,
+      elevation: 16,
+    },
+    grabber: {
+      alignSelf: "center",
+      width: 40,
+      height: 4,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.border,
+      marginBottom: 6,
+    },
+    scrollArea: {
+      flexShrink: 1,
+    },
+    body: {
+      paddingHorizontal: 20,
+      paddingBottom: SHEET_BOTTOM_PADDING,
+      gap: 16,
+    },
+    bodyWithFooter: {
+      paddingBottom: 16,
+    },
+    footer: {
+      flexDirection: "row",
+      gap: 12,
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingHorizontal: 20,
+      paddingTop: 14,
+      paddingBottom: SHEET_BOTTOM_PADDING,
+    },
+  });

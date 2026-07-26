@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getGridmasterRealtimeInvalidationKeys,
   resolveGridmasterRealtimeOrgId,
+  resolveGridmasterRealtimeUserId,
 } from "@/hooks/useGridmasterRealtimeInvalidation";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -42,13 +43,80 @@ describe("getGridmasterRealtimeInvalidationKeys", () => {
     ]);
   });
 
-  it("refreshes impersonation history and compliance/security summaries", () => {
+  it("refreshes impersonation history, compliance/security summaries, and every audit page", () => {
     expect(getGridmasterRealtimeInvalidationKeys("impersonation_sessions", orgId)).toEqual([
       queryKeys.gridmaster.impersonation(),
       queryKeys.gridmaster.security(),
       queryKeys.gridmaster.overview(),
       queryKeys.gridmaster.compliance(),
+      queryKeys.gridmaster.auditAll(),
       queryKeys.gridmaster.orgAudit(orgId, 0, 50),
+    ]);
+  });
+
+  it("refreshes every audit-log page through the audit prefix for role changes", () => {
+    expect(getGridmasterRealtimeInvalidationKeys("role_change_log", orgId)).toEqual([
+      queryKeys.gridmaster.auditAll(),
+      queryKeys.gridmaster.overview(),
+      queryKeys.gridmaster.security(),
+      queryKeys.gridmaster.compliance(),
+      queryKeys.gridmaster.dashboard(),
+      queryKeys.gridmaster.orgAudit(orgId, 0, 50),
+    ]);
+  });
+
+  it("refreshes the security sessions view and compliance summary for session changes", () => {
+    expect(getGridmasterRealtimeInvalidationKeys("user_sessions", orgId)).toEqual([
+      queryKeys.gridmaster.security(),
+      queryKeys.gridmaster.compliance(),
+    ]);
+  });
+
+  it("refreshes the accounts and all-users views for profile changes", () => {
+    expect(getGridmasterRealtimeInvalidationKeys("profiles", orgId)).toEqual([
+      queryKeys.gridmaster.accounts(),
+      queryKeys.gridmaster.allUsers(),
+      queryKeys.gridmaster.dashboard(),
+      queryKeys.gridmaster.overview(),
+      queryKeys.gridmaster.orgHealth(null),
+    ]);
+  });
+
+  it("refreshes the affected user's membership drill-down when a userId is resolved", () => {
+    const userId = "22222222-2222-4222-8222-222222222222";
+    expect(
+      getGridmasterRealtimeInvalidationKeys("organization_memberships", orgId, userId),
+    ).toEqual([
+      queryKeys.gridmaster.allUsers(),
+      queryKeys.gridmaster.dashboard(),
+      queryKeys.gridmaster.overview(),
+      queryKeys.gridmaster.orgHealth(null),
+      queryKeys.gridmaster.orgUsers(orgId),
+      queryKeys.gridmaster.orgHealth(orgId),
+      queryKeys.gridmaster.userMemberships(userId),
+    ]);
+  });
+
+  it("refreshes invitations through the audit prefix as well", () => {
+    expect(getGridmasterRealtimeInvalidationKeys("invitations", orgId)).toEqual([
+      queryKeys.gridmaster.dashboard(),
+      queryKeys.gridmaster.overview(),
+      queryKeys.gridmaster.orgHealth(null),
+      queryKeys.gridmaster.auditAll(),
+      queryKeys.gridmaster.orgInvitations(orgId),
+      queryKeys.gridmaster.orgHealth(orgId),
+      queryKeys.gridmaster.orgAudit(orgId, 0, 50),
+    ]);
+  });
+
+  it("refreshes the org's live schedule view and the platform dashboard for schedule cell changes", () => {
+    expect(getGridmasterRealtimeInvalidationKeys("schedule_cells", orgId)).toEqual([
+      queryKeys.gridmaster.overview(),
+      queryKeys.gridmaster.orgHealth(null),
+      queryKeys.gridmaster.dashboard(),
+      queryKeys.gridmaster.org(orgId),
+      queryKeys.gridmaster.orgHealth(orgId),
+      queryKeys.gridmaster.orgScheduleAll(orgId),
     ]);
   });
 
@@ -86,5 +154,25 @@ describe("resolveGridmasterRealtimeOrgId", () => {
         old: { org_id: orgId },
       }),
     ).toBe(orgId);
+  });
+});
+
+describe("resolveGridmasterRealtimeUserId", () => {
+  const userId = "22222222-2222-4222-8222-222222222222";
+
+  it("resolves user_id for organization_memberships rows", () => {
+    expect(
+      resolveGridmasterRealtimeUserId("organization_memberships", {
+        new: { user_id: userId },
+      }),
+    ).toBe(userId);
+  });
+
+  it("returns null for tables with no per-user invalidation target", () => {
+    expect(
+      resolveGridmasterRealtimeUserId("employees", {
+        new: { user_id: userId },
+      }),
+    ).toBeNull();
   });
 });

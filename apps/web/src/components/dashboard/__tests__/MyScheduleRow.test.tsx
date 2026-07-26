@@ -1,7 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import MyScheduleRow from "@/components/dashboard/MyScheduleRow";
-import type { AbsenceType, AssignmentDefinition, ShiftMap } from "@/types";
+import type {
+  AbsenceType,
+  AssignmentDefinition,
+  JobDefinition,
+  ShiftCategory,
+  ShiftMap,
+} from "@/types";
 
 const assignment: AssignmentDefinition = {
   id: 101,
@@ -56,6 +62,20 @@ const assignmentById = new Map([
 ]);
 const absenceTypeById = new Map([[absenceType.id, absenceType]]);
 
+const job: JobDefinition = {
+  id: 7,
+  orgId: "org-1",
+  name: "Registered Nurse",
+  abbr: "RN",
+  showOnGrid: true,
+  eligibleRoleIds: [],
+  requiredCertificationIds: [],
+  color: "#dbeafe",
+  border: "#93c5fd",
+  text: "#1e3a8a",
+  sortOrder: 1,
+};
+
 const weekDates = [
   new Date("2026-05-11T00:00:00"),
   new Date("2026-05-12T00:00:00"),
@@ -76,6 +96,33 @@ describe("MyScheduleRow", () => {
         absenceTypeById={absenceTypeById}
         periodDates={weekDates}
         periodLabel="this week"
+      />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("renders nothing for a management-only viewer, even with real shift data", () => {
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+    };
+
+    const { container } = render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        periodDates={weekDates}
+        periodLabel="this week"
+        isManagementOnly
       />,
     );
 
@@ -242,5 +289,185 @@ describe("MyScheduleRow", () => {
     expect(scrollBySpy).toHaveBeenCalledWith(
       expect.objectContaining({ left: 450, behavior: "smooth" }),
     );
+  });
+
+  it("shows the job name under the shift name, and reserves the same space for shifts/absences without one", () => {
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "D",
+        assignmentIds: [101],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [101],
+        publishedLabel: "D",
+      },
+      "emp-1_2026-05-12": {
+        label: "V",
+        assignmentIds: [],
+        absenceTypeId: 5,
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [],
+        publishedLabel: "V",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={assignmentById}
+        absenceTypeById={absenceTypeById}
+        jobs={[job]}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    expect(screen.getByText("Registered Nurse")).toBeInTheDocument();
+
+    // The absence pill (no job) still renders a job-name line — hidden, not
+    // removed — so every pill reserves the same three-line height.
+    const vacationPill = screen.getByText("Vacation").parentElement as HTMLElement;
+    const reservedJobLine = vacationPill.querySelector('[aria-hidden="true"]');
+    expect(reservedJobLine).toBeInTheDocument();
+    expect(reservedJobLine).toHaveStyle({ visibility: "hidden" });
+  });
+
+  it("shows the shift's own name on top, not the assignment's combined code name", () => {
+    // Some orgs name the assignment/code itself as a combined "shift + job"
+    // string for clarity elsewhere in the app (e.g. "Evening Shift
+    // Supervisor"). Now that the job gets its own line below, the top line
+    // must stay shift-only — it should prefer the segment's pure shiftName
+    // over the assignment's own name/label.
+    const supervisorAssignment: AssignmentDefinition = {
+      ...assignment,
+      id: 303,
+      name: "Evening Shift Supervisor",
+      label: "ESS",
+    };
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "ESS",
+        assignmentIds: [303],
+        segments: [
+          {
+            shiftId: 10,
+            jobId: 7,
+            position: 0,
+            assignmentId: 303,
+            label: "ESS",
+            shiftName: "Evening Shift",
+          },
+        ],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [303],
+        publishedLabel: "ESS",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={new Map([[supervisorAssignment.id, supervisorAssignment]])}
+        absenceTypeById={absenceTypeById}
+        jobs={[job]}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    expect(screen.getByText("Evening Shift")).toBeInTheDocument();
+    expect(screen.queryByText("Evening Shift Supervisor")).not.toBeInTheDocument();
+    expect(screen.getByText("Registered Nurse")).toBeInTheDocument();
+  });
+
+  it("resolves the shift's own name via the assignment's shift id when there are no explicit segments", () => {
+    // The common case: entries only carry `assignmentIds`, no explicit
+    // `segments` with their own `shiftName`. The top line must still
+    // resolve to the pure shift name (looked up via shiftCategories), not
+    // fall through to the assignment's combined code name.
+    const supervisorAssignment: AssignmentDefinition = {
+      ...assignment,
+      id: 303,
+      name: "Evening Shift Supervisor",
+      label: "ESS",
+      shiftId: 20,
+      jobId: 7,
+    };
+    const eveningShift: ShiftCategory = {
+      id: 20,
+      orgId: "org-1",
+      name: "Evening Shift",
+      sortOrder: 2,
+    };
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "ESS",
+        assignmentIds: [303],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [303],
+        publishedLabel: "ESS",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={new Map([[supervisorAssignment.id, supervisorAssignment]])}
+        absenceTypeById={absenceTypeById}
+        jobs={[job]}
+        shiftCategories={[eveningShift]}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    expect(screen.getByText("Evening Shift")).toBeInTheDocument();
+    expect(screen.queryByText("Evening Shift Supervisor")).not.toBeInTheDocument();
+    expect(screen.getByText("Registered Nurse")).toBeInTheDocument();
+  });
+
+  it("does not repeat the job name below when a shiftless job's name is already the shift line", () => {
+    // A shiftless assignment (no shift attached) resolves its "shift" label
+    // to the job's own name — showing the job line too would just repeat
+    // the same text twice.
+    const shiftlessAssignment: AssignmentDefinition = {
+      ...assignment,
+      id: 404,
+      name: "Registered Nurse",
+      label: "RN",
+      shiftId: null,
+      categoryId: null,
+      jobId: 7,
+    };
+    const currentPeriodShifts: ShiftMap = {
+      "emp-1_2026-05-11": {
+        label: "RN",
+        assignmentIds: [404],
+        isDraft: false,
+        draftKind: null,
+        publishedAssignmentDefinitionIds: [404],
+        publishedLabel: "RN",
+      },
+    };
+
+    render(
+      <MyScheduleRow
+        currentEmpId="emp-1"
+        currentPeriodShifts={currentPeriodShifts}
+        assignmentById={new Map([[shiftlessAssignment.id, shiftlessAssignment]])}
+        absenceTypeById={absenceTypeById}
+        jobs={[job]}
+        periodDates={weekDates}
+        periodLabel="this week"
+      />,
+    );
+
+    expect(screen.getAllByText("Registered Nurse")).toHaveLength(1);
   });
 });

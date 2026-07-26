@@ -150,17 +150,7 @@ export default function DomainSelector() {
                 gap: "12px",
               }}
             >
-              <button
-                type="submit"
-                disabled={loading}
-                className="dg-auth-submit"
-                style={{
-                  padding: "12px 28px",
-                  width: "auto",
-                  whiteSpace: "nowrap",
-                  display: "inline-flex",
-                }}
-              >
+              <button type="submit" disabled={loading} className="dg-btn dg-btn-primary dg-btn-lg">
                 <ButtonLoading
                   loading={loading}
                   spinnerColor="var(--color-text-inverse)"

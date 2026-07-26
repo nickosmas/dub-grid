@@ -118,11 +118,13 @@ interface StaffViewProps {
   canManageEmployees?: boolean;
   isSuperAdmin?: boolean;
   isGridmaster?: boolean;
+  isManagementUser?: boolean;
   focusAreaLabel?: string;
   certificationLabel?: string;
   roleLabel?: string;
   orgName?: string;
   shiftDisplayMode?: ShiftDisplayMode;
+  defaultShiftEnabled?: boolean;
   setupIncomplete?: boolean;
 }
 
@@ -152,11 +154,13 @@ export default function StaffView({
   canManageEmployees,
   isSuperAdmin = false,
   isGridmaster = false,
+  isManagementUser = false,
   focusAreaLabel = "Focus Areas",
   certificationLabel = "Certifications",
   roleLabel = "Roles",
   orgName,
   shiftDisplayMode = "code",
+  defaultShiftEnabled = true,
 }: StaffViewProps) {
   const searchParams = useSearchParams();
   const isMobile = useMediaQuery(MOBILE);
@@ -231,7 +235,7 @@ export default function StaffView({
       onOpenChange={handleSidebarOpenChange}
       style={{ minHeight: "unset" }}
     >
-      {!isMobile && (
+      {!isMobile && links.length > 1 && (
         <Sidebar
           collapsible="icon"
           className="border-r border-[var(--color-border)] bg-[var(--color-surface)]"
@@ -335,6 +339,7 @@ export default function StaffView({
             orgName={orgName}
             isSuperAdmin={isSuperAdmin}
             isGridmaster={isGridmaster}
+            isManagementUser={isManagementUser}
             departments={departmentsProp}
             departmentLabel={scheduledDepartmentLabel}
             managementDepartmentLabel={managementDepartmentLabel}
@@ -368,6 +373,7 @@ export default function StaffView({
                 certifications={certifications}
                 absenceTypes={absenceTypes}
                 shiftDisplayMode={shiftDisplayMode}
+                defaultShiftEnabled={defaultShiftEnabled}
               />
             )}
           </div>

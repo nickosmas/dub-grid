@@ -17,7 +17,7 @@ import {
   resolveJobColorsForShift,
   resolveJobTimesForShift,
 } from "@/lib/job-placement";
-import { isRegularStaffSystemJob } from "@/lib/system-jobs";
+import { isDefaultShiftSystemJob, isRegularStaffSystemJob } from "@/lib/system-jobs";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { EmptyState } from "@/components/EmptyState";
@@ -187,11 +187,25 @@ function buildCoverageOptions(args: {
   orgRoles: NamedItem[];
   certifications: NamedItem[];
   shiftDisplayMode: ShiftDisplayMode;
+  defaultShiftEnabled?: boolean;
 }): AssignableShiftOption[] {
-  const { focusAreas, shiftCategories, jobs, orgRoles, certifications, shiftDisplayMode } = args;
+  const {
+    focusAreas,
+    shiftCategories,
+    jobs,
+    orgRoles,
+    certifications,
+    shiftDisplayMode,
+    defaultShiftEnabled = true,
+  } = args;
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
   const activeShifts = shiftCategories.filter((shift) => !shift.archivedAt);
-  const activeJobs = jobs.filter((job) => !job.archivedAt && !isRegularStaffSystemJob(job));
+  const activeJobs = jobs.filter(
+    (job) =>
+      !job.archivedAt &&
+      !isRegularStaffSystemJob(job) &&
+      !(defaultShiftEnabled === false && isDefaultShiftSystemJob(job)),
+  );
   const focusAreaNameById = new Map(
     activeFocusAreas.map((focusArea) => [focusArea.id, focusArea.name]),
   );
@@ -730,7 +744,7 @@ export default function CoverageRequirementsSettings({
   coverageRequirements,
   onCoverageRequirementsChange,
   canEdit,
-  shiftDisplayMode = "code",
+  defaultShiftEnabled = true,
 }: {
   orgId: string;
   focusAreas: FocusArea[];
@@ -741,7 +755,7 @@ export default function CoverageRequirementsSettings({
   coverageRequirements: CoverageRequirement[];
   onCoverageRequirementsChange: (reqs: CoverageRequirement[]) => void;
   canEdit: boolean;
-  shiftDisplayMode?: ShiftDisplayMode;
+  defaultShiftEnabled?: boolean;
 }) {
   const activeFocusAreas = focusAreas.filter((focusArea) => !focusArea.archivedAt);
   const assignableOptions = useMemo(
@@ -752,9 +766,10 @@ export default function CoverageRequirementsSettings({
         focusAreas,
         orgRoles,
         certifications,
-        shiftDisplayMode,
+        shiftDisplayMode: "name",
+        defaultShiftEnabled,
       }),
-    [certifications, focusAreas, jobs, orgRoles, shiftCategories, shiftDisplayMode],
+    [certifications, focusAreas, jobs, orgRoles, shiftCategories, defaultShiftEnabled],
   );
   const coverageOptions = useMemo(
     () => assignableOptions.filter(isCoverageTargetOption),

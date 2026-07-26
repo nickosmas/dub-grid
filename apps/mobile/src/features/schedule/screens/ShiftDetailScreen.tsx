@@ -10,6 +10,7 @@ import {
   type MobileShiftRequest,
 } from "@dubgrid/contracts";
 import { indefiniteArticle } from "@dubgrid/domain";
+import { getAvatarTone, resolveShiftPillColors } from "@dubgrid/design-tokens";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -29,12 +30,17 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getMobileQueryContentState, getQueryErrorMessage } from "../../../shared/lib/query-state";
+import {
+  useIsDarkMode,
+  useMobileColors,
+  useThemeMode,
+} from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
-  mobileColors,
   mobileRadii,
   mobileText,
+  type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -678,27 +684,30 @@ function getInitials(name: string): string {
   return `${first}${last}` || "?";
 }
 
-function hashCode(value: string): number {
-  let hash = 0;
+// User-picked hex colors from the backend are tuned for a white page and
+// read as washed-out on a dark surface — remap through the shared HSV
+// darkener. Theme tokens (mobileColors.*) are already theme-correct and
+// must NOT be passed through this a second time.
+function darkenTone(
+  tone: { backgroundColor: string; borderColor: string; textColor: string },
+  isDark: boolean,
+): { backgroundColor: string; borderColor: string; textColor: string } {
+  if (!isDark) return tone;
 
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (Math.imul(31, hash) + value.charCodeAt(index)) | 0;
-  }
-
-  return Math.abs(hash);
-}
-
-function getAvatarTone(seed: string): ChipTone {
-  const hue = hashCode(seed) % 360;
-
+  const resolved = resolveShiftPillColors(
+    { color: tone.backgroundColor, text: tone.textColor, border: tone.borderColor },
+    true,
+  );
   return {
-    backgroundColor: `hsl(${hue}, 70%, 92%)`,
-    borderColor: `hsl(${hue}, 70%, 85%)`,
-    textColor: `hsl(${hue}, 70%, 35%)`,
+    backgroundColor: resolved.color,
+    borderColor: resolved.border,
+    textColor: resolved.text,
   };
 }
 
 function buildDetailJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: {
     jobColor?: string | null;
@@ -715,16 +724,33 @@ function buildDetailJobChip(
     return null;
   }
 
+  if (jobColor) {
+    return {
+      kind: "job",
+      label: trimmedLabel,
+      ...darkenTone(
+        {
+          backgroundColor: jobColor,
+          borderColor: jobBorderColor ?? jobColor,
+          textColor: jobTextColor ?? mobileColors.textMuted,
+        },
+        isDark,
+      ),
+    };
+  }
+
   return {
     kind: "job",
     label: trimmedLabel,
-    backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
-    borderColor: jobBorderColor ?? mobileColors.border,
-    textColor: jobTextColor ?? mobileColors.textMuted,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textMuted,
   };
 }
 
 function buildDetailGeneralShiftChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: {
     jobColor?: string | null;
@@ -732,7 +758,7 @@ function buildDetailGeneralShiftChip(
     jobTextColor?: string | null;
   } | null,
 ): DetailChip | null {
-  const chip = buildDetailJobChip(label, colorSource);
+  const chip = buildDetailJobChip(mobileColors, isDark, label, colorSource);
 
   if (!chip) {
     return null;
@@ -746,6 +772,8 @@ function buildDetailGeneralShiftChip(
 }
 
 function buildDetailAbsenceChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: AbsenceColorSource | null,
 ): DetailChip | null {
@@ -758,13 +786,29 @@ function buildDetailAbsenceChip(
     return null;
   }
 
+  if (absenceColor) {
+    return {
+      kind: "absence",
+      label: trimmedLabel,
+      eyebrowLabel: "Absence",
+      ...darkenTone(
+        {
+          backgroundColor: absenceColor,
+          borderColor: absenceBorderColor ?? absenceColor,
+          textColor: absenceTextColor ?? mobileColors.textMuted,
+        },
+        isDark,
+      ),
+    };
+  }
+
   return {
     kind: "absence",
     label: trimmedLabel,
     eyebrowLabel: "Absence",
-    backgroundColor: absenceColor ?? mobileColors.surfaceSecondary,
-    borderColor: absenceBorderColor ?? mobileColors.border,
-    textColor: absenceTextColor ?? mobileColors.textMuted,
+    backgroundColor: mobileColors.surfaceSecondary,
+    borderColor: mobileColors.border,
+    textColor: mobileColors.textMuted,
   };
 }
 
@@ -782,15 +826,29 @@ function hasMentoredSegments(
   return segments?.some((segment) => segment.isMentored === true) ?? false;
 }
 
-function getEntryJobChip(entry: MobileScheduleEntry): DetailChip | null {
+function getEntryJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  entry: MobileScheduleEntry,
+): DetailChip | null {
   if (getScheduleEntryAbsenceTypeId(entry) != null) {
-    return buildDetailAbsenceChip(getScheduleEntryTitle(entry), entry.presentation);
+    return buildDetailAbsenceChip(
+      mobileColors,
+      isDark,
+      getScheduleEntryTitle(entry),
+      entry.presentation,
+    );
   }
 
   const primarySegment = getScheduleEntrySegments(entry)[0] ?? null;
 
   if (isGeneralDetailSegment(primarySegment)) {
-    return buildDetailGeneralShiftChip(getScheduleEntryTitle(entry), primarySegment);
+    return buildDetailGeneralShiftChip(
+      mobileColors,
+      isDark,
+      getScheduleEntryTitle(entry),
+      primarySegment,
+    );
   }
 
   const segment = getScheduleEntrySegments(entry).find((item) => item.jobName) ?? null;
@@ -800,12 +858,21 @@ function getEntryJobChip(entry: MobileScheduleEntry): DetailChip | null {
     return null;
   }
 
-  return buildDetailJobChip(label, segment);
+  return buildDetailJobChip(mobileColors, isDark, label, segment);
 }
 
-function buildSegmentJobChip(segment: MobileScheduleEntrySegment): DetailChip | null {
+function buildSegmentJobChip(
+  mobileColors: MobileColors,
+  isDark: boolean,
+  segment: MobileScheduleEntrySegment,
+): DetailChip | null {
   if (isGeneralDetailSegment(segment)) {
-    return buildDetailGeneralShiftChip(segment.shiftName ?? segment.label ?? null, segment);
+    return buildDetailGeneralShiftChip(
+      mobileColors,
+      isDark,
+      segment.shiftName ?? segment.label ?? null,
+      segment,
+    );
   }
 
   const label = segment.jobName?.trim() ?? "";
@@ -814,10 +881,13 @@ function buildSegmentJobChip(segment: MobileScheduleEntrySegment): DetailChip | 
     return null;
   }
 
-  return buildDetailJobChip(label, segment);
+  return buildDetailJobChip(mobileColors, isDark, label, segment);
 }
 
 function MentoredPill() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
       <Text style={styles.mentoredPillText}>Mentored</Text>
@@ -826,6 +896,9 @@ function MentoredPill() {
 }
 
 export default function ShiftDetailScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
   const params = useLocalSearchParams<{
     employeeId?: string;
     date?: string;
@@ -1330,7 +1403,7 @@ export default function ShiftDetailScreen() {
     ? formatPublishedSummary(shiftEntry.publishedByName, publishedAtLabel)
     : null;
   const focusAreaName = shiftEntry ? getScheduleEntryDisplayFocusAreaName(shiftEntry) : null;
-  const jobChip = shiftEntry ? getEntryJobChip(shiftEntry) : null;
+  const jobChip = shiftEntry ? getEntryJobChip(mobileColors, isDark, shiftEntry) : null;
   let detailCardTitle = shiftEntry ? getScheduleEntryTitle(shiftEntry) : "";
 
   if (hasSplitShift) {
@@ -2144,6 +2217,8 @@ function getPickupTargetDetailLabel(
 }
 
 function DetailDateTile({ date }: { date: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const dateLabel = formatCompactScheduleDate(date);
   const dateParts = getCompactScheduleDateParts(date);
 
@@ -2162,6 +2237,9 @@ function DetailHeaderJobPill({
   chip: DetailChip | null;
   isMentored?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -2205,6 +2283,9 @@ function DetailInfoRow({
   label: string;
   value: string;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View accessibilityLabel={`${label} ${value}`} style={styles.detailInfoRow}>
       <View style={[styles.detailInfoIconBox, { backgroundColor: iconBackgroundColor }]}>
@@ -2231,6 +2312,8 @@ function DetailActionButton({
   onPress: () => void;
   tone: "neutral" | "secondary";
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isSecondary = tone === "secondary";
   const contentColor = isSecondary ? mobileColors.brand : mobileColors.dangerText;
 
@@ -2265,6 +2348,9 @@ function DetailPublishedFooter({
   publishedByName: string | null;
   summary: string;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.detailPublishedFooter}>
       <Ionicons color={mobileColors.textSubtle} name="information-circle-outline" size={18} />
@@ -2296,6 +2382,9 @@ function ActionSegmentSelector({
   selectedIndex: number;
   onSelect: (index: number) => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.actionSegmentPanel}>
       <Text style={styles.subsectionLabel}>Choose shift</Text>
@@ -2332,6 +2421,9 @@ function DetailJobPill({
   eyebrowDisplay?: EyebrowDisplay;
   isMentored?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -2393,6 +2485,9 @@ function ShiftmateSegmentGroups({
   groups: ShiftmateSegmentGroup[];
   linkedEmployeeId: string | null;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <View style={styles.shiftmateSegmentGroups}>
       {groups.map((group) => (
@@ -2452,9 +2547,14 @@ function ShiftmateRow({
   linkedEmployeeId: string | null;
   matchedSegment?: MobileScheduleEntrySegment | null;
 }) {
-  const avatarTone = getAvatarTone(entry.employeeId);
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { resolvedTheme } = useThemeMode();
+  const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");
   const displayName = entry.employeeId === linkedEmployeeId ? "Me" : entry.employeeName;
-  const jobChip = matchedSegment ? buildSegmentJobChip(matchedSegment) : getEntryJobChip(entry);
+  const jobChip = matchedSegment
+    ? buildSegmentJobChip(mobileColors, resolvedTheme === "dark", matchedSegment)
+    : getEntryJobChip(mobileColors, resolvedTheme === "dark", entry);
   const entryTimeRange = matchedSegment
     ? getScheduleEntrySegmentTimeRange(matchedSegment)
     : getScheduleEntryTimeRange(entry);
@@ -2520,6 +2620,8 @@ function SelectorChip({
   showCheck?: boolean;
   variant?: "chip" | "segment";
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isSegment = variant === "segment";
 
   return (
@@ -2534,7 +2636,8 @@ function SelectorChip({
         isSegment && styles.selectorSegment,
         active && styles.selectorChipActive,
         isSegment && active && styles.selectorSegmentActive,
-        disabled && styles.selectorChipDisabled,
+        disabled && !isSegment && styles.selectorChipDisabled,
+        disabled && isSegment && styles.selectorSegmentDisabled,
       ]}
     >
       <View style={isSegment ? styles.selectorSegmentContent : undefined}>
@@ -2543,6 +2646,7 @@ function SelectorChip({
             styles.selectorChipText,
             isSegment && styles.selectorSegmentText,
             active && styles.selectorChipTextActive,
+            disabled && isSegment && styles.selectorSegmentTextDisabled,
           ]}
         >
           {label}
@@ -2572,6 +2676,9 @@ function CoverageOptionCard({
   disabled?: boolean;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -2582,7 +2689,10 @@ function CoverageOptionCard({
       style={[
         styles.coverageOptionCard,
         tone === "danger" && styles.coverageOptionCardDanger,
-        active && styles.coverageOptionCardActive,
+        active &&
+          (tone === "danger"
+            ? styles.coverageOptionCardActiveDanger
+            : styles.coverageOptionCardActive),
         disabled && styles.coverageOptionCardDisabled,
       ]}
     >
@@ -2621,6 +2731,9 @@ function SwapSummaryCard({
   segmentIndex?: number;
   summaryNote?: string;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
   const segments = getScheduleEntrySegments(entry);
   const primarySegment =
     segmentIndex != null
@@ -2632,7 +2745,7 @@ function SwapSummaryCard({
   const timeRange = getScheduleEntryTimeRange(entry);
   const focusAreaName =
     primarySegment?.displayFocusAreaName ?? getScheduleEntryDisplayFocusAreaName(entry);
-  const jobChip = getEntryJobChip(entry);
+  const jobChip = getEntryJobChip(mobileColors, isDark, entry);
   const summaryMeta = [primarySegmentTimeRange ?? timeRange ?? "Time unavailable", focusAreaName]
     .filter(Boolean)
     .join(" · ");
@@ -2670,6 +2783,8 @@ function SwapDateChip({
   disabled?: boolean;
   onPress: () => void;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const dateParts = getCompactScheduleDateParts(date);
   const countColor = active ? mobileColors.brand : mobileColors.textMuted;
 
@@ -2723,6 +2838,8 @@ function SwapOptionCard({
   segmentIndex?: number;
   showSegments?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const optionLabel = segmentIndex != null ? getActionSegmentLabel(entry, segmentIndex) : null;
 
   return (
@@ -2761,13 +2878,15 @@ function ShiftEntrySegmentList({
   showSegmentLabels?: boolean;
   variant: "detail" | "supporting";
 }) {
+  const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
   const segments = getScheduleEntrySegments(entry);
 
   return (
     <SplitShiftSegmentList
       renderSegmentChip={(segment) => (
         <DetailJobPill
-          chip={buildSegmentJobChip(segment)}
+          chip={buildSegmentJobChip(mobileColors, isDark, segment)}
           isMentored={segment.isMentored === true}
         />
       )}
@@ -2779,728 +2898,740 @@ function ShiftEntrySegmentList({
   );
 }
 
-const styles = StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  loadingBody: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  shiftDetailCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    marginTop: 12,
-    marginBottom: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 16,
-    shadowColor: mobileColors.shadowStrong,
-    shadowOffset: {
-      width: 0,
-      height: 8,
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
     },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  detailHeroHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 14,
-  },
-  detailHeroCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 7,
-  },
-  detailHeroPillRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  detailHeroTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  detailEmployeeName: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textSubtle,
-  },
-  detailHeaderJobPill: {
-    minHeight: 28,
-    borderRadius: 10,
-    borderWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    flexShrink: 0,
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  detailHeaderJobPillText: {
-    ...mobileText.badge,
-    textTransform: "uppercase",
-  },
-  detailHeaderJobPillMentoredText: {
-    ...mobileText.badge,
-    textTransform: "none",
-  },
-  detailInfoStack: {
-    gap: 14,
-  },
-  detailSplitNotice: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textSecondary,
-  },
-  detailActionsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  detailActionButton: {
-    flex: 1,
-    minHeight: 56,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: mobileColors.dangerBorder,
-    backgroundColor: mobileColors.dangerSoft,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-  },
-  detailActionButtonSecondary: {
-    borderColor: mobileColors.brandBorder,
-    backgroundColor: mobileColors.brandSoft,
-  },
-  detailActionButtonPressed: {
-    transform: [{ scale: 0.98 }],
-  },
-  detailActionButtonDisabled: {
-    opacity: 0.5,
-  },
-  detailActionButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  detailActionButtonText: {
-    ...mobileText.bodyStrong,
-  },
-  detailPublishedFooter: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-    paddingTop: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 9,
-  },
-  detailPublishedText: {
-    flex: 1,
-    minWidth: 0,
-    ...mobileText.meta,
-    color: mobileColors.textSubtle,
-  },
-  detailPublishedName: {
-    fontWeight: "600",
-    color: mobileColors.textMuted,
-  },
-  detailInfoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  detailInfoIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  detailInfoCopy: {
-    flex: 1,
-    minWidth: 0,
-    gap: 2,
-  },
-  detailInfoLabel: {
-    ...mobileText.label,
-    textTransform: "uppercase",
-    color: mobileColors.textSubtle,
-  },
-  detailInfoValue: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textSecondary,
-  },
-  detailGroup: {
-    gap: 10,
-    alignItems: "flex-start",
-  },
-  detailDateTile: {
-    width: 60,
-    minHeight: 68,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surfaceMuted,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 8,
-  },
-  detailDateWeekday: {
-    ...mobileText.badge,
-    color: mobileColors.textSubtle,
-    textTransform: "uppercase",
-  },
-  detailDateDay: {
-    ...mobileText.heroMetric,
-    color: mobileColors.textPrimary,
-  },
-  detailShiftTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-  },
-  detailSummaryText: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  detailFocusAreaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
-  detailFocusAreaText: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textSecondary,
-  },
-  detailFootnote: {
-    ...mobileText.caption,
-    color: mobileColors.textSubtle,
-    paddingTop: 2,
-  },
-  detailJobChip: {
-    alignSelf: "flex-start",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  detailJobPillRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  detailJobChipTextStack: {
-    gap: 2,
-  },
-  detailJobChipInlineTextRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  detailJobChipEyebrowText: {
-    ...mobileText.micro,
-  },
-  detailJobChipText: {
-    ...mobileText.badge,
-    textTransform: "uppercase",
-  },
-  detailJobChipMentoredText: {
-    textTransform: "none",
-  },
-  detailJobChipValueText: {
-    ...mobileText.badge,
-    fontWeight: "600",
-  },
-  mentoredPill: {
-    alignSelf: "flex-start",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surfaceSecondary,
-    minHeight: 28,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  mentoredPillText: {
-    ...mobileText.badge,
-    color: mobileColors.textSecondary,
-  },
-  detailSegmentList: {
-    gap: 12,
-  },
-  detailSegmentBlock: {
-    gap: 5,
-  },
-  detailSegmentDivider: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-    paddingTop: 12,
-  },
-  detailSegmentTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-  },
-  detailSegmentMeta: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  sectionBlock: {
-    gap: 12,
-  },
-  sectionBody: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  shiftmatesList: {
-    gap: 0,
-  },
-  shiftmateSegmentGroups: {
-    gap: 24,
-  },
-  shiftmateSegmentGroup: {
-    gap: 6,
-  },
-  shiftmateSegmentHeader: {
-    paddingBottom: 2,
-  },
-  shiftmateSegmentHeaderCopy: {
-    gap: 2,
-    minWidth: 0,
-  },
-  shiftmateSegmentTitleRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  shiftmateSegmentTitleMeta: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  shiftmateSegmentTitle: {
-    flexShrink: 1,
-    minWidth: 0,
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  shiftmateSegmentTime: {
-    flexShrink: 0,
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "600",
-  },
-  shiftmateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 0,
-    paddingVertical: 13,
-  },
-  shiftmateRowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-  },
-  shiftmateAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  shiftmateAvatarText: {
-    ...mobileText.bodyStrong,
-  },
-  shiftmateContent: {
-    flex: 1,
-    gap: 5,
-    minWidth: 0,
-  },
-  shiftmateHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  shiftmateName: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-    flex: 1,
-  },
-  shiftmateChipRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  shiftmateMeta: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  supportingSegmentList: {
-    gap: 8,
-  },
-  supportingSegmentBlock: {
-    gap: 4,
-  },
-  supportingSegmentDivider: {
-    borderTopWidth: 1,
-    borderTopColor: mobileColors.borderSubtle,
-    paddingTop: 8,
-  },
-  supportingSegmentTitle: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textSecondary,
-  },
-  supportingSegmentMeta: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  sectionTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  modalContent: {
-    gap: 18,
-  },
-  modalActionButtons: {
-    gap: 10,
-    paddingTop: 2,
-  },
-  subsection: {
-    gap: 14,
-  },
-  subsectionLabel: {
-    ...mobileText.sectionTitle,
-    color: mobileColors.textPrimary,
-  },
-  subsectionBody: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  modalInlinePanel: {
-    gap: 12,
-    padding: 16,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-  },
-  actionSegmentPanel: {
-    gap: 10,
-    padding: ACTION_SEGMENT_PANEL_PADDING,
-    borderRadius: ACTION_SEGMENT_PANEL_RADIUS,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-    backgroundColor: mobileColors.brandSoft,
-  },
-  actionSegmentOptions: {
-    gap: 8,
-  },
-  swapSummaryList: {
-    gap: 10,
-  },
-  swapSummaryCard: {
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderRadius: mobileRadii.card,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-  },
-  swapSummaryLabel: {
-    ...mobileText.label,
-    color: mobileColors.textSubtle,
-    textTransform: "uppercase",
-  },
-  swapSummaryTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-  },
-  swapSummaryDate: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  swapSummaryNote: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  swapSummaryMeta: {
-    ...mobileText.meta,
-    color: mobileColors.textSecondary,
-    fontWeight: "500",
-  },
-  coverageOptionList: {
-    gap: 10,
-  },
-  coverageOptionCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 16,
-    gap: 8,
-    position: "relative",
-  },
-  coverageOptionCardDanger: {
-    borderColor: mobileColors.dangerBorder,
-    backgroundColor: mobileColors.dangerSoft,
-  },
-  coverageOptionCardActive: {
-    borderColor: mobileColors.brandBorder,
-    backgroundColor: mobileColors.brandSoft,
-  },
-  coverageOptionCardDisabled: {
-    opacity: 0.5,
-  },
-  coverageOptionTitle: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-  },
-  coverageOptionTitleWithCheck: {
-    paddingRight: 28,
-  },
-  coverageOptionTitleDanger: {
-    color: mobileColors.dangerText,
-  },
-  coverageOptionBody: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  coverageOptionCheckmark: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    width: 20,
-    height: 20,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: mobileColors.brand,
-  },
-  coverageOptionCheckmarkDanger: {
-    backgroundColor: mobileColors.dangerText,
-  },
-  coverageNotice: {
-    ...mobileText.body,
-    color: mobileColors.warningText,
-  },
-  selectorWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  selectorChip: {
-    borderRadius: mobileRadii.pill,
-    minHeight: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: mobileColors.surfaceSecondary,
-  },
-  selectorSegment: {
-    minHeight: 56,
-    borderRadius: ACTION_SEGMENT_OPTION_RADIUS,
-    backgroundColor: "rgba(255, 255, 255, 0.72)",
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-  },
-  selectorChipDisabled: {
-    opacity: 0.5,
-  },
-  selectorChipActive: {
-    backgroundColor: mobileColors.brandSoft,
-    borderWidth: 1,
-    borderColor: mobileColors.brandBorder,
-  },
-  selectorSegmentActive: {
-    backgroundColor: mobileColors.surface,
-    borderColor: mobileColors.brand,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  selectorSegmentContent: {
-    width: "100%",
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  selectorChipText: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textSecondary,
-  },
-  selectorSegmentText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  selectorChipTextActive: {
-    color: mobileColors.brand,
-  },
-  selectorSegmentCheckmark: {
-    width: 22,
-    height: 22,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: mobileColors.brand,
-  },
-  swapSelectedPanel: {
-    gap: 12,
-  },
-  swapDateFilteredList: {
-    gap: 12,
-  },
-  swapWeekNav: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  swapWeekNavButton: {
-    width: 44,
-    height: 44,
-    borderRadius: mobileRadii.control,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  swapWeekNavButtonPressed: {
-    transform: [{ scale: 0.98 }],
-  },
-  swapWeekNavButtonDisabled: {
-    opacity: 0.5,
-  },
-  swapWeekRangeLabel: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textPrimary,
-    flex: 1,
-    textAlign: "center",
-    fontWeight: "800",
-  },
-  swapDateGrid: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: 6,
-  },
-  swapDateChip: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 68,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-    paddingHorizontal: 4,
-    paddingVertical: 8,
-  },
-  swapDateChipActive: {
-    borderColor: mobileColors.brandBorder,
-    backgroundColor: mobileColors.brandSoft,
-  },
-  swapDateChipDisabled: {
-    opacity: 0.5,
-  },
-  swapDateChipWeekday: {
-    ...mobileText.micro,
-    color: mobileColors.textSubtle,
-    textTransform: "uppercase",
-  },
-  swapDateChipDay: {
-    fontSize: 20,
-    lineHeight: 24,
-    fontWeight: "800",
-    color: mobileColors.textPrimary,
-  },
-  swapDateChipTextActive: {
-    color: mobileColors.brand,
-  },
-  swapDateChipCount: {
-    minWidth: 0,
-    minHeight: 18,
-    borderRadius: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-    paddingHorizontal: 5,
-    backgroundColor: mobileColors.surfaceSecondary,
-  },
-  swapDateChipCountActive: {
-    backgroundColor: mobileColors.surface,
-  },
-  swapDateChipCountText: {
-    ...mobileText.micro,
-    color: mobileColors.textMuted,
-  },
-  swapDateChipCountTextActive: {
-    color: mobileColors.brand,
-  },
-  swapOptions: {
-    gap: 8,
-  },
-  swapOptionCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 14,
-    gap: 8,
-  },
-  swapOptionCardActive: {
-    backgroundColor: mobileColors.brandSoft,
-    borderColor: mobileColors.brandBorder,
-  },
-  swapOptionCardDisabled: {
-    opacity: 0.5,
-  },
-  swapOptionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
-  },
-  swapOptionName: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textPrimary,
-    flex: 1,
-  },
-  swapOptionDetail: {
-    ...mobileText.meta,
-    color: mobileColors.textSecondary,
-    fontWeight: "600",
-  },
-});
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    loadingBody: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    shiftDetailCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      marginTop: 12,
+      marginBottom: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      gap: 16,
+      shadowColor: mobileColors.shadowStrong,
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 12,
+      elevation: 2,
+    },
+    detailHeroHeader: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 14,
+    },
+    detailHeroCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 7,
+    },
+    detailHeroPillRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    detailHeroTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    detailEmployeeName: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textSubtle,
+    },
+    detailHeaderJobPill: {
+      minHeight: 28,
+      borderRadius: 10,
+      borderWidth: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      flexShrink: 0,
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    detailHeaderJobPillText: {
+      ...mobileText.badge,
+      textTransform: "uppercase",
+    },
+    detailHeaderJobPillMentoredText: {
+      ...mobileText.badge,
+      textTransform: "none",
+    },
+    detailInfoStack: {
+      gap: 14,
+    },
+    detailSplitNotice: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textSecondary,
+    },
+    detailActionsRow: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    detailActionButton: {
+      flex: 1,
+      minHeight: 56,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: mobileColors.dangerBorder,
+      backgroundColor: mobileColors.dangerSoft,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    },
+    detailActionButtonSecondary: {
+      borderColor: mobileColors.brandBorder,
+      backgroundColor: mobileColors.brandSoft,
+    },
+    detailActionButtonPressed: {
+      transform: [{ scale: 0.98 }],
+    },
+    detailActionButtonDisabled: {
+      opacity: 0.5,
+    },
+    detailActionButtonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    detailActionButtonText: {
+      ...mobileText.bodyStrong,
+    },
+    detailPublishedFooter: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+    },
+    detailPublishedText: {
+      flex: 1,
+      minWidth: 0,
+      ...mobileText.meta,
+      color: mobileColors.textSubtle,
+    },
+    detailPublishedName: {
+      fontWeight: "600",
+      color: mobileColors.textMuted,
+    },
+    detailInfoRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    detailInfoIconBox: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    detailInfoCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    detailInfoLabel: {
+      ...mobileText.label,
+      textTransform: "uppercase",
+      color: mobileColors.textSubtle,
+    },
+    detailInfoValue: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textSecondary,
+    },
+    detailGroup: {
+      gap: 10,
+      alignItems: "flex-start",
+    },
+    detailDateTile: {
+      width: 60,
+      minHeight: 68,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surfaceMuted,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+      paddingHorizontal: 6,
+      paddingVertical: 8,
+    },
+    detailDateWeekday: {
+      ...mobileText.badge,
+      color: mobileColors.textSubtle,
+      textTransform: "uppercase",
+    },
+    detailDateDay: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textPrimary,
+    },
+    detailShiftTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    detailSummaryText: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    detailFocusAreaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+    },
+    detailFocusAreaText: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textSecondary,
+    },
+    detailFootnote: {
+      ...mobileText.caption,
+      color: mobileColors.textSubtle,
+      paddingTop: 2,
+    },
+    detailJobChip: {
+      alignSelf: "flex-start",
+      borderRadius: 8,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    detailJobPillRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    detailJobChipTextStack: {
+      gap: 2,
+    },
+    detailJobChipInlineTextRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    detailJobChipEyebrowText: {
+      ...mobileText.micro,
+    },
+    detailJobChipText: {
+      ...mobileText.badge,
+      textTransform: "uppercase",
+    },
+    detailJobChipMentoredText: {
+      textTransform: "none",
+    },
+    detailJobChipValueText: {
+      ...mobileText.badge,
+      fontWeight: "600",
+    },
+    mentoredPill: {
+      alignSelf: "flex-start",
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surfaceSecondary,
+      minHeight: 28,
+      justifyContent: "center",
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    mentoredPillText: {
+      ...mobileText.badge,
+      color: mobileColors.textSecondary,
+    },
+    detailSegmentList: {
+      gap: 12,
+    },
+    detailSegmentBlock: {
+      gap: 5,
+    },
+    detailSegmentDivider: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: 12,
+    },
+    detailSegmentTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    detailSegmentMeta: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    sectionBlock: {
+      gap: 12,
+    },
+    sectionBody: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    shiftmatesList: {
+      gap: 0,
+    },
+    shiftmateSegmentGroups: {
+      gap: 24,
+    },
+    shiftmateSegmentGroup: {
+      gap: 6,
+    },
+    shiftmateSegmentHeader: {
+      paddingBottom: 2,
+    },
+    shiftmateSegmentHeaderCopy: {
+      gap: 2,
+      minWidth: 0,
+    },
+    shiftmateSegmentTitleRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    shiftmateSegmentTitleMeta: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    shiftmateSegmentTitle: {
+      flexShrink: 1,
+      minWidth: 0,
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    shiftmateSegmentTime: {
+      flexShrink: 0,
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      fontWeight: "600",
+    },
+    shiftmateRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingHorizontal: 0,
+      paddingVertical: 13,
+    },
+    shiftmateRowBorder: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+    },
+    shiftmateAvatar: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    shiftmateAvatarText: {
+      ...mobileText.bodyStrong,
+    },
+    shiftmateContent: {
+      flex: 1,
+      gap: 5,
+      minWidth: 0,
+    },
+    shiftmateHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    shiftmateName: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+      flex: 1,
+    },
+    shiftmateChipRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    shiftmateMeta: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    supportingSegmentList: {
+      gap: 8,
+    },
+    supportingSegmentBlock: {
+      gap: 4,
+    },
+    supportingSegmentDivider: {
+      borderTopWidth: 1,
+      borderTopColor: mobileColors.borderSubtle,
+      paddingTop: 8,
+    },
+    supportingSegmentTitle: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textSecondary,
+    },
+    supportingSegmentMeta: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    sectionTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    modalContent: {
+      gap: 18,
+    },
+    modalActionButtons: {
+      gap: 10,
+      paddingTop: 2,
+    },
+    subsection: {
+      gap: 14,
+    },
+    subsectionLabel: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textPrimary,
+    },
+    subsectionBody: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    modalInlinePanel: {
+      gap: 12,
+      padding: 16,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+    },
+    actionSegmentPanel: {
+      gap: 10,
+      padding: ACTION_SEGMENT_PANEL_PADDING,
+      borderRadius: ACTION_SEGMENT_PANEL_RADIUS,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      backgroundColor: mobileColors.brandSoft,
+    },
+    actionSegmentOptions: {
+      gap: 8,
+    },
+    swapSummaryList: {
+      gap: 10,
+    },
+    swapSummaryCard: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderRadius: mobileRadii.card,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 6,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+    },
+    swapSummaryLabel: {
+      ...mobileText.label,
+      color: mobileColors.textSubtle,
+      textTransform: "uppercase",
+    },
+    swapSummaryTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    swapSummaryDate: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    swapSummaryNote: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+    },
+    swapSummaryMeta: {
+      ...mobileText.meta,
+      color: mobileColors.textSecondary,
+      fontWeight: "500",
+    },
+    coverageOptionList: {
+      gap: 10,
+    },
+    coverageOptionCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 16,
+      gap: 8,
+      position: "relative",
+    },
+    coverageOptionCardDanger: {
+      borderColor: mobileColors.dangerBorder,
+      backgroundColor: mobileColors.dangerSoft,
+    },
+    coverageOptionCardActive: {
+      borderColor: mobileColors.brandBorder,
+      backgroundColor: mobileColors.brandSoft,
+    },
+    coverageOptionCardActiveDanger: {
+      borderColor: mobileColors.dangerText,
+    },
+    coverageOptionCardDisabled: {
+      opacity: 0.5,
+    },
+    coverageOptionTitle: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+    },
+    coverageOptionTitleWithCheck: {
+      paddingRight: 28,
+    },
+    coverageOptionTitleDanger: {
+      color: mobileColors.dangerText,
+    },
+    coverageOptionBody: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    coverageOptionCheckmark: {
+      position: "absolute",
+      top: 12,
+      right: 12,
+      width: 20,
+      height: 20,
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.brand,
+    },
+    coverageOptionCheckmarkDanger: {
+      backgroundColor: mobileColors.dangerText,
+    },
+    coverageNotice: {
+      ...mobileText.body,
+      color: mobileColors.warningText,
+    },
+    selectorWrap: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    selectorChip: {
+      borderRadius: mobileRadii.pill,
+      minHeight: 44,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      backgroundColor: mobileColors.surfaceSecondary,
+    },
+    selectorSegment: {
+      minHeight: 56,
+      borderRadius: ACTION_SEGMENT_OPTION_RADIUS,
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      justifyContent: "center",
+    },
+    selectorChipDisabled: {
+      opacity: 0.5,
+    },
+    selectorSegmentDisabled: {
+      backgroundColor: mobileColors.surfaceMuted,
+      borderColor: mobileColors.borderSubtle,
+    },
+    selectorChipActive: {
+      backgroundColor: mobileColors.brandSoft,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+    },
+    selectorSegmentActive: {
+      backgroundColor: mobileColors.surface,
+      borderColor: mobileColors.brand,
+      shadowColor: mobileColors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 1,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    selectorSegmentContent: {
+      width: "100%",
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    selectorChipText: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textSecondary,
+    },
+    selectorSegmentText: {
+      flex: 1,
+      minWidth: 0,
+    },
+    selectorSegmentTextDisabled: {
+      color: mobileColors.textSubtle,
+    },
+    selectorChipTextActive: {
+      color: mobileColors.brand,
+    },
+    selectorSegmentCheckmark: {
+      width: 22,
+      height: 22,
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.brand,
+    },
+    swapSelectedPanel: {
+      gap: 12,
+    },
+    swapDateFilteredList: {
+      gap: 12,
+    },
+    swapWeekNav: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    swapWeekNavButton: {
+      width: 44,
+      height: 44,
+      borderRadius: mobileRadii.control,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surfaceSecondary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    swapWeekNavButtonPressed: {
+      transform: [{ scale: 0.98 }],
+    },
+    swapWeekNavButtonDisabled: {
+      opacity: 0.5,
+    },
+    swapWeekRangeLabel: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textPrimary,
+      flex: 1,
+      textAlign: "center",
+      fontWeight: "800",
+    },
+    swapDateGrid: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: 6,
+    },
+    swapDateChip: {
+      flex: 1,
+      minWidth: 0,
+      minHeight: 68,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 2,
+      paddingHorizontal: 4,
+      paddingVertical: 8,
+    },
+    swapDateChipActive: {
+      borderColor: mobileColors.brandBorder,
+      backgroundColor: mobileColors.brandSoft,
+    },
+    swapDateChipDisabled: {
+      opacity: 0.5,
+    },
+    swapDateChipWeekday: {
+      ...mobileText.micro,
+      color: mobileColors.textSubtle,
+      textTransform: "uppercase",
+    },
+    swapDateChipDay: {
+      fontSize: 20,
+      lineHeight: 24,
+      fontWeight: "800",
+      color: mobileColors.textPrimary,
+    },
+    swapDateChipTextActive: {
+      color: mobileColors.brand,
+    },
+    swapDateChipCount: {
+      minWidth: 0,
+      minHeight: 18,
+      borderRadius: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 2,
+      paddingHorizontal: 5,
+      backgroundColor: mobileColors.surfaceSecondary,
+    },
+    swapDateChipCountActive: {
+      backgroundColor: mobileColors.surface,
+    },
+    swapDateChipCountText: {
+      ...mobileText.micro,
+      color: mobileColors.textMuted,
+    },
+    swapDateChipCountTextActive: {
+      color: mobileColors.brand,
+    },
+    swapOptions: {
+      gap: 8,
+    },
+    swapOptionCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 14,
+      gap: 8,
+    },
+    swapOptionCardActive: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+    },
+    swapOptionCardDisabled: {
+      opacity: 0.5,
+    },
+    swapOptionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    swapOptionName: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textPrimary,
+      flex: 1,
+    },
+    swapOptionDetail: {
+      ...mobileText.meta,
+      color: mobileColors.textSecondary,
+      fontWeight: "600",
+    },
+  });

@@ -5,7 +5,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { Bell, Mail } from "lucide-react";
-import { MaybeHint } from "@/components/ui/hint";
+import { Switch } from "@/components/ui/switch";
+import { EditorActionRow } from "@/components/ui/editor-action-row";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import {
   fetchNotificationPreferences,
   saveNotificationPreferences,
@@ -46,11 +48,29 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   membership: "Invitations, role changes, and removal from organizations",
   account: "Employee record updates and organization settings",
   billing: "Subscription changes, payment failures, receipts",
-  security: "Password, email, MFA, and new-device alerts",
-  system: "Impersonation notices and system updates",
+  security: "Password, email, MFA, new-device, and account-access alerts",
+  system: "Role changes and system updates",
 };
 
-const preferenceGridTemplate = "minmax(0, 1fr) 60px 60px";
+/**
+ * Which preference categories a user can actually receive notifications for.
+ * Billing events fan out to super_admins only (see
+ * features/notifications/server/events.ts), so the billing row is hidden for
+ * everyone else. Gridmasters only receive platform/system notifications.
+ */
+export function notificationCategoriesForRole({
+  isGridmaster,
+  isSuperAdmin,
+}: {
+  isGridmaster: boolean;
+  isSuperAdmin: boolean;
+}): string[] {
+  if (isGridmaster) return ["system"];
+  const categories = Object.keys(CATEGORY_LABELS);
+  return isSuperAdmin ? categories : categories.filter((category) => category !== "billing");
+}
+
+const preferenceGridTemplate = "minmax(0, 1fr) 76px 76px";
 
 const centeredChannelCellStyle: CSSProperties = {
   display: "flex",
@@ -58,13 +78,6 @@ const centeredChannelCellStyle: CSSProperties = {
   justifyContent: "center",
   width: "100%",
   minHeight: 20,
-};
-
-const checkboxStyle: CSSProperties = {
-  width: 16,
-  height: 16,
-  accentColor: "var(--color-brand)",
-  cursor: "pointer",
 };
 
 function normalizePrefs(nextPrefs: AllPrefs): AllPrefs {
@@ -153,6 +166,10 @@ export function NotificationPreferences({
     }));
   }
 
+  function discard() {
+    setPrefs(savedPrefs);
+  }
+
   if (!loaded) return null;
 
   return (
@@ -183,81 +200,112 @@ export function NotificationPreferences({
         >
           Category
         </span>
-        <MaybeHint content="In-App" side="top">
-          <span style={centeredChannelCellStyle} aria-label="In-App">
-            <Bell size={14} style={{ color: "var(--color-text-muted)" }} />
+        <span style={{ ...centeredChannelCellStyle, flexDirection: "column", gap: 3 }}>
+          <Bell size={13} style={{ color: "var(--color-text-muted)" }} />
+          <span
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              fontWeight: 600,
+              color: "var(--color-text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+            }}
+          >
+            In-App
           </span>
-        </MaybeHint>
-        <MaybeHint content="Email" side="top">
-          <span style={centeredChannelCellStyle} aria-label="Email">
-            <Mail size={14} style={{ color: "var(--color-text-muted)" }} />
+        </span>
+        <span style={{ ...centeredChannelCellStyle, flexDirection: "column", gap: 3 }}>
+          <Mail size={13} style={{ color: "var(--color-text-muted)" }} />
+          <span
+            style={{
+              fontSize: "var(--dg-fs-footnote)",
+              fontWeight: 600,
+              color: "var(--color-text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+            }}
+          >
+            Email
           </span>
-        </MaybeHint>
+        </span>
       </div>
 
       {/* Category rows */}
-      {Object.entries(CATEGORY_LABELS)
-        .filter(([category]) => !visibleCategories || visibleCategories.includes(category))
-        .map(([category, label]) => (
-          <div
-            key={category}
-            style={{
-              display: "grid",
-              gridTemplateColumns: preferenceGridTemplate,
-              gap: 8,
-              alignItems: "center",
-            }}
-          >
-            <div>
-              <span
-                style={{
-                  fontSize: "var(--dg-fs-body-sm)",
-                  fontWeight: 500,
-                  color: "var(--color-text-primary)",
-                }}
-              >
-                {label}
-              </span>
-              <span
-                style={{
-                  display: "block",
-                  fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-text-muted)",
-                  marginTop: 2,
-                }}
-              >
-                {CATEGORY_DESCRIPTIONS[category]}
-              </span>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {Object.entries(CATEGORY_LABELS)
+          .filter(([category]) => !visibleCategories || visibleCategories.includes(category))
+          .map(([category, label], index, filtered) => (
+            <div
+              key={category}
+              style={{
+                display: "grid",
+                gridTemplateColumns: preferenceGridTemplate,
+                gap: 8,
+                alignItems: "center",
+                padding: "12px 0",
+                borderBottom:
+                  index < filtered.length - 1 ? "1px solid var(--color-border-light)" : "none",
+              }}
+            >
+              <div>
+                <span
+                  style={{
+                    fontSize: "var(--dg-fs-body-sm)",
+                    fontWeight: 500,
+                    color: "var(--color-text-primary)",
+                  }}
+                >
+                  {label}
+                </span>
+                <span
+                  style={{
+                    display: "block",
+                    fontSize: "var(--dg-fs-footnote)",
+                    color: "var(--color-text-muted)",
+                    marginTop: 2,
+                  }}
+                >
+                  {CATEGORY_DESCRIPTIONS[category]}
+                </span>
+              </div>
+              <div style={centeredChannelCellStyle}>
+                <Switch
+                  checked={prefs[category]?.in_app ?? true}
+                  onChange={() => toggle(category, "in_app")}
+                  ariaLabel={`${label} in-app notifications`}
+                />
+              </div>
+              <div style={centeredChannelCellStyle}>
+                <Switch
+                  checked={prefs[category]?.email ?? false}
+                  onChange={() => toggle(category, "email")}
+                  ariaLabel={`${label} email notifications`}
+                />
+              </div>
             </div>
-            <div style={centeredChannelCellStyle}>
-              <input
-                type="checkbox"
-                checked={prefs[category]?.in_app ?? true}
-                onChange={() => toggle(category, "in_app")}
-                style={checkboxStyle}
-              />
-            </div>
-            <div style={centeredChannelCellStyle}>
-              <input
-                type="checkbox"
-                checked={prefs[category]?.email ?? false}
-                onChange={() => toggle(category, "email")}
-                style={checkboxStyle}
-              />
-            </div>
-          </div>
-        ))}
+          ))}
+      </div>
 
-      <button
-        onClick={save}
-        disabled={!hasChanges || saving}
-        className="dg-btn dg-btn-primary"
-        style={{ alignSelf: "flex-start", marginTop: 4 }}
-      >
-        <ButtonLoading loading={saving} spinnerColor="var(--color-text-inverse)" spinnerSize={14}>
-          Save Preferences
-        </ButtonLoading>
-      </button>
+      <EditorActionRow
+        secondaryAction={
+          hasChanges ? (
+            <button onClick={discard} disabled={saving} className="dg-btn dg-btn-secondary">
+              {EDITOR_ACTION_LABELS.discard}
+            </button>
+          ) : null
+        }
+        primaryAction={
+          <button onClick={save} disabled={!hasChanges || saving} className="dg-btn dg-btn-primary">
+            <ButtonLoading
+              loading={saving}
+              spinnerColor="var(--color-text-inverse)"
+              spinnerSize={14}
+            >
+              Save Preferences
+            </ButtonLoading>
+          </button>
+        }
+      />
     </div>
   );
 }

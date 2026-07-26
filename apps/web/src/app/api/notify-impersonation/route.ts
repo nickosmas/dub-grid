@@ -51,7 +51,10 @@ export async function POST(req: NextRequest) {
 
   // ── Authorization — only gridmaster can trigger impersonation notifications ──
   if (claims.platform_role !== "gridmaster") {
-    return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
+    return NextResponse.json(
+      { success: false, error: API_ERRORS.GRIDMASTER_ONLY },
+      { status: 403 },
+    );
   }
 
   // ── Config check ──────────────────────────────────────────────────

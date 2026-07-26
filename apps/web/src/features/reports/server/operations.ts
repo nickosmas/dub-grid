@@ -10,6 +10,7 @@ import {
   type PublishedShiftRow,
 } from "@/lib/published-shifts";
 import {
+  buildOperationsReportMetrics,
   buildOperationsReportPreviewTable,
   formatReportDateForDisplay,
   formatReportCellForDisplay,
@@ -68,6 +69,7 @@ export interface StaffHoursReportRow {
 
 export interface EmployeeDirectoryReportRow {
   employeeId: string;
+  employeeNumber: number | null;
   employeeName: string;
   status: string;
   employmentType: string;
@@ -128,6 +130,7 @@ export interface AbsenceCalloffReportRow {
 
 export interface RosterStatusReportRow {
   employeeId: string;
+  employeeNumber: number | null;
   employeeName: string;
   status: string;
   employmentType: string;
@@ -141,6 +144,7 @@ export interface RosterStatusReportRow {
 
 export interface CertificationRoleMatrixReportRow {
   employeeId: string;
+  employeeNumber: number | null;
   employeeName: string;
   status: string;
   certification: string;
@@ -153,6 +157,7 @@ export interface CertificationRoleMatrixReportRow {
 
 export interface AccountAccessReportRow {
   employeeId: string;
+  employeeNumber: number | null;
   employeeName: string;
   status: string;
   email: string;
@@ -200,7 +205,6 @@ export interface OperationsReportPayload {
     focusAreas: OperationsReportFilterOption[];
     dates: string[];
   };
-  metrics: ReportMetric[];
   reports: {
     employeeDirectory: EmployeeDirectoryReportRow[];
     staffHours: StaffHoursReportRow[];
@@ -223,6 +227,10 @@ type NamedRow = {
   name?: string | null;
   label?: string | null;
   abbr?: string | null;
+};
+
+type FocusAreaRow = NamedRow & {
+  department_id?: number | null;
 };
 
 type OrganizationRow = {
@@ -296,7 +304,7 @@ type ResolvedEntry = {
 export interface OperationsReportSourceData {
   org: OrganizationRow;
   employees: EmployeeReportRow[];
-  focusAreas: NamedRow[];
+  focusAreas: FocusAreaRow[];
   roles: NamedRow[];
   certifications: NamedRow[];
   departments: NamedRow[];
@@ -373,6 +381,25 @@ function formatList(
     .map((id) => map.get(id) ?? fallbackLabel)
     .filter(Boolean)
     .join("; ");
+}
+
+function resolveEmployeeDepartmentIds(
+  employee: EmployeeReportRow,
+  focusAreaDepartmentIdById: Map<number, number>,
+): number[] {
+  // department_ids can carry a department-admin permission grant unrelated to where an
+  // employee actually works (e.g. a nurse also granted admin access to Administration),
+  // so the scheduled department (where they're actually assigned to work) takes priority.
+  // Fall back to department_ids only for management-only staff with no focus area at all.
+  const scheduledDepartmentIds = new Set<number>();
+  for (const focusAreaId of employee.focus_area_ids ?? []) {
+    const departmentId = focusAreaDepartmentIdById.get(focusAreaId);
+    if (departmentId != null) scheduledDepartmentIds.add(departmentId);
+  }
+  if (scheduledDepartmentIds.size > 0) {
+    return Array.from(scheduledDepartmentIds);
+  }
+  return employee.department_ids ?? [];
 }
 
 function roundHours(value: number): number {
@@ -497,6 +524,11 @@ export function buildOperationsReportPayload(
   const roleById = buildMap(source.roles);
   const certificationById = buildMap(source.certifications);
   const departmentById = buildMap(source.departments);
+  const focusAreaDepartmentIdById = new Map(
+    source.focusAreas
+      .filter((row) => row.department_id != null)
+      .map((row) => [row.id, row.department_id as number]),
+  );
   const absenceTypeById = buildMap(source.absenceTypes);
   const jobById = buildMap(source.jobs);
   const shiftById = new Map(source.shiftCategories.map((row) => [row.id, row]));
@@ -506,6 +538,12 @@ export function buildOperationsReportPayload(
     return hasAnyNumber(employee.focus_area_ids, focusAreaIdSet);
   });
   const reportEmployeeIdSet = new Set(reportEmployees.map((employee) => employee.id));
+  const rosterEmployees = source.employees.filter((employee) => {
+    if (employeeIdSet.size > 0 && !employeeIdSet.has(employee.id)) return false;
+    const focusAreaIds = employee.focus_area_ids ?? [];
+    if (focusAreaIds.length === 0) return true;
+    return hasAnyNumber(focusAreaIds, focusAreaIdSet);
+  });
   const entries = resolveEntries(source.publishedRows, absenceTypeById).filter((item) => {
     if (!reportDateSet.has(item.entry.date)) return false;
     if (!reportEmployeeIdSet.has(item.entry.empId)) return false;
@@ -535,8 +573,9 @@ export function buildOperationsReportPayload(
     dates: rangeDates,
   };
 
-  const employeeDirectory = reportEmployees.map((employee) => ({
+  const employeeDirectory = rosterEmployees.map((employee) => ({
     employeeId: employee.id,
+    employeeNumber: employee.employee_number,
     employeeName: formatName(employee),
     status: employee.status ?? "unknown",
     employmentType: employee.employment_type ?? "full_time",
@@ -548,7 +587,11 @@ export function buildOperationsReportPayload(
       employee.certification_id == null
         ? ""
         : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
-    departments: formatList(employee.department_ids, departmentById, "Unknown department"),
+    departments: formatList(
+      resolveEmployeeDepartmentIds(employee, focusAreaDepartmentIdById),
+      departmentById,
+      "Unknown department",
+    ),
   }));
 
   const staffHours = reportEmployees.map((employee) => {
@@ -730,8 +773,9 @@ export function buildOperationsReportPayload(
       status: request.status,
     }));
 
-  const rosterStatus = reportEmployees.map((employee) => ({
+  const rosterStatus = rosterEmployees.map((employee) => ({
     employeeId: employee.id,
+    employeeNumber: employee.employee_number,
     employeeName: formatName(employee),
     status: employee.status ?? "unknown",
     employmentType: employee.employment_type ?? "full_time",
@@ -741,12 +785,17 @@ export function buildOperationsReportPayload(
       employee.certification_id == null
         ? ""
         : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
-    departments: formatList(employee.department_ids, departmentById, "Unknown department"),
+    departments: formatList(
+      resolveEmployeeDepartmentIds(employee, focusAreaDepartmentIdById),
+      departmentById,
+      "Unknown department",
+    ),
     linkedAccount: Boolean(employee.user_id),
     pendingInvitation: pendingInvitationByEmployeeId.get(employee.id) ?? "",
   }));
-  const certificationRoleMatrix = reportEmployees.map((employee) => ({
+  const certificationRoleMatrix = rosterEmployees.map((employee) => ({
     employeeId: employee.id,
+    employeeNumber: employee.employee_number,
     employeeName: formatName(employee),
     status: employee.status ?? "unknown",
     certification:
@@ -755,15 +804,20 @@ export function buildOperationsReportPayload(
         : (certificationById.get(employee.certification_id) ?? "Unknown certification"),
     roles: formatList(employee.role_ids, roleById, "Unknown role"),
     focusAreas: formatList(employee.focus_area_ids, focusAreaById, "Unknown focus area"),
-    departments: formatList(employee.department_ids, departmentById, "Unknown department"),
+    departments: formatList(
+      resolveEmployeeDepartmentIds(employee, focusAreaDepartmentIdById),
+      departmentById,
+      "Unknown department",
+    ),
     missingCertification: employee.certification_id == null,
     missingRole: (employee.role_ids ?? []).length === 0,
   }));
-  const accountAccess = reportEmployees.map((employee) => {
+  const accountAccess = rosterEmployees.map((employee) => {
     const pendingInvitation = pendingInvitationByEmployeeId.get(employee.id) ?? "";
     const linkedAccount = Boolean(employee.user_id);
     return {
       employeeId: employee.id,
+      employeeNumber: employee.employee_number,
       employeeName: formatName(employee),
       status: employee.status ?? "unknown",
       email: employee.email ?? "",
@@ -826,24 +880,6 @@ export function buildOperationsReportPayload(
       dates: dates.length > 0 ? dates : [],
     },
     filterOptions,
-    metrics: [
-      { label: "Scheduled hours", value: String(totalScheduledHours) },
-      { label: "Shifts", value: String(shiftEntries.length) },
-      {
-        label: "Coverage",
-        value: coveragePct == null ? "Not available" : `${coveragePct}%`,
-      },
-      { label: "Open slots", value: String(totalOpenSlots) },
-      { label: "Requests", value: String(shiftRequests.length) },
-      {
-        label: "Overtime alerts",
-        value: String(staffHours.filter((row) => row.overtime).length),
-      },
-      {
-        label: "Unlinked staff",
-        value: String(accountAccess.filter((row) => !row.linkedAccount).length),
-      },
-    ],
     reports: {
       employeeDirectory,
       staffHours,
@@ -1228,98 +1264,6 @@ function formatPdfPrintedDate(value: string, timeZone: string | null): string {
   }
 }
 
-function buildPdfReportDetails(
-  payload: OperationsReportPayload,
-  report: OperationsReportType,
-): ReportMetric[] {
-  const summary = payload.reports.shiftPeriodSummary;
-
-  switch (report) {
-    case "employee-directory":
-      return [
-        { label: "Staff records", value: String(payload.reports.employeeDirectory.length) },
-        { label: "Active staff", value: String(summary.activeStaffCount) },
-      ];
-    case "staff-hours":
-      return [
-        { label: "Scheduled hours", value: String(summary.totalScheduledHours) },
-        { label: "Shifts", value: String(summary.totalShifts) },
-        { label: "Overtime alerts", value: String(summary.overtimeAlertCount) },
-      ];
-    case "coverage":
-      return [
-        {
-          label: "Coverage",
-          value: summary.coveragePct == null ? "Not available" : `${summary.coveragePct}%`,
-        },
-        { label: "Open slots", value: String(summary.openSlotCount) },
-      ];
-    case "shift-period-summary":
-      return [
-        { label: "Scheduled hours", value: String(summary.totalScheduledHours) },
-        { label: "Shifts", value: String(summary.totalShifts) },
-        {
-          label: "Coverage",
-          value: summary.coveragePct == null ? "Not available" : `${summary.coveragePct}%`,
-        },
-        { label: "Open slots", value: String(summary.openSlotCount) },
-        { label: "Requests", value: String(summary.requestCount) },
-        { label: "Overtime alerts", value: String(summary.overtimeAlertCount) },
-      ];
-    case "shift-requests":
-      return [{ label: "Requests", value: String(payload.reports.shiftRequests.length) }];
-    case "absences-calloffs":
-      return [
-        {
-          label: "Absences and call-offs",
-          value: String(payload.reports.absencesCalloffs.length),
-        },
-      ];
-    case "roster-status":
-      return [
-        { label: "Staff records", value: String(payload.reports.rosterStatus.length) },
-        {
-          label: "Pending invitations",
-          value: String(payload.reports.rosterStatus.filter((row) => row.pendingInvitation).length),
-        },
-      ];
-    case "certification-role-matrix":
-      return [
-        {
-          label: "Missing certifications",
-          value: String(
-            payload.reports.certificationRoleMatrix.filter((row) => row.missingCertification)
-              .length,
-          ),
-        },
-        {
-          label: "Missing roles",
-          value: String(
-            payload.reports.certificationRoleMatrix.filter((row) => row.missingRole).length,
-          ),
-        },
-      ];
-    case "account-access":
-      return [
-        {
-          label: "Unlinked staff",
-          value: String(payload.reports.accountAccess.filter((row) => !row.linkedAccount).length),
-        },
-        {
-          label: "Pending invitations",
-          value: String(
-            payload.reports.accountAccess.filter((row) => row.pendingInvitation).length,
-          ),
-        },
-      ];
-    case "schedule-matrix":
-      return [
-        { label: "Scheduled staff", value: String(summary.scheduledStaffCount) },
-        { label: "Schedule dates", value: String(payload.reports.scheduleMatrix.dates.length) },
-      ];
-  }
-}
-
 function addOperationsPdfHeader(
   commands: string[],
   payload: OperationsReportPayload,
@@ -1576,7 +1520,7 @@ export function buildOperationsReportPdf(
     wordmark != null,
   );
 
-  const details = buildPdfReportDetails(payload, report);
+  const details = buildOperationsReportMetrics(payload, report);
   if (details.length > 0) {
     addLine(details.map((metric) => `${metric.label}: ${metric.value}`).join(" | "), 8, 16);
   }
@@ -1699,10 +1643,10 @@ export async function loadOperationsReport(
         .is("archived_at", null)
         .order("seniority", { ascending: true }),
     ),
-    fetchTableRows<NamedRow>(
+    fetchTableRows<FocusAreaRow>(
       serviceClient
         .from("focus_areas")
-        .select("id, name")
+        .select("id, name, department_id")
         .eq("org_id", input.orgId)
         .is("archived_at", null),
     ),

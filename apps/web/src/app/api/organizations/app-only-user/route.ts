@@ -5,6 +5,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { canManageEmployees } from "@/app/api/employees/shared";
+import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import {
   buildStaffValidationErrorResponse,
   getStaffFieldErrorsFromZod,
@@ -42,13 +43,36 @@ export async function PATCH(req: NextRequest) {
     return buildStaffValidationErrorResponse(getStaffFieldErrorsFromZod(parsed.error));
   }
 
-  const { orgId, userId, firstName, lastName, phone, departmentIds, deptAdminIds } = parsed.data;
+  const { userId, firstName, lastName, phone, departmentIds, deptAdminIds } = parsed.data;
+  // Effective (sandbox-redirected) org; resolved inside the try, declared here
+  // so the catch block can reference it for logging. (H-1)
+  let orgId = parsed.data.orgId;
   const serviceClient = getServiceClient();
 
   try {
+    // Resolve the effective org: if the caller is in sandbox mode, route the
+    // check AND the mutation to their sandbox, never the raw request orgId
+    // (otherwise a sandbox user could mutate the real org). See H-1.
+    orgId = await resolveEffectiveOrgId(req, user.id, parsed.data.orgId);
+
     const hasPermission = await canManageEmployees(serviceClient, user.id, orgId);
     if (!hasPermission) {
-      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
+      return NextResponse.json({ error: API_ERRORS.CANNOT_MANAGE_EMPLOYEES }, { status: 403 });
+    }
+
+    // The profiles update below is not itself org-scoped (profiles is a
+    // global table), so without this check an admin of orgId could edit an
+    // arbitrary user's name in an unrelated org just by supplying their
+    // userId. Confirm the target is actually an active member of orgId first.
+    const { data: targetMembership } = await serviceClient
+      .from("organization_memberships")
+      .select("user_id")
+      .eq("user_id", userId)
+      .eq("org_id", orgId)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (!targetMembership) {
+      return NextResponse.json({ error: "User membership not found" }, { status: 404 });
     }
 
     const referenceErrors = await validateStaffOrgReferences(serviceClient, orgId, {

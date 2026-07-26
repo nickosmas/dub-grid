@@ -16,7 +16,6 @@ export interface EmployeeStatusActionsProps {
   onDeactivate: (empId: string, note?: string) => void;
   onActivate: (empId: string) => void;
   onRemove: (empId: string, note?: string) => void;
-  onRevokeAccess?: (userId: string) => void;
   onInvite?: (emp: Employee) => void;
   onRevoke?: (invitationId: string) => Promise<boolean> | boolean | void;
   variant: "panel" | "page";
@@ -32,7 +31,6 @@ export function EmployeeStatusActions({
   onDeactivate,
   onActivate,
   onRemove,
-  onRevokeAccess,
   onInvite,
   onRevoke,
   variant,
@@ -40,7 +38,6 @@ export function EmployeeStatusActions({
   const [showDeactivateConfirm, setShowDeactivateConfirm] = useState(false);
   const [outcome, setOutcome] = useState<DeactivateOutcome>("inactive");
   const [note, setNote] = useState(employee.statusNote || "");
-  const [alsoRevokeAccess, setAlsoRevokeAccess] = useState(false);
   const [showActivateConfirm, setShowActivateConfirm] = useState(false);
   const [pendingInvitationAction, setPendingInvitationAction] = useState<
     "reinvite" | "revoke" | null
@@ -49,6 +46,9 @@ export function EmployeeStatusActions({
 
   const isActive = employee.status === "active";
   const displayName = getEmployeeDisplayName(employee);
+  // Management-only employees have an `employees` row but no focus areas —
+  // they're not on the schedule grid (see ProfilePage's isOnSchedule).
+  const isScheduled = employee.focusAreaIds.length > 0;
 
   async function handleConfirmInvitationAction() {
     if (!pendingInvitation || !pendingInvitationAction) return;
@@ -72,7 +72,6 @@ export function EmployeeStatusActions({
   function resetDeactivateForm() {
     setShowDeactivateConfirm(false);
     setOutcome("inactive");
-    setAlsoRevokeAccess(false);
   }
 
   if (!canEdit) return null;
@@ -163,7 +162,9 @@ export function EmployeeStatusActions({
                     color: "var(--color-text-muted)",
                   }}
                 >
-                  They&apos;re temporarily off the schedule. You can reactivate them anytime.
+                  {isScheduled
+                    ? "They'll be temporarily off the schedule. You can reactivate them anytime."
+                    : "They'll temporarily lose management access. You can reactivate them anytime."}
                 </span>
               </span>
             </label>
@@ -192,7 +193,8 @@ export function EmployeeStatusActions({
                     color: "var(--color-text-muted)",
                   }}
                 >
-                  They lose access and won&apos;t appear in active staff. This can&apos;t be undone.
+                  They&apos;ll lose access and won&apos;t appear in active staff. You can reactivate
+                  them later.
                 </span>
               </span>
             </label>
@@ -207,26 +209,6 @@ export function EmployeeStatusActions({
               }
               style={{ fontSize: "var(--dg-fs-label)" }}
             />
-            {isRemove && employee.userId && onRevokeAccess && (
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  fontSize: "var(--dg-fs-label)",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={alsoRevokeAccess}
-                  onChange={(e) => setAlsoRevokeAccess(e.target.checked)}
-                  className="accent-[var(--color-danger)] w-3.5 h-3.5"
-                />
-                Also revoke app access
-              </label>
-            )}
           </div>
         }
         confirmLabel={isRemove ? "Remove" : "Mark Inactive"}
@@ -234,10 +216,10 @@ export function EmployeeStatusActions({
         onConfirm={() => {
           const trimmedNote = note.trim() || undefined;
           if (isRemove) {
+            // Revoking any linked org membership happens server-side, atomically
+            // with the status change (see /api/employees/status) — not as a
+            // second client call, so the two can't diverge on partial failure.
             onRemove(employee.id, trimmedNote);
-            if (alsoRevokeAccess && employee.userId && onRevokeAccess) {
-              onRevokeAccess(employee.userId);
-            }
           } else {
             onDeactivate(employee.id, trimmedNote);
           }
@@ -304,7 +286,7 @@ export function EmployeeStatusActions({
       {showActivateConfirm && (
         <ConfirmDialog
           title="Activate Staff Member?"
-          message={`Activate ${displayName}? They will return to active staff lists and scheduling.`}
+          message={`Activate ${displayName}? They will return to active staff lists.`}
           confirmLabel="Activate"
           variant="warning"
           onConfirm={() => {

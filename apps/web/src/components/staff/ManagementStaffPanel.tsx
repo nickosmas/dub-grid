@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { AdminPermissions, DirectoryPerson, NamedItem, OrganizationRole } from "@/types";
 import { getInitials, formatRelativeTime } from "@/lib/utils";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -12,20 +14,14 @@ import {
   normalizeOptionalUsPhone,
   normalizeStaffName,
 } from "@dubgrid/contracts";
+import { CloseButton } from "@/components/ui/CloseButton";
 import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { MaybeHint } from "@/components/ui/hint";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import { MemberAccessControls } from "./MemberAccessControls";
-
-function hashCode(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h);
-}
+import { getAvatarTone } from "@dubgrid/design-tokens";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -111,6 +107,7 @@ export function ManagementStaffPanel({
   onAddToSchedule,
   isSelf = false,
 }: ManagementStaffPanelProps) {
+  const { resolvedTheme } = useTheme();
   const [closing, setClosing] = useState(false);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
@@ -217,6 +214,10 @@ export function ManagementStaffPanel({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleRequestClose]);
   const isPending = person.invitationStatus !== null && !person.hasAppAccess;
+  // Sign-in activity is admin telemetry: staff managers and access managers
+  // see it, view-only members don't (the directory API redacts it for them
+  // anyway; hiding the block avoids a misleading "Never signed in").
+  const showLastActive = canManageManagementAccess || canManageScheduleEmployees;
   // `isEmployee` here means "this person already shows up on the schedule
   // grid and edits their identity from the on-schedule profile." It's NOT
   // "has an employees row" — every org member has one of those now (Flow B
@@ -227,6 +228,17 @@ export function ManagementStaffPanel({
   const isEmployee = person.focusAreaIds.length > 0;
   const isOnSchedule = isEmployee;
   const isExpired = person.invitationStatus === "expired";
+  // Every org member gets an `employees` row now (Flow B + seed backfill), so
+  // this is null only for the rare pending invite that hasn't backfilled yet.
+  // Only staff managers can open the full /people/[id] page (mirrors the
+  // People table's name-link gate); the self link just goes to /profile.
+  const profileHref = person.employeeId
+    ? isSelf
+      ? "/profile"
+      : canManageScheduleEmployees
+        ? `/people/${person.employeeId}`
+        : null
+    : null;
   const fieldErrors = useMemo(
     () => ({
       firstName:
@@ -350,7 +362,7 @@ export function ManagementStaffPanel({
       ? `${person.firstName} ${person.lastName}`.trim()
       : person.email;
   const initials = getInitials(displayName);
-  const hue = hashCode(person.personId) % 360;
+  const avatarTone = getAvatarTone(person.personId, resolvedTheme === "dark");
 
   const statusConfig = isPending
     ? isExpired
@@ -430,21 +442,12 @@ export function ManagementStaffPanel({
       <div className={`staff-detail-pane${closing ? " closing" : ""}`}>
         {/* Header */}
         <div className="staff-detail-header">
-          <button className="staff-detail-close" onClick={handleRequestClose} aria-label="Close">
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          <CloseButton
+            size="md"
+            className="self-end"
+            onClick={handleRequestClose}
+            aria-label="Close"
+          />
 
           {/* Profile card */}
           <div
@@ -461,8 +464,8 @@ export function ManagementStaffPanel({
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
-                background: isPending ? "var(--color-surface)" : `hsl(${hue}, 65%, 94%)`,
-                color: isPending ? "var(--color-text-muted)" : `hsl(${hue}, 60%, 38%)`,
+                background: isPending ? "var(--color-surface)" : avatarTone.backgroundColor,
+                color: isPending ? "var(--color-text-muted)" : avatarTone.textColor,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -471,7 +474,7 @@ export function ManagementStaffPanel({
                 flexShrink: 0,
                 border: isPending
                   ? "1px solid var(--color-border-light)"
-                  : `2px solid hsl(${hue}, 55%, 86%)`,
+                  : `2px solid ${avatarTone.borderColor}`,
               }}
             >
               {initials}
@@ -547,6 +550,46 @@ export function ManagementStaffPanel({
               >
                 {person.email}
               </div>
+              {profileHref && (
+                <Link
+                  href={profileHref}
+                  onClick={(event) => {
+                    // Close the panel as part of this click instead of
+                    // leaving it for the route swap to yank away — same
+                    // unsaved-changes guard as the X button/Escape.
+                    if (hasChanges) {
+                      event.preventDefault();
+                      handleRequestClose();
+                      return;
+                    }
+                    closePanel();
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    marginTop: 4,
+                    fontSize: "var(--dg-fs-footnote)",
+                    fontWeight: 600,
+                    color: "var(--color-link)",
+                    textDecoration: "none",
+                  }}
+                >
+                  View full profile
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="9 6 15 12 9 18" />
+                  </svg>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -983,7 +1026,7 @@ export function ManagementStaffPanel({
               {/* Details section */}
               {(person.orgRole ||
                 personDepts.length > 0 ||
-                (!isPending && person.lastSignInAt !== null)) && (
+                (showLastActive && !isPending && person.lastSignInAt !== null)) && (
                 <div>
                   <div
                     style={{
@@ -1069,7 +1112,7 @@ export function ManagementStaffPanel({
                       </div>
                     )}
 
-                    {!isPending && (
+                    {showLastActive && !isPending && (
                       <div>
                         <div
                           style={{

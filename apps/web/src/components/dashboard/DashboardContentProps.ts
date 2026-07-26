@@ -1,10 +1,11 @@
-import type { Permissions } from "@/hooks";
+import type { WebPermissions } from "@/hooks";
 import type { ShiftRequestsData } from "@/hooks/useShiftRequests";
 import type {
   Organization,
   FocusArea,
   AssignmentDefinition,
   ShiftCategory,
+  JobDefinition,
   CoverageRequirement,
   Employee,
   ShiftMap,
@@ -30,6 +31,7 @@ export interface DashboardContentProps {
   focusAreas: FocusArea[];
   assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
   coverageRequirements: CoverageRequirement[];
   assignmentLabelMap: Map<number, string>;
   assignmentById: Map<number, AssignmentDefinition>;
@@ -37,7 +39,7 @@ export interface DashboardContentProps {
   activeEmployees: Employee[];
 
   // Permissions
-  permissions: Permissions;
+  permissions: WebPermissions;
 
   // Period
   viewMode: ViewMode;

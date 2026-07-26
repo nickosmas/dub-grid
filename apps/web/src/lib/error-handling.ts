@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { toast } from "sonner";
 import { signOutFromBrowser } from "@/features/account/client";
-import { extractRawErrorMessage, formatClientErrorMessage } from "@/lib/client-facing";
+import {
+  extractRawErrorMessage,
+  formatClientErrorMessage,
+  isSessionExpiredError,
+} from "@/lib/client-facing";
 import { isLoggingOut } from "@/lib/logout-state";
 
 /**
@@ -35,11 +39,16 @@ export async function handleApiError(error: unknown, action?: string) {
   const rawMessage = extractRawErrorMessage(error) ?? "";
   const message = formatClientErrorMessage(error, "");
 
-  if (
-    rawMessage.includes("jwt expired") ||
-    rawMessage.includes("Refresh Token Not Found") ||
-    rawMessage.includes("Invalid Refresh Token")
-  ) {
+  // Covers both Supabase's own strings (jwt expired, Invalid Refresh Token, …)
+  // and this app's own 401 body text (api-auth.ts's "Your session expired.
+  // Please sign in again.") — anything the shared pattern recognizes as
+  // session-expiry-shaped. Previously this only matched the exact-cased
+  // Supabase strings, so a stale in-flight query hitting one of our own auth
+  // routes right after an account switch fell through to the generic toast
+  // below instead of signing out and redirecting, leaving the user stuck on
+  // a broken page with a confusing "Something went wrong: Your session
+  // expired..." message.
+  if (isSessionExpiredError(error)) {
     toast.error("Your session has expired. Please log in again.", {
       id: "session-expired",
       duration: Infinity,

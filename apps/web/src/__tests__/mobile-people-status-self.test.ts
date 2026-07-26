@@ -38,13 +38,20 @@ function makeDeps(currentEmployee: Employee) {
       status: emp.status,
       userId: emp.userId,
     })) as unknown as Parameters<typeof updateMobilePersonStatus>[2]["mapEmployeeToMobilePerson"],
+    // Unused by these self-action-guard cases (the guard returns before the
+    // last-super-admin check or the org-membership sync ever run), but the
+    // deps shape requires them.
+    fetchActiveMembershipOrgRole: vi.fn().mockResolvedValue(null),
+    countActiveSuperAdmins: vi.fn().mockResolvedValue(0),
+    archiveOrganizationMembership: vi.fn(),
+    restoreOrganizationMembership: vi.fn(),
   };
 }
 
 function makeAuth(linkedUserId: string) {
   return {
     currentOrg: { id: "org-1" },
-    permissions: { canManageEmployees: true },
+    permissions: { canManageEmployees: true, isSuperAdmin: false },
     // SupabaseClient is unused because deps mock all DB access.
     serviceClient: {} as never,
     user: { id: linkedUserId, email: "self@example.com" },

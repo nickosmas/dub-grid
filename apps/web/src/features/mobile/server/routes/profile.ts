@@ -4,6 +4,8 @@ import {
   mobileProfilePhoneUpdateResponseSchema,
   mobileProfileAccountUpdateBodySchema,
   mobileProfileAccountUpdateResponseSchema,
+  mobileProfileMfaStatusUpdateBodySchema,
+  mobileProfileMfaStatusUpdateResponseSchema,
   mobileProfileResponseSchema,
 } from "@dubgrid/contracts";
 import {
@@ -11,6 +13,7 @@ import {
   listOwnProfileChangeRequests,
   updateSelfProfileDetails,
   updateSelfLinkedEmployeePhone,
+  updateSelfMfaStatus,
 } from "@/features/account/server";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import {
@@ -210,5 +213,40 @@ export async function PATCHPhone(req: NextRequest) {
         employmentType: result.employee.employmentType,
       },
     }),
+  );
+}
+
+// Mirrors /api/account/mfa-status: the actual TOTP enroll/verify/unenroll
+// calls go straight from the mobile app to Supabase's auth.mfa.* endpoints
+// (no backend route needed for those). This route only persists the
+// denormalized profiles.mfa_enabled flag the profile screen displays.
+export async function PATCHMfaStatus(req: NextRequest) {
+  const auth = await requireMobileAuth(req);
+  if ("response" in auth) return auth.response;
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json(
+      { error: "We couldn't read that request. Try again." },
+      { status: 400 },
+    );
+  }
+
+  const parsed = mobileProfileMfaStatusUpdateBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+
+  await updateSelfMfaStatus(auth.user.id, parsed.data.enabled);
+
+  const payload = await buildMobileProfilePayload(auth);
+  if ("response" in payload) {
+    return payload.response;
+  }
+
+  return NextResponse.json(
+    mobileProfileMfaStatusUpdateResponseSchema.parse({ user: payload.user }),
   );
 }

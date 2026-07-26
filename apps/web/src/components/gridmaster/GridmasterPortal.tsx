@@ -677,7 +677,12 @@ export default function GridmasterPortal() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: isMobile ? "0 12px" : "0 20px",
+          // On desktop, left padding centers the logo over the collapsed
+          // (icon-only) sidebar rail below it (--sidebar-width-icon is
+          // 3rem in components/ui/sidebar.tsx), so it stays perfectly
+          // aligned with the rail when the sidebar collapses.
+          paddingLeft: isMobile ? 12 : 10,
+          paddingRight: isMobile ? 12 : 16,
           flexShrink: 0,
         }}
       >

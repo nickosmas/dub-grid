@@ -70,11 +70,11 @@ vi.mock("expo-router/unstable-native-tabs", async () => {
   return { Icon, Label, NativeTabs, VectorIcon };
 });
 
-vi.mock("../shared/components/LoadingScreen", async () => {
+vi.mock("../shared/components/AppSplashScreen", async () => {
   const React = await import("react");
 
   return {
-    LoadingScreen: ({ title }: { title: string }) => React.createElement("div", {}, title),
+    AppSplashScreen: () => React.createElement("div", {}, "app-splash-screen"),
   };
 });
 
@@ -169,6 +169,14 @@ describe("TabsLayout", () => {
     });
   });
 
+  it("shows the app splash screen instead of a spinner while the session is restoring", () => {
+    useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
+
+    render(<TabsLayout />);
+
+    expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
+  });
+
   it("uses SF symbols on iOS and Android vector icon sources for the native tabs", () => {
     render(<TabsLayout />);
 
@@ -194,10 +202,10 @@ describe("TabsLayout", () => {
     render(<PeopleLayout />);
     render(<ProfileLayout />);
 
-    expect(stackScreenMock).toHaveBeenCalledTimes(9);
+    expect(stackScreenMock).toHaveBeenCalledTimes(11);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
-    const profileOptions = stackScreenMock.mock.calls[3]?.[0].options;
+    const profileOptions = stackScreenMock.mock.calls[4]?.[0].options;
 
     expect(stackScreenMock.mock.calls[0]?.[0]).toMatchObject({
       name: "index",
@@ -219,8 +227,19 @@ describe("TabsLayout", () => {
       },
     });
     expect(peopleOptions).not.toHaveProperty("headerLargeStyle");
-    const peopleDetailOptions = stackScreenMock.mock.calls[2]?.[0].options;
     expect(stackScreenMock.mock.calls[2]?.[0]).toMatchObject({
+      name: "add",
+      options: {
+        headerLargeTitle: false,
+        headerLargeTitleEnabled: false,
+        headerStyle: {
+          backgroundColor: expect.any(String),
+        },
+        title: "Add Person",
+      },
+    });
+    const peopleDetailOptions = stackScreenMock.mock.calls[3]?.[0].options;
+    expect(stackScreenMock.mock.calls[3]?.[0]).toMatchObject({
       name: "[id]",
       options: {
         headerLargeTitle: false,
@@ -232,7 +251,7 @@ describe("TabsLayout", () => {
       },
     });
     expect(peopleDetailOptions).not.toHaveProperty("headerLargeStyle");
-    expect(stackScreenMock.mock.calls[3]?.[0]).toMatchObject({
+    expect(stackScreenMock.mock.calls[4]?.[0]).toMatchObject({
       name: "index",
       options: {
         headerLargeTitle: true,
@@ -243,12 +262,13 @@ describe("TabsLayout", () => {
     });
     expect(profileOptions).not.toHaveProperty("headerLargeStyle");
     expect(profileOptions).not.toHaveProperty("headerRight");
-    expect(stackScreenMock.mock.calls.slice(4).map((call) => call[0]?.name)).toEqual([
+    expect(stackScreenMock.mock.calls.slice(5).map((call) => call[0]?.name)).toEqual([
       "account",
       "work",
       "security",
       "notifications",
       "privacy",
+      "appearance",
     ]);
   });
 

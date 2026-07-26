@@ -170,7 +170,7 @@ async function requireEmployeeAction(req: NextRequest, orgId: string, employeeId
 
   if (!canActForOthers && actorEmployeeId !== employeeId) {
     return {
-      response: NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 }),
+      response: NextResponse.json({ error: API_ERRORS.CANNOT_ACT_FOR_OTHERS }, { status: 403 }),
     } as const;
   }
 

@@ -15,7 +15,6 @@ import type {
   RecurringShift,
   ShiftCategory,
   AssignmentDefinition,
-  ShiftDisplayMode,
   ShiftMap,
   ShiftRequest,
 } from "@/types";
@@ -29,7 +28,6 @@ interface SharedSelfWorkProps {
   absenceTypes: AbsenceType[];
   certifications: NamedItem[];
   orgRoles: NamedItem[];
-  shiftDisplayMode?: ShiftDisplayMode;
   shifts: ShiftMap;
   recurringShifts: RecurringShift[];
   shiftRequests: ShiftRequest[];
@@ -81,7 +79,6 @@ export function SelfWorkOverview({
   shifts,
   certifications,
   orgRoles,
-  shiftDisplayMode,
   ...rest
 }: SharedSelfWorkProps) {
   const { assignmentById, categoryById } = useSelfWorkMaps(rest);
@@ -111,7 +108,6 @@ export function SelfWorkOverview({
       orgRoles={orgRoles}
       pendingInvite={null}
       thisWeekHours={thisWeekHours}
-      shiftDisplayMode={shiftDisplayMode}
     />
   );
 }
@@ -123,7 +119,6 @@ export function SelfWorkSchedule({
   recurringShifts,
   shiftRequests,
   auditNames,
-  shiftDisplayMode,
   ...rest
 }: SharedSelfWorkProps) {
   const { assignmentById, categoryById, focusAreaById, absenceTypeById } = useSelfWorkMaps({
@@ -191,7 +186,6 @@ export function SelfWorkSchedule({
         shiftRequests={shiftRequests}
         recurringShifts={recurringShifts}
         canViewRecurringShifts
-        shiftDisplayMode={shiftDisplayMode}
       />
     </div>
   );

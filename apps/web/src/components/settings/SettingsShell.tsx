@@ -215,7 +215,7 @@ export function SettingsShell<TId extends string = string>({
                   <SidebarMenuButton
                     onClick={() => handleSidebarOpenChange(!sidebarOpen)}
                     tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
-                    className="h-9 text-[var(--color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
+                    className="h-9 text-[var(--color-text-faint)] hover:text-[var(--color-text-primary)] transition-all ease-in-out duration-150"
                   >
                     <span className="flex shrink-0 items-center justify-center">
                       <svg

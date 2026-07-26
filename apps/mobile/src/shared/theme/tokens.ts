@@ -1,6 +1,7 @@
 import {
   borderColorFromText,
   colorTokens,
+  darkColorTokens,
   mobileNavigationTheme,
   mobileTypographyTokens,
   overlayTokens,
@@ -13,6 +14,11 @@ export const mobileColors = {
   ...colorTokens,
   overlay: overlayTokens.background,
 } as const;
+export const darkMobileColors = {
+  ...darkColorTokens,
+  overlay: overlayTokens.background,
+} as const;
+export type MobileColors = Record<keyof typeof mobileColors, string>;
 export const mobileSpacing = spacingTokens;
 export const mobileRadii = radiusTokens;
 export const mobileTypography = mobileTypographyTokens;

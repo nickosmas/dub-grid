@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileOpenShift,
@@ -21,13 +22,15 @@ import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
-  mobileColors,
   mobileRadii,
   mobileSpacing,
   mobileText,
+  type MobileColors,
 } from "../../../shared/theme/tokens";
+import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { useMobileShiftRequestsRealtime } from "../hooks/useMobileShiftRequestsRealtime";
 import {
   type MobileRequestActionFeedback,
   getMobileRequestActionFeedback,
@@ -96,6 +99,8 @@ function hasMentoredSegments(
 }
 
 function MentoredPill() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
       <Text style={styles.mentoredPillText}>Mentored</Text>
@@ -117,6 +122,7 @@ function readOptionalColor(value: string | null | undefined): string | null {
 }
 
 function getShiftPillColors(
+  mobileColors: MobileColors,
   presentation:
     | MobileShiftRequest["requesterPresentation"]
     | MobileOpenShift["presentation"]
@@ -177,6 +183,7 @@ function getOpenShiftLabel(openShift: MobileOpenShift): string {
 }
 
 function buildJobChip(
+  mobileColors: MobileColors,
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
@@ -239,10 +246,11 @@ function buildJobChip(
 }
 
 function buildGeneralShiftChip(
+  mobileColors: MobileColors,
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
-  const chip = buildJobChip(label, colorSource);
+  const chip = buildJobChip(mobileColors, label, colorSource);
 
   if (!chip) {
     return null;
@@ -263,24 +271,30 @@ function isGeneralShiftSegment(segment: { shiftId?: number | null } | null | und
   );
 }
 
-function getOpenShiftJobChip(openShift: MobileOpenShift): JobChip | null {
+function getOpenShiftJobChip(
+  mobileColors: MobileColors,
+  openShift: MobileOpenShift,
+): JobChip | null {
   const primarySegment = openShift.presentation.segments[0] ?? null;
 
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(getOpenShiftLabel(openShift), primarySegment);
+    return buildGeneralShiftChip(mobileColors, getOpenShiftLabel(openShift), primarySegment);
   }
 
   const segment = openShift.presentation.segments.find((item) => item.jobName) ?? null;
 
-  return buildJobChip(segment?.jobName ?? null, segment);
+  return buildJobChip(mobileColors, segment?.jobName ?? null, segment);
 }
 
-function getSegmentJobChip(segment: MobileScheduleEntrySegment): JobChip | null {
+function getSegmentJobChip(
+  mobileColors: MobileColors,
+  segment: MobileScheduleEntrySegment,
+): JobChip | null {
   if (isGeneralShiftSegment(segment)) {
-    return buildGeneralShiftChip(segment.shiftName ?? segment.label, segment);
+    return buildGeneralShiftChip(mobileColors, segment.shiftName ?? segment.label, segment);
   }
 
-  return buildJobChip(segment.jobName ?? null, segment);
+  return buildJobChip(mobileColors, segment.jobName ?? null, segment);
 }
 
 function getOpenShiftFocusAreaName(openShift: MobileOpenShift): string | null {
@@ -319,7 +333,68 @@ function formatRequestStatus(status: MobileShiftRequest["status"]): string {
     : status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+type StatusChipTone = {
+  backgroundColor: string;
+  borderColor: string;
+  textColor: string;
+};
+
+function createStatusChipTones(
+  mobileColors: MobileColors,
+): Record<MobileShiftRequest["status"], StatusChipTone> {
+  return {
+    open: {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+      textColor: mobileColors.brand,
+    },
+    pending_approval: {
+      backgroundColor: mobileColors.warningSoft,
+      borderColor: mobileColors.warningBorder,
+      textColor: mobileColors.warningText,
+    },
+    approved: {
+      backgroundColor: mobileColors.successSoft,
+      borderColor: mobileColors.successBorder,
+      textColor: mobileColors.successText,
+    },
+    rejected: {
+      backgroundColor: mobileColors.dangerSoft,
+      borderColor: mobileColors.dangerBorder,
+      textColor: mobileColors.dangerText,
+    },
+    cancelled: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.border,
+      textColor: mobileColors.textSubtle,
+    },
+    expired: {
+      backgroundColor: mobileColors.surfaceSecondary,
+      borderColor: mobileColors.border,
+      textColor: mobileColors.textSubtle,
+    },
+  };
+}
+
+function CardIcon({
+  name,
+  muted = false,
+}: {
+  name: keyof typeof Ionicons.glyphMap;
+  muted?: boolean;
+}) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  return (
+    <View style={[styles.cardIconFrame, muted && styles.cardIconFrameMuted]}>
+      <Ionicons color={mobileColors.brand} name={name} size={18} />
+    </View>
+  );
+}
+
 export default function RequestsScreen() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const params = useLocalSearchParams<{
     requestId?: string | string[];
     tab?: string | string[];
@@ -364,14 +439,19 @@ export default function RequestsScreen() {
     queryFn: () => getMySchedule(accessToken!, requestRange),
     enabled: Boolean(accessToken) && Boolean(linkedEmployeeId) && !canViewAllRequests,
   });
-  const manualRefresh = useManualRefresh(async () => {
+  const refreshRequests = useCallback(() => {
     const refreshes: Array<Promise<unknown>> = [requestsQuery.refetch()];
 
     if (linkedEmployeeId && !canViewAllRequests) {
       refreshes.push(availabilityScheduleQuery.refetch());
     }
 
-    await Promise.all(refreshes);
+    return Promise.all(refreshes);
+  }, [availabilityScheduleQuery, canViewAllRequests, linkedEmployeeId, requestsQuery]);
+  const manualRefresh = useManualRefresh(refreshRequests);
+  useMobileShiftRequestsRealtime({
+    orgId: bootstrapQuery.data?.currentOrg.id ?? null,
+    onChange: refreshRequests,
   });
   const requestActionMutation = useMutation({
     mutationFn: async (input: { requestId: string; body: RequestActionBody }) =>
@@ -648,11 +728,13 @@ export default function RequestsScreen() {
               <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
                 {tab.label}
               </Text>
-              <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
-                <Text style={[styles.tabBadgeText, isActive && styles.tabBadgeTextActive]}>
-                  {tab.count}
-                </Text>
-              </View>
+              {tab.count > 0 ? (
+                <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
+                  <Text style={[styles.tabBadgeText, isActive && styles.tabBadgeTextActive]}>
+                    {tab.count}
+                  </Text>
+                </View>
+              ) : null}
             </Pressable>
           );
         })}
@@ -855,6 +937,9 @@ function RequestCard({
   onAction: (body: RequestActionBody) => void;
   showDate?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const statusChipTones = useMemo(() => createStatusChipTones(mobileColors), [mobileColors]);
   const shiftLabel = getRequestShiftLabel(request);
   const timeRange = getRequestTimeRange(request);
   const isMentored = hasMentoredSegments(getRequestSegments(request));
@@ -866,215 +951,244 @@ function RequestCard({
     request.targetPresentation,
     request.targetState ?? null,
   );
+  const typeLabel =
+    request.type === "pickup"
+      ? "Pickup request"
+      : request.type === "swap"
+        ? "Swap request"
+        : "Calloff request";
+  const statusTone = statusChipTones[request.status];
+
+  const canCancel =
+    Boolean(linkedEmployeeId) &&
+    request.requesterEmpId === linkedEmployeeId &&
+    (request.status === "open" || request.status === "pending_approval");
+  const canClaim =
+    Boolean(linkedEmployeeId) &&
+    request.type === "pickup" &&
+    request.status === "open" &&
+    request.targetEmpId == null &&
+    request.requesterEmpId !== linkedEmployeeId;
+  const canRespond =
+    Boolean(linkedEmployeeId) &&
+    request.targetEmpId === linkedEmployeeId &&
+    request.status === "open";
+  const canResolve = canApprove && request.status === "pending_approval";
+  const hasActions = canCancel || canClaim || canRespond || canResolve;
 
   return (
     <View style={[styles.requestCard, highlighted && styles.requestCardHighlighted]}>
-      <View style={styles.requestHeaderRow}>
-        <Text style={styles.requestTitle}>
-          {showDate
-            ? `${request.requesterName} • ${request.requesterShiftDate}`
-            : request.requesterName}
-        </Text>
-        <View style={styles.statusChip}>
-          <Text style={styles.statusChipText}>{formatRequestStatus(request.status)}</Text>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardTitleRow}>
+          <CardIcon muted={highlighted} name="swap-horizontal-outline" />
+          <View style={styles.titleColumn}>
+            <Text style={styles.requestTitle}>{request.requesterName}</Text>
+            <Text style={styles.metaText}>
+              {typeLabel}
+              {showDate ? ` • ${request.requesterShiftDate}` : ""}
+            </Text>
+            {requesterSplitSegments.length > 1 ? (
+              <View style={styles.splitShiftPanel}>
+                <SplitShiftBadge count={requesterSplitSegments.length} compact />
+                <SplitShiftSegmentList
+                  renderSegmentChip={(segment) => (
+                    <JobPill
+                      chip={getSegmentJobChip(mobileColors, segment)}
+                      compact
+                      isMentored={segment.isMentored === true}
+                    />
+                  )}
+                  segments={requesterSplitSegments}
+                  variant="compact"
+                />
+              </View>
+            ) : (
+              <View style={styles.shiftPillRow}>
+                <ShiftPill
+                  colors={getShiftPillColors(mobileColors, request.requesterPresentation)}
+                  label={shiftLabel}
+                />
+                {timeRange ? <Text style={styles.shiftTitleTimeText}>{timeRange}</Text> : null}
+                {isMentored ? <MentoredPill /> : null}
+              </View>
+            )}
+            {request.targetName ? (
+              <Text style={styles.metaText}>Target: {request.targetName}</Text>
+            ) : null}
+            {targetSplitSegments.length > 1 ? (
+              <View style={styles.splitShiftPanel}>
+                <Text style={styles.splitShiftPanelLabel}>Target shift</Text>
+                <SplitShiftBadge count={targetSplitSegments.length} compact />
+                <SplitShiftSegmentList
+                  renderSegmentChip={(segment) => (
+                    <JobPill
+                      chip={getSegmentJobChip(mobileColors, segment)}
+                      compact
+                      isMentored={segment.isMentored === true}
+                    />
+                  )}
+                  segments={targetSplitSegments}
+                  variant="compact"
+                />
+              </View>
+            ) : null}
+            {request.adminNote ? (
+              <Text style={styles.metaText}>Manager note: {request.adminNote}</Text>
+            ) : null}
+          </View>
+        </View>
+        <View
+          style={[
+            styles.statusChip,
+            { backgroundColor: statusTone.backgroundColor, borderColor: statusTone.borderColor },
+          ]}
+        >
+          <Text style={[styles.statusChipText, { color: statusTone.textColor }]}>
+            {formatRequestStatus(request.status)}
+          </Text>
         </View>
       </View>
-      <Text style={styles.metaText}>
-        {request.type === "pickup"
-          ? "Pickup request"
-          : request.type === "swap"
-            ? "Swap request"
-            : "Calloff request"}
-      </Text>
-      {requesterSplitSegments.length > 1 ? (
-        <View style={styles.splitShiftPanel}>
-          <SplitShiftBadge count={requesterSplitSegments.length} compact />
-          <SplitShiftSegmentList
-            renderSegmentChip={(segment) => (
-              <JobPill
-                chip={getSegmentJobChip(segment)}
-                compact
-                isMentored={segment.isMentored === true}
-              />
-            )}
-            segments={requesterSplitSegments}
-            variant="compact"
-          />
+      {hasActions ? (
+        <View style={styles.cardActions}>
+          {canCancel
+            ? (() => {
+                const body: RequestActionBody = {
+                  action: "cancel",
+                  empId: linkedEmployeeId!,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Cancel"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                    tone="neutral"
+                  />
+                );
+              })()
+            : null}
+          {canClaim
+            ? (() => {
+                const body: RequestActionBody = {
+                  action: "claim",
+                  claimerEmpId: linkedEmployeeId!,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Claim"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                  />
+                );
+              })()
+            : null}
+          {canRespond ? (
+            <>
+              {(() => {
+                const body: RequestActionBody = {
+                  action: "respond",
+                  empId: linkedEmployeeId!,
+                  accept: true,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Accept"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                  />
+                );
+              })()}
+              {(() => {
+                const body: RequestActionBody = {
+                  action: "respond",
+                  empId: linkedEmployeeId!,
+                  accept: false,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Decline"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                    tone="neutral"
+                  />
+                );
+              })()}
+            </>
+          ) : null}
+          {canResolve ? (
+            <>
+              {(() => {
+                const body: RequestActionBody = {
+                  action: "resolve",
+                  approved: true,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Approve"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                  />
+                );
+              })()}
+              {(() => {
+                const body: RequestActionBody = {
+                  action: "resolve",
+                  approved: false,
+                };
+                const isLoading =
+                  pendingAction?.key === getMobileRequestActionKey(request.id, body);
+
+                return (
+                  <Button
+                    compact
+                    disabled={Boolean(pendingAction)}
+                    label={isLoading ? pendingAction.label : "Reject"}
+                    loading={isLoading}
+                    onPress={() => {
+                      onAction(body);
+                    }}
+                    tone="danger"
+                  />
+                );
+              })()}
+            </>
+          ) : null}
         </View>
-      ) : (
-        <View style={styles.shiftPillRow}>
-          <ShiftPill
-            colors={getShiftPillColors(request.requesterPresentation)}
-            label={shiftLabel}
-          />
-          {timeRange ? <Text style={styles.shiftTitleTimeText}>{timeRange}</Text> : null}
-          {isMentored ? <MentoredPill /> : null}
-        </View>
-      )}
-      {request.targetName ? (
-        <Text style={styles.metaText}>Target: {request.targetName}</Text>
       ) : null}
-      {targetSplitSegments.length > 1 ? (
-        <View style={styles.splitShiftPanel}>
-          <Text style={styles.splitShiftPanelLabel}>Target shift</Text>
-          <SplitShiftBadge count={targetSplitSegments.length} compact />
-          <SplitShiftSegmentList
-            renderSegmentChip={(segment) => (
-              <JobPill
-                chip={getSegmentJobChip(segment)}
-                compact
-                isMentored={segment.isMentored === true}
-              />
-            )}
-            segments={targetSplitSegments}
-            variant="compact"
-          />
-        </View>
-      ) : null}
-      {request.adminNote ? (
-        <Text style={styles.metaText}>Manager note: {request.adminNote}</Text>
-      ) : null}
-      <View style={styles.actions}>
-        {linkedEmployeeId &&
-        request.requesterEmpId === linkedEmployeeId &&
-        (request.status === "open" || request.status === "pending_approval")
-          ? (() => {
-              const body: RequestActionBody = {
-                action: "cancel",
-                empId: linkedEmployeeId,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Cancel"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                  tone="neutral"
-                />
-              );
-            })()
-          : null}
-        {linkedEmployeeId &&
-        request.type === "pickup" &&
-        request.status === "open" &&
-        request.targetEmpId == null &&
-        request.requesterEmpId !== linkedEmployeeId
-          ? (() => {
-              const body: RequestActionBody = {
-                action: "claim",
-                claimerEmpId: linkedEmployeeId,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Claim"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                />
-              );
-            })()
-          : null}
-        {linkedEmployeeId &&
-        request.targetEmpId === linkedEmployeeId &&
-        request.status === "open" ? (
-          <>
-            {(() => {
-              const body: RequestActionBody = {
-                action: "respond",
-                empId: linkedEmployeeId,
-                accept: true,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Accept"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                />
-              );
-            })()}
-            {(() => {
-              const body: RequestActionBody = {
-                action: "respond",
-                empId: linkedEmployeeId,
-                accept: false,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Decline"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                  tone="neutral"
-                />
-              );
-            })()}
-          </>
-        ) : null}
-        {canApprove && request.status === "pending_approval" ? (
-          <>
-            {(() => {
-              const body: RequestActionBody = {
-                action: "resolve",
-                approved: true,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Approve"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                />
-              );
-            })()}
-            {(() => {
-              const body: RequestActionBody = {
-                action: "resolve",
-                approved: false,
-              };
-              const isLoading = pendingAction?.key === getMobileRequestActionKey(request.id, body);
-
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction)}
-                  label={isLoading ? pendingAction.label : "Reject"}
-                  loading={isLoading}
-                  onPress={() => {
-                    onAction(body);
-                  }}
-                  tone="danger"
-                />
-              );
-            })()}
-          </>
-        ) : null}
-      </View>
     </View>
   );
 }
@@ -1092,9 +1206,13 @@ function OpenShiftCard({
   onAction: (body: RequestActionBody) => void;
   showDate?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const statusChipTones = useMemo(() => createStatusChipTones(mobileColors), [mobileColors]);
+  const openShiftChipTone = statusChipTones.open;
   const shiftLabel = getOpenShiftLabel(openShift);
   const focusAreaName = getOpenShiftFocusAreaName(openShift);
-  const jobChip = getOpenShiftJobChip(openShift);
+  const jobChip = getOpenShiftJobChip(mobileColors, openShift);
   const isMentored = hasMentoredSegments(openShift.presentation.segments);
   const timeRange = getOpenShiftTimeRange(openShift);
   const splitSegments = getSplitShiftSegmentsFromPresentation(
@@ -1105,18 +1223,29 @@ function OpenShiftCard({
     openShift.canVolunteer === false
       ? (openShift.volunteerBlockReason ?? "You can't volunteer for this shift right now.")
       : null;
+  const hasActions = Boolean(linkedEmployeeId);
 
   return (
     <View style={[styles.requestCard, styles.openShiftCard]}>
-      <View style={styles.requestHeaderRow}>
+      <View style={styles.openShiftTitleRow}>
         <View style={styles.shiftTitleTimeRow}>
           <Text style={styles.openShiftTitle}>{shiftLabel}</Text>
           {splitSegments.length <= 1 && timeRange ? (
             <Text style={styles.shiftTitleTimeText}>{timeRange}</Text>
           ) : null}
         </View>
-        <View style={styles.statusChip}>
-          <Text style={styles.statusChipText}>Open shift</Text>
+        <View
+          style={[
+            styles.statusChip,
+            {
+              backgroundColor: openShiftChipTone.backgroundColor,
+              borderColor: openShiftChipTone.borderColor,
+            },
+          ]}
+        >
+          <Text style={[styles.statusChipText, { color: openShiftChipTone.textColor }]}>
+            Open shift
+          </Text>
         </View>
       </View>
       {showDate ? <Text style={styles.metaText}>{openShift.date}</Text> : null}
@@ -1126,7 +1255,7 @@ function OpenShiftCard({
           <SplitShiftSegmentList
             renderSegmentChip={(segment) => (
               <JobPill
-                chip={getSegmentJobChip(segment)}
+                chip={getSegmentJobChip(mobileColors, segment)}
                 compact
                 isMentored={segment.isMentored === true}
               />
@@ -1149,38 +1278,37 @@ function OpenShiftCard({
         {openShift.needed} teammate{openShift.needed === 1 ? "" : "s"} needed
       </Text>
       {volunteerBlockReason ? <Text style={styles.metaText}>{volunteerBlockReason}</Text> : null}
-      <View style={styles.actions}>
-        {linkedEmployeeId
-          ? (() => {
-              const body: RequestActionBody = {
-                action: "volunteer_open_shift",
-                empId: linkedEmployeeId,
-                shiftDate: openShift.date,
-                focusAreaId: openShift.focusAreaId,
-                state: openShift.state,
-              };
-              const isLoading =
-                pendingAction?.key === getMobileRequestActionKey(openShift.id, body);
+      {hasActions ? (
+        <View style={[styles.cardActions, styles.cardActionsFlush]}>
+          {(() => {
+            const body: RequestActionBody = {
+              action: "volunteer_open_shift",
+              empId: linkedEmployeeId!,
+              shiftDate: openShift.date,
+              focusAreaId: openShift.focusAreaId,
+              state: openShift.state,
+            };
+            const isLoading = pendingAction?.key === getMobileRequestActionKey(openShift.id, body);
 
-              return (
-                <Button
-                  compact
-                  disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
-                  label={isLoading ? pendingAction.label : "Volunteer"}
-                  loading={isLoading}
-                  onPress={() => {
-                    if (openShift.canVolunteer === false) {
-                      return;
-                    }
+            return (
+              <Button
+                compact
+                disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
+                label={isLoading ? pendingAction.label : "Volunteer"}
+                loading={isLoading}
+                onPress={() => {
+                  if (openShift.canVolunteer === false) {
+                    return;
+                  }
 
-                    onAction(body);
-                  }}
-                  tone="secondary"
-                />
-              );
-            })()
-          : null}
-      </View>
+                  onAction(body);
+                }}
+                tone="secondary"
+              />
+            );
+          })()}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1194,6 +1322,8 @@ function JobPill({
   compact?: boolean;
   isMentored?: boolean;
 }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
   }
@@ -1264,6 +1394,8 @@ function JobPill({
 }
 
 function ShiftPill({ colors, label }: { colors: ShiftPillColors; label: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View
       accessibilityLabel={`Shift ${label}`}
@@ -1280,251 +1412,288 @@ function ShiftPill({ colors, label }: { colors: ShiftPillColors; label: string }
   );
 }
 
-const styles = StyleSheet.create({
-  loadingState: {
-    gap: 14,
-  },
-  loadingTitle: {
-    ...mobileText.screenTitle,
-    color: mobileColors.textPrimary,
-  },
-  loadingBody: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  tabRow: {
-    marginHorizontal: -mobileSpacing.screenX,
-  },
-  tabRowContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: mobileSpacing.screenX,
-    paddingVertical: 2,
-  },
-  tabButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    minHeight: 36,
-    maxWidth: 180,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: mobileRadii.pill,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surface,
-  },
-  tabButtonActive: {
-    borderColor: mobileColors.brand,
-    backgroundColor: mobileColors.brand,
-  },
-  tabButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: mobileColors.textSecondary,
-  },
-  tabButtonTextActive: {
-    color: mobileColors.textInverse,
-  },
-  tabBadge: {
-    minWidth: 20,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: mobileRadii.pill,
-    backgroundColor: mobileColors.surfaceSecondary,
-  },
-  tabBadgeActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.22)",
-  },
-  tabBadgeText: {
-    ...mobileText.badge,
-    color: mobileColors.textMuted,
-    textAlign: "center",
-  },
-  tabBadgeTextActive: {
-    color: mobileColors.textInverse,
-  },
-  section: {
-    gap: 10,
-  },
-  dateGroup: {
-    gap: 10,
-  },
-  dateGroupLabel: {
-    ...mobileText.bodyStrong,
-    color: mobileColors.textMuted,
-  },
-  dateGroupItems: {
-    gap: 10,
-  },
-  requestCard: {
-    backgroundColor: mobileColors.surface,
-    borderRadius: mobileRadii.card,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    padding: 16,
-    gap: 10,
-  },
-  openShiftCard: {
-    gap: 12,
-    padding: 18,
-    shadowColor: mobileColors.shadow,
-    shadowOffset: {
-      width: 0,
-      height: 8,
+const createStyles = (mobileColors: MobileColors) =>
+  StyleSheet.create({
+    loadingState: {
+      gap: 14,
     },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 2,
-  },
-  requestCardHighlighted: {
-    borderColor: mobileColors.brand,
-    backgroundColor: mobileColors.brandSoft,
-  },
-  requestHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  requestHeaderContent: {
-    flex: 1,
-    gap: 10,
-  },
-  requestTitle: {
-    ...mobileText.cardTitle,
-    color: mobileColors.textPrimary,
-  },
-  openShiftTitle: {
-    ...mobileText.sectionTitle,
-    flex: 1,
-    minWidth: 0,
-    color: mobileColors.textPrimary,
-  },
-  shiftTitleTimeRow: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  shiftTitleTimeText: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textMuted,
-    fontWeight: "500",
-  },
-  shiftPillRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 8,
-  },
-  splitShiftPanel: {
-    gap: 10,
-  },
-  splitShiftPanelLabel: {
-    ...mobileText.meta,
-    color: mobileColors.textMuted,
-    fontWeight: "700",
-  },
-  shiftPill: {
-    borderRadius: mobileRadii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  shiftPillText: {
-    ...mobileText.meta,
-    fontWeight: "600",
-  },
-  statusChip: {
-    borderRadius: mobileRadii.pill,
-    borderWidth: 1,
-    borderColor: mobileColors.border,
-    backgroundColor: mobileColors.surfaceSecondary,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignSelf: "flex-start",
-  },
-  statusChipText: {
-    ...mobileText.caption,
-    color: mobileColors.textSecondary,
-    fontWeight: "600",
-  },
-  metaText: {
-    ...mobileText.body,
-    color: mobileColors.textMuted,
-  },
-  openShiftContextStack: {
-    gap: 8,
-  },
-  openShiftContextText: {
-    ...mobileText.rowTitle,
-    color: mobileColors.textSecondary,
-  },
-  jobPill: {
-    alignSelf: "flex-start",
-    borderRadius: 8,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  jobPillCompact: {
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  jobPillTextStack: {
-    gap: 2,
-  },
-  jobPillInlineTextRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  jobPillEyebrowText: {
-    ...mobileText.micro,
-  },
-  jobPillEyebrowTextCompact: {
-    fontSize: 9,
-  },
-  jobPillText: {
-    ...mobileText.badge,
-    textTransform: "uppercase",
-  },
-  jobPillMentoredText: {
-    textTransform: "none",
-  },
-  jobPillTextCompact: {
-    fontSize: 12,
-  },
-  jobPillValueText: {
-    ...mobileText.meta,
-    fontWeight: "600",
-  },
-  jobPillValueTextCompact: {
-    fontSize: 12,
-  },
-  mentoredPill: {
-    alignSelf: "flex-start",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: mobileColors.borderSubtle,
-    backgroundColor: mobileColors.surfaceSecondary,
-    minHeight: 28,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  mentoredPillText: {
-    ...mobileText.badge,
-    color: mobileColors.textSecondary,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-});
+    loadingTitle: {
+      ...mobileText.screenTitle,
+      color: mobileColors.textPrimary,
+    },
+    loadingBody: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    tabRow: {
+      marginHorizontal: -mobileSpacing.screenX,
+    },
+    tabRowContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: mobileSpacing.screenX,
+      paddingVertical: 2,
+    },
+    tabButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      minHeight: 36,
+      maxWidth: 180,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surface,
+    },
+    tabButtonActive: {
+      borderColor: mobileColors.brand,
+      backgroundColor: mobileColors.brand,
+    },
+    tabButtonText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: mobileColors.textSecondary,
+    },
+    tabButtonTextActive: {
+      color: mobileColors.textInverse,
+    },
+    tabBadge: {
+      minWidth: 20,
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.surfaceSecondary,
+    },
+    tabBadgeActive: {
+      backgroundColor: "rgba(255, 255, 255, 0.22)",
+    },
+    tabBadgeText: {
+      ...mobileText.badge,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+      includeFontPadding: false,
+    },
+    tabBadgeTextActive: {
+      color: mobileColors.textInverse,
+    },
+    section: {
+      gap: 10,
+    },
+    dateGroup: {
+      gap: 10,
+    },
+    dateGroupLabel: {
+      ...mobileText.bodyStrong,
+      color: mobileColors.textMuted,
+    },
+    dateGroupItems: {
+      gap: 10,
+    },
+    requestCard: {
+      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.card,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      padding: 16,
+      gap: 10,
+    },
+    openShiftCard: {
+      gap: 12,
+      padding: 18,
+    },
+    requestCardHighlighted: {
+      borderColor: mobileColors.brand,
+      backgroundColor: mobileColors.brandSoft,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    openShiftTitleRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 12,
+    },
+    cardTitleRow: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+    },
+    cardIconFrame: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.brandSoft,
+    },
+    cardIconFrameMuted: {
+      backgroundColor: mobileColors.surface,
+    },
+    titleColumn: {
+      flex: 1,
+      minWidth: 0,
+      gap: 10,
+    },
+    cardActions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "flex-start",
+      gap: 8,
+      marginLeft: 42,
+      paddingTop: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
+    },
+    cardActionsFlush: {
+      marginLeft: 0,
+    },
+    requestTitle: {
+      ...mobileText.cardTitle,
+      flex: 1,
+      minWidth: 0,
+      color: mobileColors.textPrimary,
+    },
+    openShiftTitle: {
+      ...mobileText.sectionTitle,
+      flex: 1,
+      minWidth: 0,
+      color: mobileColors.textPrimary,
+    },
+    shiftTitleTimeRow: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    shiftTitleTimeText: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textMuted,
+      fontWeight: "500",
+      // Matches the pill's text below: Android's default font padding throws
+      // off vertical centering against the bordered/padded pill next to it.
+      includeFontPadding: false,
+    },
+    shiftPillRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 8,
+    },
+    splitShiftPanel: {
+      gap: 10,
+    },
+    splitShiftPanelLabel: {
+      ...mobileText.meta,
+      color: mobileColors.textMuted,
+      fontWeight: "700",
+    },
+    shiftPill: {
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    shiftPillText: {
+      ...mobileText.meta,
+      fontWeight: "600",
+      includeFontPadding: false,
+    },
+    statusChip: {
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      borderColor: mobileColors.border,
+      backgroundColor: mobileColors.surfaceSecondary,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      alignSelf: "flex-start",
+    },
+    statusChipText: {
+      ...mobileText.caption,
+      color: mobileColors.textSecondary,
+      fontWeight: "600",
+      includeFontPadding: false,
+    },
+    metaText: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    openShiftContextStack: {
+      gap: 8,
+    },
+    openShiftContextText: {
+      ...mobileText.rowTitle,
+      color: mobileColors.textSecondary,
+    },
+    jobPill: {
+      alignSelf: "flex-start",
+      borderRadius: 8,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+    },
+    jobPillCompact: {
+      borderRadius: 8,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+    },
+    jobPillTextStack: {
+      gap: 2,
+    },
+    jobPillInlineTextRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    jobPillEyebrowText: {
+      ...mobileText.micro,
+      includeFontPadding: false,
+    },
+    jobPillEyebrowTextCompact: {
+      fontSize: 9,
+    },
+    jobPillText: {
+      ...mobileText.badge,
+      textTransform: "uppercase",
+      includeFontPadding: false,
+    },
+    jobPillMentoredText: {
+      textTransform: "none",
+    },
+    jobPillTextCompact: {
+      fontSize: 12,
+    },
+    jobPillValueText: {
+      ...mobileText.meta,
+      fontWeight: "600",
+      includeFontPadding: false,
+    },
+    jobPillValueTextCompact: {
+      fontSize: 12,
+    },
+    mentoredPill: {
+      alignSelf: "flex-start",
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: mobileColors.borderSubtle,
+      backgroundColor: mobileColors.surfaceSecondary,
+      minHeight: 28,
+      justifyContent: "center",
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    mentoredPillText: {
+      ...mobileText.badge,
+      color: mobileColors.textSecondary,
+      includeFontPadding: false,
+    },
+  });

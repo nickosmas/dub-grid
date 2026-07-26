@@ -82,7 +82,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
-    const orgAuth = await requireOrgPermissions(req, parsed.data.orgId, () => true);
+    // Full membership rows carry admin telemetry (admin_permissions, emails,
+    // last sign-in). Every real consumer is a super_admin/gridmaster surface
+    // (access management, gridmaster portal), so gate accordingly.
+    const orgAuth = await requireOrgPermissions(
+      req,
+      parsed.data.orgId,
+      (permissions) => permissions.isSuperAdmin || permissions.isGridmaster,
+    );
     if ("response" in orgAuth) {
       return orgAuth.response;
     }

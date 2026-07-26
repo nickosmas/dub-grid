@@ -43,6 +43,7 @@ function makeRequest() {
 function makeOrganizationsQuery(rows: Record<string, unknown>[]) {
   const query = {
     select: vi.fn(() => query),
+    eq: vi.fn(() => query),
     order: vi.fn(() =>
       Promise.resolve({
         data: rows,
@@ -115,9 +116,24 @@ describe("GET /api/gridmaster/dashboard", () => {
   });
 
   it("loads stats with the authenticated request client", async () => {
+    const organizationsQuery = makeOrganizationsQuery([
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        name: "Arden Wood",
+        slug: "arden-wood",
+      },
+    ]);
+    serviceFrom.mockImplementation((table: string) => {
+      if (table === "organizations") return organizationsQuery;
+      if (table === "profiles") return profilesCountQuery;
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
     const response = await GET(makeRequest());
 
     expect(response.status).toBe(200);
+    // Sandbox orgs must never surface in the gridmaster dashboard's org list.
+    expect(organizationsQuery.eq).toHaveBeenCalledWith("workspace_kind", "real");
     await expect(response.json()).resolves.toEqual({
       organizations: [
         {
