@@ -24,6 +24,7 @@ function createThenableQuery(result: { data: unknown; error: unknown }) {
     or: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
+    range: vi.fn(() => query),
     then: (
       onFulfilled?: (value: typeof result) => unknown,
       onRejected?: (error: unknown) => unknown,

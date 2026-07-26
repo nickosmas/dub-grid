@@ -935,21 +935,39 @@ export async function fetchMobileShiftRequestRows(
   return (data ?? []) as MobileShiftRequestQueryRow[];
 }
 
+const MOBILE_PEOPLE_PAGE_SIZE = 500;
+
 export async function fetchMobilePeopleRows(
   serviceClient: SupabaseClient,
   orgId: string,
+  pageSize: number = MOBILE_PEOPLE_PAGE_SIZE,
 ): Promise<MobilePeopleQueryRow[]> {
-  const { data, error } = await serviceClient
-    .from("employees")
-    .select(
-      "id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
-    )
-    .eq("org_id", orgId)
-    .order("first_name", { ascending: true });
+  // A single unpaged query here would silently truncate at PostgREST's
+  // max_rows cap (200 OK, rows just missing) once an org has more employees
+  // than the configured limit, mirroring the same failure mode the web
+  // /api/employees/manage route guards against with fetchAllRows. Each page
+  // builds a FRESH query since Supabase builders are single-use once awaited.
+  const rows: MobilePeopleQueryRow[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await serviceClient
+      .from("employees")
+      .select(
+        "id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, department_ids, dept_admin_ids, phone, email, contact_notes, user_id, version",
+      )
+      .eq("org_id", orgId)
+      .order("first_name", { ascending: true })
+      .range(from, from + pageSize - 1);
 
-  if (error) throw error;
+    if (error) throw error;
 
-  return (data ?? []) as MobilePeopleQueryRow[];
+    const page = (data ?? []) as MobilePeopleQueryRow[];
+    rows.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return rows;
 }
 
 export async function fetchMobilePendingInvitationRows(
