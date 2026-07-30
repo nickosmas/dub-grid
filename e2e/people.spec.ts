@@ -8,8 +8,10 @@ import { loginAsQaSuperAdmin } from "./helpers/auth";
 test("an authenticated admin can open the People roster", async ({ page }) => {
   await loginAsQaSuperAdmin(page);
 
-  await page.getByRole("link", { name: "People" }).click();
+  // exact: true — matches schedule.spec.ts's defense against dashboard CTAs
+  // that substring-match the nav label.
+  await page.getByRole("link", { name: "People", exact: true }).click();
 
   await expect(page).toHaveURL(/\/people/);
-  await expect(page.getByRole("link", { name: "People" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "People", exact: true })).toBeVisible();
 });

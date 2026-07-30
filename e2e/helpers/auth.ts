@@ -8,6 +8,37 @@ export const QA_SUPER_ADMIN_EMAIL = "qa-super-admin@dubgrid.test";
 export const QA_SUPER_ADMIN_PASSWORD = "password123";
 
 /**
+ * Clears dismissible overlays (cookie consent, an MFA nag banner, etc.) that
+ * can block clicks on the nav underneath. These don't all render on the same
+ * tick — the cookie dialog and MFA banner both decide whether to show inside
+ * a post-mount effect — so this doesn't gate on first detecting an overlay
+ * (a single-shot check can run before either has appeared); it just spends a
+ * bounded window proactively trying each known dismiss control a few times.
+ */
+async function clearBlockingOverlays(page: Page): Promise<void> {
+  const dismissControls = [
+    page.getByRole("button", { name: "Essential only" }), // cookie consent banner
+    page.getByRole("button", { name: "Dismiss" }), // MFA nag banner
+    // The shared <Modal> primitive's close button (Modal.tsx) — covers any
+    // Modal-based interstitial, e.g. TrialWelcomeModal on a first-ever login
+    // for a fresh org, without needing to special-case each one by title.
+    page.getByRole("button", { name: "Close modal" }),
+  ];
+  let consecutiveEmptyPasses = 0;
+  for (let attempt = 0; attempt < 6 && consecutiveEmptyPasses < 2; attempt++) {
+    let dismissedAny = false;
+    for (const control of dismissControls) {
+      if (await control.isVisible({ timeout: 400 }).catch(() => false)) {
+        await control.click({ timeout: 2_000 }).catch(() => {});
+        dismissedAny = true;
+      }
+    }
+    consecutiveEmptyPasses = dismissedAny ? 0 : consecutiveEmptyPasses + 1;
+    await page.waitForTimeout(300);
+  }
+}
+
+/**
  * Logs in as the seeded QA super admin against the current page's origin
  * (the calmhaven subdomain, per playwright.config.ts's baseURL) and waits
  * for the authenticated app shell to render.
@@ -22,8 +53,54 @@ export async function loginAsQaSuperAdmin(page: Page): Promise<void> {
   await page.getByRole("textbox", { name: "Password" }).fill(QA_SUPER_ADMIN_PASSWORD);
   await page.getByRole("button", { name: "Sign In" }).click();
 
+  // A never-before-logged-in account (true of any freshly seeded CI database)
+  // is redirected to a one-time Terms interstitial before its real
+  // destination. Accept it if it shows up; skip straight through otherwise.
+  const termsHeading = page.getByRole("heading", { name: "Updated Terms of Service" });
+  const dashboardLink = page.getByRole("link", { name: "Dashboard" });
+  await Promise.race([
+    termsHeading.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+    dashboardLink.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+  ]);
+
+  if (await termsHeading.isVisible()) {
+    // The Accept & Continue button stays disabled until the terms body is
+    // scrolled to the bottom — jump straight there rather than simulating a
+    // realistic scroll gesture, which is unnecessary and flakier in CI.
+    await page
+      .getByLabel("Terms of Service content")
+      .evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+    await page.getByRole("button", { name: "Accept & Continue" }).click();
+  }
+
+  // A super_admin's first-ever login into a given org also triggers the
+  // OnboardingWizard instead of landing directly on the dashboard. Skip it
+  // if shown — it's a 2-step flow (Skip setup -> confirm) and the cookie
+  // consent dialog can render on top and intercept the first click, so
+  // dismiss that first.
+  const skipSetupButton = page.getByRole("button", { name: "Skip setup" });
+  await Promise.race([
+    skipSetupButton.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+    dashboardLink.waitFor({ state: "visible", timeout: 15_000 }).catch(() => {}),
+  ]);
+
+  if (await skipSetupButton.isVisible()) {
+    await clearBlockingOverlays(page);
+    await skipSetupButton.click();
+    await page.getByRole("button", { name: "Yes, skip" }).click();
+    // handleSkip() does a full window.location.reload() on completion.
+    await page.waitForLoadState("load");
+  }
+
   // Successful login lands on an authenticated route and renders the primary
   // nav (Header.tsx) — the most stable "we're signed in" signal available,
   // since it doesn't depend on any particular page's own content.
-  await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible({ timeout: 15_000 });
+  await expect(dashboardLink).toBeVisible({ timeout: 15_000 });
+
+  // Cover every path (including the fast one where neither terms nor
+  // onboarding triggered) — something's usually still sitting on top of the
+  // nav for whatever the calling test clicks next otherwise.
+  await clearBlockingOverlays(page);
 }

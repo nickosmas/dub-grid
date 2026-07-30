@@ -10,10 +10,12 @@ import { loginAsQaSuperAdmin } from "./helpers/auth";
 test("an authenticated admin can open the schedule grid", async ({ page }) => {
   await loginAsQaSuperAdmin(page);
 
-  await page.getByRole("link", { name: "Schedule" }).click();
+  // exact: true — the dashboard also has an "Open schedule" CTA and a
+  // "Schedule published X ago" link, both of which substring-match "Schedule".
+  await page.getByRole("link", { name: "Schedule", exact: true }).click();
 
   await expect(page).toHaveURL(/\/schedule/);
   // Confirms the authenticated shell is still mounted (i.e. we weren't
   // silently bounced back to /login by a broken auth check).
-  await expect(page.getByRole("link", { name: "Schedule" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Schedule", exact: true })).toBeVisible();
 });
