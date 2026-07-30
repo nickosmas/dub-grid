@@ -1,10 +1,24 @@
+import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { DEFAULT_TRIAL_DAYS } from "@dubgrid/domain";
 import logger from "@/lib/logger";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 import { createClient } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 let _stripe: Stripe | null | undefined;
+
+/**
+ * Kill-switch check for all /api/stripe/* routes. Call at the top of each
+ * route handler; a non-null return is the 503 to send back immediately.
+ */
+export async function requireStripeEnabled(): Promise<NextResponse | null> {
+  if (await isFeatureEnabled("stripe")) return null;
+  return NextResponse.json(
+    { error: "Billing is temporarily unavailable. Please try again shortly." },
+    { status: 503 },
+  );
+}
 
 type BillingSyncClient = Pick<SupabaseClient, "from">;
 
@@ -82,11 +96,22 @@ function getStripe(): Stripe | null {
 export { getStripe };
 
 /**
- * Create a Stripe customer for an organization.
+ * Get or create a Stripe customer for an organization. Idempotent by `org_id` metadata:
+ * if the persist of `stripe_customer_id` ever failed on a prior attempt (leaving a customer
+ * in Stripe the org row doesn't know about), we reuse that customer instead of creating a
+ * duplicate. Callers guard on a null local `stripe_customer_id`, so without this an
+ * unpersisted customer would silently orphan and the next attempt would create another.
  */
 export async function createStripeCustomer(orgId: string, orgName: string, email: string) {
   const s = getStripe();
   if (!s) throw new Error("Stripe not configured");
+
+  const existing = await s.customers.search({
+    query: `metadata['org_id']:'${orgId}'`,
+    limit: 1,
+  });
+  if (existing.data[0]) return existing.data[0];
+
   return s.customers.create({
     metadata: { org_id: orgId },
     name: orgName,

@@ -482,12 +482,20 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     return createInvitationEmailUnavailableResponse();
   }
 
-  const invitation = await refreshMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
-    orgId: loaded.auth.currentOrg.id,
-    invitationId: parsed.data.invitationId,
-    expectedUpdatedAt: parsed.data.expectedUpdatedAt,
-  });
-  if (!invitation || invitation.employee_id !== id) {
+  // Read (don't yet mutate) the pending invite, and run the optimistic-concurrency check
+  // against it. The row is only refreshed AFTER the email succeeds (below) so a failed
+  // send leaves it untouched — otherwise the client's now-stale expectedUpdatedAt would
+  // make the retry fail this same check with a confusing "changed elsewhere" 409.
+  const existing = await fetchMobilePendingInvitationRowByEmployeeId(
+    loaded.auth.serviceClient,
+    loaded.auth.currentOrg.id,
+    id,
+  );
+  if (
+    !existing ||
+    existing.id !== parsed.data.invitationId ||
+    existing.updated_at !== parsed.data.expectedUpdatedAt
+  ) {
     return NextResponse.json(
       { error: "Invitation changed elsewhere. Refresh and try again." },
       { status: 409 },
@@ -497,7 +505,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const existingMember = await findExistingOrganizationMemberByEmail({
     serviceClient: loaded.auth.serviceClient,
     orgId: loaded.auth.currentOrg.id,
-    email: invitation.email,
+    email: existing.email,
   });
 
   if (existingMember) {
@@ -512,22 +520,39 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     });
   }
 
+  // Rotate the token in memory, email it, and only persist it once the email has actually
+  // been sent — so the emailed link and the committed row always match, and a send failure
+  // is a true no-op the client can safely retry.
+  const nextToken = crypto.randomUUID();
   try {
     await sendInvitationEmail({
       config: emailConfig,
-      token: invitation.token,
-      email: invitation.email,
+      token: nextToken,
+      email: existing.email,
       orgName: loaded.auth.currentOrg.name || "your organization",
       inviterName: loaded.auth.user.email ?? null,
     });
   } catch (error) {
     logger.error(
-      { err: error, employeeId: id, invitationId: invitation.id },
+      { err: error, employeeId: id, invitationId: existing.id },
       "Failed to resend mobile invitation email",
     );
     return NextResponse.json(
       { error: "Invitation email could not be sent. Try again in a moment." },
       { status: 502 },
+    );
+  }
+
+  const invitation = await refreshMobileEmployeeInvitationRow(loaded.auth.serviceClient, {
+    orgId: loaded.auth.currentOrg.id,
+    invitationId: parsed.data.invitationId,
+    expectedUpdatedAt: parsed.data.expectedUpdatedAt,
+    token: nextToken,
+  });
+  if (!invitation || invitation.employee_id !== id) {
+    return NextResponse.json(
+      { error: "Invitation changed elsewhere. Refresh and try again." },
+      { status: 409 },
     );
   }
 

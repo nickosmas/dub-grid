@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { loadGridmasterOrgHealth } from "@/app/api/gridmaster/_lib/oversight";
+import logger from "@/lib/logger";
 
 const querySchema = z.object({
   orgId: z.string().uuid().optional(),
@@ -25,7 +26,10 @@ export async function GET(req: NextRequest) {
     const summaries = await loadGridmasterOrgHealth(getServiceClient(), parsed.data.orgId);
     return NextResponse.json({ organizations: summaries });
   } catch (error) {
-    console.error("gridmaster org-health GET failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/org-health" },
+      "gridmaster org-health GET failed",
+    );
     return NextResponse.json({ error: "Failed to load organization health" }, { status: 500 });
   }
 }

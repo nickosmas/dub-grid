@@ -11,6 +11,7 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 const querySchema = z.object({
   type: z.enum(["staff", "schedule"]),
@@ -192,6 +193,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(
         { error: "Too many requests" },
         { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      );
+    }
+
+    // Checked after auth + rate-limiting (not before) so a disabled flag can't be
+    // used to probe this route for free, unauthenticated and unrate-limited.
+    if (!(await isFeatureEnabled("csv_export"))) {
+      return NextResponse.json(
+        { error: "Exports are temporarily unavailable. Please try again shortly." },
+        { status: 503 },
       );
     }
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getServiceClient } from "@/lib/supabase-service";
+import logger from "@/lib/logger";
 
 const querySchema = z.object({
   token: z.string().min(1),
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
           : null,
     });
   } catch (error) {
-    console.error("invitation lookup GET failed", error);
+    logger.error({ error }, "invitation lookup GET failed");
     return NextResponse.json({ error: "Failed to look up invitation" }, { status: 500 });
   }
 }

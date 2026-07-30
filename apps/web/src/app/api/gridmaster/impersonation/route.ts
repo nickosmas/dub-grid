@@ -4,6 +4,7 @@ import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import logger from "@/lib/logger";
 
 const historyQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -71,7 +72,10 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error("gridmaster impersonation GET failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/impersonation" },
+      "gridmaster impersonation GET failed",
+    );
     return NextResponse.json({ error: "Failed to load impersonation history" }, { status: 500 });
   }
 }
@@ -174,7 +178,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
   } catch (error) {
-    console.error("gridmaster impersonation POST failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/impersonation" },
+      "gridmaster impersonation POST failed",
+    );
     return NextResponse.json({ error: "Failed to update impersonation session" }, { status: 500 });
   }
 }

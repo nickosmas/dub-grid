@@ -60,6 +60,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authentic
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
+-- public.platform_feature_flags and public.impersonation_sessions intentionally
+-- get no column-level carve-out below: both are gridmaster-only tables, so the
+-- blanket grant above plus their `is_gridmaster()` RLS policy is the entire
+-- access story. Column grants only exist for tables regular (non-gridmaster)
+-- users also touch, like public.organizations further down.
+
 -- Organization billing identifiers are server-managed. Keep broad row access
 -- for normal organization context, but do not expose Stripe IDs or billed-seat
 -- snapshots through direct browser/mobile Supabase reads or writes.

@@ -15,6 +15,7 @@ import type {
   GridmasterOverview,
   GridmasterSecuritySummary,
   GridmasterUserSession,
+  PlatformFeatureFlag,
   PlatformUser,
   UserMembership,
 } from "@/types";
@@ -245,6 +246,34 @@ export function fetchGridmasterOrgHealth(options?: {
 
 export function fetchGridmasterSecurity(): Promise<GridmasterSecuritySummary> {
   return requestGridmasterJson("/api/gridmaster/security");
+}
+
+export function fetchPlatformFeatureFlags(): Promise<{ flags: PlatformFeatureFlag[] }> {
+  return requestGridmasterJson("/api/gridmaster/platform-flags");
+}
+
+export function updatePlatformFeatureFlag(input: {
+  key: string;
+  enabled: boolean;
+  expectedUpdatedAt: string;
+}): Promise<{ flag: PlatformFeatureFlag }> {
+  return requestGridmasterJson("/api/gridmaster/platform-flags", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function createPlatformFeatureFlag(input: {
+  key: string;
+  description: string;
+  enabled?: boolean;
+}): Promise<{ flag: PlatformFeatureFlag }> {
+  return requestGridmasterJson("/api/gridmaster/platform-flags", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }
 
 export function fetchGridmasterSessions(options?: {

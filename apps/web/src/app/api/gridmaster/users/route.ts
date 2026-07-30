@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
+import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import type { PlatformRole, OrganizationRole } from "@dubgrid/domain";
 import type { PlatformUser } from "@/types";
@@ -121,7 +122,7 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error("gridmaster users GET failed", error);
+    logger.error({ error }, "gridmaster users GET failed");
     return NextResponse.json({ error: "Failed to load users" }, { status: 500 });
   }
 }
@@ -186,7 +187,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("gridmaster users PATCH failed", error);
+    logger.error({ error }, "gridmaster users PATCH failed");
     return NextResponse.json({ error: "Failed to update user status" }, { status: 500 });
   }
 }

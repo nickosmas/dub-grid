@@ -18,6 +18,7 @@ import type { LucideIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
+import { MaybeHint } from "@/components/ui/hint";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import {
@@ -26,7 +27,7 @@ import {
   openBillingPortal,
   startBillingCheckout,
 } from "@/features/billing/client";
-import { useIsInSandbox, useLogout, useSandboxSourceOrgId } from "@/hooks";
+import { useClientFeatureFlags, useIsInSandbox, useLogout, useSandboxSourceOrgId } from "@/hooks";
 import { describeAction, formatDetails, formatRelativeTime } from "@/lib/activity-log-utils";
 import { formatBillingStatusLabel, formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
@@ -519,6 +520,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
   const { signOut } = useLogout();
   const isInSandbox = useIsInSandbox();
   const sandboxSourceOrgId = useSandboxSourceOrgId();
+  const featureFlags = useClientFeatureFlags();
   const searchParams = useSearchParams();
   const handledBillingReturnRef = useRef<string | null>(null);
   const [openingCheckout, setOpeningCheckout] = useState(false);
@@ -895,28 +897,36 @@ export default function BillingSettings({ organization }: { organization: { id: 
                     minWidth: 220,
                   }}
                 >
-                  <button
-                    type="button"
-                    className="dg-btn dg-btn-primary"
-                    onClick={
-                      billing.hasStripeCustomer && billing.hasStripeSubscription
-                        ? handlePortal
-                        : handleCheckout
-                    }
-                    disabled={
-                      !billing.canManageBilling ||
-                      !billing.stripeConfigured ||
-                      openingCheckout ||
-                      openingPortal ||
+                  <MaybeHint
+                    content={
                       isInSandbox
-                    }
-                    title={
-                      isInSandbox ? "Billing actions are disabled in sandbox mode." : undefined
+                        ? "Billing actions are disabled in sandbox mode."
+                        : !featureFlags.stripe
+                          ? "Billing is temporarily unavailable. Please try again shortly."
+                          : null
                     }
                   >
-                    <ExternalLink size={15} aria-hidden="true" />
-                    {openingCheckout || openingPortal ? "Opening..." : primaryAction}
-                  </button>
+                    <button
+                      type="button"
+                      className="dg-btn dg-btn-primary"
+                      onClick={
+                        billing.hasStripeCustomer && billing.hasStripeSubscription
+                          ? handlePortal
+                          : handleCheckout
+                      }
+                      disabled={
+                        !billing.canManageBilling ||
+                        !billing.stripeConfigured ||
+                        openingCheckout ||
+                        openingPortal ||
+                        isInSandbox ||
+                        !featureFlags.stripe
+                      }
+                    >
+                      <ExternalLink size={15} aria-hidden="true" />
+                      {openingCheckout || openingPortal ? "Opening..." : primaryAction}
+                    </button>
+                  </MaybeHint>
                 </div>
               </div>
             </>

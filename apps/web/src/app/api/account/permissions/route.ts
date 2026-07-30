@@ -7,6 +7,7 @@ import { verifyImpersonationSession } from "@/lib/impersonation-server";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { isCallerInactive } from "@/app/api/shared/permissions";
+import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -227,7 +228,7 @@ export async function GET(req: NextRequest) {
       mfaNagRequired,
     });
   } catch (error) {
-    console.error("account permissions GET failed", error);
+    logger.error({ error }, "account permissions GET failed");
     return jsonError("Failed to load permissions");
   }
 }

@@ -122,6 +122,7 @@ import { getScheduleStartForSpan, resolveScheduleSpan } from "@/lib/schedule-vie
 import {
   usePermissions,
   useOrganizationData,
+  useClientFeatureFlags,
   useEmployees,
   useCellLocks,
   useReliableRealtimeBroadcasts,
@@ -271,6 +272,7 @@ function SchedulerContent() {
     isLoading: permsLoading,
     orgId,
   } = usePermissions();
+  const featureFlags = useClientFeatureFlags();
   // Schedulers/staff managers always see every open shift, as a filling
   // tool, regardless of the org's openShiftVisibility setting or their own
   // personal eligibility for a given shift (see openShifts memo below).
@@ -5731,7 +5733,7 @@ function SchedulerContent() {
                 canImportPrevious={canEditShifts}
                 onImportPrevious={spanWeeks !== "month" ? handleImportPreviousPreview : undefined}
                 isImportingPrevious={isImportingPrevious}
-                onPrintOpen={() => setShowPrintOptions(true)}
+                onPrintOpen={featureFlags.printing ? () => setShowPrintOptions(true) : undefined}
                 onExportCSV={
                   dates.length > 0 && filteredEmployees.length > 0
                     ? () => exportScheduleCSV(filteredEmployees, dates, shiftForKey)

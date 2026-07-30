@@ -90,7 +90,7 @@ describe("subscribeToPostgresChanges", () => {
     expect(onEvent).toHaveBeenCalledWith("employees");
   });
 
-  it("calls onError on CHANNEL_ERROR and onReconnectAfterError on the next SUBSCRIBED", () => {
+  it("calls onError with a 1-based error count on CHANNEL_ERROR and onReconnectAfterError on the next SUBSCRIBED", () => {
     const mock = createMockChannel();
     const client = createMockClient(mock.channel);
     const onError = vi.fn();
@@ -100,7 +100,7 @@ describe("subscribeToPostgresChanges", () => {
 
     const error = new Error("boom");
     mock.emitStatus("CHANNEL_ERROR", error);
-    expect(onError).toHaveBeenCalledWith(error);
+    expect(onError).toHaveBeenCalledWith(error, 1);
     expect(onReconnectAfterError).not.toHaveBeenCalled();
 
     mock.emitStatus("SUBSCRIBED");
@@ -109,6 +109,29 @@ describe("subscribeToPostgresChanges", () => {
     // A later SUBSCRIBED with no intervening error shouldn't fire again.
     mock.emitStatus("SUBSCRIBED");
     expect(onReconnectAfterError).toHaveBeenCalledTimes(1);
+  });
+
+  it("increments consecutiveErrorCount across repeated CHANNEL_ERRORs before a reconnect, then resets", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+    const onError = vi.fn();
+    const onReconnectAfterError = vi.fn();
+
+    subscribeToPostgresChanges(client, "ch", [], { onError, onReconnectAfterError });
+
+    const error = new Error("boom");
+    mock.emitStatus("CHANNEL_ERROR", error);
+    mock.emitStatus("CHANNEL_ERROR", error);
+    mock.emitStatus("CHANNEL_ERROR", error);
+    expect(onError).toHaveBeenNthCalledWith(1, error, 1);
+    expect(onError).toHaveBeenNthCalledWith(2, error, 2);
+    expect(onError).toHaveBeenNthCalledWith(3, error, 3);
+
+    mock.emitStatus("SUBSCRIBED");
+    expect(onReconnectAfterError).toHaveBeenCalledTimes(1);
+
+    mock.emitStatus("CHANNEL_ERROR", error);
+    expect(onError).toHaveBeenNthCalledWith(4, error, 1);
   });
 
   it("cleanup removes the channel from the client", () => {

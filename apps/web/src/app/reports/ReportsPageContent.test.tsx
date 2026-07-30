@@ -5,6 +5,7 @@ import ReportsPageContent from "./ReportsPageContent";
 
 const usePermissions = vi.fn();
 const useOrganizationData = vi.fn();
+const useClientFeatureFlags = vi.fn();
 const fetchOperationsReport = vi.fn();
 const exportOperationsReportCsv = vi.fn();
 const exportOperationsReportPdf = vi.fn();
@@ -59,6 +60,7 @@ vi.mock("@/components/ProgressBar", () => ({
 vi.mock("@/hooks", () => ({
   usePermissions: () => usePermissions(),
   useOrganizationData: (options?: unknown) => useOrganizationData(options),
+  useClientFeatureFlags: () => useClientFeatureFlags(),
 }));
 
 vi.mock("sonner", () => ({
@@ -252,6 +254,13 @@ describe("ReportsPageContent", () => {
         payPeriodStartDate: "2026-04-19",
       },
       loading: false,
+    });
+    useClientFeatureFlags.mockReturnValue({
+      stripe: true,
+      csvImport: true,
+      csvExport: true,
+      reports: true,
+      printing: true,
     });
     fetchOperationsReport.mockResolvedValue(payload);
     exportOperationsReportCsv.mockResolvedValue(undefined);
@@ -539,6 +548,26 @@ describe("ReportsPageContent", () => {
 
     await waitFor(() => {
       expect(toastInfo).toHaveBeenCalledWith("Reports are available to admins and super admins.");
+      expect(routerReplace).toHaveBeenCalledWith("/dashboard");
+    });
+    expect(fetchOperationsReport).not.toHaveBeenCalled();
+  });
+
+  it("redirects admins away when the reports feature flag is off", async () => {
+    useClientFeatureFlags.mockReturnValue({
+      stripe: true,
+      csvImport: true,
+      csvExport: true,
+      reports: false,
+      printing: true,
+    });
+
+    renderReports();
+
+    await waitFor(() => {
+      expect(toastInfo).toHaveBeenCalledWith(
+        "Reports are temporarily unavailable. Please try again shortly.",
+      );
       expect(routerReplace).toHaveBeenCalledWith("/dashboard");
     });
     expect(fetchOperationsReport).not.toHaveBeenCalled();

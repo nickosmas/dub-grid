@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { loadGridmasterCompliance } from "@/app/api/gridmaster/_lib/oversight";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,7 +13,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(await loadGridmasterCompliance(getServiceClient()));
   } catch (error) {
-    console.error("gridmaster compliance GET failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/compliance" },
+      "gridmaster compliance GET failed",
+    );
     return NextResponse.json({ error: "Failed to load compliance oversight" }, { status: 500 });
   }
 }

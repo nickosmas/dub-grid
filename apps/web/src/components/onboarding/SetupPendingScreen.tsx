@@ -32,7 +32,7 @@ export default function SetupPendingScreen() {
         justifyContent: "center",
         padding: 24,
         background:
-          "linear-gradient(145deg, var(--color-bg) 0%, var(--color-brand-bg, #eff6ff) 100%)",
+          "linear-gradient(to bottom, var(--color-bg) 0%, var(--color-brand-bg, #eff6ff) 100%)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
       }}
     >

@@ -3,6 +3,7 @@ import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api
 import { getServiceClient } from "@/lib/supabase-service";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { rowToOrganization } from "@/lib/db/mappers";
+import logger from "@/lib/logger";
 import type { DbOrganization } from "@/lib/db/types";
 
 export async function GET(req: NextRequest) {
@@ -51,7 +52,10 @@ export async function GET(req: NextRequest) {
       ),
     });
   } catch (error) {
-    console.error("gridmaster dashboard GET failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/dashboard" },
+      "gridmaster dashboard GET failed",
+    );
     return NextResponse.json(
       { error: "Failed to load gridmaster dashboard data" },
       { status: 500 },

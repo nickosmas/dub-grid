@@ -15,6 +15,7 @@ vi.mock("@/app/api/shared/permissions", () => ({
 
 vi.mock("@/lib/stripe", () => ({
   syncCheckoutSessionToDb: (...args: unknown[]) => syncCheckoutSessionToDb(...args),
+  requireStripeEnabled: async () => null,
 }));
 
 vi.mock("@/lib/logger", () => ({

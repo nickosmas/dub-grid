@@ -5,6 +5,7 @@ import {
 } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(await fetchTermsAcceptanceStatus(auth.user.id));
   } catch (error) {
-    console.error("account terms GET failed", error);
+    logger.error({ error }, "account terms GET failed");
     return NextResponse.json({ error: "Failed to load terms status" }, { status: 500 });
   }
 }
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     await recordCurrentTermsAcceptance(auth.user.id);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("account terms POST failed", error);
+    logger.error({ error }, "account terms POST failed");
     return NextResponse.json({ error: "Failed to record terms acceptance" }, { status: 500 });
   }
 }

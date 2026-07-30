@@ -21,6 +21,7 @@ import {
 } from "@/lib/db/mappers";
 import { mapNormalizedScheduleCellRowToScheduleEntry } from "@/lib/schedule-cells";
 import { createAssignmentDefinitionIdByPairMap } from "@/lib/shift-job-segments";
+import logger from "@/lib/logger";
 import type { AssignmentDefinition, DraftKind, ShiftDisplayMode } from "@/types";
 
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -419,7 +420,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ shifts });
   } catch (error) {
-    console.error("gridmaster schedule GET failed", error);
+    logger.error({ error }, "gridmaster schedule GET failed");
     return NextResponse.json({ error: "Failed to load read-only schedule" }, { status: 500 });
   }
 }

@@ -9,9 +9,11 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
 import { rowToRecurringShift } from "@/lib/db/mappers";
 import { RECURRING_SHIFT_COLS } from "@/lib/db/shared";
-import { API_ERRORS } from "@dubgrid/client-errors";
+import { API_ERRORS, DEFAULT_ERROR_FALLBACK } from "@dubgrid/client-errors";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
 import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export const dynamic = "force-dynamic";
 
@@ -344,7 +346,11 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Recurring schedule operation failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    Sentry.captureException(error, { extra: { context: "schedule/recurring" } });
+    logger.error({ error }, "Recurring schedule operation failed");
+    return NextResponse.json(
+      { error: formatClientErrorMessage(error, DEFAULT_ERROR_FALLBACK) },
+      { status: 500 },
+    );
   }
 }

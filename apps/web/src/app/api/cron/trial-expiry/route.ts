@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,11 @@ export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
   if (auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!(await isFeatureEnabled("cron_trial_expiry"))) {
+    // 200, not 503 — this is an intentional gridmaster kill-switch flip, not a
+    // misconfiguration, and a status-code-only monitor shouldn't treat it as one.
+    return NextResponse.json({ ok: true, skipped: true, reason: "disabled" });
   }
 
   const db = getServiceClient();

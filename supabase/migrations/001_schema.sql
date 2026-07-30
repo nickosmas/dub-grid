@@ -1488,6 +1488,39 @@ CREATE INDEX idx_audit_log_resource ON public.audit_log(resource_type, resource_
 COMMENT ON TABLE public.audit_log IS 'Comprehensive audit trail for all mutations across the platform';
 
 
+-- ── platform_feature_flags ────────────────────────────────────────────────────
+
+CREATE TABLE public.platform_feature_flags (
+  key           TEXT PRIMARY KEY
+    CONSTRAINT platform_feature_flags_key_format CHECK (key ~ '^[a-z0-9_]+$'),
+  enabled       BOOLEAN NOT NULL DEFAULT true,
+  description   TEXT NOT NULL DEFAULT '',
+  updated_by    UUID,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.platform_feature_flags IS 'Platform-wide kill switches, gridmaster-managed. One row per flag (not a JSONB blob) so concurrent gridmaster edits to different flags cannot clobber each other via read-modify-write. enabled=true is the normal/live state; flip to false to kill-switch the feature without a deploy. Read via isFeatureEnabled() in apps/web/src/lib/feature-flags.ts, which caches with a short TTL and fails OPEN (unknown key or read error = enabled) so this table can never itself become a second point of failure.';
+COMMENT ON COLUMN public.platform_feature_flags.key IS 'Stable identifier referenced by call sites, e.g. "stripe", "sentry", "posthog", "resend_email", "csv_import", "csv_export", "mobile_api", "cron_trial_expiry".';
+COMMENT ON COLUMN public.platform_feature_flags.enabled IS 'true = live. false = kill-switched.';
+COMMENT ON COLUMN public.platform_feature_flags.updated_by IS 'Gridmaster user id who last changed this flag.';
+
+-- Seed rows for every flag wired up at ship time. Adding a new switch later is
+-- one more INSERT in a future migration plus a call site, not a schema change.
+INSERT INTO public.platform_feature_flags (key, enabled, description) VALUES
+  ('stripe',                      true, 'Stripe billing routes (webhook, checkout, billing portal). Disabling returns 503 from all /api/stripe/* routes.'),
+  ('sentry',                      true, 'Sentry error/crash reporting.'),
+  ('posthog',                     true, 'PostHog product analytics.'),
+  ('resend_email',                true, 'Outbound transactional email via Resend (invites, notifications, billing emails).'),
+  ('csv_import',                  true, 'Employee CSV import route.'),
+  ('csv_export',                  true, 'Schedule/staff CSV export route.'),
+  ('mobile_api',                  true, 'Entire mobile v1 API surface, gated in requireMobileAuth().'),
+  ('cron_trial_expiry',           true, 'Daily trial-expiry notification cron.'),
+  ('cron_expire_requests',        true, 'Shift-request auto-expiry cron.'),
+  ('cron_reconcile_org_domains',  true, 'Org-domain reconciliation cron.'),
+  ('cron_sandbox_cleanup',        true, 'Test-sandbox cleanup cron.')
+ON CONFLICT (key) DO NOTHING;
+
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 5. REALTIME
 -- ══════════════════════════════════════════════════════════════════════════════

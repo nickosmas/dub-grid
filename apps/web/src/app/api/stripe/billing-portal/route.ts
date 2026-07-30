@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createBillingPortalSession, writeBillingPortalOpenedAuditLog } from "@/lib/stripe";
+import {
+  createBillingPortalSession,
+  writeBillingPortalOpenedAuditLog,
+  requireStripeEnabled,
+} from "@/lib/stripe";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie } from "@/lib/api-auth";
@@ -71,6 +75,11 @@ export async function POST(req: NextRequest) {
         },
       );
     }
+
+    // Checked after auth + rate-limiting (not before) so a disabled flag can't be
+    // used to probe this route for free, unauthenticated and unrate-limited.
+    const stripeDisabled = await requireStripeEnabled();
+    if (stripeDisabled) return stripeDisabled;
 
     const { data: org, error: orgError } = await supabase
       .from("organizations")

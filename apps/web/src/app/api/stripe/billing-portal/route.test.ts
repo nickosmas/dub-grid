@@ -20,6 +20,7 @@ vi.mock("@/lib/stripe", () => ({
   createBillingPortalSession: (...args: unknown[]) => createBillingPortalSession(...args),
   writeBillingPortalOpenedAuditLog: (...args: unknown[]) =>
     writeBillingPortalOpenedAuditLog(...args),
+  requireStripeEnabled: async () => null,
 }));
 
 vi.mock("@/lib/logger", () => ({

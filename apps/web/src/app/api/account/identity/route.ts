@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchAccountIdentitySnapshot } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(await fetchAccountIdentitySnapshot(auth.user.id));
   } catch (error) {
-    console.error("account identity GET failed", error);
+    logger.error({ error }, "account identity GET failed");
     return NextResponse.json({ error: "Failed to load account identity" }, { status: 500 });
   }
 }

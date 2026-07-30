@@ -2,6 +2,8 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { createHash } from "node:crypto";
 import { serverEnv } from "@/lib/env";
+import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
 
 /**
  * SHA-256 of a normalized email, for use as a rate-limit key without storing
@@ -105,6 +107,9 @@ export async function checkRateLimit(
   if (!limiter) {
     // Fail-closed in production: missing Redis = service unavailable (not "too many requests")
     if (isProduction) {
+      const message = "Rate limiter unavailable: no Redis configured in production";
+      logger.error(message);
+      Sentry.captureMessage(message, "error");
       return { limited: true, misconfigured: true };
     }
     return { limited: false };
@@ -112,11 +117,17 @@ export async function checkRateLimit(
   try {
     const { success, reset } = await limiter.limit(key);
     return { limited: !success, reset };
-  } catch {
+  } catch (err) {
     // Redis/Upstash unreachable. Don't let it escape as a framework 500 from
     // whatever callsite invoked us (some call before their try block). Fail
     // closed in production (treat like misconfigured → 503), open in dev. (M-3)
     if (isProduction) {
+      const message = "Rate limiter check failed (Redis/Upstash unreachable)";
+      logger.error({ error: err }, message);
+      // captureException (not captureMessage) so the real error — DNS failure vs.
+      // auth failure vs. timeout — is attached instead of just a fixed string.
+      // Sentry still groups these by exception type + this call site.
+      Sentry.captureException(err, { extra: { context: "rate-limit-check" } });
       return { limited: true, misconfigured: true };
     }
     return { limited: false };

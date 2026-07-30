@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
+import logger from "@/lib/logger";
 import { loadGridmasterSecurity } from "@/app/api/gridmaster/_lib/oversight";
 
 export async function GET(req: NextRequest) {
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(await loadGridmasterSecurity(getServiceClient()));
   } catch (error) {
-    console.error("gridmaster security GET failed", error);
+    logger.error({ error }, "gridmaster security GET failed");
     return NextResponse.json({ error: "Failed to load security oversight" }, { status: 500 });
   }
 }

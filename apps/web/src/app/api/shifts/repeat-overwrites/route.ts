@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
 
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ overwriteCount });
   } catch (error) {
-    console.error("repeat overwrites POST failed", error);
+    logger.error({ error }, "repeat overwrites POST failed");
     return NextResponse.json({ error: "Failed to load repeat overwrite count" }, { status: 500 });
   }
 }

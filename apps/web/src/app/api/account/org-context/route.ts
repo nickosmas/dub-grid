@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
       isGridmaster: auth.claims.platform_role === "gridmaster",
     });
   } catch (error) {
-    console.error("account org context GET failed", error);
+    logger.error({ error }, "account org context GET failed");
     return NextResponse.json({ error: "Failed to load account org context" }, { status: 500 });
   }
 }

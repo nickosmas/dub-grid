@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createStripeCustomer, createCheckoutSession } from "@/lib/stripe";
+import { createStripeCustomer, createCheckoutSession, requireStripeEnabled } from "@/lib/stripe";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { forbidIfSandboxCookie } from "@/lib/api-auth";
@@ -72,6 +72,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Checked after auth + rate-limiting (not before) so a disabled flag can't be
+    // used to probe this route for free, unauthenticated and unrate-limited.
+    const stripeDisabled = await requireStripeEnabled();
+    if (stripeDisabled) return stripeDisabled;
+
     const { data: org, error: orgError } = await supabase
       .from("organizations")
       .select("id, name, stripe_customer_id")
@@ -105,10 +110,22 @@ export async function POST(req: NextRequest) {
       const customer = await createStripeCustomer(orgId, org.name, email);
       customerId = customer.id;
 
-      await supabase
+      const { error: persistError } = await supabase
         .from("organizations")
         .update({ stripe_customer_id: customerId })
         .eq("id", orgId);
+      if (persistError) {
+        // The Stripe customer exists but we couldn't record its id. Surface it — retries are
+        // safe now that createStripeCustomer reuses the existing customer by org_id metadata
+        // rather than creating a duplicate, but a persistently unpersisted id is worth seeing.
+        Sentry.captureException(persistError, {
+          extra: { context: "create-checkout-persist-customer", orgId },
+        });
+        logger.error(
+          { error: persistError, orgId },
+          "Failed to persist stripe_customer_id after customer creation",
+        );
+      }
     }
 
     const seats = Math.max(await countBillableAppUsers(supabase, orgId), 1);

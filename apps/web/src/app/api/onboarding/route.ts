@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const searchSchema = z.object({
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
       tooltipToursCompleted: (data?.tooltip_tours_completed as Record<string, string>) ?? {},
     });
   } catch (error) {
-    console.error("onboarding GET failed", error);
+    logger.error({ error }, "onboarding GET failed");
     return NextResponse.json({ error: "Failed to load onboarding status" }, { status: 500 });
   }
 }
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("onboarding POST failed", error);
+    logger.error({ error }, "onboarding POST failed");
     return NextResponse.json({ error: "Failed to complete onboarding" }, { status: 500 });
   }
 }

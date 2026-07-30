@@ -18,6 +18,7 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
+import logger from "@/lib/logger";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
   ABSENCE_TYPE_COLS,
@@ -1852,7 +1853,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
     }
   } catch (error) {
-    console.error("Settings GET failed", { action, orgId: effectiveOrgId, error });
+    logger.error({ action, orgId: effectiveOrgId, error }, "Settings GET failed");
     return NextResponse.json({ error: "Settings request failed" }, { status: 500 });
   }
 }
@@ -2996,7 +2997,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(deptConflict, { status: 409 });
       }
     }
-    console.error("Settings POST failed", { action: data.action, orgId, error });
+    logger.error({ action: data.action, orgId, error }, "Settings POST failed");
     return apiErrorResponse(error, "Settings request failed");
   }
 }

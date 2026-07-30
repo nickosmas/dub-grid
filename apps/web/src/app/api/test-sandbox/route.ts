@@ -10,7 +10,10 @@ import {
   deleteSandboxForUser,
   findActiveSandboxForUser,
 } from "@/features/test-sandbox/server";
-import { API_ERRORS } from "@dubgrid/client-errors";
+import { API_ERRORS, DEFAULT_ERROR_FALLBACK } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
+import * as Sentry from "@/lib/sentry";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 
 export const dynamic = "force-dynamic";
 
@@ -173,8 +176,11 @@ export async function POST(req: NextRequest) {
     );
     return response;
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "We couldn't toggle sandbox mode right now.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    Sentry.captureException(error, { extra: { context: "test-sandbox" } });
+    logger.error({ error }, "Failed to toggle sandbox mode");
+    return NextResponse.json(
+      { error: formatClientErrorMessage(error, DEFAULT_ERROR_FALLBACK) },
+      { status: 500 },
+    );
   }
 }

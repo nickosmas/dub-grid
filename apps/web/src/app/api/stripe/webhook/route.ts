@@ -5,6 +5,7 @@ import {
   writeStripeCustomerBillingActivityLog,
   writeStripePaymentFailedAuditLog,
   writeStripePaymentSucceededAuditLog,
+  requireStripeEnabled,
 } from "@/lib/stripe";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
@@ -31,6 +32,10 @@ async function upsertSubscription(sub: Stripe.Subscription, event: Stripe.Event)
 }
 
 export async function POST(req: NextRequest) {
+  // 503 so Stripe retries the event later rather than dropping it.
+  const stripeDisabled = await requireStripeEnabled();
+  if (stripeDisabled) return stripeDisabled;
+
   const stripe = getStripe();
   if (!stripe) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });

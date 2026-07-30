@@ -11,8 +11,16 @@ export interface PostgresChangeListener<Table extends string = string> {
 }
 
 export interface RealtimeErrorHooks {
-  /** Called on CHANNEL_ERROR. Platform plugs in Sentry / console.error / etc. */
-  onError?: (error: Error) => void;
+  /**
+   * Called on CHANNEL_ERROR. Platform plugs in Sentry / console.error / etc.
+   * `consecutiveErrorCount` is 1 on the first error since the last successful
+   * SUBSCRIBE and increments on each further error before a reconnect — this
+   * package doesn't retry or back off itself (the underlying Supabase client
+   * already does), it just counts, so callers can decide their own escalation
+   * policy (e.g. only alert after N consecutive errors) without duplicating
+   * that policy in every consumer on every platform.
+   */
+  onError?: (error: Error, consecutiveErrorCount: number) => void;
   /**
    * Called once when the channel re-SUBSCRIBEs after a prior error — the
    * "we may have missed events while disconnected" catch-up signal.
@@ -36,7 +44,7 @@ export function subscribeToPostgresChanges<Table extends string>(
   listeners: ReadonlyArray<PostgresChangeListener<Table>>,
   hooks: RealtimeErrorHooks = {},
 ): () => void {
-  let hadError = false;
+  let errorCount = 0;
   const channel = client.channel(channelName);
 
   for (const listener of listeners) {
@@ -53,12 +61,12 @@ export function subscribeToPostgresChanges<Table extends string>(
   }
 
   channel.subscribe((status: string, err?: Error) => {
-    if (status === "SUBSCRIBED" && hadError) {
-      hadError = false;
+    if (status === "SUBSCRIBED" && errorCount > 0) {
+      errorCount = 0;
       hooks.onReconnectAfterError?.();
     } else if (status === "CHANNEL_ERROR") {
-      hadError = true;
-      hooks.onError?.(err ?? new Error(`realtime channel error: ${channelName}`));
+      errorCount += 1;
+      hooks.onError?.(err ?? new Error(`realtime channel error: ${channelName}`), errorCount);
     }
   });
 

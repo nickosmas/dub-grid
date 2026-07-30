@@ -1152,3 +1152,21 @@ CREATE POLICY "deny_all_stripe_processed_events"
   ON public.stripe_processed_events FOR ALL TO authenticated, anon
   USING (FALSE)
   WITH CHECK (FALSE);
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- platform_feature_flags
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Platform-wide kill switches. Only gridmasters can read or write; everyone
+-- else gets nothing, since app code always reads through the service-role
+-- client (apps/web/src/lib/feature-flags.ts), never PostgREST directly.
+
+ALTER TABLE public.platform_feature_flags ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "gridmaster_all_platform_feature_flags"
+  ON public.platform_feature_flags FOR ALL TO authenticated
+  USING (public.is_gridmaster())
+  WITH CHECK (public.is_gridmaster());
+
+COMMENT ON POLICY "gridmaster_all_platform_feature_flags" ON public.platform_feature_flags
+  IS 'Only gridmasters can read or write platform-wide kill switches.';

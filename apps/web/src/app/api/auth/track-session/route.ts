@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     if (isSupabaseErrorCode(error, "23503")) {
       return NextResponse.json({ error: "User not ready" }, { status: 409 });
     }
-    console.error("track-session upsert error:", error);
+    logger.error({ err: error }, "track-session upsert error");
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

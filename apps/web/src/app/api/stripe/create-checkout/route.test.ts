@@ -27,6 +27,7 @@ vi.mock("@/app/api/shared/permissions", () => ({
 vi.mock("@/lib/stripe", () => ({
   createCheckoutSession: (...args: unknown[]) => createCheckoutSession(...args),
   createStripeCustomer: (...args: unknown[]) => createStripeCustomer(...args),
+  requireStripeEnabled: async () => null,
 }));
 
 vi.mock("@/lib/rate-limit", () => ({

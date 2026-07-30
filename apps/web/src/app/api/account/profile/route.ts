@@ -5,6 +5,7 @@ import {
 } from "@/features/account/server";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
@@ -72,7 +73,7 @@ export async function PATCH(req: NextRequest) {
       { status: 403 },
     );
   } catch (error) {
-    console.error("account profile PATCH failed", error);
+    logger.error({ error }, "account profile PATCH failed");
     return NextResponse.json({ error: "Failed to update account details" }, { status: 500 });
   }
 }

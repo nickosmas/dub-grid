@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 import type { Notification, NotificationPriority, NotificationType } from "@/types";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -75,7 +76,7 @@ export async function GET(req: NextRequest) {
         : undefined,
     });
   } catch (error) {
-    console.error("notifications GET failed", error);
+    logger.error({ error }, "notifications GET failed");
     return NextResponse.json({ error: "Failed to load notifications" }, { status: 500 });
   }
 }
@@ -117,7 +118,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("notifications PATCH failed", error);
+    logger.error({ error }, "notifications PATCH failed");
     return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 });
   }
 }

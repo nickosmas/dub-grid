@@ -51,11 +51,51 @@ if (process.env.NODE_ENV !== "development") {
   _sdk = require("@sentry/nextjs");
 }
 
+// ── Platform kill switch (server-side only) ───────────────────────────────────
+//
+// This module is imported from both server and client code, and the flags
+// table read (isFeatureEnabled) is server-only (service-role Supabase +
+// Redis) — so the kill switch only gates server-side captures. It can't gate
+// the top-level SDK load above without breaking the dead-code-elimination
+// trick, so instead it wraps just captureException/captureMessage, the two
+// calls that actually generate billable events, using a short-TTL in-memory
+// cache refreshed via a dynamic import (kept out of the client bundle).
+
+const SENTRY_FLAG_TTL_MS = 30_000;
+let _sentryFlagEnabled = true;
+let _sentryFlagCheckedAt = 0;
+
+function refreshSentryFlagIfStale(): void {
+  if (typeof window !== "undefined") return; // client: always follow the dev/prod shim above
+  const now = Date.now();
+  if (now - _sentryFlagCheckedAt < SENTRY_FLAG_TTL_MS) return;
+  _sentryFlagCheckedAt = now; // mark checked immediately so concurrent calls don't pile up requests
+  void import("@/lib/feature-flags")
+    .then(({ isFeatureEnabled }) => isFeatureEnabled("sentry"))
+    .then((enabled) => {
+      _sentryFlagEnabled = enabled;
+    })
+    .catch(async (err) => {
+      // Fail open — keep the last known value rather than losing error visibility.
+      // Still log: a persistent failure here would otherwise silently keep Sentry
+      // on/off against the admin's intent with zero observability. Dynamic import,
+      // same as feature-flags above, to keep this out of the client bundle.
+      const { default: logger } = await import("@/lib/logger");
+      logger.error({ err }, "Sentry kill-switch flag refresh failed");
+    });
+}
+
+function sentryKillSwitchEnabled(): boolean {
+  refreshSentryFlagIfStale();
+  return _sentryFlagEnabled;
+}
+
 // ── Conditional re-exports ────────────────────────────────────────────────────
 
 // captureException
 export const captureException: (error: unknown, context?: CaptureContext) => void = _sdk
   ? (...args) => {
+      if (!sentryKillSwitchEnabled()) return;
       _sdk!.captureException(...args);
     }
   : noop;
@@ -63,6 +103,7 @@ export const captureException: (error: unknown, context?: CaptureContext) => voi
 // captureMessage
 export const captureMessage: (message: string, level?: SeverityLevel) => void = _sdk
   ? (...args) => {
+      if (!sentryKillSwitchEnabled()) return;
       _sdk!.captureMessage(...args);
     }
   : noop;

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
+import logger from "@/lib/logger";
 
 type ServiceClient = ReturnType<typeof getServiceClient>;
 type AuditRow = Record<string, unknown>;
@@ -110,7 +111,10 @@ export async function GET(req: NextRequest) {
       entries,
     });
   } catch (error) {
-    console.error("gridmaster full audit-log GET failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/audit-log/full" },
+      "gridmaster full audit-log GET failed",
+    );
     return NextResponse.json({ error: "Failed to load full audit log" }, { status: 500 });
   }
 }

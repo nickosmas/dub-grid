@@ -1176,12 +1176,15 @@ export async function refreshMobileEmployeeInvitationRow(
     orgId: string;
     invitationId: string;
     expectedUpdatedAt: string | null;
+    // When provided, persist this exact token (the caller has already emailed it, so the
+    // committed row and the emailed link stay in sync). Omitted → generate a fresh token.
+    token?: string;
   },
 ): Promise<MobileInvitationRow | null> {
   let query = serviceClient
     .from("invitations")
     .update({
-      token: crypto.randomUUID(),
+      token: input.token ?? crypto.randomUUID(),
       expires_at: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
       revoked_at: null,
       updated_at: new Date().toISOString(),

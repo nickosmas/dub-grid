@@ -28,6 +28,11 @@ jobs:
     env:
       TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      # Required so rate limiting isn't null under `next start`'s NODE_ENV=production —
+      # without these, checkRateLimit() fails closed on every call (see
+      # apps/web/src/lib/rate-limit.ts) and login 503s for every Playwright spec.
+      UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
       # Well-known Supabase CLI local dev keys (deterministic, not secrets).
       # See: https://supabase.com/docs/guides/local-development
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321

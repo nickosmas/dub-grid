@@ -163,7 +163,7 @@ export default function ScheduleRules({
                 marginTop: 2,
               }}
             >
-              When enabled, overlapping shifts cannot be saved. Admins can override.
+              When enabled, overlapping shifts cannot be saved.
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>

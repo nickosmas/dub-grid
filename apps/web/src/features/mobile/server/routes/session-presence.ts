@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { trackUserSessionForUser } from "@/features/account/server";
 import { requireMobileAuth } from "@/features/mobile/server";
+import logger from "@/lib/logger";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
 
 const CORS_METHODS = ["POST", "OPTIONS"] as const;
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
       ipAddress: ip,
     });
   } catch (error) {
-    console.error("mobile session-presence upsert failed", error);
+    logger.error({ error }, "mobile session-presence upsert failed");
     return json({ error: "Failed to track session" }, { status: 500 });
   }
 

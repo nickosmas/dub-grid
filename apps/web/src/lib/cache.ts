@@ -66,6 +66,9 @@ export const CacheKey = {
 
   // Public subdomain lookup (validate-domain)
   orgBySlug: (slug: string) => `dg:org:slug:${slug}`,
+
+  // Platform-wide kill switches (see lib/feature-flags.ts)
+  platformFlags: () => `dg:platform:featureFlags`,
 } as const;
 
 // ── Typed Cache Operations ──────────────────────────────────────────────
