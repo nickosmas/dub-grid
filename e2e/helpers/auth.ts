@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 // Seeded by seed.ts (run in CI via `npx tsx seed.ts`, see .github/workflows/e2e.yml)
 // as a super_admin on the "calmhaven" org — the same org the shared Playwright
@@ -44,6 +44,12 @@ async function clearBlockingOverlays(page: Page): Promise<void> {
  * for the authenticated app shell to render.
  */
 export async function loginAsQaSuperAdmin(page: Page): Promise<void> {
+  // A first-ever login for a fresh seed runs through up to four sequential
+  // gates (terms, onboarding, trial modal, cookie consent), each with its
+  // own multi-second wait budget — comfortably past Playwright's default
+  // 30s per-test timeout on a CI runner slower than a local machine.
+  test.setTimeout(60_000);
+
   await page.goto("/login");
 
   await page.getByLabel("Email").fill(QA_SUPER_ADMIN_EMAIL);
