@@ -103,7 +103,17 @@ export async function middleware(req: NextRequest) {
     : btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
   const analyticsSrc = "https://va.vercel-scripts.com";
   const devScriptExtras = isDev ? "'unsafe-eval'" : "";
-  const devConnectExtras = isDev
+  // Gated on NEXT_PUBLIC_SUPABASE_URL being a loopback address, not on isDev —
+  // a *production build* (`next start`) run against local Supabase (e.g. the
+  // e2e CI job) needs this too, and a real deployment's Supabase URL is never
+  // 127.0.0.1/localhost, so this never loosens the CSP for an actual prod
+  // deployment. Without it, the client-side Supabase SDK's own calls (session
+  // refresh, getUser, etc.) are silently blocked by CSP after a successful
+  // server-side login, leaving the user stuck on the login page.
+  const isLocalSupabase = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+  );
+  const devConnectExtras = isLocalSupabase
     ? "http://127.0.0.1:54321 ws://127.0.0.1:54321 http://localhost:54321 ws://localhost:54321"
     : "";
   const buildCsp = (scriptSrc: string) =>
