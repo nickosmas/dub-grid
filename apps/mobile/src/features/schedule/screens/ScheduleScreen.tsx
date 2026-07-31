@@ -122,6 +122,21 @@ import {
   type MobileScheduleWeekDay,
   type WeeklyHoursSummary,
 } from "../lib/schedule";
+import {
+  WEEK_SWIPE_FALLBACK_WIDTH,
+  getCurrentTimeValue,
+  getSegmentStartTime,
+  getSegmentEndTime,
+  getLocalDateTimeMinutes,
+  getHeroTiming,
+  formatHoursValue,
+  getSwipeEventX,
+  getSwipeEventTimestamp,
+  clampWeekSwipeDelta,
+  isCommittedWeekSwipe,
+  type HeroTiming,
+} from "../lib/scheduleScreenHelpers";
+
 import type {
   MobileOpenShift,
   MobileScheduleEntry,
@@ -129,11 +144,6 @@ import type {
   MobileShiftRequest,
 } from "@dubgrid/contracts";
 
-const WEEK_SWIPE_FALLBACK_WIDTH = 360;
-const WEEK_SWIPE_MIN_THRESHOLD = 96;
-const WEEK_SWIPE_THRESHOLD_RATIO = 0.3;
-const WEEK_SWIPE_FLICK_MIN_DISTANCE = 24;
-const WEEK_SWIPE_FLICK_VELOCITY = 0.45;
 const MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS = 4;
 const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
 const OPEN_SHIFT_CARD_SHADOW_ALLOWANCE = 18;
@@ -178,10 +188,6 @@ if (
 }
 
 type ScheduleScope = "mine" | "team";
-type ShiftTimeRange = {
-  start: string;
-  end: string;
-};
 type RequestActionBody =
   | { action: "claim"; claimerEmpId: string }
   | {
@@ -475,208 +481,6 @@ function buildTeamScheduleShiftGroupsForView(
     }));
 }
 
-function getTimePartsInTimeZone(
-  value: Date,
-  timeZone?: string | null,
-): { hour: number; minute: number; second: number } {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: timeZone ?? "UTC",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const parts = formatter.formatToParts(value);
-
-  return {
-    hour: Number(parts.find((part) => part.type === "hour")?.value ?? "0"),
-    minute: Number(parts.find((part) => part.type === "minute")?.value ?? "0"),
-    second: Number(parts.find((part) => part.type === "second")?.value ?? "0"),
-  };
-}
-
-function getCurrentTimeValue(value: Date, timeZone?: string | null): string {
-  const parts = getTimePartsInTimeZone(value, timeZone);
-
-  return `${`${parts.hour}`.padStart(2, "0")}:${`${parts.minute}`.padStart(2, "0")}:${`${parts.second}`.padStart(2, "0")}`;
-}
-
-function getMinutesSinceMidnight(value: string): number | null {
-  const [rawHours, rawMinutes] = value.split(":");
-  const hours = Number(rawHours);
-  const minutes = Number(rawMinutes);
-
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-    return null;
-  }
-
-  return hours * 60 + minutes;
-}
-
-function expandTimeRange(range: ShiftTimeRange): Array<{ start: number; end: number }> {
-  const startMinutes = getMinutesSinceMidnight(range.start);
-  const endMinutes = getMinutesSinceMidnight(range.end);
-
-  if (startMinutes == null || endMinutes == null) {
-    return [];
-  }
-
-  if (endMinutes <= startMinutes) {
-    return [
-      { start: startMinutes, end: 24 * 60 },
-      { start: 0, end: endMinutes },
-    ];
-  }
-
-  return [{ start: startMinutes, end: endMinutes }];
-}
-
-type HeroTiming = {
-  label: string;
-  progress: number | null;
-};
-
-function getSegmentStartTime(
-  segment: MobileScheduleEntrySegment | null | undefined,
-): string | null {
-  return segment?.startTime ?? segment?.shiftStartTime ?? null;
-}
-
-function getSegmentEndTime(segment: MobileScheduleEntrySegment | null | undefined): string | null {
-  return segment?.endTime ?? segment?.shiftEndTime ?? null;
-}
-
-function formatDurationValue(totalMinutes: number): string {
-  const minutes = Math.max(totalMinutes, 0);
-  const daysPart = Math.floor(minutes / (24 * 60));
-  const remainingDayMinutes = minutes % (24 * 60);
-  const hoursPart = Math.floor(remainingDayMinutes / 60);
-  const minutesPart = remainingDayMinutes % 60;
-
-  if (daysPart > 0) {
-    return hoursPart > 0 ? `${daysPart}d ${hoursPart}h` : `${daysPart}d`;
-  }
-
-  if (hoursPart === 0) {
-    return `${minutesPart}m`;
-  }
-
-  if (minutesPart === 0) {
-    return `${hoursPart}h`;
-  }
-
-  return `${hoursPart}h ${minutesPart}m`;
-}
-
-function formatDurationLabel(totalMinutes: number): string {
-  return `${formatDurationValue(totalMinutes)} left`;
-}
-
-function getIsoDateOrdinal(value: string): number | null {
-  const timestamp = Date.parse(`${value}T00:00:00.000Z`);
-
-  if (Number.isNaN(timestamp)) {
-    return null;
-  }
-
-  return Math.floor(timestamp / (24 * 60 * 60 * 1000));
-}
-
-function getLocalDateTimeMinutes(date: string, time: string): number | null {
-  const dateOrdinal = getIsoDateOrdinal(date);
-  const timeMinutes = getMinutesSinceMidnight(time);
-
-  if (dateOrdinal == null || timeMinutes == null) {
-    return null;
-  }
-
-  return dateOrdinal * 24 * 60 + timeMinutes;
-}
-
-function getStartingInLabel(input: {
-  currentDate: string;
-  currentTime: string;
-  shiftDate: string;
-  shiftStartTime: string | null;
-}): string | null {
-  if (!input.shiftStartTime) {
-    return null;
-  }
-
-  const shiftStartMinutes = getLocalDateTimeMinutes(input.shiftDate, input.shiftStartTime);
-  const currentMinutes = getLocalDateTimeMinutes(input.currentDate, input.currentTime);
-
-  if (shiftStartMinutes == null || currentMinutes == null) {
-    return null;
-  }
-
-  return `Starting in ${formatDurationValue(shiftStartMinutes - currentMinutes)}`;
-}
-
-function getHeroTiming(
-  entry: MobileScheduleEntry | null,
-  segmentStartTime: string | null,
-  segmentEndTime: string | null,
-  status: "active" | "upcoming" | "scheduled" | "away" | "empty",
-  currentDate: string,
-  currentTime: string,
-): HeroTiming | null {
-  if (!entry || !segmentStartTime || status === "away" || status === "empty") {
-    return null;
-  }
-
-  const segmentStartMinutes = getLocalDateTimeMinutes(entry.date, segmentStartTime);
-  const currentMinutes = getLocalDateTimeMinutes(currentDate, currentTime);
-
-  if (segmentStartMinutes == null || currentMinutes == null) {
-    return null;
-  }
-
-  if (currentMinutes < segmentStartMinutes) {
-    const startingInLabel = getStartingInLabel({
-      currentDate,
-      currentTime,
-      shiftDate: entry.date,
-      shiftStartTime: segmentStartTime,
-    });
-
-    return startingInLabel ? { label: startingInLabel, progress: null } : null;
-  }
-
-  if (!segmentEndTime) {
-    return null;
-  }
-
-  const segmentEndMinutes = getLocalDateTimeMinutes(entry.date, segmentEndTime);
-
-  if (segmentEndMinutes == null) {
-    return null;
-  }
-
-  const normalizedEndMinutes =
-    segmentEndMinutes <= segmentStartMinutes ? segmentEndMinutes + 24 * 60 : segmentEndMinutes;
-
-  if (currentMinutes < segmentStartMinutes || currentMinutes >= normalizedEndMinutes) {
-    return null;
-  }
-
-  const totalMinutes = normalizedEndMinutes - segmentStartMinutes;
-  const elapsedMinutes = Math.min(Math.max(currentMinutes - segmentStartMinutes, 0), totalMinutes);
-
-  if (totalMinutes <= 0) {
-    return null;
-  }
-
-  return {
-    progress: elapsedMinutes / totalMinutes,
-    label: formatDurationLabel(normalizedEndMinutes - currentMinutes),
-  };
-}
-
-function formatHoursValue(value: number): string {
-  return Number.isInteger(value) ? `${value}` : value.toFixed(1);
-}
-
 function getRequestSegments(request: MobileShiftRequest, which: "requester" | "target") {
   const legacyRequest = request as MobileShiftRequest & {
     requesterSegments?: MobileShiftRequest["requesterPresentation"]["segments"];
@@ -826,77 +630,6 @@ function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
     : null;
 }
 
-function getSwipeEventX(event: GestureResponderEvent): number | null {
-  const nativeEvent = event.nativeEvent;
-  const webNativeEvent = nativeEvent as typeof nativeEvent & {
-    changedTouches?: Array<{ pageX?: number }>;
-    touches?: Array<{ pageX?: number }>;
-  };
-
-  if (typeof nativeEvent.pageX === "number") {
-    return nativeEvent.pageX;
-  }
-
-  const changedTouchX = webNativeEvent.changedTouches?.[0]?.pageX;
-  if (typeof changedTouchX === "number") {
-    return changedTouchX;
-  }
-
-  const touchX = webNativeEvent.touches?.[0]?.pageX;
-  if (typeof touchX === "number") {
-    return touchX;
-  }
-
-  return null;
-}
-
-function getSwipeEventTimestamp(event: GestureResponderEvent): number | null {
-  const nativeEvent = event.nativeEvent;
-  const webNativeEvent = nativeEvent as typeof nativeEvent & {
-    timeStamp?: number;
-  };
-  const webEvent = event as GestureResponderEvent & {
-    timeStamp?: number;
-    timestamp?: number;
-  };
-  const timestamp =
-    nativeEvent.timestamp ?? webNativeEvent.timeStamp ?? webEvent.timestamp ?? webEvent.timeStamp;
-
-  return typeof timestamp === "number" ? timestamp : null;
-}
-
-function getWeekSwipeThreshold(width: number): number {
-  return Math.max(WEEK_SWIPE_MIN_THRESHOLD, width * WEEK_SWIPE_THRESHOLD_RATIO);
-}
-
-function clampWeekSwipeDelta(value: number, width: number): number {
-  if (width <= 0) {
-    return value;
-  }
-
-  return Math.max(-width, Math.min(width, value));
-}
-
-function isCommittedWeekSwipe(input: {
-  deltaX: number;
-  elapsedMs: number | null;
-  width: number;
-}): boolean {
-  const distance = Math.abs(input.deltaX);
-
-  if (distance >= getWeekSwipeThreshold(input.width)) {
-    return true;
-  }
-
-  if (input.elapsedMs == null || input.elapsedMs <= 0) {
-    return false;
-  }
-
-  return (
-    distance >= WEEK_SWIPE_FLICK_MIN_DISTANCE &&
-    distance / input.elapsedMs >= WEEK_SWIPE_FLICK_VELOCITY
-  );
-}
 
 export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const mobileColors = useMobileColors();
