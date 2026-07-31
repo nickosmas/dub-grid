@@ -76,6 +76,38 @@ import {
 import DroppableCell from "./DroppableCell";
 import DraggableShift from "./DraggableShift";
 import { PublishDiffPill } from "./schedule-grid/publishDiffPill";
+import {
+  shouldUseShiftColorForDiffState,
+  GridDiffBadge,
+  MentoredShiftBadge,
+  AuthorBadge,
+  type GridDiffBadgeConfig,
+} from "./schedule-grid/badges";
+import {
+  getFocusAreaInitials,
+  getCrossFocusBadgePalette,
+  isOvernightTimes,
+  getDraftBorder,
+  getPublishDiffBoxShadow,
+  joinBoxShadows,
+  areGridCellIdsEqual,
+  getGridCellKey,
+  getBulkSelectionRingStyle,
+  cellShowsDraftDiffBadge,
+  buildPublishTooltip,
+  timeRangesFromCustomTimes,
+  splitShiftLabelParts,
+  assignmentIdsFromPublishState,
+  absenceTypeIdFromPublishState,
+  timeRangesFromPublishState,
+  SINGLE_SHIFT_PILL_RADIUS,
+  MULTI_SHIFT_PILL_RADIUS,
+  RAISED_DIFF_BADGE_TOP_INSET,
+  SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING,
+  MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING,
+} from "./schedule-grid/gridHelpers";
+
+
 import type { ShiftDragData } from "./DraggableShift";
 import type { CellDropData } from "./DroppableCell";
 import { useAuth } from "@/components/AuthProvider";
@@ -86,375 +118,6 @@ import {
   type ShiftDiffBorderKind,
   type ShiftDiffTimeRange,
 } from "@/lib/shift-diff-badges";
-
-function getFocusAreaInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 3);
-}
-
-function getCrossFocusBadgePalette(style?: Pick<AssignmentDefinition, "color" | "text"> | null) {
-  return {
-    background: style?.color ?? "var(--color-bg)",
-    color: style?.text ?? "var(--color-text-muted)",
-  };
-}
-
-/** Returns true if the given HH:MM times represent an overnight shift (crosses midnight).
- *  An end time of "00:00" means midnight (end of day), not start of next day. */
-function isOvernightTimes(
-  start: string | null | undefined,
-  end: string | null | undefined,
-): boolean {
-  if (!start || !end) return false;
-  // Normalize to HH:MM — DB TIME columns may include seconds ("00:00:00")
-  const s = start.slice(0, 5);
-  const e = end.slice(0, 5);
-  const effectiveEnd = e === "00:00" ? "24:00" : e;
-  return s > effectiveEnd;
-}
-
-function getDraftBorder(draftKind: DraftKind, fallback: string): string {
-  if (!draftKind) return fallback;
-  return `2px dashed ${DRAFT_BORDER_COLORS[draftKind]}`;
-}
-
-function getPublishDiffBoxShadow(kind: string, fallback: string): string {
-  const color = DRAFT_BORDER_COLORS[kind] ?? fallback;
-  return `0 0 0 1px var(--color-surface), 0 0 0 2.5px ${color}`;
-}
-
-function joinBoxShadows(...values: Array<string | undefined>): string | undefined {
-  const shadows = values.filter((value): value is string => !!value);
-  return shadows.length > 0 ? shadows.join(", ") : undefined;
-}
-
-const SINGLE_SHIFT_PILL_RADIUS = 8;
-const MULTI_SHIFT_PILL_RADIUS = 6;
-const RAISED_DIFF_BADGE_TOP_INSET = 10;
-const SINGLE_CROSS_FOCUS_CONTENT_LEFT_PADDING = 24;
-const MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING = 20;
-const BULK_SELECTION_RING_PADDING = 2;
-
-function areGridCellIdsEqual(
-  left: GridCellId | null | undefined,
-  right: GridCellId | null | undefined,
-): boolean {
-  if (!left || !right) return false;
-  return (
-    left.empId === right.empId &&
-    left.dateKey === right.dateKey &&
-    left.sectionId === right.sectionId
-  );
-}
-
-function getGridCellKey(cellId: Pick<GridCellId, "empId" | "dateKey">): string {
-  return `${cellId.empId}_${cellId.dateKey}`;
-}
-
-function getBulkSelectionRingStyle(args: {
-  topInset: number;
-  rightInset: number;
-  bottomInset: number;
-  leftInset: number;
-  topDividerInset: number;
-  leadingDividerInset: number;
-  pillRadius: number;
-}): React.CSSProperties {
-  const padding = BULK_SELECTION_RING_PADDING;
-  return {
-    top: `${args.topDividerInset + args.topInset - padding}px`,
-    right: `${args.rightInset - padding}px`,
-    bottom: `${args.bottomInset - padding}px`,
-    left: `${args.leadingDividerInset + args.leftInset - padding}px`,
-    borderRadius: args.pillRadius + padding,
-  };
-}
-
-function getInsetDividerShadow(args: {
-  color: string;
-  side?: "left" | "right";
-  width?: number;
-}): string {
-  const { color, side = "left", width = 1 } = args;
-  const horizontalOffset = side === "left" ? width : -width;
-  return `inset ${horizontalOffset}px 0 0 0 ${color}`;
-}
-
-function cellShowsDraftDiffBadge(args: {
-  draftKind: DraftKind;
-  showDiffOverlay: boolean;
-}): boolean {
-  const { draftKind, showDiffOverlay } = args;
-  return showDiffOverlay && !!draftKind && draftKind !== "deleted";
-}
-
-function formatRelativePublishTime(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} hr ago`;
-
-  const days = Math.floor(hrs / 24);
-  return `${days} day${days !== 1 ? "s" : ""} ago`;
-}
-
-function buildPublishTooltip(args: {
-  publishDiff: PublishChange & { publishedAt: string; publishedBy: string };
-  resolvePublisherName?: (userId: string) => string | null;
-  detail?: string;
-}): string {
-  const { publishDiff, resolvePublisherName, detail } = args;
-  const publisherName = publishDiff.publishedBy
-    ? resolvePublisherName?.(publishDiff.publishedBy)
-    : null;
-  const summary = `Published ${formatRelativePublishTime(publishDiff.publishedAt)}${publisherName ? ` by ${publisherName}` : ""}.`;
-
-  return detail ? `${summary} ${detail}` : summary;
-}
-
-function timeRangesFromCustomTimes(args: {
-  customTimes:
-    | {
-        start: string;
-        end: string;
-        perPill?: { start: string; end: string }[];
-      }
-    | null
-    | undefined;
-  count: number;
-}): ShiftDiffTimeRange[] {
-  const { customTimes, count } = args;
-  if (count === 0) return [];
-  if (customTimes?.perPill?.length) {
-    return Array.from({ length: count }, (_, index) => ({
-      start: customTimes.perPill?.[index]?.start ?? null,
-      end: customTimes.perPill?.[index]?.end ?? null,
-    }));
-  }
-  return Array.from({ length: count }, (_, index) => ({
-    start: index === 0 ? (customTimes?.start ?? null) : null,
-    end: index === 0 ? (customTimes?.end ?? null) : null,
-  }));
-}
-
-function splitShiftLabelParts(value: string | null | undefined): string[] {
-  if (!value) return [];
-  return value
-    .split("/")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-}
-
-function assignmentIdsFromPublishState(
-  state: ScheduleCellState | null | undefined,
-  assignmentIdByPair: Map<string, number>,
-): number[] {
-  if (state?.kind !== "worked") return [];
-  const orderedSegments = [...state.segments].sort((left, right) => left.position - right.position);
-  return deriveAssignmentDefinitionIdsFromAssignments(
-    {
-      shiftIds: orderedSegments.map((segment) => segment.shiftId),
-      jobIds: orderedSegments.map((segment) => segment.jobId),
-    },
-    assignmentIdByPair,
-  );
-}
-
-function absenceTypeIdFromPublishState(state: ScheduleCellState | null | undefined): number | null {
-  return state?.kind === "absence" ? state.absenceTypeId : null;
-}
-
-function timeRangesFromPublishState(
-  state: ScheduleCellState | null | undefined,
-  fallbackStart: string | null | undefined,
-  fallbackEnd: string | null | undefined,
-  count: number,
-): ShiftDiffTimeRange[] {
-  if (count === 0) return [];
-  return expandDelimitedTimeRanges(
-    state?.customStartTime ?? fallbackStart,
-    state?.customEndTime ?? fallbackEnd,
-    count,
-  );
-}
-
-type GridDiffBadgeConfig = {
-  source: "publish" | "draft";
-  kind: "new" | "modified" | "time" | "deleted";
-  text: string;
-  tooltip?: string;
-  topOffset?: number;
-  rightOffset?: number;
-  leftOffset?: number;
-};
-
-function shouldUseShiftColorForDiffState(args: { isCross: boolean }): boolean {
-  return !args.isCross;
-}
-
-function GridDiffBadge({ badge }: { badge: GridDiffBadgeConfig }) {
-  const topOffset = badge.topOffset ?? 1;
-  const rightOffset = badge.rightOffset ?? 1;
-  const leftOffset = badge.leftOffset;
-  const dataAttributes =
-    badge.source === "publish"
-      ? { "data-publish-badge": badge.kind }
-      : { "data-draft-badge": badge.kind };
-  const badgeNode = (
-    <PublishDiffPill
-      kind={badge.kind}
-      {...dataAttributes}
-      aria-label={badge.tooltip ?? badge.text}
-      style={{
-        position: "absolute",
-        top: topOffset,
-        ...(leftOffset != null
-          ? {
-              left: leftOffset,
-              maxWidth: `calc(100% - ${leftOffset + 4}px)`,
-            }
-          : {
-              right: rightOffset,
-              maxWidth: "calc(100% - 4px)",
-            }),
-        borderRadius: 3,
-        pointerEvents: badge.tooltip ? "auto" : "none",
-        zIndex: 6,
-      }}
-    >
-      {badge.text}
-    </PublishDiffPill>
-  );
-
-  if (!badge.tooltip) {
-    return badgeNode;
-  }
-
-  return (
-    <MaybeHint content={badge.tooltip} side="top">
-      {badgeNode}
-    </MaybeHint>
-  );
-}
-
-function MentoredShiftBadge({ compact = false }: { compact?: boolean }) {
-  const size = compact ? 15 : 16;
-  const badge = (
-    <span
-      data-mentored-badge="true"
-      aria-label="Mentored assignment"
-      style={{
-        position: "absolute",
-        top: 0.5,
-        right: 0.5,
-        width: size,
-        height: size,
-        borderRadius: 999,
-        background: "rgba(255,255,255,0.92)",
-        border: "1px solid rgba(51,65,85,0.22)",
-        color: "#334155",
-        boxShadow: "0 1px 2px rgba(15,23,42,0.12)",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: compact ? 8 : 9,
-        fontWeight: 800,
-        lineHeight: 1,
-        pointerEvents: "auto",
-        zIndex: 5,
-      }}
-    >
-      M
-    </span>
-  );
-
-  return (
-    <MaybeHint content="Mentored assignment" side="top">
-      {badge}
-    </MaybeHint>
-  );
-}
-
-function AuthorBadge({
-  name,
-  leftInset = 5,
-  rightInset = 5,
-  bottomInset = 5,
-}: {
-  name: string;
-  leftInset?: number;
-  rightInset?: number;
-  bottomInset?: number;
-}) {
-  return (
-    <div
-      data-author-pill="true"
-      style={{
-        position: "absolute",
-        left: leftInset,
-        right: rightInset,
-        bottom: bottomInset,
-        display: "flex",
-        justifyContent: "flex-start",
-        pointerEvents: "none",
-        zIndex: 4,
-      }}
-    >
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "flex-start",
-          gap: 4,
-          minWidth: 0,
-          maxWidth: "100%",
-          fontSize: "var(--dg-fs-micro)",
-          fontWeight: 600,
-          lineHeight: 1.3,
-          textAlign: "left",
-          color: "var(--color-text-muted)",
-          padding: "2px 7px",
-          background: "var(--color-surface)",
-          borderRadius: 999,
-          border: "1px solid rgba(0,0,0,0.08)",
-          boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",
-          textDecoration: "none",
-        }}
-      >
-        <span
-          aria-hidden="true"
-          data-author-pill-icon="true"
-          style={{
-            flexShrink: 0,
-            lineHeight: 1,
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <UserPen size={10} strokeWidth={2.2} />
-        </span>
-        <span
-          style={{
-            minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {name}
-        </span>
-      </span>
-    </div>
-  );
-}
 
 interface LegacyScheduleGridProps {
   filteredEmployees: Employee[];
