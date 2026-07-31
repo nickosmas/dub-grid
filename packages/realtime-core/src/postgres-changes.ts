@@ -1,13 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+/** Minimal shape of a Supabase postgres_changes payload the listeners can read. */
+export interface RealtimeChangePayload {
+  new?: Record<string, unknown>;
+  old?: Record<string, unknown>;
+}
+
 export interface PostgresChangeListener<Table extends string = string> {
   table: Table;
   /** Defaults to "*" (all events). */
   event?: "INSERT" | "UPDATE" | "DELETE" | "*";
   /** Defaults to "public". */
   schema?: string;
-  filter: string;
-  onEvent: (table: Table) => void;
+  /** Omit to subscribe to every row of the table (e.g. a platform-wide admin listener). */
+  filter?: string;
+  onEvent: (table: Table, payload: RealtimeChangePayload) => void;
 }
 
 export interface RealtimeErrorHooks {
@@ -48,15 +55,18 @@ export function subscribeToPostgresChanges<Table extends string>(
   const channel = client.channel(channelName);
 
   for (const listener of listeners) {
-    channel.on(
-      "postgres_changes" as "system",
-      {
-        event: listener.event ?? "*",
-        schema: listener.schema ?? "public",
-        table: listener.table,
-        filter: listener.filter,
-      } as Record<string, unknown>,
-      () => listener.onEvent(listener.table),
+    const config: Record<string, unknown> = {
+      event: listener.event ?? "*",
+      schema: listener.schema ?? "public",
+      table: listener.table,
+    };
+    // Omit the filter key entirely when unfiltered — passing `filter: undefined`
+    // is not the same as subscribing to every row.
+    if (listener.filter !== undefined) {
+      config.filter = listener.filter;
+    }
+    channel.on("postgres_changes" as "system", config, (payload: RealtimeChangePayload) =>
+      listener.onEvent(listener.table, payload),
     );
   }
 

@@ -75,7 +75,7 @@ describe("subscribeToPostgresChanges", () => {
     });
   });
 
-  it("invokes onEvent with the table name when the listener fires", () => {
+  it("invokes onEvent with the table name and payload when the listener fires", () => {
     const mock = createMockChannel();
     const client = createMockClient(mock.channel);
     const onEvent = vi.fn();
@@ -84,10 +84,25 @@ describe("subscribeToPostgresChanges", () => {
       { table: "employees", filter: "org_id=eq.org-1", onEvent },
     ]);
 
-    const handler = mock.channel.on.mock.calls[0]?.[2] as () => void;
-    handler();
+    const handler = mock.channel.on.mock.calls[0]?.[2] as (payload: unknown) => void;
+    const payload = { new: { id: "1", org_id: "org-1" } };
+    handler(payload);
 
-    expect(onEvent).toHaveBeenCalledWith("employees");
+    expect(onEvent).toHaveBeenCalledWith("employees", payload);
+  });
+
+  it("omits the filter key entirely for an unfiltered (platform-wide) listener", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+
+    subscribeToPostgresChanges(client, "ch", [{ table: "organizations", onEvent: vi.fn() }]);
+
+    expect(mock.onCalls[0]?.filter).toEqual({
+      event: "*",
+      schema: "public",
+      table: "organizations",
+    });
+    expect(mock.onCalls[0]?.filter).not.toHaveProperty("filter");
   });
 
   it("calls onError with a 1-based error count on CHANNEL_ERROR and onReconnectAfterError on the next SUBSCRIBED", () => {
