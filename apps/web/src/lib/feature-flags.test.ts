@@ -4,6 +4,7 @@ const select = vi.fn();
 const from = vi.fn(() => ({ select }));
 const getServiceClient = vi.fn(() => ({ from }));
 const loggerError = vi.fn();
+const captureException = vi.fn();
 
 let cacheStore: Map<string, unknown>;
 const cacheDel = vi.fn(async (key: string) => {
@@ -20,6 +21,9 @@ const cacheThrough = vi.fn(
 
 vi.mock("@/lib/supabase-service", () => ({ getServiceClient: () => getServiceClient() }));
 vi.mock("@/lib/logger", () => ({ default: { error: (...args: unknown[]) => loggerError(...args) } }));
+vi.mock("@/lib/sentry", () => ({
+  captureException: (...args: unknown[]) => captureException(...args),
+}));
 vi.mock("@/lib/cache", () => ({
   cacheThrough: (...args: Parameters<typeof cacheThrough>) => cacheThrough(...args),
   cacheDel: (...args: Parameters<typeof cacheDel>) => cacheDel(...args),
@@ -44,11 +48,16 @@ describe("feature-flags", () => {
     await expect(isFeatureEnabled("some_unseeded_flag")).resolves.toBe(true);
   });
 
-  it("fails open and logs when the DB read errors", async () => {
-    select.mockResolvedValue({ data: null, error: new Error("connection refused") });
+  it("fails open, logs, and alerts when the DB read errors", async () => {
+    const dbError = new Error("connection refused");
+    select.mockResolvedValue({ data: null, error: dbError });
 
     await expect(isFeatureEnabled("stripe")).resolves.toBe(true);
     expect(loggerError).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      dbError,
+      expect.objectContaining({ extra: expect.objectContaining({ context: expect.any(String) }) }),
+    );
   });
 
   it("only fetches once across calls within the cache TTL", async () => {

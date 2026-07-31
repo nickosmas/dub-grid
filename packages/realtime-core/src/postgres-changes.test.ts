@@ -149,6 +149,43 @@ describe("subscribeToPostgresChanges", () => {
     expect(onError).toHaveBeenNthCalledWith(4, error, 1);
   });
 
+  it("does not let a throwing onError hook propagate out of the subscribe callback", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+    const onError = vi.fn(() => {
+      throw new Error("consumer bug");
+    });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    subscribeToPostgresChanges(client, "ch", [], { onError });
+
+    expect(() => mock.emitStatus("CHANNEL_ERROR", new Error("boom"))).not.toThrow();
+    expect(consoleError).toHaveBeenCalled();
+
+    // Bookkeeping still advances normally on the next error despite the prior throw.
+    mock.emitStatus("CHANNEL_ERROR", new Error("boom again"));
+    expect(onError).toHaveBeenNthCalledWith(2, expect.any(Error), 2);
+
+    consoleError.mockRestore();
+  });
+
+  it("does not let a throwing onReconnectAfterError hook propagate out of the subscribe callback", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+    const onReconnectAfterError = vi.fn(() => {
+      throw new Error("consumer bug");
+    });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    subscribeToPostgresChanges(client, "ch", [], { onReconnectAfterError });
+
+    mock.emitStatus("CHANNEL_ERROR", new Error("boom"));
+    expect(() => mock.emitStatus("SUBSCRIBED")).not.toThrow();
+    expect(consoleError).toHaveBeenCalled();
+
+    consoleError.mockRestore();
+  });
+
   it("cleanup removes the channel from the client", () => {
     const mock = createMockChannel();
     const client = createMockClient(mock.channel);

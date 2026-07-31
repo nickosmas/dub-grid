@@ -66,7 +66,15 @@ let _sentryFlagEnabled = true;
 let _sentryFlagCheckedAt = 0;
 
 function refreshSentryFlagIfStale(): void {
-  if (typeof window !== "undefined") return; // client: always follow the dev/prod shim above
+  // Client AND Edge Middleware both always follow the dev/prod shim above —
+  // `typeof window === "undefined"` is true in Edge Runtime too, so without
+  // this it would (harmlessly, but pointlessly) pull the feature-flags ->
+  // cache -> supabase-service -> logger module graph into every Edge
+  // Middleware bundle and fire a Redis/Postgres read on a globally
+  // distributed hot path (any JWT/org-access error) that isn't the intent
+  // described above — middleware isn't where anyone would go to check
+  // whether Sentry itself is misbehaving.
+  if (typeof window !== "undefined" || process.env.NEXT_RUNTIME === "edge") return;
   const now = Date.now();
   if (now - _sentryFlagCheckedAt < SENTRY_FLAG_TTL_MS) return;
   _sentryFlagCheckedAt = now; // mark checked immediately so concurrent calls don't pile up requests

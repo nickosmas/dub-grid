@@ -71,12 +71,23 @@ export function subscribeToPostgresChanges<Table extends string>(
   }
 
   channel.subscribe((status: string, err?: Error) => {
+    // A throwing consumer hook must not propagate into the Supabase client's
+    // own status-callback dispatch — that's shared machinery for this socket,
+    // not something a single listener's bug should be able to disrupt.
     if (status === "SUBSCRIBED" && errorCount > 0) {
       errorCount = 0;
-      hooks.onReconnectAfterError?.();
+      try {
+        hooks.onReconnectAfterError?.();
+      } catch (hookError) {
+        console.error(`[realtime-core] onReconnectAfterError hook threw for "${channelName}"`, hookError);
+      }
     } else if (status === "CHANNEL_ERROR") {
       errorCount += 1;
-      hooks.onError?.(err ?? new Error(`realtime channel error: ${channelName}`), errorCount);
+      try {
+        hooks.onError?.(err ?? new Error(`realtime channel error: ${channelName}`), errorCount);
+      } catch (hookError) {
+        console.error(`[realtime-core] onError hook threw for "${channelName}"`, hookError);
+      }
     }
   });
 

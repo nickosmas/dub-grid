@@ -31,8 +31,16 @@ jobs:
       # Required so rate limiting isn't null under `next start`'s NODE_ENV=production —
       # without these, checkRateLimit() fails closed on every call (see
       # apps/web/src/lib/rate-limit.ts) and login 503s for every Playwright spec.
-      UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
-      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+      #
+      # Prefers a CI-only Upstash database (E2E_UPSTASH_REDIS_REST_*) so repeated/retried
+      # test runs don't share rate-limit state (or Sentry/monitoring noise) with real
+      # production traffic against the same account. Falls back to the production
+      # credentials if the CI-only secrets haven't been created yet, so this doesn't break
+      # CI in the meantime — create a separate free-tier Upstash database and add
+      # E2E_UPSTASH_REDIS_REST_URL / E2E_UPSTASH_REDIS_REST_TOKEN as repo secrets to switch
+      # over.
+      UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL || secrets.UPSTASH_REDIS_REST_URL }}
+      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN || secrets.UPSTASH_REDIS_REST_TOKEN }}
       # Well-known Supabase CLI local dev keys (deterministic, not secrets).
       # See: https://supabase.com/docs/guides/local-development
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
