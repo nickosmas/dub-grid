@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -109,10 +110,7 @@ export function ManagementStaffPanel({
 }: ManagementStaffPanelProps) {
   const { resolvedTheme } = useTheme();
   const [closing, setClosing] = useState(false);
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  });
+  const onCloseRef = useLatestRef(onClose);
 
   const [firstName, setFirstName] = useState(person.firstName);
   const [lastName, setLastName] = useState(person.lastName);

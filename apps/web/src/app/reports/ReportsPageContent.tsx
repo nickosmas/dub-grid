@@ -113,6 +113,12 @@ function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+// NOTE: These date helpers are intentionally UTC-based and distinct from the
+// local-time `getWeekStart`/`addDays` in `@/lib/utils`. The entire reports date
+// pipeline runs on UTC ISO strings (`toIsoDate` -> `toISOString`, `parseIsoDate`,
+// and every formatter passes `timeZone: "UTC"`), so week math must also be UTC —
+// using the local-time shared helpers would shift the resulting ISO date by the
+// viewer's timezone offset. Do not replace with the `@/lib/utils` versions.
 function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);

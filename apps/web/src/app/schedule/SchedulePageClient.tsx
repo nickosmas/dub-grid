@@ -2324,19 +2324,18 @@ function SchedulerContent() {
   const allCoverageGaps = useMemo(() => {
     if (!coverageRequirements.length || !focusAreas.length) return [];
 
-    return computeCoverageGaps(
+    return computeCoverageGaps({
       focusAreas,
       shiftCategories,
       assignments,
-      coverageRequirements,
+      requirements: coverageRequirements,
       dates,
       employeesByFocusArea,
       assignmentIdsForKey,
-      assignmentById,
       assignmentIdsByFocusArea,
       assignmentLabelMap,
       coverageCreditForKey,
-    );
+    });
   }, [
     coverageRequirements,
     focusAreas,
@@ -2345,7 +2344,6 @@ function SchedulerContent() {
     dates,
     employeesByFocusArea,
     assignmentIdsForKey,
-    assignmentById,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
     coverageCreditForKey,
@@ -2356,19 +2354,18 @@ function SchedulerContent() {
       return [];
     }
 
-    return computeCoverageGaps(
+    return computeCoverageGaps({
       focusAreas,
       shiftCategories,
       assignments,
-      coverageRequirements,
-      publishedVisibleDates,
+      requirements: coverageRequirements,
+      dates: publishedVisibleDates,
       employeesByFocusArea,
       assignmentIdsForKey,
-      assignmentById,
       assignmentIdsByFocusArea,
       assignmentLabelMap,
       coverageCreditForKey,
-    ).filter((gap) => getActionableCoverageGapAssignmentIds(gap).length > 0);
+    }).filter((gap) => getActionableCoverageGapAssignmentIds(gap).length > 0);
   }, [
     coverageRequirements,
     focusAreas,
@@ -2377,7 +2374,6 @@ function SchedulerContent() {
     publishedVisibleDates,
     employeesByFocusArea,
     assignmentIdsForKey,
-    assignmentById,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
     coverageCreditForKey,

@@ -210,10 +210,7 @@ export function getReadableTextColor(bgHex: string): string {
 
 /** Returns the text color as a semi-transparent rgba for use as a border. */
 export function borderColor(textHex: string, opacity = 0.35): string {
-  const normalized = normalizeHex(textHex);
-  const r = Number.parseInt(normalized.slice(1, 3), 16);
-  const g = Number.parseInt(normalized.slice(3, 5), 16);
-  const b = Number.parseInt(normalized.slice(5, 7), 16);
+  const { r, g, b } = hexToRgb(textHex);
   return `rgba(${r},${g},${b},${opacity})`;
 }
 

@@ -1165,21 +1165,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const activeTeamFocusAreaTab =
     teamFocusAreaTabs.find((tab) => tab.key === activeTeamFocusAreaKey) ?? null;
 
-  useEffect(() => {
-    if (defaultTeamFocusAreaKey == null) {
-      if (selectedTeamFocusAreaKey != null) {
-        setSelectedTeamFocusAreaKey(null);
-      }
-      return;
-    }
-
-    if (
-      selectedTeamFocusAreaKey == null ||
-      !teamFocusAreaTabs.some((tab) => tab.key === selectedTeamFocusAreaKey)
-    ) {
-      setSelectedTeamFocusAreaKey(defaultTeamFocusAreaKey);
-    }
-  }, [teamFocusAreaTabs, defaultTeamFocusAreaKey, selectedTeamFocusAreaKey]);
+  // `activeTeamFocusAreaKey` above already falls back to the default whenever the
+  // selected key is missing or no longer in the tab set, so no effect is needed
+  // to "fix up" `selectedTeamFocusAreaKey` — the raw state is only written by the
+  // user's tab-tap handler below.
 
   const activeEntries = useMemo(() => {
     if (!isTeamScope) {

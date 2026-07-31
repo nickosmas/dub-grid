@@ -22,12 +22,12 @@ import type {
 import type {
   AdminPermissions,
   AssignableOrganizationRole,
-  CoverageRuleConfig,
   Organization,
   OrganizationRole,
   PlatformRole,
   ShiftDisplayMode,
 } from "@dubgrid/domain";
+import { normalizeCoverageRuleConfig } from "@dubgrid/schedule-core";
 import type {
   DbFocusArea,
   DbDepartment,
@@ -63,26 +63,6 @@ const EMPTY_SCHEDULED_JOB_STYLE = {
   border: "",
   text: "",
 } as const;
-
-const DEFAULT_COVERAGE_RULE_CONFIG: CoverageRuleConfig = {
-  mentoredCoverageCreditPercent: 100,
-};
-
-function normalizeCoverageRuleConfig(value: unknown): CoverageRuleConfig {
-  if (!value || typeof value !== "object") {
-    return DEFAULT_COVERAGE_RULE_CONFIG;
-  }
-
-  const rawPercent = (value as Record<string, unknown>).mentoredCoverageCreditPercent;
-  const percent =
-    typeof rawPercent === "number" && Number.isFinite(rawPercent)
-      ? Math.min(100, Math.max(0, Math.round(rawPercent)))
-      : DEFAULT_COVERAGE_RULE_CONFIG.mentoredCoverageCreditPercent;
-
-  return {
-    mentoredCoverageCreditPercent: percent,
-  };
-}
 
 // ── Named Item (certifications / organization_roles) ─────────────────────────
 

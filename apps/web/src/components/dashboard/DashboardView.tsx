@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
@@ -321,14 +322,8 @@ export default function DashboardView({
 
   // Stable refs for Maps to avoid re-fetching on every render
   // (Map objects have no referential stability)
-  const assignmentLabelMapRef = useRef(assignmentLabelMap);
-  useEffect(() => {
-    assignmentLabelMapRef.current = assignmentLabelMap;
-  });
-  const absenceTypeMapRef = useRef(absenceTypeMap);
-  useEffect(() => {
-    absenceTypeMapRef.current = absenceTypeMap;
-  });
+  const assignmentLabelMapRef = useLatestRef(assignmentLabelMap);
+  const absenceTypeMapRef = useLatestRef(absenceTypeMap);
 
   useEffect(() => {
     let cancelled = false;

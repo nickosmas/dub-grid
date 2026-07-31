@@ -583,18 +583,17 @@ describe("cross-platform coverage parity", () => {
     ]);
     const coverageCreditForKey = (empId: string) => (empId === "emp-2" ? 0.5 : 1); // emp-2 mentored
 
-    const snapshots = computeCoverageCategorySnapshots(
-      [fa],
-      [cat],
-      [mentoredCode],
-      [req],
-      [date],
+    const snapshots = computeCoverageCategorySnapshots({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [mentoredCode],
+      requirements: [req],
+      dates: [date],
       employeesByFocusArea,
-      () => [10],
-      new Map([[1, new Set([10])]]),
-      undefined,
+      assignmentIdsForKey: () => [10],
+      assignmentIdsByFocusArea: new Map([[1, new Set([10])]]),
       coverageCreditForKey,
-    );
+    });
     const webTotals = summarizeCoverageTotals(snapshots);
     const webByFocusArea = summarizeCoverageByFocusArea(snapshots, [fa]);
 

@@ -24,7 +24,11 @@ import { EmptyState } from "@/components/EmptyState";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey } from "@/lib/utils";
-import { computeDailyTallies, resolveRequirement } from "@/lib/schedule-logic";
+import {
+  computeDailyTallies,
+  resolveRequirementByAssignment,
+  resolveRequirementByJobShift,
+} from "@/lib/schedule-logic";
 import { getScheduleGridLayout } from "@/lib/schedule-grid-layout";
 import {
   Employee,
@@ -51,7 +55,7 @@ import type {
   ScheduleGridInteractionState,
   ScheduleGridModel,
 } from "./schedule-grid/model";
-import { getCertAbbr, getRoleAbbrs, getEmployeeDisplayName } from "@/lib/utils";
+import { getCertAbbr, getRoleAbbrs, getEmployeeDisplayName, fmt12hShort } from "@/lib/utils";
 import {
   borderColor,
   DESIGNATION_COLORS,
@@ -97,12 +101,6 @@ function getCrossFocusBadgePalette(style?: Pick<AssignmentDefinition, "color" | 
     background: style?.color ?? "var(--color-bg)",
     color: style?.text ?? "var(--color-text-muted)",
   };
-}
-
-function fmt12hShort(time24: string): string {
-  const [h, m] = time24.split(":").map(Number);
-  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return m === 0 ? String(h12) : `${h12}:${String(m).padStart(2, "0")}`;
 }
 
 /** Returns true if the given HH:MM times represent an overnight shift (crosses midnight).
@@ -973,15 +971,25 @@ const SectionBlock = memo(function SectionBlock({
         if (code.categoryId == null) continue;
         const resolved =
           code.jobId != null
-            ? (resolveRequirement(
+            ? (resolveRequirementByJobShift(
                 coverageRequirements,
                 sectionFocusArea.id,
                 code.jobId,
                 code.shiftId ?? code.categoryId ?? null,
                 dayOfWeek,
               ) ??
-              resolveRequirement(coverageRequirements, sectionFocusArea.id, code.id, dayOfWeek))
-            : resolveRequirement(coverageRequirements, sectionFocusArea.id, code.id, dayOfWeek);
+              resolveRequirementByAssignment(
+                coverageRequirements,
+                sectionFocusArea.id,
+                code.id,
+                dayOfWeek,
+              ))
+            : resolveRequirementByAssignment(
+                coverageRequirements,
+                sectionFocusArea.id,
+                code.id,
+                dayOfWeek,
+              );
         if (!resolved || resolved.minStaff <= 0) continue;
 
         requirementsByCategory[code.categoryId] =

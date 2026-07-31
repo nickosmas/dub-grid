@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
@@ -350,15 +351,8 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     [allAbsenceTypes],
   );
 
-  const allAssignmentDefinitionsRef = useRef<AssignmentDefinition[]>(allAssignmentDefinitions);
-  useEffect(() => {
-    allAssignmentDefinitionsRef.current = allAssignmentDefinitions;
-  }, [allAssignmentDefinitions]);
-
-  const allAbsenceTypesRef = useRef<AbsenceType[]>(allAbsenceTypes);
-  useEffect(() => {
-    allAbsenceTypesRef.current = allAbsenceTypes;
-  }, [allAbsenceTypes]);
+  const allAssignmentDefinitionsRef = useLatestRef(allAssignmentDefinitions);
+  const allAbsenceTypesRef = useLatestRef(allAbsenceTypes);
 
   const assignmentLabelMap = useMemo(
     () =>

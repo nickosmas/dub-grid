@@ -9,7 +9,8 @@ import { DEFAULT_COVERAGE_RULE_CONFIG, normalizeCoverageRuleConfig } from "@dubg
 export {
   DEFAULT_COVERAGE_RULE_CONFIG,
   normalizeCoverageRuleConfig,
-  resolveRequirement,
+  resolveRequirementByAssignment,
+  resolveRequirementByJobShift,
   computeCoverageStatus,
   buildAssignmentDefinitionIdsByFocusArea,
   computeCoverageCategorySnapshots,
