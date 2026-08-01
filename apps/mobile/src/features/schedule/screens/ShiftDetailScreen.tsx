@@ -65,8 +65,13 @@ import {
   getScheduleEntryTitle,
   sortScheduleEntries,
 } from "../lib/schedule";
+import {
+  type RequestMode,
+  type ShiftTimeRange,
+  type ShiftmateSegmentMatch,
+  type ShiftmateSegmentGroup,
+} from "../lib/shiftDetailHelpers";
 
-type RequestMode = "coverage" | "swap" | null;
 type CoverageRequestType = "pickup" | "calloff" | null;
 type ShiftDetailConfirmation = {
   title: string;
@@ -75,10 +80,6 @@ type ShiftDetailConfirmation = {
   confirmTone?: "primary" | "dangerFilled";
   onConfirm: () => void;
 } | null;
-type ShiftTimeRange = {
-  start: string;
-  end: string;
-};
 const SWAP_SCHEDULE_LOOKAHEAD_DAYS = MAX_MOBILE_SCHEDULE_RANGE_DAYS;
 const ACTION_SEGMENT_PANEL_RADIUS = mobileRadii.card;
 const ACTION_SEGMENT_PANEL_PADDING = 14;
@@ -106,17 +107,6 @@ type AbsenceColorSource = Pick<
   "shiftColor" | "shiftBorderColor" | "shiftTextColor"
 >;
 type EyebrowDisplay = "inside" | "outside";
-type ShiftmateSegmentMatch = {
-  entry: MobileScheduleEntry;
-  segment: MobileScheduleEntrySegment;
-};
-type ShiftmateSegmentGroup = {
-  key: string;
-  label: string;
-  title: string;
-  timeRange: string | null;
-  entries: ShiftmateSegmentMatch[];
-};
 
 function readOptionalColor(value: string | null | undefined): string | null {
   if (typeof value !== "string") {
