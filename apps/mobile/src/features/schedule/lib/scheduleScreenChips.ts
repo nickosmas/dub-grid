@@ -3,9 +3,7 @@ import type {
   MobileScheduleEntrySegment,
   MobileShiftRequest,
 } from "@dubgrid/contracts";
-import {
-  type MobileColors,
-} from "../../../shared/theme/tokens";
+import { type MobileColors } from "../../../shared/theme/tokens";
 import {
   doScheduleEntrySegmentsShareShiftAndFocusArea,
   formatCompactScheduleDate,
@@ -26,10 +24,7 @@ import {
   getSegmentEndTime,
   getSegmentStartTime,
 } from "./scheduleScreenHelpers";
-import {
-  resolveShiftPillColors,
-  type AvatarTone,
-} from "@dubgrid/design-tokens";
+import { resolveShiftPillColors, type AvatarTone } from "@dubgrid/design-tokens";
 
 // Chip/label builders and me-hero segment matching for the schedule screen,
 // extracted from ScheduleScreen.tsx. Pure functions only: theme colors come in
@@ -201,7 +196,9 @@ export function buildGeneralShiftChip(
   };
 }
 
-export function isGeneralShiftSegment(segment: { shiftId?: number | null } | null | undefined): boolean {
+export function isGeneralShiftSegment(
+  segment: { shiftId?: number | null } | null | undefined,
+): boolean {
   return (
     segment != null &&
     Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
@@ -361,7 +358,10 @@ export function getVisibleScheduleItemTypeChip(
   return chipLabel.length > 0 && shiftLabels.includes(chipLabel) ? null : typeChip;
 }
 
-export function shouldShowMePrimaryTitle(title: string | null | undefined, chip: JobChip | null): boolean {
+export function shouldShowMePrimaryTitle(
+  title: string | null | undefined,
+  chip: JobChip | null,
+): boolean {
   if (!chip?.eyebrowLabel) {
     return true;
   }
@@ -389,7 +389,9 @@ export function getScheduleItemTimeRange(item: FeaturedMeScheduleSegment["item"]
   );
 }
 
-export function getScheduleItemSplitShiftLabel(item: FeaturedMeScheduleSegment["item"]): string | null {
+export function getScheduleItemSplitShiftLabel(
+  item: FeaturedMeScheduleSegment["item"],
+): string | null {
   if (!item) {
     return null;
   }
@@ -546,4 +548,3 @@ export function getMeHeroShiftmates(
 export function getRequestDateLabel(request: MobileShiftRequest): string {
   return formatCompactScheduleDate(request.requesterShiftDate);
 }
-

@@ -156,7 +156,6 @@ import {
   type JobChip,
 } from "../lib/scheduleScreenChips";
 
-
 import type {
   MobileOpenShift,
   MobileScheduleEntry,
@@ -649,7 +648,6 @@ function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
     ? formatScheduleTimeRange(openShift.presentation.startTime, openShift.presentation.endTime)
     : null;
 }
-
 
 export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const mobileColors = useMobileColors();
