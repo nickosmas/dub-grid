@@ -169,130 +169,175 @@ export function normalizeSettingsTextField(args: {
   });
 }
 
-export function validateNamedItems(
-  items: NamedItemInput[],
-  args: { itemLabel: string },
-): { items: NamedItemInput[] } | { response: NextResponse } {
-  const fieldErrors: Record<string, string | null> = {};
-  const draftItems = items.map((item, index) => {
-    const nameError = validateSettingsTextField({
-      value: item.name,
-      label: `${args.itemLabel} name`,
-      maxLength: SETTINGS_NAME_MAX,
+// ── Generic validation core ─────────────────────────────────────────────────
+// The seven entity validators below are thin config wrappers over this core.
+// Their names, signatures, and result shapes are pinned by validation.test.ts —
+// the tests were written against the previous hand-rolled implementations and
+// must keep passing unchanged.
+
+type TextFieldSpec = {
+  kind: "text";
+  key: string;
+  errorKey: string;
+  label: string;
+  maxLength: number;
+};
+
+/**
+ * A short code field (abbr / label). Optional codes are validated only when
+ * non-empty and normalize an empty value to `emptyValue`; required codes are
+ * always validated.
+ */
+type CodeFieldSpec = {
+  kind: "code";
+  key: string;
+  errorKey: string;
+  label: string;
+  maxLength: number;
+  required?: boolean;
+  uppercase?: boolean;
+  emptyValue?: "" | null;
+};
+
+type FieldSpec = TextFieldSpec | CodeFieldSpec;
+
+function getFieldSpecError(value: string, spec: FieldSpec): string | null {
+  if (spec.kind === "text") {
+    return validateSettingsTextField({
+      value,
+      label: spec.label,
+      maxLength: spec.maxLength,
       required: true,
     });
-    const abbrError =
-      item.abbr.trim().length > 0
-        ? getCodeError(item.abbr, {
-            label: `${args.itemLabel} abbreviation`,
-            maxLength: SETTINGS_ABBR_MAX,
-          })
-        : null;
-    fieldErrors[`items.${index}.name`] = nameError;
-    fieldErrors[`items.${index}.abbr`] = abbrError;
-
-    return item;
-  });
-
-  const firstFieldError = Object.values(fieldErrors).find(Boolean);
-  if (firstFieldError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: firstFieldError,
-        fieldErrors,
-      }),
-    };
   }
-
-  const normalizedItems = draftItems.map((item) => ({
-    ...item,
-    name: normalizeSettingsTextField({
-      value: item.name,
-      label: `${args.itemLabel} name`,
-      maxLength: SETTINGS_NAME_MAX,
+  if (spec.required) {
+    return getCodeError(value, {
+      label: spec.label,
+      maxLength: spec.maxLength,
       required: true,
-    }),
-    abbr:
-      item.abbr.trim().length > 0
-        ? normalizeCode(item.abbr, {
-            label: `${args.itemLabel} abbreviation`,
-            maxLength: SETTINGS_ABBR_MAX,
-          })
-        : "",
-  }));
-
-  const duplicateName = findDuplicateValue(normalizedItems.map((item) => item.name.toLowerCase()));
-  if (duplicateName) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: `Duplicate ${args.itemLabel.toLowerCase()} name: "${duplicateName}"`,
-        fieldErrors,
-      }),
-    };
+      uppercase: spec.uppercase,
+    });
   }
-
-  return { items: normalizedItems };
+  return value.trim().length > 0
+    ? getCodeError(value, { label: spec.label, maxLength: spec.maxLength, uppercase: spec.uppercase })
+    : null;
 }
 
-export function validateDepartments(
-  items: DepartmentInput[],
-): { items: DepartmentInput[] } | { response: NextResponse } {
-  const fieldErrors: Record<string, string | null> = {};
-  const draftItems = items.map((item, index) => {
-    const nameError = validateSettingsTextField({
-      value: item.name,
-      label: "Department name",
-      maxLength: SETTINGS_NAME_MAX,
+function normalizeFieldSpecValue(value: string, spec: FieldSpec): string | null {
+  if (spec.kind === "text") {
+    return normalizeSettingsTextField({
+      value,
+      label: spec.label,
+      maxLength: spec.maxLength,
       required: true,
     });
-    const abbrError =
-      item.abbr.trim().length > 0
-        ? getCodeError(item.abbr, {
-            label: "Department abbreviation",
-            maxLength: SETTINGS_ABBR_MAX,
-          })
-        : null;
-    fieldErrors[`items.${index}.name`] = nameError;
-    fieldErrors[`items.${index}.abbr`] = abbrError;
+  }
+  if (spec.required) {
+    return normalizeCode(value, {
+      label: spec.label,
+      maxLength: spec.maxLength,
+      required: true,
+      uppercase: spec.uppercase,
+    });
+  }
+  if (value.trim().length > 0) {
+    return normalizeCode(value, {
+      label: spec.label,
+      maxLength: spec.maxLength,
+      uppercase: spec.uppercase,
+    });
+  }
+  // NOTE: `emptyValue` may legitimately be null (shift-category abbr), so this
+  // must not use `?? ""`.
+  return spec.emptyValue === undefined ? "" : spec.emptyValue;
+}
 
-    return item;
+function readFieldValue(entity: Record<string, unknown>, key: string): string {
+  const raw = entity[key];
+  return typeof raw === "string" ? raw : "";
+}
+
+/**
+ * Validates one entity against its field specs. Field errors are recorded in
+ * spec order (insertion order determines which error becomes the top-level
+ * message); on success every spec'd field is replaced by its normalized value.
+ */
+function validateEntity<T extends Record<string, unknown>>(
+  entity: T,
+  specs: FieldSpec[],
+): { normalized: T } | { response: NextResponse } {
+  const fieldErrors: Record<string, string | null> = {};
+  for (const spec of specs) {
+    fieldErrors[spec.errorKey] = getFieldSpecError(readFieldValue(entity, spec.key), spec);
+  }
+
+  const firstFieldError = Object.values(fieldErrors).find(Boolean);
+  if (firstFieldError) {
+    return { response: buildSettingsValidationResponse({ error: firstFieldError, fieldErrors }) };
+  }
+
+  const normalized = { ...entity };
+  for (const spec of specs) {
+    (normalized as Record<string, unknown>)[spec.key] = normalizeFieldSpecValue(
+      readFieldValue(entity, spec.key),
+      spec,
+    );
+  }
+  return { normalized };
+}
+
+/**
+ * Validates a list of entities (all field errors are collected across the whole
+ * list before failing), then rejects case-insensitive duplicate names — within
+ * `duplicate.groupBy` groups when set (e.g. department type). The duplicate
+ * message quotes the lowercased normalized name, matching the original
+ * implementations.
+ */
+function validateEntityList<T extends Record<string, unknown>>(
+  items: T[],
+  options: {
+    specsForIndex: (index: number) => FieldSpec[];
+    duplicate: { label: string; groupBy?: (item: T) => string };
+  },
+): { items: T[] } | { response: NextResponse } {
+  const fieldErrors: Record<string, string | null> = {};
+  const allSpecs = items.map((item, index) => {
+    const specs = options.specsForIndex(index);
+    for (const spec of specs) {
+      fieldErrors[spec.errorKey] = getFieldSpecError(readFieldValue(item, spec.key), spec);
+    }
+    return specs;
   });
 
   const firstFieldError = Object.values(fieldErrors).find(Boolean);
   if (firstFieldError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: firstFieldError,
-        fieldErrors,
-      }),
-    };
+    return { response: buildSettingsValidationResponse({ error: firstFieldError, fieldErrors }) };
   }
 
-  const normalizedItems = draftItems.map((item) => ({
-    ...item,
-    name: normalizeSettingsTextField({
-      value: item.name,
-      label: "Department name",
-      maxLength: SETTINGS_NAME_MAX,
-      required: true,
-    }),
-    abbr:
-      item.abbr.trim().length > 0
-        ? normalizeCode(item.abbr, {
-            label: "Department abbreviation",
-            maxLength: SETTINGS_ABBR_MAX,
-          })
-        : "",
-  }));
+  const normalizedItems = items.map((item, index) => {
+    const normalized = { ...item };
+    for (const spec of allSpecs[index]) {
+      (normalized as Record<string, unknown>)[spec.key] = normalizeFieldSpecValue(
+        readFieldValue(item, spec.key),
+        spec,
+      );
+    }
+    return normalized;
+  });
 
-  for (const type of ["scheduled", "management"] as const) {
-    const duplicateName = findDuplicateValue(
-      normalizedItems.filter((item) => item.type === type).map((item) => item.name.toLowerCase()),
-    );
+  const groups = new Map<string, string[]>();
+  for (const item of normalizedItems) {
+    const group = options.duplicate.groupBy?.(item) ?? "";
+    const names = groups.get(group) ?? [];
+    names.push(String(item.name).toLowerCase());
+    groups.set(group, names);
+  }
+  for (const names of groups.values()) {
+    const duplicateName = findDuplicateValue(names);
     if (duplicateName) {
       return {
         response: buildSettingsValidationResponse({
-          error: `Duplicate department name: "${duplicateName}"`,
+          error: `Duplicate ${options.duplicate.label} name: "${duplicateName}"`,
           fieldErrors,
         }),
       };
@@ -302,216 +347,151 @@ export function validateDepartments(
   return { items: normalizedItems };
 }
 
+// ── Entity validators ────────────────────────────────────────────────────────
+
+export function validateNamedItems(
+  items: NamedItemInput[],
+  args: { itemLabel: string },
+): { items: NamedItemInput[] } | { response: NextResponse } {
+  return validateEntityList(items, {
+    specsForIndex: (index) => [
+      {
+        kind: "text",
+        key: "name",
+        errorKey: `items.${index}.name`,
+        label: `${args.itemLabel} name`,
+        maxLength: SETTINGS_NAME_MAX,
+      },
+      {
+        kind: "code",
+        key: "abbr",
+        errorKey: `items.${index}.abbr`,
+        label: `${args.itemLabel} abbreviation`,
+        maxLength: SETTINGS_ABBR_MAX,
+        emptyValue: "",
+      },
+    ],
+    duplicate: { label: args.itemLabel.toLowerCase() },
+  });
+}
+
+export function validateDepartments(
+  items: DepartmentInput[],
+): { items: DepartmentInput[] } | { response: NextResponse } {
+  return validateEntityList(items, {
+    specsForIndex: (index) => [
+      {
+        kind: "text",
+        key: "name",
+        errorKey: `items.${index}.name`,
+        label: "Department name",
+        maxLength: SETTINGS_NAME_MAX,
+      },
+      {
+        kind: "code",
+        key: "abbr",
+        errorKey: `items.${index}.abbr`,
+        label: "Department abbreviation",
+        maxLength: SETTINGS_ABBR_MAX,
+        emptyValue: "",
+      },
+    ],
+    // Duplicate names are only conflicts within the same department type.
+    duplicate: { label: "department", groupBy: (item) => item.type },
+  });
+}
+
 export function validateFocusArea(
   focusArea: FocusAreaInput,
 ): { focusArea: FocusAreaInput } | { response: NextResponse } {
-  const nameError = validateSettingsTextField({
-    value: focusArea.name,
-    label: "Focus area name",
-    maxLength: FOCUS_AREA_NAME_MAX,
-    required: true,
-  });
-  if (nameError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: nameError,
-        fieldErrors: {
-          "focusArea.name": nameError,
-        },
-      }),
-    };
-  }
-
-  return {
-    focusArea: {
-      ...focusArea,
-      name: normalizeSettingsTextField({
-        value: focusArea.name,
-        label: "Focus area name",
-        maxLength: FOCUS_AREA_NAME_MAX,
-        required: true,
-      }),
+  const result = validateEntity(focusArea, [
+    {
+      kind: "text",
+      key: "name",
+      errorKey: "focusArea.name",
+      label: "Focus area name",
+      maxLength: FOCUS_AREA_NAME_MAX,
     },
-  };
+  ]);
+  return "response" in result ? result : { focusArea: result.normalized };
 }
 
 export function validateShiftCategory(
   shiftCategory: ShiftCategoryInput,
 ): { shiftCategory: ShiftCategoryInput } | { response: NextResponse } {
-  const nameError = validateSettingsTextField({
-    value: shiftCategory.name,
-    label: "Shift name",
-    maxLength: SHIFT_CATEGORY_NAME_MAX,
-    required: true,
-  });
-  const abbrError = shiftCategory.abbr?.trim()
-    ? getCodeError(shiftCategory.abbr, {
-        label: "Shift code",
-        maxLength: SHIFT_CATEGORY_ABBR_MAX,
-        uppercase: true,
-      })
-    : null;
-  const fieldErrors = {
-    "shiftCategory.name": nameError,
-    "shiftCategory.abbr": abbrError,
-  };
-  const firstFieldError = Object.values(fieldErrors).find(Boolean);
-  if (firstFieldError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: firstFieldError,
-        fieldErrors,
-      }),
-    };
-  }
-
-  return {
-    shiftCategory: {
-      ...shiftCategory,
-      name: normalizeSettingsTextField({
-        value: shiftCategory.name,
-        label: "Shift name",
-        maxLength: SHIFT_CATEGORY_NAME_MAX,
-        required: true,
-      }),
-      abbr: shiftCategory.abbr?.trim()
-        ? normalizeCode(shiftCategory.abbr, {
-            label: "Shift code",
-            maxLength: SHIFT_CATEGORY_ABBR_MAX,
-            uppercase: true,
-          })
-        : null,
+  const result = validateEntity(shiftCategory, [
+    {
+      kind: "text",
+      key: "name",
+      errorKey: "shiftCategory.name",
+      label: "Shift name",
+      maxLength: SHIFT_CATEGORY_NAME_MAX,
     },
-  };
+    {
+      kind: "code",
+      key: "abbr",
+      errorKey: "shiftCategory.abbr",
+      label: "Shift code",
+      maxLength: SHIFT_CATEGORY_ABBR_MAX,
+      uppercase: true,
+      emptyValue: null,
+    },
+  ]);
+  return "response" in result ? result : { shiftCategory: result.normalized };
 }
 
 export function validateJob(job: JobInput): { job: JobInput } | { response: NextResponse } {
-  const nameError = validateSettingsTextField({
-    value: job.name,
-    label: "Job name",
-    maxLength: JOB_NAME_MAX,
-    required: true,
-  });
-  const abbrError = getCodeError(job.abbr, {
-    label: "Job abbreviation",
-    maxLength: JOB_ABBR_MAX,
-    required: true,
-    uppercase: true,
-  });
-  const fieldErrors = {
-    "job.name": nameError,
-    "job.abbr": abbrError,
-  };
-  const firstFieldError = Object.values(fieldErrors).find(Boolean);
-  if (firstFieldError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: firstFieldError,
-        fieldErrors,
-      }),
-    };
-  }
-
-  return {
-    job: {
-      ...job,
-      name: normalizeSettingsTextField({
-        value: job.name,
-        label: "Job name",
-        maxLength: JOB_NAME_MAX,
-        required: true,
-      }),
-      abbr: normalizeCode(job.abbr, {
-        label: "Job abbreviation",
-        maxLength: JOB_ABBR_MAX,
-        required: true,
-        uppercase: true,
-      }),
+  const result = validateEntity(job, [
+    { kind: "text", key: "name", errorKey: "job.name", label: "Job name", maxLength: JOB_NAME_MAX },
+    {
+      kind: "code",
+      key: "abbr",
+      errorKey: "job.abbr",
+      label: "Job abbreviation",
+      maxLength: JOB_ABBR_MAX,
+      required: true,
+      uppercase: true,
     },
-  };
+  ]);
+  return "response" in result ? result : { job: result.normalized };
 }
 
 export function validateAbsenceType(
   absenceType: AbsenceTypeInput,
 ): { absenceType: AbsenceTypeInput } | { response: NextResponse } {
-  const labelError =
-    absenceType.label.trim().length > 0
-      ? getCodeError(absenceType.label, {
-          label: "Absence code",
-          maxLength: ABSENCE_LABEL_MAX,
-          uppercase: true,
-        })
-      : null;
-  const nameError = validateSettingsTextField({
-    value: absenceType.name,
-    label: "Absence name",
-    maxLength: ABSENCE_NAME_MAX,
-    required: true,
-  });
-  const fieldErrors = {
-    "absenceType.label": labelError,
-    "absenceType.name": nameError,
-  };
-  const firstFieldError = Object.values(fieldErrors).find(Boolean);
-  if (firstFieldError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: firstFieldError,
-        fieldErrors,
-      }),
-    };
-  }
-
-  return {
-    absenceType: {
-      ...absenceType,
-      label:
-        absenceType.label.trim().length > 0
-          ? normalizeCode(absenceType.label, {
-              label: "Absence code",
-              maxLength: ABSENCE_LABEL_MAX,
-              uppercase: true,
-            })
-          : "",
-      name: normalizeSettingsTextField({
-        value: absenceType.name,
-        label: "Absence name",
-        maxLength: ABSENCE_NAME_MAX,
-        required: true,
-      }),
+  const result = validateEntity(absenceType, [
+    // Label first: when both fields fail, the code error surfaces top-level.
+    {
+      kind: "code",
+      key: "label",
+      errorKey: "absenceType.label",
+      label: "Absence code",
+      maxLength: ABSENCE_LABEL_MAX,
+      uppercase: true,
+      emptyValue: "",
     },
-  };
+    {
+      kind: "text",
+      key: "name",
+      errorKey: "absenceType.name",
+      label: "Absence name",
+      maxLength: ABSENCE_NAME_MAX,
+    },
+  ]);
+  return "response" in result ? result : { absenceType: result.normalized };
 }
 
 export function validateIndicatorType(
   indicatorType: IndicatorTypeInput,
 ): { indicatorType: IndicatorTypeInput } | { response: NextResponse } {
-  const nameError = validateSettingsTextField({
-    value: indicatorType.name,
-    label: "Indicator name",
-    maxLength: INDICATOR_NAME_MAX,
-    required: true,
-  });
-  if (nameError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: nameError,
-        fieldErrors: {
-          "indicatorType.name": nameError,
-        },
-      }),
-    };
-  }
-
-  return {
-    indicatorType: {
-      ...indicatorType,
-      name: normalizeSettingsTextField({
-        value: indicatorType.name,
-        label: "Indicator name",
-        maxLength: INDICATOR_NAME_MAX,
-        required: true,
-      }),
+  const result = validateEntity(indicatorType, [
+    {
+      kind: "text",
+      key: "name",
+      errorKey: "indicatorType.name",
+      label: "Indicator name",
+      maxLength: INDICATOR_NAME_MAX,
     },
-  };
+  ]);
+  return "response" in result ? result : { indicatorType: result.normalized };
 }
