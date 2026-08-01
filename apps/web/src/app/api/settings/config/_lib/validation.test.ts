@@ -45,7 +45,14 @@ function makeFocusArea(overrides: Partial<FocusAreaInput> = {}): FocusAreaInput 
 }
 
 function makeShiftCategory(overrides: Partial<ShiftCategoryInput> = {}): ShiftCategoryInput {
-  return { orgId: ORG_ID, name: "Day", color: "#FFFFFF", sortOrder: 1, focusAreaId: null, ...overrides };
+  return {
+    orgId: ORG_ID,
+    name: "Day",
+    color: "#FFFFFF",
+    sortOrder: 1,
+    focusAreaId: null,
+    ...overrides,
+  };
 }
 
 function makeJob(overrides: Partial<JobInput> = {}): JobInput {
@@ -93,7 +100,10 @@ async function expectValidationError(result: unknown): Promise<{
 describe("validateNamedItems", () => {
   it("trims and collapses whitespace in names; keeps abbr case; empty abbr becomes ''", () => {
     const result = validateNamedItems(
-      [makeNamedItem({ name: "  Trauma   Nurse ", abbr: " iCu " }), makeNamedItem({ id: 2, name: "B", abbr: "" })],
+      [
+        makeNamedItem({ name: "  Trauma   Nurse ", abbr: " iCu " }),
+        makeNamedItem({ id: 2, name: "B", abbr: "" }),
+      ],
       { itemLabel: "Certification" },
     );
     expect(result).not.toHaveProperty("response");
@@ -105,7 +115,9 @@ describe("validateNamedItems", () => {
   });
 
   it("rejects a missing name with per-item field errors", async () => {
-    const result = validateNamedItems([makeNamedItem({ name: "   " })], { itemLabel: "Certification" });
+    const result = validateNamedItems([makeNamedItem({ name: "   " })], {
+      itemLabel: "Certification",
+    });
     const body = await expectValidationError(result);
     expect(body.error).toBe("Certification name is required");
     expect(body.fieldErrors["items.0.name"]).toBe("Certification name is required");
@@ -126,7 +138,9 @@ describe("validateNamedItems", () => {
 
   it("rejects URL-like names (disallowUrl semantics)", async () => {
     const body = await expectValidationError(
-      validateNamedItems([makeNamedItem({ name: "see www.example.com" })], { itemLabel: "Certification" }),
+      validateNamedItems([makeNamedItem({ name: "see www.example.com" })], {
+        itemLabel: "Certification",
+      }),
     );
     expect(body.error).toBe("Certification name cannot contain a URL");
   });
@@ -215,7 +229,9 @@ describe("validateShiftCategory", () => {
   });
 
   it("rejects missing names, names over 50, and codes over 8", async () => {
-    const name = await expectValidationError(validateShiftCategory(makeShiftCategory({ name: "" })));
+    const name = await expectValidationError(
+      validateShiftCategory(makeShiftCategory({ name: "" })),
+    );
     expect(name.error).toBe("Shift name is required");
     expect(name.fieldErrors["shiftCategory.name"]).toBe("Shift name is required");
 
@@ -286,7 +302,9 @@ describe("validateIndicatorType", () => {
   });
 
   it("rejects missing and over-long names under the indicatorType.name key", async () => {
-    const missing = await expectValidationError(validateIndicatorType(makeIndicatorType({ name: "" })));
+    const missing = await expectValidationError(
+      validateIndicatorType(makeIndicatorType({ name: "" })),
+    );
     expect(missing.error).toBe("Indicator name is required");
     expect(missing.fieldErrors).toEqual({ "indicatorType.name": "Indicator name is required" });
 

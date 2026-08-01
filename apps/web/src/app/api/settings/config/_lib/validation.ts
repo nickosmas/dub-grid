@@ -219,7 +219,11 @@ function getFieldSpecError(value: string, spec: FieldSpec): string | null {
     });
   }
   return value.trim().length > 0
-    ? getCodeError(value, { label: spec.label, maxLength: spec.maxLength, uppercase: spec.uppercase })
+    ? getCodeError(value, {
+        label: spec.label,
+        maxLength: spec.maxLength,
+        uppercase: spec.uppercase,
+      })
     : null;
 }
 

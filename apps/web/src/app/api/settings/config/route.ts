@@ -143,12 +143,10 @@ async function hardDeleteSettingsRowsByIds(
   }
 }
 
-
 const coverageRequirementInputSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6).nullable(),
   minStaff: z.number().int().min(0),
 });
-
 
 const postBodySchema = z.discriminatedUnion("action", [
   z.object({
@@ -271,8 +269,6 @@ const postBodySchema = z.discriminatedUnion("action", [
     itemId: z.number().int(),
   }),
 ]);
-
-
 
 function buildSummary(parts: string[]): Omit<DependencyInfo, "hasAnyReferences"> {
   const active = parts.filter(Boolean);
