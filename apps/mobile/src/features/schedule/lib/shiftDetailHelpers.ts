@@ -1,4 +1,8 @@
-import type { MobileScheduleEntry, MobileScheduleEntrySegment, MobileShiftRequest } from "@dubgrid/contracts";
+import type {
+  MobileScheduleEntry,
+  MobileScheduleEntrySegment,
+  MobileShiftRequest,
+} from "@dubgrid/contracts";
 import {
   doScheduleEntrySegmentsShareShiftAndFocusArea,
   getScheduleEntryAbsenceTypeId,
@@ -13,7 +17,6 @@ import {
   getSplitShiftSegmentsForEntry,
   sortScheduleEntries,
 } from "./schedule";
-
 
 // Types and pure helpers for the shift-detail screen, extracted from
 // ShiftDetailScreen.tsx so they are unit-testable and the screen file stays
@@ -528,7 +531,10 @@ export function hasScheduleEntrySegmentStarted(
   return currentMinutes >= startMinutes;
 }
 
-export function hasScheduleEntryStarted(entry: MobileScheduleEntry, timeZone?: string | null): boolean {
+export function hasScheduleEntryStarted(
+  entry: MobileScheduleEntry,
+  timeZone?: string | null,
+): boolean {
   const { dateKey: todayDateKey, timeKey: currentTimeKey } = getCurrentDateTimeParts(timeZone);
 
   if (entry.date < todayDateKey) {
@@ -594,7 +600,9 @@ export function getInitials(name: string): string {
   return `${first}${last}` || "?";
 }
 
-export function isGeneralDetailSegment(segment: { shiftId?: number | null } | null | undefined): boolean {
+export function isGeneralDetailSegment(
+  segment: { shiftId?: number | null } | null | undefined,
+): boolean {
   return (
     segment != null &&
     Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
