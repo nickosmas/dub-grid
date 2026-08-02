@@ -3,6 +3,47 @@ import { readFileSync } from "fs";
 import { Client } from "pg";
 import { getPresetByBg, normalizePresetBg } from "./apps/web/src/lib/colors";
 
+// ── Schedule date anchoring ──────────────────────────────────────────────────
+// Every seeded shift/absence — both the programmatic tenants below and the
+// dates baked into the tenant SQL files — is authored around this reference
+// Sunday. On each reseed we shift them all by whole weeks so the reference
+// lands on the current week's Sunday, keeping the seeded schedule in the
+// current pay period instead of drifting into the past. The offset is always a
+// multiple of 7, so weekday/weekend patterns (and 14-day pay-period alignment)
+// are preserved.
+const SEED_SCHEDULE_REFERENCE_SUNDAY = "2026-07-05";
+
+function currentWeekSundayIso(now = new Date()): string {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+  return d.toISOString().slice(0, 10);
+}
+
+const SEED_SCHEDULE_SHIFT_DAYS = Math.round(
+  (Date.parse(currentWeekSundayIso()) - Date.parse(SEED_SCHEDULE_REFERENCE_SUNDAY)) / 86_400_000,
+);
+
+/** Shift a `YYYY-MM-DD` string by the schedule offset, in UTC. */
+function shiftSeedDateIso(iso: string): string {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + SEED_SCHEDULE_SHIFT_DAYS);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Rewrites every quoted 2026 date literal in a tenant SQL seed file by the
+ * schedule offset. Only matches `'2026-MM-DD'` — all such literals are schedule
+ * dates (verified: no config/created-date literals), and UUIDs never match a
+ * `YYYY-MM-DD` shape, so this is a safe, exhaustive shift.
+ */
+function shiftSeedSqlDates(sql: string): string {
+  if (SEED_SCHEDULE_SHIFT_DAYS === 0) return sql;
+  return sql.replace(
+    /'(2026-\d{2}-\d{2})'/g,
+    (_match, iso: string) => `'${shiftSeedDateIso(iso)}'`,
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 5-Tenant Seed: Realistic healthcare scheduling data
 // Uses @snaplet/copycat for deterministic fake data, raw pg for inserts
@@ -1845,7 +1886,7 @@ async function seedTenantSqlBeforeSchedule(
   scheduledJobCount: number;
   shiftlessJobCount: number;
 }> {
-  const tenantSql = readFileSync(sqlPath, "utf8");
+  const tenantSql = shiftSeedSqlDates(readFileSync(sqlPath, "utf8"));
   const { prefixSql, scheduleSql } = splitSqlBeforeFinalScheduleBlock(tenantSql);
 
   if (prefixSql) {
@@ -2775,7 +2816,8 @@ async function main() {
       );
       if (empWorkAssignments.length === 0) continue;
 
-      const shiftStart = new Date(2026, 6, 5); // July 5, 2026
+      const shiftStart = new Date(2026, 6, 5); // reference Sunday (July 5, 2026)
+      shiftStart.setDate(shiftStart.getDate() + SEED_SCHEDULE_SHIFT_DAYS); // → current pay period
       for (let i = 0; i < 14; i++) {
         const d = new Date(shiftStart);
         d.setDate(d.getDate() + i);
