@@ -12,6 +12,7 @@ import {
   validateStaffOrgReferences,
 } from "@/lib/staff-validation";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
 
 const patchSchema = z.object({
   orgId: z.string().uuid(),
@@ -117,7 +118,7 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("organization app-only-user PATCH failed", error);
+    logger.error({ error }, "organization app-only-user PATCH failed");
     return NextResponse.json({ error: "Failed to update app-only user" }, { status: 500 });
   }
 }

@@ -64,7 +64,7 @@ const FOCUS_AREA_COLS = "id, org_id, department_id, name, color, sort_order, arc
 const SHIFT_CATEGORY_COLS =
   "id, org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes, archived_at";
 const JOB_COLS =
-  "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, shift_time_overrides, shift_color_overrides, default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
+  "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, job_shift_overrides(shift_id, start_time, end_time, color), default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
 const ABSENCE_TYPE_COLS =
   "id, org_id, label, name, color, border_color, text_color, sort_order, archived_at";
 const EMPLOYEE_COLS =

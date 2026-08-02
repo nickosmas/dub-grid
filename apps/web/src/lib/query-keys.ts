@@ -84,6 +84,7 @@ export const queryKeys = {
     userMemberships: (userId: string) => ["gm", "users", userId, "memberships"] as const,
     tenantStats: () => ["gm", "tenantStats"] as const,
     org: (orgId: string) => ["gm", "org", orgId] as const,
+    platformFlags: () => ["gm", "platform-flags"] as const,
     orgUsers: (orgId: string) => ["gm", "org", orgId, "users"] as const,
     orgEmployees: (orgId: string) => ["gm", "org", orgId, "employees"] as const,
     orgInvitations: (orgId: string) => ["gm", "org", orgId, "invitations"] as const,
@@ -100,4 +101,7 @@ export const queryKeys = {
     impersonationHistory: (page: number, limit: number) =>
       ["gm", "impersonation", "history", page, limit] as const,
   },
+  // Client-visible subset of platform kill switches (stripe/csv_import/csv_export) —
+  // not org-scoped, see apps/web/src/hooks/useClientFeatureFlags.ts.
+  featureFlags: () => ["featureFlags"] as const,
 } as const;

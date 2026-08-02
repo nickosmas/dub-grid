@@ -4,6 +4,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
 
 const actorNamesSchema = z.object({
   orgId: z.string().uuid(),
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ names });
   } catch (error) {
-    console.error("schedule actor names POST failed", error);
+    logger.error({ error }, "schedule actor names POST failed");
     return NextResponse.json({ error: "Failed to load schedule actor names" }, { status: 500 });
   }
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { OrganizationRole, PlatformRole } from "@dubgrid/domain";
 import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
+import logger from "@/lib/logger";
 import { USER_SESSION_ACTIVE_WINDOW_MS } from "@/features/account/server";
 import type { GridmasterUserSession, GridmasterUserSessionOrg } from "@/types";
 
@@ -147,7 +148,7 @@ export async function GET(req: NextRequest) {
       gridmasterSessions,
     });
   } catch (error) {
-    console.error("gridmaster security sessions GET failed", error);
+    logger.error({ error }, "gridmaster security sessions GET failed");
     return NextResponse.json({ error: "Failed to load sessions" }, { status: 500 });
   }
 }

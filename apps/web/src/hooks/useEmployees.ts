@@ -16,6 +16,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { useOrgRealtimeInvalidation } from "@/hooks/useOrgRealtimeInvalidation";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import type { Employee } from "@/types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -76,11 +77,8 @@ export function useEmployees(orgId: string | null): EmployeesData {
 
   const loading = employeesQuery.isLoading;
 
-  // Ref for capturing the latest employee list inside optimistic callbacks.
-  const allEmployeesRef = useRef<Employee[]>([]);
-  useEffect(() => {
-    allEmployeesRef.current = allLocal;
-  }, [allLocal]);
+  // Latest employee list, for reading inside optimistic callbacks.
+  const allEmployeesRef = useLatestRef(allLocal);
 
   // Helper: invalidate the all-employees query so the next focus/navigation
   // picks up any server-side changes.

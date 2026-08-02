@@ -3,6 +3,7 @@ import { z } from "zod";
 import { updateSelfMfaStatus } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ profile });
   } catch (error) {
-    console.error("account mfa status POST failed", error);
+    logger.error({ error }, "account mfa status POST failed");
     return NextResponse.json({ error: "Failed to update MFA status" }, { status: 500 });
   }
 }

@@ -128,6 +128,16 @@ export function fmt12h(time24: string | null | undefined): string {
   return `${p.hour}:${p.minute} ${p.period}`;
 }
 
+/**
+ * Compact 12-hour label used inside dense grid/print cells: drops the AM/PM
+ * suffix and the ":00" on whole hours (e.g. "9", "9:30", "13:00" -> "1").
+ */
+export function fmt12hShort(time24: string): string {
+  const [h, m] = time24.split(":").map(Number);
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return m === 0 ? String(h12) : `${h12}:${String(m).padStart(2, "0")}`;
+}
+
 /** Calculate duration between two 24h time strings. Handles overnight spans. */
 export function calcTimeDuration(
   start: string | null | undefined,

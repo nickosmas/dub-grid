@@ -20,7 +20,7 @@ import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
 import { Popover, PopoverContent } from "@/components/ui/popover";
-import { useOrganizationData, usePermissions } from "@/hooks";
+import { useClientFeatureFlags, useOrganizationData, usePermissions } from "@/hooks";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import {
@@ -113,6 +113,12 @@ function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+// NOTE: These date helpers are intentionally UTC-based and distinct from the
+// local-time `getWeekStart`/`addDays` in `@/lib/utils`. The entire reports date
+// pipeline runs on UTC ISO strings (`toIsoDate` -> `toISOString`, `parseIsoDate`,
+// and every formatter passes `timeZone: "UTC"`), so week math must also be UTC —
+// using the local-time shared helpers would shift the resulting ISO date by the
+// viewer's timezone offset. Do not replace with the `@/lib/utils` versions.
 function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
@@ -520,12 +526,14 @@ function TargetDropdown({
 function ReportsContent() {
   const router = useRouter();
   const permissions = usePermissions();
+  const featureFlags = useClientFeatureFlags();
   const { org, loading: orgLoading } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
   });
-  const canAccessReports =
+  const hasReportsPermission =
     !permissions.isUserViewActive &&
     (permissions.role === "admin" || permissions.isSuperAdmin === true);
+  const canAccessReports = hasReportsPermission && featureFlags.reports;
   const orgId = permissions.orgId ?? org?.id ?? null;
   const [report, setReport] = useState<OperationsReportType>("staff-hours");
   const [quickRange, setQuickRange] = useState<QuickRange>("current-week");
@@ -559,11 +567,15 @@ function ReportsContent() {
   );
 
   useEffect(() => {
-    if (!permissions.isLoading && !canAccessReports) {
+    if (permissions.isLoading) return;
+    if (!hasReportsPermission) {
       toast.info("Reports are available to admins and super admins.");
       router.replace("/dashboard");
+    } else if (!featureFlags.reports) {
+      toast.info("Reports are temporarily unavailable. Please try again shortly.");
+      router.replace("/dashboard");
     }
-  }, [canAccessReports, permissions.isLoading, router]);
+  }, [hasReportsPermission, featureFlags.reports, permissions.isLoading, router]);
 
   const resetAppliedReport = () => {
     setAppliedRequest(null);

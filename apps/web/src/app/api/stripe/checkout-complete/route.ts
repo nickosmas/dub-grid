@@ -3,7 +3,7 @@ import { z } from "zod";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
-import { syncCheckoutSessionToDb } from "@/lib/stripe";
+import { syncCheckoutSessionToDb, requireStripeEnabled } from "@/lib/stripe";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -58,6 +58,11 @@ export async function POST(req: NextRequest) {
         },
       );
     }
+
+    // Checked after auth + rate-limiting (not before) so a disabled flag can't be
+    // used to probe this route for free, unauthenticated and unrate-limited.
+    const stripeDisabled = await requireStripeEnabled();
+    if (stripeDisabled) return stripeDisabled;
 
     await syncCheckoutSessionToDb(auth.serviceClient, parsed.data.sessionId, parsed.data.orgId, {
       actor: {

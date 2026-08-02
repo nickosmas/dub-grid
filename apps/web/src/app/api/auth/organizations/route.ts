@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const switchOrganizationSchema = z.object({
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
       organizations: result.data ?? [],
     });
   } catch (error) {
-    console.error("auth organizations GET failed", error);
+    logger.error({ error }, "auth organizations GET failed");
     return NextResponse.json({ error: "Failed to load organizations" }, { status: 500 });
   }
 }
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("auth organizations POST failed", error);
+    logger.error({ error }, "auth organizations POST failed");
     return NextResponse.json({ error: "Failed to switch organization" }, { status: 500 });
   }
 }

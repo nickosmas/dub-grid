@@ -535,4 +535,102 @@ describe("mobile person invitation route", () => {
       "Failed to send mobile invitation email",
     );
   });
+
+  function makePatchRequest(body: Record<string, unknown>) {
+    return new Request(
+      "http://localhost/api/mobile/v1/people/11111111-1111-4111-8111-111111111111/invitation",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    ) as never;
+  }
+
+  const PENDING_ROW = {
+    id: "22222222-2222-4222-8222-222222222222",
+    email: "mina@example.com",
+    expires_at: "2026-05-05T00:00:00.000Z",
+    updated_at: "2026-05-02T21:30:00.000Z",
+    employee_id: "11111111-1111-4111-8111-111111111111",
+  };
+
+  function setupResendAuth() {
+    const serviceClient = makeServiceClient({ existingMemberUserId: null });
+    requireMobileAuth.mockResolvedValue({
+      currentOrg: { id: "44444444-4444-4444-8444-444444444444", name: "Calm Haven" },
+      permissions: { canManageEmployees: true },
+      serviceClient,
+      user: { id: "55555555-5555-4555-8555-555555555555", email: "admin@example.com" },
+    });
+    return serviceClient;
+  }
+
+  it("does NOT mutate the invitation row when a resend email fails (retry stays clean)", async () => {
+    setupResendAuth();
+    fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(PENDING_ROW);
+    sendResendEmail.mockRejectedValue(new Error("Resend unavailable"));
+
+    const { PATCH } = await import("./person-invitation");
+    const response = await PATCH(
+      makePatchRequest({
+        invitationId: PENDING_ROW.id,
+        expectedUpdatedAt: PENDING_ROW.updated_at,
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(502);
+    // The row is only committed AFTER a successful send — so a failed send leaves it
+    // untouched and the client's expectedUpdatedAt stays valid for a clean retry.
+    expect(refreshMobileEmployeeInvitationRow).not.toHaveBeenCalled();
+  });
+
+  it("commits the exact token it emailed once the resend succeeds", async () => {
+    setupResendAuth();
+    fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(PENDING_ROW);
+    sendResendEmail.mockResolvedValue(undefined);
+    refreshMobileEmployeeInvitationRow.mockResolvedValue({
+      ...PENDING_ROW,
+      token: "committed-token",
+      updated_at: "2026-05-02T22:00:00.000Z",
+    });
+
+    const { PATCH } = await import("./person-invitation");
+    const response = await PATCH(
+      makePatchRequest({
+        invitationId: PENDING_ROW.id,
+        expectedUpdatedAt: PENDING_ROW.updated_at,
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    // The token committed to the row must be the exact one embedded in the emailed link,
+    // proving we emailed first and persisted that same token (not a separately-rotated one).
+    const refreshArg = refreshMobileEmployeeInvitationRow.mock.calls[0][1];
+    expect(refreshArg.invitationId).toBe(PENDING_ROW.id);
+    expect(typeof refreshArg.token).toBe("string");
+    expect(refreshArg.token.length).toBeGreaterThan(0);
+    const emailedHtml = sendResendEmail.mock.calls[0][0].html as string;
+    expect(emailedHtml).toContain(refreshArg.token);
+  });
+
+  it("409s a stale resend without emailing or mutating", async () => {
+    setupResendAuth();
+    fetchMobilePendingInvitationRowByEmployeeId.mockResolvedValue(PENDING_ROW);
+
+    const { PATCH } = await import("./person-invitation");
+    const response = await PATCH(
+      makePatchRequest({
+        invitationId: PENDING_ROW.id,
+        expectedUpdatedAt: "2026-01-01T00:00:00.000Z",
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(409);
+    expect(sendResendEmail).not.toHaveBeenCalled();
+    expect(refreshMobileEmployeeInvitationRow).not.toHaveBeenCalled();
+  });
 });

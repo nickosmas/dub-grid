@@ -1,0 +1,55 @@
+# Hourly sweeper for expired shift requests and invitations.
+#
+# This used to be a Vercel cron (apps/web/vercel.json), but Vercel's Hobby plan
+# caps crons at once/day, so the hourly schedule failed every deployment. The
+# route itself is unchanged — this just calls it on the hourly cadence it needs.
+# The other (daily) crons stay in vercel.json since Hobby allows those.
+#
+# NOTE: GitHub Actions `schedule` triggers only fire from the default branch
+# (main), so this starts running once merged to main — not from dev/PR branches.
+# Use "Run workflow" (workflow_dispatch) to test it before then.
+#
+# Required repo secrets:
+#   CRON_SECRET           — must match the deployment's CRON_SECRET env var
+#   NEXT_PUBLIC_SITE_URL  — production origin, e.g. https://app.dubgrid.com
+
+name: Cron — Expire Requests
+
+on:
+  schedule:
+    - cron: "0 * * * *" # top of every hour (UTC)
+  workflow_dispatch:
+
+concurrency:
+  group: cron-expire-requests
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: Ping expire-requests endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call cron endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ] || [ -z "${SITE_URL:-}" ]; then
+            echo "::error::CRON_SECRET and NEXT_PUBLIC_SITE_URL repo secrets must both be set"
+            exit 1
+          fi
+          url="${SITE_URL%/}/api/cron/expire-requests"
+          echo "Calling $url"
+          # Capture body + status; fail the job on any non-2xx so a broken cron is visible.
+          status=$(curl -sS -o /tmp/cron-body.txt -w '%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "$url")
+          echo "HTTP $status"
+          cat /tmp/cron-body.txt
+          echo
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error::expire-requests returned HTTP $status"
+            exit 1
+          fi

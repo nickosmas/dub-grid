@@ -134,4 +134,70 @@ describe("POST /api/organizations/invitations/create", () => {
       expect.objectContaining({ p_role: "super_admin", p_org_id: ORG_ID }),
     );
   });
+
+  // Chainable stub for the refreshPendingInvitation update: .update().eq().ilike()
+  // .is().is().gte().select().maybeSingle()
+  function makeRefreshChain(result: { data: unknown; error: unknown }) {
+    const chain: Record<string, unknown> = {};
+    for (const method of ["update", "eq", "ilike", "is", "gte", "select"]) {
+      chain[method] = () => chain;
+    }
+    chain.maybeSingle = async () => result;
+    return chain;
+  }
+
+  it("refreshes an orphaned pending invite (from a failed first send) instead of 409", async () => {
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: "An active invitation already exists for this email" },
+    }));
+    const from = vi.fn(() =>
+      makeRefreshChain({
+        data: { id: "inv-orphan", token: "fresh-tok", expires_at: "2026-02-02T00:00:00Z" },
+        error: null,
+      }),
+    );
+    getServiceClient.mockReturnValue({ rpc, from });
+
+    const { POST } = await importRoute();
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "orphan@test.com", role: "admin" }));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      invitationId: "inv-orphan",
+      token: "fresh-tok",
+      expiresAt: "2026-02-02T00:00:00Z",
+      resent: true,
+    });
+    expect(from).toHaveBeenCalledWith("invitations");
+  });
+
+  it("still 409s when the guard fires but no pending row can be refreshed", async () => {
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: "An active invitation already exists for this email" },
+    }));
+    const from = vi.fn(() => makeRefreshChain({ data: null, error: null }));
+    getServiceClient.mockReturnValue({ rpc, from });
+
+    const { POST } = await importRoute();
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "gone@test.com", role: "admin" }));
+
+    expect(res.status).toBe(409);
+  });
+
+  it("maps a genuine already-a-member RPC error to 409 without refreshing", async () => {
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: "User is already a member of this organization" },
+    }));
+    const from = vi.fn();
+    getServiceClient.mockReturnValue({ rpc, from });
+
+    const { POST } = await importRoute();
+    const res = await POST(makeRequest({ orgId: ORG_ID, email: "member@test.com", role: "admin" }));
+
+    expect(res.status).toBe(409);
+    expect(from).not.toHaveBeenCalled();
+  });
 });

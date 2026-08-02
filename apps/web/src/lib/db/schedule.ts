@@ -2,6 +2,7 @@ import { supabase, logAudit, formatDateKey, fetchAllRows } from "./shared";
 import type { DbScheduleNote, RecurringDraft } from "./types";
 import { generateSeriesDates } from "./mappers";
 import { upsertShift, deleteShift } from "./shifts";
+import { toPublishChanges } from "./publish-history";
 import type {
   PublishChange,
   PublishHistoryEntry,
@@ -137,7 +138,9 @@ export async function fetchRecentPublishHistory(
   const cutoff = since ?? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("publish_history")
-    .select("id, org_id, published_by, start_date, end_date, change_count, changes, published_at")
+    .select(
+      "id, org_id, published_by, start_date, end_date, change_count, published_at, schedule_publish_changes(emp_id, date, kind, from_state, to_state, from_absence_type_id, to_absence_type_id, updated_by, from_custom_start, from_custom_end, to_custom_start, to_custom_end)",
+    )
     .eq("org_id", orgId)
     .gte("published_at", cutoff)
     .order("published_at", { ascending: false });
@@ -150,7 +153,7 @@ export async function fetchRecentPublishHistory(
     startDate: row.start_date,
     endDate: row.end_date,
     changeCount: row.change_count,
-    changes: row.changes as PublishChange[],
+    changes: toPublishChanges(row.schedule_publish_changes),
     publishedAt: row.published_at,
   }));
 }

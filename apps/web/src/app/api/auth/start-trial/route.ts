@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const startTrialSchema = z.object({
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("auth start-trial POST failed", error);
+    logger.error({ error }, "auth start-trial POST failed");
     return NextResponse.json({ error: "Failed to start trial" }, { status: 500 });
   }
 }

@@ -93,7 +93,7 @@ describe("formatClientErrorMessage", () => {
         new Error("Invitation email could not be sent. Try again in a moment."),
         "fallback",
       ),
-    ).toBe("We couldn't send that invitation email. Try again in a moment.");
+    ).toBe("We couldn't send that email. Please try again shortly.");
   });
 
   it("returns the canonical network message for connectivity failures", () => {
@@ -225,6 +225,14 @@ describe("isTechnicalErrorMessage", () => {
   it("flags backend/infra leaks", () => {
     expect(isTechnicalErrorMessage("PGRST301 row-level security violation")).toBe(true);
     expect(isTechnicalErrorMessage("invalid input syntax for type uuid")).toBe(true);
+  });
+
+  it("flags Postgres/driver connection and timeout failures", () => {
+    expect(isTechnicalErrorMessage("canceling statement due to statement timeout")).toBe(true);
+    expect(isTechnicalErrorMessage("Connection terminated unexpectedly")).toBe(true);
+    expect(isTechnicalErrorMessage("server closed the connection unexpectedly")).toBe(true);
+    expect(isTechnicalErrorMessage('too many connections for role "app_user"')).toBe(true);
+    expect(isTechnicalErrorMessage("connect ECONNREFUSED 127.0.0.1:5432")).toBe(true);
   });
 
   it("does not flag plain human-readable messages", () => {

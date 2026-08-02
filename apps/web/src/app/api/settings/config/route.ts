@@ -18,6 +18,7 @@ import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import type { AuditAction, AuditResourceType } from "@/lib/audit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiErrorResponse } from "@/lib/error-handling";
+import logger from "@/lib/logger";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
   ABSENCE_TYPE_COLS,
@@ -43,11 +44,21 @@ import {
 import { buildScheduleAssignmentOptions } from "@/lib/assignable-shifts";
 import { normalizePresetBg } from "@/lib/colors";
 import {
-  getCodeError,
-  getLineTextError,
-  normalizeCode,
-  normalizeLineText,
-} from "@/lib/form-validation";
+  namedItemSchema,
+  departmentSchema,
+  focusAreaSchema,
+  shiftCategorySchema,
+  jobSchema,
+  absenceTypeSchema,
+  indicatorTypeSchema,
+  validateNamedItems,
+  validateDepartments,
+  validateFocusArea,
+  validateShiftCategory,
+  validateJob,
+  validateAbsenceType,
+  validateIndicatorType,
+} from "./_lib/validation";
 import {
   getJobEligibilityMode,
   getStoredJobDepartmentIds,
@@ -132,103 +143,9 @@ async function hardDeleteSettingsRowsByIds(
   }
 }
 
-const namedItemSchema = z.object({
-  id: z.number().int(),
-  orgId: z.string(),
-  name: z.string(),
-  abbr: z.string(),
-  isScheduleRole: z.boolean().optional(),
-  departmentId: z.number().int().nullable().optional(),
-  sortOrder: z.number().int(),
-  archivedAt: z.string().nullable().optional(),
-});
-
-const departmentSchema = z.object({
-  id: z.number().int(),
-  orgId: z.string(),
-  name: z.string(),
-  abbr: z.string(),
-  type: z.enum(["scheduled", "management"]),
-  sortOrder: z.number().int(),
-  archivedAt: z.string().nullable().optional(),
-  permissions: z.record(z.string(), z.boolean()).nullable().optional(),
-});
-
-const focusAreaSchema = z.object({
-  id: z.number().int().optional(),
-  orgId: z.string(),
-  departmentId: z.number().int().nullable(),
-  name: z.string(),
-  color: z.string().optional().nullable(),
-  sortOrder: z.number().int(),
-  archivedAt: z.string().nullable().optional(),
-});
-
-const shiftCategorySchema = z.object({
-  id: z.number().int().optional(),
-  orgId: z.string(),
-  name: z.string(),
-  abbr: z.string().nullable().optional(),
-  startTime: z.string().nullable().optional(),
-  endTime: z.string().nullable().optional(),
-  color: z.string(),
-  sortOrder: z.number().int(),
-  focusAreaId: z.number().int().nullable(),
-  breakMinutes: z.number().int().nullable().optional(),
-  archivedAt: z.string().nullable().optional(),
-});
-
-const jobSchema = z.object({
-  id: z.number().int().optional(),
-  orgId: z.string(),
-  name: z.string(),
-  abbr: z.string(),
-  showOnGrid: z.boolean(),
-  assignmentMode: z.enum(["with_shift", "shiftless", "both"]).optional(),
-  eligibilityMode: z.enum(["and", "or"]).optional(),
-  focusAreaIds: z.array(z.number().int()).optional(),
-  departmentIds: z.array(z.number().int()).optional(),
-  applicableShiftIds: z.array(z.number().int()).optional(),
-  eligibleRoleIds: z.array(z.number().int()).optional(),
-  requiredCertificationIds: z.array(z.number().int()).optional(),
-  color: z.string(),
-  border: z.string(),
-  text: z.string(),
-  shiftTimeOverrides: z.record(z.string(), z.unknown()).optional(),
-  shiftColorOverrides: z.record(z.string(), z.string()).optional(),
-  defaultStartTime: z.string().nullable().optional(),
-  defaultEndTime: z.string().nullable().optional(),
-  defaultDurationHours: z.number().int().nullable().optional(),
-  defaultDurationMinutes: z.number().int().nullable().optional(),
-  sortOrder: z.number().int(),
-  systemKey: z.string().nullable().optional(),
-  archivedAt: z.string().nullable().optional(),
-});
-
 const coverageRequirementInputSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6).nullable(),
   minStaff: z.number().int().min(0),
-});
-
-const absenceTypeSchema = z.object({
-  id: z.number().int().optional(),
-  orgId: z.string(),
-  label: z.string(),
-  name: z.string(),
-  color: z.string(),
-  border: z.string(),
-  text: z.string(),
-  sortOrder: z.number().int(),
-  archivedAt: z.string().nullable().optional(),
-});
-
-const indicatorTypeSchema = z.object({
-  id: z.number().int().optional(),
-  orgId: z.string(),
-  name: z.string(),
-  color: z.string(),
-  sortOrder: z.number().int(),
-  archivedAt: z.string().nullable().optional(),
 });
 
 const postBodySchema = z.discriminatedUnion("action", [
@@ -352,418 +269,6 @@ const postBodySchema = z.discriminatedUnion("action", [
     itemId: z.number().int(),
   }),
 ]);
-
-type NamedItemInput = z.infer<typeof namedItemSchema>;
-type DepartmentInput = z.infer<typeof departmentSchema>;
-type FocusAreaInput = z.infer<typeof focusAreaSchema>;
-type ShiftCategoryInput = z.infer<typeof shiftCategorySchema>;
-type JobInput = z.infer<typeof jobSchema>;
-type AbsenceTypeInput = z.infer<typeof absenceTypeSchema>;
-type IndicatorTypeInput = z.infer<typeof indicatorTypeSchema>;
-
-const SETTINGS_NAME_MAX = 80;
-const SETTINGS_ABBR_MAX = 20;
-const FOCUS_AREA_NAME_MAX = 80;
-const SHIFT_CATEGORY_NAME_MAX = 50;
-const SHIFT_CATEGORY_ABBR_MAX = 8;
-const JOB_NAME_MAX = 50;
-const JOB_ABBR_MAX = 6;
-const ABSENCE_LABEL_MAX = 6;
-const ABSENCE_NAME_MAX = 50;
-const INDICATOR_NAME_MAX = 50;
-
-function buildSettingsValidationResponse(args: {
-  error: string;
-  fieldErrors: Record<string, string | null>;
-}) {
-  return NextResponse.json(args, { status: 400 });
-}
-
-function findDuplicateValue(values: string[]): string | null {
-  const seen = new Set<string>();
-  for (const value of values) {
-    if (seen.has(value)) {
-      return value;
-    }
-    seen.add(value);
-  }
-  return null;
-}
-
-function validateSettingsTextField(args: {
-  value: string;
-  label: string;
-  maxLength: number;
-  required?: boolean;
-}): string | null {
-  return getLineTextError(args.value, {
-    label: args.label,
-    maxLength: args.maxLength,
-    required: args.required,
-    disallowUrl: true,
-  });
-}
-
-function normalizeSettingsTextField(args: {
-  value: string;
-  label: string;
-  maxLength: number;
-  required?: boolean;
-}): string {
-  return normalizeLineText(args.value, {
-    label: args.label,
-    maxLength: args.maxLength,
-    required: args.required,
-    disallowUrl: true,
-  });
-}
-
-function validateNamedItems(
-  items: NamedItemInput[],
-  args: { itemLabel: string },
-): { items: NamedItemInput[] } | { response: NextResponse } {
-  const fieldErrors: Record<string, string | null> = {};
-  const draftItems = items.map((item, index) => {
-    const nameError = validateSettingsTextField({
-      value: item.name,
-      label: `${args.itemLabel} name`,
-      maxLength: SETTINGS_NAME_MAX,
-      required: true,
-    });
-    const abbrError =
-      item.abbr.trim().length > 0
-        ? getCodeError(item.abbr, {
-            label: `${args.itemLabel} abbreviation`,
-            maxLength: SETTINGS_ABBR_MAX,
-          })
-        : null;
-    fieldErrors[`items.${index}.name`] = nameError;
-    fieldErrors[`items.${index}.abbr`] = abbrError;
-
-    return item;
-  });
-
-  const firstFieldError = Object.values(fieldErrors).find(Boolean);
-  if (firstFieldError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: firstFieldError,
-        fieldErrors,
-      }),
-    };
-  }
-
-  const normalizedItems = draftItems.map((item) => ({
-    ...item,
-    name: normalizeSettingsTextField({
-      value: item.name,
-      label: `${args.itemLabel} name`,
-      maxLength: SETTINGS_NAME_MAX,
-      required: true,
-    }),
-    abbr:
-      item.abbr.trim().length > 0
-        ? normalizeCode(item.abbr, {
-            label: `${args.itemLabel} abbreviation`,
-            maxLength: SETTINGS_ABBR_MAX,
-          })
-        : "",
-  }));
-
-  const duplicateName = findDuplicateValue(normalizedItems.map((item) => item.name.toLowerCase()));
-  if (duplicateName) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: `Duplicate ${args.itemLabel.toLowerCase()} name: "${duplicateName}"`,
-        fieldErrors,
-      }),
-    };
-  }
-
-  return { items: normalizedItems };
-}
-
-function validateDepartments(
-  items: DepartmentInput[],
-): { items: DepartmentInput[] } | { response: NextResponse } {
-  const fieldErrors: Record<string, string | null> = {};
-  const draftItems = items.map((item, index) => {
-    const nameError = validateSettingsTextField({
-      value: item.name,
-      label: "Department name",
-      maxLength: SETTINGS_NAME_MAX,
-      required: true,
-    });
-    const abbrError =
-      item.abbr.trim().length > 0
-        ? getCodeError(item.abbr, {
-            label: "Department abbreviation",
-            maxLength: SETTINGS_ABBR_MAX,
-          })
-        : null;
-    fieldErrors[`items.${index}.name`] = nameError;
-    fieldErrors[`items.${index}.abbr`] = abbrError;
-
-    return item;
-  });
-
-  const firstFieldError = Object.values(fieldErrors).find(Boolean);
-  if (firstFieldError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: firstFieldError,
-        fieldErrors,
-      }),
-    };
-  }
-
-  const normalizedItems = draftItems.map((item) => ({
-    ...item,
-    name: normalizeSettingsTextField({
-      value: item.name,
-      label: "Department name",
-      maxLength: SETTINGS_NAME_MAX,
-      required: true,
-    }),
-    abbr:
-      item.abbr.trim().length > 0
-        ? normalizeCode(item.abbr, {
-            label: "Department abbreviation",
-            maxLength: SETTINGS_ABBR_MAX,
-          })
-        : "",
-  }));
-
-  for (const type of ["scheduled", "management"] as const) {
-    const duplicateName = findDuplicateValue(
-      normalizedItems.filter((item) => item.type === type).map((item) => item.name.toLowerCase()),
-    );
-    if (duplicateName) {
-      return {
-        response: buildSettingsValidationResponse({
-          error: `Duplicate department name: "${duplicateName}"`,
-          fieldErrors,
-        }),
-      };
-    }
-  }
-
-  return { items: normalizedItems };
-}
-
-function validateFocusArea(
-  focusArea: FocusAreaInput,
-): { focusArea: FocusAreaInput } | { response: NextResponse } {
-  const nameError = validateSettingsTextField({
-    value: focusArea.name,
-    label: "Focus area name",
-    maxLength: FOCUS_AREA_NAME_MAX,
-    required: true,
-  });
-  if (nameError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: nameError,
-        fieldErrors: {
-          "focusArea.name": nameError,
-        },
-      }),
-    };
-  }
-
-  return {
-    focusArea: {
-      ...focusArea,
-      name: normalizeSettingsTextField({
-        value: focusArea.name,
-        label: "Focus area name",
-        maxLength: FOCUS_AREA_NAME_MAX,
-        required: true,
-      }),
-    },
-  };
-}
-
-function validateShiftCategory(
-  shiftCategory: ShiftCategoryInput,
-): { shiftCategory: ShiftCategoryInput } | { response: NextResponse } {
-  const nameError = validateSettingsTextField({
-    value: shiftCategory.name,
-    label: "Shift name",
-    maxLength: SHIFT_CATEGORY_NAME_MAX,
-    required: true,
-  });
-  const abbrError = shiftCategory.abbr?.trim()
-    ? getCodeError(shiftCategory.abbr, {
-        label: "Shift code",
-        maxLength: SHIFT_CATEGORY_ABBR_MAX,
-        uppercase: true,
-      })
-    : null;
-  const fieldErrors = {
-    "shiftCategory.name": nameError,
-    "shiftCategory.abbr": abbrError,
-  };
-  const firstFieldError = Object.values(fieldErrors).find(Boolean);
-  if (firstFieldError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: firstFieldError,
-        fieldErrors,
-      }),
-    };
-  }
-
-  return {
-    shiftCategory: {
-      ...shiftCategory,
-      name: normalizeSettingsTextField({
-        value: shiftCategory.name,
-        label: "Shift name",
-        maxLength: SHIFT_CATEGORY_NAME_MAX,
-        required: true,
-      }),
-      abbr: shiftCategory.abbr?.trim()
-        ? normalizeCode(shiftCategory.abbr, {
-            label: "Shift code",
-            maxLength: SHIFT_CATEGORY_ABBR_MAX,
-            uppercase: true,
-          })
-        : null,
-    },
-  };
-}
-
-function validateJob(job: JobInput): { job: JobInput } | { response: NextResponse } {
-  const nameError = validateSettingsTextField({
-    value: job.name,
-    label: "Job name",
-    maxLength: JOB_NAME_MAX,
-    required: true,
-  });
-  const abbrError = getCodeError(job.abbr, {
-    label: "Job abbreviation",
-    maxLength: JOB_ABBR_MAX,
-    required: true,
-    uppercase: true,
-  });
-  const fieldErrors = {
-    "job.name": nameError,
-    "job.abbr": abbrError,
-  };
-  const firstFieldError = Object.values(fieldErrors).find(Boolean);
-  if (firstFieldError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: firstFieldError,
-        fieldErrors,
-      }),
-    };
-  }
-
-  return {
-    job: {
-      ...job,
-      name: normalizeSettingsTextField({
-        value: job.name,
-        label: "Job name",
-        maxLength: JOB_NAME_MAX,
-        required: true,
-      }),
-      abbr: normalizeCode(job.abbr, {
-        label: "Job abbreviation",
-        maxLength: JOB_ABBR_MAX,
-        required: true,
-        uppercase: true,
-      }),
-    },
-  };
-}
-
-function validateAbsenceType(
-  absenceType: AbsenceTypeInput,
-): { absenceType: AbsenceTypeInput } | { response: NextResponse } {
-  const labelError =
-    absenceType.label.trim().length > 0
-      ? getCodeError(absenceType.label, {
-          label: "Absence code",
-          maxLength: ABSENCE_LABEL_MAX,
-          uppercase: true,
-        })
-      : null;
-  const nameError = validateSettingsTextField({
-    value: absenceType.name,
-    label: "Absence name",
-    maxLength: ABSENCE_NAME_MAX,
-    required: true,
-  });
-  const fieldErrors = {
-    "absenceType.label": labelError,
-    "absenceType.name": nameError,
-  };
-  const firstFieldError = Object.values(fieldErrors).find(Boolean);
-  if (firstFieldError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: firstFieldError,
-        fieldErrors,
-      }),
-    };
-  }
-
-  return {
-    absenceType: {
-      ...absenceType,
-      label:
-        absenceType.label.trim().length > 0
-          ? normalizeCode(absenceType.label, {
-              label: "Absence code",
-              maxLength: ABSENCE_LABEL_MAX,
-              uppercase: true,
-            })
-          : "",
-      name: normalizeSettingsTextField({
-        value: absenceType.name,
-        label: "Absence name",
-        maxLength: ABSENCE_NAME_MAX,
-        required: true,
-      }),
-    },
-  };
-}
-
-function validateIndicatorType(
-  indicatorType: IndicatorTypeInput,
-): { indicatorType: IndicatorTypeInput } | { response: NextResponse } {
-  const nameError = validateSettingsTextField({
-    value: indicatorType.name,
-    label: "Indicator name",
-    maxLength: INDICATOR_NAME_MAX,
-    required: true,
-  });
-  if (nameError) {
-    return {
-      response: buildSettingsValidationResponse({
-        error: nameError,
-        fieldErrors: {
-          "indicatorType.name": nameError,
-        },
-      }),
-    };
-  }
-
-  return {
-    indicatorType: {
-      ...indicatorType,
-      name: normalizeSettingsTextField({
-        value: indicatorType.name,
-        label: "Indicator name",
-        maxLength: INDICATOR_NAME_MAX,
-        required: true,
-      }),
-    },
-  };
-}
 
 function buildSummary(parts: string[]): Omit<DependencyInfo, "hasAnyReferences"> {
   const active = parts.filter(Boolean);
@@ -1047,8 +552,6 @@ async function ensureDefaultShiftJobForOrg(orgId: string): Promise<void> {
     color: "#E2E8F0",
     border_color: "transparent",
     text_color: "#1E293B",
-    shift_time_overrides: {},
-    shift_color_overrides: {},
     default_start_time: null,
     default_end_time: null,
     default_duration_hours: null,
@@ -1854,7 +1357,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
     }
   } catch (error) {
-    console.error("Settings GET failed", { action, orgId: effectiveOrgId, error });
+    logger.error({ action, orgId: effectiveOrgId, error }, "Settings GET failed");
     return NextResponse.json({ error: "Settings request failed" }, { status: 500 });
   }
 }
@@ -2627,11 +2130,6 @@ export async function POST(req: NextRequest) {
           color: storedStyle.color,
           border_color: storedStyle.border_color,
           text_color: storedStyle.text_color,
-          shift_time_overrides: normalizeShiftTimeOverrides(
-            validatedJob.job.shiftTimeOverrides as
-              Record<string, JobShiftTimeOverride | undefined> | undefined,
-          ),
-          shift_color_overrides: normalizeShiftColorOverrides(validatedJob.job.shiftColorOverrides),
           default_start_time: normalizedTiming.defaultStartTime,
           default_end_time: normalizedTiming.defaultEndTime,
           default_duration_hours: normalizedTiming.defaultDurationHours,
@@ -2639,6 +2137,11 @@ export async function POST(req: NextRequest) {
           sort_order: validatedJob.job.sortOrder,
           system_key: validatedJob.job.systemKey ?? null,
         };
+        const timeOverrides = normalizeShiftTimeOverrides(
+          validatedJob.job.shiftTimeOverrides as
+            Record<string, JobShiftTimeOverride | undefined> | undefined,
+        );
+        const colorOverrides = normalizeShiftColorOverrides(validatedJob.job.shiftColorOverrides);
 
         let savedRow;
         if (validatedJob.job.id) {
@@ -2660,6 +2163,20 @@ export async function POST(req: NextRequest) {
           if (error) throw error;
           savedRow = inserted;
         }
+
+        const { error: overridesError } = await serviceClient.rpc("set_job_shift_overrides", {
+          p_job_id: savedRow.id,
+          p_time_overrides: timeOverrides,
+          p_color_overrides: colorOverrides,
+          p_actor_id: actor.id,
+        });
+        if (overridesError) throw overridesError;
+        const { data: overrideRows, error: overrideRowsError } = await serviceClient
+          .from("job_shift_overrides")
+          .select("shift_id, start_time, end_time, color")
+          .eq("job_id", savedRow.id);
+        if (overrideRowsError) throw overrideRowsError;
+        savedRow.job_shift_overrides = overrideRows ?? [];
 
         await cacheDel(
           CacheKey.assignments(validatedJob.job.orgId),
@@ -2984,7 +2501,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(deptConflict, { status: 409 });
       }
     }
-    console.error("Settings POST failed", { action: data.action, orgId, error });
+    logger.error({ action: data.action, orgId, error }, "Settings POST failed");
     return apiErrorResponse(error, "Settings request failed");
   }
 }

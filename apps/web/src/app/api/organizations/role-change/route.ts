@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ result: resultData });
   } catch (error) {
-    console.error("organization role change POST failed", error);
+    logger.error({ error }, "organization role change POST failed");
     return NextResponse.json({ error: "Failed to change role" }, { status: 500 });
   }
 }

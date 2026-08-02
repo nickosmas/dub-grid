@@ -5,7 +5,7 @@ import {
   computeCoverageCategorySnapshots,
   computeCoverageGaps,
   computeCoverageStatus,
-  resolveRequirement,
+  resolveRequirementByAssignment,
   summarizeCoverageByFocusArea,
   summarizeCoverageTotals,
   type CoverageAssignmentDefinitionLike,
@@ -49,26 +49,26 @@ function makeCoverageRequirement(
   };
 }
 
-describe("resolveRequirement", () => {
+describe("resolveRequirementByAssignment", () => {
   it("returns day-specific match", () => {
     const reqs = [
       makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 5 }),
     ];
-    expect(resolveRequirement(reqs, 1, 10, 1)).toEqual({ minStaff: 5 });
+    expect(resolveRequirementByAssignment(reqs, 1, 10, 1)).toEqual({ minStaff: 5 });
   });
 
   it("falls back to every-day when no day-specific match", () => {
     const reqs = [
       makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 }),
     ];
-    expect(resolveRequirement(reqs, 1, 10, 2)).toEqual({ minStaff: 3 });
+    expect(resolveRequirementByAssignment(reqs, 1, 10, 2)).toEqual({ minStaff: 3 });
   });
 
   it("returns null when neither day-specific nor every-day match", () => {
     const reqs = [
       makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 5 }),
     ];
-    expect(resolveRequirement(reqs, 1, 10, 3)).toBeNull();
+    expect(resolveRequirementByAssignment(reqs, 1, 10, 3)).toBeNull();
   });
 });
 
@@ -78,8 +78,13 @@ describe("computeCoverageStatus", () => {
   it("reports met when actual >= required", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const emp2 = makeEmployee({ id: "emp-2" });
-    const result = computeCoverageStatus([emp1, emp2], date, () => [10], new Set([10]), [10], {
-      minStaff: 2,
+    const result = computeCoverageStatus({
+      employees: [emp1, emp2],
+      date,
+      assignmentIdsForKey: () => [10],
+      sectionCodeIds: new Set([10]),
+      eligibleAssignmentDefinitionIds: [10],
+      requirement: { minStaff: 2 },
     });
     expect(result).toEqual({ actual: 2, required: 2, isMet: true, hasRequirement: true });
   });
@@ -88,15 +93,15 @@ describe("computeCoverageStatus", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const emp2 = makeEmployee({ id: "emp-2" });
     const creditForKey = (empId: string) => (empId === "emp-1" ? 0.5 : 1);
-    const result = computeCoverageStatus(
-      [emp1, emp2],
+    const result = computeCoverageStatus({
+      employees: [emp1, emp2],
       date,
-      () => [10],
-      new Set([10]),
-      [10],
-      { minStaff: 2 },
-      creditForKey,
-    );
+      assignmentIdsForKey: () => [10],
+      sectionCodeIds: new Set([10]),
+      eligibleAssignmentDefinitionIds: [10],
+      requirement: { minStaff: 2 },
+      coverageCreditForKey: creditForKey,
+    });
     expect(result.actual).toBe(1.5);
     expect(result.isMet).toBe(false);
   });
@@ -117,17 +122,16 @@ describe("computeCoverageGaps / computeCoverageCategorySnapshots", () => {
     });
     const emp1 = makeEmployee({ id: "emp-1" });
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [code],
-      [req],
-      [date],
-      new Map([[1, [emp1]]]),
-      () => [10],
-      new Map([[10, code]]),
-      new Map([[1, new Set([10])]]),
-    );
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [code],
+      requirements: [req],
+      dates: [date],
+      employeesByFocusArea: new Map([[1, [emp1]]]),
+      assignmentIdsForKey: () => [10],
+      assignmentIdsByFocusArea: new Map([[1, new Set([10])]]),
+    });
 
     expect(gaps).toHaveLength(1);
     expect(gaps[0].status.actual).toBe(1);
@@ -146,17 +150,16 @@ describe("computeCoverageGaps / computeCoverageCategorySnapshots", () => {
     });
     const emp = makeEmployee({ id: "emp-1" });
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [code],
-      [req],
-      [date],
-      new Map([[1, [emp]]]),
-      () => [10],
-      new Map([[10, code]]),
-      new Map([[1, new Set([10])]]),
-    );
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [code],
+      requirements: [req],
+      dates: [date],
+      employeesByFocusArea: new Map([[1, [emp]]]),
+      assignmentIdsForKey: () => [10],
+      assignmentIdsByFocusArea: new Map([[1, new Set([10])]]),
+    });
     expect(gaps).toEqual([]);
   });
 });
@@ -286,18 +289,17 @@ describe("cross-platform parity", () => {
     const date = new Date(2024, 0, 15);
 
     const buildSnapshots = () =>
-      computeCoverageCategorySnapshots(
-        [fa],
-        [cat],
-        [mentoredCode],
-        [req],
-        [date],
-        new Map([[1, [emp1, emp2, emp3]]]),
-        () => [10],
-        buildAssignmentDefinitionIdsByFocusArea([fa], [mentoredCode]),
-        undefined,
-        (empId) => (empId === "emp-2" ? 0.5 : 1),
-      );
+      computeCoverageCategorySnapshots({
+        focusAreas: [fa],
+        shiftCategories: [cat],
+        assignments: [mentoredCode],
+        requirements: [req],
+        dates: [date],
+        employeesByFocusArea: new Map([[1, [emp1, emp2, emp3]]]),
+        assignmentIdsForKey: () => [10],
+        assignmentIdsByFocusArea: buildAssignmentDefinitionIdsByFocusArea([fa], [mentoredCode]),
+        coverageCreditForKey: (empId) => (empId === "emp-2" ? 0.5 : 1),
+      });
 
     // "web-shaped" call and "mobile-shaped" call are literally the same
     // function today (that's the point of the fix) — assert both produce

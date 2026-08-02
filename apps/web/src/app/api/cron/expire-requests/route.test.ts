@@ -48,6 +48,11 @@ vi.mock("@/lib/logger", () => ({
   default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
+const isFeatureEnabled = vi.fn(async (_key: string) => true);
+vi.mock("@/lib/feature-flags", () => ({
+  isFeatureEnabled: (key: string) => isFeatureEnabled(key),
+}));
+
 import { GET } from "./route";
 
 const SECRET = "test-cron-secret";
@@ -63,6 +68,7 @@ describe("GET /api/cron/expire-requests", () => {
     vi.clearAllMocks();
     fromCallIndex = 0;
     process.env.CRON_SECRET = SECRET;
+    isFeatureEnabled.mockResolvedValue(true);
     dispatchNotificationEvent.mockResolvedValue({ success: true });
     shiftRequestsSelect.mockResolvedValue({ data: [], error: null });
     shiftRequestsUpdate.mockResolvedValue({ error: null });
@@ -78,6 +84,13 @@ describe("GET /api/cron/expire-requests", () => {
     delete process.env.CRON_SECRET;
     const res = await GET(makeReq({ authorization: `Bearer ${SECRET}` }));
     expect(res.status).toBe(503);
+  });
+
+  it("returns 200 skipped (not 503) when intentionally disabled via kill switch", async () => {
+    isFeatureEnabled.mockResolvedValue(false);
+    const res = await GET(makeReq({ authorization: `Bearer ${SECRET}` }));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true, skipped: true, reason: "disabled" });
   });
 
   it("marks stale shift_requests expired and dispatches per row", async () => {

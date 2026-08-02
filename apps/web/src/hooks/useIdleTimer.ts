@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import { broadcastIdleActivity, listenForIdleActivity } from "@/lib/idle-broadcast";
 
 export type IdleTimerPhase = "active" | "warning" | "expired";
@@ -48,10 +49,7 @@ export function useIdleTimer({
   const [phase, setPhase] = useState<IdleTimerPhase>("active");
   const [secondsRemaining, setSecondsRemaining] = useState(0);
 
-  const onExpireRef = useRef(onExpire);
-  useEffect(() => {
-    onExpireRef.current = onExpire;
-  }, [onExpire]);
+  const onExpireRef = useLatestRef(onExpire);
 
   const lastActivityAtRef = useRef(Date.now());
   const lastThrottleFlushRef = useRef(0);

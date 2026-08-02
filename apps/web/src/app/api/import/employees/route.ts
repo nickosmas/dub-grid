@@ -7,6 +7,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Too many requests" },
         { status: 429, headers: { "Retry-After": String(Math.ceil((reset ?? 0) / 1000)) } },
+      );
+    }
+
+    // Checked after auth + rate-limiting (not before) so a disabled flag can't be
+    // used to probe this route for free, unauthenticated and unrate-limited.
+    if (!(await isFeatureEnabled("csv_import"))) {
+      return NextResponse.json(
+        { error: "Employee import is temporarily unavailable. Please try again shortly." },
+        { status: 503 },
       );
     }
 

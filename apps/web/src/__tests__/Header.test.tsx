@@ -46,6 +46,13 @@ vi.mock("@/hooks", () => ({
   useMediaQuery: () => false,
   MOBILE: "(max-width: 767px)",
   TABLET: "(min-width: 768px) and (max-width: 1024px)",
+  useClientFeatureFlags: () => ({
+    stripe: true,
+    csvImport: true,
+    csvExport: true,
+    reports: true,
+    printing: true,
+  }),
 }));
 
 vi.mock("@/components/AuthProvider", () => ({

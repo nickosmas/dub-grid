@@ -24,6 +24,7 @@ function createThenableQuery(result: { data: unknown; error: unknown }) {
     or: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
+    range: vi.fn(() => query),
     then: (
       onFulfilled?: (value: typeof result) => unknown,
       onRejected?: (error: unknown) => unknown,
@@ -122,8 +123,7 @@ function buildMockJobRows(
       color: explicitJob?.color ?? "#eff6ff",
       border_color: explicitJob?.borderColor ?? "#60a5fa",
       text_color: explicitJob?.textColor ?? "#1d4ed8",
-      shift_time_overrides: {},
-      shift_color_overrides: {},
+      job_shift_overrides: [],
       default_start_time: hasWorkedShift ? null : (fallbackAssignment?.defaultStartTime ?? null),
       default_end_time: hasWorkedShift ? null : (fallbackAssignment?.defaultEndTime ?? null),
       default_duration_hours: explicitJob?.defaultDurationHours ?? null,

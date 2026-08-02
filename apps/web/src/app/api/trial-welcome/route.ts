@@ -107,11 +107,22 @@ export async function GET(req: NextRequest) {
           });
         } catch (err) {
           // Roll the claim back (only if it's still ours) so a retry can send.
-          await service
+          const { error: rollbackError } = await service
             .from("organizations")
             .update({ trial_welcome_email_sent_at: null })
             .eq("id", orgId)
             .eq("trial_welcome_email_sent_at", claimedAt);
+          if (rollbackError) {
+            // If the rollback itself fails, the claim stays set and the welcome email will
+            // never be resent — surface it so a stuck flag is detectable rather than silent.
+            Sentry.captureException(rollbackError, {
+              extra: { context: "trial-welcome-rollback", orgId },
+            });
+            logger.error(
+              { err: rollbackError, orgId },
+              "Failed to roll back trial-welcome email claim after send failure",
+            );
+          }
           Sentry.captureException(err, {
             extra: { context: "trial-welcome-email" },
           });

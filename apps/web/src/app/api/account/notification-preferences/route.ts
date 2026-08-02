@@ -5,6 +5,7 @@ import {
 } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 import { mobileNotificationPreferencesUpdateBodySchema } from "@dubgrid/contracts";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
       prefs: await fetchNotificationPreferences(auth.user.id),
     });
   } catch (error) {
-    console.error("account notification preferences GET failed", error);
+    logger.error({ error }, "account notification preferences GET failed");
     return NextResponse.json({ error: "Failed to load notification preferences" }, { status: 500 });
   }
 }
@@ -50,7 +51,7 @@ export async function PUT(req: NextRequest) {
       prefs: await saveNotificationPreferences(auth.user.id, parsed.data.prefs),
     });
   } catch (error) {
-    console.error("account notification preferences PUT failed", error);
+    logger.error({ error }, "account notification preferences PUT failed");
     return NextResponse.json({ error: "Failed to save notification preferences" }, { status: 500 });
   }
 }

@@ -17,6 +17,7 @@ import {
   getCertAbbr,
   getRoleAbbrs,
   getEmployeeDisplayName,
+  fmt12hShort,
 } from "@/lib/utils";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { computeDailyTallies } from "@/lib/schedule-logic";
@@ -151,12 +152,6 @@ function getCrossFocusBadgePalette(style?: Pick<AssignmentDefinition, "color" | 
 function pillText(label: string, max: number): string {
   if (label.length <= max) return label;
   return label.slice(0, max - 1).trimEnd() + "\u2026";
-}
-
-function fmt12hShort(time24: string): string {
-  const [h, m] = time24.split(":").map(Number);
-  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return m === 0 ? String(h12) : `${h12}:${String(m).padStart(2, "0")}`;
 }
 
 // ── Per-section print grid ─────────────────────────────────────────────────

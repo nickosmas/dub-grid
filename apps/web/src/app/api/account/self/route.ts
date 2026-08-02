@@ -3,6 +3,7 @@ import { z } from "zod";
 import { fetchSelfWorkProfileSnapshot } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { resolveEffectiveOrgId } from "@/app/api/shared/permissions";
+import logger from "@/lib/logger";
 
 const querySchema = z.object({
   orgId: z.string().uuid().optional(),
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(await fetchSelfWorkProfileSnapshot(auth.user.id, effectiveOrgId));
   } catch (error) {
-    console.error("account self GET failed", error);
+    logger.error({ error }, "account self GET failed");
     return NextResponse.json({ error: "Failed to load your profile" }, { status: 500 });
   }
 }

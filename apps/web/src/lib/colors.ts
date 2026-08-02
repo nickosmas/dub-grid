@@ -329,6 +329,22 @@ export function borderColor(textHex: string, opacity = 0.35): string {
 }
 
 /**
+ * Darkens a `#RRGGBB` hex color by scaling each channel toward black, returning
+ * an `rgb(...)` string. Non-hex input is returned unchanged (used for pill/shift
+ * border colors derived from a fill color).
+ */
+export function darkenColor(color: string, amount = 0.25): string {
+  const hex = color.replace("#", "");
+  if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+    const r = Math.max(0, Math.round(parseInt(hex.slice(0, 2), 16) * (1 - amount)));
+    const g = Math.max(0, Math.round(parseInt(hex.slice(2, 4), 16) * (1 - amount)));
+    const b = Math.max(0, Math.round(parseInt(hex.slice(4, 6), 16) * (1 - amount)));
+    return `rgb(${r},${g},${b})`;
+  }
+  return color;
+}
+
+/**
  * Remaps a pastel shift-category/job color for dark mode. The preset palette
  * (`PREDEFINED_COLOR_GROUPS`) is tuned for a white page — rendered as-is on
  * an ink-black page those pale swatches read as blown-out, glaring blocks.

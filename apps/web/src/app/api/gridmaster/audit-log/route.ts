@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
+import logger from "@/lib/logger";
 
 const querySchema = z.object({
   orgId: z.string().uuid().optional(),
@@ -49,7 +50,10 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error) {
-    console.error("gridmaster audit-log GET failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/audit-log" },
+      "gridmaster audit-log GET failed",
+    );
     return NextResponse.json({ error: "Failed to load audit log" }, { status: 500 });
   }
 }

@@ -80,7 +80,7 @@ export default function OnboardingPage() {
         minHeight: "100vh",
         padding: "24px",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "linear-gradient(135deg, var(--color-bg) 0%, var(--color-brand-bg) 100%)",
+        background: "linear-gradient(to bottom, var(--color-bg) 0%, var(--color-brand-bg) 100%)",
       }}
     >
       <div

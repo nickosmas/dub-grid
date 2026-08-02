@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -107,10 +108,7 @@ export function StaffDetailPanel({
   const [pendingInvitationAction, setPendingInvitationAction] = useState<
     "reinvite" | "revoke" | null
   >(null);
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  });
+  const onCloseRef = useLatestRef(onClose);
   const pendingInvitation = canManageEmployees
     ? pendingInviteByEmployeeId.get(employee.id)
     : undefined;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
+import logger from "@/lib/logger";
 
 const querySchema = z.object({
   orgId: z.string().uuid(),
@@ -36,7 +37,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ invitations: data ?? [] });
   } catch (error) {
-    console.error("gridmaster invitations GET failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/invitations" },
+      "gridmaster invitations GET failed",
+    );
     return NextResponse.json({ error: "Failed to load invitations" }, { status: 500 });
   }
 }

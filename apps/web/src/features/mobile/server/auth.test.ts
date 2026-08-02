@@ -24,6 +24,10 @@ vi.mock("@/lib/db/mappers", () => ({
   rowToOrganization: (row: unknown) => row,
 }));
 
+vi.mock("@/lib/feature-flags", () => ({
+  isFeatureEnabled: async () => true,
+}));
+
 const ORG_ID = "577a93d3-8f6a-4b45-a93d-b9731122ce11";
 const USER_ID = "8af6f242-c060-4920-a7db-91b4cb66fd26";
 

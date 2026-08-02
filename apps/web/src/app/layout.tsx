@@ -49,11 +49,14 @@ import PostHogProvider from "@/components/PostHogProvider";
 import AppToaster from "@/components/AppToaster";
 import WebVitals from "@/components/WebVitals";
 import ThemeProvider from "@/components/ThemeProvider";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 
 const staticWebCssVariables = createStaticWebCssVariables() as CSSProperties;
 const themedCssText = createThemedCssText();
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const posthogEnabled = await isFeatureEnabled("posthog");
+
   return (
     <html
       lang="en"
@@ -67,7 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning>
         <ThemeProvider>
           <AuthProvider>
-            <PostHogProvider>
+            <PostHogProvider enabled={posthogEnabled}>
               <QueryProvider>
                 <Suspense fallback={null}>
                   <OnboardingGate>

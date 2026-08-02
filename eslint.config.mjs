@@ -233,6 +233,13 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    files: ["apps/web/src/app/api/**/*.{ts,tsx}", "apps/web/src/features/**/server/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.ts", "**/*.test.tsx", "**/__tests__/**"],
+    rules: {
+      "no-console": "error",
+    },
+  },
+  {
     files: [
       "apps/web/src/app/**/*.{ts,tsx}",
       "apps/web/src/components/**/*.{ts,tsx}",

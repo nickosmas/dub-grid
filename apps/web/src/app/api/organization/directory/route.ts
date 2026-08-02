@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import type { AdminPermissions, DirectoryPerson, EmployeeStatus, OrganizationRole } from "@/types";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
@@ -114,7 +115,7 @@ export async function GET(req: NextRequest) {
       nextOffset: hasMore ? offset + rows.length : null,
     });
   } catch (error) {
-    console.error("organization directory GET failed", error);
+    logger.error({ error }, "organization directory GET failed");
     return NextResponse.json({ error: "Failed to load organization directory" }, { status: 500 });
   }
 }

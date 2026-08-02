@@ -185,15 +185,10 @@ describe("rowToJobDefinition", () => {
       color: "#E2E8F0",
       border_color: "#CBD5E1",
       text_color: "#1E293B",
-      shift_time_overrides: {
-        "10": {
-          startTime: "08:00:00",
-          endTime: "16:00:00",
-        },
-      },
-      shift_color_overrides: {
-        "11": "#BFDBFE",
-      },
+      job_shift_overrides: [
+        { shift_id: 10, start_time: "08:00:00", end_time: "16:00:00", color: null },
+        { shift_id: 11, start_time: null, end_time: null, color: "#BFDBFE" },
+      ],
       default_start_time: "07:00:00",
       default_end_time: "15:00:00",
       default_duration_hours: null,
@@ -243,8 +238,7 @@ describe("rowToJobDefinition", () => {
       color: "#FDE68A",
       border_color: "#B45309",
       text_color: "#78350F",
-      shift_time_overrides: {},
-      shift_color_overrides: {},
+      job_shift_overrides: [],
       default_start_time: null,
       default_end_time: null,
       default_duration_hours: 4,

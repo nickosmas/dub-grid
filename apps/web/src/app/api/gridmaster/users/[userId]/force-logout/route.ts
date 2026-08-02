@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
+import logger from "@/lib/logger";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("gridmaster force logout POST failed", error);
+    logger.error({ error }, "gridmaster force logout POST failed");
     return NextResponse.json({ error: "Failed to force logout user" }, { status: 500 });
   }
 }

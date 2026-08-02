@@ -2,9 +2,9 @@ export { createRealtimeChannelName } from "./channel-name";
 export {
   subscribeToPostgresChanges,
   type PostgresChangeListener,
+  type RealtimeChangePayload,
   type RealtimeErrorHooks,
 } from "./postgres-changes";
-export { createDebouncedTableFlusher, type DebouncedTableFlusher } from "./debounced-flusher";
 export {
   subscribeOrgScopedRealtime,
   type OrgScopedRealtimeOptions,

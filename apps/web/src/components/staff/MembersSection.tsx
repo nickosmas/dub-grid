@@ -33,11 +33,13 @@ import type {
   NamedItem,
   OrganizationRole,
 } from "@/types";
-import { useDirectory, useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { useClientFeatureFlags, useDirectory, useMediaQuery, MOBILE, TABLET } from "@/hooks";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { MaybeHint } from "@/components/ui/hint";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
 import { EmptyState } from "@/components/EmptyState";
 import { getAvatarInitials } from "@/lib/utils";
@@ -130,6 +132,7 @@ export function MembersSection({
 }: MembersSectionProps) {
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
+  const featureFlags = useClientFeatureFlags();
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
   const { resolvedTheme } = useTheme();
@@ -651,9 +654,28 @@ export function MembersSection({
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
 
-  function handleExport() {
+  async function handleExport() {
     if (!orgId) return;
-    window.open(`/api/export?type=staff&orgId=${orgId}`, "_blank");
+    try {
+      const res = await fetch(`/api/export?type=staff&orgId=${orgId}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        toast.error(formatClientErrorMessage(data?.error, "Export failed"));
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const filenameMatch = disposition.match(/filename="([^"]+)"/);
+      const filename = filenameMatch?.[1] ?? "staff-export.csv";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Export failed");
+    }
   }
 
   async function handleConfirmBulkAction() {
@@ -1180,24 +1202,41 @@ export function MembersSection({
 
             <div className="ml-auto flex items-center gap-2">
               {!showManagement && canManageEmployees && orgId && !isMobile && (
-                <button
-                  onClick={() => setShowImport(true)}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
+                <MaybeHint
+                  content={
+                    !featureFlags.csvImport
+                      ? "Employee import is temporarily unavailable. Please try again shortly."
+                      : null
+                  }
                 >
-                  <ImportIcon size={14} />
-                  Import
-                </button>
+                  <button
+                    onClick={() => setShowImport(true)}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                    disabled={!featureFlags.csvImport}
+                  >
+                    <ImportIcon size={14} />
+                    Import
+                  </button>
+                </MaybeHint>
               )}
 
               {!showManagement && canViewManagementUsers && orgId && !isMobile && (
-                <button
-                  onClick={() => setExportConfirm(true)}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
-                  disabled={!hasExportableStaffRows}
+                <MaybeHint
+                  content={
+                    !featureFlags.csvExport
+                      ? "Exports are temporarily unavailable. Please try again shortly."
+                      : null
+                  }
                 >
-                  <Upload size={14} />
-                  Export
-                </button>
+                  <button
+                    onClick={() => setExportConfirm(true)}
+                    className="dg-btn dg-btn-secondary dg-btn-sm"
+                    disabled={!hasExportableStaffRows || !featureFlags.csvExport}
+                  >
+                    <Upload size={14} />
+                    Export
+                  </button>
+                </MaybeHint>
               )}
 
               {canAddScheduled && canAddManagement && (
@@ -2277,7 +2316,7 @@ export function MembersSection({
           variant="warning"
           onConfirm={() => {
             setExportConfirm(false);
-            handleExport();
+            void handleExport();
           }}
           onCancel={() => setExportConfirm(false)}
         />

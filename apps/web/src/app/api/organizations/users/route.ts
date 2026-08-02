@@ -6,6 +6,7 @@ import { membershipRowToOrganizationUser } from "@/lib/db/mappers";
 import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { OrganizationUser, PlatformRole } from "@/types";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
@@ -99,7 +100,7 @@ export async function GET(req: NextRequest) {
     const users = await fetchOrganizationUserRows(orgAuth.orgId);
     return NextResponse.json({ users });
   } catch (error) {
-    console.error("organization users GET failed", error);
+    logger.error({ error }, "organization users GET failed");
     return NextResponse.json({ error: "Failed to load organization users" }, { status: 500 });
   }
 }
