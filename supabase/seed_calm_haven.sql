@@ -432,7 +432,7 @@ DO $$
 DECLARE
   org  uuid := 'b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90';
   schedule_source_start date := DATE '2026-03-22';
-  schedule_target_start date := DATE '2026-07-05';
+  schedule_target_start date := DATE '2026-08-02';
   -- Focus area IDs
   snw  bigint;
   sc   bigint;

@@ -392,7 +392,7 @@ DO $$
 DECLARE
   target_org uuid := '964c29d1-dc1e-4cd6-861c-8b8ab00d20c0';
   schedule_source_start date := DATE '2026-04-19';
-  schedule_start date := DATE '2026-07-05';
+  schedule_start date := DATE '2026-08-02';
   fa_snw bigint;
   fa_sc bigint;
   fa_ns bigint;
