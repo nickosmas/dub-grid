@@ -251,7 +251,7 @@ export function SettingsShell<TId extends string = string>({
             minWidth: 0,
             height: "100%",
             overflowY: "auto",
-            padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px",
+            padding: `${isMobile ? 16 : isTablet ? 24 : 32}px var(--dg-page-gutter)`,
             display: "flex",
             flexDirection: "column" as const,
             alignItems: "center",

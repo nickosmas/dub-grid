@@ -876,11 +876,11 @@ export default function DashboardView({
     // borders/shadows aren't clipped by the scroll container's edge). A small
     // outer gutter keeps the panes off the very screen edge.
     paddingTop: userLockLayout ? 16 : isMobile ? 16 : isTablet ? 24 : 32,
-    paddingRight: userLockLayout ? 24 : isMobile ? 16 : isTablet ? 24 : 40,
     paddingBottom: userLockLayout ? 0 : isMobile ? 16 : isTablet ? 24 : 32,
-    // Flat 16px, matching Schedule's toolbar/grid padding and the header
-    // logo on both pages (see Header.tsx's isFlatPaddingRoute).
-    paddingLeft: 16,
+    // The canonical page gutter, shared with the header logo and every other
+    // page so the logo stays put across routes (see globals.css).
+    paddingLeft: "var(--dg-page-gutter)",
+    paddingRight: "var(--dg-page-gutter)",
     maxWidth: isUserDashboardMode ? 1560 : 1300,
     margin: "0 auto",
     width: "100%" as const,
@@ -1153,8 +1153,8 @@ const stickyBarStyle = {
 };
 
 const toolbarContainerStyle = {
-  // Flat 16px, matching Schedule's toolbar and the header logo on both
-  // pages (see Header.tsx's isFlatPaddingRoute).
-  padding: "12px 16px 0",
+  // Horizontally on the canonical page gutter, like Schedule's toolbar and
+  // the header logo (see globals.css).
+  padding: "12px var(--dg-page-gutter) 0",
   borderBottom: "1px solid var(--color-border)",
 };

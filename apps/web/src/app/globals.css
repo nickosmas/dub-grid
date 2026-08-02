@@ -90,6 +90,11 @@
    ============================================================ */
 :root {
   /* Shared runtime tokens are injected from @dubgrid/design-tokens in layout.tsx. */
+
+  /* Canonical horizontal page gutter. The header logo and every page's left
+     content edge use this and nothing else, so the logo lands on the same
+     pixel on every route — see PageContainer and Header. */
+  --dg-page-gutter: 16px;
 }
 
 html,

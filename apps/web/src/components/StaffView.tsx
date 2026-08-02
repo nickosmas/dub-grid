@@ -347,7 +347,7 @@ export default function StaffView({
         )}
 
         {activeSection !== "directory" && (
-          <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+          <div className="px-[var(--dg-page-gutter)] py-4 md:py-6 lg:py-10">
             {activeSection === "requests" && canAccessPeopleAdminSurfaces && orgId && (
               <ProfileChangeRequestQueue
                 orgId={orgId}

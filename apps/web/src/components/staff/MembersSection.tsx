@@ -911,7 +911,7 @@ export function MembersSection({
 
   return (
     <>
-      <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+      <div className="px-[var(--dg-page-gutter)] py-4 md:py-6 lg:py-10">
         <div className="space-y-8">
           <div>
             <h1 className="text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--color-text-primary)]">

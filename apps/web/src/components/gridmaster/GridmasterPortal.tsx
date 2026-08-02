@@ -690,12 +690,10 @@ export default function GridmasterPortal() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          // On desktop, left padding centers the logo over the collapsed
-          // (icon-only) sidebar rail below it (--sidebar-width-icon is
-          // 3rem in components/ui/sidebar.tsx), so it stays perfectly
-          // aligned with the rail when the sidebar collapses.
-          paddingLeft: isMobile ? 12 : 10,
-          paddingRight: isMobile ? 12 : 16,
+          // The portal renders its own header, so it follows the same
+          // canonical page gutter as the main app (see globals.css).
+          paddingLeft: "var(--dg-page-gutter)",
+          paddingRight: "var(--dg-page-gutter)",
           flexShrink: 0,
         }}
       >
@@ -1019,7 +1017,11 @@ export default function GridmasterPortal() {
         {/* Main content */}
         <main
           aria-label="Gridmaster content"
-          style={{ flex: 1, overflow: "auto", padding: isMobile ? 16 : 24 }}
+          style={{
+            flex: 1,
+            overflow: "auto",
+            padding: `${isMobile ? 16 : 24}px var(--dg-page-gutter)`,
+          }}
         >
           {error && (
             <div
