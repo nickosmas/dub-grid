@@ -630,7 +630,6 @@ function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
     : null;
 }
 
-
 export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);

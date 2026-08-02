@@ -1,7 +1,13 @@
 import { DRAFT_BORDER_COLORS } from "@/lib/colors";
 import { deriveAssignmentDefinitionIdsFromAssignments } from "@/lib/shift-job-segments";
 import { expandDelimitedTimeRanges, type ShiftDiffTimeRange } from "@/lib/shift-diff-badges";
-import type { GridCellId, AssignmentDefinition, DraftKind, PublishChange, ScheduleCellState } from "@/types";
+import type {
+  GridCellId,
+  AssignmentDefinition,
+  DraftKind,
+  PublishChange,
+  ScheduleCellState,
+} from "@/types";
 
 export function getFocusAreaInitials(name: string): string {
   return name
@@ -12,7 +18,9 @@ export function getFocusAreaInitials(name: string): string {
     .slice(0, 3);
 }
 
-export function getCrossFocusBadgePalette(style?: Pick<AssignmentDefinition, "color" | "text"> | null) {
+export function getCrossFocusBadgePalette(
+  style?: Pick<AssignmentDefinition, "color" | "text"> | null,
+) {
   return {
     background: style?.color ?? "var(--color-bg)",
     color: style?.text ?? "var(--color-text-muted)",
@@ -183,7 +191,9 @@ export function assignmentIdsFromPublishState(
   );
 }
 
-export function absenceTypeIdFromPublishState(state: ScheduleCellState | null | undefined): number | null {
+export function absenceTypeIdFromPublishState(
+  state: ScheduleCellState | null | undefined,
+): number | null {
   return state?.kind === "absence" ? state.absenceTypeId : null;
 }
 

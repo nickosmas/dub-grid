@@ -593,7 +593,8 @@ export type WebTheme = "light" | "dark";
 // not the page theme, and live in `createStaticWebCssVariables` instead.
 // Shared by the login/onboarding shells' dark-mode background — see the
 // `--dg-color-auth-shell-bg` / `--dg-color-onboarding-shell-bg` entries below.
-const darkVerticalShellGradient = "linear-gradient(to bottom, #000000 0%, #000000 40%, #040E33 100%)";
+const darkVerticalShellGradient =
+  "linear-gradient(to bottom, #000000 0%, #000000 40%, #040E33 100%)";
 
 // Landing page's marketing CTA band ("Done with the spreadsheet?" — see
 // apps/web/src/app/page.tsx). Light mode keeps a flat brand-blue fill; dark

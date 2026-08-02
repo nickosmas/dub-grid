@@ -10,10 +10,7 @@ import {
   type ScheduleEntryLike,
   type TeamScheduleFocusAreaTab,
 } from "./types";
-import {
-  formatScheduleDayLabel,
-  formatScheduleSectionSubtitle,
-} from "./dates";
+import { formatScheduleDayLabel, formatScheduleSectionSubtitle } from "./dates";
 import {
   getScheduleEntryAbsenceTypeId,
   getScheduleEntryCustomStartTime,
@@ -23,10 +20,7 @@ import {
   getScheduleEntryStartTime,
   getScheduleEntryTitle,
 } from "./entry-accessors";
-import {
-  getSortableTime,
-  sortScheduleEntries,
-} from "./schedule-time";
+import { getSortableTime, sortScheduleEntries } from "./schedule-time";
 
 export function getScheduleEntryCategoryKey(entry: ScheduleEntryLike): string {
   const title = getScheduleEntryTitle(entry);

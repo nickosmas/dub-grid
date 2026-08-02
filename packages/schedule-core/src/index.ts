@@ -81,7 +81,6 @@ export * from "./team-schedule";
 export * from "./open-shifts";
 import { getRequestSortTime } from "./open-shifts";
 
-
 export function buildMeScheduleSegmentItems(
   entries: ReadonlyArray<ScheduleEntryLike>,
 ): MeScheduleSegmentItem[] {
@@ -407,4 +406,3 @@ export function buildScheduleTimeGroups(
       entries: value.entries,
     }));
 }
-

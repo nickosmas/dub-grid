@@ -79,7 +79,10 @@ export function subscribeToPostgresChanges<Table extends string>(
       try {
         hooks.onReconnectAfterError?.();
       } catch (hookError) {
-        console.error(`[realtime-core] onReconnectAfterError hook threw for "${channelName}"`, hookError);
+        console.error(
+          `[realtime-core] onReconnectAfterError hook threw for "${channelName}"`,
+          hookError,
+        );
       }
     } else if (status === "CHANNEL_ERROR") {
       errorCount += 1;
