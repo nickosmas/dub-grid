@@ -262,7 +262,7 @@ export default function StaffView({
                         }
                         isActive={activeSection === link.id}
                         tooltip={link.label}
-                        className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)]"
+                        className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)]"
                       >
                         <span
                           className={

@@ -41,6 +41,13 @@ export const lightColorTokens = {
   brandLight: "#3B82F6",
   brandSoft: "#EFF6FF",
   brandBorder: "#BFDBFE",
+  // Active-item highlight for the navbar tabs and app sidebars: gray rather
+  // than `brandSoft`, paired with `textPrimary` instead of brand blue.
+  // Sits half a step between `surfaceSecondary` (slate-100, also the hover
+  // background — the active state has to stay distinguishable from it) and
+  // `borderSubtle` (slate-200), and carries the same slate tint as the rest
+  // of the light ramp rather than being a pure neutral.
+  navActiveBg: "#E7ECF2",
   success: "#16A34A",
   successText: "#166534",
   successSoft: "#F0FDF4",
@@ -103,6 +110,11 @@ export const darkColorTokens: ColorTokens = {
   brandLight: "#4A9BFF",
   brandSoft: darkBrandSoft,
   brandBorder: "#1E3A5F",
+  // Dark counterpart: lifted above `surface` rather than dropped below it,
+  // and on the same zinc ramp as `surfaceSecondary`/`borderSubtle`/`border`
+  // (all R=G with B a few points higher). The light value would be near-white
+  // here, and its near-black text unreadable.
+  navActiveBg: "#26262B",
   success: "#22C55E",
   successText: "#4ADE80",
   successSoft: "#122118",
@@ -415,8 +427,8 @@ export const lightShadcnTokens = {
   sidebarForeground: "oklch(0.145 0 0)",
   sidebarPrimary: lightColorTokens.brand,
   sidebarPrimaryForeground: lightColorTokens.textInverse,
-  sidebarAccent: lightColorTokens.brandSoft,
-  sidebarAccentForeground: lightColorTokens.brand,
+  sidebarAccent: lightColorTokens.navActiveBg,
+  sidebarAccentForeground: lightColorTokens.textPrimary,
   sidebarBorder: "oklch(0.922 0 0)",
   sidebarRing: lightColorTokens.brandLight,
 } as const;
@@ -461,8 +473,8 @@ export const darkShadcnTokens: Record<keyof typeof lightShadcnTokens, string> = 
   sidebarForeground: "oklch(0.97 0 0)",
   sidebarPrimary: darkColorTokens.brand,
   sidebarPrimaryForeground: darkColorTokens.textInverse,
-  sidebarAccent: darkColorTokens.brandSoft,
-  sidebarAccentForeground: darkColorTokens.brandLight,
+  sidebarAccent: darkColorTokens.navActiveBg,
+  sidebarAccentForeground: darkColorTokens.textPrimary,
   sidebarBorder: "oklch(1 0 0 / 12%)",
   sidebarRing: darkColorTokens.brandLight,
 } as const;
@@ -491,6 +503,7 @@ export const webThemeTokens = {
     "--color-brand-light": "var(--dg-color-brand-light)",
     "--color-brand-bg": "var(--dg-color-brand-bg)",
     "--color-brand-border": "var(--dg-color-brand-border)",
+    "--color-nav-active-bg": "var(--dg-color-nav-active-bg)",
     "--color-primary": "var(--dg-color-primary)",
     "--color-link": "var(--dg-color-link)",
     "--color-accent-text": "var(--dg-color-accent-text)",
@@ -637,6 +650,7 @@ function themedWebCssVariables(theme: WebTheme): Record<string, string> {
     "--dg-color-brand-light": tokens.brandLight,
     "--dg-color-brand-bg": tokens.brandSoft,
     "--dg-color-brand-border": tokens.brandBorder,
+    "--dg-color-nav-active-bg": tokens.navActiveBg,
     "--dg-color-primary": tokens.brand,
     "--dg-color-link": tokens.brand,
     "--dg-color-accent-text": tokens.brand,

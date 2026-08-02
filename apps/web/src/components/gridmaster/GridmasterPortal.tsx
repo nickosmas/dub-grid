@@ -85,7 +85,7 @@ type GridmasterView =
 // ── Sidebar nav items ────────────────────────────────────────────────────────
 
 const SIDEBAR_MENU_BTN_CLASS =
-  "h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150";
+  "h-9 data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)] transition-all ease-in-out duration-150";
 const SIDEBAR_GROUP_LABEL_CLASS =
   "text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--color-text-faint)] px-3 pb-0";
 

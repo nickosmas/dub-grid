@@ -153,7 +153,7 @@ export function SettingsShell<TId extends string = string>({
                               render={<Link href={hrefFor(item.id)} replace />}
                               isActive={isActive}
                               tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
+                              className="h-9 data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)] transition-all ease-in-out duration-150"
                             >
                               <span
                                 className={
@@ -190,7 +190,7 @@ export function SettingsShell<TId extends string = string>({
                               render={<Link href={hrefFor(item.id)} replace />}
                               isActive={isActive}
                               tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
+                              className="h-9 data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)] transition-all ease-in-out duration-150"
                             >
                               <span
                                 className={

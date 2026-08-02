@@ -850,7 +850,7 @@ function FilterChip({
       data-active={active ? "true" : undefined}
       className={
         active
-          ? "bg-[var(--color-brand-bg)] text-[var(--color-brand)] ring-1 ring-[var(--color-brand-border)] ring-inset"
+          ? "bg-[var(--color-nav-active-bg)] text-[var(--color-text-primary)]"
           : "hover:bg-[var(--color-bg-secondary)]"
       }
       style={{
