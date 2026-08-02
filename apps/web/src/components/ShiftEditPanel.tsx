@@ -173,11 +173,9 @@ interface ShiftEditPanelProps {
   shiftDisplayMode?: ShiftDisplayMode;
 }
 
-
 function formatTimeRangeLabel(range: TimeRange): string {
   return `${fmt12h(range.start)} - ${fmt12h(range.end)}`;
 }
-
 
 function addDaysIso(iso: string, days: number): string {
   return formatDateKey(addDaysUtil(new Date(`${iso}T00:00:00`), days));

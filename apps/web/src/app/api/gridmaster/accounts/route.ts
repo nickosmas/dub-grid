@@ -86,7 +86,10 @@ export async function GET(req: NextRequest) {
       accounts: await loadGridmasterAccounts(),
     });
   } catch (error) {
-    logger.error({ err: error, path: "/api/gridmaster/accounts" }, "gridmaster accounts GET failed");
+    logger.error(
+      { err: error, path: "/api/gridmaster/accounts" },
+      "gridmaster accounts GET failed",
+    );
     return NextResponse.json({ error: "Failed to load gridmaster accounts" }, { status: 500 });
   }
 }

@@ -528,8 +528,8 @@ describe("computeCoverageStatus", () => {
       sectionCodeIds: new Set([10]),
       eligibleAssignmentDefinitionIds: [10],
       requirement: {
-      minStaff: 2,
-    },
+        minStaff: 2,
+      },
     });
     expect(result.actual).toBe(2);
     expect(result.required).toBe(2);
@@ -547,8 +547,8 @@ describe("computeCoverageStatus", () => {
       sectionCodeIds: new Set([10]),
       eligibleAssignmentDefinitionIds: [10],
       requirement: {
-      minStaff: 3,
-    },
+        minStaff: 3,
+      },
     });
     expect(result.actual).toBe(1);
     expect(result.required).toBe(3);
@@ -576,8 +576,8 @@ describe("computeCoverageStatus", () => {
       sectionCodeIds: new Set([10]),
       eligibleAssignmentDefinitionIds: [10],
       requirement: {
-      minStaff: 2,
-    },
+        minStaff: 2,
+      },
     });
     expect(result.actual).toBe(0);
   });
@@ -594,8 +594,8 @@ describe("computeCoverageStatus", () => {
       sectionCodeIds: new Set([10, 20]),
       eligibleAssignmentDefinitionIds: [10],
       requirement: {
-      minStaff: 1,
-    },
+        minStaff: 1,
+      },
     });
     expect(result.actual).toBe(1); // only emp1 on shift 10
   });
@@ -819,7 +819,8 @@ describe("computeCoverageGaps", () => {
       requirements: [req],
       dates: [date],
       employeesByFocusArea: new Map([[1, [emp1, emp2, emp3]]]),
-      assignmentIdsForKey: (empId: string) => (empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [12]),
+      assignmentIdsForKey: (empId: string) =>
+        empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [12],
       assignmentIdsByFocusArea: new Map([[1, new Set([10, 11, 12])]]),
     });
 
@@ -911,7 +912,8 @@ describe("computeCoverageGaps", () => {
       requirements: [dayReq, supReq],
       dates: [date],
       employeesByFocusArea: new Map([[1, [emp1, emp2, emp3]]]),
-      assignmentIdsForKey: (empId: string) => (empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [10]),
+      assignmentIdsForKey: (empId: string) =>
+        empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [10],
       assignmentIdsByFocusArea: new Map([[1, new Set([10, 11])]]),
     });
 

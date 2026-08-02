@@ -1,7 +1,4 @@
-import type {
-  MobileScheduleEntry,
-  MobileScheduleEntrySegment,
-} from "@dubgrid/contracts";
+import type { MobileScheduleEntry, MobileScheduleEntrySegment } from "@dubgrid/contracts";
 import {
   type MobileScheduleMonthDay,
   type MobileScheduleRange,
@@ -59,7 +56,6 @@ export function sortScheduleEntries(
     return left.employeeName.localeCompare(right.employeeName);
   }) as MobileScheduleEntry[];
 }
-
 
 export function buildScheduleWeekDays(
   range: MobileScheduleRange,
@@ -178,7 +174,11 @@ export function expandTimeRange(
   return [{ start: startMinutes, end: endMinutes }];
 }
 
-export function isTimeWithinRange(start: string | null, end: string | null, currentTime: string): boolean {
+export function isTimeWithinRange(
+  start: string | null,
+  end: string | null,
+  currentTime: string,
+): boolean {
   const currentMinutes = getMinutesSinceMidnight(currentTime);
 
   if (currentMinutes == null) {
@@ -196,7 +196,6 @@ export function getRangeDurationMinutes(start: string | null, end: string | null
     0,
   );
 }
-
 
 export function normalizeTimeValue(value: string | null | undefined): string | null {
   const normalized = value?.trim().slice(0, 5) ?? null;
@@ -366,7 +365,10 @@ export function getDurationFieldMinutes(
   return Math.max((value.defaultDurationHours ?? 0) * 60 + (value.defaultDurationMinutes ?? 0), 0);
 }
 
-export function subtractBreakMinutes(minutes: number, breakMinutes: number | null | undefined): number {
+export function subtractBreakMinutes(
+  minutes: number,
+  breakMinutes: number | null | undefined,
+): number {
   return Math.max(minutes - (breakMinutes ?? 0), 0);
 }
 

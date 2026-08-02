@@ -94,7 +94,9 @@ const KEY_FORMAT_ERROR = "Use lowercase letters, numbers, and underscores only."
 const KEY_FORMAT_PATTERN = /^[a-z0-9_]+$/;
 
 function getFlagInfo(flag: PlatformFeatureFlag): { label: string; description: string } {
-  return FLAG_INFO[flag.key] ?? { label: formatClientLabel(flag.key), description: flag.description };
+  return (
+    FLAG_INFO[flag.key] ?? { label: formatClientLabel(flag.key), description: flag.description }
+  );
 }
 
 export default function PlatformFeatureFlagsView() {
@@ -157,7 +159,11 @@ export default function PlatformFeatureFlagsView() {
 
   function handleCreateSubmit() {
     if (!newKey.trim() || !newDescription.trim() || keyError) return;
-    createMutation.mutate({ key: newKey.trim(), description: newDescription.trim(), enabled: newEnabled });
+    createMutation.mutate({
+      key: newKey.trim(),
+      description: newDescription.trim(),
+      enabled: newEnabled,
+    });
   }
 
   return (
@@ -255,7 +261,12 @@ export default function PlatformFeatureFlagsView() {
                           {flag.key}
                         </span>
                       </div>
-                      <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+                      <div
+                        style={{
+                          fontSize: "var(--dg-fs-footnote)",
+                          color: "var(--color-text-muted)",
+                        }}
+                      >
                         {info.description}
                       </div>
                     </div>
@@ -263,7 +274,9 @@ export default function PlatformFeatureFlagsView() {
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
                         fontWeight: 600,
-                        color: flag.enabled ? "var(--color-success-text)" : "var(--color-danger-text)",
+                        color: flag.enabled
+                          ? "var(--color-success-text)"
+                          : "var(--color-danger-text)",
                       }}
                     >
                       {flag.enabled ? "On" : "Off"}
@@ -278,7 +291,11 @@ export default function PlatformFeatureFlagsView() {
 
       {pendingFlag && pendingInfo && (
         <ConfirmDialog
-          title={pendingFlag.enabled ? `Turn Off "${pendingInfo.label}"?` : `Turn On "${pendingInfo.label}"?`}
+          title={
+            pendingFlag.enabled
+              ? `Turn Off "${pendingInfo.label}"?`
+              : `Turn On "${pendingInfo.label}"?`
+          }
           message={
             pendingFlag.enabled
               ? `This affects every organization on the platform immediately. ${pendingInfo.description}`
@@ -324,7 +341,8 @@ export default function PlatformFeatureFlagsView() {
                   color: keyError ? "var(--color-danger-text)" : "var(--color-text-muted)",
                 }}
               >
-                {keyError ?? "Lowercase letters, numbers, and underscores only. Must match exactly what the code checks for."}
+                {keyError ??
+                  "Lowercase letters, numbers, and underscores only. Must match exactly what the code checks for."}
               </span>
             </label>
             <label style={{ display: "grid", gap: 6 }}>

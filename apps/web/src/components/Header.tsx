@@ -295,7 +295,9 @@ export default function Header({ orgName }: HeaderProps) {
     if (item.id === "schedule") return true;
     if (item.id === "people") return canViewStaff;
     if (item.id === "reports") {
-      return featureFlags.reports && !isUserViewActive && (role === "admin" || isSuperAdmin === true);
+      return (
+        featureFlags.reports && !isUserViewActive && (role === "admin" || isSuperAdmin === true)
+      );
     }
     if (item.id === "settings") {
       return isGridmaster || isSuperAdmin || (role === "admin" && canAccessSettings);

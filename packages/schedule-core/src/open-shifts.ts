@@ -34,9 +34,6 @@ function getAvailableShiftFeedItemSlotCount(item: AvailableShiftFeedItem): numbe
   return 1;
 }
 
-
-
-
 function getRequestPrimarySegment(
   request: MobileShiftRequest,
   which: "requester" | "target",
@@ -53,7 +50,10 @@ function getRequestPrimarySegment(
   return segments[0] ?? null;
 }
 
-export function getRequestSortTime(request: MobileShiftRequest, which: "requester" | "target"): string {
+export function getRequestSortTime(
+  request: MobileShiftRequest,
+  which: "requester" | "target",
+): string {
   const legacyRequest = request as LegacyMobileShiftRequest;
   const primarySegment = getRequestPrimarySegment(request, which);
 
@@ -445,4 +445,3 @@ export function buildAvailableOpenShiftFeed(input: {
     totalCount: groups.reduce((total, group) => total + group.slotCount, 0),
   };
 }
-

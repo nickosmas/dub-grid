@@ -107,7 +107,6 @@ import {
   MULTI_CROSS_FOCUS_CONTENT_LEFT_PADDING,
 } from "./schedule-grid/gridHelpers";
 
-
 import type { ShiftDragData } from "./DraggableShift";
 import type { CellDropData } from "./DroppableCell";
 import { useAuth } from "@/components/AuthProvider";

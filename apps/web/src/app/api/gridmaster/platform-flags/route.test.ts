@@ -118,7 +118,9 @@ describe("/api/gridmaster/platform-flags", () => {
 
     it("returns 409 when expectedUpdatedAt is stale", async () => {
       const updateEq2 = vi.fn(() => ({
-        select: vi.fn(() => ({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) })),
+        select: vi.fn(() => ({
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        })),
       }));
       const updateEq1 = vi.fn(() => ({ eq: updateEq2 }));
       const currentMaybeSingle = vi.fn().mockResolvedValue({ data: FLAG_ROW, error: null });

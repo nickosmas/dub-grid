@@ -86,11 +86,9 @@ export async function loginAsQaSuperAdmin(page: Page): Promise<void> {
     // The Accept & Continue button stays disabled until the terms body is
     // scrolled to the bottom — jump straight there rather than simulating a
     // realistic scroll gesture, which is unnecessary and flakier in CI.
-    await page
-      .getByLabel("Terms of Service content")
-      .evaluate((el) => {
-        el.scrollTop = el.scrollHeight;
-      });
+    await page.getByLabel("Terms of Service content").evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
     await page.getByRole("button", { name: "Accept & Continue" }).click();
   }
 

@@ -79,7 +79,9 @@ export function getSegmentStartTime(
   return segment?.startTime ?? segment?.shiftStartTime ?? null;
 }
 
-export function getSegmentEndTime(segment: MobileScheduleEntrySegment | null | undefined): string | null {
+export function getSegmentEndTime(
+  segment: MobileScheduleEntrySegment | null | undefined,
+): string | null {
   return segment?.endTime ?? segment?.shiftEndTime ?? null;
 }
 
@@ -213,7 +215,6 @@ export function getHeroTiming(
 export function formatHoursValue(value: number): string {
   return Number.isInteger(value) ? `${value}` : value.toFixed(1);
 }
-
 
 export function getSwipeEventX(event: GestureResponderEvent): number | null {
   const nativeEvent = event.nativeEvent;

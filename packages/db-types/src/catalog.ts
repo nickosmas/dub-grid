@@ -79,7 +79,8 @@ export interface DbJobDefinition {
   color: string;
   border_color: string;
   text_color: string;
-  job_shift_overrides?: Pick<DbJobShiftOverride, "shift_id" | "start_time" | "end_time" | "color">[] | null;
+  job_shift_overrides?:
+    Pick<DbJobShiftOverride, "shift_id" | "start_time" | "end_time" | "color">[] | null;
   default_start_time: string | null;
   default_end_time: string | null;
   default_duration_hours: number | null;

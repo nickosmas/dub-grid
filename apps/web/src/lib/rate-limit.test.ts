@@ -5,7 +5,9 @@ const loggerError = vi.fn();
 const captureMessage = vi.fn();
 const captureException = vi.fn();
 
-vi.mock("@/lib/logger", () => ({ default: { error: (...args: unknown[]) => loggerError(...args) } }));
+vi.mock("@/lib/logger", () => ({
+  default: { error: (...args: unknown[]) => loggerError(...args) },
+}));
 vi.mock("@/lib/sentry", () => ({
   captureMessage: (...args: unknown[]) => captureMessage(...args),
   captureException: (...args: unknown[]) => captureException(...args),
