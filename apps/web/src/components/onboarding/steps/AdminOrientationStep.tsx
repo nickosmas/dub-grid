@@ -1,7 +1,12 @@
 "use client";
 
 import StepLayout from "../StepLayout";
-import { LayoutDashboard, CalendarDays, Users, Settings } from "lucide-react";
+import {
+  DashboardIcon,
+  ScheduleIcon,
+  PeopleIcon,
+  SettingsIcon,
+} from "@/components/icons/NavIcons";
 
 interface AdminOrientationStepProps {
   onNext: () => void;
@@ -10,22 +15,22 @@ interface AdminOrientationStepProps {
 
 const sections = [
   {
-    icon: <LayoutDashboard size={22} />,
+    icon: <DashboardIcon size={22} />,
     name: "Dashboard",
     desc: "Your home base \u2014 see coverage status, shift summaries, and quick actions at a glance.",
   },
   {
-    icon: <CalendarDays size={22} />,
+    icon: <ScheduleIcon size={22} />,
     name: "Schedule",
     desc: "The schedule grid where you view, edit, and publish shifts for your team.",
   },
   {
-    icon: <Users size={22} />,
+    icon: <PeopleIcon size={22} />,
     name: "People",
     desc: "Manage employees, view the directory, send invitations, and track certifications.",
   },
   {
-    icon: <Settings size={22} />,
+    icon: <SettingsIcon size={22} />,
     name: "Settings",
     desc: "Configure departments, shifts, jobs, roles, and other organization options.",
   },

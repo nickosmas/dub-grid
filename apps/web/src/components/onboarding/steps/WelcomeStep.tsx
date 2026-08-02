@@ -2,7 +2,12 @@
 
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { useOrganizationData, useOrgClaims } from "@/hooks";
-import { CalendarDays, Users, LayoutDashboard, Shield } from "lucide-react";
+import {
+  DashboardIcon,
+  ScheduleIcon,
+  PeopleIcon,
+  ShieldIcon,
+} from "@/components/icons/NavIcons";
 
 interface WelcomeStepProps {
   role: string;
@@ -13,51 +18,51 @@ interface WelcomeStepProps {
 const featureCards: Record<string, { icon: React.ReactNode; title: string; desc: string }[]> = {
   super_admin: [
     {
-      icon: <LayoutDashboard size={20} />,
+      icon: <DashboardIcon size={20} />,
       title: "Dashboard & Insights",
       desc: "Real-time coverage, staffing metrics, and scheduling overview",
     },
     {
-      icon: <CalendarDays size={20} />,
+      icon: <ScheduleIcon size={20} />,
       title: "Smart Scheduling",
       desc: "Build, publish, and manage schedules with conflict prevention",
     },
     {
-      icon: <Users size={20} />,
+      icon: <PeopleIcon size={20} />,
       title: "Staff Management",
       desc: "Manage employees, certifications, roles, and departments",
     },
     {
-      icon: <Shield size={20} />,
+      icon: <ShieldIcon size={20} />,
       title: "Full Control",
       desc: "Configure every aspect of your organization and delegate permissions",
     },
   ],
   admin: [
     {
-      icon: <CalendarDays size={20} />,
+      icon: <ScheduleIcon size={20} />,
       title: "Schedule Management",
       desc: "View and edit schedules based on your assigned permissions",
     },
     {
-      icon: <Users size={20} />,
+      icon: <PeopleIcon size={20} />,
       title: "Team Overview",
       desc: "See your team, manage employees, and track staffing",
     },
     {
-      icon: <LayoutDashboard size={20} />,
+      icon: <DashboardIcon size={20} />,
       title: "Dashboard",
       desc: "Coverage gaps, shift summaries, and quick actions at a glance",
     },
   ],
   user: [
     {
-      icon: <CalendarDays size={20} />,
+      icon: <ScheduleIcon size={20} />,
       title: "Your Schedule",
       desc: "View your upcoming shifts, request changes, and stay informed",
     },
     {
-      icon: <Users size={20} />,
+      icon: <PeopleIcon size={20} />,
       title: "Your Team",
       desc: "See who you're working with and facility staffing",
     },

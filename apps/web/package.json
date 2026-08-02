@@ -35,7 +35,6 @@
     "@dubgrid/mobile-api-core": "*",
     "@dubgrid/realtime-core": "*",
     "@dubgrid/schedule-core": "*",
-    "@heroicons/react": "^2.2.0",
     "@react-email/components": "^1.0.12",
     "@sentry/nextjs": "^10.57.0",
     "@supabase/ssr": "0.9.0",

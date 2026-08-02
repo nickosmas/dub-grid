@@ -193,11 +193,11 @@ function HeaderBillingNotice({ orgId, compact = false }: { orgId: string; compac
   );
 }
 
-const renderDrawerIcon = (id: string, active: boolean): React.ReactNode => {
+const renderDrawerIcon = (id: string): React.ReactNode => {
   const item = NAV_ITEMS.find((i) => i.id === id);
   if (!item) return <span />;
   const Icon = item.Icon;
-  return <Icon size={22} active={active} />;
+  return <Icon size={22} />;
 };
 
 /* ── Hamburger Icon ──────────────────────────────────────── */
@@ -500,7 +500,7 @@ export default function Header({ orgName }: HeaderProps) {
             id: item.id,
             href: item.href,
             label: item.label,
-            icon: renderDrawerIcon(item.id, activeTab === item.id),
+            icon: renderDrawerIcon(item.id),
           }))}
           activeTab={activeTab}
           isGridmaster={isGridmaster}
@@ -598,7 +598,7 @@ export default function Header({ orgName }: HeaderProps) {
                 href={item.href}
                 className={`dg-nav-tab${active ? " active" : ""}`}
               >
-                <Icon size={16} active={active} />
+                <Icon size={16} />
                 {item.label}
               </Link>
             );

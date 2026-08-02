@@ -960,7 +960,7 @@ export default function GridmasterPortal() {
                                   : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                               }
                             >
-                              <item.Icon active={view === item.key} />
+                              <item.Icon />
                             </span>
                             <span className="font-semibold">{item.label}</span>
                           </SidebarMenuButton>
@@ -997,7 +997,7 @@ export default function GridmasterPortal() {
                                   : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                               }
                             >
-                              <item.Icon active={view === item.key} />
+                              <item.Icon />
                             </span>
                             <span className="font-semibold">{item.label}</span>
                           </SidebarMenuButton>

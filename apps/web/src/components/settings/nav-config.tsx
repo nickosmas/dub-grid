@@ -7,7 +7,10 @@ import {
   LabelsIcon,
   DisplayIcon,
   ShieldIcon,
-  CalendarIcon,
+  DepartmentsIcon,
+  ShiftsIcon,
+  JobsIcon,
+  AbsenceIcon,
   CoverageIcon,
   AwardIcon,
   RolesIcon,
@@ -151,7 +154,7 @@ export function buildNavGroups(
       staffItems.push({
         id: "staff-departments",
         label: "Departments",
-        Icon: BuildingIcon,
+        Icon: DepartmentsIcon,
         helpHint: "Scheduled departments drive the grid; management departments are app-only.",
         description:
           "Includes scheduled departments for the grid and management departments for app-only staff.",
@@ -200,7 +203,7 @@ export function buildNavGroups(
       schedItems.push({
         id: "schedule-shifts",
         label: "Shifts",
-        Icon: LabelsIcon,
+        Icon: ShiftsIcon,
         description:
           "Configure your core Day, Evening, Night, and similar shift definitions with default times and colors.",
       });
@@ -208,7 +211,7 @@ export function buildNavGroups(
       schedItems.push({
         id: "schedule-jobs",
         label: "Jobs",
-        Icon: CalendarIcon,
+        Icon: JobsIcon,
         helpHint: "Jobs can be scheduled or general and can restrict qualification.",
         description:
           "Define responsibilities like Supervisor, Mentor, Nurse, and Office, including assignment rules and grid visibility.",
@@ -217,7 +220,7 @@ export function buildNavGroups(
       schedItems.push({
         id: "schedule-absence-types",
         label: "Absence Types",
-        Icon: CalendarIcon,
+        Icon: AbsenceIcon,
         helpHint: "Absences replace worked assignments and are excluded from coverage.",
         description: "Manage PTO, sick, vacation, calloff, and other non-worked schedule labels.",
       });

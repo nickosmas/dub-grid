@@ -104,7 +104,7 @@ export function SettingsShell<TId extends string = string>({
           return {
             id: item.id,
             label: item.label,
-            icon: <item.Icon active={isActive} />,
+            icon: <item.Icon />,
             href: hrefFor(item.id),
             active: isActive,
             group: group.label,
@@ -162,7 +162,7 @@ export function SettingsShell<TId extends string = string>({
                                     : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                                 }
                               >
-                                <item.Icon active={isActive} />
+                                <item.Icon />
                               </span>
                               <span className="font-semibold">{item.label}</span>
                             </SidebarMenuButton>
@@ -199,7 +199,7 @@ export function SettingsShell<TId extends string = string>({
                                     : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                                 }
                               >
-                                <item.Icon active={isActive} />
+                                <item.Icon />
                               </span>
                               <span className="font-semibold">{item.label}</span>
                             </SidebarMenuButton>
