@@ -168,6 +168,9 @@ describe("shared chrome theming", () => {
       expect(source).toContain("data-[active=true]:text-[var(--color-text-primary)]");
       // No border/ring on the active item, matching the navbar tabs.
       expect(source).not.toMatch(/data-\[active=true\]:ring-/);
+      // Active sidebar chrome is fully neutral: the icon wrapper follows the
+      // label rather than being tinted brand blue.
+      expect(source).not.toMatch(/text-\[var\(--color-brand\)\]/);
     }
   });
 

@@ -158,7 +158,7 @@ export function SettingsShell<TId extends string = string>({
                               <span
                                 className={
                                   isActive
-                                    ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors"
+                                    ? "text-[var(--color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
                                     : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                                 }
                               >
@@ -195,7 +195,7 @@ export function SettingsShell<TId extends string = string>({
                               <span
                                 className={
                                   isActive
-                                    ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors"
+                                    ? "text-[var(--color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
                                     : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                                 }
                               >

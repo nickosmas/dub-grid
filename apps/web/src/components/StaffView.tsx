@@ -267,7 +267,7 @@ export default function StaffView({
                         <span
                           className={
                             activeSection === link.id
-                              ? "flex shrink-0 items-center justify-center text-[var(--color-brand)] transition-colors"
+                              ? "flex shrink-0 items-center justify-center text-[var(--color-text-primary)] transition-colors"
                               : "flex shrink-0 items-center justify-center text-[var(--color-text-faint)] transition-colors"
                           }
                         >

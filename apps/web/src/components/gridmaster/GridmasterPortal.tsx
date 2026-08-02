@@ -954,7 +954,7 @@ export default function GridmasterPortal() {
                             <span
                               className={
                                 view === item.key
-                                  ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors"
+                                  ? "text-[var(--color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
                                   : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                               }
                             >
@@ -991,7 +991,7 @@ export default function GridmasterPortal() {
                             <span
                               className={
                                 view === item.key
-                                  ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors"
+                                  ? "text-[var(--color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
                                   : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                               }
                             >
