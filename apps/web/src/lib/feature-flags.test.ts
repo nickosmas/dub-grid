@@ -10,17 +10,17 @@ let cacheStore: Map<string, unknown>;
 const cacheDel = vi.fn(async (key: string) => {
   cacheStore.delete(key);
 });
-const cacheThrough = vi.fn(
-  async (key: string, _ttl: number, fetcher: () => Promise<unknown>) => {
-    if (cacheStore.has(key)) return cacheStore.get(key);
-    const data = await fetcher();
-    cacheStore.set(key, data);
-    return data;
-  },
-);
+const cacheThrough = vi.fn(async (key: string, _ttl: number, fetcher: () => Promise<unknown>) => {
+  if (cacheStore.has(key)) return cacheStore.get(key);
+  const data = await fetcher();
+  cacheStore.set(key, data);
+  return data;
+});
 
 vi.mock("@/lib/supabase-service", () => ({ getServiceClient: () => getServiceClient() }));
-vi.mock("@/lib/logger", () => ({ default: { error: (...args: unknown[]) => loggerError(...args) } }));
+vi.mock("@/lib/logger", () => ({
+  default: { error: (...args: unknown[]) => loggerError(...args) },
+}));
 vi.mock("@/lib/sentry", () => ({
   captureException: (...args: unknown[]) => captureException(...args),
 }));
@@ -56,6 +56,19 @@ describe("feature-flags", () => {
     expect(loggerError).toHaveBeenCalledTimes(1);
     expect(captureException).toHaveBeenCalledWith(
       dbError,
+      expect.objectContaining({ extra: expect.objectContaining({ context: expect.any(String) }) }),
+    );
+  });
+
+  it("fails open when getServiceClient throws (e.g. missing env during build prerender)", async () => {
+    getServiceClient.mockImplementationOnce(() => {
+      throw new Error("Supabase env vars not configured");
+    });
+
+    await expect(isFeatureEnabled("stripe")).resolves.toBe(true);
+    expect(loggerError).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
       expect.objectContaining({ extra: expect.objectContaining({ context: expect.any(String) }) }),
     );
   });
