@@ -60,6 +60,19 @@ describe("feature-flags", () => {
     );
   });
 
+  it("fails open when getServiceClient throws (e.g. missing env during build prerender)", async () => {
+    getServiceClient.mockImplementationOnce(() => {
+      throw new Error("Supabase env vars not configured");
+    });
+
+    await expect(isFeatureEnabled("stripe")).resolves.toBe(true);
+    expect(loggerError).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ extra: expect.objectContaining({ context: expect.any(String) }) }),
+    );
+  });
+
   it("only fetches once across calls within the cache TTL", async () => {
     await isFeatureEnabled("stripe");
     await isFeatureEnabled("mobile_api");
