@@ -13,6 +13,8 @@ import {
   mobileSpacing,
   mobileText,
   mobileTypography,
+  mobileDarkenTone,
+  mobileVisiblePillBorder,
 } from "./tokens";
 
 describe("mobileBorderColorFromText", () => {
@@ -22,6 +24,44 @@ describe("mobileBorderColorFromText", () => {
 
   it("falls back to the default mobile border color for invalid input", () => {
     expect(mobileBorderColorFromText("transparent")).toBe("#CBD5E1");
+  });
+});
+
+describe("mobileVisiblePillBorder", () => {
+  it("derives the border from the text color when none is stored", () => {
+    expect(mobileVisiblePillBorder("transparent", "#92400E")).toBe("rgba(146,64,14,0.35)");
+    expect(mobileVisiblePillBorder(null, "#92400E")).toBe("rgba(146,64,14,0.35)");
+    expect(mobileVisiblePillBorder("  ", "#92400E")).toBe("rgba(146,64,14,0.35)");
+  });
+
+  it("keeps an explicitly stored border color", () => {
+    expect(mobileVisiblePillBorder("#D97706", "#92400E")).toBe("#D97706");
+  });
+});
+
+describe("mobileDarkenTone", () => {
+  const lightTone = {
+    backgroundColor: "#FDE68A",
+    borderColor: "transparent",
+    textColor: "#92400E",
+  };
+
+  it("leaves page-tuned colors alone in light mode", () => {
+    expect(mobileDarkenTone(lightTone, false)).toEqual(lightTone);
+  });
+
+  it("remaps the fill and re-derives text and border in dark mode", () => {
+    const darkened = mobileDarkenTone(lightTone, true);
+
+    expect(darkened.backgroundColor).not.toBe(lightTone.backgroundColor);
+    expect(darkened.borderColor).not.toBe("transparent");
+    expect(darkened).toMatchInlineSnapshot(`
+      {
+        "backgroundColor": "#725F15",
+        "borderColor": "rgba(241,228,177,0.35)",
+        "textColor": "#F1E4B1",
+      }
+    `);
   });
 });
 

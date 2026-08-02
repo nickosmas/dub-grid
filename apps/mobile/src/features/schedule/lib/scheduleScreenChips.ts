@@ -3,7 +3,11 @@ import type {
   MobileScheduleEntrySegment,
   MobileShiftRequest,
 } from "@dubgrid/contracts";
-import { type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileDarkenTone,
+  mobileVisiblePillBorder,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import {
   doScheduleEntrySegmentsShareShiftAndFocusArea,
   formatCompactScheduleDate,
@@ -24,7 +28,7 @@ import {
   getSegmentEndTime,
   getSegmentStartTime,
 } from "./scheduleScreenHelpers";
-import { resolveShiftPillColors, type AvatarTone } from "@dubgrid/design-tokens";
+import { type AvatarTone } from "@dubgrid/design-tokens";
 
 // Chip/label builders and me-hero segment matching for the schedule screen,
 // extracted from ScheduleScreen.tsx. Pure functions only: theme colors come in
@@ -109,27 +113,6 @@ export function normalizeScheduleLabel(value: string | null | undefined): string
   return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-// User-picked / hardcoded-preset hex colors are tuned for a white page and
-// read as blown-out or washed-out on a dark surface — remap through the
-// shared HSV darkener. Theme tokens (mobileColors.*) are already
-// theme-correct and must NOT be passed through this a second time.
-export function darkenTone(
-  tone: { backgroundColor: string; borderColor: string; textColor: string },
-  isDark: boolean,
-): { backgroundColor: string; borderColor: string; textColor: string } {
-  if (!isDark) return tone;
-
-  const resolved = resolveShiftPillColors(
-    { color: tone.backgroundColor, text: tone.textColor, border: tone.borderColor },
-    true,
-  );
-  return {
-    backgroundColor: resolved.color,
-    borderColor: resolved.border,
-    textColor: resolved.text,
-  };
-}
-
 export function buildAbsenceChip(
   mobileColors: MobileColors,
   isDark: boolean,
@@ -150,10 +133,13 @@ export function buildAbsenceChip(
       kind: "absence",
       eyebrowLabel: "Absence",
       label: trimmedLabel,
-      ...darkenTone(
+      ...mobileDarkenTone(
         {
           backgroundColor: absenceColor,
-          borderColor: absenceBorderColor ?? absenceColor,
+          borderColor: mobileVisiblePillBorder(
+            absenceBorderColor,
+            absenceTextColor ?? mobileColors.textMuted,
+          ),
           textColor: absenceTextColor ?? mobileColors.textMuted,
         },
         isDark,
@@ -225,7 +211,7 @@ export function buildJobChip(
     return {
       kind: "job",
       label: trimmedLabel,
-      ...darkenTone(
+      ...mobileDarkenTone(
         {
           backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
           borderColor: jobBorderColor ?? mobileColors.border,
@@ -242,7 +228,7 @@ export function buildJobChip(
     normalizedLabel.includes("supervisor") ||
     normalizedLabel.includes("lead") ||
     normalizedLabel.includes("manager")
-      ? darkenTone(
+      ? mobileDarkenTone(
           {
             backgroundColor: "#FCE7F3",
             borderColor: "#FBCFE8",
@@ -259,7 +245,7 @@ export function buildJobChip(
         : normalizedLabel.includes("nurse") ||
             normalizedLabel.includes("rn") ||
             normalizedLabel.includes("lpn")
-          ? darkenTone(
+          ? mobileDarkenTone(
               {
                 backgroundColor: "#ECFEFF",
                 borderColor: "#A5F3FC",

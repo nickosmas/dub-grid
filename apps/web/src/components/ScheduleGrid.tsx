@@ -64,6 +64,7 @@ import {
   getReadableTextOnSurface,
   resolveShiftPillColors,
   toDarkPillColors,
+  visiblePillBorder,
 } from "@/lib/colors";
 import { useTheme } from "next-themes";
 import { lightColorTokens, darkColorTokens } from "@dubgrid/design-tokens";
@@ -1829,9 +1830,12 @@ const SectionBlock = memo(function SectionBlock({
                                           effectiveText,
                                           themeSurface,
                                         );
-                                    // Compute effective border: draft indicators use dashed border
+                                    // Compute effective border: draft indicators use dashed border.
+                                    // Absence pills derive theirs from the resolved text like every
+                                    // other pill — their stored border is the "transparent"
+                                    // sentinel, which would render as no border at all in light mode.
                                     const absenceBorder = isAbsence
-                                      ? `1px solid ${isDarkTheme ? borderColor(effectiveText) : cellAbsenceType!.border}`
+                                      ? `1px solid ${isDarkTheme ? borderColor(effectiveText) : visiblePillBorder(cellAbsenceType!.border, singleForegroundColor)}`
                                       : `1px solid ${borderColor(singleForegroundColor)}`;
                                     const effectiveBorder = singleDraftBorderKind
                                       ? getDraftBorder(singleDraftBorderKind, absenceBorder)

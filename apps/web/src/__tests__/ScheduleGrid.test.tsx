@@ -1771,6 +1771,38 @@ describe("ScheduleGrid", () => {
     expect(pill?.style.borderColor).toBe("rgba(26, 61, 27, 0.35)");
   });
 
+  it("borders absence pills in light mode even when the stored border is transparent", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      absenceTypeMap: new Map([
+        [
+          7,
+          {
+            id: 7,
+            orgId: "org-1",
+            label: "VAC",
+            name: "Vacation",
+            color: "#FDE68A",
+            border: "transparent",
+            text: "#92400E",
+            countsTowardAvailability: false,
+            sortOrder: 1,
+          },
+        ],
+      ]),
+      absenceTypeIdForKey: () => 7,
+      shiftForKey: () => "VAC",
+      assignmentIdsForKey: () => [],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
+
+    expect(pill?.textContent).toContain("VAC");
+    expect(pill?.style.borderColor).toBe("rgba(146, 64, 14, 0.35)");
+  });
+
   it("keeps draft time-only changes compact and shows the time badge in-cell", () => {
     observedWidth = 1600;
 

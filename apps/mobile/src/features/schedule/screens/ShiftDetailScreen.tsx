@@ -10,7 +10,7 @@ import {
   type MobileShiftRequest,
 } from "@dubgrid/contracts";
 import { indefiniteArticle } from "@dubgrid/domain";
-import { getAvatarTone, resolveShiftPillColors } from "@dubgrid/design-tokens";
+import { getAvatarTone } from "@dubgrid/design-tokens";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -38,8 +38,10 @@ import {
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
+  mobileDarkenTone,
   mobileRadii,
   mobileText,
+  mobileVisiblePillBorder,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -149,27 +151,6 @@ function getRequestModalPresentationStyle(mode: RequestMode) {
   return "pageSheet" as const;
 }
 
-// User-picked hex colors from the backend are tuned for a white page and
-// read as washed-out on a dark surface — remap through the shared HSV
-// darkener. Theme tokens (mobileColors.*) are already theme-correct and
-// must NOT be passed through this a second time.
-function darkenTone(
-  tone: { backgroundColor: string; borderColor: string; textColor: string },
-  isDark: boolean,
-): { backgroundColor: string; borderColor: string; textColor: string } {
-  if (!isDark) return tone;
-
-  const resolved = resolveShiftPillColors(
-    { color: tone.backgroundColor, text: tone.textColor, border: tone.borderColor },
-    true,
-  );
-  return {
-    backgroundColor: resolved.color,
-    borderColor: resolved.border,
-    textColor: resolved.text,
-  };
-}
-
 function buildDetailJobChip(
   mobileColors: MobileColors,
   isDark: boolean,
@@ -193,10 +174,13 @@ function buildDetailJobChip(
     return {
       kind: "job",
       label: trimmedLabel,
-      ...darkenTone(
+      ...mobileDarkenTone(
         {
           backgroundColor: jobColor,
-          borderColor: jobBorderColor ?? jobColor,
+          borderColor: mobileVisiblePillBorder(
+            jobBorderColor,
+            jobTextColor ?? mobileColors.textMuted,
+          ),
           textColor: jobTextColor ?? mobileColors.textMuted,
         },
         isDark,
@@ -256,10 +240,13 @@ function buildDetailAbsenceChip(
       kind: "absence",
       label: trimmedLabel,
       eyebrowLabel: "Absence",
-      ...darkenTone(
+      ...mobileDarkenTone(
         {
           backgroundColor: absenceColor,
-          borderColor: absenceBorderColor ?? absenceColor,
+          borderColor: mobileVisiblePillBorder(
+            absenceBorderColor,
+            absenceTextColor ?? mobileColors.textMuted,
+          ),
           textColor: absenceTextColor ?? mobileColors.textMuted,
         },
         isDark,

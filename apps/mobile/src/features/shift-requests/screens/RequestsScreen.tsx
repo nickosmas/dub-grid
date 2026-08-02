@@ -22,12 +22,14 @@ import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
+  mobileDarkenTone,
   mobileRadii,
   mobileSpacing,
   mobileText,
+  mobileVisiblePillBorder,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { useMobileShiftRequestsRealtime } from "../hooks/useMobileShiftRequestsRealtime";
@@ -123,17 +125,36 @@ function readOptionalColor(value: string | null | undefined): string | null {
 
 function getShiftPillColors(
   mobileColors: MobileColors,
+  isDark: boolean,
   presentation:
     | MobileShiftRequest["requesterPresentation"]
     | MobileOpenShift["presentation"]
     | null
     | undefined,
 ): ShiftPillColors {
-  return {
-    backgroundColor: presentation?.shiftColor ?? mobileColors.brandSoft,
-    borderColor: presentation?.shiftBorderColor ?? mobileColors.brandBorder,
-    textColor: presentation?.shiftTextColor ?? mobileColors.brand,
-  };
+  const shiftColor = readOptionalColor(presentation?.shiftColor);
+
+  // Without a stored fill the pill runs on brand tokens, which are already
+  // theme-correct — a stored text color alone would be a light-page hex on a
+  // dark surface, so it only applies alongside its own fill.
+  if (!shiftColor) {
+    return {
+      backgroundColor: mobileColors.brandSoft,
+      borderColor: mobileColors.brandBorder,
+      textColor: mobileColors.brand,
+    };
+  }
+
+  const textColor = readOptionalColor(presentation?.shiftTextColor) ?? mobileColors.brand;
+
+  return mobileDarkenTone(
+    {
+      backgroundColor: shiftColor,
+      borderColor: mobileVisiblePillBorder(presentation?.shiftBorderColor, textColor),
+      textColor,
+    },
+    isDark,
+  );
 }
 
 function getRequestShiftLabel(request: MobileShiftRequest): string {
@@ -184,6 +205,7 @@ function getOpenShiftLabel(openShift: MobileOpenShift): string {
 
 function buildJobChip(
   mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
@@ -200,9 +222,14 @@ function buildJobChip(
     return {
       kind: "job",
       label: trimmedLabel,
-      backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
-      borderColor: jobBorderColor ?? mobileColors.border,
-      textColor: jobTextColor ?? mobileColors.textMuted,
+      ...mobileDarkenTone(
+        {
+          backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
+          borderColor: jobBorderColor ?? mobileColors.border,
+          textColor: jobTextColor ?? mobileColors.textMuted,
+        },
+        isDark,
+      ),
       isMentored: colorSource?.isMentored === true,
     };
   }
@@ -212,25 +239,34 @@ function buildJobChip(
     normalizedLabel.includes("supervisor") ||
     normalizedLabel.includes("lead") ||
     normalizedLabel.includes("manager")
-      ? {
-          backgroundColor: "#FCE7F3",
-          borderColor: "#FBCFE8",
-          textColor: "#BE185D",
-        }
+      ? mobileDarkenTone(
+          {
+            backgroundColor: "#FCE7F3",
+            borderColor: "#FBCFE8",
+            textColor: "#BE185D",
+          },
+          isDark,
+        )
       : normalizedLabel.includes("mentor") || normalizedLabel.includes("trainer")
-        ? {
-            backgroundColor: "#FFF7ED",
-            borderColor: "#FED7AA",
-            textColor: "#B45309",
-          }
+        ? mobileDarkenTone(
+            {
+              backgroundColor: "#FFF7ED",
+              borderColor: "#FED7AA",
+              textColor: "#B45309",
+            },
+            isDark,
+          )
         : normalizedLabel.includes("nurse") ||
             normalizedLabel.includes("rn") ||
             normalizedLabel.includes("lpn")
-          ? {
-              backgroundColor: "#ECFEFF",
-              borderColor: "#A5F3FC",
-              textColor: "#0E7490",
-            }
+          ? mobileDarkenTone(
+              {
+                backgroundColor: "#ECFEFF",
+                borderColor: "#A5F3FC",
+                textColor: "#0E7490",
+              },
+              isDark,
+            )
           : {
               backgroundColor: mobileColors.surfaceSecondary,
               borderColor: mobileColors.border,
@@ -247,10 +283,11 @@ function buildJobChip(
 
 function buildGeneralShiftChip(
   mobileColors: MobileColors,
+  isDark: boolean,
   label: string | null | undefined,
   colorSource?: JobColorSource | null,
 ): JobChip | null {
-  const chip = buildJobChip(mobileColors, label, colorSource);
+  const chip = buildJobChip(mobileColors, isDark, label, colorSource);
 
   if (!chip) {
     return null;
@@ -273,28 +310,35 @@ function isGeneralShiftSegment(segment: { shiftId?: number | null } | null | und
 
 function getOpenShiftJobChip(
   mobileColors: MobileColors,
+  isDark: boolean,
   openShift: MobileOpenShift,
 ): JobChip | null {
   const primarySegment = openShift.presentation.segments[0] ?? null;
 
   if (isGeneralShiftSegment(primarySegment)) {
-    return buildGeneralShiftChip(mobileColors, getOpenShiftLabel(openShift), primarySegment);
+    return buildGeneralShiftChip(
+      mobileColors,
+      isDark,
+      getOpenShiftLabel(openShift),
+      primarySegment,
+    );
   }
 
   const segment = openShift.presentation.segments.find((item) => item.jobName) ?? null;
 
-  return buildJobChip(mobileColors, segment?.jobName ?? null, segment);
+  return buildJobChip(mobileColors, isDark, segment?.jobName ?? null, segment);
 }
 
 function getSegmentJobChip(
   mobileColors: MobileColors,
+  isDark: boolean,
   segment: MobileScheduleEntrySegment,
 ): JobChip | null {
   if (isGeneralShiftSegment(segment)) {
-    return buildGeneralShiftChip(mobileColors, segment.shiftName ?? segment.label, segment);
+    return buildGeneralShiftChip(mobileColors, isDark, segment.shiftName ?? segment.label, segment);
   }
 
-  return buildJobChip(mobileColors, segment.jobName ?? null, segment);
+  return buildJobChip(mobileColors, isDark, segment.jobName ?? null, segment);
 }
 
 function getOpenShiftFocusAreaName(openShift: MobileOpenShift): string | null {
@@ -938,6 +982,7 @@ function RequestCard({
   showDate?: boolean;
 }) {
   const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const statusChipTones = useMemo(() => createStatusChipTones(mobileColors), [mobileColors]);
   const shiftLabel = getRequestShiftLabel(request);
@@ -993,7 +1038,7 @@ function RequestCard({
                 <SplitShiftSegmentList
                   renderSegmentChip={(segment) => (
                     <JobPill
-                      chip={getSegmentJobChip(mobileColors, segment)}
+                      chip={getSegmentJobChip(mobileColors, isDark, segment)}
                       compact
                       isMentored={segment.isMentored === true}
                     />
@@ -1005,7 +1050,7 @@ function RequestCard({
             ) : (
               <View style={styles.shiftPillRow}>
                 <ShiftPill
-                  colors={getShiftPillColors(mobileColors, request.requesterPresentation)}
+                  colors={getShiftPillColors(mobileColors, isDark, request.requesterPresentation)}
                   label={shiftLabel}
                 />
                 {timeRange ? <Text style={styles.shiftTitleTimeText}>{timeRange}</Text> : null}
@@ -1022,7 +1067,7 @@ function RequestCard({
                 <SplitShiftSegmentList
                   renderSegmentChip={(segment) => (
                     <JobPill
-                      chip={getSegmentJobChip(mobileColors, segment)}
+                      chip={getSegmentJobChip(mobileColors, isDark, segment)}
                       compact
                       isMentored={segment.isMentored === true}
                     />
@@ -1207,12 +1252,13 @@ function OpenShiftCard({
   showDate?: boolean;
 }) {
   const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const statusChipTones = useMemo(() => createStatusChipTones(mobileColors), [mobileColors]);
   const openShiftChipTone = statusChipTones.open;
   const shiftLabel = getOpenShiftLabel(openShift);
   const focusAreaName = getOpenShiftFocusAreaName(openShift);
-  const jobChip = getOpenShiftJobChip(mobileColors, openShift);
+  const jobChip = getOpenShiftJobChip(mobileColors, isDark, openShift);
   const isMentored = hasMentoredSegments(openShift.presentation.segments);
   const timeRange = getOpenShiftTimeRange(openShift);
   const splitSegments = getSplitShiftSegmentsFromPresentation(
@@ -1255,7 +1301,7 @@ function OpenShiftCard({
           <SplitShiftSegmentList
             renderSegmentChip={(segment) => (
               <JobPill
-                chip={getSegmentJobChip(mobileColors, segment)}
+                chip={getSegmentJobChip(mobileColors, isDark, segment)}
                 compact
                 isMentored={segment.isMentored === true}
               />

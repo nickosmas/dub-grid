@@ -51,7 +51,7 @@ import {
   getShiftRequests,
   updateShiftRequest,
 } from "../../../shared/lib/api";
-import { getAvatarTone, resolveShiftPillColors, type AvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTone, type AvatarTone } from "@dubgrid/design-tokens";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";

@@ -21,6 +21,7 @@ export {
   borderColor,
   toDarkPillColors,
   resolveShiftPillColors,
+  visiblePillBorder,
   type ShiftPillColors,
 } from "./pill-colors";
 

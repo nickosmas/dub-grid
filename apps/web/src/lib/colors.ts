@@ -322,9 +322,7 @@ export function normalizePresetBg(bgHex: string | null | undefined): string {
 
 /** Returns the text color as a semi-transparent rgba for use as a border. */
 export function borderColor(textHex: string, opacity = 0.35): string {
-  const r = parseInt(textHex.slice(1, 3), 16);
-  const g = parseInt(textHex.slice(3, 5), 16);
-  const b = parseInt(textHex.slice(5, 7), 16);
+  const { r, g, b } = hexToRgb(textHex);
   return `rgba(${r},${g},${b},${opacity})`;
 }
 
@@ -376,6 +374,20 @@ export interface ShiftPillColors {
 }
 
 /**
+ * Every pill gets a visible edge. `jobs.border_color` and
+ * `absence_types.border_color` both default to `'transparent'` in the schema
+ * and the color picker never writes anything else, so a stored border is
+ * almost always the transparent sentinel — rendering it literally leaves the
+ * pill as a borderless block of fill. Fall back to the same text-derived tint
+ * dark mode uses so light and dark match.
+ */
+export function visiblePillBorder(border: string | null | undefined, textHex: string): string {
+  const stored = border?.trim();
+  if (!stored || stored === TRANSPARENT_BORDER) return borderColor(textHex);
+  return stored;
+}
+
+/**
  * Pure (non-hook) counterpart to `toDarkPillColors`, for call sites that
  * render pills inside a loop/map — where calling a hook per-iteration would
  * break the Rules of Hooks. Callers read the active theme once via
@@ -383,7 +395,7 @@ export interface ShiftPillColors {
  * `isDark` down into this function for each pill.
  */
 export function resolveShiftPillColors(style: ShiftPillColors, isDark: boolean): ShiftPillColors {
-  if (!isDark) return style;
+  if (!isDark) return { ...style, border: visiblePillBorder(style.border, style.text) };
 
   const dark = toDarkPillColors(style.color);
   return { color: dark.bg, text: dark.text, border: borderColor(dark.text) };
