@@ -19,6 +19,10 @@ vi.mock("@/lib/sentry", () => ({
   captureException: vi.fn(),
 }));
 
+vi.mock("@/lib/feature-flags", () => ({
+  isFeatureEnabled: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("@/features/reports/server/operations", async () => {
   const actual = await vi.importActual<typeof import("@/features/reports/server/operations")>(
     "@/features/reports/server/operations",

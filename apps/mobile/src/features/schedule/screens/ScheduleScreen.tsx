@@ -122,6 +122,40 @@ import {
   type MobileScheduleWeekDay,
   type WeeklyHoursSummary,
 } from "../lib/schedule";
+import {
+  WEEK_SWIPE_FALLBACK_WIDTH,
+  getCurrentTimeValue,
+  getSegmentStartTime,
+  getSegmentEndTime,
+  getLocalDateTimeMinutes,
+  getHeroTiming,
+  formatHoursValue,
+  getSwipeEventX,
+  getSwipeEventTimestamp,
+  clampWeekSwipeDelta,
+  isCommittedWeekSwipe,
+  type HeroTiming,
+} from "../lib/scheduleScreenHelpers";
+import {
+  buildAbsenceChip,
+  buildGeneralShiftChip,
+  buildJobChip,
+  getMeHeroShiftmates,
+  getMeHeroSupplementalSplitSegments,
+  getRequestDateLabel,
+  getScheduleItemFocusArea,
+  getScheduleItemShiftName,
+  getScheduleItemSplitShiftLabel,
+  getScheduleItemTimeRange,
+  getScheduleItemTypeChip,
+  getSegmentJobChip,
+  getVisibleScheduleItemTypeChip,
+  hasMentoredSegments,
+  isGeneralShiftSegment,
+  shouldShowMePrimaryTitle,
+  type JobChip,
+} from "../lib/scheduleScreenChips";
+
 import type {
   MobileOpenShift,
   MobileScheduleEntry,
@@ -129,11 +163,6 @@ import type {
   MobileShiftRequest,
 } from "@dubgrid/contracts";
 
-const WEEK_SWIPE_FALLBACK_WIDTH = 360;
-const WEEK_SWIPE_MIN_THRESHOLD = 96;
-const WEEK_SWIPE_THRESHOLD_RATIO = 0.3;
-const WEEK_SWIPE_FLICK_MIN_DISTANCE = 24;
-const WEEK_SWIPE_FLICK_VELOCITY = 0.45;
 const MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS = 4;
 const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
 const OPEN_SHIFT_CARD_SHADOW_ALLOWANCE = 18;
@@ -178,10 +207,6 @@ if (
 }
 
 type ScheduleScope = "mine" | "team";
-type ShiftTimeRange = {
-  start: string;
-  end: string;
-};
 type RequestActionBody =
   | { action: "claim"; claimerEmpId: string }
   | {
@@ -475,208 +500,6 @@ function buildTeamScheduleShiftGroupsForView(
     }));
 }
 
-function getTimePartsInTimeZone(
-  value: Date,
-  timeZone?: string | null,
-): { hour: number; minute: number; second: number } {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: timeZone ?? "UTC",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const parts = formatter.formatToParts(value);
-
-  return {
-    hour: Number(parts.find((part) => part.type === "hour")?.value ?? "0"),
-    minute: Number(parts.find((part) => part.type === "minute")?.value ?? "0"),
-    second: Number(parts.find((part) => part.type === "second")?.value ?? "0"),
-  };
-}
-
-function getCurrentTimeValue(value: Date, timeZone?: string | null): string {
-  const parts = getTimePartsInTimeZone(value, timeZone);
-
-  return `${`${parts.hour}`.padStart(2, "0")}:${`${parts.minute}`.padStart(2, "0")}:${`${parts.second}`.padStart(2, "0")}`;
-}
-
-function getMinutesSinceMidnight(value: string): number | null {
-  const [rawHours, rawMinutes] = value.split(":");
-  const hours = Number(rawHours);
-  const minutes = Number(rawMinutes);
-
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
-    return null;
-  }
-
-  return hours * 60 + minutes;
-}
-
-function expandTimeRange(range: ShiftTimeRange): Array<{ start: number; end: number }> {
-  const startMinutes = getMinutesSinceMidnight(range.start);
-  const endMinutes = getMinutesSinceMidnight(range.end);
-
-  if (startMinutes == null || endMinutes == null) {
-    return [];
-  }
-
-  if (endMinutes <= startMinutes) {
-    return [
-      { start: startMinutes, end: 24 * 60 },
-      { start: 0, end: endMinutes },
-    ];
-  }
-
-  return [{ start: startMinutes, end: endMinutes }];
-}
-
-type HeroTiming = {
-  label: string;
-  progress: number | null;
-};
-
-function getSegmentStartTime(
-  segment: MobileScheduleEntrySegment | null | undefined,
-): string | null {
-  return segment?.startTime ?? segment?.shiftStartTime ?? null;
-}
-
-function getSegmentEndTime(segment: MobileScheduleEntrySegment | null | undefined): string | null {
-  return segment?.endTime ?? segment?.shiftEndTime ?? null;
-}
-
-function formatDurationValue(totalMinutes: number): string {
-  const minutes = Math.max(totalMinutes, 0);
-  const daysPart = Math.floor(minutes / (24 * 60));
-  const remainingDayMinutes = minutes % (24 * 60);
-  const hoursPart = Math.floor(remainingDayMinutes / 60);
-  const minutesPart = remainingDayMinutes % 60;
-
-  if (daysPart > 0) {
-    return hoursPart > 0 ? `${daysPart}d ${hoursPart}h` : `${daysPart}d`;
-  }
-
-  if (hoursPart === 0) {
-    return `${minutesPart}m`;
-  }
-
-  if (minutesPart === 0) {
-    return `${hoursPart}h`;
-  }
-
-  return `${hoursPart}h ${minutesPart}m`;
-}
-
-function formatDurationLabel(totalMinutes: number): string {
-  return `${formatDurationValue(totalMinutes)} left`;
-}
-
-function getIsoDateOrdinal(value: string): number | null {
-  const timestamp = Date.parse(`${value}T00:00:00.000Z`);
-
-  if (Number.isNaN(timestamp)) {
-    return null;
-  }
-
-  return Math.floor(timestamp / (24 * 60 * 60 * 1000));
-}
-
-function getLocalDateTimeMinutes(date: string, time: string): number | null {
-  const dateOrdinal = getIsoDateOrdinal(date);
-  const timeMinutes = getMinutesSinceMidnight(time);
-
-  if (dateOrdinal == null || timeMinutes == null) {
-    return null;
-  }
-
-  return dateOrdinal * 24 * 60 + timeMinutes;
-}
-
-function getStartingInLabel(input: {
-  currentDate: string;
-  currentTime: string;
-  shiftDate: string;
-  shiftStartTime: string | null;
-}): string | null {
-  if (!input.shiftStartTime) {
-    return null;
-  }
-
-  const shiftStartMinutes = getLocalDateTimeMinutes(input.shiftDate, input.shiftStartTime);
-  const currentMinutes = getLocalDateTimeMinutes(input.currentDate, input.currentTime);
-
-  if (shiftStartMinutes == null || currentMinutes == null) {
-    return null;
-  }
-
-  return `Starting in ${formatDurationValue(shiftStartMinutes - currentMinutes)}`;
-}
-
-function getHeroTiming(
-  entry: MobileScheduleEntry | null,
-  segmentStartTime: string | null,
-  segmentEndTime: string | null,
-  status: "active" | "upcoming" | "scheduled" | "away" | "empty",
-  currentDate: string,
-  currentTime: string,
-): HeroTiming | null {
-  if (!entry || !segmentStartTime || status === "away" || status === "empty") {
-    return null;
-  }
-
-  const segmentStartMinutes = getLocalDateTimeMinutes(entry.date, segmentStartTime);
-  const currentMinutes = getLocalDateTimeMinutes(currentDate, currentTime);
-
-  if (segmentStartMinutes == null || currentMinutes == null) {
-    return null;
-  }
-
-  if (currentMinutes < segmentStartMinutes) {
-    const startingInLabel = getStartingInLabel({
-      currentDate,
-      currentTime,
-      shiftDate: entry.date,
-      shiftStartTime: segmentStartTime,
-    });
-
-    return startingInLabel ? { label: startingInLabel, progress: null } : null;
-  }
-
-  if (!segmentEndTime) {
-    return null;
-  }
-
-  const segmentEndMinutes = getLocalDateTimeMinutes(entry.date, segmentEndTime);
-
-  if (segmentEndMinutes == null) {
-    return null;
-  }
-
-  const normalizedEndMinutes =
-    segmentEndMinutes <= segmentStartMinutes ? segmentEndMinutes + 24 * 60 : segmentEndMinutes;
-
-  if (currentMinutes < segmentStartMinutes || currentMinutes >= normalizedEndMinutes) {
-    return null;
-  }
-
-  const totalMinutes = normalizedEndMinutes - segmentStartMinutes;
-  const elapsedMinutes = Math.min(Math.max(currentMinutes - segmentStartMinutes, 0), totalMinutes);
-
-  if (totalMinutes <= 0) {
-    return null;
-  }
-
-  return {
-    progress: elapsedMinutes / totalMinutes,
-    label: formatDurationLabel(normalizedEndMinutes - currentMinutes),
-  };
-}
-
-function formatHoursValue(value: number): string {
-  return Number.isInteger(value) ? `${value}` : value.toFixed(1);
-}
-
 function getRequestSegments(request: MobileShiftRequest, which: "requester" | "target") {
   const legacyRequest = request as MobileShiftRequest & {
     requesterSegments?: MobileShiftRequest["requesterPresentation"]["segments"];
@@ -824,78 +647,6 @@ function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
   return openShift.presentation.startTime && openShift.presentation.endTime
     ? formatScheduleTimeRange(openShift.presentation.startTime, openShift.presentation.endTime)
     : null;
-}
-
-function getSwipeEventX(event: GestureResponderEvent): number | null {
-  const nativeEvent = event.nativeEvent;
-  const webNativeEvent = nativeEvent as typeof nativeEvent & {
-    changedTouches?: Array<{ pageX?: number }>;
-    touches?: Array<{ pageX?: number }>;
-  };
-
-  if (typeof nativeEvent.pageX === "number") {
-    return nativeEvent.pageX;
-  }
-
-  const changedTouchX = webNativeEvent.changedTouches?.[0]?.pageX;
-  if (typeof changedTouchX === "number") {
-    return changedTouchX;
-  }
-
-  const touchX = webNativeEvent.touches?.[0]?.pageX;
-  if (typeof touchX === "number") {
-    return touchX;
-  }
-
-  return null;
-}
-
-function getSwipeEventTimestamp(event: GestureResponderEvent): number | null {
-  const nativeEvent = event.nativeEvent;
-  const webNativeEvent = nativeEvent as typeof nativeEvent & {
-    timeStamp?: number;
-  };
-  const webEvent = event as GestureResponderEvent & {
-    timeStamp?: number;
-    timestamp?: number;
-  };
-  const timestamp =
-    nativeEvent.timestamp ?? webNativeEvent.timeStamp ?? webEvent.timestamp ?? webEvent.timeStamp;
-
-  return typeof timestamp === "number" ? timestamp : null;
-}
-
-function getWeekSwipeThreshold(width: number): number {
-  return Math.max(WEEK_SWIPE_MIN_THRESHOLD, width * WEEK_SWIPE_THRESHOLD_RATIO);
-}
-
-function clampWeekSwipeDelta(value: number, width: number): number {
-  if (width <= 0) {
-    return value;
-  }
-
-  return Math.max(-width, Math.min(width, value));
-}
-
-function isCommittedWeekSwipe(input: {
-  deltaX: number;
-  elapsedMs: number | null;
-  width: number;
-}): boolean {
-  const distance = Math.abs(input.deltaX);
-
-  if (distance >= getWeekSwipeThreshold(input.width)) {
-    return true;
-  }
-
-  if (input.elapsedMs == null || input.elapsedMs <= 0) {
-    return false;
-  }
-
-  return (
-    distance >= WEEK_SWIPE_FLICK_MIN_DISTANCE &&
-    distance / input.elapsedMs >= WEEK_SWIPE_FLICK_VELOCITY
-  );
 }
 
 export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
@@ -1165,21 +916,10 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const activeTeamFocusAreaTab =
     teamFocusAreaTabs.find((tab) => tab.key === activeTeamFocusAreaKey) ?? null;
 
-  useEffect(() => {
-    if (defaultTeamFocusAreaKey == null) {
-      if (selectedTeamFocusAreaKey != null) {
-        setSelectedTeamFocusAreaKey(null);
-      }
-      return;
-    }
-
-    if (
-      selectedTeamFocusAreaKey == null ||
-      !teamFocusAreaTabs.some((tab) => tab.key === selectedTeamFocusAreaKey)
-    ) {
-      setSelectedTeamFocusAreaKey(defaultTeamFocusAreaKey);
-    }
-  }, [teamFocusAreaTabs, defaultTeamFocusAreaKey, selectedTeamFocusAreaKey]);
+  // `activeTeamFocusAreaKey` above already falls back to the default whenever the
+  // selected key is missing or no longer in the tab set, so no effect is needed
+  // to "fix up" `selectedTeamFocusAreaKey` — the raw state is only written by the
+  // user's tab-tap handler below.
 
   const activeEntries = useMemo(() => {
     if (!isTeamScope) {
@@ -2257,529 +1997,6 @@ export function TeamScheduleScreen() {
 
 export default TeamScheduleScreen;
 
-function joinMetaParts(parts: Array<string | null | undefined>): string | null {
-  const values = parts.filter(
-    (part): part is string => typeof part === "string" && part.trim().length > 0,
-  );
-
-  return values.length > 0 ? values.join(" • ") : null;
-}
-
-function getScheduleItemShiftName(item: FeaturedMeScheduleSegment["item"]): string {
-  if (!item) {
-    return "Nothing scheduled this week";
-  }
-
-  return item.segment.shiftName || getScheduleEntryTitle(item.entry);
-}
-
-function getScheduleItemJobName(item: FeaturedMeScheduleSegment["item"]): string | null {
-  if (!item || getScheduleEntryAbsenceTypeId(item.entry) != null) {
-    return null;
-  }
-
-  return item.segment.jobName ?? null;
-}
-
-function getScheduleItemFocusArea(item: FeaturedMeScheduleSegment["item"]): string | null {
-  if (!item) {
-    return null;
-  }
-
-  return getScheduleEntrySegmentFocusAreaName(item.entry, item.segment);
-}
-
-type JobColorSource = {
-  jobColor?: string | null;
-  jobBorderColor?: string | null;
-  jobTextColor?: string | null;
-  isMentored?: boolean | null;
-};
-
-type JobChipKind = "job" | "general" | "absence";
-
-type JobChip = AvatarTone & {
-  kind: JobChipKind;
-  label: string;
-  eyebrowLabel?: string | null;
-  isMentored?: boolean;
-};
-
-type AbsenceColorSource = Pick<
-  MobileScheduleEntry["presentation"],
-  "shiftColor" | "shiftBorderColor" | "shiftTextColor"
->;
-
-function readOptionalColor(value: string | null | undefined): string | null {
-  if (typeof value !== "string") {
-    return value ?? null;
-  }
-
-  const trimmedValue = value.trim();
-  if (trimmedValue.length === 0) {
-    return null;
-  }
-
-  return trimmedValue.toLowerCase() === "transparent" ? null : trimmedValue;
-}
-
-function readOptionalStyleColor(value: string | null | undefined): string | null {
-  if (typeof value !== "string") {
-    return value ?? null;
-  }
-
-  const trimmedValue = value.trim();
-  return trimmedValue.length > 0 ? trimmedValue : null;
-}
-
-function normalizeScheduleLabel(value: string | null | undefined): string {
-  return (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-// User-picked / hardcoded-preset hex colors are tuned for a white page and
-// read as blown-out or washed-out on a dark surface — remap through the
-// shared HSV darkener. Theme tokens (mobileColors.*) are already
-// theme-correct and must NOT be passed through this a second time.
-function darkenTone(
-  tone: { backgroundColor: string; borderColor: string; textColor: string },
-  isDark: boolean,
-): { backgroundColor: string; borderColor: string; textColor: string } {
-  if (!isDark) return tone;
-
-  const resolved = resolveShiftPillColors(
-    { color: tone.backgroundColor, text: tone.textColor, border: tone.borderColor },
-    true,
-  );
-  return {
-    backgroundColor: resolved.color,
-    borderColor: resolved.border,
-    textColor: resolved.text,
-  };
-}
-
-function buildAbsenceChip(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  label: string | null | undefined,
-  colorSource?: AbsenceColorSource | null,
-): JobChip | null {
-  const trimmedLabel = label?.trim() ?? "";
-  const absenceColor = readOptionalStyleColor(colorSource?.shiftColor);
-  const absenceBorderColor = readOptionalStyleColor(colorSource?.shiftBorderColor);
-  const absenceTextColor = readOptionalStyleColor(colorSource?.shiftTextColor);
-
-  if (!trimmedLabel) {
-    return null;
-  }
-
-  if (absenceColor) {
-    return {
-      kind: "absence",
-      eyebrowLabel: "Absence",
-      label: trimmedLabel,
-      ...darkenTone(
-        {
-          backgroundColor: absenceColor,
-          borderColor: absenceBorderColor ?? absenceColor,
-          textColor: absenceTextColor ?? mobileColors.textMuted,
-        },
-        isDark,
-      ),
-    };
-  }
-
-  return {
-    kind: "absence",
-    eyebrowLabel: "Absence",
-    label: trimmedLabel,
-    backgroundColor: mobileColors.surfaceSecondary,
-    borderColor: mobileColors.border,
-    textColor: mobileColors.textMuted,
-  };
-}
-
-function hasMentoredSegments(
-  segments: ReadonlyArray<{ isMentored?: boolean | null }> | null | undefined,
-): boolean {
-  return segments?.some((segment) => segment.isMentored === true) ?? false;
-}
-
-function MentoredPill() {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-
-  return (
-    <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
-      <Text style={styles.mentoredPillText}>Mentored</Text>
-    </View>
-  );
-}
-
-function buildGeneralShiftChip(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  label: string | null | undefined,
-  colorSource?: JobColorSource | null,
-): JobChip | null {
-  const chip = buildJobChip(mobileColors, isDark, label, colorSource);
-
-  if (!chip) {
-    return null;
-  }
-
-  return {
-    ...chip,
-    kind: "general",
-    eyebrowLabel: "General shift",
-  };
-}
-
-function isGeneralShiftSegment(segment: { shiftId?: number | null } | null | undefined): boolean {
-  return (
-    segment != null &&
-    Object.prototype.hasOwnProperty.call(segment, "shiftId") &&
-    segment.shiftId === null
-  );
-}
-
-function buildJobChip(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  label: string | null | undefined,
-  colorSource?: JobColorSource | null,
-): JobChip | null {
-  const trimmedLabel = label?.trim() ?? "";
-  const jobColor = readOptionalColor(colorSource?.jobColor);
-  const jobBorderColor = readOptionalColor(colorSource?.jobBorderColor);
-  const jobTextColor = readOptionalColor(colorSource?.jobTextColor);
-
-  if (!trimmedLabel) {
-    return null;
-  }
-
-  if (jobColor || jobBorderColor || jobTextColor) {
-    return {
-      kind: "job",
-      label: trimmedLabel,
-      ...darkenTone(
-        {
-          backgroundColor: jobColor ?? mobileColors.surfaceSecondary,
-          borderColor: jobBorderColor ?? mobileColors.border,
-          textColor: jobTextColor ?? mobileColors.textMuted,
-        },
-        isDark,
-      ),
-      isMentored: colorSource?.isMentored === true,
-    };
-  }
-
-  const normalizedLabel = trimmedLabel.toLowerCase();
-  const tone =
-    normalizedLabel.includes("supervisor") ||
-    normalizedLabel.includes("lead") ||
-    normalizedLabel.includes("manager")
-      ? darkenTone(
-          {
-            backgroundColor: "#FCE7F3",
-            borderColor: "#FBCFE8",
-            textColor: "#BE185D",
-          },
-          isDark,
-        )
-      : normalizedLabel.includes("mentor") || normalizedLabel.includes("trainer")
-        ? {
-            backgroundColor: mobileColors.warningSoft,
-            borderColor: mobileColors.warningBorder,
-            textColor: isDark ? mobileColors.warningText : "#B45309",
-          }
-        : normalizedLabel.includes("nurse") ||
-            normalizedLabel.includes("rn") ||
-            normalizedLabel.includes("lpn")
-          ? darkenTone(
-              {
-                backgroundColor: "#ECFEFF",
-                borderColor: "#A5F3FC",
-                textColor: "#0E7490",
-              },
-              isDark,
-            )
-          : {
-              backgroundColor: mobileColors.surfaceSecondary,
-              borderColor: mobileColors.border,
-              textColor: mobileColors.textMuted,
-            };
-
-  return {
-    kind: "job",
-    label: trimmedLabel,
-    isMentored: colorSource?.isMentored === true,
-    ...tone,
-  };
-}
-
-function getScheduleItemJobChip(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  item: FeaturedMeScheduleSegment["item"],
-): JobChip | null {
-  if (!item) {
-    return null;
-  }
-
-  if (getScheduleEntryAbsenceTypeId(item.entry) != null) {
-    return buildAbsenceChip(
-      mobileColors,
-      isDark,
-      getScheduleItemShiftName(item),
-      item.entry.presentation,
-    );
-  }
-
-  if (isGeneralShiftSegment(item.segment)) {
-    return buildGeneralShiftChip(
-      mobileColors,
-      isDark,
-      getScheduleItemShiftName(item),
-      item.segment,
-    );
-  }
-
-  const jobName = getScheduleItemJobName(item);
-  return buildJobChip(mobileColors, isDark, jobName, item.segment);
-}
-
-function getSegmentJobChip(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  segment: MobileScheduleEntrySegment,
-): JobChip | null {
-  if (isGeneralShiftSegment(segment)) {
-    return buildGeneralShiftChip(mobileColors, isDark, segment.shiftName ?? segment.label, segment);
-  }
-
-  return buildJobChip(mobileColors, isDark, segment.jobName ?? null, segment);
-}
-
-function getScheduleItemTypeChip(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  item: FeaturedMeScheduleSegment["item"],
-): JobChip | null {
-  return getScheduleItemJobChip(mobileColors, isDark, item);
-}
-
-function getVisibleScheduleItemTypeChip(
-  mobileColors: MobileColors,
-  isDark: boolean,
-  item: FeaturedMeScheduleSegment["item"],
-): JobChip | null {
-  const typeChip = getScheduleItemTypeChip(mobileColors, isDark, item);
-
-  if (!item || !typeChip) {
-    return typeChip;
-  }
-
-  if (typeChip.kind !== "job") {
-    return typeChip;
-  }
-
-  const chipLabel = normalizeScheduleLabel(typeChip.label);
-  const shiftLabels = [
-    getScheduleItemShiftName(item),
-    item.segment.shiftName,
-    item.segment.label,
-    item.entry.presentation?.label,
-  ].map(normalizeScheduleLabel);
-
-  return chipLabel.length > 0 && shiftLabels.includes(chipLabel) ? null : typeChip;
-}
-
-function shouldShowMePrimaryTitle(title: string | null | undefined, chip: JobChip | null): boolean {
-  if (!chip?.eyebrowLabel) {
-    return true;
-  }
-
-  return normalizeScheduleLabel(title) !== normalizeScheduleLabel(chip.label);
-}
-
-function getScheduleItemTimeRange(item: FeaturedMeScheduleSegment["item"]): string | null {
-  if (!item) {
-    return null;
-  }
-
-  const segmentCount = getScheduleEntrySegments(item.entry).length;
-
-  if (segmentCount <= 1) {
-    return (
-      getScheduleEntryCustomTimeRange(item.entry) ??
-      getScheduleEntrySegmentTimeRange(item.segment) ??
-      getScheduleEntryBaseTimeRange(item.entry)
-    );
-  }
-
-  return (
-    getScheduleEntrySegmentTimeRange(item.segment) ?? getScheduleEntryBaseTimeRange(item.entry)
-  );
-}
-
-function getScheduleItemSplitShiftLabel(item: FeaturedMeScheduleSegment["item"]): string | null {
-  if (!item) {
-    return null;
-  }
-
-  const splitSegments = getSplitShiftSegmentsForEntry(item.entry);
-  const segmentIndex = splitSegments.indexOf(item.segment);
-  if (splitSegments.length <= 1 || segmentIndex < 0) {
-    return null;
-  }
-
-  return getSplitShiftSegmentLabel(segmentIndex, splitSegments.length);
-}
-
-function doScheduleSegmentsMatch(
-  left: MobileScheduleEntrySegment,
-  right: MobileScheduleEntrySegment,
-): boolean {
-  return (
-    left === right ||
-    (left.shiftId === right.shiftId &&
-      left.jobId === right.jobId &&
-      left.shiftName === right.shiftName &&
-      left.jobName === right.jobName &&
-      left.startTime === right.startTime &&
-      left.endTime === right.endTime)
-  );
-}
-
-function getMeHeroSupplementalSplitSegments(
-  item: FeaturedMeScheduleSegment["item"],
-  splitSegments: ReadonlyArray<MobileScheduleEntrySegment>,
-  currentDate: string,
-  currentTime: string,
-): {
-  segments: MobileScheduleEntrySegment[];
-  segmentLabelIndices: number[];
-} {
-  if (!item || splitSegments.length <= 1) {
-    return { segments: [], segmentLabelIndices: [] };
-  }
-
-  const featuredSegmentIndex = splitSegments.findIndex((segment) =>
-    doScheduleSegmentsMatch(segment, item.segment),
-  );
-  const hiddenSegmentIndex = featuredSegmentIndex >= 0 ? featuredSegmentIndex : 0;
-  const segments: MobileScheduleEntrySegment[] = [];
-  const segmentLabelIndices: number[] = [];
-
-  splitSegments.forEach((segment, index) => {
-    if (index === hiddenSegmentIndex) {
-      return;
-    }
-
-    if (isHeroSplitSegmentComplete(item.entry, segment, currentDate, currentTime)) {
-      return;
-    }
-
-    segments.push(segment);
-    segmentLabelIndices.push(index);
-  });
-
-  return { segments, segmentLabelIndices };
-}
-
-function isHeroSplitSegmentComplete(
-  entry: MobileScheduleEntry,
-  segment: MobileScheduleEntrySegment,
-  currentDate: string,
-  currentTime: string,
-): boolean {
-  const segmentStartTime = getSegmentStartTime(segment);
-  const segmentEndTime = getSegmentEndTime(segment);
-
-  if (!segmentStartTime || !segmentEndTime) {
-    return false;
-  }
-
-  const segmentStartMinutes = getLocalDateTimeMinutes(entry.date, segmentStartTime);
-  const segmentEndMinutes = getLocalDateTimeMinutes(entry.date, segmentEndTime);
-  const currentMinutes = getLocalDateTimeMinutes(currentDate, currentTime);
-
-  if (segmentStartMinutes == null || segmentEndMinutes == null || currentMinutes == null) {
-    return false;
-  }
-
-  const normalizedEndMinutes =
-    segmentEndMinutes <= segmentStartMinutes ? segmentEndMinutes + 24 * 60 : segmentEndMinutes;
-
-  return currentMinutes >= normalizedEndMinutes;
-}
-
-function getScheduleSegmentMatchKey(segment: MobileScheduleEntrySegment): string | null {
-  if (segment.shiftId != null) {
-    return `shift:${segment.shiftId}`;
-  }
-
-  const title = segment.shiftName?.trim() || segment.label?.trim();
-  return title
-    ? `segment:${title}:${segment.startTime ?? "none"}:${segment.endTime ?? "none"}`
-    : null;
-}
-
-function entriesShareWorkedSegment(
-  left: MobileScheduleEntry,
-  rightEntry: MobileScheduleEntry,
-  rightSegment: MobileScheduleEntrySegment,
-  rightKey: string | null,
-): boolean {
-  if (!rightKey) {
-    return false;
-  }
-
-  for (const segment of getScheduleEntrySegments(left)) {
-    if (
-      getScheduleSegmentMatchKey(segment) === rightKey &&
-      doScheduleEntrySegmentsShareShiftAndFocusArea(rightEntry, rightSegment, left, segment)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function getMeHeroShiftmates(
-  item: FeaturedMeScheduleSegment["item"],
-  teamEntries: MobileScheduleEntry[],
-): MobileScheduleEntry[] {
-  if (
-    !item ||
-    getScheduleEntryAbsenceTypeId(item.entry) != null ||
-    isGeneralShiftSegment(item.segment)
-  ) {
-    return [];
-  }
-
-  const featuredSegmentKey = getScheduleSegmentMatchKey(item.segment);
-  const matchingEntries = teamEntries.filter(
-    (entry) =>
-      entry.date === item.date &&
-      entry.employeeId !== item.entry.employeeId &&
-      getScheduleEntryAbsenceTypeId(entry) == null &&
-      entriesShareWorkedSegment(entry, item.entry, item.segment, featuredSegmentKey),
-  );
-
-  return sortScheduleEntries(
-    matchingEntries.filter(
-      (entry, index, entries) =>
-        entries.findIndex((candidate) => candidate.employeeId === entry.employeeId) === index,
-    ),
-  );
-}
-
-function getRequestDateLabel(request: MobileShiftRequest): string {
-  return formatCompactScheduleDate(request.requesterShiftDate);
-}
-
 function getRequestJobChip(
   mobileColors: MobileColors,
   isDark: boolean,
@@ -2811,6 +2028,17 @@ function getRequestJobChip(
   const segment = getRequestSegments(request, which).find((item) => item.jobName) ?? null;
   const jobName = getRequestJobName(request, which);
   return buildJobChip(mobileColors, isDark, jobName, segment);
+}
+
+function MentoredPill() {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
+  return (
+    <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
+      <Text style={styles.mentoredPillText}>Mentored</Text>
+    </View>
+  );
 }
 
 function MeSectionHeader({

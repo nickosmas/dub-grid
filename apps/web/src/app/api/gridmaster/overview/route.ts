@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { loadGridmasterOverview } from "@/app/api/gridmaster/_lib/oversight";
+import logger from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,7 +14,10 @@ export async function GET(req: NextRequest) {
     const overview = await loadGridmasterOverview(getServiceClient());
     return NextResponse.json(overview);
   } catch (error) {
-    console.error("gridmaster overview GET failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/overview" },
+      "gridmaster overview GET failed",
+    );
     return NextResponse.json({ error: "Failed to load gridmaster overview" }, { status: 500 });
   }
 }

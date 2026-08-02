@@ -1028,6 +1028,14 @@ export interface GridmasterSecuritySummary {
   highRiskAuditEvents: GridmasterAuditEventSummary[];
 }
 
+export interface PlatformFeatureFlag {
+  key: string;
+  enabled: boolean;
+  description: string;
+  updatedBy: string | null;
+  updatedAt: string;
+}
+
 export interface GridmasterBillingOrgSummary {
   orgId: string;
   orgName: string;

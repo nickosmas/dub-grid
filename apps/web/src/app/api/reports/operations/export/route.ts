@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 import {
   buildOperationsReportCsv,
   buildOperationsReportPdf,
@@ -44,6 +45,13 @@ export async function GET(req: NextRequest) {
     );
     if ("response" in auth) {
       return auth.response;
+    }
+
+    if (!(await isFeatureEnabled("reports"))) {
+      return NextResponse.json(
+        { error: "Reports are temporarily unavailable. Please try again shortly." },
+        { status: 503 },
+      );
     }
 
     const payload = await loadOperationsReport(auth.serviceClient, {

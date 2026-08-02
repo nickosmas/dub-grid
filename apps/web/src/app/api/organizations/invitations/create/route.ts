@@ -14,6 +14,7 @@ import type { AssignableOrganizationRole } from "@/types";
 import { buildStaffValidationErrorResponse, getStaffFieldErrors } from "@/lib/staff-validation";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
 
 const postSchema = z.object({
   email: z.string().trim().email(),
@@ -26,6 +27,50 @@ const postSchema = z.object({
   departmentIds: z.array(z.number().int()).optional(),
   deptAdminIds: z.array(z.number().int()).optional(),
 });
+
+type RefreshedInvitation = {
+  invitationId: string;
+  token: string;
+  expiresAt: string;
+};
+
+/**
+ * When the RPC reports an already-pending invite for this email, the row is often an
+ * orphan from an earlier attempt whose email step failed (e.g. the resend_email kill
+ * switch, or any transient Resend outage) — no email was ever delivered, but the row
+ * blocks a retry. Instead of erroring, refresh that pending row (rotate its token, extend
+ * expiry) and return it so the caller re-sends the email. Idempotent: the partial unique
+ * index guarantees at most one pending row per (org_id, email), so this updates it in place.
+ * Returns null if no pending row is actually found (let the original error surface).
+ */
+async function refreshPendingInvitation(
+  serviceClient: ReturnType<typeof getServiceClient>,
+  orgId: string,
+  email: string,
+): Promise<RefreshedInvitation | null> {
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await serviceClient
+    .from("invitations")
+    .update({ token, expires_at: expiresAt, revoked_at: null })
+    .eq("org_id", orgId)
+    .ilike("email", email)
+    .is("accepted_at", null)
+    .is("revoked_at", null)
+    .gte("expires_at", new Date().toISOString())
+    .select("id, token, expires_at")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    invitationId: data.id as string,
+    token: data.token as string,
+    expiresAt: data.expires_at as string,
+  };
+}
 
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
@@ -135,7 +180,7 @@ export async function POST(req: NextRequest) {
       expiresAt: data.expires_at as string,
     });
   } catch (error) {
-    console.error("organization invitation create POST failed", error);
+    logger.error({ error }, "organization invitation create POST failed");
     // Surface the known send_invitation RPC errors with friendly messages
     // and correct status codes. Anything we don't recognize falls through
     // to a generic 500 so we don't leak internals.
@@ -154,6 +199,24 @@ export async function POST(req: NextRequest) {
       );
     }
     if (text.includes("active invitation already exists")) {
+      // Don't dead-end on a still-pending row: refresh it and return it so the caller
+      // re-sends the email. This makes "retry with the same email" work after a first
+      // attempt whose email step failed (e.g. the resend_email kill switch) left an
+      // orphaned pending row behind. See refreshPendingInvitation above.
+      try {
+        const refreshed = await refreshPendingInvitation(
+          serviceClient,
+          orgId,
+          normalizeRequiredStaffEmail(email),
+        );
+        if (refreshed) {
+          return NextResponse.json({ ...refreshed, resent: true });
+        }
+      } catch (refreshError) {
+        logger.error({ error: refreshError }, "failed to refresh pending invitation on retry");
+      }
+      // No pending row found to refresh (or the refresh itself failed) — fall back to the
+      // original guard message rather than claim success.
       return NextResponse.json(
         {
           error:

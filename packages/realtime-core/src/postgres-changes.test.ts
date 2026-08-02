@@ -75,7 +75,7 @@ describe("subscribeToPostgresChanges", () => {
     });
   });
 
-  it("invokes onEvent with the table name when the listener fires", () => {
+  it("invokes onEvent with the table name and payload when the listener fires", () => {
     const mock = createMockChannel();
     const client = createMockClient(mock.channel);
     const onEvent = vi.fn();
@@ -84,13 +84,28 @@ describe("subscribeToPostgresChanges", () => {
       { table: "employees", filter: "org_id=eq.org-1", onEvent },
     ]);
 
-    const handler = mock.channel.on.mock.calls[0]?.[2] as () => void;
-    handler();
+    const handler = mock.channel.on.mock.calls[0]?.[2] as (payload: unknown) => void;
+    const payload = { new: { id: "1", org_id: "org-1" } };
+    handler(payload);
 
-    expect(onEvent).toHaveBeenCalledWith("employees");
+    expect(onEvent).toHaveBeenCalledWith("employees", payload);
   });
 
-  it("calls onError on CHANNEL_ERROR and onReconnectAfterError on the next SUBSCRIBED", () => {
+  it("omits the filter key entirely for an unfiltered (platform-wide) listener", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+
+    subscribeToPostgresChanges(client, "ch", [{ table: "organizations", onEvent: vi.fn() }]);
+
+    expect(mock.onCalls[0]?.filter).toEqual({
+      event: "*",
+      schema: "public",
+      table: "organizations",
+    });
+    expect(mock.onCalls[0]?.filter).not.toHaveProperty("filter");
+  });
+
+  it("calls onError with a 1-based error count on CHANNEL_ERROR and onReconnectAfterError on the next SUBSCRIBED", () => {
     const mock = createMockChannel();
     const client = createMockClient(mock.channel);
     const onError = vi.fn();
@@ -100,7 +115,7 @@ describe("subscribeToPostgresChanges", () => {
 
     const error = new Error("boom");
     mock.emitStatus("CHANNEL_ERROR", error);
-    expect(onError).toHaveBeenCalledWith(error);
+    expect(onError).toHaveBeenCalledWith(error, 1);
     expect(onReconnectAfterError).not.toHaveBeenCalled();
 
     mock.emitStatus("SUBSCRIBED");
@@ -109,6 +124,66 @@ describe("subscribeToPostgresChanges", () => {
     // A later SUBSCRIBED with no intervening error shouldn't fire again.
     mock.emitStatus("SUBSCRIBED");
     expect(onReconnectAfterError).toHaveBeenCalledTimes(1);
+  });
+
+  it("increments consecutiveErrorCount across repeated CHANNEL_ERRORs before a reconnect, then resets", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+    const onError = vi.fn();
+    const onReconnectAfterError = vi.fn();
+
+    subscribeToPostgresChanges(client, "ch", [], { onError, onReconnectAfterError });
+
+    const error = new Error("boom");
+    mock.emitStatus("CHANNEL_ERROR", error);
+    mock.emitStatus("CHANNEL_ERROR", error);
+    mock.emitStatus("CHANNEL_ERROR", error);
+    expect(onError).toHaveBeenNthCalledWith(1, error, 1);
+    expect(onError).toHaveBeenNthCalledWith(2, error, 2);
+    expect(onError).toHaveBeenNthCalledWith(3, error, 3);
+
+    mock.emitStatus("SUBSCRIBED");
+    expect(onReconnectAfterError).toHaveBeenCalledTimes(1);
+
+    mock.emitStatus("CHANNEL_ERROR", error);
+    expect(onError).toHaveBeenNthCalledWith(4, error, 1);
+  });
+
+  it("does not let a throwing onError hook propagate out of the subscribe callback", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+    const onError = vi.fn(() => {
+      throw new Error("consumer bug");
+    });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    subscribeToPostgresChanges(client, "ch", [], { onError });
+
+    expect(() => mock.emitStatus("CHANNEL_ERROR", new Error("boom"))).not.toThrow();
+    expect(consoleError).toHaveBeenCalled();
+
+    // Bookkeeping still advances normally on the next error despite the prior throw.
+    mock.emitStatus("CHANNEL_ERROR", new Error("boom again"));
+    expect(onError).toHaveBeenNthCalledWith(2, expect.any(Error), 2);
+
+    consoleError.mockRestore();
+  });
+
+  it("does not let a throwing onReconnectAfterError hook propagate out of the subscribe callback", () => {
+    const mock = createMockChannel();
+    const client = createMockClient(mock.channel);
+    const onReconnectAfterError = vi.fn(() => {
+      throw new Error("consumer bug");
+    });
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    subscribeToPostgresChanges(client, "ch", [], { onReconnectAfterError });
+
+    mock.emitStatus("CHANNEL_ERROR", new Error("boom"));
+    expect(() => mock.emitStatus("SUBSCRIBED")).not.toThrow();
+    expect(consoleError).toHaveBeenCalled();
+
+    consoleError.mockRestore();
   });
 
   it("cleanup removes the channel from the client", () => {

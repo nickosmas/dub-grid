@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 import type { NotificationFacets } from "@/types";
 import { mapNotificationRow } from "../route";
 import { API_ERRORS } from "@dubgrid/client-errors";
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
       facets: (facetsResult.data ?? null) as NotificationFacets | null,
     });
   } catch (error) {
-    console.error("notifications search failed", error);
+    logger.error({ error }, "notifications search failed");
     return NextResponse.json({ error: "Failed to search notifications" }, { status: 500 });
   }
 }

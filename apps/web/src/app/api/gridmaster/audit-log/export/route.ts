@@ -4,6 +4,7 @@ import { requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
+import logger from "@/lib/logger";
 
 const exportSchema = z.object({
   orgId: z.string().uuid().optional(),
@@ -104,7 +105,10 @@ export async function POST(req: NextRequest) {
       entries,
     });
   } catch (error) {
-    console.error("gridmaster audit export POST failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/audit-log/export" },
+      "gridmaster audit export POST failed",
+    );
     return NextResponse.json({ error: "Failed to export audit log" }, { status: 500 });
   }
 }

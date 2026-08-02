@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiErrorResponse } from "@/lib/error-handling";
-import type { PublishChange } from "@/types";
+import { toPublishChanges, type ScheduleChangeRow } from "@/lib/db/publish-history";
 
 const querySchema = z.object({
   orgId: z.string().uuid(),
@@ -40,7 +40,9 @@ export async function GET(req: NextRequest) {
     const offset = parsed.data.offset ?? 0;
     const { data, error } = await auth.serviceClient
       .from("publish_history")
-      .select("id, published_by, start_date, end_date, change_count, changes, published_at")
+      .select(
+        "id, published_by, start_date, end_date, change_count, published_at, schedule_publish_changes(emp_id, date, kind, from_state, to_state, from_absence_type_id, to_absence_type_id, updated_by, from_custom_start, from_custom_end, to_custom_start, to_custom_end)",
+      )
       .eq("org_id", auth.orgId)
       .order("published_at", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -54,7 +56,7 @@ export async function GET(req: NextRequest) {
       start_date: string;
       end_date: string;
       change_count: number;
-      changes: PublishChange[];
+      schedule_publish_changes: ScheduleChangeRow[];
       published_at: string;
     }[];
     const publisherIds = [...new Set(rows.map((row) => row.published_by))];
@@ -89,7 +91,7 @@ export async function GET(req: NextRequest) {
         startDate: row.start_date,
         endDate: row.end_date,
         changeCount: row.change_count,
-        changes: row.changes,
+        changes: toPublishChanges(row.schedule_publish_changes),
         publishedAt: row.published_at,
       })),
     });

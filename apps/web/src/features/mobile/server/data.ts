@@ -1397,19 +1397,17 @@ export async function fetchMobileOpenShifts(
     return [];
   }
 
-  const gaps = computeCoverageGaps(
-    inputs.context.focusAreas,
-    inputs.context.shiftCategories,
-    inputs.context.assignments,
-    inputs.context.coverageRequirements,
-    inputs.dates,
-    inputs.employeesByFocusArea,
-    inputs.assignmentIdsForKey,
-    inputs.assignmentById,
-    inputs.assignmentIdsByFocusArea,
-    undefined,
-    inputs.coverageCreditForKey,
-  );
+  const gaps = computeCoverageGaps({
+    focusAreas: inputs.context.focusAreas,
+    shiftCategories: inputs.context.shiftCategories,
+    assignments: inputs.context.assignments,
+    requirements: inputs.context.coverageRequirements,
+    dates: inputs.dates,
+    employeesByFocusArea: inputs.employeesByFocusArea,
+    assignmentIdsForKey: inputs.assignmentIdsForKey,
+    assignmentIdsByFocusArea: inputs.assignmentIdsByFocusArea,
+    coverageCreditForKey: inputs.coverageCreditForKey,
+  });
 
   return buildMobileOpenShiftsFromGaps(gaps, inputs, input);
 }
@@ -1448,31 +1446,19 @@ export async function fetchMobileCoverageSummary(
     };
   }
 
-  const snapshots = computeCoverageCategorySnapshots(
-    inputs.context.focusAreas,
-    inputs.context.shiftCategories,
-    inputs.context.assignments,
-    inputs.context.coverageRequirements,
-    inputs.dates,
-    inputs.employeesByFocusArea,
-    inputs.assignmentIdsForKey,
-    inputs.assignmentIdsByFocusArea,
-    undefined,
-    inputs.coverageCreditForKey,
-  );
-  const gaps = computeCoverageGaps(
-    inputs.context.focusAreas,
-    inputs.context.shiftCategories,
-    inputs.context.assignments,
-    inputs.context.coverageRequirements,
-    inputs.dates,
-    inputs.employeesByFocusArea,
-    inputs.assignmentIdsForKey,
-    inputs.assignmentById,
-    inputs.assignmentIdsByFocusArea,
-    undefined,
-    inputs.coverageCreditForKey,
-  );
+  const coverageInput = {
+    focusAreas: inputs.context.focusAreas,
+    shiftCategories: inputs.context.shiftCategories,
+    assignments: inputs.context.assignments,
+    requirements: inputs.context.coverageRequirements,
+    dates: inputs.dates,
+    employeesByFocusArea: inputs.employeesByFocusArea,
+    assignmentIdsForKey: inputs.assignmentIdsForKey,
+    assignmentIdsByFocusArea: inputs.assignmentIdsByFocusArea,
+    coverageCreditForKey: inputs.coverageCreditForKey,
+  };
+  const snapshots = computeCoverageCategorySnapshots(coverageInput);
+  const gaps = computeCoverageGaps(coverageInput);
 
   return {
     openShifts: buildMobileOpenShiftsFromGaps(gaps, inputs, input),

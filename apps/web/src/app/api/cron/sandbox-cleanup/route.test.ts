@@ -39,6 +39,11 @@ vi.mock("@/lib/logger", () => ({
   default: { error: vi.fn() },
 }));
 
+const isFeatureEnabled = vi.fn(async (_key: string) => true);
+vi.mock("@/lib/feature-flags", () => ({
+  isFeatureEnabled: (key: string) => isFeatureEnabled(key),
+}));
+
 import { GET } from "./route";
 
 const SECRET = "test-cron-secret";
@@ -52,6 +57,7 @@ describe("GET /api/cron/sandbox-cleanup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.CRON_SECRET = SECRET;
+    isFeatureEnabled.mockResolvedValue(true);
     selectResult = { data: [], error: null };
     deleteIn.mockResolvedValue({ error: null });
   });
@@ -66,6 +72,14 @@ describe("GET /api/cron/sandbox-cleanup", () => {
     delete process.env.CRON_SECRET;
     const res = await GET(makeReq({ authorization: `Bearer ${SECRET}` }));
     expect(res.status).toBe(503);
+    expect(deleteIn).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 skipped (not 503) when intentionally disabled via kill switch", async () => {
+    isFeatureEnabled.mockResolvedValue(false);
+    const res = await GET(makeReq({ authorization: `Bearer ${SECRET}` }));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ ok: true, skipped: true, reason: "disabled" });
     expect(deleteIn).not.toHaveBeenCalled();
   });
 

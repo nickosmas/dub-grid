@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { clearImpersonationSessionsForGridmaster } from "@/features/account/server";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 
 export async function POST(req: NextRequest) {
   const csrfError = validateCsrfOrigin(req);
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     await clearImpersonationSessionsForGridmaster(auth.user.id);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("account logout cleanup failed", error);
+    logger.error({ error }, "account logout cleanup failed");
     return NextResponse.json({ error: "Failed to clear impersonation sessions" }, { status: 500 });
   }
 }

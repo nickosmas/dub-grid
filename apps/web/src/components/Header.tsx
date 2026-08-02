@@ -15,6 +15,7 @@ import {
   type NavIconProps,
 } from "@/components/icons/NavIcons";
 import {
+  useClientFeatureFlags,
   useLogout,
   usePermissions,
   setUserViewActive,
@@ -256,6 +257,7 @@ export default function Header({ orgName }: HeaderProps) {
   const isManagementOnlyUser = role === "user" && isManagementUser && !isOnSchedule;
   const isMobile = useMediaQuery(MOBILE);
   const isTablet = useMediaQuery(TABLET);
+  const featureFlags = useClientFeatureFlags();
 
   // Match each top-nav route explicitly. Routes like /profile and
   // /alerts aren't top-nav items and should leave every tab
@@ -293,7 +295,9 @@ export default function Header({ orgName }: HeaderProps) {
     if (item.id === "schedule") return true;
     if (item.id === "people") return canViewStaff;
     if (item.id === "reports") {
-      return !isUserViewActive && (role === "admin" || isSuperAdmin === true);
+      return (
+        featureFlags.reports && !isUserViewActive && (role === "admin" || isSuperAdmin === true)
+      );
     }
     if (item.id === "settings") {
       return isGridmaster || isSuperAdmin || (role === "admin" && canAccessSettings);

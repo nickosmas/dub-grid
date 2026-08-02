@@ -5,6 +5,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { canManageEmployees } from "@/app/api/employees/shared";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     .ilike("email", normalized)
     .limit(1);
   if (authLookupErr) {
-    console.error("check-email auth lookup failed", authLookupErr);
+    logger.error({ error: authLookupErr }, "check-email auth lookup failed");
     return NextResponse.json({ error: "Failed to look up user" }, { status: 500 });
   }
   const matchedUserId = matchedUsers?.[0]?.id ?? null;

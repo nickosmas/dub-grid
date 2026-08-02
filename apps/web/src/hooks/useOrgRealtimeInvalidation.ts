@@ -6,6 +6,7 @@ import { subscribeOrgScopedRealtime } from "@dubgrid/realtime-core";
 import * as Sentry from "@/lib/sentry";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { queryKeys } from "@/lib/query-keys";
+import { uniqueKeys } from "@/lib/realtime-invalidation";
 import { getBrowserSupabaseClient } from "@/features/account/client";
 
 type OrgRealtimeTable =
@@ -59,18 +60,6 @@ const ORG_FILTER_TABLES: OrgRealtimeTable[] = [
   "audit_log",
   "role_change_log",
 ];
-
-function uniqueKeys(keys: readonly (readonly unknown[])[]): readonly unknown[][] {
-  const seen = new Set<string>();
-  const unique: unknown[][] = [];
-  for (const key of keys) {
-    const cacheKey = JSON.stringify(key);
-    if (seen.has(cacheKey)) continue;
-    seen.add(cacheKey);
-    unique.push([...key]);
-  }
-  return unique;
-}
 
 export function getOrgRealtimeInvalidationKeys(
   orgId: string,

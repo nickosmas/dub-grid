@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 const bulkSchema = z.object({
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, count: ids.length });
   } catch (error) {
-    console.error("notifications bulk failed", error);
+    logger.error({ error }, "notifications bulk failed");
     return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 });
   }
 }

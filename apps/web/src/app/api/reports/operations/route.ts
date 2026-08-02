@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 import { loadOperationsReport } from "@/features/reports/server/operations";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { operationsQuerySchema, parseOperationsFilters, parseOperationsRange } from "./params";
@@ -33,6 +34,13 @@ export async function GET(req: NextRequest) {
     );
     if ("response" in auth) {
       return auth.response;
+    }
+
+    if (!(await isFeatureEnabled("reports"))) {
+      return NextResponse.json(
+        { error: "Reports are temporarily unavailable. Please try again shortly." },
+        { status: 503 },
+      );
     }
 
     const payload = await loadOperationsReport(auth.serviceClient, {

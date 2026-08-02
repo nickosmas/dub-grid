@@ -41,6 +41,7 @@ import {
   ORG_ROLE_COLS,
   SHIFT_CATEGORY_COLS,
 } from "@/lib/db/shared";
+import logger from "@/lib/logger";
 
 function parseIncludeAssignments(req: NextRequest): boolean {
   return req.nextUrl.searchParams.get("includeAssignments") !== "0";
@@ -272,7 +273,7 @@ export async function GET(req: NextRequest) {
       coverageRequirements,
     });
   } catch (error) {
-    console.error("organization bootstrap GET failed", error);
+    logger.error({ error }, "organization bootstrap GET failed");
     return NextResponse.json({ error: "Failed to load organization bootstrap" }, { status: 500 });
   }
 }

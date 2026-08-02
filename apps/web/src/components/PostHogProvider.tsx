@@ -8,9 +8,18 @@ import { getAnalyticsConsentSnapshot, subscribeToConsentChanges } from "@/compon
 /**
  * Initializes PostHog and identifies the user.
  * Gated on analytics cookie consent — only initializes if the user
- * has accepted analytics cookies.
+ * has accepted analytics cookies — and on the platform-wide "posthog" kill
+ * switch, evaluated server-side once at page load and passed down as `enabled`
+ * (a live toggle would need a client-side poll; this flag changes rarely
+ * enough that "takes effect on next navigation" is an acceptable trade-off).
  */
-export default function PostHogProvider({ children }: { children: React.ReactNode }) {
+export default function PostHogProvider({
+  children,
+  enabled = true,
+}: {
+  children: React.ReactNode;
+  enabled?: boolean;
+}) {
   const { user } = useAuth();
   const hasConsent = useSyncExternalStore(
     subscribeToConsentChanges,
@@ -19,7 +28,7 @@ export default function PostHogProvider({ children }: { children: React.ReactNod
   );
 
   useEffect(() => {
-    if (!hasConsent) {
+    if (!enabled || !hasConsent) {
       disablePostHog();
       return;
     }
@@ -31,7 +40,7 @@ export default function PostHogProvider({ children }: { children: React.ReactNod
     } else {
       resetPostHog();
     }
-  }, [hasConsent, user]);
+  }, [enabled, hasConsent, user]);
 
   return <>{children}</>;
 }

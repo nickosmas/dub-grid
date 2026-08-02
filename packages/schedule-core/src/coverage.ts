@@ -91,74 +91,87 @@ export const DEFAULT_COVERAGE_RULE_CONFIG: CoverageRuleConfig = {
   mentoredCoverageCreditPercent: 100,
 };
 
-export function normalizeCoverageRuleConfig(
-  config?: Partial<CoverageRuleConfig> | null,
-): CoverageRuleConfig {
-  const rawPercent = config?.mentoredCoverageCreditPercent;
-  const mentoredCoverageCreditPercent =
-    typeof rawPercent === "number" && Number.isFinite(rawPercent)
-      ? Math.min(100, Math.max(0, Math.round(rawPercent)))
-      : DEFAULT_COVERAGE_RULE_CONFIG.mentoredCoverageCreditPercent;
+/**
+ * Clamp a mentored-coverage credit percentage to a valid 0–100 integer, falling
+ * back to the default when the input is missing or not a finite number.
+ */
+export function clampMentoredCreditPercent(percent: unknown): number {
+  return typeof percent === "number" && Number.isFinite(percent)
+    ? Math.min(100, Math.max(0, Math.round(percent)))
+    : DEFAULT_COVERAGE_RULE_CONFIG.mentoredCoverageCreditPercent;
+}
 
-  return { mentoredCoverageCreditPercent };
+/**
+ * Normalize a raw coverage-rule config — a partial object or unparsed DB JSON —
+ * into a complete, validated `CoverageRuleConfig`.
+ */
+export function normalizeCoverageRuleConfig(config?: unknown): CoverageRuleConfig {
+  const rawPercent =
+    config && typeof config === "object"
+      ? (config as { mentoredCoverageCreditPercent?: unknown }).mentoredCoverageCreditPercent
+      : undefined;
+
+  return { mentoredCoverageCreditPercent: clampMentoredCreditPercent(rawPercent) };
 }
 
 // ── Coverage intelligence ───────────────────────────────────────────────────
 
 /**
- * Resolves the coverage requirement for a given (focusAreaId, jobId, preferredShiftId, dayOfWeek).
- * Checks for a day-specific row first, then falls back to the "every day" row (dayOfWeek=null).
+ * Both resolvers check for a day-specific requirement row first, then fall back
+ * to the "every day" row (`dayOfWeek === null`).
  */
-export function resolveRequirement(
+function pickRequirement(
+  requirements: CoverageRequirementLike[],
+  dayOfWeek: number,
+  matches: (requirement: CoverageRequirementLike, dow: number | null) => boolean,
+): { minStaff: number } | null {
+  const found =
+    requirements.find((requirement) => matches(requirement, dayOfWeek)) ??
+    requirements.find((requirement) => matches(requirement, null));
+  return found ? { minStaff: found.minStaff } : null;
+}
+
+/**
+ * Legacy coverage model: resolve the requirement for a (focusAreaId,
+ * assignmentDefinitionId, dayOfWeek) against `assignmentId`-keyed rows.
+ */
+export function resolveRequirementByAssignment(
   requirements: CoverageRequirementLike[],
   focusAreaId: number,
-  jobIdOrAssignmentDefinitionId: number,
-  preferredShiftIdOrDayOfWeek: number | null,
-  maybeDayOfWeek?: number,
+  assignmentId: number,
+  dayOfWeek: number,
 ): { minStaff: number } | null {
-  const legacyMode = maybeDayOfWeek === undefined;
-  const jobId = legacyMode ? null : jobIdOrAssignmentDefinitionId;
-  const preferredShiftId = legacyMode ? null : (preferredShiftIdOrDayOfWeek ?? null);
-  const dayOfWeek = legacyMode ? Number(preferredShiftIdOrDayOfWeek) : Number(maybeDayOfWeek);
+  return pickRequirement(
+    requirements,
+    dayOfWeek,
+    (requirement, dow) =>
+      requirement.focusAreaId === focusAreaId &&
+      (requirement.assignmentId ?? null) === assignmentId &&
+      requirement.dayOfWeek === dow,
+  );
+}
 
-  if (legacyMode) {
-    const daySpecific = requirements.find(
-      (requirement) =>
-        requirement.focusAreaId === focusAreaId &&
-        (requirement.assignmentId ?? null) === jobIdOrAssignmentDefinitionId &&
-        requirement.dayOfWeek === dayOfWeek,
-    );
-    if (daySpecific) return { minStaff: daySpecific.minStaff };
-
-    const everyDay = requirements.find(
-      (requirement) =>
-        requirement.focusAreaId === focusAreaId &&
-        (requirement.assignmentId ?? null) === jobIdOrAssignmentDefinitionId &&
-        requirement.dayOfWeek === null,
-    );
-    if (everyDay) return { minStaff: everyDay.minStaff };
-    return null;
-  }
-
-  const daySpecific = requirements.find(
-    (requirement) =>
+/**
+ * Current coverage model: resolve the requirement for a (focusAreaId, jobId,
+ * preferredShiftId, dayOfWeek) against `jobId`/`preferredShiftId`-keyed rows.
+ */
+export function resolveRequirementByJobShift(
+  requirements: CoverageRequirementLike[],
+  focusAreaId: number,
+  jobId: number,
+  preferredShiftId: number | null,
+  dayOfWeek: number,
+): { minStaff: number } | null {
+  const shiftId = preferredShiftId ?? null;
+  return pickRequirement(
+    requirements,
+    dayOfWeek,
+    (requirement, dow) =>
       requirement.focusAreaId === focusAreaId &&
       requirement.jobId === jobId &&
-      (requirement.preferredShiftId ?? null) === preferredShiftId &&
-      requirement.dayOfWeek === dayOfWeek,
+      (requirement.preferredShiftId ?? null) === shiftId &&
+      requirement.dayOfWeek === dow,
   );
-  if (daySpecific) return { minStaff: daySpecific.minStaff };
-
-  const everyDay = requirements.find(
-    (requirement) =>
-      requirement.focusAreaId === focusAreaId &&
-      requirement.jobId === jobId &&
-      (requirement.preferredShiftId ?? null) === preferredShiftId &&
-      requirement.dayOfWeek === null,
-  );
-  if (everyDay) return { minStaff: everyDay.minStaff };
-
-  return null;
 }
 
 function findCoverageAssignmentDefinition(
@@ -184,19 +197,30 @@ function findCoverageAssignmentDefinition(
   );
 }
 
+export interface CoverageStatusInput {
+  employees: CoverageEmployeeLike[];
+  date: Date;
+  assignmentIdsForKey: (empId: string, date: Date) => number[];
+  sectionCodeIds: Set<number>;
+  eligibleAssignmentDefinitionIds: number[] | Set<number>;
+  requirement: { minStaff: number };
+  coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number;
+}
+
 /**
  * Computes coverage status for a single (focusArea, assignment, date) cell.
  * Counts actual headcount and qualified headcount against the requirement.
  */
-export function computeCoverageStatus(
-  employees: CoverageEmployeeLike[],
-  date: Date,
-  assignmentIdsForKey: (empId: string, date: Date) => number[],
-  sectionCodeIds: Set<number>,
-  eligibleAssignmentDefinitionIds: number[] | Set<number>,
-  requirement: { minStaff: number },
-  coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number,
-): CoverageStatus {
+export function computeCoverageStatus(input: CoverageStatusInput): CoverageStatus {
+  const {
+    employees,
+    date,
+    assignmentIdsForKey,
+    sectionCodeIds,
+    eligibleAssignmentDefinitionIds,
+    requirement,
+    coverageCreditForKey,
+  } = input;
   const eligibleAssignmentDefinitionIdSet =
     eligibleAssignmentDefinitionIds instanceof Set
       ? eligibleAssignmentDefinitionIds
@@ -278,18 +302,34 @@ function getRequirementGroupKey(
 /**
  * Computes coverage snapshots for each focus area/date/assignable option.
  */
+export interface CoverageComputationInput {
+  focusAreas: CoverageFocusAreaLike[];
+  shiftCategories: CoverageShiftCategoryLike[];
+  assignments: CoverageAssignmentDefinitionLike[];
+  requirements: CoverageRequirementLike[];
+  dates: Date[];
+  employeesByFocusArea: Map<number, CoverageEmployeeLike[]>;
+  assignmentIdsForKey: (empId: string, date: Date) => number[];
+  assignmentIdsByFocusArea: Map<number, Set<number>>;
+  assignmentLabelMap?: Map<number, string>;
+  coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number;
+}
+
 export function computeCoverageCategorySnapshots(
-  focusAreas: CoverageFocusAreaLike[],
-  shiftCategories: CoverageShiftCategoryLike[],
-  assignments: CoverageAssignmentDefinitionLike[],
-  requirements: CoverageRequirementLike[],
-  dates: Date[],
-  employeesByFocusArea: Map<number, CoverageEmployeeLike[]>,
-  assignmentIdsForKey: (empId: string, date: Date) => number[],
-  assignmentIdsByFocusArea: Map<number, Set<number>>,
-  assignmentLabelMap?: Map<number, string>,
-  coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number,
+  input: CoverageComputationInput,
 ): CoverageCategorySnapshot[] {
+  const {
+    focusAreas,
+    shiftCategories,
+    assignments,
+    requirements,
+    dates,
+    employeesByFocusArea,
+    assignmentIdsForKey,
+    assignmentIdsByFocusArea,
+    assignmentLabelMap,
+    coverageCreditForKey,
+  } = input;
   const snapshots: CoverageCategorySnapshot[] = [];
   const categoryById = new Map(shiftCategories.map((category) => [category.id, category]));
   const activeAssignmentDefinitions = assignments.filter((assignment) => !assignment.archivedAt);
@@ -349,7 +389,7 @@ export function computeCoverageCategorySnapshots(
           const assignment = activeAssignmentDefinitionById.get(assignmentId);
           if (!assignment) continue;
 
-          const requirement = resolveRequirement(
+          const requirement = resolveRequirementByAssignment(
             legacyRequirements,
             focusArea.id,
             assignmentId,
@@ -359,15 +399,15 @@ export function computeCoverageCategorySnapshots(
 
           totalRequired += requirement.minStaff;
 
-          const exactStatus = computeCoverageStatus(
+          const exactStatus = computeCoverageStatus({
             employees,
             date,
             assignmentIdsForKey,
             sectionCodeIds,
-            [assignmentId],
+            eligibleAssignmentDefinitionIds: [assignmentId],
             requirement,
             coverageCreditForKey,
-          );
+          });
           const shortage = Math.max(requirement.minStaff - exactStatus.actual, 0);
           if (shortage > 0) {
             shortageDetails.push({
@@ -382,15 +422,17 @@ export function computeCoverageCategorySnapshots(
 
         if (totalRequired <= 0) continue;
 
-        const status = computeCoverageStatus(
+        const status = computeCoverageStatus({
           employees,
           date,
           assignmentIdsForKey,
           sectionCodeIds,
-          eligibleAssignmentDefinitions.map((assignment) => assignment.id),
-          { minStaff: totalRequired },
+          eligibleAssignmentDefinitionIds: eligibleAssignmentDefinitions.map(
+            (assignment) => assignment.id,
+          ),
+          requirement: { minStaff: totalRequired },
           coverageCreditForKey,
-        );
+        });
         const preferredOpenAssignmentDefinitionId =
           shortageDetails[0]?.assignmentId ??
           sortedRequirementAssignmentIds[0] ??
@@ -450,7 +492,7 @@ export function computeCoverageCategorySnapshots(
 
     for (const { assignment, jobId, preferredShiftId } of localRequirementGroups) {
       for (const date of dates) {
-        const resolvedRequirement = resolveRequirement(
+        const resolvedRequirement = resolveRequirementByJobShift(
           requirements,
           focusArea.id,
           jobId,
@@ -459,15 +501,15 @@ export function computeCoverageCategorySnapshots(
         );
         if (!resolvedRequirement || resolvedRequirement.minStaff <= 0) continue;
 
-        const status = computeCoverageStatus(
+        const status = computeCoverageStatus({
           employees,
           date,
           assignmentIdsForKey,
           sectionCodeIds,
-          [assignment.id],
-          resolvedRequirement,
+          eligibleAssignmentDefinitionIds: [assignment.id],
+          requirement: resolvedRequirement,
           coverageCreditForKey,
-        );
+        });
         const shortage = Math.max(resolvedRequirement.minStaff - status.actual, 0);
         const displayLabel = getAssignmentDisplayLabel(assignment, assignmentLabelMap);
 
@@ -505,33 +547,8 @@ export function computeCoverageCategorySnapshots(
 /**
  * Computes all category-level coverage gaps across all focus areas and dates.
  */
-export function computeCoverageGaps(
-  focusAreas: CoverageFocusAreaLike[],
-  shiftCategories: CoverageShiftCategoryLike[],
-  assignments: CoverageAssignmentDefinitionLike[],
-  requirements: CoverageRequirementLike[],
-  dates: Date[],
-  employeesByFocusArea: Map<number, CoverageEmployeeLike[]>,
-  assignmentIdsForKey: (empId: string, date: Date) => number[],
-  assignmentById: Map<number, CoverageAssignmentDefinitionLike>,
-  assignmentIdsByFocusArea: Map<number, Set<number>>,
-  assignmentLabelMap?: Map<number, string>,
-  coverageCreditForKey?: (empId: string, date: Date, assignmentId: number) => number,
-): CoverageGap[] {
-  void assignmentById;
-
-  return computeCoverageCategorySnapshots(
-    focusAreas,
-    shiftCategories,
-    assignments,
-    requirements,
-    dates,
-    employeesByFocusArea,
-    assignmentIdsForKey,
-    assignmentIdsByFocusArea,
-    assignmentLabelMap,
-    coverageCreditForKey,
-  )
+export function computeCoverageGaps(input: CoverageComputationInput): CoverageGap[] {
+  return computeCoverageCategorySnapshots(input)
     .filter((snapshot) => snapshot.status.hasRequirement && !snapshot.status.isMet)
     .map((snapshot) => ({
       focusAreaId: snapshot.focusAreaId,

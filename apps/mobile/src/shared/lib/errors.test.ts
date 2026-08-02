@@ -39,7 +39,7 @@ describe("mobile error helpers", () => {
         new Error("Invitation email could not be sent. Try again in a moment."),
         "Fallback message",
       ),
-    ).toBe("We couldn't send that invitation email. Try again in a moment.");
+    ).toBe("We couldn't send that email. Please try again shortly.");
   });
 
   it("detects network connection errors", () => {

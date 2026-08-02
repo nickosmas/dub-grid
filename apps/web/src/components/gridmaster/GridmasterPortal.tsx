@@ -42,6 +42,7 @@ import {
   BellIcon,
   ImpersonateIcon,
   HistoryIcon,
+  ActivityIcon,
   type NavIconProps,
 } from "@/components/icons/NavIcons";
 
@@ -50,6 +51,7 @@ import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsVi
 import GridmasterBillingView from "@/components/gridmaster/GridmasterBillingView";
 import GridmasterComplianceView from "@/components/gridmaster/GridmasterComplianceView";
 import GridmasterSecurityView from "@/components/gridmaster/GridmasterSecurityView";
+import PlatformFeatureFlagsView from "@/components/gridmaster/PlatformFeatureFlagsView";
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation";
 import ImpersonationHistory from "@/components/gridmaster/ImpersonationHistory";
@@ -72,6 +74,7 @@ type GridmasterView =
   | "billing"
   | "compliance"
   | "security"
+  | "platform-flags"
   | "audit-log"
   | "organization"
   | "impersonation"
@@ -495,6 +498,16 @@ export default function GridmasterPortal() {
             Icon: ShieldIcon,
             onClick: () => {
               setView("security");
+              setSelectedId(null);
+              setSelectedOrgInitialTab(undefined);
+            },
+          },
+          {
+            key: "platform-flags",
+            label: "Kill Switches",
+            Icon: ActivityIcon,
+            onClick: () => {
+              setView("platform-flags");
               setSelectedId(null);
               setSelectedOrgInitialTab(undefined);
             },
@@ -1053,6 +1066,8 @@ export default function GridmasterPortal() {
           {view === "security" && (
             <GridmasterSecurityView organizations={organizations} currentUserId={authUser?.id} />
           )}
+
+          {view === "platform-flags" && <PlatformFeatureFlagsView />}
 
           {view === "gridmaster-accounts" && (
             <GridmasterAccountsView organizations={organizations} currentUserId={authUser?.id} />

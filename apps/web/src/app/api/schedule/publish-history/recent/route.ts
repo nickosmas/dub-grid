@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
+import { toPublishChanges, type ScheduleChangeRow } from "@/lib/db/publish-history";
 
 const querySchema = z.object({
   orgId: z.string().uuid(),
@@ -50,7 +51,9 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await auth.serviceClient
       .from("publish_history")
-      .select("id, org_id, published_by, start_date, end_date, change_count, changes, published_at")
+      .select(
+        "id, org_id, published_by, start_date, end_date, change_count, published_at, schedule_publish_changes(emp_id, date, kind, from_state, to_state, from_absence_type_id, to_absence_type_id, updated_by, from_custom_start, from_custom_end, to_custom_start, to_custom_end)",
+      )
       .eq("org_id", parsed.data.orgId)
       .gte("end_date", todayKey)
       .gte("published_at", cutoff)
@@ -66,7 +69,7 @@ export async function GET(req: NextRequest) {
         startDate: row.start_date as string,
         endDate: row.end_date as string,
         changeCount: row.change_count as number,
-        changes: row.changes,
+        changes: toPublishChanges(row.schedule_publish_changes as ScheduleChangeRow[]),
         publishedAt: row.published_at as string,
       })),
     });

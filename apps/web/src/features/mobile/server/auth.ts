@@ -14,6 +14,7 @@ import {
 import { rowToOrganization } from "@/lib/db/mappers";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getServiceClient } from "@/lib/supabase-service";
+import { isFeatureEnabled } from "@/lib/feature-flags";
 import { createMobileUserClient } from "./client";
 
 export type MobileAuthContext = ResolvedMobileAuthContext<Organization>;
@@ -21,6 +22,15 @@ export type MobileAuthContext = ResolvedMobileAuthContext<Organization>;
 export async function requireMobileAuth(
   req: NextRequest,
 ): Promise<MobileAuthContext | { response: NextResponse }> {
+  if (!(await isFeatureEnabled("mobile_api"))) {
+    return {
+      response: NextResponse.json(
+        { error: "The mobile app is temporarily unavailable. Please try again shortly." },
+        { status: 503 },
+      ),
+    };
+  }
+
   const accessToken = extractMobileBearerToken(req.headers.get("authorization"));
   if (!accessToken) {
     return {

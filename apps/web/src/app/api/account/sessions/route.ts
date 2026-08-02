@@ -6,6 +6,7 @@ import {
 } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(await fetchUserSessionOverviewForUser(auth.user.id));
   } catch (error) {
-    console.error("account sessions GET failed", error);
+    logger.error({ error }, "account sessions GET failed");
     return NextResponse.json({ error: "Failed to load sessions" }, { status: 500 });
   }
 }
@@ -74,7 +75,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("account sessions DELETE failed", error);
+    logger.error({ error }, "account sessions DELETE failed");
     return NextResponse.json({ error: "Failed to revoke session" }, { status: 500 });
   }
 }

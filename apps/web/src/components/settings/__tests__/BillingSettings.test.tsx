@@ -20,6 +20,13 @@ vi.mock("@/hooks", () => ({
   MOBILE: "(max-width: 767px)",
   useIsInSandbox: () => false,
   useSandboxSourceOrgId: () => null,
+  useClientFeatureFlags: () => ({
+    stripe: true,
+    csvImport: true,
+    csvExport: true,
+    reports: true,
+    printing: true,
+  }),
 }));
 
 vi.mock("@/features/billing/client", () => ({

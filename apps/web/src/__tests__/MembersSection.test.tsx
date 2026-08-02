@@ -57,6 +57,13 @@ vi.mock("@/hooks", async (importOriginal) => {
       loadingMore: false,
       loadMore: vi.fn(),
     }),
+    useClientFeatureFlags: () => ({
+      stripe: true,
+      csvImport: true,
+      csvExport: true,
+      reports: true,
+      printing: true,
+    }),
   };
 });
 

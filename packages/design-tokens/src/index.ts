@@ -593,7 +593,8 @@ export type WebTheme = "light" | "dark";
 // not the page theme, and live in `createStaticWebCssVariables` instead.
 // Shared by the login/onboarding shells' dark-mode background — see the
 // `--dg-color-auth-shell-bg` / `--dg-color-onboarding-shell-bg` entries below.
-const darkDiagonalShellGradient = "linear-gradient(135deg, #000000 0%, #000000 40%, #040E33 100%)";
+const darkVerticalShellGradient =
+  "linear-gradient(to bottom, #000000 0%, #000000 40%, #040E33 100%)";
 
 // Landing page's marketing CTA band ("Done with the spreadsheet?" — see
 // apps/web/src/app/page.tsx). Light mode keeps a flat brand-blue fill; dark
@@ -680,16 +681,16 @@ function themedWebCssVariables(theme: WebTheme): Record<string, string> {
     "--dg-color-table-divider-strong": theme === "dark" ? "#FFFFFF" : tokens.textPrimary,
     // Full-page background behind the login/onboarding auth card (see
     // .dg-auth-shell) and the onboarding wizard shell (see WizardShell.tsx):
-    // a black-to-vibrant-blue diagonal sweep in dark mode instead of a flat
-    // surface fill, echoing the brand blue without competing with the card.
-    // Held at pure black through the first 40% so the sweep reads as a slow
-    // build into blue rather than an even 0-to-100 fade. Light mode keeps
-    // each shell's existing (non-vibrant) fill.
-    "--dg-color-auth-shell-bg": theme === "dark" ? darkDiagonalShellGradient : tokens.surface,
+    // a black-to-vibrant-blue top-to-bottom sweep in dark mode instead of a
+    // flat surface fill, echoing the brand blue without competing with the
+    // card. Held at pure black through the first 40% so the sweep reads as a
+    // slow build into blue rather than an even 0-to-100 fade. Light mode
+    // keeps each shell's existing (non-vibrant) fill.
+    "--dg-color-auth-shell-bg": theme === "dark" ? darkVerticalShellGradient : tokens.surface,
     "--dg-color-onboarding-shell-bg":
       theme === "dark"
-        ? darkDiagonalShellGradient
-        : `linear-gradient(145deg, ${tokens.background} 0%, ${tokens.brandSoft} 100%)`,
+        ? darkVerticalShellGradient
+        : `linear-gradient(to bottom, ${tokens.background} 0%, ${tokens.brandSoft} 100%)`,
     "--dg-color-cta-shell-bg": theme === "dark" ? darkCtaShellGradient : tokens.brand,
   };
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
 
 const searchSchema = z.object({
   orgId: z.string().uuid(),
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ employeeCount: count ?? 0 });
   } catch (error) {
-    console.error("organization employee count GET failed", error);
+    logger.error({ error }, "organization employee count GET failed");
     return NextResponse.json({ error: "Failed to load employee count" }, { status: 500 });
   }
 }

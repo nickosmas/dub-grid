@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import {
@@ -66,10 +67,7 @@ export function StaffReadOnlyDetailPanel({
   const avatarTone = getAvatarTone(employee.id, resolvedTheme === "dark");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState(false);
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  });
+  const onCloseRef = useLatestRef(onClose);
 
   const closePanel = useCallback(() => {
     setClosing(true);

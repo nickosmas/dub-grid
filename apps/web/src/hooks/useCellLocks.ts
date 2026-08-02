@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo, type MutableRefObject } from "react";
+import { useLatestRef } from "@/hooks/useLatestRef";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 export interface CellLock {
@@ -107,9 +108,9 @@ export function useCellLocks(
   const [remoteSessions, setRemoteSessions] = useState<Map<string, RemoteEditorSession>>(
     () => new Map(),
   );
-  const currentUserRef = useRef(currentUser);
-  const canTrackPresenceRef = useRef(canTrackPresence);
-  const canLockCellsRef = useRef(canLockCells);
+  const currentUserRef = useLatestRef(currentUser);
+  const canTrackPresenceRef = useLatestRef(canTrackPresence);
+  const canLockCellsRef = useLatestRef(canLockCells);
   const currentCellRef = useRef<string | null>(null);
   const lockRevisionRef = useRef(0);
   const desiredPresenceRef = useRef<LocalPresenceState>({
@@ -121,11 +122,6 @@ export function useCellLocks(
   const presenceFlushInFlightRef = useRef(false);
   const presenceRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cellStateBroadcastKey = `cell_state:${editorSessionId}`;
-  useEffect(() => {
-    currentUserRef.current = currentUser;
-    canTrackPresenceRef.current = canTrackPresence;
-    canLockCellsRef.current = canLockCells;
-  }, [currentUser, canTrackPresence, canLockCells]);
 
   const clearPresenceRetry = useCallback(() => {
     if (!presenceRetryTimerRef.current) return;

@@ -99,7 +99,6 @@ import {
   fetchScheduleNotes,
   fetchShifts,
   getScheduleLastViewed,
-  importPreviousSchedule,
   moveShift,
   publishSchedule,
   updateScheduleLastViewed,
@@ -108,7 +107,6 @@ import {
   upsertShift,
   upsertShiftTimes,
   type DeleteShiftBatchItem,
-  type ImportPreviousScheduleOutcome,
 } from "@/features/schedule/client";
 import {
   computeDraftBreakdown,
@@ -122,6 +120,7 @@ import { getScheduleStartForSpan, resolveScheduleSpan } from "@/lib/schedule-vie
 import {
   usePermissions,
   useOrganizationData,
+  useClientFeatureFlags,
   useEmployees,
   useCellLocks,
   useReliableRealtimeBroadcasts,
@@ -168,11 +167,10 @@ import {
   OPERATION_MODAL_DISMISS_MS,
   PUBLISH_WINDOW_DATE_FORMATTER,
   SCHEDULE_DELETE_BATCH_SIZE,
-  summarizeImportPreviousOutcomes,
   widenFetchWindow,
-  type ImportPreviousBreakdown,
   type ScheduleOperation,
 } from "./_lib/operations";
+import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
   Employee,
   EditModalState,
@@ -234,24 +232,6 @@ function normalizeCustomTimeForSegmentCount(
   return time ?? null;
 }
 
-type ImportPreviewState = {
-  sourceRange: string;
-  targetRange: string;
-  sourceStartDate: string;
-  sourceEndDate: string;
-  targetStartDate: string;
-  targetEndDate: string;
-  outcomes: ImportPreviousScheduleOutcome[];
-  breakdown: ImportPreviousBreakdown;
-};
-
-type ImportResultsState = {
-  sourceRange: string;
-  targetRange: string;
-  outcomes: ImportPreviousScheduleOutcome[];
-  breakdown: ImportPreviousBreakdown;
-};
-
 function SchedulerContent() {
   const isMobile = useMediaQuery(MOBILE);
   const shouldAutoUseOneWeek = useMediaQuery(AUTO_ONE_WEEK);
@@ -271,6 +251,7 @@ function SchedulerContent() {
     isLoading: permsLoading,
     orgId,
   } = usePermissions();
+  const featureFlags = useClientFeatureFlags();
   // Schedulers/staff managers always see every open shift, as a filling
   // tool, regardless of the org's openShiftVisibility setting or their own
   // personal eligibility for a given shift (see openShifts memo below).
@@ -430,11 +411,6 @@ function SchedulerContent() {
     useDismissibleBanner("schedule-out-of-window-publishes");
   const lastViewedRef = useRef<string | null>(null);
   const hasShownChangeToast = useRef(false);
-  const [isImportingPrevious, setIsImportingPrevious] = useState(false);
-  const [showImportConfirm, setShowImportConfirm] = useState(false);
-  const [importPreview, setImportPreview] = useState<ImportPreviewState | null>(null);
-  const [importResults, setImportResults] = useState<ImportResultsState | null>(null);
-  const [showImportResults, setShowImportResults] = useState(false);
   const [activeOperation, setActiveOperation] = useState<ScheduleOperation | null>(null);
   const [isCreatingRepeatSeries, setIsCreatingRepeatSeries] = useState(false);
   const operationDismissTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -913,6 +889,28 @@ function SchedulerContent() {
     },
     [org, shiftFetchStart, shiftFetchEnd],
   );
+
+  const {
+    importPreview,
+    importResults,
+    showImportConfirm,
+    showImportResults,
+    isImportingPrevious,
+    handleImportPreviousPreview,
+    handleImportPrevious,
+    cancelImportConfirm,
+    closeImportResults,
+  } = useScheduleImport({
+    org,
+    spanWeeks,
+    weekStart,
+    employees,
+    refetchScheduleData,
+    startScheduleOperation,
+    updateScheduleOperation,
+    finishScheduleOperation,
+    clearScheduleOperation,
+  });
 
   // Load schedule-specific data (shifts, notes, recurring, publish history) once org data is ready.
   const scheduleLoadStarted = useRef(false);
@@ -2322,19 +2320,18 @@ function SchedulerContent() {
   const allCoverageGaps = useMemo(() => {
     if (!coverageRequirements.length || !focusAreas.length) return [];
 
-    return computeCoverageGaps(
+    return computeCoverageGaps({
       focusAreas,
       shiftCategories,
       assignments,
-      coverageRequirements,
+      requirements: coverageRequirements,
       dates,
       employeesByFocusArea,
       assignmentIdsForKey,
-      assignmentById,
       assignmentIdsByFocusArea,
       assignmentLabelMap,
       coverageCreditForKey,
-    );
+    });
   }, [
     coverageRequirements,
     focusAreas,
@@ -2343,7 +2340,6 @@ function SchedulerContent() {
     dates,
     employeesByFocusArea,
     assignmentIdsForKey,
-    assignmentById,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
     coverageCreditForKey,
@@ -2354,19 +2350,18 @@ function SchedulerContent() {
       return [];
     }
 
-    return computeCoverageGaps(
+    return computeCoverageGaps({
       focusAreas,
       shiftCategories,
       assignments,
-      coverageRequirements,
-      publishedVisibleDates,
+      requirements: coverageRequirements,
+      dates: publishedVisibleDates,
       employeesByFocusArea,
       assignmentIdsForKey,
-      assignmentById,
       assignmentIdsByFocusArea,
       assignmentLabelMap,
       coverageCreditForKey,
-    ).filter((gap) => getActionableCoverageGapAssignmentIds(gap).length > 0);
+    }).filter((gap) => getActionableCoverageGapAssignmentIds(gap).length > 0);
   }, [
     coverageRequirements,
     focusAreas,
@@ -2375,7 +2370,6 @@ function SchedulerContent() {
     publishedVisibleDates,
     employeesByFocusArea,
     assignmentIdsForKey,
-    assignmentById,
     assignmentIdsByFocusArea,
     assignmentLabelMap,
     coverageCreditForKey,
@@ -4286,156 +4280,6 @@ function SchedulerContent() {
   // local-state planning, no post-fetch reconciliation. See
   // `public.import_previous_schedule` in 002_functions_triggers.sql.
 
-  const handleImportPreviousPreview = useCallback(async () => {
-    if (!org || spanWeeks === "month") return;
-
-    const days = spanWeeks * 7;
-    const sourceStart = addDays(weekStart, -days);
-    const sourceEnd = addDays(sourceStart, days - 1);
-    const targetEnd = addDays(weekStart, days - 1);
-    const sourceStartKey = formatDateKey(sourceStart);
-    const sourceEndKey = formatDateKey(sourceEnd);
-    const targetStartKey = formatDateKey(weekStart);
-    const targetEndKey = formatDateKey(targetEnd);
-
-    setIsImportingPrevious(true);
-    try {
-      const outcomes = await importPreviousSchedule({
-        orgId: org.id,
-        sourceStartDate: sourceStartKey,
-        sourceEndDate: sourceEndKey,
-        targetStartDate: targetStartKey,
-        targetEndDate: targetEndKey,
-        dryRun: true,
-      });
-
-      if (outcomes.length === 0) {
-        toast.info("Nothing to import — the previous period has no shifts.");
-        return;
-      }
-
-      const breakdown = summarizeImportPreviousOutcomes(outcomes);
-      if (breakdown.imported === 0 && breakdown.totalSkipped > 0) {
-        const nameByEmpId = new Map(employees.map((e) => [e.id, getEmployeeDisplayName(e)]));
-        toast.info(
-          `Nothing new to import — ${formatImportPreviousSkipDescription(outcomes, breakdown, nameByEmpId)}.`,
-        );
-        return;
-      }
-
-      setImportPreview({
-        sourceRange: `${formatDate(sourceStart)} – ${formatDate(sourceEnd)}`,
-        targetRange: `${formatDate(weekStart)} – ${formatDate(targetEnd)}`,
-        sourceStartDate: sourceStartKey,
-        sourceEndDate: sourceEndKey,
-        targetStartDate: targetStartKey,
-        targetEndDate: targetEndKey,
-        outcomes,
-        breakdown,
-      });
-      setShowImportConfirm(true);
-    } catch (err) {
-      Sentry.captureException(err);
-      toast.error("Couldn't load the import preview. Try again.");
-    } finally {
-      setIsImportingPrevious(false);
-    }
-  }, [org, spanWeeks, weekStart, employees]);
-
-  const handleImportPrevious = useCallback(async () => {
-    if (!org || spanWeeks === "month" || !importPreview) return;
-
-    const expected = importPreview.breakdown.imported;
-    startScheduleOperation({
-      kind: "import_previous",
-      title: "Importing previous schedule...",
-      detail: `Copying ${expected} shift${expected === 1 ? "" : "s"} from ${importPreview.sourceRange} into ${importPreview.targetRange}.`,
-      progress: 25,
-    });
-    setShowImportConfirm(false);
-    setIsImportingPrevious(true);
-
-    try {
-      const outcomes = await importPreviousSchedule({
-        orgId: org.id,
-        sourceStartDate: importPreview.sourceStartDate,
-        sourceEndDate: importPreview.sourceEndDate,
-        targetStartDate: importPreview.targetStartDate,
-        targetEndDate: importPreview.targetEndDate,
-        dryRun: false,
-      });
-
-      updateScheduleOperation("import_previous", {
-        progress: 80,
-        detail: "Refreshing the schedule with the imported shifts...",
-      });
-      // Widen the refetch window so newly imported drafts in a target period
-      // beyond the default ±90 days from today still come back from the API
-      // and show up in the grid.
-      await refetchScheduleData({
-        ensureStart: importPreview.targetStartDate,
-        ensureEnd: importPreview.targetEndDate,
-      });
-      finishScheduleOperation("import_previous");
-
-      const breakdown = summarizeImportPreviousOutcomes(outcomes);
-      const nameByEmpId = new Map(employees.map((e) => [e.id, getEmployeeDisplayName(e)]));
-      const skipDescription = formatImportPreviousSkipDescription(outcomes, breakdown, nameByEmpId);
-
-      if (breakdown.totalSkipped > 0) {
-        setImportResults({
-          sourceRange: importPreview.sourceRange,
-          targetRange: importPreview.targetRange,
-          outcomes,
-          breakdown,
-        });
-      }
-
-      if (breakdown.imported === 0) {
-        toast.info(
-          skipDescription ? `Nothing imported — ${skipDescription}.` : "Nothing imported.",
-          breakdown.totalSkipped > 0
-            ? { action: { label: "View details", onClick: () => setShowImportResults(true) } }
-            : undefined,
-        );
-      } else if (breakdown.totalSkipped > 0) {
-        toast.warning(
-          `Imported ${breakdown.imported} shift${
-            breakdown.imported === 1 ? "" : "s"
-          }, skipped ${breakdown.totalSkipped} (${skipDescription}).`,
-          {
-            duration: 12000,
-            action: { label: "View details", onClick: () => setShowImportResults(true) },
-          },
-        );
-      } else {
-        toast.success(
-          `Imported ${breakdown.imported} shift${
-            breakdown.imported === 1 ? "" : "s"
-          } from previous ${spanWeeks === 1 ? "week" : "2 weeks"}.`,
-        );
-      }
-    } catch (err) {
-      clearScheduleOperation("import_previous");
-      Sentry.captureException(err);
-      toast.error("Couldn't import the previous schedule. Refreshing now.");
-      await refetchScheduleData();
-    } finally {
-      setIsImportingPrevious(false);
-      setImportPreview(null);
-    }
-  }, [
-    org,
-    spanWeeks,
-    importPreview,
-    employees,
-    refetchScheduleData,
-    startScheduleOperation,
-    updateScheduleOperation,
-    finishScheduleOperation,
-    clearScheduleOperation,
-  ]);
-
   const handleNoteToggle = useCallback(
     (indicatorTypeId: number, active: boolean, focusAreaId: number) => {
       updateEditSessionDraft((prev) => {
@@ -5731,7 +5575,7 @@ function SchedulerContent() {
                 canImportPrevious={canEditShifts}
                 onImportPrevious={spanWeeks !== "month" ? handleImportPreviousPreview : undefined}
                 isImportingPrevious={isImportingPrevious}
-                onPrintOpen={() => setShowPrintOptions(true)}
+                onPrintOpen={featureFlags.printing ? () => setShowPrintOptions(true) : undefined}
                 onExportCSV={
                   dates.length > 0 && filteredEmployees.length > 0
                     ? () => exportScheduleCSV(filteredEmployees, dates, shiftForKey)
@@ -6635,10 +6479,7 @@ function SchedulerContent() {
               variant="info"
               isLoading={isImportingPrevious}
               onConfirm={handleImportPrevious}
-              onCancel={() => {
-                setShowImportConfirm(false);
-                setImportPreview(null);
-              }}
+              onCancel={cancelImportConfirm}
             />
           )}
           {showImportResults && importResults && (
@@ -6648,7 +6489,7 @@ function SchedulerContent() {
               outcomes={importResults.outcomes}
               breakdown={importResults.breakdown}
               nameByEmpId={new Map(employees.map((e) => [e.id, getEmployeeDisplayName(e)]))}
-              onClose={() => setShowImportResults(false)}
+              onClose={closeImportResults}
             />
           )}
           {showPublishHistory && org && (

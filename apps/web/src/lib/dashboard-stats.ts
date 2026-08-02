@@ -26,7 +26,7 @@ import {
   summarizeCoverageTotals,
 } from "@dubgrid/schedule-core";
 import type { CoverageRuleConfig } from "@dubgrid/domain";
-import { formatDateKey } from "@/lib/utils";
+import { formatDateKey, getWeekStart, addDays } from "@/lib/utils";
 
 // ─── Exported Types ─────────────────────────────────────
 
@@ -181,18 +181,10 @@ export function getDatesInRange(start: Date, count: number): Date[] {
   });
 }
 
-export function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
-
-export function getWeekStart(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - d.getDay());
-  return d;
-}
+// `getWeekStart` and `addDays` are the canonical local-time helpers from
+// `@/lib/utils`; re-exported here so Dashboard-facing consumers keep a single
+// import surface.
+export { getWeekStart, addDays };
 
 // ─── Shift Filtering ────────────────────────────────────
 
@@ -444,18 +436,18 @@ export function computeCoveragePctAndSlots(
 
   const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
   const coverageCreditForKey = createCoverageCreditResolver(shifts, coverageRuleConfig);
-  const snapshots = computeCoverageCategorySnapshots(
+  const snapshots = computeCoverageCategorySnapshots({
     focusAreas,
-    [],
+    shiftCategories: [],
     assignments,
     requirements,
-    weekDates,
-    empsByFa,
-    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
-    codesByFa,
-    undefined,
+    dates: weekDates,
+    employeesByFocusArea: empsByFa,
+    assignmentIdsForKey: (empId, lookupDate) =>
+      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
+    assignmentIdsByFocusArea: codesByFa,
     coverageCreditForKey,
-  );
+  });
   const { totalRequired, totalFilled, pct } = summarizeCoverageTotals(snapshots);
   return { pct, openSlots: totalRequired - totalFilled, totalRequired };
 }
@@ -537,18 +529,18 @@ export function computeCoverageBySection(
 
   const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
   const coverageCreditForKey = createCoverageCreditResolver(shifts, coverageRuleConfig);
-  const snapshots = computeCoverageCategorySnapshots(
+  const snapshots = computeCoverageCategorySnapshots({
     focusAreas,
-    [],
+    shiftCategories: [],
     assignments,
-    coverageRequirements,
-    weekDates,
-    empsByFa,
-    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
-    codesByFa,
-    undefined,
+    requirements: coverageRequirements,
+    dates: weekDates,
+    employeesByFocusArea: empsByFa,
+    assignmentIdsForKey: (empId, lookupDate) =>
+      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
+    assignmentIdsByFocusArea: codesByFa,
     coverageCreditForKey,
-  );
+  });
 
   const allSections = focusAreas.map((fa) => {
     const faEmps = empsByFa.get(fa.id) ?? [];
@@ -633,18 +625,19 @@ export function computeOpenShifts(
 
   const codesByFa = buildAssignmentIdsByFocusArea(focusAreas, assignments);
   const coverageCreditForKey = createCoverageCreditResolver(shifts, coverageRuleConfig);
-  const snapshots = computeCoverageCategorySnapshots(
+  const snapshots = computeCoverageCategorySnapshots({
     focusAreas,
-    [],
+    shiftCategories: [],
     assignments,
-    coverageRequirements,
-    weekDates,
-    empsByFa,
-    (empId, lookupDate) => shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
-    codesByFa,
+    requirements: coverageRequirements,
+    dates: weekDates,
+    employeesByFocusArea: empsByFa,
+    assignmentIdsForKey: (empId, lookupDate) =>
+      shifts[`${empId}_${formatDateKey(lookupDate)}`]?.assignmentIds ?? [],
+    assignmentIdsByFocusArea: codesByFa,
     assignmentLabelMap,
     coverageCreditForKey,
-  );
+  });
   const today = options?.now ? new Date(options.now) : new Date();
   today.setHours(0, 0, 0, 0);
 

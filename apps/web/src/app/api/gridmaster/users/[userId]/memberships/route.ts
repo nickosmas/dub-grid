@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
+import logger from "@/lib/logger";
 import type { UserMembership, OrganizationRole } from "@/types";
 
 const paramsSchema = z.object({
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ userId:
 
     return NextResponse.json({ memberships });
   } catch (error) {
-    console.error("gridmaster memberships GET failed", error);
+    logger.error({ error }, "gridmaster memberships GET failed");
     return NextResponse.json({ error: "Failed to load memberships" }, { status: 500 });
   }
 }

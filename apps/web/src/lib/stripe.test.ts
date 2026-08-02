@@ -291,3 +291,50 @@ describe("syncSubscriptionToDb", () => {
     });
   });
 });
+
+describe("createStripeCustomer", () => {
+  const customersSearch = vi.fn();
+  const customersCreate = vi.fn();
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    process.env.STRIPE_SECRET_KEY = "sk_test_mock";
+    stripeConstructor.mockImplementation(() => ({
+      customers: { search: customersSearch, create: customersCreate },
+    }));
+  });
+
+  afterEach(() => {
+    process.env.STRIPE_SECRET_KEY = ORIGINAL_STRIPE_SECRET_KEY;
+  });
+
+  it("reuses an existing customer found by org_id metadata instead of creating a duplicate", async () => {
+    customersSearch.mockResolvedValue({ data: [{ id: "cus_existing" }] });
+    const { createStripeCustomer } = await import("./stripe");
+
+    const result = await createStripeCustomer(ORG_ID, "Acme", "billing@acme.test");
+
+    expect(result).toEqual({ id: "cus_existing" });
+    expect(customersSearch).toHaveBeenCalledWith({
+      query: `metadata['org_id']:'${ORG_ID}'`,
+      limit: 1,
+    });
+    expect(customersCreate).not.toHaveBeenCalled();
+  });
+
+  it("creates a new customer when none exists for the org", async () => {
+    customersSearch.mockResolvedValue({ data: [] });
+    customersCreate.mockResolvedValue({ id: "cus_new" });
+    const { createStripeCustomer } = await import("./stripe");
+
+    const result = await createStripeCustomer(ORG_ID, "Acme", "billing@acme.test");
+
+    expect(result).toEqual({ id: "cus_new" });
+    expect(customersCreate).toHaveBeenCalledWith({
+      metadata: { org_id: ORG_ID },
+      name: "Acme",
+      email: "billing@acme.test",
+    });
+  });
+});

@@ -18,6 +18,7 @@ vi.mock("@/lib/stripe", async () => ({
       constructEvent,
     },
   }),
+  requireStripeEnabled: async () => null,
 }));
 
 vi.mock("@/lib/supabase-service", () => ({

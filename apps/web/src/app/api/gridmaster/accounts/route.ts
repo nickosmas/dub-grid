@@ -5,6 +5,7 @@ import { validateCsrfOrigin } from "@/lib/csrf";
 import { getServiceClient } from "@/lib/supabase-service";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { apiErrorResponse } from "@/lib/error-handling";
+import logger from "@/lib/logger";
 import type { GridmasterAccount } from "@/types";
 
 const accountActionSchema = z.discriminatedUnion("action", [
@@ -85,7 +86,10 @@ export async function GET(req: NextRequest) {
       accounts: await loadGridmasterAccounts(),
     });
   } catch (error) {
-    console.error("gridmaster accounts GET failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/accounts" },
+      "gridmaster accounts GET failed",
+    );
     return NextResponse.json({ error: "Failed to load gridmaster accounts" }, { status: 500 });
   }
 }
@@ -187,7 +191,10 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("gridmaster accounts POST failed", error);
+    logger.error(
+      { err: error, path: "/api/gridmaster/accounts" },
+      "gridmaster accounts POST failed",
+    );
     return NextResponse.json({ error: "Failed to update gridmaster account" }, { status: 500 });
   }
 }

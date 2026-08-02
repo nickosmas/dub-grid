@@ -167,7 +167,7 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
   {
     pattern:
       /email service not configured|invitation email could not be sent|failed to send (?:invitation )?email/i,
-    message: "We couldn't send that invitation email. Try again in a moment.",
+    message: "We couldn't send that email. Please try again shortly.",
   },
 ];
 
@@ -189,6 +189,14 @@ export const TECHNICAL_ERROR_PATTERNS: readonly RegExp[] = [
   /JSON|non-JSON/i,
   /service role|environment variable|env var/i,
   /HTTP\s+\d{3}/i,
+  // Postgres/driver-level connection and timeout failures — infra problems on
+  // the backend, not the caller's network (see NETWORK_ERROR_PATTERNS for that),
+  // so these route to the generic fallback rather than the "check your
+  // connection" copy.
+  /statement timeout|query.*timed? ?out|idle.?in.?transaction timeout/i,
+  /connection (terminated|closed|reset)|server closed the connection/i,
+  /too many connections|out of shared memory|out of memory/i,
+  /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|ECONNRESET/,
   // Raw JSON dumps and Zod issue arrays carried as plain strings.
   /^\s*\[\s*\{/,
   /"code"\s*:\s*"invalid_type"/i,

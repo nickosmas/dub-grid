@@ -1,3 +1,5 @@
+import { isFeatureEnabled } from "@/lib/feature-flags";
+
 type ResendRecipient = string | string[];
 
 type SendResendEmailInput = {
@@ -21,6 +23,13 @@ export async function sendResendEmail({
   html,
   replyTo,
 }: SendResendEmailInput): Promise<ResendApiResponse> {
+  if (!(await isFeatureEnabled("resend_email"))) {
+    // Matches an existing CLIENT_FRIENDLY_ERROR_PATTERNS entry
+    // (packages/client-errors), so every caller that already routes errors
+    // through formatClientErrorMessage gets a friendly message for free.
+    throw new Error("Email service not configured: sending is disabled by a platform kill switch");
+  }
+
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {

@@ -19,6 +19,7 @@ ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shift_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.job_shift_overrides ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.absence_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_cells ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_cell_snapshots ENABLE ROW LEVEL SECURITY;
@@ -37,6 +38,7 @@ ALTER TABLE public.mobile_device_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_draft_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.recurring_shifts_draft_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.publish_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.schedule_publish_changes ENABLE ROW LEVEL SECURITY;
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -327,6 +329,29 @@ CREATE POLICY "admin_delete_jobs"
   ON public.jobs FOR DELETE TO authenticated
   USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
 
+-- ── job_shift_overrides ──────────────────────────────────────────────────────
+
+CREATE POLICY "gridmaster_all_job_shift_overrides"
+  ON public.job_shift_overrides FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_job_shift_overrides"
+  ON public.job_shift_overrides FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_insert_job_shift_overrides"
+  ON public.job_shift_overrides FOR INSERT TO authenticated
+  WITH CHECK (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
+
+CREATE POLICY "admin_update_job_shift_overrides"
+  ON public.job_shift_overrides FOR UPDATE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'))
+  WITH CHECK (org_id = public.caller_org_id());
+
+CREATE POLICY "admin_delete_job_shift_overrides"
+  ON public.job_shift_overrides FOR DELETE TO authenticated
+  USING (org_id = public.caller_org_id() AND public.check_admin_permission('canManageScheduleDefinitions'));
+
 -- ── absence_types ──────────────────────────────────────────────────────────────
 
 CREATE POLICY "gridmaster_all_absence_types"
@@ -450,6 +475,19 @@ CREATE POLICY "gridmaster_all_publish_history"
 CREATE POLICY "members_select_publish_history"
   ON public.publish_history FOR SELECT TO authenticated
   USING (org_id = public.caller_org_id());
+
+-- ── schedule_publish_changes ─────────────────────────────────────────────────
+-- Written only via publish_schedule() (SECURITY DEFINER); no direct
+-- insert/update/delete policies for authenticated, mirroring publish_history.
+
+CREATE POLICY "gridmaster_all_schedule_publish_changes"
+  ON public.schedule_publish_changes FOR ALL TO authenticated
+  USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
+
+CREATE POLICY "members_select_schedule_publish_changes"
+  ON public.schedule_publish_changes FOR SELECT TO authenticated
+  USING (org_id = public.caller_org_id());
+
 CREATE POLICY "gridmaster_all_schedule_cells"
   ON public.schedule_cells FOR ALL TO authenticated
   USING (public.is_gridmaster()) WITH CHECK (public.is_gridmaster());
@@ -703,7 +741,8 @@ CREATE POLICY "audit_select"
 
 CREATE POLICY "own_locks_only"
   ON public.jwt_refresh_locks FOR ALL TO authenticated
-  USING (user_id = auth.uid());
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -737,8 +776,9 @@ COMMENT ON POLICY "gridmaster_update_impersonation" ON public.impersonation_sess
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE POLICY "own_sessions_only"
-  ON public.user_sessions
-  USING (user_id = auth.uid());
+  ON public.user_sessions FOR ALL TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -1112,3 +1152,21 @@ CREATE POLICY "deny_all_stripe_processed_events"
   ON public.stripe_processed_events FOR ALL TO authenticated, anon
   USING (FALSE)
   WITH CHECK (FALSE);
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- platform_feature_flags
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Platform-wide kill switches. Only gridmasters can read or write; everyone
+-- else gets nothing, since app code always reads through the service-role
+-- client (apps/web/src/lib/feature-flags.ts), never PostgREST directly.
+
+ALTER TABLE public.platform_feature_flags ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "gridmaster_all_platform_feature_flags"
+  ON public.platform_feature_flags FOR ALL TO authenticated
+  USING (public.is_gridmaster())
+  WITH CHECK (public.is_gridmaster());
+
+COMMENT ON POLICY "gridmaster_all_platform_feature_flags" ON public.platform_feature_flags
+  IS 'Only gridmasters can read or write platform-wide kill switches.';

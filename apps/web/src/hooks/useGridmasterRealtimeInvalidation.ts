@@ -2,13 +2,16 @@
 
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
+import {
+  createRealtimeChannelName,
+  subscribeToPostgresChanges,
+  type RealtimeChangePayload,
+} from "@dubgrid/realtime-core";
 import * as Sentry from "@/lib/sentry";
 import { broadcastInvalidation } from "@/lib/cache-broadcast";
 import { queryKeys } from "@/lib/query-keys";
-import {
-  createBrowserRealtimeChannel,
-  removeBrowserRealtimeChannel,
-} from "@/features/account/client";
+import { uniqueKeys } from "@/lib/realtime-invalidation";
+import { getBrowserSupabaseClient } from "@/features/account/client";
 
 export type GridmasterRealtimeTable =
   | "organizations"
@@ -36,10 +39,7 @@ export type GridmasterRealtimeTable =
   | "user_sessions"
   | "profiles";
 
-type RealtimePayload = {
-  new?: Record<string, unknown>;
-  old?: Record<string, unknown>;
-};
+type RealtimePayload = RealtimeChangePayload;
 
 const ORG_FILTER_TABLES: GridmasterRealtimeTable[] = [
   "subscriptions",
@@ -64,18 +64,6 @@ const ORG_FILTER_TABLES: GridmasterRealtimeTable[] = [
   "user_sessions",
   "profiles",
 ];
-
-function uniqueKeys(keys: readonly (readonly unknown[])[]): readonly unknown[][] {
-  const seen = new Set<string>();
-  const unique: unknown[][] = [];
-  for (const key of keys) {
-    const cacheKey = JSON.stringify(key);
-    if (seen.has(cacheKey)) continue;
-    seen.add(cacheKey);
-    unique.push([...key]);
-  }
-  return unique;
-}
 
 export function getGridmasterRealtimeInvalidationKeys(
   table: GridmasterRealtimeTable,
@@ -274,11 +262,6 @@ export function useGridmasterRealtimeInvalidation({
   useEffect(() => {
     if (!enabled) return;
 
-    let hadError = false;
-    const channelId = `gridmaster-freshness:${Date.now()}:${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
-    const channel = createBrowserRealtimeChannel(channelId);
     const handleChange = (table: GridmasterRealtimeTable, payload: RealtimePayload) => {
       invalidateGridmasterRealtimeQueries(
         queryClient,
@@ -288,42 +271,29 @@ export function useGridmasterRealtimeInvalidation({
       );
     };
 
-    channel.on(
-      "postgres_changes" as "system",
-      { event: "*", schema: "public", table: "organizations" } as Record<string, unknown>,
-      (payload: RealtimePayload) => handleChange("organizations", payload),
-    );
-    channel.on(
-      "postgres_changes" as "system",
-      { event: "*", schema: "public", table: "audit_log" } as Record<string, unknown>,
-      (payload: RealtimePayload) => handleChange("audit_log", payload),
-    );
-    channel.on(
-      "postgres_changes" as "system",
-      { event: "*", schema: "public", table: "impersonation_sessions" } as Record<string, unknown>,
-      (payload: RealtimePayload) => handleChange("impersonation_sessions", payload),
-    );
+    // Gridmaster is platform-wide: subscribe unfiltered (every org's rows) and
+    // derive the affected org/user from each payload. One channel, N listeners —
+    // routed through the shared realtime-core helper rather than hand-rolled
+    // channel plumbing.
+    const tables: GridmasterRealtimeTable[] = [
+      "organizations",
+      "audit_log",
+      "impersonation_sessions",
+      ...ORG_FILTER_TABLES,
+    ];
 
-    for (const table of ORG_FILTER_TABLES) {
-      channel.on(
-        "postgres_changes" as "system",
-        { event: "*", schema: "public", table } as Record<string, unknown>,
-        (payload: RealtimePayload) => handleChange(table, payload),
-      );
-    }
-
-    channel.subscribe((status: string, err?: Error) => {
-      if (status === "SUBSCRIBED" && hadError) {
-        hadError = false;
-        void queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.all() });
-      } else if (status === "CHANNEL_ERROR") {
-        hadError = true;
-        Sentry.captureException(err ?? new Error("gridmaster freshness channel error"));
-      }
-    });
-
-    return () => {
-      void removeBrowserRealtimeChannel(channel);
-    };
+    return subscribeToPostgresChanges<GridmasterRealtimeTable>(
+      getBrowserSupabaseClient(),
+      createRealtimeChannelName("gridmaster-freshness"),
+      tables.map((table) => ({ table, onEvent: handleChange })),
+      {
+        onReconnectAfterError: () => {
+          void queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.all() });
+        },
+        onError: (error) => {
+          Sentry.captureException(error);
+        },
+      },
+    );
   }, [enabled, queryClient]);
 }

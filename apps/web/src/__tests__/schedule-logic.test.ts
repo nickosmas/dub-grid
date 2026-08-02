@@ -8,7 +8,7 @@ import {
   timesOverlap,
   checkCrossDateOverlap,
   checkSameDayOverlaps,
-  resolveRequirement,
+  resolveRequirementByAssignment,
   computeCoverageStatus,
   buildAssignmentDefinitionIdsByFocusArea as buildAssignmentIdsByFocusArea,
   computeCoverageGaps,
@@ -457,12 +457,12 @@ describe("checkSameDayOverlaps", () => {
 
 // ── resolveRequirement ───────────────────────────────────────────────────────
 
-describe("resolveRequirement", () => {
+describe("resolveRequirementByAssignment", () => {
   it("returns day-specific match", () => {
     const reqs = [
       makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 5 }),
     ];
-    const result = resolveRequirement(reqs, 1, 10, 1);
+    const result = resolveRequirementByAssignment(reqs, 1, 10, 1);
     expect(result).toEqual({ minStaff: 5 });
   });
 
@@ -470,7 +470,7 @@ describe("resolveRequirement", () => {
     const reqs = [
       makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: null, minStaff: 3 }),
     ];
-    const result = resolveRequirement(reqs, 1, 10, 2);
+    const result = resolveRequirementByAssignment(reqs, 1, 10, 2);
     expect(result).toEqual({ minStaff: 3 });
   });
 
@@ -478,7 +478,7 @@ describe("resolveRequirement", () => {
     const reqs = [
       makeCoverageRequirement({ focusAreaId: 1, assignmentId: 10, dayOfWeek: 1, minStaff: 5 }),
     ];
-    const result = resolveRequirement(reqs, 1, 10, 3);
+    const result = resolveRequirementByAssignment(reqs, 1, 10, 3);
     expect(result).toBeNull();
   });
 
@@ -499,7 +499,7 @@ describe("resolveRequirement", () => {
         minStaff: 7,
       }),
     ];
-    const result = resolveRequirement(reqs, 1, 10, 1);
+    const result = resolveRequirementByAssignment(reqs, 1, 10, 1);
     expect(result).toEqual({ minStaff: 7 });
   });
 
@@ -507,7 +507,7 @@ describe("resolveRequirement", () => {
     const reqs = [
       makeCoverageRequirement({ focusAreaId: 2, assignmentId: 10, dayOfWeek: null, minStaff: 3 }),
     ];
-    const result = resolveRequirement(reqs, 1, 10, 0);
+    const result = resolveRequirementByAssignment(reqs, 1, 10, 0);
     expect(result).toBeNull();
   });
 });
@@ -521,8 +521,15 @@ describe("computeCoverageStatus", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const emp2 = makeEmployee({ id: "emp-2" });
     const idsForKey = () => [10];
-    const result = computeCoverageStatus([emp1, emp2], date, idsForKey, new Set([10]), [10], {
-      minStaff: 2,
+    const result = computeCoverageStatus({
+      employees: [emp1, emp2],
+      date,
+      assignmentIdsForKey: idsForKey,
+      sectionCodeIds: new Set([10]),
+      eligibleAssignmentDefinitionIds: [10],
+      requirement: {
+        minStaff: 2,
+      },
     });
     expect(result.actual).toBe(2);
     expect(result.required).toBe(2);
@@ -533,8 +540,15 @@ describe("computeCoverageStatus", () => {
   it("reports not met when actual < required", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const idsForKey = () => [10];
-    const result = computeCoverageStatus([emp1], date, idsForKey, new Set([10]), [10], {
-      minStaff: 3,
+    const result = computeCoverageStatus({
+      employees: [emp1],
+      date,
+      assignmentIdsForKey: idsForKey,
+      sectionCodeIds: new Set([10]),
+      eligibleAssignmentDefinitionIds: [10],
+      requirement: {
+        minStaff: 3,
+      },
     });
     expect(result.actual).toBe(1);
     expect(result.required).toBe(3);
@@ -542,14 +556,28 @@ describe("computeCoverageStatus", () => {
   });
 
   it("reports no requirement when minStaff is 0", () => {
-    const result = computeCoverageStatus([], date, () => [], new Set([10]), [10], { minStaff: 0 });
+    const result = computeCoverageStatus({
+      employees: [],
+      date,
+      assignmentIdsForKey: () => [],
+      sectionCodeIds: new Set([10]),
+      eligibleAssignmentDefinitionIds: [10],
+      requirement: { minStaff: 0 },
+    });
     expect(result.hasRequirement).toBe(false);
     expect(result.isMet).toBe(true);
   });
 
   it("returns actual 0 when no employees", () => {
-    const result = computeCoverageStatus([], date, () => [10], new Set([10]), [10], {
-      minStaff: 2,
+    const result = computeCoverageStatus({
+      employees: [],
+      date,
+      assignmentIdsForKey: () => [10],
+      sectionCodeIds: new Set([10]),
+      eligibleAssignmentDefinitionIds: [10],
+      requirement: {
+        minStaff: 2,
+      },
     });
     expect(result.actual).toBe(0);
   });
@@ -559,8 +587,15 @@ describe("computeCoverageStatus", () => {
     const emp2 = makeEmployee({ id: "emp-2" });
     // emp1 has shift 10, emp2 has shift 20
     const idsForKey = (empId: string) => (empId === "emp-1" ? [10] : [20]);
-    const result = computeCoverageStatus([emp1, emp2], date, idsForKey, new Set([10, 20]), [10], {
-      minStaff: 1,
+    const result = computeCoverageStatus({
+      employees: [emp1, emp2],
+      date,
+      assignmentIdsForKey: idsForKey,
+      sectionCodeIds: new Set([10, 20]),
+      eligibleAssignmentDefinitionIds: [10],
+      requirement: {
+        minStaff: 1,
+      },
     });
     expect(result.actual).toBe(1); // only emp1 on shift 10
   });
@@ -569,14 +604,14 @@ describe("computeCoverageStatus", () => {
     const emp1 = makeEmployee({ id: "emp-1" });
     const emp2 = makeEmployee({ id: "emp-2" });
     const idsForKey = (empId: string) => (empId === "emp-1" ? [10] : [11]);
-    const result = computeCoverageStatus(
-      [emp1, emp2],
+    const result = computeCoverageStatus({
+      employees: [emp1, emp2],
       date,
-      idsForKey,
-      new Set([10, 11]),
-      [10, 11],
-      { minStaff: 2 },
-    );
+      assignmentIdsForKey: idsForKey,
+      sectionCodeIds: new Set([10, 11]),
+      eligibleAssignmentDefinitionIds: [10, 11],
+      requirement: { minStaff: 2 },
+    });
     expect(result.actual).toBe(2);
     expect(result.isMet).toBe(true);
   });
@@ -587,15 +622,15 @@ describe("computeCoverageStatus", () => {
     const idsForKey = (empId: string) => (empId === "emp-1" ? [10] : [10]);
     const creditForKey = (empId: string) => (empId === "emp-1" ? 0.5 : 1);
 
-    const result = computeCoverageStatus(
-      [emp1, emp2],
+    const result = computeCoverageStatus({
+      employees: [emp1, emp2],
       date,
-      idsForKey,
-      new Set([10]),
-      [10],
-      { minStaff: 2 },
-      creditForKey,
-    );
+      assignmentIdsForKey: idsForKey,
+      sectionCodeIds: new Set([10]),
+      eligibleAssignmentDefinitionIds: [10],
+      requirement: { minStaff: 2 },
+      coverageCreditForKey: creditForKey,
+    });
 
     expect(result.actual).toBe(1.5);
     expect(result.required).toBe(2);
@@ -633,17 +668,16 @@ describe("computeCoverageGaps", () => {
     });
     const emp = makeEmployee({ id: "emp-1", focusAreaIds: [1] });
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [code],
-      [req],
-      [date],
-      new Map([[1, [emp]]]),
-      () => [10],
-      new Map([[10, code]]),
-      new Map([[1, new Set([10])]]),
-    );
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [code],
+      requirements: [req],
+      dates: [date],
+      employeesByFocusArea: new Map([[1, [emp]]]),
+      assignmentIdsForKey: () => [10],
+      assignmentIdsByFocusArea: new Map([[1, new Set([10])]]),
+    });
     expect(gaps).toEqual([]);
   });
 
@@ -658,17 +692,16 @@ describe("computeCoverageGaps", () => {
       minStaff: 3,
     });
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [code],
-      [req],
-      [date],
-      new Map([[1, []]]), // no employees
-      () => [],
-      new Map([[10, code]]),
-      new Map([[1, new Set([10])]]),
-    );
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [code],
+      requirements: [req],
+      dates: [date],
+      employeesByFocusArea: new Map([[1, []]]),
+      assignmentIdsForKey: () => [],
+      assignmentIdsByFocusArea: new Map([[1, new Set([10])]]),
+    });
     expect(gaps).toHaveLength(1);
     expect(gaps[0].focusAreaId).toBe(1);
     expect(gaps[0].assignmentId).toBe(10);
@@ -696,17 +729,16 @@ describe("computeCoverageGaps", () => {
       minStaff: 3,
     });
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [code],
-      [req],
-      [date],
-      new Map([[1, []]]),
-      () => [],
-      new Map([[10, code]]),
-      new Map([[1, new Set()]]), // shift 10 NOT in focus area 1's section
-    );
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [code],
+      requirements: [req],
+      dates: [date],
+      employeesByFocusArea: new Map([[1, []]]),
+      assignmentIdsForKey: () => [],
+      assignmentIdsByFocusArea: new Map([[1, new Set()]]),
+    });
     expect(gaps).toEqual([]);
   });
 
@@ -715,17 +747,16 @@ describe("computeCoverageGaps", () => {
     const cat = makeShiftCategory({ id: 1 });
     const code = makeAssignmentDefinition({ id: 10, categoryId: 1 });
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [code],
-      [], // no requirements
-      [date],
-      new Map([[1, []]]),
-      () => [],
-      new Map([[10, code]]),
-      new Map([[1, new Set([10])]]),
-    );
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [code],
+      requirements: [],
+      dates: [date],
+      employeesByFocusArea: new Map([[1, []]]),
+      assignmentIdsForKey: () => [],
+      assignmentIdsByFocusArea: new Map([[1, new Set([10])]]),
+    });
     expect(gaps).toEqual([]);
   });
 
@@ -740,17 +771,16 @@ describe("computeCoverageGaps", () => {
       minStaff: 2,
     });
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [code],
-      [req],
-      [date],
-      new Map([[1, []]]),
-      () => [],
-      new Map([[20, code]]),
-      new Map([[1, new Set([20])]]),
-    );
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [code],
+      requirements: [req],
+      dates: [date],
+      employeesByFocusArea: new Map([[1, []]]),
+      assignmentIdsForKey: () => [],
+      assignmentIdsByFocusArea: new Map([[1, new Set([20])]]),
+    });
     expect(gaps).toHaveLength(1);
     expect(gaps[0].shiftCategoryName).toBe("Evening");
     expect(gaps[0].focusAreaName).toBe("ER");
@@ -782,21 +812,17 @@ describe("computeCoverageGaps", () => {
     const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
     const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [day, supervisor, mentoring],
-      [req],
-      [date],
-      new Map([[1, [emp1, emp2, emp3]]]),
-      (empId: string) => (empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [12]),
-      new Map([
-        [10, day],
-        [11, supervisor],
-        [12, mentoring],
-      ]),
-      new Map([[1, new Set([10, 11, 12])]]),
-    );
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [day, supervisor, mentoring],
+      requirements: [req],
+      dates: [date],
+      employeesByFocusArea: new Map([[1, [emp1, emp2, emp3]]]),
+      assignmentIdsForKey: (empId: string) =>
+        empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [12],
+      assignmentIdsByFocusArea: new Map([[1, new Set([10, 11, 12])]]),
+    });
 
     expect(gaps).toEqual([]);
   });
@@ -835,25 +861,20 @@ describe("computeCoverageGaps", () => {
     const emp4 = makeEmployee({ id: "emp-4", focusAreaIds: [1] });
     const emp5 = makeEmployee({ id: "emp-5", focusAreaIds: [1] });
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [day, supervisor, mentoring],
-      [dayReq, supReq],
-      [date],
-      new Map([[1, [emp1, emp2, emp3, emp4, emp5]]]),
-      (empId: string) => {
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [day, supervisor, mentoring],
+      requirements: [dayReq, supReq],
+      dates: [date],
+      employeesByFocusArea: new Map([[1, [emp1, emp2, emp3, emp4, emp5]]]),
+      assignmentIdsForKey: (empId: string) => {
         if (empId === "emp-1" || empId === "emp-2") return [10];
         if (empId === "emp-3") return [11];
         return [12];
       },
-      new Map([
-        [10, day],
-        [11, supervisor],
-        [12, mentoring],
-      ]),
-      new Map([[1, new Set([10, 11, 12])]]),
-    );
+      assignmentIdsByFocusArea: new Map([[1, new Set([10, 11, 12])]]),
+    });
 
     expect(gaps).toEqual([]);
   });
@@ -884,20 +905,17 @@ describe("computeCoverageGaps", () => {
     const emp2 = makeEmployee({ id: "emp-2", focusAreaIds: [1] });
     const emp3 = makeEmployee({ id: "emp-3", focusAreaIds: [1] });
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [day, supervisor],
-      [dayReq, supReq],
-      [date],
-      new Map([[1, [emp1, emp2, emp3]]]),
-      (empId: string) => (empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [10]),
-      new Map([
-        [10, day],
-        [11, supervisor],
-      ]),
-      new Map([[1, new Set([10, 11])]]),
-    );
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [day, supervisor],
+      requirements: [dayReq, supReq],
+      dates: [date],
+      employeesByFocusArea: new Map([[1, [emp1, emp2, emp3]]]),
+      assignmentIdsForKey: (empId: string) =>
+        empId === "emp-1" ? [10] : empId === "emp-2" ? [11] : [10],
+      assignmentIdsByFocusArea: new Map([[1, new Set([10, 11])]]),
+    });
 
     expect(gaps).toHaveLength(1);
     expect(gaps[0].shiftCategoryName).toBe("Day");
@@ -940,17 +958,16 @@ describe("computeCoverageGaps", () => {
     ]);
     const publishedDates = filterPublishedDates([march1, march2], publishedDateSet);
 
-    const gaps = computeCoverageGaps(
-      [fa],
-      [cat],
-      [code],
-      [reqDay1, reqDay2],
-      publishedDates,
-      new Map([[1, []]]),
-      () => [],
-      new Map([[10, code]]),
-      new Map([[1, new Set([10])]]),
-    );
+    const gaps = computeCoverageGaps({
+      focusAreas: [fa],
+      shiftCategories: [cat],
+      assignments: [code],
+      requirements: [reqDay1, reqDay2],
+      dates: publishedDates,
+      employeesByFocusArea: new Map([[1, []]]),
+      assignmentIdsForKey: () => [],
+      assignmentIdsByFocusArea: new Map([[1, new Set([10])]]),
+    });
 
     expect(gaps).toHaveLength(1);
     expect(formatDateKey(gaps[0].date)).toBe(formatDateKey(march2));

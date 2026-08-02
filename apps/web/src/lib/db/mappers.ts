@@ -22,12 +22,12 @@ import type {
 import type {
   AdminPermissions,
   AssignableOrganizationRole,
-  CoverageRuleConfig,
   Organization,
   OrganizationRole,
   PlatformRole,
   ShiftDisplayMode,
 } from "@dubgrid/domain";
+import { normalizeCoverageRuleConfig } from "@dubgrid/schedule-core";
 import type {
   DbFocusArea,
   DbDepartment,
@@ -63,26 +63,6 @@ const EMPTY_SCHEDULED_JOB_STYLE = {
   border: "",
   text: "",
 } as const;
-
-const DEFAULT_COVERAGE_RULE_CONFIG: CoverageRuleConfig = {
-  mentoredCoverageCreditPercent: 100,
-};
-
-function normalizeCoverageRuleConfig(value: unknown): CoverageRuleConfig {
-  if (!value || typeof value !== "object") {
-    return DEFAULT_COVERAGE_RULE_CONFIG;
-  }
-
-  const rawPercent = (value as Record<string, unknown>).mentoredCoverageCreditPercent;
-  const percent =
-    typeof rawPercent === "number" && Number.isFinite(rawPercent)
-      ? Math.min(100, Math.max(0, Math.round(rawPercent)))
-      : DEFAULT_COVERAGE_RULE_CONFIG.mentoredCoverageCreditPercent;
-
-  return {
-    mentoredCoverageCreditPercent: percent,
-  };
-}
 
 // ── Named Item (certifications / organization_roles) ─────────────────────────
 
@@ -265,22 +245,22 @@ export function rowToShiftCategory(row: DbShiftCategory): ShiftCategory {
 export function rowToJobDefinition(row: DbJobDefinition): JobDefinition {
   const assignmentMode = row.assignment_mode ?? "with_shift";
   const focusAreaIds = row.focus_area_ids ?? [];
+  const overrideRows = row.job_shift_overrides ?? [];
   const shiftTimeOverrides = Object.fromEntries(
-    Object.entries(row.shift_time_overrides ?? {})
-      .filter(([shiftId, value]) => shiftId.trim().length > 0 && value != null)
-      .map(([shiftId, value]) => [
-        shiftId,
+    overrideRows
+      .filter((override) => override.start_time != null || override.end_time != null)
+      .map((override) => [
+        String(override.shift_id),
         {
-          startTime: trimTime(value.startTime) ?? null,
-          endTime: trimTime(value.endTime) ?? null,
+          startTime: trimTime(override.start_time) ?? null,
+          endTime: trimTime(override.end_time) ?? null,
         },
       ]),
   );
   const shiftColorOverrides = Object.fromEntries(
-    Object.entries(row.shift_color_overrides ?? {}).filter(
-      ([shiftId, value]) =>
-        shiftId.trim().length > 0 && typeof value === "string" && value.trim().length > 0,
-    ),
+    overrideRows
+      .filter((override) => typeof override.color === "string" && override.color.trim().length > 0)
+      .map((override) => [String(override.shift_id), override.color as string]),
   );
   const style =
     assignmentMode === "shiftless"
