@@ -1,4 +1,5 @@
 import { StyleSheet, Text, type StyleProp, type TextProps, type TextStyle } from "react-native";
+import { useMobileColors } from "../providers/ThemeModeProvider";
 
 /**
  * The DubGrid brand wordmark for native.
@@ -7,7 +8,7 @@ import { StyleSheet, Text, type StyleProp, type TextProps, type TextStyle } from
  *   - Lowercase "dubgrid"
  *   - DM Sans Bold (weight 700)
  *   - Letter-spacing -2% of font size (RN takes an absolute value)
- *   - Default color #111827
+ *   - Defaults to the theme's primary text color
  *
  * The DM Sans Bold font is loaded in `app/_layout.tsx` via
  * `@expo-google-fonts/dm-sans`. If you change the loaded weight here,
@@ -15,7 +16,7 @@ import { StyleSheet, Text, type StyleProp, type TextProps, type TextStyle } from
  */
 export function DubGridWordmark({
   fontSize = 26,
-  color = "#111827",
+  color,
   style,
   ...rest
 }: {
@@ -23,10 +24,19 @@ export function DubGridWordmark({
   color?: string;
   style?: StyleProp<TextStyle>;
 } & Omit<TextProps, "style" | "children">) {
+  // Defaulting to a fixed near-black would render the wordmark invisible on a
+  // dark surface. Both current call sites pass a theme color explicitly; this
+  // keeps that true for any that don't.
+  const mobileColors = useMobileColors();
+
   return (
     <Text
       {...rest}
-      style={[styles.wordmark, { fontSize, color, letterSpacing: fontSize * -0.02 }, style]}
+      style={[
+        styles.wordmark,
+        { fontSize, color: color ?? mobileColors.textPrimary, letterSpacing: fontSize * -0.02 },
+        style,
+      ]}
     >
       dubgrid
     </Text>

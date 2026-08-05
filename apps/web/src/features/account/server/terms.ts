@@ -1,12 +1,10 @@
 import "server-only";
 
+import { CURRENT_TERMS_VERSION, hasAcceptedCurrentTerms } from "@dubgrid/domain";
+import type { TermsAcceptanceStatus } from "@dubgrid/domain";
 import { getServiceClient } from "@/lib/supabase-service";
-import { CURRENT_TERMS_VERSION } from "../shared/terms";
 
-export interface TermsAcceptanceStatus {
-  acceptedCurrentTerms: boolean;
-  acceptedVersion: string | null;
-}
+export type { TermsAcceptanceStatus };
 
 export async function fetchTermsAcceptanceStatus(userId: string): Promise<TermsAcceptanceStatus> {
   const { data, error } = await getServiceClient()
@@ -21,7 +19,7 @@ export async function fetchTermsAcceptanceStatus(userId: string): Promise<TermsA
 
   const acceptedVersion = data?.terms_version ?? null;
   return {
-    acceptedCurrentTerms: acceptedVersion === CURRENT_TERMS_VERSION,
+    acceptedCurrentTerms: hasAcceptedCurrentTerms(acceptedVersion),
     acceptedVersion,
   };
 }

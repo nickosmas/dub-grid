@@ -1,33 +1,24 @@
+import { ORG_ROLE_LABELS, getHighlightedOrgRole, type OrgRole } from "@dubgrid/domain";
 import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
-type MobileOrgRole = "super_admin" | "admin" | "user" | null;
-type OrgRole = NonNullable<MobileOrgRole>;
-type HighlightedOrgRole = Extract<OrgRole, "super_admin" | "admin">;
+type MobileOrgRole = OrgRole | null;
 
-export const MOBILE_ORG_ROLE_LABELS: Record<OrgRole, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  user: "User",
-};
-
-export function getHighlightedMobileOrgRole(
-  role: MobileOrgRole | null | undefined,
-): HighlightedOrgRole | null {
-  return role === "super_admin" || role === "admin" ? role : null;
-}
+// The labels and the which-roles-get-badged rule are shared with web via
+// `@dubgrid/domain`; only the styling below is mobile-specific.
+export { ORG_ROLE_LABELS, getHighlightedOrgRole };
 
 export function getMobileOrgRoleBadge(
   mobileColors: MobileColors,
   role: MobileOrgRole | null | undefined,
 ) {
-  const highlightedRole = getHighlightedMobileOrgRole(role);
+  const highlightedRole = getHighlightedOrgRole(role);
   if (!highlightedRole) {
     return null;
   }
 
   if (highlightedRole === "super_admin") {
     return {
-      label: MOBILE_ORG_ROLE_LABELS[highlightedRole],
+      label: ORG_ROLE_LABELS[highlightedRole],
       tone: "warning" as const,
       containerStyle: {
         alignItems: "center" as const,
@@ -48,7 +39,7 @@ export function getMobileOrgRoleBadge(
   }
 
   return {
-    label: MOBILE_ORG_ROLE_LABELS[highlightedRole],
+    label: ORG_ROLE_LABELS[highlightedRole],
     tone: "brand" as const,
     containerStyle: {
       alignItems: "center" as const,

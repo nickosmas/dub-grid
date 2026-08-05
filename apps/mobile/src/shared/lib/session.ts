@@ -1,8 +1,5 @@
-import type { Session } from "@supabase/supabase-js";
-
 import { getStoredValue, removeStoredValue, setStoredValue } from "./local-storage";
 
-const SESSION_KEY = "dubgrid-mobile-session";
 const LAST_ORG_KEY = "dubgrid-mobile-last-org";
 const PUSH_DEVICE_KEY = "dubgrid-mobile-push-device";
 const HAS_SEEN_ONBOARDING_KEY = "dubgrid-mobile-has-seen-onboarding";
@@ -43,18 +40,6 @@ async function saveJsonValue<T>(key: string, value: T | null): Promise<void> {
   }
 
   await setStoredValue(key, JSON.stringify(value));
-}
-
-export async function saveSession(session: Session | null): Promise<void> {
-  if (!session) {
-    await removeStoredValue(SESSION_KEY);
-    return;
-  }
-  await setStoredValue(SESSION_KEY, JSON.stringify(session));
-}
-
-export async function loadSession(): Promise<Session | null> {
-  return loadJsonValue<Session>(SESSION_KEY);
 }
 
 export async function saveLastOrgSlug(slug: string | null): Promise<void> {

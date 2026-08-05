@@ -8,12 +8,14 @@ import { extractNotificationAction, formatNotificationMetadata } from "@dubgrid/
 import { Button } from "../../../shared/components/Button";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
+import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
   bulkUpdateNotifications,
   getNotifications,
   markNotificationRead,
 } from "../../../shared/lib/api";
+import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
@@ -106,6 +108,10 @@ export default function NotificationDetailScreen() {
 
   const notification = cachedNotification ?? detailQuery.data ?? null;
 
+  const manualRefresh = useManualRefresh(async () => {
+    await detailQuery.refetch();
+  });
+
   const handleMarkRead = useCallback(async () => {
     if (!accessToken || !notification || notification.readAt) return;
     try {
@@ -188,7 +194,7 @@ export default function NotificationDetailScreen() {
   if (!notification && detailQuery.isLoading) {
     return (
       <Screen title="Alert">
-        <Text style={mobileText.body}>Loading…</Text>
+        <DetailSkeleton />
       </Screen>
     );
   }
@@ -209,7 +215,7 @@ export default function NotificationDetailScreen() {
   const isArchived = !!notification.archivedAt;
 
   return (
-    <Screen title="Alert">
+    <Screen onRefresh={manualRefresh.refresh} refreshing={manualRefresh.isRefreshing} title="Alert">
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.iconFrame}>

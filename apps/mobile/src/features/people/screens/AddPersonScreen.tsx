@@ -10,6 +10,7 @@ import {
 } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
 import { Screen } from "../../../shared/components/Screen";
+import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { createMobilePerson, createMobilePersonInvitation } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
@@ -106,6 +107,18 @@ export default function AddPersonScreen() {
   function toggleFocusArea(id: number) {
     setFocusAreaIds((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
+    );
+  }
+
+  // Focus areas and certifications come from bootstrap. Rendering the form
+  // before it resolves shows an empty Assignments picker next to a live
+  // "Select at least one <focus area>" error, which reads as broken rather
+  // than loading.
+  if (bootstrapQuery.isLoading) {
+    return (
+      <Screen>
+        <DetailSkeleton sections={3} />
+      </Screen>
     );
   }
 

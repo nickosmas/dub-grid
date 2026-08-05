@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { router } from "expo-router";
+import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
 import { HeroSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
@@ -87,8 +88,30 @@ export function AdminHomeScreen() {
     );
   }
 
+  // `contentState` covers loading and error, so this is the "resolved but
+  // empty" case. Rendering null here left a genuinely blank screen with no way
+  // to retry.
   if (!dashboardQuery.data) {
-    return null;
+    return (
+      <Screen
+        title="Home"
+        subtitle="Organization overview"
+        bottomPaddingMode="tabbed"
+        refreshing={manualRefresh.isRefreshing}
+        onRefresh={manualRefresh.refresh}
+      >
+        <EmptyStateCard
+          actionLabel="Refresh"
+          body="There's nothing to show for this organization yet. Pull to refresh once your schedule is set up."
+          fillScreen
+          iconName="stats-chart-outline"
+          onAction={() => {
+            void dashboardQuery.refetch();
+          }}
+          title="No dashboard data yet"
+        />
+      </Screen>
+    );
   }
 
   const data = dashboardQuery.data;

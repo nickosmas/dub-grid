@@ -387,8 +387,18 @@ export function getSegmentScheduledMinutes(
   return subtractBreakMinutes(minutes, segment.breakMinutes);
 }
 
-export function formatHoursValue(totalMinutes: number): number {
+/** Convert a duration in minutes to hours, rounded to one decimal place. */
+export function toHoursValue(totalMinutes: number): number {
   return Math.round((Math.max(totalMinutes, 0) / 60) * 10) / 10;
+}
+
+/**
+ * Render an hours value for display: whole hours stay bare ("8"), fractional
+ * hours get one decimal ("7.5"). Takes **hours**, not minutes — pair it with
+ * `toHoursValue` when starting from a duration.
+ */
+export function formatHoursLabel(hours: number): string {
+  return Number.isInteger(hours) ? `${hours}` : hours.toFixed(1);
 }
 
 export function getEntrySegmentSortTime(

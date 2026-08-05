@@ -1581,7 +1581,7 @@ describe("ScheduleScreen", () => {
     const headerButtonLabels = screen
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label") ?? button.textContent);
-    expect(headerButtonLabels.indexOf("Select date 2026-04-18")).toBeLessThan(
+    expect(headerButtonLabels.indexOf("Select Sat, Apr 18")).toBeLessThan(
       headerButtonLabels.indexOf("Select Emergency"),
     );
     expect(screen.getByText("Me")).toBeInTheDocument();
@@ -1732,7 +1732,7 @@ describe("ScheduleScreen", () => {
 
     expect(screen.getByText("Me")).toBeInTheDocument();
     expect(screen.queryByText("Next Week Nurse")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Select date 2026-04-23" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Select Thu, Apr 23" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -1741,7 +1741,7 @@ describe("ScheduleScreen", () => {
       fireQuickWeekSwipe(index);
     }
 
-    expect(screen.getByRole("button", { name: "Select date 2026-06-25" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Select Thu, Jun 25" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -1787,7 +1787,7 @@ describe("ScheduleScreen", () => {
   it("expands the month calendar via the drag handle and collapses back to a populated week strip", () => {
     render(<TeamScheduleScreen />);
 
-    expect(screen.getByRole("button", { name: "Select date 2026-04-16" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Select Today, Apr 16" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -1802,7 +1802,7 @@ describe("ScheduleScreen", () => {
     // Regression: closing used to leave calendarMonthAnchor pointed at
     // whatever month was last browsed, which could make the collapsed
     // week strip render nothing at all.
-    expect(screen.getByRole("button", { name: "Select date 2026-04-16" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Select Today, Apr 16" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -1848,7 +1848,7 @@ describe("ScheduleScreen", () => {
 
     // Swiping into May (not the current month) selects its 1st.
     fireQuickMonthSwipe("next");
-    expect(screen.getByRole("button", { name: "Select date 2026-05-01" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Select Fri, May 1" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -1858,7 +1858,7 @@ describe("ScheduleScreen", () => {
     // accessible match — the off-screen adjacent-month preview cells are
     // correctly excluded from the accessibility tree.
     fireQuickMonthSwipe("previous");
-    expect(screen.getByRole("button", { name: "Select date 2026-04-16" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Select Today, Apr 16" })).toHaveAttribute(
       "aria-selected",
       "true",
     );

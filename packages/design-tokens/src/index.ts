@@ -25,6 +25,10 @@ export {
   type ShiftPillColors,
 } from "./pill-colors";
 
+export { getHeroGradientCss, heroGradientTokens, type HeroGradientStops } from "./hero-gradient";
+
+export { resolveJobChipTone, type JobChipTone, type JobChipToneContext } from "./job-chip-tone";
+
 export const lightColorTokens = {
   background: "#F8FAFC",
   surface: "#FFFFFF",
@@ -151,16 +155,64 @@ export const darkColorTokens: ColorTokens = {
 /** @deprecated Use `lightColorTokens` (or the theme-aware helpers) directly — this alias exists only for back-compat with existing static imports. */
 export const colorTokens = lightColorTokens;
 
+/**
+ * Named layout slots for mobile. Kept as-is for existing call sites; new work
+ * should reach for `mobileSpacing` below unless one of these names genuinely
+ * describes the slot.
+ */
 export const spacingTokens = {
   screenX: 16,
   sectionGap: 16,
   cardGap: 8,
 } as const;
 
+/**
+ * The mobile spacing ramp, in density-independent pixels.
+ *
+ * `webSpacingTokens` are `"px"` strings that React Native can't consume, so
+ * mobile had no scale to reach for and screens hand-rolled numbers instead
+ * (ScheduleScreen alone had ~190 raw values against 12 token references).
+ * Values match the web ramp one-for-one so the two platforms stay in step.
+ */
+export const mobileSpacingTokens = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  "2xl": 24,
+  "3xl": 32,
+  "4xl": 40,
+  "5xl": 48,
+} as const;
+
+/**
+ * Toast fills. Deliberately fixed across themes: a toast is a transient
+ * high-contrast overlay, not a themed surface, and it always pairs a saturated
+ * fill with `textInverse`. They live here rather than inline in the mobile
+ * provider so they're part of the design system like everything else.
+ */
+export const toastToneTokens = {
+  error: { background: "#DC2626", border: "#B91C1C" },
+  success: { background: "#16A34A", border: "#166534" },
+  info: { background: "#1D4ED8", border: "#1E3A8A" },
+  warning: { background: "#D97706", border: "#92400E" },
+} as const;
+
 export const radiusTokens = {
   card: 16,
   control: 12,
   pill: 999,
+} as const;
+
+/**
+ * Radius ramp for mobile surfaces smaller than a card — chips, inputs, inline
+ * badges. `radiusTokens` stays the vocabulary for the three named roles.
+ */
+export const mobileRadiusTokens = {
+  sm: 6,
+  md: 8,
+  lg: 10,
 } as const;
 
 export const webSpacingTokens = {

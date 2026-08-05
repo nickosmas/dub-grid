@@ -7,6 +7,7 @@ import {
   rowToShiftCategory,
   rowToShiftRequest,
 } from "@/lib/db/mappers";
+import { fetchTermsAcceptanceStatus } from "@/features/account/server";
 import type { MobilePublishedScheduleRow } from "@dubgrid/data-access";
 import {
   fetchLinkedEmployeeRowForUser,
@@ -1695,6 +1696,15 @@ export async function fetchMobileNotificationFacets(
   userClient: SupabaseClient,
 ): ReturnType<typeof fetchMobileNotificationFacetsData> {
   return fetchMobileNotificationFacetsData(userClient);
+}
+
+/**
+ * The Terms of Service version this user has accepted, or null. Mobile has no
+ * login-time redirect the way web does, so bootstrap carries the flag and the
+ * app gates on it in-place.
+ */
+export async function fetchMobileTermsAcceptedVersion(userId: string): Promise<string | null> {
+  return (await fetchTermsAcceptanceStatus(userId)).acceptedVersion;
 }
 
 export function mapOrganizationToMobileConfig(org: Organization) {

@@ -14,6 +14,11 @@ const serverSchema = z
     // Note: SUPABASE_JWT_SECRET is no longer required — JWT verification uses JWKS
     // (ES256 asymmetric keys fetched from Supabase's .well-known/jwks.json endpoint).
     SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
+    // Shared secret for the scheduled jobs in vercel.json. Vercel only injects
+    // `Authorization: Bearer $CRON_SECRET` when this var exists on the project,
+    // so an unset value makes every cron run return 503 and get reported as a
+    // failed job. Optional here because local dev never runs the crons.
+    CRON_SECRET: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
     EXPO_ACCESS_TOKEN: z.string().optional(),
     STRIPE_SECRET_KEY: z.string().optional(),

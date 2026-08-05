@@ -1,19 +1,9 @@
 import type { CSSProperties } from "react";
 import type { DirectoryPerson } from "@/types";
 
-type OrgRole = NonNullable<DirectoryPerson["orgRole"]>;
-
-export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  user: "User",
-};
-
-export function getHighlightedOrgRole(
-  role: DirectoryPerson["orgRole"] | null | undefined,
-): Extract<OrgRole, "super_admin" | "admin"> | null {
-  return role === "super_admin" || role === "admin" ? role : null;
-}
+// The labels and the which-roles-get-badged rule are shared with mobile so the
+// two can't drift; only the styling below is web-specific.
+export { ORG_ROLE_LABELS, getHighlightedOrgRole } from "@dubgrid/domain";
 
 export function getOrgRoleBadgeStyle(
   _role: DirectoryPerson["orgRole"] | null | undefined,

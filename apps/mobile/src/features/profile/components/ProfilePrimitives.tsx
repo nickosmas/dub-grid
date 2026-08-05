@@ -273,6 +273,9 @@ export function ProfileTextInput({
           style={[styles.inputShell, focused && styles.inputFocused, error && styles.inputError]}
         >
           <TextInput
+            // The visible <Text> label isn't associated with the input on
+            // native, so without this the field is announced unlabeled.
+            accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
             {...resolvedInputProps}
             placeholderTextColor={mobileColors.textSubtle}
             style={[
@@ -287,6 +290,7 @@ export function ProfileTextInput({
         </View>
       ) : (
         <TextInput
+          accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
           {...resolvedInputProps}
           placeholderTextColor={mobileColors.textSubtle}
           style={[

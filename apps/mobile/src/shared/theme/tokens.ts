@@ -3,6 +3,8 @@ import {
   colorTokens,
   darkColorTokens,
   mobileNavigationTheme,
+  mobileRadiusTokens,
+  mobileSpacingTokens,
   mobileTypographyTokens,
   overlayTokens,
   radiusTokens,
@@ -20,8 +22,14 @@ export const darkMobileColors = {
   overlay: overlayTokens.background,
 } as const;
 export type MobileColors = Record<keyof typeof mobileColors, string>;
+/** Named layout slots (screen gutter, section gap, card gap). */
 export const mobileSpacing = spacingTokens;
+/** The 4/8/12/16/20/24/32/40/48 ramp — reach for this for ad-hoc spacing. */
+export const mobileSpace = mobileSpacingTokens;
+/** Named radii for the three surface roles (card, control, pill). */
 export const mobileRadii = radiusTokens;
+/** Small-surface radius ramp for chips, inputs and inline badges. */
+export const mobileRadius = mobileRadiusTokens;
 export const mobileTypography = mobileTypographyTokens;
 export const dubGridNavigationTheme = mobileNavigationTheme;
 export const mobileBorderColorFromText = borderColorFromText;

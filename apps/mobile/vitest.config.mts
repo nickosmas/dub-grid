@@ -90,6 +90,14 @@ export default defineConfig(async () => {
           find: /^expo-linear-gradient$/,
           replacement: path.resolve(__dirname, "./src/test/shims/expo-linear-gradient.tsx"),
         },
+        // react-native-safe-area-context re-exports untranspiled react-native
+        // Flow syntax, so any screen reaching it transitively failed to
+        // collect. Zero insets under jsdom; tests needing real values still
+        // vi.mock it directly.
+        {
+          find: /^react-native-safe-area-context$/,
+          replacement: path.resolve(__dirname, "./src/test/shims/safe-area-context.tsx"),
+        },
       ],
     },
     test: {

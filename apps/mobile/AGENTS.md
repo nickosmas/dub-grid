@@ -28,8 +28,9 @@ best-effort clears app storage on a booted Android emulator via `adb`.
 ```
 apps/mobile/
   app/                              # Expo Router file-based routes
-    _layout.tsx                     # Root layout (fonts, providers, auth, consent gate)
+    _layout.tsx                     # Root layout (fonts, providers, auth, consent + terms gates, ErrorBoundary)
     index.tsx                       # Entry redirect
+    +not-found.tsx                  # Unmatched-route fallback
     (auth)/
       login.tsx
       onboarding.tsx
@@ -41,7 +42,7 @@ apps/mobile/
   src/
     features/
       auth/                         # Auth flow, MobileRealtimeProvider
-      consent/                      # ConsentGate
+      consent/                      # ConsentGate + TermsGate
       notifications/
       onboarding/                   # Onboarding screens/components
       people/
@@ -74,6 +75,32 @@ surface, front or backend, by design — these are admin/config-heavy
 workflows that reasonably stay desktop-only. Don't treat their absence as
 a gap to fill; confirm with the user before adding any of them to mobile.
 
+## Gates and Boundaries
+
+Three things wrap the authed app in `app/_layout.tsx`, in this order:
+
+- **`ConsentGate`** — cookie/analytics consent. Keep `CONSENT_VERSION` in
+  lockstep with web's `CookieConsent.tsx`.
+- **`TermsGate`** — blocks until the user has accepted `CURRENT_TERMS_VERSION`
+  (`@dubgrid/domain`). Web enforces this by redirecting to `/accept-terms` at
+  login; mobile signs in through its own endpoint, so it gates in-place off the
+  `acceptedCurrentTerms` flag in bootstrap. That flag defaults to `true` so a
+  stale server response can never lock anyone out. The sheet covers the whole
+  app, so it must always offer **Sign out** alongside Accept — declining has to
+  be possible, and there is no screen underneath to escape to.
+- **`ErrorBoundary`** — exported from `app/_layout.tsx` and from
+  `app/(tabs)/_layout.tsx`, both rendering `RouteErrorScreen`. Without these a
+  single render throw takes the whole app down. There is no crash-reporting SDK
+  on mobile.
+
+`useTabsGate` is the only auth guard, and it wraps `(tabs)` only. The web tab
+layout (`_layout.web.tsx`) must call it rather than re-deriving the rules —
+a second copy silently drifted once.
+
+Sign-out must revoke this device's push token **before** dropping the session
+(`disablePushForCurrentDevice` in `shared/lib/auth-reset.ts`), or the phone
+keeps receiving the previous user's notifications.
+
 ## Platform Rules
 
 - Do not use browser-only APIs (`window`, `document`, `localStorage`) in native
@@ -87,8 +114,8 @@ a gap to fill; confirm with the user before adding any of them to mobile.
 ## API and Contract Rules
 
 - Backend reached via `EXPO_PUBLIC_API_BASE_URL`. Never hardcode environment hosts.
-- Keep request/response payloads aligned with `@dubgrid/contracts` (`./mobile` export)
-  and `@dubgrid/api-client`.
+- Keep request/response payloads aligned with `@dubgrid/contracts` and
+  `@dubgrid/api-client`.
 - When mobile API contract changes, run `npm run test:mobile` AND check web mobile routes.
 
 ## Secrets

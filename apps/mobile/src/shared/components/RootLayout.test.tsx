@@ -43,6 +43,15 @@ vi.mock("../../features/consent/components/ConsentGate", async () => {
   };
 });
 
+vi.mock("../../features/consent/components/TermsGate", async () => {
+  const React = await import("react");
+
+  return {
+    TermsGate: ({ children }: { children: React.ReactNode }) =>
+      React.createElement("div", { "data-testid": "terms-gate" }, children),
+  };
+});
+
 vi.mock("@react-navigation/native", async () => {
   const React = await import("react");
 

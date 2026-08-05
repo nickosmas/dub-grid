@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -79,7 +80,13 @@ export function ConfirmationModal({
       transparent
       visible={visible}
     >
-      <View style={styles.root}>
+      <KeyboardAvoidingView
+        // Callers may render a TextInput via `children` (e.g. the People
+        // status-change reason), and this sheet is vertically centered — with
+        // no avoidance the keyboard covers the field and both buttons.
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.root}
+      >
         <Pressable
           accessibilityLabel="Dismiss"
           style={StyleSheet.absoluteFill}
@@ -105,7 +112,7 @@ export function ConfirmationModal({
             />
           </View>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

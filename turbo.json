@@ -1,6 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalPassThroughEnv": [
+    "CRON_SECRET",
     "DEMO_RECIPIENT_EMAIL",
     "EXPO_ACCESS_TOKEN",
     "LOG_LEVEL",

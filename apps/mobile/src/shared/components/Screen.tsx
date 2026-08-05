@@ -152,6 +152,11 @@ export function Screen({
     <ScrollView
       ref={internalScrollViewRef}
       automaticallyAdjustContentInsets={useNativeContentInsets}
+      // iOS does not inset a ScrollView for the software keyboard on its own,
+      // so form fields and submit buttons near the bottom of a screen sat
+      // behind it. Android resizes the window instead (`adjustResize`), where
+      // this prop is ignored.
+      automaticallyAdjustKeyboardInsets
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={{
         paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,

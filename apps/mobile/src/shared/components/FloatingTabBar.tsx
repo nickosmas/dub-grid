@@ -94,8 +94,11 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
         return (
           <Pressable
             key={route.key}
-            accessibilityRole="button"
-            accessibilityState={focused ? { selected: true } : {}}
+            accessibilityRole="tab"
+            // Report `selected: false` explicitly — an empty state object makes
+            // VoiceOver/TalkBack announce nothing at all for unselected tabs,
+            // so a user can't tell which one they're on.
+            accessibilityState={{ selected: focused }}
             accessibilityLabel={options.tabBarAccessibilityLabel ?? label}
             onPress={onPress}
             onLongPress={onLongPress}
@@ -142,7 +145,7 @@ const createStyles = (mobileColors: MobileColors) =>
           elevation: 8,
         },
         default: {
-          shadowColor: "#000",
+          shadowColor: mobileColors.shadow,
           shadowOpacity: 0.12,
           shadowRadius: 12,
           shadowOffset: { width: 0, height: 4 },

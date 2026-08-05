@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   Animated,
-  Dimensions,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { mobileRadii, type MobileColors } from "../theme/tokens";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 
-const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
-const SHEET_TRAVEL = Dimensions.get("window").height;
-const MAX_HEIGHT = Math.round(Dimensions.get("window").height * 0.92);
+/** Padding below the sheet content, on top of the device's own bottom inset. */
+const SHEET_CONTENT_BOTTOM_PADDING = mobileSpace["2xl"];
 
 export function BottomSheetModal({
   visible,
@@ -34,16 +35,24 @@ export function BottomSheetModal({
   children: ReactNode;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const translateY = useRef(new Animated.Value(SHEET_TRAVEL)).current;
+  const insets = useSafeAreaInsets();
+  // Read live rather than at module scope: a module-scope `Dimensions.get`
+  // snapshot goes stale on rotation and on foldables.
+  const { height: windowHeight } = useWindowDimensions();
+  const bottomPadding = SHEET_CONTENT_BOTTOM_PADDING + insets.bottom;
+  const styles = useMemo(
+    () => createStyles(mobileColors, windowHeight, bottomPadding),
+    [mobileColors, windowHeight, bottomPadding],
+  );
+  const translateY = useRef(new Animated.Value(windowHeight)).current;
 
   useEffect(() => {
     Animated.timing(translateY, {
-      toValue: visible ? 0 : SHEET_TRAVEL,
+      toValue: visible ? 0 : windowHeight,
       duration: 260,
       useNativeDriver: true,
     }).start();
-  }, [visible, translateY]);
+  }, [visible, translateY, windowHeight]);
 
   const handleDismiss = () => {
     if (dismissDisabled) return;
@@ -58,7 +67,10 @@ export function BottomSheetModal({
       transparent
       visible={visible}
     >
-      <View style={styles.root}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.root}
+      >
         <Pressable
           accessibilityLabel={accessibilityLabel}
           style={StyleSheet.absoluteFill}
@@ -79,12 +91,12 @@ export function BottomSheetModal({
           )}
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, windowHeight: number, bottomPadding: number) =>
   StyleSheet.create({
     root: {
       flex: 1,
@@ -93,7 +105,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     sheet: {
       width: "100%",
-      maxHeight: MAX_HEIGHT,
+      maxHeight: Math.round(windowHeight * 0.92),
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       borderWidth: 1,
@@ -119,11 +131,11 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     body: {
       paddingHorizontal: 20,
-      paddingBottom: SHEET_BOTTOM_PADDING,
-      gap: 16,
+      paddingBottom: bottomPadding,
+      gap: mobileSpace.lg,
     },
     bodyWithFooter: {
-      paddingBottom: 16,
+      paddingBottom: mobileSpace.lg,
     },
     footer: {
       flexDirection: "row",
@@ -132,6 +144,6 @@ const createStyles = (mobileColors: MobileColors) =>
       borderTopColor: mobileColors.borderSubtle,
       paddingHorizontal: 20,
       paddingTop: 14,
-      paddingBottom: SHEET_BOTTOM_PADDING,
+      paddingBottom: bottomPadding,
     },
   });
