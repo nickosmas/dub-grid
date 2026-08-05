@@ -1,6 +1,5 @@
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Redirect } from "expo-router";
-import { AppState } from "react-native";
 import { AppSplashScreen } from "../../../shared/components/AppSplashScreen";
 import { useBootstrap } from "./useBootstrap";
 import { OrganizationLockedScreen } from "../screens/OrganizationLockedScreen";
@@ -31,21 +30,11 @@ export function useTabsGate(): TabsGateResult {
   usePushRegistration(accessToken, lockedMessage ? null : bootstrapQuery.data?.currentOrg.id);
   usePushResponseHandler(Boolean(accessToken));
 
-  useEffect(() => {
-    if (!accessToken) {
-      return;
-    }
-
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        void bootstrapQuery.refetch();
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [accessToken, bootstrapQuery]);
+  // No explicit AppState listener here: `NetworkStateProvider` drives
+  // react-query's `focusManager`, which already refetches bootstrap on
+  // foreground once it's past `staleTime`. The listener this replaced also
+  // depended on the whole query object, so it was torn down and re-added on
+  // every render.
 
   if (isLoading) {
     return {

@@ -1,6 +1,10 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AuthSessionProvider, useSessionState } from "./AuthSessionProvider";
+import {
+  AuthSessionProvider,
+  SESSION_RESTORE_TIMEOUT_MS,
+  useSessionState,
+} from "./AuthSessionProvider";
 
 const getSession = vi.fn();
 const signOut = vi.fn();
@@ -83,7 +87,7 @@ describe("AuthSessionProvider", () => {
       expect(screen.getByTestId("loading")).toHaveTextContent("true");
 
       act(() => {
-        vi.advanceTimersByTime(3999);
+        vi.advanceTimersByTime(SESSION_RESTORE_TIMEOUT_MS - 1);
       });
 
       expect(screen.getByTestId("loading")).toHaveTextContent("true");

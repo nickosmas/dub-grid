@@ -57,6 +57,7 @@ vi.mock("../../../shared/lib/supabase", () => ({
 }));
 
 vi.mock("../../../shared/lib/auth-reset", () => ({
+  disablePushForCurrentDevice: vi.fn().mockResolvedValue(undefined),
   handleExpiredMobileSession,
 }));
 

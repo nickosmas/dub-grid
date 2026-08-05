@@ -12,6 +12,10 @@ import { focusManager, onlineManager } from "@tanstack/react-query";
 import * as Network from "expo-network";
 
 const NETWORK_RECONNECT_STABILITY_MS = 1_500;
+// This provider renders nothing until the first probe resolves, and it sits
+// above the screen that hides the native splash — so a probe that never settles
+// would strand the app on the splash forever. Assume online after this budget.
+const NETWORK_PROBE_TIMEOUT_MS = 2_000;
 
 type NetworkStatusContextValue = {
   hasResolvedState: boolean;
@@ -74,19 +78,32 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
       }, NETWORK_RECONNECT_STABILITY_MS);
     }
 
+    function assumeOnline() {
+      if (cancelled) {
+        return;
+      }
+      setHasResolvedState(true);
+      setIsOnline(true);
+      isOnlineRef.current = true;
+      onlineManager.setOnline(true);
+    }
+
+    const probeTimeout = setTimeout(() => {
+      if (!receivedLiveEvent) {
+        assumeOnline();
+      }
+    }, NETWORK_PROBE_TIMEOUT_MS);
+
     Network.getNetworkStateAsync()
       .then((networkState) => {
+        clearTimeout(probeTimeout);
         if (!receivedLiveEvent) {
           applyOnlineState(toOnlineValue(networkState));
         }
       })
       .catch(() => {
-        if (!cancelled) {
-          setHasResolvedState(true);
-          setIsOnline(true);
-          isOnlineRef.current = true;
-          onlineManager.setOnline(true);
-        }
+        clearTimeout(probeTimeout);
+        assumeOnline();
       });
 
     const subscription = Network.addNetworkStateListener((networkState) => {
@@ -96,6 +113,7 @@ export function NetworkStateProvider({ children }: PropsWithChildren) {
 
     return () => {
       cancelled = true;
+      clearTimeout(probeTimeout);
       clearReconnectTimer();
       subscription.remove();
     };

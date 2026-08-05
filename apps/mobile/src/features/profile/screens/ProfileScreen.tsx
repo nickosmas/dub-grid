@@ -2,6 +2,7 @@ import { router, Stack } from "expo-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
+import { getOrgRoleLabel } from "@dubgrid/domain";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   Alert,
@@ -26,17 +27,19 @@ import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   getProfile,
   getProfileChangeRequests,
-  registerPushToken,
   updateProfileChangeRequest,
 } from "../../../shared/lib/api";
-import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
+import {
+  disablePushForCurrentDevice,
+  handleExpiredMobileSession,
+} from "../../../shared/lib/auth-reset";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import {
   getInlineErrorMessageOrToast,
   pushClientFriendlyErrorToast,
 } from "../../../shared/lib/errors";
 import { getMobileQueryContentState, getQueryErrorMessage } from "../../../shared/lib/query-state";
-import { loadStoredPushDevice, saveLastOrgSlug } from "../../../shared/lib/session";
+import { saveLastOrgSlug } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -58,12 +61,6 @@ import {
   useProfilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
 import { PendingRequestsCard } from "../components/PendingRequestsCard";
-
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  user: "User",
-};
 
 type OrganizationSwitchClient = {
   rpc: (
@@ -152,7 +149,7 @@ export default function ProfileScreen() {
   const memberships = bootstrapQuery.data?.memberships ?? [];
   const canSwitchOrganizations = memberships.length > 1;
   const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, profile?.effectiveRole);
-  const roleLabel = orgRoleBadge?.label ?? ROLE_LABELS[profile?.effectiveRole ?? ""] ?? "User";
+  const roleLabel = orgRoleBadge?.label ?? getOrgRoleLabel(profile?.effectiveRole);
   const avatarSeed = profile?.linkedEmployee?.id ?? profile?.user.id ?? "";
   const avatarTone = avatarSeed ? getAvatarTone(avatarSeed, resolvedTheme === "dark") : null;
   const staffStatusLabel = formatProfileStatus(profile?.linkedEmployee?.status);
@@ -162,17 +159,7 @@ export default function ProfileScreen() {
     setLogoutError(null);
 
     try {
-      const storedPushDevice = await loadStoredPushDevice();
-      if (accessToken && storedPushDevice) {
-        try {
-          await registerPushToken(accessToken, {
-            ...storedPushDevice,
-            disabled: true,
-          });
-        } catch {
-          // Keep logout resilient even if token cleanup fails.
-        }
-      }
+      await disablePushForCurrentDevice();
 
       const { error } = await getSupabaseClient().auth.signOut({
         scope: "local",
@@ -238,8 +225,15 @@ export default function ProfileScreen() {
       }
 
       await saveLastOrgSlug(input.slug);
-      await queryClient.invalidateQueries({ queryKey: ["mobile"] });
-      await Promise.all([profileQuery.refetch(), bootstrapQuery.refetch()]);
+
+      // Drop the previous org's data outright rather than marking it stale —
+      // `invalidateQueries` keeps rendering the old rows until each refetch
+      // lands, which flashes another tenant's people and schedule. Web resets
+      // just as hard (clear + hard navigation) for the same reason. Resetting
+      // to Home also re-derives tab visibility from the new bootstrap instead
+      // of leaving the old org's tabs on screen.
+      queryClient.clear();
+      router.replace("/(tabs)/home");
     } catch (error) {
       pushClientFriendlyErrorToast(pushToast, {
         error,

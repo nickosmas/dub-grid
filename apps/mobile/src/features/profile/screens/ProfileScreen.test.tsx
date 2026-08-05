@@ -18,6 +18,7 @@ const getSupabaseClient = vi.fn();
 const registerPushToken = vi.fn();
 const loadStoredPushDevice = vi.fn();
 const handleExpiredMobileSession = vi.fn();
+const disablePushForCurrentDevice = vi.fn();
 const pushToast = vi.fn();
 
 vi.mock("expo-router", () => ({
@@ -54,6 +55,7 @@ vi.mock("../../../shared/lib/api", () => ({
 }));
 
 vi.mock("../../../shared/lib/auth-reset", () => ({
+  disablePushForCurrentDevice,
   handleExpiredMobileSession,
 }));
 
@@ -195,6 +197,8 @@ describe("ProfileScreen", () => {
     registerPushToken.mockReset();
     loadStoredPushDevice.mockReset();
     handleExpiredMobileSession.mockReset();
+    disablePushForCurrentDevice.mockReset();
+    disablePushForCurrentDevice.mockResolvedValue(undefined);
     pushToast.mockReset();
     routerPush.mockReset();
 
@@ -389,13 +393,8 @@ describe("ProfileScreen", () => {
   });
 
   it("resets the mobile session after a successful sign-out", async () => {
-    getSupabaseClient.mockReturnValue({
-      auth: {
-        signOut: vi.fn().mockResolvedValue({
-          error: null,
-        }),
-      },
-    } as never);
+    const signOut = vi.fn().mockResolvedValue({ error: null });
+    getSupabaseClient.mockReturnValue({ auth: { signOut } } as never);
     handleExpiredMobileSession.mockResolvedValue(undefined);
 
     render(<ProfileScreen />);
@@ -412,5 +411,12 @@ describe("ProfileScreen", () => {
         skipSignOut: true,
       });
     });
+
+    // The push token has to be revoked while the session is still valid,
+    // otherwise the device keeps receiving this user's notifications.
+    expect(disablePushForCurrentDevice).toHaveBeenCalled();
+    expect(disablePushForCurrentDevice.mock.invocationCallOrder[0]).toBeLessThan(
+      signOut.mock.invocationCallOrder[0],
+    );
   });
 });

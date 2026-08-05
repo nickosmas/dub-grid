@@ -3,7 +3,7 @@ import type { Factor } from "@supabase/supabase-js";
 import * as LocalAuthentication from "expo-local-authentication";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { DetailSkeleton } from "../../../shared/components/Skeleton";
@@ -26,7 +26,10 @@ import {
   getInlineErrorMessageOrToast,
   pushClientFriendlyErrorToast,
 } from "../../../shared/lib/errors";
-import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
+import {
+  disablePushForCurrentDevice,
+  handleExpiredMobileSession,
+} from "../../../shared/lib/auth-reset";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -358,6 +361,12 @@ export default function ProfileSecurityScreen() {
 
     setSessionScopeLoading(scope);
     try {
+      if (scope === "global") {
+        // This device is about to lose its session too, so stop its pushes
+        // while the token is still valid.
+        await disablePushForCurrentDevice();
+      }
+
       const result = await getSupabaseClient().auth.signOut({ scope });
       if (result.error) {
         pushClientFriendlyErrorToast(pushToast, {
@@ -455,6 +464,8 @@ export default function ProfileSecurityScreen() {
         );
         return;
       }
+
+      await disablePushForCurrentDevice();
 
       const signOutResult = await getSupabaseClient().auth.signOut({
         scope: "global",
@@ -1167,7 +1178,9 @@ const createStyles = (mobileColors: MobileColors) =>
     mfaSecretText: {
       ...mobileText.body,
       color: mobileColors.textPrimary,
-      fontFamily: "monospace",
+      // "monospace" is an Android alias with no iOS equivalent, so recovery
+      // codes silently rendered in the system font there.
+      fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
       letterSpacing: 1,
     },
     sessionList: {
