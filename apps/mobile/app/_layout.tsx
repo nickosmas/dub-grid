@@ -1,5 +1,5 @@
 import { ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
-import { Stack } from "expo-router";
+import { Stack, type ErrorBoundaryProps } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import {
@@ -16,7 +16,9 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { getMobileNavigationTheme } from "@dubgrid/design-tokens";
 import { MobileRealtimeProvider } from "../src/features/auth/providers/MobileRealtimeProvider";
 import { ConsentGate } from "../src/features/consent/components/ConsentGate";
+import { TermsGate } from "../src/features/consent/components/TermsGate";
 import { ConfigurationScreen } from "../src/shared/components/ConfigurationScreen";
+import { RouteErrorScreen } from "../src/shared/components/RouteErrorScreen";
 import { validateMobileEnv } from "../src/shared/lib/env";
 import { queryClient } from "../src/shared/lib/query-client";
 import { AppLockProvider } from "../src/shared/providers/AppLockProvider";
@@ -34,6 +36,30 @@ import {
 } from "../src/shared/navigation/top-level-stack";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+/**
+ * Expo Router renders this instead of crashing the app when a render throws.
+ * Without it a single bad render takes the whole app down with no way back —
+ * web has the equivalent via each segment's `error.tsx`.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  // The native splash is still held at this point if we failed during startup.
+  SplashScreen.hideAsync().catch(() => {});
+
+  return (
+    <ThemeModeProvider>
+      <RouteErrorScreen
+        actionLabel="Try again"
+        body="Something went wrong and this screen couldn't load. Trying again usually clears it."
+        detail={error.message}
+        onAction={() => {
+          void retry();
+        }}
+        title="This screen ran into a problem"
+      />
+    </ThemeModeProvider>
+  );
+}
 
 function RootLayoutContent({
   envValidation,
@@ -60,20 +86,22 @@ function RootLayoutContent({
                 <AppLockProvider>
                   <MobileRealtimeProvider>
                     <ConsentGate>
-                      <Stack screenOptions={createCommonStackOptions(mobileColors)}>
-                        <Stack.Screen name="index" options={{ headerShown: false }} />
-                        <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-                        <Stack.Screen
-                          name="(auth)/onboarding"
-                          options={{ headerShown: false, animation: "fade" }}
-                        />
-                        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                        <Stack.Screen name="alerts" options={{ headerShown: false }} />
-                        <Stack.Screen
-                          name="shift/[employeeId]/[date]"
-                          options={createDetailStackOptions(mobileColors, "Shift Detail")}
-                        />
-                      </Stack>
+                      <TermsGate>
+                        <Stack screenOptions={createCommonStackOptions(mobileColors)}>
+                          <Stack.Screen name="index" options={{ headerShown: false }} />
+                          <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+                          <Stack.Screen
+                            name="(auth)/onboarding"
+                            options={{ headerShown: false, animation: "fade" }}
+                          />
+                          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                          <Stack.Screen name="alerts" options={{ headerShown: false }} />
+                          <Stack.Screen
+                            name="shift/[employeeId]/[date]"
+                            options={createDetailStackOptions(mobileColors, "Shift Detail")}
+                          />
+                        </Stack>
+                      </TermsGate>
                     </ConsentGate>
                   </MobileRealtimeProvider>
                 </AppLockProvider>

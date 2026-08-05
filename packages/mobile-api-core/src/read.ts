@@ -12,6 +12,7 @@ import type {
   MobileScheduleEntry,
   MobileScheduleRange,
 } from "@dubgrid/contracts";
+import { hasAcceptedCurrentTerms } from "@dubgrid/domain";
 import type { Organization, PlatformRole } from "@dubgrid/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -118,6 +119,8 @@ type FetchLinkedEmployeeForUser = (
 ) => Promise<MobileLinkedEmployee | null>;
 
 type FetchMobileUnreadNotificationCount = (userClient: SupabaseClient) => Promise<number>;
+
+type FetchTermsAcceptedVersion = (userId: string) => Promise<string | null>;
 
 type FetchMobileAbsenceTypes = (
   serviceClient: SupabaseClient,
@@ -226,6 +229,7 @@ export async function loadMobileBootstrapPayload(
     fetchMobileRoles: FetchMobileNamedItems;
     fetchMobileCertifications: FetchMobileNamedItems;
     fetchMobileDepartments: FetchMobileDepartments;
+    fetchTermsAcceptedVersion: FetchTermsAcceptedVersion;
     mapOrganizationToMobileConfig: MapOrganizationToMobileConfig;
   },
 ): Promise<MobileBootstrapResponse> {
@@ -237,6 +241,7 @@ export async function loadMobileBootstrapPayload(
     roles,
     certifications,
     departments,
+    termsAcceptedVersion,
   ] = await Promise.all([
     deps.fetchLinkedEmployeeForUser(auth.serviceClient, auth.currentOrg.id, auth.user.id),
     deps.fetchMobileUnreadNotificationCount(auth.userClient),
@@ -245,6 +250,7 @@ export async function loadMobileBootstrapPayload(
     deps.fetchMobileRoles(auth.serviceClient, auth.currentOrg.id),
     deps.fetchMobileCertifications(auth.serviceClient, auth.currentOrg.id),
     deps.fetchMobileDepartments(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchTermsAcceptedVersion(auth.user.id),
   ]);
 
   return {
@@ -281,6 +287,7 @@ export async function loadMobileBootstrapPayload(
     certifications,
     departments,
     unreadNotificationCount,
+    acceptedCurrentTerms: hasAcceptedCurrentTerms(termsAcceptedVersion),
   };
 }
 

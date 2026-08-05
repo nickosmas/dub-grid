@@ -3,7 +3,7 @@ import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "rea
 import { Button } from "../../../shared/components/Button";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
-import { LEGAL_URLS, needsConsentDecision, setStoredConsent } from "../lib/consent";
+import { getLegalUrls, needsConsentDecision, setStoredConsent } from "../lib/consent";
 
 const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
 
@@ -61,7 +61,7 @@ export function ConsentGate({ children }: PropsWithChildren) {
               </Text>
               <Pressable
                 accessibilityRole="link"
-                onPress={() => void Linking.openURL(LEGAL_URLS.cookies)}
+                onPress={() => void Linking.openURL(getLegalUrls().cookies)}
               >
                 <Text style={styles.link}>Read our cookie policy</Text>
               </Pressable>

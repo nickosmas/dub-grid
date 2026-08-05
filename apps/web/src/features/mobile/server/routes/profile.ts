@@ -7,6 +7,7 @@ import {
   mobileProfileMfaStatusUpdateBodySchema,
   mobileProfileMfaStatusUpdateResponseSchema,
   mobileProfileResponseSchema,
+  mobileTermsAcceptanceResponseSchema,
 } from "@dubgrid/contracts";
 import {
   fetchSelfProfileSnapshot,
@@ -14,6 +15,7 @@ import {
   updateSelfProfileDetails,
   updateSelfLinkedEmployeePhone,
   updateSelfMfaStatus,
+  recordCurrentTermsAcceptance,
 } from "@/features/account/server";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import {
@@ -248,5 +250,22 @@ export async function PATCHMfaStatus(req: NextRequest) {
 
   return NextResponse.json(
     mobileProfileMfaStatusUpdateResponseSchema.parse({ user: payload.user }),
+  );
+}
+
+/**
+ * Mobile counterpart to `POST /api/account/terms`. The web route authenticates
+ * from cookies and enforces a CSRF origin check, neither of which applies to a
+ * Bearer-token native client — hence a separate handler over the same
+ * `recordCurrentTermsAcceptance` write.
+ */
+export async function POSTTerms(req: NextRequest) {
+  const auth = await requireMobileAuth(req);
+  if ("response" in auth) return auth.response;
+
+  await recordCurrentTermsAcceptance(auth.user.id);
+
+  return NextResponse.json(
+    mobileTermsAcceptanceResponseSchema.parse({ acceptedCurrentTerms: true }),
   );
 }

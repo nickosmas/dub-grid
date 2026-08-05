@@ -31,11 +31,13 @@ import {
   mobileUpdateShiftRequestResponseSchema,
   mobileOrganizationLookupResponseSchema,
   mobileOrgStatusResponseSchema,
+  mobileTermsAcceptanceResponseSchema,
   type MobileAuthSession,
   type MobileAuthLoginResponse,
   type MobileCreateShiftRequestBody,
   type MobileBootstrapResponse,
   type MobileOrgStatusResponse,
+  type MobileTermsAcceptanceResponse,
   type MobilePersonInvitationActionBody,
   type MobilePersonCreateBody,
   type MobilePersonInvitationCreateBody,
@@ -291,6 +293,15 @@ export function parseMobileNameMismatchError(error: unknown): MobileNameMismatch
 export function getBootstrap(accessToken: string): Promise<MobileBootstrapResponse> {
   return mobileApiRequest("/api/mobile/v1/bootstrap", accessToken, { method: "GET" }, (value) =>
     mobileBootstrapResponseSchema.parse(value),
+  );
+}
+
+export function acceptCurrentTerms(accessToken: string): Promise<MobileTermsAcceptanceResponse> {
+  return mobileApiRequest(
+    "/api/mobile/v1/profile/terms",
+    accessToken,
+    { method: "POST", body: JSON.stringify({}) },
+    (value) => mobileTermsAcceptanceResponseSchema.parse(value),
   );
 }
 

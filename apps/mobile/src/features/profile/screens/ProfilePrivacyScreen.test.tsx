@@ -12,15 +12,20 @@ vi.mock("../../../shared/components/Screen", async () => createScreenModule(awai
 
 const getStoredConsent = vi.fn();
 const setStoredConsent = vi.fn();
+const pushToast = vi.fn();
 
 vi.mock("../../consent/lib/consent", () => ({
   getStoredConsent: (...args: unknown[]) => getStoredConsent(...args),
   setStoredConsent: (...args: unknown[]) => setStoredConsent(...args),
-  LEGAL_URLS: {
+  getLegalUrls: () => ({
     privacy: "https://app.dubgrid.com/privacy",
     terms: "https://app.dubgrid.com/terms",
     cookies: "https://app.dubgrid.com/cookie-policy",
-  },
+  }),
+}));
+
+vi.mock("../../../shared/providers/ToastProvider", () => ({
+  useToast: () => ({ pushToast: (...args: unknown[]) => pushToast(...args) }),
 }));
 
 import ProfilePrivacyScreen from "./ProfilePrivacyScreen";

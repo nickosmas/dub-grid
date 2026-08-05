@@ -199,6 +199,13 @@ export const mobileBootstrapResponseSchema = z.object({
   certifications: z.array(mobileNamedItemSchema).default([]),
   departments: z.array(mobileDepartmentSchema).default([]),
   unreadNotificationCount: z.number().int().nonnegative(),
+  // Defaults to true so a client talking to an older server that doesn't send
+  // this field stays usable rather than being locked out of the app.
+  acceptedCurrentTerms: z.boolean().default(true),
+});
+
+export const mobileTermsAcceptanceResponseSchema = z.object({
+  acceptedCurrentTerms: z.literal(true),
 });
 
 export const mobileProfileUserSchema = mobileUserSchema.extend({
@@ -966,6 +973,7 @@ export const mobilePushTokenResponseSchema = z.object({
 });
 
 export type MobileBootstrapResponse = z.infer<typeof mobileBootstrapResponseSchema>;
+export type MobileTermsAcceptanceResponse = z.infer<typeof mobileTermsAcceptanceResponseSchema>;
 export type MobileProfileResponse = z.infer<typeof mobileProfileResponseSchema>;
 export type MobileProfileAccountUpdateBody = z.infer<typeof mobileProfileAccountUpdateBodySchema>;
 export type MobileProfilePhoneUpdateBody = z.infer<typeof mobileProfilePhoneUpdateBodySchema>;
