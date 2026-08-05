@@ -55,4 +55,24 @@ describe("OnboardingScreen", () => {
     });
     expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
   });
+
+  it("starts on the first slide with an advance action, not a finish action", () => {
+    render(<OnboardingScreen />);
+
+    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Get Started" })).not.toBeInTheDocument();
+  });
+
+  // The primary button doubles as advance and finish. If it ever completed on
+  // the first slide, every new user would be dropped straight onto login and
+  // never see the value props — and the flag is device-local, so they would
+  // never be shown them again either.
+  it("Continue advances instead of completing onboarding", () => {
+    render(<OnboardingScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(saveHasSeenOnboarding).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
+  });
 });
