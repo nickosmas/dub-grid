@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
-import { useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, type MobileColors } from "../../../../shared/theme/tokens";
+import { useIsDarkMode, useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
+import { mobileDarkenTone, mobileRadii, type MobileColors } from "../../../../shared/theme/tokens";
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
 
@@ -42,8 +42,16 @@ const NOTES: Array<{
   },
 ];
 
+function noteTone(note: { iconBg: string; iconColor: string }, isDark: boolean) {
+  return mobileDarkenTone(
+    { backgroundColor: note.iconBg, borderColor: note.iconBg, textColor: note.iconColor },
+    isDark,
+  );
+}
+
 export function IllustrationNotifications() {
   const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
     <View accessible={false} style={styles.stack}>
@@ -57,8 +65,15 @@ export function IllustrationNotifications() {
 
       {NOTES.map((note, index) => (
         <View key={note.title} style={[styles.card, index === 0 ? styles.cardLead : null]}>
-          <View style={[styles.iconCircle, { backgroundColor: note.iconBg }]}>
-            <Ionicons color={note.iconColor} name={note.iconName} size={16} />
+          <View
+            style={[
+              styles.iconCircle,
+              // Fixed light-page pastels on a themed card — remap them rather
+              // than leaving a washed-out chip on a dark surface.
+              { backgroundColor: noteTone(note, isDark).backgroundColor },
+            ]}
+          >
+            <Ionicons color={noteTone(note, isDark).textColor} name={note.iconName} size={16} />
           </View>
           <View style={styles.copy}>
             <View style={styles.titleRow}>
@@ -126,7 +141,7 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingHorizontal: 12,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
-      shadowColor: "#0F172A",
+      shadowColor: mobileColors.shadow,
       shadowOpacity: 0.05,
       shadowRadius: 10,
       shadowOffset: { width: 0, height: 4 },
@@ -134,7 +149,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     cardLead: {
       borderColor: mobileColors.brandBorder,
-      backgroundColor: "#F8FBFF",
+      backgroundColor: mobileColors.brandSoft,
     },
     iconCircle: {
       width: 32,

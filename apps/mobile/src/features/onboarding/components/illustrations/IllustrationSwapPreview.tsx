@@ -50,7 +50,7 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 2,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
-      shadowColor: "#0F172A",
+      shadowColor: mobileColors.shadow,
       shadowOpacity: 0.06,
       shadowRadius: 14,
       shadowOffset: { width: 0, height: 6 },
@@ -58,7 +58,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     cardReceive: {
       borderColor: mobileColors.brandBorder,
-      backgroundColor: "#F8FAFF",
+      backgroundColor: mobileColors.brandSoft,
     },
     label: {
       color: mobileColors.textMuted,
@@ -92,10 +92,10 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingHorizontal: 8,
       paddingVertical: 3,
       borderRadius: 6,
-      backgroundColor: "#FEF3C7",
+      backgroundColor: mobileColors.warningSoft,
     },
     supervisorText: {
-      color: "#92400E",
+      color: mobileColors.warningText,
       fontSize: 9,
       fontWeight: "700",
       letterSpacing: 0.6,
