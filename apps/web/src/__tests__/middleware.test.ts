@@ -84,9 +84,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   // SUPABASE_JWT_SECRET is no longer used — middleware now verifies via JWKS.
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "test-anon-key";
   process.env.NEXT_PUBLIC_BASE_DOMAIN = "localhost";
-  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+  process.env.SUPABASE_SECRET_KEY = "test-service-role-key";
   mockVerifyImpersonationSession.mockResolvedValue(null);
   mockSupabaseFrom.mockImplementation((table: string) => ({
     select: vi.fn(() => ({

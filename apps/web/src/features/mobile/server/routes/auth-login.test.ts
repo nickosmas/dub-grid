@@ -159,7 +159,7 @@ describe("mobile auth login route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "anon-key");
   });
 
   it("returns 403 ACCOUNT_DISABLED when the JWT hook refuses a terminated employee", async () => {

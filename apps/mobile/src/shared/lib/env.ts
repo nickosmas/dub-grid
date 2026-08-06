@@ -3,9 +3,6 @@ import { Platform, type PlatformOSType } from "react-native";
 type MobileEnvKey =
   | "EXPO_PUBLIC_SUPABASE_URL"
   | "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
-  // Legacy name, still read as a fallback while environments migrate to
-  // Supabase's `sb_publishable_…` key format.
-  | "EXPO_PUBLIC_SUPABASE_ANON_KEY"
   | "EXPO_PUBLIC_API_BASE_URL";
 
 export type MobileEnvConfig = {
@@ -76,9 +73,7 @@ function isKnownHostedDubGridHost(hostname: string): boolean {
 
 export function validateMobileEnv(platform: PlatformOSType = Platform.OS): MobileEnvValidation {
   const supabaseUrl = readEnvValue("EXPO_PUBLIC_SUPABASE_URL");
-  const supabaseAnonKey =
-    readEnvValue("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ||
-    readEnvValue("EXPO_PUBLIC_SUPABASE_ANON_KEY");
+  const supabaseAnonKey = readEnvValue("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
   const apiBaseUrl = readEnvValue("EXPO_PUBLIC_API_BASE_URL");
 
   const issues: MobileEnvIssue[] = [];

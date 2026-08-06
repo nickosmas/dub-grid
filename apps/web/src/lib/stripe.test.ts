@@ -36,7 +36,7 @@ const ORG_ID = "11111111-1111-4111-8111-111111111111";
 const ORIGINAL_STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const ORIGINAL_STRIPE_PRICE_ID_MONTHLY = process.env.STRIPE_PRICE_ID_MONTHLY;
 const ORIGINAL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const ORIGINAL_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const ORIGINAL_SERVICE_KEY = process.env.SUPABASE_SECRET_KEY;
 
 describe("syncSubscriptionToDb", () => {
   beforeEach(() => {
@@ -44,7 +44,7 @@ describe("syncSubscriptionToDb", () => {
     vi.clearAllMocks();
     process.env.STRIPE_SECRET_KEY = "sk_test_mock";
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "service-role-key";
+    process.env.SUPABASE_SECRET_KEY = "service-role-key";
 
     stripeConstructor.mockImplementation(() => ({
       checkout: {
@@ -104,7 +104,7 @@ describe("syncSubscriptionToDb", () => {
     process.env.STRIPE_SECRET_KEY = ORIGINAL_STRIPE_SECRET_KEY;
     process.env.STRIPE_PRICE_ID_MONTHLY = ORIGINAL_STRIPE_PRICE_ID_MONTHLY;
     process.env.NEXT_PUBLIC_SUPABASE_URL = ORIGINAL_SUPABASE_URL;
-    process.env.SUPABASE_SERVICE_ROLE_KEY = ORIGINAL_SERVICE_KEY;
+    process.env.SUPABASE_SECRET_KEY = ORIGINAL_SERVICE_KEY;
   });
 
   it("syncs Stripe subscription state into subscriptions and organizations", async () => {
