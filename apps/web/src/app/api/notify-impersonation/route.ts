@@ -12,6 +12,7 @@ import logger from "@/lib/logger";
 import { sendResendEmail } from "@/lib/resend";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { getSupabaseSecretKey } from "@/lib/supabase-keys";
 
 const bodySchema = z.object({
   targetEmail: z.string().email(),
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
     // from x-forwarded-for. This is more reliable than client-reported IP.
     if (isStart) {
       const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
-      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const serviceRoleKey = getSupabaseSecretKey();
       if (ip && serviceRoleKey) {
         try {
           const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey);

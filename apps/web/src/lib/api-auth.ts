@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { JwtPayload, Session, User } from "@supabase/supabase-js";
 import { getServiceClient } from "@/lib/supabase-service";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
+import { requireSupabasePublishableKey } from "@/lib/supabase-keys";
 
 type Claims = JwtPayload & {
   platform_role?: unknown;
@@ -22,7 +23,7 @@ type ClaimsAuthResult =
 export function createRequestSupabaseClient(req: NextRequest) {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    requireSupabasePublishableKey(),
     {
       cookies: {
         getAll() {
@@ -46,7 +47,7 @@ export function createRequestSupabaseClient(req: NextRequest) {
 export function createTokenScopedClient(accessToken: string) {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    requireSupabasePublishableKey(),
     {
       auth: { autoRefreshToken: false, persistSession: false },
       global: { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -64,7 +65,7 @@ export function createTokenScopedClient(accessToken: string) {
 export function createAnonClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    requireSupabasePublishableKey(),
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
 }

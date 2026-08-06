@@ -142,14 +142,15 @@ jobs:
 
       # Step-scoped, not job-scoped. The install above unpacks ~8,500
       # third-party packages; anything executing during that step can read the
-      # entire environment. SUPABASE_SERVICE_ROLE_KEY bypasses every RLS policy
+      # entire environment. SUPABASE_SECRET_KEY bypasses every RLS policy
       # we have and SENTRY_AUTH_TOKEN can publish releases, so neither exists
       # until the build itself runs.
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # `||` falls back while the repo secret is still under its old name.
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY || secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
           NEXT_PUBLIC_BASE_DOMAIN: ${{ secrets.NEXT_PUBLIC_BASE_DOMAIN }}
           NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}

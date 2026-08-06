@@ -11,8 +11,8 @@ runtime:
 **Always required (all environments):**
 
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase public anon key (baked into client bundle)
-- `SUPABASE_SERVICE_ROLE_KEY` — Server-only service role key (never `NEXT_PUBLIC_`)
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — Supabase public anon key (baked into client bundle)
+- `SUPABASE_SECRET_KEY` — Server-only service role key (never `NEXT_PUBLIC_`)
 
 **Required in production (`NODE_ENV=production` + `VERCEL_ENV=production` or `STRICT_PROD_ENV_VALIDATION=1`):**
 
@@ -45,7 +45,7 @@ runtime:
 
 ## Rotation Procedures
 
-### SUPABASE_SERVICE_ROLE_KEY
+### SUPABASE_SECRET_KEY
 
 1. Go to Supabase Dashboard > Settings > API
 2. Regenerate the service_role key
@@ -54,7 +54,7 @@ runtime:
 5. Restart the deployment
 6. Verify: hit `/api/health` and confirm DB check passes
 
-### NEXT_PUBLIC_SUPABASE_ANON_KEY
+### NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 
 1. Same location as above — regenerate the anon key
 2. Update in Vercel env vars (all environments)
@@ -161,7 +161,7 @@ If a secret is compromised:
 
 | Secret                      | Check                                                   |
 | --------------------------- | ------------------------------------------------------- |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase audit logs for unexpected service-role queries |
+| `SUPABASE_SECRET_KEY` | Supabase audit logs for unexpected service-role queries |
 | `STRIPE_SECRET_KEY`         | Stripe Dashboard > Logs for unexpected API calls        |
 | `STRIPE_WEBHOOK_SECRET`     | Stripe webhook delivery logs for signature failures     |
 | `RESEND_API_KEY`            | Resend logs for unexpected email sends                  |

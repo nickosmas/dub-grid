@@ -2,12 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { extractJwtClaims } from "@/features/permissions/shared";
 import SchedulerPageClient, { type SchedulePageInitialState } from "./SchedulePageClient";
+import { requireSupabasePublishableKey } from "@/lib/supabase-keys";
 
 async function loadInitialScheduleState(): Promise<SchedulePageInitialState> {
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    requireSupabasePublishableKey(),
     {
       cookies: {
         getAll() {

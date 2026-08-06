@@ -119,7 +119,7 @@ controls assume a dependency will eventually be malicious.
 - **Actions are pinned to commit SHAs**, and every workflow declares
   `permissions: contents: read`, so a dependency executing in CI cannot inherit
   a token that writes to the repo.
-- **Secrets are step-scoped.** `SUPABASE_SERVICE_ROLE_KEY`, `SENTRY_AUTH_TOKEN`,
+- **Secrets are step-scoped.** `SUPABASE_SECRET_KEY`, `SENTRY_AUTH_TOKEN`,
   and the E2E Upstash credentials are absent from the environment during
   `npm ci` and present only for the steps that need them. Harvesting
   `process.env` is the first thing a compromised package does.

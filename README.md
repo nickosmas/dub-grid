@@ -71,8 +71,8 @@ Fill in your Supabase credentials:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-anon-key
+SUPABASE_SECRET_KEY=your-service-role-key
 # Optional: browser-restricted Google Maps Places key for org address autocomplete
 # NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-browser-restricted-google-maps-key
 ```
@@ -229,8 +229,8 @@ double-check all of these are set before relying on the `build` job passing.
 | Secret                               | Source                                                                  |
 | ------------------------------------ | ----------------------------------------------------------------------- |
 | `NEXT_PUBLIC_SUPABASE_URL`           | Supabase project API settings (same value as `apps/web/.env.example`)   |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY`      | Supabase project API settings                                           |
-| `SUPABASE_SERVICE_ROLE_KEY`          | Supabase project API settings (server-only, never expose to the client) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`      | Supabase project API settings                                           |
+| `SUPABASE_SECRET_KEY`          | Supabase project API settings (server-only, never expose to the client) |
 | `NEXT_PUBLIC_SITE_URL`               | The deployed site origin (e.g. `https://app.example.com`)               |
 | `NEXT_PUBLIC_BASE_DOMAIN`            | The base domain used for subdomain routing                              |
 | `NEXT_PUBLIC_SENTRY_DSN`             | Sentry project settings                                                 |

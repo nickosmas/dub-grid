@@ -96,12 +96,12 @@ async function main() {
   const env = parseEnvFile(mobileEnvPath);
   const supabaseUrl = env.EXPO_PUBLIC_SUPABASE_URL?.trim();
   const apiBaseUrl = env.EXPO_PUBLIC_API_BASE_URL?.trim();
-  const anonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const anonKey = env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
 
   console.log(`  EXPO_PUBLIC_SUPABASE_URL    = ${supabaseUrl || "(missing)"}`);
   console.log(`  EXPO_PUBLIC_API_BASE_URL    = ${apiBaseUrl || "(missing)"}`);
   console.log(
-    `  EXPO_PUBLIC_SUPABASE_ANON_KEY = ${anonKey ? `${anonKey.slice(0, 8)}…` : "(missing)"}`,
+    `  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY = ${anonKey ? `${anonKey.slice(0, 8)}…` : "(missing)"}`,
   );
   console.log("");
 

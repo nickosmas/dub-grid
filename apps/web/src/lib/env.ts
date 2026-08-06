@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getSupabasePublishableKey, getSupabaseSecretKey } from "./supabase-keys";
 
 /**
  * Centralized environment variable validation.
@@ -13,7 +14,11 @@ const serverSchema = z
   .object({
     // Note: SUPABASE_JWT_SECRET is no longer required — JWT verification uses JWKS
     // (ES256 asymmetric keys fetched from Supabase's .well-known/jwks.json endpoint).
-    SUPABASE_SERVICE_ROLE_KEY: z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY is required"),
+    // Accepts either name during the migration to Supabase's `sb_secret_…`
+    // format; `getSupabaseSecretKey()` resolves the same precedence at runtime.
+    SUPABASE_SECRET_KEY: z
+      .string()
+      .min(1, "SUPABASE_SECRET_KEY is required (legacy: SUPABASE_SERVICE_ROLE_KEY)"),
     // Shared secret for the scheduled jobs in vercel.json. Vercel only injects
     // `Authorization: Bearer $CRON_SECRET` when this var exists on the project,
     // so an unset value makes every cron run return 503 and get reported as a
@@ -54,7 +59,9 @@ const serverSchema = z
 
 const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url("NEXT_PUBLIC_SUPABASE_URL must be a valid URL"),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY is required"),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z
+    .string()
+    .min(1, "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required (legacy: NEXT_PUBLIC_SUPABASE_ANON_KEY)"),
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
   NEXT_PUBLIC_BASE_DOMAIN: z.string().optional(),
   NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
@@ -91,7 +98,7 @@ function validateServerEnv() {
 function validateClientEnv() {
   const result = clientSchema.safeParse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: getSupabasePublishableKey(),
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
     NEXT_PUBLIC_BASE_DOMAIN: process.env.NEXT_PUBLIC_BASE_DOMAIN,
     NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,

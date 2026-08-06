@@ -8,7 +8,7 @@ describe("mobile env validation", () => {
 
   it("flags missing required Expo mobile env vars", () => {
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "");
-    vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "");
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "");
 
     const result = validateMobileEnv("ios");
@@ -20,14 +20,14 @@ describe("mobile env validation", () => {
 
     expect(result.issues.map((issue) => issue.key)).toEqual([
       "EXPO_PUBLIC_SUPABASE_URL",
-      "EXPO_PUBLIC_SUPABASE_ANON_KEY",
+      "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "EXPO_PUBLIC_API_BASE_URL",
     ]);
   });
 
   it("rejects loopback URLs on native devices", () => {
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
-    vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "anon-key");
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "http://localhost:3000");
 
     const result = validateMobileEnv("ios");
@@ -51,7 +51,7 @@ describe("mobile env validation", () => {
 
   it("allows hosted URLs for Expo Go on a phone", () => {
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://example-project.supabase.co");
-    vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "anon-key");
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "https://dubgrid.com/");
 
     expect(validateMobileEnv("ios")).toEqual({
@@ -66,7 +66,7 @@ describe("mobile env validation", () => {
 
   it("rejects a local API mixed with hosted Supabase", () => {
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://example-project.supabase.co");
-    vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "anon-key");
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "http://192.168.1.25:3000");
 
     const result = validateMobileEnv("ios");
@@ -87,7 +87,7 @@ describe("mobile env validation", () => {
 
   it("rejects local Supabase mixed with the hosted DubGrid API", () => {
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "http://192.168.1.25:54321");
-    vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "anon-key");
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "https://dubgrid.com");
 
     const result = validateMobileEnv("ios");

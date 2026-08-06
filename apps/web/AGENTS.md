@@ -138,7 +138,7 @@ Font: DM Sans only (`var(--font-dm-sans)`). Never Geist.
 
 - Variable names from `.env.example` or `apps/web/.env.example` only.
 - `NEXT_PUBLIC_*` is browser-visible.
-- `SUPABASE_SERVICE_ROLE_KEY`, Stripe, Resend, Upstash, Sentry tokens are server-only.
+- `SUPABASE_SECRET_KEY`, Stripe, Resend, Upstash, Sentry tokens are server-only.
 
 ## Verification
 

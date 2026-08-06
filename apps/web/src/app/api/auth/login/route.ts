@@ -15,6 +15,7 @@ import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { Timer } from "@/lib/server-timing";
 import { API_ERRORS } from "@dubgrid/client-errors";
+import { getSupabasePublishableKey } from "@/lib/supabase-keys";
 
 export const dynamic = "force-dynamic";
 
@@ -191,7 +192,7 @@ export async function POST(req: NextRequest) {
 
   // ── Authenticate via Supabase ─────────────────────────────────────
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const anonKey = getSupabasePublishableKey();
 
   if (!supabaseUrl || !anonKey) {
     logger.error("Supabase env vars not configured for login route");

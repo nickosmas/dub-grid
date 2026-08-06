@@ -10,6 +10,7 @@ import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { Timer } from "@/lib/server-timing";
 import * as Sentry from "@/lib/sentry";
+import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./src/lib/supabase-keys";
 
 /**
  * Vercel Edge Middleware for RBAC Route Protection
@@ -213,7 +214,7 @@ export async function middleware(req: NextRequest) {
   // reconstruction used by @supabase/ssr browser clients.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    requireSupabasePublishableKey(),
     {
       cookies: {
         getAll() {
@@ -377,7 +378,7 @@ export async function middleware(req: NextRequest) {
           // sessions row before trusting targetOrgId/targetUserId, the same
           // way the sandbox cookie is re-verified against the DB below.
           const supabaseUrl3 = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          const serviceKey3 = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          const serviceKey3 = getSupabaseSecretKey();
           const verified =
             typeof impData.sessionId === "string" && supabaseUrl3 && serviceKey3
               ? await timer.time("mw_impersonation_verify", () =>
@@ -440,7 +441,7 @@ export async function middleware(req: NextRequest) {
       } else {
         try {
           const supabaseUrl2 = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+          const serviceKey = getSupabaseSecretKey();
           if (supabaseUrl2 && serviceKey) {
             const svc = createClient(supabaseUrl2, serviceKey, {
               auth: { autoRefreshToken: false, persistSession: false },

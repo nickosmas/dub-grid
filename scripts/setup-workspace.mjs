@@ -1,8 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
 // Instructions:
-// 1. Ensure .env.local has NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
-// 2. (Optional) Add SUPABASE_SERVICE_ROLE_KEY to .env.local to automate everything
+// 1. Ensure .env.local has NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+// 2. (Optional) Add SUPABASE_SECRET_KEY to .env.local to automate everything
 // 3. Run: node scripts/setup-workspace.mjs
 
 const URL = "https://xpoylacxkbphnudsupuu.supabase.co";
@@ -11,7 +11,7 @@ const ANON_KEY =
 
 // If you have a service role key, use it here to bypass RLS.
 // Otherwise, follow the SQL instructions below.
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ANON_KEY;
+const SERVICE_KEY = process.env.SUPABASE_SECRET_KEY || ANON_KEY;
 
 const supabase = createClient(URL, SERVICE_KEY);
 

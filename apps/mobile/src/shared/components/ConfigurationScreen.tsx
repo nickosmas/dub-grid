@@ -12,6 +12,7 @@ function getIssueTitle(key: string): string {
       return "Mobile connection";
     case "EXPO_PUBLIC_SUPABASE_URL":
       return "Sign-in service";
+    case "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY":
     case "EXPO_PUBLIC_SUPABASE_ANON_KEY":
       return "Sign-in access";
     default:
@@ -32,6 +33,7 @@ function getIssueMessage(key: string, message: string): string {
     case "EXPO_PUBLIC_API_BASE_URL":
       return "This build is missing a reachable DubGrid web connection.";
     case "EXPO_PUBLIC_SUPABASE_URL":
+    case "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY":
     case "EXPO_PUBLIC_SUPABASE_ANON_KEY":
       return "This build is missing sign-in configuration.";
     default:

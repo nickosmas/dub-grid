@@ -4,6 +4,7 @@ import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
+import { getSupabaseSecretKey } from "@/lib/supabase-keys";
 
 export async function GET(req: NextRequest) {
   // ── Rate limit by IP ──────────────────────────────────────────────────
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey = getSupabaseSecretKey();
 
   const cacheHeaders = { "Cache-Control": "public, max-age=60" };
 

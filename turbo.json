@@ -15,6 +15,7 @@
     "STRIPE_PRICE_ID_MONTHLY",
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_SECRET",
+    "SUPABASE_SECRET_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
     "UPSTASH_REDIS_REST_TOKEN",
     "UPSTASH_REDIS_REST_URL",
@@ -29,6 +30,7 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*", "../../.env*"],
       "env": [
         "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY",
         "NEXT_PUBLIC_SITE_URL",
         "NEXT_PUBLIC_BASE_DOMAIN",
@@ -69,6 +71,7 @@
       "inputs": ["$TURBO_DEFAULT$", ".env*", "../../.env*"],
       "env": [
         "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY",
         "NEXT_PUBLIC_SITE_URL",
         "NEXT_PUBLIC_BASE_DOMAIN",
