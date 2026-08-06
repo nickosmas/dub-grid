@@ -40,7 +40,11 @@ export const DENYLIST = {
   keyv: ["6.0.0"],
   cacheable: ["2.5.1"],
   ecto: ["5.0.1"],
-  "@cacheable/node-cache": ["2.5.1"],
+  // flat-cache is the dangerous one to miss: it is a transitive dependency of
+  // eslint, so it reaches far more trees than the cache packages above.
+  "flat-cache": ["6.1.24"],
+  "@cacheable/net": ["2.1.1"],
+  "@cacheable/node-cache": ["3.1.2"],
   "@cacheable/memoize": ["2.5.1"],
   "@cacheable/utils": ["2.5.1"],
 };
@@ -53,10 +57,42 @@ export const MARKERS = [
   "IfYouBlockThisAPIKeyItWillCrashTheLiveProductionServersOfAllThirdPartyClients",
   "_NODE_RUNTIME_INIT",
   "tmp.dpkg_14527.lock",
+  // C2 hosts the payload exfiltrates to, all on 443.
+  "awqhnjewqjkl.icu",
+  "pypi-get.com",
+  "js-mirror.com",
+  "npm-cache.com",
+];
+
+/**
+ * Persistence the payload plants outside any repo, so no amount of scanning a
+ * checkout would find it. Dormant in the observed sample, but present.
+ */
+export const HOST_PERSISTENCE = [
+  ".local/bin/gh-token-monitor.sh",
+  ".config/gh-token-monitor",
+  "Library/LaunchAgents/com.user.gh-token-monitor.plist",
+  ".config/systemd/user/gh-token-monitor.service",
 ];
 
 /** Files the worm plants to re-trigger itself when a developer opens the repo. */
-export const PLANTED_PATHS = [".vscode/tasks.json", ".claude/setup.mjs", "setup.mjs"];
+export const PLANTED_PATHS = [
+  ".vscode/tasks.json",
+  ".vscode/setup.mjs",
+  ".claude/setup.mjs",
+  ".claude/math_init.js",
+  "setup.mjs",
+  "math_init.js",
+  "Math_Symbol.js",
+];
+
+/**
+ * `.claude/settings.json` is both a legitimate Claude Code file and one the
+ * worm writes, so its presence proves nothing — only a hook that launches the
+ * loader does. Checking for the file itself would cry wolf on every repo.
+ */
+export const HOOKED_SETTINGS = ".claude/settings.json";
+export const HOOK_LAUNCHERS = ["setup.mjs", "math_init.js", "Math_Symbol.js"];
 
 /** `node_modules/a/node_modules/@scope/b` -> `@scope/b` */
 export function packageNameFromLockPath(lockPath) {
@@ -123,6 +159,35 @@ function checkPlantedFiles(failures) {
         `Unexpected file ${rel} — the npm worm plants this to re-trigger on repo open. ` +
           `If you added it deliberately, remove it from PLANTED_PATHS in this script.`,
       );
+    }
+  }
+
+  // Presence is normal; a loader reference in it is not.
+  const settingsPath = join(ROOT, HOOKED_SETTINGS);
+  if (existsSync(settingsPath)) {
+    const body = readFileSync(settingsPath, "utf8");
+    for (const launcher of HOOK_LAUNCHERS) {
+      // A `hooks` block that runs the loader on session start is the giveaway.
+      if (/"hooks"\s*:/.test(body) && body.includes(launcher)) {
+        failures.push(
+          `${HOOKED_SETTINGS} contains a hook referencing ${launcher} — ` +
+            `the worm installs a Claude session hook to relaunch its loader.`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * The repo is not the only thing at risk: the payload writes a launch agent /
+ * systemd unit under $HOME that survives any amount of cleaning in a checkout.
+ */
+function checkHostPersistence(failures) {
+  const home = process.env.HOME;
+  if (!home) return;
+  for (const rel of HOST_PERSISTENCE) {
+    if (existsSync(join(home, rel))) {
+      failures.push(`Host persistence artifact ~/${rel} — this machine looks compromised.`);
     }
   }
 }
@@ -208,6 +273,7 @@ async function main(argv) {
   const entries = checkLockfile(failures);
   checkMarkers(failures);
   checkPlantedFiles(failures);
+  checkHostPersistence(failures);
 
   if (argv.includes("--freshness")) {
     const fresh = await checkFreshness(entries, {
