@@ -13,6 +13,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: e2e-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -28,19 +31,6 @@ jobs:
     env:
       TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-      # Required so rate limiting isn't null under `next start`'s NODE_ENV=production —
-      # without these, checkRateLimit() fails closed on every call (see
-      # apps/web/src/lib/rate-limit.ts) and login 503s for every Playwright spec.
-      #
-      # Prefers a CI-only Upstash database (E2E_UPSTASH_REDIS_REST_*) so repeated/retried
-      # test runs don't share rate-limit state (or Sentry/monitoring noise) with real
-      # production traffic against the same account. Falls back to the production
-      # credentials if the CI-only secrets haven't been created yet, so this doesn't break
-      # CI in the meantime — create a separate free-tier Upstash database and add
-      # E2E_UPSTASH_REDIS_REST_URL / E2E_UPSTASH_REDIS_REST_TOKEN as repo secrets to switch
-      # over.
-      UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL || secrets.UPSTASH_REDIS_REST_URL }}
-      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN || secrets.UPSTASH_REDIS_REST_TOKEN }}
       # Well-known Supabase CLI local dev keys (deterministic, not secrets).
       # See: https://supabase.com/docs/guides/local-development
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
@@ -50,12 +40,15 @@ jobs:
       NEXT_PUBLIC_BASE_DOMAIN: localhost
       CI: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      # Seeding needs @prisma/engines binaries, which only arrive via the
+      # allowlisted rebuild now that install scripts are off by default.
+      - run: npm run deps:rebuild
 
       - name: Install Playwright browsers
         run: |
@@ -66,9 +59,9 @@ jobs:
           fi
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
         with:
-          version: latest
+          version: "2.111.0" # pinned: `latest` silently adopts any new CLI build
 
       - name: Start Supabase
         run: supabase start
@@ -78,11 +71,32 @@ jobs:
         env:
           FORCE_LOCAL_DB: "1"
 
+      # Rate limiting must not be null under `next start`'s NODE_ENV=production —
+      # without these, checkRateLimit() fails closed on every call (see
+      # apps/web/src/lib/rate-limit.ts) and login 503s for every Playwright spec.
+      #
+      # Prefers a CI-only Upstash database (E2E_UPSTASH_REDIS_REST_*) so repeated/retried
+      # test runs don't share rate-limit state (or Sentry/monitoring noise) with real
+      # production traffic against the same account. Falls back to the production
+      # credentials if the CI-only secrets haven't been created yet, so this doesn't break
+      # CI in the meantime — create a separate free-tier Upstash database and add
+      # E2E_UPSTASH_REDIS_REST_URL / E2E_UPSTASH_REDIS_REST_TOKEN as repo secrets to switch
+      # over.
+      #
+      # Scoped to the two steps that need them rather than to the whole job:
+      # that fallback can resolve to production Upstash credentials, which must
+      # not sit in the environment while `npm ci` unpacks third-party packages.
       - name: Build Next.js
         run: npm run build
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL || secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN || secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Start server
         run: npm run start > server.log 2>&1 &
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.E2E_UPSTASH_REDIS_REST_URL || secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.E2E_UPSTASH_REDIS_REST_TOKEN || secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Wait for server
         run: timeout 60 bash -c 'until curl -s http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
@@ -97,7 +111,7 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-report
           path: playwright-report/
@@ -105,7 +119,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-test-results
           path: test-results/
@@ -113,7 +127,7 @@ jobs:
 
       - name: Upload server log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: server-log
           path: server.log

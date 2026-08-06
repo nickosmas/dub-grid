@@ -13,6 +13,43 @@ DubGrid is proprietary software. All contributions must be authorized.
 
 ---
 
+## Changing Dependencies
+
+`package-lock.json` is a security boundary. Deleting it and reinstalling
+re-resolves all ~8,500 packages to whatever is newest on npm that minute, which
+is how a freshly published malicious version gets adopted. Never do this:
+
+```bash
+rm -rf node_modules package-lock.json && npm install   # ❌ never
+```
+
+Add, remove, or bump a dependency this way instead:
+
+```bash
+npm install --package-lock-only <pkg>@<version>   # resolve, execute nothing
+git diff package-lock.json                        # review what actually moved
+npm ci --ignore-scripts && npm run deps:rebuild   # install the reviewed tree
+npm run deps:scan && npm audit signatures         # verify before building
+```
+
+To see whether anything you just pulled in is brand new (and therefore hasn't
+had time to be caught if it is malicious):
+
+```bash
+npm run deps:scan -- --freshness --since=origin/main
+```
+
+Install scripts are disabled repo-wide in `.npmrc` (`ignore-scripts=true`) — a
+compromised package's `preinstall` runs before any of your code imports it.
+Packages that genuinely need a native build are allowlisted by name in the
+`deps:rebuild` script; if a new dependency needs one, add it there in the same
+PR and say why.
+
+Routine bumps should come from Dependabot, which holds new releases for 3–14
+days (`.github/dependabot.yml`) so bad publishes are caught upstream first.
+
+---
+
 ## Branch Naming
 
 ```
