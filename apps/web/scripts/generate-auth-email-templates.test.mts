@@ -9,6 +9,16 @@
  *
  * Supabase substitutes its placeholders ({{ .ConfirmationURL }} etc.) at send
  * time, so they must be preserved verbatim in the output.
+ *
+ * This writes react-email's raw output; `npm run email:build` then runs
+ * `prettier --write` over the results, because react-email's `pretty: true`
+ * uses a different style (single quotes, collapsed CSS) than the repo's
+ * Prettier config. Without that second step every run left the six committed
+ * templates showing a ~750-line formatting-only diff that looked like real
+ * work and wasn't. Formatting is deliberately left to the Prettier CLI rather
+ * than its Node API: under Vitest's resolver the API settles on a different
+ * (also stable) layout than the CLI produces, so only the CLI is guaranteed to
+ * agree with `prettier --check` and with a pre-commit hook.
  */
 import { createElement } from "react";
 import { render } from "@react-email/components";
