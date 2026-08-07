@@ -19,7 +19,7 @@
     "start": "next start",
     "analyze": "NEXT_IGNORE_INCORRECT_LOCKFILE=1 ANALYZE=true next build",
     "email:dev": "email dev --dir src/emails",
-    "email:build": "vitest run --config vitest.config.mts scripts/generate-auth-email-templates.test.mts && prettier --write \"../../supabase/templates/*.html\"",
+    "email:build": "vitest run --config vitest.config.mts scripts/generate-auth-email-templates.test.mts",
     "email:lockup": "npx tsx scripts/generate-wordmark-lockup.mts"
   },
   "dependencies": {
