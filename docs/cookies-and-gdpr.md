@@ -13,11 +13,12 @@ This document covers DubGrid's cookie implementation, consent management, analyt
 5. [Sandbox Cookie](#sandbox-cookie)
 6. [Impersonation Cookie](#impersonation-cookie)
 7. [Sidebar State Cookie](#sidebar-state-cookie)
-8. [Cookie Security](#cookie-security)
-9. [GDPR Compliance](#gdpr-compliance)
-10. [Mobile App](#mobile-app)
-11. [Data Flow](#data-flow)
-12. [Developer Guide](#developer-guide)
+8. [Theme Preference Cookie](#theme-preference-cookie)
+9. [Cookie Security](#cookie-security)
+10. [GDPR Compliance](#gdpr-compliance)
+11. [Mobile App](#mobile-app)
+12. [Data Flow](#data-flow)
+13. [Developer Guide](#developer-guide)
 
 ---
 
@@ -30,6 +31,7 @@ This document covers DubGrid's cookie implementation, consent management, analyt
 | `dubgrid-sandbox`             | Essential | Activates Test Sandbox mode for the calling user. `HttpOnly`, read and written server-side only.                                         | 7 days (cleared on exit)   | Server Route Handler (`/api/test-sandbox`) |
 | `dubgrid-impersonation`       | Essential | Gridmaster support impersonation session data.                                                                                           | Dynamic, up to 30 min      | Client JS (`impersonation.ts`)             |
 | `sidebar_state`               | Essential | Remembers sidebar open/collapsed state.                                                                                                  | 7 days                     | Client JS (`ui/sidebar.tsx`)               |
+| `dg-theme`                    | Essential | Light/dark/system appearance preference, shared across the apex and org subdomains. Domain-scoped, so it has no effect on localhost — see `lib/theme-preference.ts`. | 1 year                     | Client JS (`ThemeProvider.tsx`)            |
 | PostHog cookies               | Analytics | Product analytics session tracking (consent-gated).                                                                                      | Varies (PostHog-managed)   | PostHog SDK                                |
 | Vercel Analytics              | Analytics | Web performance metrics (consent-gated).                                                                                                 | Varies (Vercel-managed)    | `@vercel/analytics`                        |
 | Sentry Session Replay         | Analytics | Privacy-masked session replay for bug reproduction (consent-gated). Error monitoring itself is always-on and sets no additional cookies. | Varies (Sentry-managed)    | Sentry SDK                                 |
@@ -57,7 +59,7 @@ The landing-page footer, auth-flow footer, request-demo footer, and Profile > Pr
 {
   "essential": true,
   "analytics": true,
-  "version": "1.1"
+  "version": "1.2"
 }
 ```
 
@@ -75,14 +77,15 @@ Stored as:
 // apps/web/src/components/CookieConsent.tsx
 // IMPORTANT: Bump this version when cookies, analytics providers, or the
 // cookie/privacy policy change. A new version re-prompts all users to re-consent.
-const CONSENT_VERSION = "1.1";
+const CONSENT_VERSION = "1.2";
 ```
 
-**Current version: `"1.1"`**
+**Current version: `"1.2"`**
 
 Version history:
 
 - `1.1` — Sentry Session Replay moved behind analytics consent; error monitoring stays always-on.
+- `1.2` — Added the essential `dg-theme` cookie for cross-subdomain appearance preference.
 
 The mobile app (`apps/mobile/src/features/consent/lib/consent.ts`) mirrors this constant. Bump both in lockstep so both platforms re-prompt together when the policy changes.
 
@@ -370,6 +373,26 @@ A simple UI-state preference cookie.
 
 ---
 
+## Theme Preference Cookie
+
+Shares the light/dark/system appearance preference between the apex (`dubgrid.com`) and
+every org subdomain (`acme.dubgrid.com`), which are separate browser origins.
+
+- **Name:** `dg-theme`
+- **Value:** `light`, `dark`, or `system`
+- **Flags:** `SameSite=Lax`, `Secure` (on HTTPS; omitted on HTTP), `path=/`, `domain=.<root>`
+- **`HttpOnly`:** No (read by client JS before paint to pick the right theme)
+- **Duration:** 1 year (`max-age=31536000`)
+- **Set by:** `ThemeCookieSync` in `apps/web/src/components/ThemeProvider.tsx`
+
+`localStorage.theme` (next-themes' own key) remains the source of truth on each origin;
+this cookie only seeds it. Because browsers refuse to share a domain-scoped cookie
+between `localhost` and `sub.localhost`, it has **no effect in local development** — a
+`?theme=` query param on the three cross-origin login links covers dev instead. See
+`apps/web/src/lib/theme-preference.ts`.
+
+---
+
 ## Cookie Security
 
 ### Security Flags Matrix
@@ -381,6 +404,7 @@ A simple UI-state preference cookie.
 | `dubgrid-sandbox`        | Yes (production) | **Yes**                      | Lax                           |
 | `dubgrid-impersonation`  | Yes (HTTPS)      | No                           | Lax                           |
 | `sidebar_state`          | Yes (HTTPS)      | No                           | Lax                           |
+| `dg-theme`               | Yes (HTTPS)      | No                           | Lax                           |
 
 ### Notes
 
@@ -503,7 +527,7 @@ The Expo app (`apps/mobile`) ships no analytics or tracking SDKs today and uses 
 
 ### Consent Gate
 
-- **`apps/mobile/src/features/consent/lib/consent.ts`** — `getStoredConsent()` / `setStoredConsent()` persist `{ essential, analytics, version }` to `expo-secure-store` under the same `dubgrid-cookie-consent` key and `CONSENT_VERSION` (`"1.1"`) as web. `syncConsentToServer()` POSTs to `/api/consent` on the web app (best-effort, never throws). The request sends an `Origin` header on the same root domain so the CSRF check passes; it records an anonymous row tagged with the mobile user-agent.
+- **`apps/mobile/src/features/consent/lib/consent.ts`** — `getStoredConsent()` / `setStoredConsent()` persist `{ essential, analytics, version }` to `expo-secure-store` under the same `dubgrid-cookie-consent` key and `CONSENT_VERSION` (`"1.2"`) as web. `syncConsentToServer()` POSTs to `/api/consent` on the web app (best-effort, never throws). The request sends an `Origin` header on the same root domain so the CSRF check passes; it records an anonymous row tagged with the mobile user-agent.
 - **`apps/mobile/src/features/consent/components/ConsentGate.tsx`** — A non-dismissable first-launch bottom sheet (Accept all / Essential only) wrapped around the app in `app/_layout.tsx`. Re-prompts only when the stored version is stale or absent.
 - **Profile > Privacy & data** (`ProfilePrivacyScreen.tsx`) — exposes an analytics toggle that calls `setStoredConsent()`, and links out to the web Privacy, Terms, and Cookie Policy pages.
 

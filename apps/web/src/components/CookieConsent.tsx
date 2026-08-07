@@ -3,13 +3,16 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { Switch } from "@/components/ui/switch";
+import { getCookieDomain, isSecure } from "@/lib/cookies";
 
 const STORAGE_KEY = "dubgrid-cookie-consent";
 // IMPORTANT: Bump this version when cookies, analytics providers, or the
 // cookie/privacy policy change. A new version re-prompts all users to re-consent.
 // 1.1 — Sentry session replay moved behind analytics consent (error monitoring
 //       stays always-on as a necessary operational service).
-const CONSENT_VERSION = "1.1";
+// 1.2 — Added the essential `dg-theme` cookie, which shares the light/dark/system
+//       preference between the apex and org subdomains.
+const CONSENT_VERSION = "1.2";
 
 /** Fired after consent is saved so other components can react without a full page reload. */
 const CONSENT_CHANGED_EVENT = "dubgrid:consent-changed";
@@ -40,31 +43,6 @@ export function getCookieConsent(): CookiePreferences | null {
   } catch {
     return null;
   }
-}
-
-function isSecure(): boolean {
-  return typeof window !== "undefined" && window.location.protocol === "https:";
-}
-
-function isLocalhost(): boolean {
-  if (typeof window === "undefined") return false;
-  const h = window.location.hostname;
-  return h === "localhost" || h.endsWith(".localhost");
-}
-
-/** Build a domain suffix so the cookie is readable across all subdomains. */
-function getCookieDomain(): string {
-  if (typeof window === "undefined") return "";
-  const hostname = window.location.hostname;
-  // localhost doesn't support domain= attribute — omit it
-  if (isLocalhost()) return "";
-  // For production (e.g. app.dubgrid.com, org.dubgrid.com) → domain=.dubgrid.com
-  const parts = hostname.split(".");
-  if (parts.length >= 2) {
-    const root = parts.slice(-2).join(".");
-    return `; domain=.${root}`;
-  }
-  return "";
 }
 
 function writeStoredConsent(prefs: CookiePreferences) {

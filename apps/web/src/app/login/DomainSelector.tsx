@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
 import { getValidPort, buildSubdomainHost, RESERVED_SUBDOMAINS } from "@/lib/subdomain";
@@ -10,6 +11,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { SubdomainField } from "@/components/auth/SubdomainField";
 import Modal from "@/components/Modal";
+import { withThemeParam } from "@/lib/theme-preference";
 import { useClientHost } from "./shared";
 
 export default function DomainSelector() {
@@ -18,6 +20,7 @@ export default function DomainSelector() {
   const [loading, setLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
+  const { theme } = useTheme();
   const { parsed } = useClientHost();
   const baseDomain = parsed?.rootDomain ?? "localhost";
 
@@ -95,7 +98,13 @@ export default function DomainSelector() {
     const portStr = getValidPort(port);
     // Forward the resolved name so the org login heading renders it instantly.
     const nameParam = orgName ? `&name=${encodeURIComponent(orgName)}` : "";
-    window.location.href = `${protocol}//${normalized}.${baseDomain}${portStr}/login?verified=1${nameParam}`;
+    // The subdomain is a separate origin with its own localStorage, so hand the
+    // theme over explicitly — otherwise the sign-in page resolves whatever that
+    // origin happens to remember and the theme visibly flips mid-flow.
+    window.location.href = withThemeParam(
+      `${protocol}//${normalized}.${baseDomain}${portStr}/login?verified=1${nameParam}`,
+      theme,
+    );
   }
 
   return (

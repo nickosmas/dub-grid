@@ -17,6 +17,13 @@ vi.mock("sonner", () => ({
   toast: { error: (...args: unknown[]) => mockToastError(...args) },
 }));
 
+// The subdomain is a separate origin, so the redirect has to carry the theme.
+// Defaults to undefined, matching next-themes before it has mounted.
+let mockTheme: string | undefined;
+vi.mock("next-themes", () => ({
+  useTheme: () => ({ theme: mockTheme, setTheme: vi.fn() }),
+}));
+
 function submitSlug(slug: string) {
   const input = screen.getByLabelText("Organization subdomain");
   fireEvent.change(input, { target: { value: slug } });
@@ -28,6 +35,7 @@ describe("DomainSelector", () => {
 
   beforeEach(() => {
     hrefSetter = vi.fn();
+    mockTheme = undefined;
     mockToastError.mockReset();
     Object.defineProperty(window, "location", {
       value: {
@@ -81,6 +89,25 @@ describe("DomainSelector", () => {
     await waitFor(() => {
       expect(hrefSetter).toHaveBeenCalledWith(
         "https://acme.localhost/login?verified=1&name=Acme%20Co",
+      );
+    });
+  });
+
+  it("hands the theme over to the subdomain, which has its own localStorage", async () => {
+    mockTheme = "light";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ valid: true, name: "Acme Co" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    render(<DomainSelector />);
+    submitSlug("acme");
+
+    await waitFor(() => {
+      expect(hrefSetter).toHaveBeenCalledWith(
+        "https://acme.localhost/login?verified=1&name=Acme%20Co&theme=light",
       );
     });
   });

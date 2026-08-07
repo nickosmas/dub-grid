@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { getValidPort } from "@/lib/subdomain";
+import { withThemeParam } from "@/lib/theme-preference";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { markAuthTransition } from "@/lib/auth-transition";
 import { setUserViewActive } from "@/hooks";
@@ -334,8 +336,17 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     setLoading(false);
   }
 
+  const { theme } = useTheme();
   const { parsed, protocol } = useClientHost();
   const baseDomain = parsed?.rootDomain ?? "localhost";
+
+  // The apex is a separate origin with its own localStorage, so carry the theme
+  // over rather than letting the landing page resolve its own. Gated on
+  // `parsed` for the same reason `useClientHost` exists: it stays null through
+  // SSR *and* the first hydration pass, so the rendered href matches on both
+  // and only picks up the param once the client-only effect has run.
+  const apexOrigin = `${protocol}//${baseDomain}${parsed?.port ?? ""}`;
+  const apexHref = parsed ? withThemeParam(`${apexOrigin}/`, theme) : `${apexOrigin}/`;
 
   if (mfaRequired) {
     return (
@@ -354,7 +365,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
         <Card>
           {/* Logo — links to apex landing page */}
           <a
-            href={`${protocol}//${baseDomain}${parsed?.port ?? ""}/`}
+            href={apexHref}
             className="dg-auth-logo-block"
             style={{ marginBottom: "32px" }}
           >
@@ -421,7 +432,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 const { protocol, port } = window.location;
                 const portStr = getValidPort(port);
                 const target = `${protocol}//${baseDomain}${portStr}/login`;
-                window.location.href = target;
+                window.location.href = withThemeParam(target, theme);
               }}
               className="dg-auth-link"
             >

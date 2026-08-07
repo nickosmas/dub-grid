@@ -10,7 +10,7 @@ const CONSENT_KEY = "dubgrid-cookie-consent";
 
 // Mirror the web banner's version (apps/web/src/components/CookieConsent.tsx).
 // Bump in lockstep with web so a policy change re-prompts on both platforms.
-export const CONSENT_VERSION = "1.1";
+export const CONSENT_VERSION = "1.2";
 
 export type ConsentPreferences = {
   essential: true;
