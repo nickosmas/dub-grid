@@ -119,4 +119,52 @@ describe("mobile env validation", () => {
     expect(isPrivateIpv4Host("172.20.10.2")).toBe(true);
     expect(isPrivateIpv4Host("8.8.8.8")).toBe(false);
   });
+
+  // Both URLs can be right while the key belongs to the other stack — the exact
+  // state that broke local dev after the API-key migration.
+  it("rejects a hosted Supabase key pointed at a local stack", () => {
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "http://192.168.1.10:54321");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_abc123");
+    vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "http://192.168.1.10:3000");
+
+    const result = validateMobileEnv("ios");
+
+    expect(result.status).toBe("invalid");
+    if (result.status !== "invalid") {
+      throw new Error("Expected invalid mobile env state");
+    }
+
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" }),
+      ]),
+    );
+  });
+
+  it("rejects a local Supabase key pointed at the hosted project", () => {
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://abc.supabase.co");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIn0.x");
+    vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "https://dubgrid.com");
+
+    const result = validateMobileEnv("ios");
+
+    expect(result.status).toBe("invalid");
+    if (result.status !== "invalid") {
+      throw new Error("Expected invalid mobile env state");
+    }
+
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" }),
+      ]),
+    );
+  });
+
+  it("accepts a matched local URL and key", () => {
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "http://192.168.1.10:54321");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "eyJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIn0.x");
+    vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "http://192.168.1.10:3000");
+
+    expect(validateMobileEnv("ios").status).toBe("ready");
+  });
 });

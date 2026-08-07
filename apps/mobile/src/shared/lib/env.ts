@@ -71,6 +71,15 @@ function isKnownHostedDubGridHost(hostname: string): boolean {
   return normalized === "dubgrid.com" || normalized.endsWith(".dubgrid.com");
 }
 
+/**
+ * A hosted Supabase project issues `sb_publishable_…` keys; a local stack issues
+ * `supabase-demo` JWTs and rejects the hosted ones outright. The pair therefore
+ * has to match, and a mismatch is invisible until the first request fails.
+ */
+function isHostedSupabaseKey(key: string): boolean {
+  return key.startsWith("sb_publishable_") || key.startsWith("sb_secret_");
+}
+
 export function validateMobileEnv(platform: PlatformOSType = Platform.OS): MobileEnvValidation {
   const supabaseUrl = readEnvValue("EXPO_PUBLIC_SUPABASE_URL");
   const supabaseAnonKey = readEnvValue("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
@@ -155,6 +164,33 @@ export function validateMobileEnv(platform: PlatformOSType = Platform.OS): Mobil
         key: "EXPO_PUBLIC_SUPABASE_URL",
         message:
           "Your mobile Supabase URL points at the hosted project while the API points at a local machine. Use `npm run use:mobile:local` for local testing or `npm run use:mobile:remote` for the hosted backend.",
+      });
+    }
+  }
+
+  // The key has to match the stack it is sent to. Checked separately from the
+  // URL pairing above because a correct pair of URLs can still carry the wrong
+  // key — which is silent until Supabase rejects the first request.
+  if (supabaseUrlObject && supabaseAnonKey) {
+    const supabaseHost = supabaseUrlObject.hostname;
+    const supabaseLooksLocal = isLoopbackHost(supabaseHost) || isPrivateIpv4Host(supabaseHost);
+    const hostedKey = isHostedSupabaseKey(supabaseAnonKey);
+
+    if (supabaseLooksLocal && hostedKey) {
+      issues.push({
+        key: "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        message:
+          "This is a hosted Supabase key but the Supabase URL points at a local stack, which only accepts its own local keys. Run `npm run use:mobile:local`.",
+      });
+    }
+
+    // Only a recognisable local JWT counts here. Treating "not a hosted key" as
+    // "is a local key" would flag placeholders and any future key format.
+    if (isKnownHostedSupabaseHost(supabaseHost) && supabaseAnonKey.startsWith("eyJ")) {
+      issues.push({
+        key: "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        message:
+          "This is a local Supabase key but the Supabase URL points at the hosted project. Run `npm run use:mobile:remote`.",
       });
     }
   }
