@@ -14,6 +14,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Mobile error boundaries and unmatched-route screen** — `app/_layout.tsx` and `app/(tabs)/_layout.tsx` export an Expo Router `ErrorBoundary`, and `app/+not-found.tsx` handles stale deep links; both render the new `RouteErrorScreen`. A render throw previously took the whole app down with no way back, and an unknown route fell through to Expo's developer-facing "Unmatched Route" screen.
 - **Mobile spacing and radius ramps** — `mobileSpacingTokens` (4-48) and `mobileRadiusTokens` in `@dubgrid/design-tokens`, surfaced as `mobileSpace` / `mobileRadius`. The web ramps are `"px"` strings React Native can't consume, so mobile screens had no scale to reach for.
 
+### Security
+
+- **Supabase API keys migrated to publishable/secret** — the legacy `anon` / `service_role` JWTs both derived from one JWT secret, so neither could be rotated without the other. The new `sb_publishable_…` / `sb_secret_…` keys are revocable individually, and production, CI and any local admin use now hold separate secret keys. Env vars renamed to match (`SUPABASE_SECRET_KEY`, `*_PUBLISHABLE_KEY`); reads go through `apps/web/src/lib/supabase-keys` rather than sixteen scattered `process.env` lookups.
+- **All 28 npm advisories cleared, including two criticals.** Most were caused by *stale* `overrides` pins that had themselves fallen into the vulnerable ranges (axios 1.17.0, postcss 8.5.12, dompurify 3.4.11, tar, hono). `next` 16.2.10 -> 16.3.0 alone cleared nine Next.js advisories including three highs.
+- **Supply-chain scanner IOCs corrected** — `flat-cache@6.1.24` was missing from the denylist entirely (it is a transitive dependency of eslint, so it reaches far more trees than the cache packages that were listed) and `@cacheable/node-cache` was pinned to a version that could never match. Added host-persistence detection, since the payload's launch agent lives under `$HOME` where scanning a checkout would never find it.
+- **Removed six root-level `check_*.mjs` scripts and `deploy_migration.mjs`** — each embedded the production project's anon key, and the migration they referenced (`026_draft_schedules.sql`) has not existed since the schema was consolidated to four files.
+
 ### Fixed
 
 - **Mobile: a push tap that cold-starts the app no longer loses its destination** — `usePushResponseHandler` now also reads `getLastNotificationResponseAsync()`, which is how a tap that launches a killed app is delivered; the response listener alone only fires while the app is already running.
