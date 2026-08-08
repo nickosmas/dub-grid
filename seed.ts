@@ -3164,6 +3164,94 @@ async function main() {
   `);
   console.log(`    ✓ Backfilled employees rows for management members`);
 
+  // ── Put the login accounts on the schedule ─────────────────────────────
+  // The per-org loop above generates schedule cells only for the anonymous
+  // roster it just inserted; the employees rows for real login accounts do
+  // not exist yet at that point (auth users are created afterwards). Left
+  // alone, every account you can actually sign in as has focus_area_ids = '{}'
+  // and zero cells, so "my schedule" on mobile and the personal schedule on
+  // web are empty for all of them while the grid looks fully populated.
+  //
+  // Give each login-linked employee a real week by mirroring one seeded
+  // co-worker: copy that donor's focus areas (an employee with no focus area
+  // is off-schedule entirely and never renders in the grid) and replay their
+  // published cells. Cloning rather than generating keeps this valid for all
+  // seven tenants, including Calm Haven and Arden Wood whose shifts come from
+  // SQL files with no assignment data left in scope here. Donors are paired
+  // round-robin per org so the accounts get visibly different schedules.
+  // Runs before the publish_history backfill below so the recorded range
+  // covers these cells too.
+  console.log("\n  Putting login accounts on the schedule...");
+  const linkedEmployeeDonorCte = `
+    WITH linked AS (
+      SELECT e.id, e.org_id,
+             row_number() OVER (PARTITION BY e.org_id ORDER BY e.id) - 1 AS idx
+      FROM public.employees e
+      WHERE e.user_id IS NOT NULL
+        AND e.archived_at IS NULL
+    ),
+    donors AS (
+      SELECT e.id, e.org_id, e.focus_area_ids,
+             row_number() OVER (PARTITION BY e.org_id ORDER BY e.seniority DESC, e.id) - 1 AS idx,
+             count(*) OVER (PARTITION BY e.org_id) AS n
+      FROM public.employees e
+      WHERE e.user_id IS NULL
+        AND e.archived_at IS NULL
+        AND e.status = 'active'
+        AND e.focus_area_ids <> '{}'
+        AND EXISTS (SELECT 1 FROM public.schedule_cells c WHERE c.emp_id = e.id)
+    ),
+    pairs AS (
+      SELECT l.id AS linked_id, l.org_id, d.id AS donor_id, d.focus_area_ids
+      FROM linked l
+      JOIN donors d
+        ON d.org_id = l.org_id
+       AND d.idx = l.idx % d.n
+    )`;
+
+  // An employee with no focus area is treated as off-schedule, so the focus
+  // areas have to land before the cells mean anything.
+  await db.query(`
+    ${linkedEmployeeDonorCte}
+    UPDATE public.employees e
+    SET focus_area_ids = p.focus_area_ids
+    FROM pairs p
+    WHERE e.id = p.linked_id
+      AND e.focus_area_ids = '{}'
+  `);
+
+  const { rowCount: linkedCellCount } = await db.query(`
+    ${linkedEmployeeDonorCte}
+    SELECT public.write_schedule_cell_snapshot_internal(
+      p.org_id, p.linked_id, c.date, 'published', s.state_kind,
+      COALESCE(seg.shift_ids, '{}'::bigint[]),
+      COALESCE(seg.job_ids, '{}'::bigint[]),
+      s.absence_type_id, s.custom_start_time, s.custom_end_time,
+      NULL, false, c.focus_area_id, NULL, NULL,
+      COALESCE(seg.mentored, '{}'::boolean[])
+    )
+    FROM pairs p
+    JOIN public.schedule_cells c
+      ON c.emp_id = p.donor_id
+    JOIN public.schedule_cell_snapshots s
+      ON s.cell_id = c.id
+     AND s.snapshot_kind = 'published'
+    LEFT JOIN LATERAL (
+      SELECT array_agg(g.shift_id  ORDER BY g.position) AS shift_ids,
+             array_agg(g.job_id    ORDER BY g.position) AS job_ids,
+             array_agg(g.is_mentored ORDER BY g.position) AS mentored
+      FROM public.schedule_cell_segments g
+      WHERE g.snapshot_id = s.id
+    ) seg ON true
+    WHERE s.state_kind <> 'deleted'
+      AND NOT EXISTS (
+        SELECT 1 FROM public.schedule_cells existing
+        WHERE existing.emp_id = p.linked_id
+          AND existing.date = c.date
+      )
+  `);
+  console.log(`    ✓ ${linkedCellCount} cells cloned onto login-linked employees`);
+
   // ── Publish history ────────────────────────────────────────────────────
   // The seed writes published cell snapshots directly via
   // write_schedule_cell_snapshot_internal, which (unlike the publish_schedule
