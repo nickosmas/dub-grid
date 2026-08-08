@@ -124,6 +124,22 @@ describe("AddPersonScreen", () => {
     expect(screen.getByRole("button", { name: "Add person" })).not.toBeDisabled();
   });
 
+  it("names the organization's focus-area label as a singular noun in the validation error", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { focusArea: "Wings", certification: "Certification" } },
+        focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+        certifications: [],
+      },
+    });
+    renderWithMutation();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+
+    expect(screen.getByText("Select at least one wing")).toBeInTheDocument();
+    expect(screen.queryByText("Select at least one Wings")).not.toBeInTheDocument();
+  });
+
   it("creates the person and navigates back on success, without inviting when no email is set", async () => {
     createMobilePerson.mockResolvedValue({
       success: true,

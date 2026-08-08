@@ -32,6 +32,7 @@ import {
   updateProfilePhone,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { singularLabelNoun } from "../../../shared/lib/labels";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
@@ -354,7 +355,7 @@ export default function ProfileWorkScreen() {
                 const requestNoteError = getStaffNotesError(draft.requestNote);
                 const focusAreaError =
                   canEditProfileDirectly && linkedEmployee && draft.focusAreaIds.length === 0
-                    ? `Select at least one ${profile.currentOrg.labels.focusArea}.`
+                    ? `Select at least one ${singularLabelNoun(profile.currentOrg.labels.focusArea)}.`
                     : null;
                 const firstError =
                   firstNameError ??
@@ -571,7 +572,7 @@ function EditPanel({
     requestNote: getStaffNotesError(draft.requestNote),
     focusAreaIds:
       canEditProfileDirectly && hasLinkedEmployee && draft.focusAreaIds.length === 0
-        ? `Select at least one ${focusAreaLabel}.`
+        ? `Select at least one ${singularLabelNoun(focusAreaLabel)}.`
         : null,
   };
   const hasValidationErrors = Object.values(fieldErrors).some(Boolean);

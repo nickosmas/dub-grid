@@ -47,6 +47,7 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
+import { singularLabelNoun } from "../../../shared/lib/labels";
 import { getMobileQueryContentState } from "../../../shared/lib/query-state";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
@@ -172,6 +173,9 @@ export default function PersonDetailScreen() {
   }, [editing, person]);
 
   const maps = useMemo(() => buildLookupMaps(bootstrapQuery.data), [bootstrapQuery.data]);
+  // Declared up here rather than with the other labels below because
+  // `handleSave` names it in a validation message.
+  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
 
   function updateCachedPerson(nextPerson: MobilePerson) {
     queryClient.setQueryData(["mobile", "person", accessToken, nextPerson.id], {
@@ -331,7 +335,7 @@ export default function PersonDetailScreen() {
           emailError ??
           phoneError ??
           notesError ??
-          "Select at least one focus area.",
+          `Select at least one ${singularLabelNoun(focusAreaLabel)}.`,
         tone: "warning",
       });
       return;
@@ -411,7 +415,6 @@ export default function PersonDetailScreen() {
     );
   }
 
-  const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
   const roleLabel = bootstrapQuery.data?.currentOrg.labels.role ?? "Roles";
   const certificationLabel =
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certification";
@@ -988,7 +991,10 @@ function EditPanel({
     phone: getOptionalUsPhoneError(draft.phone),
     email: getOptionalStaffEmailError(draft.email),
     contactNotes: getStaffNotesError(draft.contactNotes),
-    focusAreaIds: draft.focusAreaIds.length === 0 ? "Select at least one focus area" : null,
+    focusAreaIds:
+      draft.focusAreaIds.length === 0
+        ? `Select at least one ${singularLabelNoun(focusAreaLabel)}`
+        : null,
   };
   const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
   const hasChanges =

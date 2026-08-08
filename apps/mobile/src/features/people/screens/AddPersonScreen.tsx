@@ -14,6 +14,7 @@ import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { createMobilePerson, createMobilePersonInvitation } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -50,7 +51,7 @@ export default function AddPersonScreen() {
     email: email.trim().length > 0 ? getOptionalStaffEmailError(email) : null,
     focusAreaIds:
       focusAreaIds.length === 0 && (firstName.trim().length > 0 || lastName.trim().length > 0)
-        ? `Select at least one ${focusAreaLabel}`
+        ? `Select at least one ${singularLabelNoun(focusAreaLabel)}`
         : null,
   };
   const canSubmit =
