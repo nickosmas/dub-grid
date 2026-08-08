@@ -11,6 +11,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
@@ -264,6 +265,7 @@ export function ProfileTextInput({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { style: textInputStyle, ...resolvedInputProps } = inputProps;
+  const { inputAccessoryViewID, keyboardDoneAccessory } = useKeyboardDoneAccessory(inputProps);
 
   return (
     <View style={[styles.field, containerStyle]}>
@@ -277,6 +279,7 @@ export function ProfileTextInput({
             // native, so without this the field is announced unlabeled.
             accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
             {...resolvedInputProps}
+            inputAccessoryViewID={inputAccessoryViewID}
             placeholderTextColor={mobileColors.textSubtle}
             style={[
               styles.input,
@@ -292,6 +295,7 @@ export function ProfileTextInput({
         <TextInput
           accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
           {...resolvedInputProps}
+          inputAccessoryViewID={inputAccessoryViewID}
           placeholderTextColor={mobileColors.textSubtle}
           style={[
             styles.input,
@@ -303,6 +307,7 @@ export function ProfileTextInput({
           ]}
         />
       )}
+      {keyboardDoneAccessory}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );

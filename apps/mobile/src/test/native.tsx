@@ -89,13 +89,26 @@ function pickDomProps(input: Record<string, any>) {
       continue;
     }
 
+    // Kept (rather than dropped) so tests can assert which accessory view a
+    // field is wired to, but renamed so React doesn't warn about the casing.
+    if (key === "inputAccessoryViewID") {
+      if (value != null) {
+        output["data-input-accessory-view-id"] = value;
+      }
+      continue;
+    }
+
     output[key] = value;
   }
 
   return output;
 }
 
-export function createReactNativeModule(React: ReactModule) {
+export function createReactNativeModule(
+  React: ReactModule,
+  options: { platformOS?: "ios" | "android" } = {},
+) {
+  const platformOS = options.platformOS ?? "ios";
   let layoutOffset = 0;
   const View = ({ children, onLayout, ...props }: Record<string, any>) => {
     const layoutYRef = React.useRef<number | null>(null);
@@ -144,6 +157,19 @@ export function createReactNativeModule(React: ReactModule) {
   );
   const KeyboardAvoidingView = ({ children, ...props }: Record<string, any>) =>
     React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
+  // The real view renders above the keyboard rather than inline, but keeping
+  // its children in the tree lets tests assert the Done affordance exists.
+  const InputAccessoryView = ({
+    children,
+    nativeID,
+    backgroundColor: _backgroundColor,
+    ...props
+  }: Record<string, any>) =>
+    React.createElement(
+      "div",
+      { ...pickDomProps(props), "data-native-id": nativeID },
+      children as ReactType.ReactNode,
+    );
   const Image = ({ source, ...props }: Record<string, any>) =>
     React.createElement("img", {
       alt: props.accessibilityLabel ?? "",
@@ -286,6 +312,7 @@ export function createReactNativeModule(React: ReactModule) {
       get: () => null,
       getEnforcing: () => new Proxy({}, { get: () => () => undefined }),
     },
+    InputAccessoryView,
     Keyboard: {
       dismiss: keyboardDismissMock,
       addListener: () => ({
@@ -312,8 +339,8 @@ export function createReactNativeModule(React: ReactModule) {
     },
     Modal,
     Platform: {
-      OS: "ios",
-      select: (value: Record<string, any>) => value.ios ?? value.default ?? null,
+      OS: platformOS,
+      select: (value: Record<string, any>) => value[platformOS] ?? value.default ?? null,
     },
     Pressable,
     RefreshControl: () => null,
