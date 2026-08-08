@@ -13,9 +13,9 @@ vi.mock("expo-secure-store", () => ({
 }));
 
 import {
-  loadLastOrgSlug,
+  loadLastOrg,
   loadStoredPushDevice,
-  saveLastOrgSlug,
+  saveLastOrg,
   saveStoredPushDevice,
   secureStoreAdapter,
 } from "./session";
@@ -35,10 +35,36 @@ describe("session storage", () => {
     await expect(secureStoreAdapter.getItem("token")).resolves.toBeNull();
   });
 
-  it("persists the last organization slug across logouts", async () => {
-    await saveLastOrgSlug("DubGrid-Health");
+  it("persists the last organization across logouts", async () => {
+    await saveLastOrg({ slug: "DubGrid-Health", name: "DubGrid Health" });
 
-    await expect(loadLastOrgSlug()).resolves.toBe("dubgrid-health");
+    await expect(loadLastOrg()).resolves.toEqual({
+      slug: "dubgrid-health",
+      name: "DubGrid Health",
+    });
+  });
+
+  // Login shows the cached name immediately; without one it can only name the
+  // organization by subdomain until a lookup answers.
+  it("stores a null name when none is known yet", async () => {
+    await saveLastOrg({ slug: "dubgrid-health" });
+
+    await expect(loadLastOrg()).resolves.toEqual({ slug: "dubgrid-health", name: null });
+  });
+
+  // Installs that last wrote this key before names were cached hold a bare
+  // slug; dropping it would forget the remembered organization on upgrade.
+  it("reads a legacy bare-slug record", async () => {
+    window.localStorage.setItem("dubgrid-mobile-last-org", "dubgrid-health");
+
+    await expect(loadLastOrg()).resolves.toEqual({ slug: "dubgrid-health", name: null });
+  });
+
+  it("forgets the organization when the slug is cleared", async () => {
+    await saveLastOrg({ slug: "dubgrid-health", name: "DubGrid Health" });
+    await saveLastOrg({ slug: null });
+
+    await expect(loadLastOrg()).resolves.toBeNull();
   });
 
   it("persists the active push device on web", async () => {

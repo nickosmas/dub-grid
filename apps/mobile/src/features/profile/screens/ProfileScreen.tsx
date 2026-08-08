@@ -39,7 +39,7 @@ import {
   pushClientFriendlyErrorToast,
 } from "../../../shared/lib/errors";
 import { getMobileQueryContentState, getQueryErrorMessage } from "../../../shared/lib/query-state";
-import { saveLastOrgSlug } from "../../../shared/lib/session";
+import { saveLastOrg } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -190,6 +190,7 @@ export default function ProfileScreen() {
   async function handleSwitchOrganization(input: {
     id: string;
     slug: string | null;
+    name?: string | null;
     isCurrent: boolean;
   }) {
     if (input.isCurrent || switchingOrgId) {
@@ -224,7 +225,7 @@ export default function ProfileScreen() {
         return;
       }
 
-      await saveLastOrgSlug(input.slug);
+      await saveLastOrg({ slug: input.slug, name: input.name });
 
       // Drop the previous org's data outright rather than marking it stale —
       // `invalidateQueries` keeps rendering the old rows until each refetch

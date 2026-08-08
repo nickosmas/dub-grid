@@ -61,7 +61,7 @@ vi.mock("../../../shared/lib/auth-reset", () => ({
 
 vi.mock("../../../shared/lib/session", () => ({
   loadStoredPushDevice,
-  saveLastOrgSlug: vi.fn(),
+  saveLastOrg: vi.fn(),
 }));
 
 vi.mock("../../../shared/lib/query-client", () => ({
