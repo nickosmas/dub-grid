@@ -107,6 +107,10 @@ keeps receiving the previous user's notifications.
   runtime code unless guarded with `Platform.OS` and covered by tests.
 - Use Expo or React Native APIs for native behavior.
 - Use `expo-secure-store` for native persisted secrets/session data.
+- Open DubGrid web pages (policies, billing) with `openInAppBrowser`
+  (`shared/lib/inAppBrowser.ts`), not `Linking.openURL` — reading a policy
+  should not evict the user from the app. `Linking` stays for `tel:`/`mailto:`
+  and anything genuinely meant to hand off to another app.
 - Guard platform-specific code with `Platform.OS` or existing helpers.
 - Never set `fontFamily` on `<TextInput>` unless the font is guaranteed loaded —
   an unknown family makes Android `EditText` non-interactive.

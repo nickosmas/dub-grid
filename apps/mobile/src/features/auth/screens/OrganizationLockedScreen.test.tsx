@@ -97,9 +97,10 @@ describe("OrganizationLockedScreen", () => {
 
   it("shows a Manage billing on web button only for super_admins, and opens the billing URL", async () => {
     mockStatus({ state: "locked", isLocked: true, trialGraceEndsAt: null, orgRole: "super_admin" });
-    const openURL = vi.fn().mockResolvedValue(undefined);
-    const rn = await import("react-native");
-    vi.spyOn(rn.Linking, "openURL").mockImplementation(openURL);
+    // Billing opens in an in-app browser, so a locked org can be paid for
+    // without leaving the app and losing the retry button behind it.
+    const { openedUrls } = await import("../../../test/shims/expo-web-browser");
+    openedUrls.length = 0;
 
     render(
       <OrganizationLockedScreen
@@ -114,7 +115,7 @@ describe("OrganizationLockedScreen", () => {
     fireEvent.click(billingButton);
 
     await waitFor(() => {
-      expect(openURL).toHaveBeenCalledWith("https://app.dubgrid.com/settings?section=org-billing");
+      expect(openedUrls.at(-1)?.url).toBe("https://app.dubgrid.com/settings?section=org-billing");
     });
   });
 

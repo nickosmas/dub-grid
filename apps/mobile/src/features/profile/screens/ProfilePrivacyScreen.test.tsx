@@ -75,20 +75,28 @@ describe("ProfilePrivacyScreen", () => {
     expect(screen.getByLabelText("Analytics consent")).toBeChecked();
   });
 
+  // Policies open in an in-app browser, not Safari — reading one shouldn't
+  // evict the user from the app.
   it("opens the correct legal URL for each policy link", async () => {
     getStoredConsent.mockResolvedValue(null);
-    const { Linking } = await import("react-native");
-    const openURL = vi.spyOn(Linking, "openURL").mockResolvedValue(undefined as never);
+    const { openedUrls } = await import("../../../test/shims/expo-web-browser");
+    openedUrls.length = 0;
 
     render(<ProfilePrivacyScreen />);
 
-    fireEvent.click(screen.getByText("Privacy policy"));
-    expect(openURL).toHaveBeenLastCalledWith("https://app.dubgrid.com/privacy");
+    await act(async () => {
+      fireEvent.click(screen.getByText("Privacy policy"));
+    });
+    expect(openedUrls.at(-1)?.url).toBe("https://app.dubgrid.com/privacy");
 
-    fireEvent.click(screen.getByText("Terms of service"));
-    expect(openURL).toHaveBeenLastCalledWith("https://app.dubgrid.com/terms");
+    await act(async () => {
+      fireEvent.click(screen.getByText("Terms of service"));
+    });
+    expect(openedUrls.at(-1)?.url).toBe("https://app.dubgrid.com/terms");
 
-    fireEvent.click(screen.getByText("Cookie policy"));
-    expect(openURL).toHaveBeenLastCalledWith("https://app.dubgrid.com/cookie-policy");
+    await act(async () => {
+      fireEvent.click(screen.getByText("Cookie policy"));
+    });
+    expect(openedUrls.at(-1)?.url).toBe("https://app.dubgrid.com/cookie-policy");
   });
 });

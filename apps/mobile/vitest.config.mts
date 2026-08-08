@@ -66,6 +66,7 @@ export default defineConfig(async () => {
           "font",
           "asset",
           "local-authentication",
+          "web-browser",
         ].map((m) => ({
           find: new RegExp(`^expo-${m}$`),
           replacement: path.resolve(__dirname, `./src/test/shims/expo-${m}.ts`),

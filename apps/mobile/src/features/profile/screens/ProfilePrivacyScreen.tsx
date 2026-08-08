@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Linking, StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Switch, Text, View } from "react-native";
 import { Screen } from "../../../shared/components/Screen";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
@@ -84,18 +85,18 @@ export default function ProfilePrivacyScreen() {
           <ProfileNavRow
             iconName="lock-closed-outline"
             label="Privacy policy"
-            onPress={() => void Linking.openURL(getLegalUrls().privacy)}
+            onPress={() => void openInAppBrowser(getLegalUrls().privacy, mobileColors)}
           />
           <ProfileNavRow
             iconName="document-text-outline"
             label="Terms of service"
-            onPress={() => void Linking.openURL(getLegalUrls().terms)}
+            onPress={() => void openInAppBrowser(getLegalUrls().terms, mobileColors)}
           />
           <ProfileNavRow
             iconName="information-circle-outline"
             isLast
             label="Cookie policy"
-            onPress={() => void Linking.openURL(getLegalUrls().cookies)}
+            onPress={() => void openInAppBrowser(getLegalUrls().cookies, mobileColors)}
           />
         </ProfileList>
       </ProfileSection>

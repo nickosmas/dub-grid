@@ -36,7 +36,8 @@
         {
           "userTrackingPermission": "We use this only if you opt in to analytics. It helps us understand how people use DubGrid so we can make it better. You can change this any time in Profile, Privacy & data."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "ios": {
       "supportsTablet": true,
