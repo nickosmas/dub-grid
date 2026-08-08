@@ -432,7 +432,13 @@ DO $$
 DECLARE
   org  uuid := 'b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90';
   schedule_source_start date := DATE '2026-03-22';
-  schedule_target_start date := DATE '2026-08-02';
+  -- Land the roster on the current week so "this week" is never empty. Must be
+  -- computed, not a literal: every shift below is written as
+  -- schedule_target_start + (dt - schedule_source_start), so this is the one
+  -- absolute anchor in the file and a hardcoded date silently rots (it also used
+  -- to get double-shifted by the seed's date rewriter, pushing Calm Haven's
+  -- whole schedule a month into the future). DOW is 0 for Sunday.
+  schedule_target_start date := CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int;
   -- Focus area IDs
   snw  bigint;
   sc   bigint;

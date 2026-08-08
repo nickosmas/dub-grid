@@ -392,7 +392,13 @@ DO $$
 DECLARE
   target_org uuid := '964c29d1-dc1e-4cd6-861c-8b8ab00d20c0';
   schedule_source_start date := DATE '2026-04-19';
-  schedule_start date := DATE '2026-08-02';
+  -- Land the roster on the current week so "this week" is never empty. Must be
+  -- computed, not a literal: every shift below is written as
+  -- schedule_start + (shift_date - schedule_source_start), so this is the one
+  -- absolute anchor in the file and a hardcoded date silently rots (it also used
+  -- to get double-shifted by the seed's date rewriter, pushing Arden Wood's
+  -- whole schedule a month into the future). DOW is 0 for Sunday.
+  schedule_start date := CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int;
   fa_snw bigint;
   fa_sc bigint;
   fa_ns bigint;
