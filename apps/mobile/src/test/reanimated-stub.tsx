@@ -36,14 +36,25 @@ export const SlideOutRight = noopAnimation;
 export const SlideOutLeft = noopAnimation;
 
 export function useSharedValue<T>(initial: T) {
-  return { value: initial };
+  return React.useRef({ value: initial }).current;
+}
+
+export function useAnimatedRef<T>() {
+  return React.useRef<T | null>(null);
 }
 
 export function useReducedMotion() {
   return false;
 }
 
-export function withTiming<T>(toValue: T, _config?: unknown, _cb?: unknown) {
+export function withTiming<T>(
+  toValue: T,
+  _config?: unknown,
+  callback?: (finished: boolean) => void,
+) {
+  // Resolve immediately: tests that assert what happens *after* an animation
+  // (a sheet dragged past its dismiss threshold) have no frames to wait for.
+  callback?.(true);
   return toValue;
 }
 
@@ -82,8 +93,10 @@ export function runOnJS<Args extends unknown[], Return>(fn: (...args: Args) => R
   return fn;
 }
 
-export function useAnimatedScrollHandler() {
-  return () => undefined;
+// Returned as-is so tests can drive it with a synthetic scroll event, the way
+// they drive a captured gesture's handlers.
+export function useAnimatedScrollHandler<T>(handler: T) {
+  return handler;
 }
 
 export function useAnimatedStyle<T>(factory: () => T) {

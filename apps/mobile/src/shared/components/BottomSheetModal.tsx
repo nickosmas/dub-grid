@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
-  Animated,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
 } from "react-native";
+import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
+import { useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 
 /** Padding below the sheet content, on top of the device's own bottom inset. */
@@ -44,20 +45,17 @@ export function BottomSheetModal({
     () => createStyles(mobileColors, windowHeight, bottomPadding),
     [mobileColors, windowHeight, bottomPadding],
   );
-  const translateY = useRef(new Animated.Value(windowHeight)).current;
-
-  useEffect(() => {
-    Animated.timing(translateY, {
-      toValue: visible ? 0 : windowHeight,
-      duration: 260,
-      useNativeDriver: true,
-    }).start();
-  }, [visible, translateY, windowHeight]);
-
   const handleDismiss = () => {
     if (dismissDisabled) return;
     onDismiss();
   };
+  const { backdropStyle, gesture, scrollHandler, scrollRef, sheetStyle } = useSheetDragToDismiss({
+    enabled: !dismissDisabled,
+    onDismiss: handleDismiss,
+    scrollable,
+    travel: windowHeight,
+    visible,
+  });
 
   return (
     <Modal
@@ -67,40 +65,64 @@ export function BottomSheetModal({
       transparent
       visible={visible}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.root}
-      >
-        <Pressable
-          accessibilityLabel={accessibilityLabel}
-          style={StyleSheet.absoluteFill}
-          onPress={handleDismiss}
-        />
-        <Animated.View style={[styles.sheet, { transform: [{ translateY }] }]}>
-          <View style={styles.grabber} />
-          {scrollable ? (
-            <ScrollView
-              contentContainerStyle={[styles.body, footer ? styles.bodyWithFooter : null]}
-              showsVerticalScrollIndicator={false}
-              style={styles.scrollArea}
-            >
-              {children}
-            </ScrollView>
-          ) : (
-            <View style={[styles.body, footer ? styles.bodyWithFooter : null]}>{children}</View>
-          )}
-          {footer ? <View style={styles.footer}>{footer}</View> : null}
-        </Animated.View>
-      </KeyboardAvoidingView>
+      {/* A Modal renders in its own native view hierarchy, which sits outside
+          the root provider, so gesture-handler needs its own root in here. */}
+      <GestureHandlerRootView style={styles.gestureRoot}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.root}
+        >
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
+          />
+          <Pressable
+            accessibilityLabel={accessibilityLabel}
+            style={StyleSheet.absoluteFill}
+            onPress={handleDismiss}
+          />
+          <GestureDetector gesture={gesture}>
+            <Animated.View style={[styles.sheet, sheetStyle]}>
+              <View style={styles.grabberArea}>
+                <View style={styles.grabber} />
+              </View>
+              {scrollable ? (
+                <Animated.ScrollView
+                  ref={scrollRef}
+                  // No rubber-banding at the top edge: that bounce is where the
+                  // sheet drag takes over, and the two fighting reads as jitter.
+                  bounces={false}
+                  contentContainerStyle={[styles.body, footer ? styles.bodyWithFooter : null]}
+                  onScroll={scrollHandler}
+                  scrollEventThrottle={16}
+                  showsVerticalScrollIndicator={false}
+                  style={styles.scrollArea}
+                >
+                  {children}
+                </Animated.ScrollView>
+              ) : (
+                <View style={[styles.body, footer ? styles.bodyWithFooter : null]}>{children}</View>
+              )}
+              {footer ? <View style={styles.footer}>{footer}</View> : null}
+            </Animated.View>
+          </GestureDetector>
+        </KeyboardAvoidingView>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
 
 const createStyles = (mobileColors: MobileColors, windowHeight: number, bottomPadding: number) =>
   StyleSheet.create({
+    gestureRoot: {
+      flex: 1,
+    },
     root: {
       flex: 1,
       justifyContent: "flex-end",
+    },
+    // Split out of `root` so it can fade with the sheet as it is dragged down.
+    backdrop: {
       backgroundColor: mobileColors.overlay,
     },
     sheet: {
@@ -111,20 +133,24 @@ const createStyles = (mobileColors: MobileColors, windowHeight: number, bottomPa
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surface,
-      paddingTop: 10,
       shadowColor: mobileColors.textPrimary,
       shadowOffset: { width: 0, height: -8 },
       shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
       shadowRadius: 28,
       elevation: 16,
     },
+    // Full-width so the grabber is comfortable to catch, and it carries the
+    // sheet's top padding so the visual spacing is unchanged.
+    grabberArea: {
+      alignItems: "center",
+      paddingBottom: 6,
+      paddingTop: 10,
+    },
     grabber: {
-      alignSelf: "center",
       width: 40,
       height: 4,
       borderRadius: mobileRadii.pill,
       backgroundColor: mobileColors.border,
-      marginBottom: 6,
     },
     scrollArea: {
       flexShrink: 1,
