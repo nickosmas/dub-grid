@@ -403,7 +403,9 @@ export default function PeopleScreen() {
         />
       ) : (
         <View style={styles.section}>
-          <View style={styles.linkList}>
+          {/* The directory sits straight on the page background: no card
+              surface, rows aligned with the screen gutters. */}
+          <View>
             {filteredPeople.map((person, index) => {
               const focusAreasForPerson = person.focusAreaIds
                 .map((focusAreaId) => focusAreaMap.get(focusAreaId) ?? null)
@@ -633,7 +635,6 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       gap: 12,
       minHeight: 76,
-      paddingHorizontal: 16,
       paddingVertical: 12,
     },
     personRowDivider: {
