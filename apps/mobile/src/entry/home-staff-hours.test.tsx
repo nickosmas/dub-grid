@@ -45,7 +45,8 @@ describe("StaffHoursExpandedScreen", () => {
 
     render(<StaffHoursExpandedScreen />);
 
-    expect(screen.getByText("Loading overtime watch")).toBeInTheDocument();
+    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Loading overtime watch")).not.toBeInTheDocument();
   });
 
   it("shows a retry state when the dashboard query fails", () => {

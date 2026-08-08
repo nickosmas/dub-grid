@@ -728,10 +728,6 @@ export default function RequestsScreen() {
 
       {contentState.kind === "loading" ? (
         <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading shift requests</Text>
-          <Text style={styles.loadingBody}>
-            Bringing your active requests and history into the mobile app.
-          </Text>
           <ListSkeleton rows={4} showSectionHeader={false} />
         </View>
       ) : contentState.kind === "error" ? (

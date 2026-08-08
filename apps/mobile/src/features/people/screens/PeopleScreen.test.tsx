@@ -124,7 +124,8 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    expect(screen.getByText("Loading directory")).toBeInTheDocument();
+    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Loading directory")).not.toBeInTheDocument();
   });
 
   it("shows a locked state when the user lacks directory access", () => {

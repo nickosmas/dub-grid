@@ -45,7 +45,8 @@ describe("CoverageExpandedScreen", () => {
 
     render(<CoverageExpandedScreen />);
 
-    expect(screen.getByText("Loading coverage")).toBeInTheDocument();
+    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Loading coverage")).not.toBeInTheDocument();
   });
 
   it("shows a retry state when the dashboard query fails", () => {

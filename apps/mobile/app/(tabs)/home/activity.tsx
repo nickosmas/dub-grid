@@ -40,7 +40,6 @@ export default function ActivityExpandedScreen() {
     return (
       <Screen title="Recent activity" bottomPaddingMode="tabbed">
         <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading activity</Text>
           <ListSkeleton rows={4} showSectionHeader={false} />
         </View>
       </Screen>
@@ -131,10 +130,6 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     loadingState: {
       gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
     },
     headerRow: {
       flexDirection: "row",

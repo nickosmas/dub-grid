@@ -14,14 +14,6 @@ export const createStyles = (mobileColors: MobileColors) =>
     loadingState: {
       gap: 14,
     },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
-    },
-    loadingBody: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-    },
     tabRow: {
       marginHorizontal: -mobileSpacing.screenX,
     },

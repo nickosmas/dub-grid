@@ -43,7 +43,6 @@ export default function OpenShiftsExpandedScreen() {
     return (
       <Screen title="Open shifts" bottomPaddingMode="tabbed">
         <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading open shifts</Text>
           <ListSkeleton rows={4} showSectionHeader={false} />
         </View>
       </Screen>
@@ -158,10 +157,6 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     loadingState: {
       gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
     },
     headerRow: {
       flexDirection: "row",

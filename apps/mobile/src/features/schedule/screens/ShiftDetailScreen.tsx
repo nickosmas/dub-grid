@@ -1047,8 +1047,6 @@ export default function ShiftDetailScreen() {
     >
       {contentState.kind === "loading" ? (
         <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading shift</Text>
-          <Text style={styles.loadingBody}>Getting the latest shift details.</Text>
           <DetailSkeleton sections={2} />
         </View>
       ) : contentState.kind === "error" ? (

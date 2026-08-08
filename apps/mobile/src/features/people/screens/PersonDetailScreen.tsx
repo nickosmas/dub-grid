@@ -367,7 +367,6 @@ export default function PersonDetailScreen() {
         refreshing={manualRefresh.isRefreshing}
       >
         <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading profile</Text>
           <ListSkeleton rows={4} showSectionHeader={false} />
         </View>
       </Screen>
@@ -1184,10 +1183,6 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     loadingState: {
       gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
     },
     quickActions: {
       flexDirection: "row",

@@ -49,7 +49,8 @@ describe("OpenShiftsExpandedScreen", () => {
 
     render(<OpenShiftsExpandedScreen />);
 
-    expect(screen.getByText("Loading open shifts")).toBeInTheDocument();
+    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Loading open shifts")).not.toBeInTheDocument();
   });
 
   it("shows a retry state when the dashboard query fails", () => {

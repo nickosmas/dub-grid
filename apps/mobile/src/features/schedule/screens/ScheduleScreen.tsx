@@ -1664,8 +1664,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
         ) : null}
         {contentState.kind === "loading" ? (
           <View style={styles.loadingState}>
-            <Text style={styles.loadingTitle}>Loading schedule</Text>
-            <Text style={styles.loadingBody}>Getting the latest published schedule.</Text>
             {!isTeamScope ? (
               <>
                 <HeroSkeleton />

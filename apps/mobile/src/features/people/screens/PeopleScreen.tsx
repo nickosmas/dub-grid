@@ -366,7 +366,6 @@ export default function PeopleScreen() {
 
       {contentState.kind === "loading" ? (
         <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading directory</Text>
           <ListSkeleton rows={4} showSectionHeader={false} />
         </View>
       ) : contentState.kind === "error" && contentState.reason === "unauthorized" ? (
@@ -600,10 +599,6 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     loadingState: {
       gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
     },
     section: {
       gap: 10,

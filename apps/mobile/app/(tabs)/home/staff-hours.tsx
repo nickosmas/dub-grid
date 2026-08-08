@@ -42,7 +42,6 @@ export default function StaffHoursExpandedScreen() {
     return (
       <Screen title="Overtime watch" bottomPaddingMode="tabbed">
         <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading overtime watch</Text>
           <ListSkeleton rows={4} showSectionHeader={false} />
         </View>
       </Screen>
@@ -156,10 +155,6 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     loadingState: {
       gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
     },
     headerRow: {
       flexDirection: "row",

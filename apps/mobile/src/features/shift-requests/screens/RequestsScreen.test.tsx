@@ -106,7 +106,11 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
-    expect(screen.getByText("Loading shift requests")).toBeInTheDocument();
+    // Skeletons carry the loading state on their own; a headline over them
+    // repeats what their shape already says.
+    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Loading shift requests")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Bringing your active requests/)).not.toBeInTheDocument();
   });
 
   it("shows a retryable query error state", () => {

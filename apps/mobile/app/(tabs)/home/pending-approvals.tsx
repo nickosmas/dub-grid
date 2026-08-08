@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Screen } from "../../../src/shared/components/Screen";
 import { ListSkeleton } from "../../../src/shared/components/Skeleton";
 import { StatusBanner } from "../../../src/shared/components/StatusBanner";
@@ -8,7 +8,7 @@ import { ActionQueueRow } from "../../../src/features/dashboard/components/Actio
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
 import { getMobileQueryContentState } from "../../../src/shared/lib/query-state";
 import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../src/shared/theme/tokens";
+import { type MobileColors } from "../../../src/shared/theme/tokens";
 
 // No filter UI — there's no web "expanded" panel for pending approvals to
 // mirror, so this ships as a plain full list.
@@ -26,7 +26,6 @@ export default function PendingApprovalsExpandedScreen() {
     return (
       <Screen title="Pending approvals" bottomPaddingMode="tabbed">
         <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading pending approvals</Text>
           <ListSkeleton rows={3} showSectionHeader={false} />
         </View>
       </Screen>
@@ -78,10 +77,6 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     loadingState: {
       gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
     },
     list: {
       gap: 16,

@@ -43,7 +43,8 @@ describe("ActivityExpandedScreen", () => {
 
     render(<ActivityExpandedScreen />);
 
-    expect(screen.getByText("Loading activity")).toBeInTheDocument();
+    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Loading activity")).not.toBeInTheDocument();
   });
 
   it("shows a retry state when the dashboard query fails", () => {

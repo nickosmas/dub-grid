@@ -280,7 +280,6 @@ export default function ProfileScreen() {
       />
       {contentState.kind === "loading" ? (
         <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading profile</Text>
           <DetailSkeleton sections={3} />
         </View>
       ) : contentState.kind === "error" ? (
@@ -590,10 +589,6 @@ const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     loadingState: {
       gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
     },
     orgOptionRow: {
       alignItems: "center",

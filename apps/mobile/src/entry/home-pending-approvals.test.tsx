@@ -60,7 +60,8 @@ describe("PendingApprovalsExpandedScreen", () => {
 
     render(<PendingApprovalsExpandedScreen />);
 
-    expect(screen.getByText("Loading pending approvals")).toBeInTheDocument();
+    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Loading pending approvals")).not.toBeInTheDocument();
   });
 
   it("shows a retry state when the dashboard query fails", () => {

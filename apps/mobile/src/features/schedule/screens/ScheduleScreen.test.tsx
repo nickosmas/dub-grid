@@ -491,6 +491,25 @@ describe("ScheduleScreen", () => {
     vi.useRealTimers();
   });
 
+  // Skeletons stand in for the content that's coming; a "Loading schedule"
+  // headline on top of them says the same thing twice, in a heavier voice.
+  it("shows skeletons alone while the schedule loads", () => {
+    useQuery.mockImplementation(() => ({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    }));
+
+    render(<HomeScheduleScreen />);
+
+    expect(screen.getByTestId("hero-skeleton")).toBeInTheDocument();
+    expect(screen.getAllByTestId("list-skeleton").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Loading schedule")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Getting the latest/)).not.toBeInTheDocument();
+  });
+
   it("renders the redesigned Home page with current shift, upcoming shifts, open shifts, cover requests, and hours", () => {
     render(<HomeScheduleScreen />);
 
