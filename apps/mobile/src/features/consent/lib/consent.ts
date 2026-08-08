@@ -57,6 +57,17 @@ export async function getStoredConsent(): Promise<ConsentPreferences | null> {
   }
 }
 
+/**
+ * Forget the stored choice so the gate prompts again.
+ *
+ * Consent lives in device storage, which `npm run db:reset` can't reach from
+ * the host machine, so a reset DB otherwise leaves a decided device behind.
+ * Dev-only reset paths use this to restore the real first-run experience.
+ */
+export async function clearStoredConsent(): Promise<void> {
+  await secureStoreAdapter.removeItem(CONSENT_KEY);
+}
+
 /** True when there is no stored choice, or it predates the current version. */
 export async function needsConsentDecision(): Promise<boolean> {
   const stored = await getStoredConsent();

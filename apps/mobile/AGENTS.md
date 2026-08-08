@@ -17,11 +17,13 @@ Feature code in `apps/mobile/src`.
 - Android: `npm --workspace @dubgrid/mobile run android`
 - Root mobile + contracts tests: `npm run test:mobile`
 
-`hasSeenOnboarding` is device-local storage (`shared/lib/session.ts`), not DB
-state — `npm run db:reset` never clears it. After a local reset, either
-long-press the wordmark on the login screen (`__DEV__`-only, routes back to
-onboarding) or run `npm run db:reset:mobile` from the repo root, which
-best-effort clears app storage on a booted Android emulator via `adb`.
+First-run state is device-local storage, not DB state, so `npm run db:reset`
+never clears it: `hasSeenOnboarding` (`shared/lib/session.ts`) and the cookie
+consent choice (`features/consent/lib/consent.ts`). After a local reset, either
+long-press the wordmark on the login screen (`__DEV__`-only: clears both, routes
+back to onboarding, and re-opens the consent sheet) or run
+`npm run db:reset:mobile` from the repo root, which best-effort clears app
+storage on a booted Android emulator via `adb`.
 
 ## Directory Map
 

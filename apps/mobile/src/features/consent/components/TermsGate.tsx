@@ -1,8 +1,9 @@
-import { useMemo, useState, type PropsWithChildren } from "react";
+import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { acceptCurrentTerms } from "../../../shared/lib/api";
+import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { handleExpiredMobileSession } from "../../../shared/lib/auth-reset";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -37,6 +38,13 @@ export function TermsGate({ children }: PropsWithChildren) {
   // Only gate once bootstrap has actually answered — never on a loading or
   // errored state, which would strand the user behind an un-acceptable sheet.
   const needsAcceptance = bootstrapQuery.data?.acceptedCurrentTerms === false;
+
+  // Same reason as ConsentGate: this gate opens on an async answer, so a field
+  // on the screen behind may still hold focus, and an iOS modal leaves that
+  // window's keyboard up on top of the sheet.
+  useEffect(() => {
+    if (needsAcceptance) Keyboard.dismiss();
+  }, [needsAcceptance]);
 
   async function accept() {
     if (!accessToken || saving) return;
@@ -81,7 +89,7 @@ export function TermsGate({ children }: PropsWithChildren) {
               <Pressable
                 accessibilityRole="link"
                 hitSlop={8}
-                onPress={() => void Linking.openURL(getLegalUrls().terms)}
+                onPress={() => void openInAppBrowser(getLegalUrls().terms, mobileColors)}
               >
                 <Text style={styles.link}>Read the Terms of Service</Text>
               </Pressable>

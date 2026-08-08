@@ -1,11 +1,46 @@
-import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
-import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type PropsWithChildren,
+} from "react";
+import { Keyboard, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
+import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { getLegalUrls, needsConsentDecision, setStoredConsent } from "../lib/consent";
 
 const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
+
+const ConsentDecisionPendingContext = createContext(false);
+
+/**
+ * True until the user's consent choice is known: while it is still being read
+ * from storage, and while the sheet is up waiting for an answer.
+ *
+ * The gate renders the app behind its sheet, so a screen mounting underneath
+ * can't tell that something is about to take over the display. Screens read
+ * this to hold back anything that would fight the sheet for attention —
+ * above all, focusing a field, which raises the keyboard over it.
+ */
+export function useIsConsentDecisionPending() {
+  return useContext(ConsentDecisionPendingContext);
+}
+
+const RecheckConsentDecisionContext = createContext<() => void>(() => {});
+
+/**
+ * Re-reads the stored decision and re-opens the sheet if there no longer is
+ * one. The gate reads storage once at mount, so anything that clears consent
+ * on a running app (the dev first-run reset) has to say so.
+ */
+export function useRecheckConsentDecision() {
+  return useContext(RecheckConsentDecisionContext);
+}
 
 /**
  * Blocks first render with a cookie/analytics consent choice until the user
@@ -19,15 +54,29 @@ export function ConsentGate({ children }: PropsWithChildren) {
   const [needsDecision, setNeedsDecision] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const applyDecision = useCallback((needed: boolean) => {
+    // The storage read resolves after the screen behind is interactive, so a
+    // field there can already hold focus (typically login). An iOS modal
+    // doesn't resign the presenting window's first responder, which would
+    // leave the keyboard up covering this sheet, with a still-active text
+    // field competing for the same taps.
+    if (needed) Keyboard.dismiss();
+    setNeedsDecision(needed);
+  }, []);
+
   useEffect(() => {
     let active = true;
     void needsConsentDecision().then((needed) => {
-      if (active) setNeedsDecision(needed);
+      if (active) applyDecision(needed);
     });
     return () => {
       active = false;
     };
-  }, []);
+  }, [applyDecision]);
+
+  const recheckDecision = useCallback(() => {
+    void needsConsentDecision().then(applyDecision);
+  }, [applyDecision]);
 
   async function choose(analytics: boolean) {
     setSaving(true);
@@ -41,7 +90,11 @@ export function ConsentGate({ children }: PropsWithChildren) {
 
   return (
     <>
-      {children}
+      <RecheckConsentDecisionContext.Provider value={recheckDecision}>
+        <ConsentDecisionPendingContext.Provider value={needsDecision !== false}>
+          {children}
+        </ConsentDecisionPendingContext.Provider>
+      </RecheckConsentDecisionContext.Provider>
       <Modal
         animationType="fade"
         // Non-dismissable: the user must make a choice. Re-prompt on hardware back.
@@ -61,7 +114,9 @@ export function ConsentGate({ children }: PropsWithChildren) {
               </Text>
               <Pressable
                 accessibilityRole="link"
-                onPress={() => void Linking.openURL(getLegalUrls().cookies)}
+                // In-app: leaving for Safari mid-decision would drop the user
+                // out of a sheet they still have to answer.
+                onPress={() => void openInAppBrowser(getLegalUrls().cookies, mobileColors)}
               >
                 <Text style={styles.link}>Read our cookie policy</Text>
               </Pressable>

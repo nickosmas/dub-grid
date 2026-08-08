@@ -5,6 +5,7 @@ type ReactModule = typeof ReactType;
 
 export const screenScrollToMock = vi.fn();
 export const alertMock = vi.fn();
+export const keyboardDismissMock = vi.fn();
 
 function pickDomProps(input: Record<string, any>) {
   const output: Record<string, any> = {};
@@ -284,6 +285,14 @@ export function createReactNativeModule(React: ReactModule) {
     TurboModuleRegistry: {
       get: () => null,
       getEnforcing: () => new Proxy({}, { get: () => () => undefined }),
+    },
+    Keyboard: {
+      dismiss: keyboardDismissMock,
+      addListener: () => ({
+        remove() {
+          return undefined;
+        },
+      }),
     },
     KeyboardAvoidingView,
     Image,
