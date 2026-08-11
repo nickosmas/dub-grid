@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useRef } from "react";
 import { Pressable, StyleSheet, TextInput, type TextInputProps, View } from "react-native";
+import { Button } from "./Button";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileRadii, type MobileColors } from "../theme/tokens";
 
@@ -63,15 +64,14 @@ export function SearchBar({
         value={value}
       />
       {showClear ? (
-        <Pressable
+        <Button
           accessibilityLabel="Clear search"
-          accessibilityRole="button"
-          hitSlop={8}
+          icon="close-circle"
+          iconOnly
           onPress={() => onChangeText("")}
-          style={({ pressed }) => [styles.clearButton, pressed && styles.clearButtonPressed]}
-        >
-          <Ionicons color={mobileColors.textSecondary} name="close-circle" size={20} />
-        </Pressable>
+          size="sm"
+          tone="ghost"
+        />
       ) : null}
     </View>
   );
@@ -102,14 +102,6 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
       flex: 1,
       paddingVertical: 12,
-    },
-    clearButton: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.surfaceSecondary,
     },
     clearButtonPressed: {
       transform: [{ scale: 0.96 }],

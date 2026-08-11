@@ -1,5 +1,13 @@
 import { StyleSheet } from "react-native";
-import { mobileRadii, mobileSpacing, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileElevation,
+  mobileMotion,
+  mobileRadii,
+  mobileSpacing,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
 /**
  * Fixed pixel geometry shared by the screen and its stylesheet.
@@ -21,16 +29,17 @@ export const MONTH_EXPAND_SECTION_GAP = 14;
  * The stylesheet for the schedule screen's screen. Split out of the screen file
  * purely for size; this is a move, not a rewrite.
  */
-export const createStyles = (mobileColors: MobileColors) =>
+export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
-    loadingState: {
-      gap: 14,
-    },
     stickyControlsSection: {
       gap: 16,
     },
     scheduleCalendarStickyHeaderShell: {
-      backgroundColor: mobileColors.borderSubtle,
+      // Was `borderSubtle`, a gray bar that read as separate chrome and sat on
+      // top of the page wash. Matching the page lets the header's slice of the
+      // gradient through; the border and shadow below still separate it from
+      // the content scrolling underneath.
+      backgroundColor: mobileColors.background,
       borderBottomWidth: 0.5,
       borderBottomColor: mobileColors.border,
       shadowColor: mobileColors.shadow,
@@ -86,10 +95,9 @@ export const createStyles = (mobileColors: MobileColors) =>
       gap: 4,
     },
     meWeekNavigatorTitle: {
-      ...mobileText.sectionTitle,
+      ...mobileTextWeighted("sectionTitle", "bold"),
       fontSize: 26,
       lineHeight: 32,
-      fontWeight: "800",
       color: mobileColors.textPrimary,
     },
     meWeekNavigatorRangeLabel: {
@@ -108,23 +116,23 @@ export const createStyles = (mobileColors: MobileColors) =>
       flexShrink: 0,
       gap: 8,
     },
+    // Matches the shared Button's `secondary` tone at size sm: solid tint, no
+    // border, pill. The JSX still hand-rolls the Pressable; it converts to
+    // <Button> when this screen's animation rework opens the file.
     meTodayButton: {
-      minHeight: 44,
-      borderRadius: 22,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
+      minHeight: 36,
+      borderRadius: mobileRadii.pill,
+      borderWidth: 0,
       backgroundColor: mobileColors.brandSoft,
       justifyContent: "center",
       paddingHorizontal: 14,
     },
     meTodayButtonPressed: {
-      opacity: 0.82,
+      transform: [{ scale: mobileMotion.press.scale }],
     },
     meTodayButtonText: {
-      ...mobileText.meta,
+      ...mobileText.bodyStrong,
       color: mobileColors.brand,
-      fontFamily: "DMSans_700Bold",
-      fontWeight: "700",
     },
     meHeroCard: {
       position: "relative",
@@ -234,10 +242,9 @@ export const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textInverse,
     },
     meHeroDateText: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "semibold"),
       alignSelf: "flex-start",
       color: "rgba(255, 255, 255, 0.86)",
-      fontWeight: "600",
     },
     meHeroTitle: {
       flexShrink: 1,
@@ -262,9 +269,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     meHeroSupportingText: {
-      ...mobileText.body,
+      ...mobileTextWeighted("body", "medium"),
       color: "rgba(255, 255, 255, 0.84)",
-      fontWeight: "500",
     },
     meHeroSupportingTextMuted: {
       color: mobileColors.textMuted,
@@ -364,9 +370,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: "rgba(255, 255, 255, 0.55)",
     },
     meHeroEmptyText: {
-      ...mobileText.body,
+      ...mobileTextWeighted("body", "medium"),
       color: "rgba(255, 255, 255, 0.84)",
-      fontWeight: "500",
     },
     meHeroEmptyBlock: {
       gap: 10,
@@ -461,8 +466,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       justifyContent: "center",
     },
     meHeroCollaboratorAvatarText: {
-      ...mobileText.meta,
-      fontWeight: "600",
+      ...mobileTextWeighted("meta", "semibold"),
     },
     meHeroCollaboratorOverflow: {
       width: 38,
@@ -691,9 +695,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       elevation: 2,
     },
     meSectionBody: {
-      ...mobileText.body,
+      ...mobileTextWeighted("body", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     scheduleListRow: {
       flexDirection: "row",
@@ -743,9 +746,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       gap: 8,
     },
     scheduleRowTimeText: {
-      ...mobileText.rowTitle,
+      ...mobileTextWeighted("rowTitle", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     scheduleRowArrow: {
       width: 48,
@@ -882,9 +884,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       gap: 2,
     },
     requestHeaderSubtext: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "semibold"),
       color: mobileColors.textSecondary,
-      fontWeight: "600",
     },
     requestDateText: {
       ...mobileText.bodyStrong,
@@ -931,8 +932,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       fontSize: 12,
     },
     jobPillValueText: {
-      ...mobileText.meta,
-      fontWeight: "600",
+      ...mobileTextWeighted("meta", "semibold"),
     },
     jobPillValueTextCompact: {
       fontSize: 12,
@@ -976,9 +976,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       justifyContent: "center",
     },
     meCollaboratorAvatarText: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "semibold"),
       color: mobileColors.brand,
-      fontWeight: "600",
     },
     meCollaboratorCopy: {
       flex: 1,
@@ -1067,81 +1066,34 @@ export const createStyles = (mobileColors: MobileColors) =>
       minWidth: 0,
     },
     meSelectedDateTitle: {
-      ...mobileText.sectionTitle,
+      ...mobileTextWeighted("sectionTitle", "bold"),
       fontSize: 26,
       lineHeight: 32,
-      fontWeight: "800",
       flex: 1,
       color: mobileColors.textPrimary,
       textAlign: "left",
     },
     teamHeaderTitle: {
-      ...mobileText.sectionTitle,
+      ...mobileTextWeighted("sectionTitle", "bold"),
       fontSize: 26,
       lineHeight: 32,
-      fontWeight: "800",
       color: mobileColors.textPrimary,
       textAlign: "left",
       flexShrink: 1,
       minWidth: 0,
     },
-    focusAreaPillList: {
-      marginHorizontal: -mobileSpacing.screenX,
-    },
-    focusAreaPillListContent: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingHorizontal: mobileSpacing.screenX,
-      paddingVertical: 2,
-    },
-    focusAreaPill: {
-      minHeight: 36,
-      maxWidth: 180,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surface,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-    },
-    focusAreaPillActive: {
-      borderColor: mobileColors.brand,
-      backgroundColor: mobileColors.brand,
-    },
-    focusAreaPillPressed: {
-      opacity: 0.62,
-    },
-    focusAreaPillText: {
-      color: mobileColors.textSecondary,
-      fontSize: 14,
-      fontWeight: "700",
-    },
-    focusAreaPillTextActive: {
-      color: mobileColors.textInverse,
-    },
     iconControlButton: {
       width: 44,
       height: 44,
-      borderRadius: 22,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surface,
+      borderRadius: mobileRadii.pill,
+      borderWidth: 0,
+      backgroundColor: mobileColors.surfaceSecondary,
       alignItems: "center",
       justifyContent: "center",
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 6,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 14,
-      elevation: 2,
+      ...mobileElevation("card", isDark),
     },
     iconControlButtonPressed: {
-      opacity: 0.82,
+      transform: [{ scale: mobileMotion.press.iconOnlyScale }],
     },
     calendarBlock: {
       gap: MONTH_EXPAND_SECTION_GAP,
@@ -1305,14 +1257,13 @@ export const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       paddingHorizontal: 16,
       paddingVertical: 14,
     },
     weekDayEmptyText: {
-      ...mobileText.body,
+      ...mobileTextWeighted("body", "semibold"),
       color: mobileColors.textMuted,
-      fontWeight: "600",
     },
     groupEntries: {
       gap: 10,
@@ -1414,8 +1365,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       textTransform: "uppercase",
     },
     teamMemberRoleChipValueText: {
-      ...mobileText.caption,
-      fontWeight: "600",
+      ...mobileTextWeighted("caption", "semibold"),
     },
     compactSegmentList: {
       gap: 8,
@@ -1454,9 +1404,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textInverse,
     },
     heroSegmentMeta: {
-      ...mobileText.body,
+      ...mobileTextWeighted("body", "medium"),
       color: "rgba(255, 255, 255, 0.84)",
-      fontWeight: "500",
     },
     timelineSegmentList: {
       gap: 12,
@@ -1474,15 +1423,14 @@ export const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     timelineSegmentMeta: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     entryCard: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       padding: 16,
       gap: 12,
     },
@@ -1502,8 +1450,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     entryMetaText: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
   });

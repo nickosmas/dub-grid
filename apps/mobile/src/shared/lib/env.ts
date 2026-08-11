@@ -1,9 +1,7 @@
 import { Platform, type PlatformOSType } from "react-native";
 
 type MobileEnvKey =
-  | "EXPO_PUBLIC_SUPABASE_URL"
-  | "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
-  | "EXPO_PUBLIC_API_BASE_URL";
+  "EXPO_PUBLIC_SUPABASE_URL" | "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | "EXPO_PUBLIC_API_BASE_URL";
 
 export type MobileEnvConfig = {
   supabaseUrl: string;

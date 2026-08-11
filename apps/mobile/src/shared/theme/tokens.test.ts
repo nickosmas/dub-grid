@@ -5,10 +5,11 @@ import {
   radiusTokens,
   spacingTokens,
 } from "@dubgrid/design-tokens";
-
 import {
+  darkMobileColors,
   mobileBorderColorFromText,
   mobileColors,
+  mobileSoftGradientStops,
   mobileRadii,
   mobileSpacing,
   mobileText,
@@ -122,5 +123,30 @@ describe("shared design token derivation", () => {
         },
       }
     `);
+  });
+});
+
+describe("card border", () => {
+  it("is invisible in light mode and a hairline in dark", () => {
+    // Transparent rather than absent, so the 1px keeps occupying layout and
+    // nothing reflows when the theme flips.
+    expect(mobileColors.cardBorder).toBe("transparent");
+    expect(darkMobileColors.cardBorder).not.toBe("transparent");
+  });
+});
+
+describe("mobile soft gradient", () => {
+  it("dissolves the light brand wash into the mobile page, not the web one", () => {
+    const stops = mobileSoftGradientStops("brandWash", false);
+
+    // The shared token ends on the web page colour; ending there on mobile
+    // leaves a visible band partway down the screen.
+    expect(stops.at(-1)).toBe(mobileColors.background);
+  });
+
+  it("leaves the other kinds to the shared tokens", () => {
+    // `aurora` fades to fully transparent, so it needs no page-colour fixup.
+    expect(mobileSoftGradientStops("aurora", false).at(-1)).toContain("0.00");
+    expect(mobileSoftGradientStops("brandWash", true).at(-1)).toBe(darkMobileColors.background);
   });
 });

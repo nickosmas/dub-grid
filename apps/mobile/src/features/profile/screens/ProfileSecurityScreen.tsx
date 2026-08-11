@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Factor } from "@supabase/supabase-js";
+import {
+  PASSWORD_MISMATCH_MESSAGE,
+  PASSWORD_STRENGTH_LABELS,
+  getPasswordMismatchError,
+  getPasswordStrengthHints,
+  getPasswordStrengthLevel,
+  isPasswordAcceptable,
+  passwordsMatch,
+} from "@dubgrid/domain";
 import * as LocalAuthentication from "expo-local-authentication";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
-import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -30,11 +38,16 @@ import {
   disablePushForCurrentDevice,
   handleExpiredMobileSession,
 } from "../../../shared/lib/auth-reset";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
@@ -45,6 +58,7 @@ import {
   ProfileTextInput,
   useProfilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
+import { ProfileSkeleton } from "../components/ProfileSkeleton";
 
 const PENDING_ACCOUNT_DELETION_MESSAGE = "An account deletion request is pending admin review.";
 
@@ -64,31 +78,6 @@ function isStaleMobileTotpFactor(factor: Factor): boolean {
 
 type MfaStep = "idle" | "enrolling";
 
-const PASSWORD_STRENGTH_RULES = [
-  {
-    id: "length",
-    label: "At least 10 characters",
-    isMet: (password: string) => password.length >= 10,
-  },
-  {
-    id: "uppercase",
-    label: "Uppercase letter",
-    isMet: (password: string) => /[A-Z]/.test(password),
-  },
-  {
-    id: "number",
-    label: "Number",
-    isMet: (password: string) => /[0-9]/.test(password),
-  },
-  {
-    id: "symbol",
-    label: "Symbol",
-    isMet: (password: string) => /[^A-Za-z0-9]/.test(password),
-  },
-] as const;
-
-const PASSWORD_STRENGTH_LABELS = ["Too short", "Weak", "Fair", "Strong"];
-
 type PasswordField = "currentPassword" | "newPassword" | "confirmPassword";
 
 type SecurityConfirmation =
@@ -103,33 +92,6 @@ function formatSessionPlatform(platform: string | null) {
   if (platform === "android") return "AND";
   if (platform === "web") return "WEB";
   return "?";
-}
-
-function getPasswordStrengthHints(password: string) {
-  return PASSWORD_STRENGTH_RULES.map((rule) => ({
-    id: rule.id,
-    label: rule.label,
-    met: rule.isMet(password),
-  }));
-}
-
-function getPasswordStrengthLevel(password: string) {
-  const hints = getPasswordStrengthHints(password);
-  const metCount = hints.filter((hint) => hint.met).length;
-
-  if (!hints[0]?.met) {
-    return 0;
-  }
-
-  if (metCount === hints.length) {
-    return 3;
-  }
-
-  if (metCount >= 3) {
-    return 2;
-  }
-
-  return 1;
 }
 
 function PasswordStrengthHints({ password }: { password: string }) {
@@ -320,18 +282,20 @@ export default function ProfileSecurityScreen() {
   const manualRefresh = useManualRefresh(() =>
     Promise.all([profileQuery.refetch(), sessionsQuery.refetch()]),
   );
-  const contentState = getMobileQueryContentState({
+  const contentState = useMobileContentState({
     hasData: Boolean(profileQuery.data),
     isLoading: profileQuery.isLoading,
     error: profileQuery.error,
   });
   const accountEmail = profileQuery.data?.user.email ?? null;
-  const confirmPasswordError =
-    confirmPassword.length > 0 && newPassword !== confirmPassword
-      ? "Passwords do not match."
-      : null;
+  const confirmPasswordError = getPasswordMismatchError(newPassword, confirmPassword);
+  // The same bar as the reset flow and web, via the shared rule. Gating on
+  // length alone let a password the reset screen would reject enable this
+  // submit, which is the exact drift `@dubgrid/domain/password` exists to stop.
   const passwordLooksReady =
-    currentPassword.length > 0 && newPassword.length >= 10 && newPassword === confirmPassword;
+    currentPassword.length > 0 &&
+    isPasswordAcceptable(newPassword) &&
+    passwordsMatch(newPassword, confirmPassword);
 
   function resetPasswordEditor() {
     setPasswordError(null);
@@ -409,12 +373,14 @@ export default function ProfileSecurityScreen() {
       setPasswordError("Enter your current password.");
       return;
     }
-    if (newPassword.length < 10) {
-      setPasswordError("Password must be at least 10 characters.");
+    if (!isPasswordAcceptable(newPassword)) {
+      // Same wording as the reset flow: the strength hints above the field
+      // already name the specific rule that is still unmet.
+      setPasswordError("Choose a stronger password.");
       return;
     }
-    if (newPassword !== confirmPassword) {
-      setPasswordError("Passwords do not match.");
+    if (!passwordsMatch(newPassword, confirmPassword)) {
+      setPasswordError(PASSWORD_MISMATCH_MESSAGE);
       return;
     }
     if (newPassword === currentPassword) {
@@ -747,7 +713,9 @@ export default function ProfileSecurityScreen() {
   return (
     <Screen refreshing={manualRefresh.isRefreshing} onRefresh={manualRefresh.refresh}>
       {contentState.kind === "loading" ? (
-        <DetailSkeleton sections={3} />
+        contentState.showSkeleton ? (
+          <ProfileSkeleton rowsPerSection={3} sections={3} showHero={false} />
+        ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try Again"
@@ -1050,7 +1018,7 @@ export default function ProfileSecurityScreen() {
           pendingConfirmation?.kind === "revokeSession" ||
           pendingConfirmation?.kind === "mfaDisable" ||
           (pendingConfirmation?.kind === "sessionScope" && pendingConfirmation.scope === "global")
-            ? "dangerFilled"
+            ? "danger"
             : "primary"
         }
         loading={
@@ -1089,13 +1057,11 @@ const createStyles = (mobileColors: MobileColors) =>
       justifyContent: "space-between",
     },
     passwordStrengthTitle: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     passwordStrengthLevel: {
-      ...mobileText.caption,
-      fontWeight: "600",
+      ...mobileTextWeighted("caption", "semibold"),
     },
     passwordStrengthLevelShort: {
       color: mobileColors.dangerText,
@@ -1140,9 +1106,8 @@ const createStyles = (mobileColors: MobileColors) =>
       width: 40,
     },
     signOutNotice: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.danger,
-      fontWeight: "500",
     },
     mfaInstructions: {
       ...mobileText.body,
@@ -1159,9 +1124,8 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 4,
     },
     rowTitle: {
-      ...mobileText.cardTitle,
+      ...mobileTextWeighted("cardTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     rowDescription: {
       ...mobileText.caption,
@@ -1185,7 +1149,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     sessionList: {
       backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       gap: 0,
@@ -1229,9 +1193,8 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 8,
     },
     sessionTitle: {
-      ...mobileText.rowTitle,
+      ...mobileTextWeighted("rowTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     sessionCurrentBadge: {
       backgroundColor: mobileColors.brand,
@@ -1240,9 +1203,8 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: 1,
     },
     sessionCurrentBadgeText: {
-      ...mobileText.micro,
+      ...mobileTextWeighted("micro", "bold"),
       color: mobileColors.textInverse,
-      fontWeight: "700",
     },
     sessionBody: {
       ...mobileText.body,
@@ -1253,12 +1215,11 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSubtle,
     },
     sessionGroupHeading: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "semibold"),
       backgroundColor: mobileColors.surfaceSecondary,
       borderBottomColor: mobileColors.borderSubtle,
       borderBottomWidth: StyleSheet.hairlineWidth,
       color: mobileColors.textMuted,
-      fontWeight: "600",
       letterSpacing: 0.4,
       paddingHorizontal: 16,
       paddingVertical: 8,

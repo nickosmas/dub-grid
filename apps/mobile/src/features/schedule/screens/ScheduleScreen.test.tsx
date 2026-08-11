@@ -33,6 +33,7 @@ vi.mock("@tanstack/react-query", () => ({
   onlineManager: {
     isOnline: () => true,
   },
+  keepPreviousData: (previousData: unknown) => previousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -493,7 +494,7 @@ describe("ScheduleScreen", () => {
 
   // Skeletons stand in for the content that's coming; a "Loading schedule"
   // headline on top of them says the same thing twice, in a heavier voice.
-  it("shows skeletons alone while the schedule loads", () => {
+  it("shows skeletons alone while the schedule loads", async () => {
     useQuery.mockImplementation(() => ({
       data: undefined,
       error: null,
@@ -504,8 +505,13 @@ describe("ScheduleScreen", () => {
 
     render(<HomeScheduleScreen />);
 
-    expect(screen.getByTestId("hero-skeleton")).toBeInTheDocument();
-    expect(screen.getAllByTestId("list-skeleton").length).toBeGreaterThan(0);
+    // Held back briefly so a fast response never flashes a skeleton.
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+
+    expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
+    // Exactly one: the page-level skeleton now covers the request sections
+    // that used to paint a second wave of their own after it cleared.
+    expect(screen.getAllByTestId("skeleton")).toHaveLength(1);
     expect(screen.queryByText("Loading schedule")).not.toBeInTheDocument();
     expect(screen.queryByText(/Getting the latest/)).not.toBeInTheDocument();
   });
@@ -1593,15 +1599,20 @@ describe("ScheduleScreen", () => {
 
     expect(screen.getByText("Today, Apr 16")).toBeInTheDocument();
     expect(screen.queryByTestId("today-date-dot-2026-04-16")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Select Skilled Nursing" })).toHaveAttribute(
+    // Focus areas are a shared ScrollableTabStrip now, so they carry role="tab"
+    // and their bare label, matching the Requests strip.
+    expect(screen.getByRole("tab", { name: "Skilled Nursing" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    const headerButtonLabels = screen
-      .getAllByRole("button")
-      .map((button) => button.getAttribute("aria-label") ?? button.textContent);
-    expect(headerButtonLabels.indexOf("Select Sat, Apr 18")).toBeLessThan(
-      headerButtonLabels.indexOf("Select Emergency"),
+    const headerControlLabels = [...screen.getAllByRole("button"), ...screen.getAllByRole("tab")]
+      .sort((a, b) =>
+        // eslint-disable-next-line no-bitwise
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+      )
+      .map((control) => control.getAttribute("aria-label") ?? control.textContent);
+    expect(headerControlLabels.indexOf("Select Sat, Apr 18")).toBeLessThan(
+      headerControlLabels.indexOf("Emergency"),
     );
     expect(screen.getByText("Me")).toBeInTheDocument();
     expect(screen.queryByText("Alex Kim")).not.toBeInTheDocument();
@@ -1775,13 +1786,10 @@ describe("ScheduleScreen", () => {
   it("keeps the Schedule tab pill flow working with focus-area filtering", () => {
     render(<TeamScheduleScreen />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Select Emergency" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Emergency" }));
 
     expect(screen.queryByLabelText("Focus area filter popup")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Select Emergency" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(screen.getByRole("tab", { name: "Emergency" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Chris Hall")).toBeInTheDocument();
     expect(screen.getByText("Nurse")).toBeInTheDocument();
     expect(screen.queryByText("Me")).not.toBeInTheDocument();

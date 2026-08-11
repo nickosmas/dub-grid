@@ -39,6 +39,23 @@ vi.mock("expo-router", () => ({
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
 
+// Recorded rather than only queried, so a state that renders for a single
+// frame and is then corrected still shows up: `screen` only ever sees the
+// final DOM, but every render that reached the commit phase lands here.
+const emptyStateTitles: string[] = [];
+
+vi.mock("../../../shared/components/EmptyStateCard", () => ({
+  EmptyStateCard: ({ title, body }: { title: string; body?: string }) => {
+    emptyStateTitles.push(title);
+    return (
+      <div>
+        {title}
+        {body}
+      </div>
+    );
+  },
+}));
+
 vi.mock("../../../shared/navigation/top-level-stack", () => ({
   createDetailStackOptions: () => ({}),
 }));
@@ -76,6 +93,7 @@ describe("PersonDetailScreen", () => {
     useBootstrap.mockReset();
     useLocalSearchParams.mockReset();
     pushToast.mockReset();
+    emptyStateTitles.length = 0;
 
     useAccessToken.mockReturnValue("token-123");
     useLocalSearchParams.mockReturnValue({
@@ -112,6 +130,82 @@ describe("PersonDetailScreen", () => {
       isPending: false,
       mutate: vi.fn(),
     });
+  });
+
+  function makePerson(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "emp-1",
+      firstName: "Mina",
+      lastName: "Diaz",
+      orgRole: "super_admin",
+      employmentType: "full_time",
+      phone: "(415) 425-3334",
+      email: "mina@dubgrid.com",
+      status: "active",
+      certificationId: null,
+      roleIds: [3],
+      seniority: 2,
+      focusAreaIds: [2],
+      departmentIds: [4],
+      deptAdminIds: [],
+      contactNotes: "Weekend availability",
+      statusChangedAt: null,
+      statusNote: "",
+      userId: "user-1",
+      version: 7,
+      ...overrides,
+    };
+  }
+
+  // The edit draft used to be synced from the person in an effect, and effects
+  // run after the paint — so the frame where the person first arrived still had
+  // a null draft and rendered the not-found card before correcting itself.
+  it("never paints the not-found card on the frame the person arrives", () => {
+    useQuery.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
+
+    const { rerender } = render(<PersonDetailScreen />);
+
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ pendingInvitation: null }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    rerender(<PersonDetailScreen />);
+
+    expect(emptyStateTitles).not.toContain("Person not found");
+    expect(screen.getAllByText("Mina Diaz").length).toBeGreaterThan(0);
+  });
+
+  // `person` is gated on canManageEmployees, which comes from bootstrap. With
+  // only the person query resolved, an inactive teammate reads as null and the
+  // screen declared them missing until bootstrap landed.
+  it("waits for bootstrap before deciding a person is missing", () => {
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ status: "inactive", pendingInvitation: null }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(emptyStateTitles).not.toContain("Person not found");
   });
 
   it("fetches the selected person directly and avoids duplicate active account copy", () => {

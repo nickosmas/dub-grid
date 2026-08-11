@@ -52,7 +52,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "monochromeImage": "./assets/images/adaptive-icon-monochrome.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "predictiveBackGestureEnabled": true
     },
     "experiments": {
       "autolinkingModuleResolution": true

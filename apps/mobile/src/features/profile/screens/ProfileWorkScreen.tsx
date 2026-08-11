@@ -20,7 +20,6 @@ import {
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -34,7 +33,7 @@ import {
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { queryClient } from "../../../shared/lib/query-client";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -49,6 +48,7 @@ import {
   formatProfileStatus,
   formatProfileValue,
 } from "../components/ProfilePrimitives";
+import { ProfileSkeleton } from "../components/ProfileSkeleton";
 
 const PENDING_PROFILE_CHANGE_MESSAGE = "A profile change request is pending admin review.";
 
@@ -121,7 +121,7 @@ export default function ProfileWorkScreen() {
     (draft.email.trim().toLowerCase() !== (profile.user.email ?? "").trim().toLowerCase() ||
       (linkedEmployee && draft.phone.trim() !== (linkedEmployee.phone ?? ""))),
   );
-  const contentState = getMobileQueryContentState({
+  const contentState = useMobileContentState({
     hasData: Boolean(profile),
     isLoading: profileQuery.isLoading,
     error: profileQuery.error,
@@ -290,7 +290,9 @@ export default function ProfileWorkScreen() {
   return (
     <Screen refreshing={manualRefresh.isRefreshing} onRefresh={manualRefresh.refresh}>
       {contentState.kind === "loading" ? (
-        <DetailSkeleton sections={3} />
+        contentState.showSkeleton ? (
+          <ProfileSkeleton rowsPerSection={3} sections={3} showHero={false} />
+        ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try again"
@@ -497,7 +499,7 @@ export default function ProfileWorkScreen() {
       <ConfirmationModal
         body="Your edits will be lost."
         confirmLabel="Discard"
-        confirmTone="dangerFilled"
+        confirmTone="danger"
         onCancel={() => setPendingConfirmation(null)}
         onConfirm={() => {
           setPendingConfirmation(null);

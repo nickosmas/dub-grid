@@ -7,7 +7,12 @@ import {
   getSplitShiftBadgeLabel,
   getSplitShiftSegmentLabel,
 } from "../lib/schedule";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 
 type SplitShiftVariant = "compact" | "hero" | "detail" | "supporting";
@@ -399,9 +404,8 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textInverse,
     },
     segmentHeroCaptionText: {
-      ...mobileText.body,
+      ...mobileTextWeighted("body", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     segmentHeroCaptionTextInverse: {
       color: "rgba(255, 255, 255, 0.82)",
@@ -415,8 +419,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     segmentTitleDetail: {
-      ...mobileText.sectionTitle,
-      fontWeight: "800",
+      ...mobileTextWeighted("sectionTitle", "bold"),
     },
     segmentTitleHero: {
       ...mobileText.sectionTitle,
@@ -425,14 +428,12 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textInverse,
     },
     segmentTitleSupporting: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "bold"),
       color: mobileColors.textSecondary,
-      fontWeight: "700",
     },
     segmentMeta: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     segmentMetaHero: {
       ...mobileText.body,
@@ -441,9 +442,8 @@ const createStyles = (mobileColors: MobileColors) =>
       color: "rgba(255, 255, 255, 0.82)",
     },
     segmentTiming: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "bold"),
       color: mobileColors.brand,
-      fontWeight: "700",
     },
     segmentTimingHero: {
       ...mobileText.body,

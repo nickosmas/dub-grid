@@ -15,9 +15,9 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { ModalHeader } from "../../../shared/components/ModalHeader";
-import { DetailSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
 import { Card, Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { ShiftDetailSkeleton } from "../components/ShiftDetailSkeleton";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
@@ -29,7 +29,8 @@ import {
   getShiftSwapOptions,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import { getMobileQueryContentState, getQueryErrorMessage } from "../../../shared/lib/query-state";
+import { getQueryErrorMessage } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import {
   useIsDarkMode,
   useMobileColors,
@@ -114,7 +115,7 @@ type ShiftDetailConfirmation = {
   title: string;
   body: string;
   confirmLabel: string;
-  confirmTone?: "primary" | "dangerFilled";
+  confirmTone?: "primary" | "danger";
   onConfirm: () => void;
 } | null;
 const SWAP_SCHEDULE_LOOKAHEAD_DAYS = MAX_MOBILE_SCHEDULE_RANGE_DAYS;
@@ -422,6 +423,13 @@ export default function ShiftDetailScreen() {
       Boolean(myScheduleRange.startDate) &&
       Boolean(myScheduleRange.endDate),
   });
+  // Named rather than inline so the content-state gate below can ask the same
+  // question: a query that is never enabled is also never "resolved".
+  const canLoadTeamSchedule =
+    Boolean(accessToken) &&
+    Boolean(teamScheduleRange.startDate) &&
+    Boolean(teamScheduleRange.endDate) &&
+    (canViewTeamSchedule || needsTeamScheduleForShift);
   const teamScheduleQuery = useQuery({
     queryKey: [
       "mobile",
@@ -432,11 +440,7 @@ export default function ShiftDetailScreen() {
       teamScheduleRange.endDate,
     ],
     queryFn: () => getOrgSchedule(accessToken!, teamScheduleRange),
-    enabled:
-      Boolean(accessToken) &&
-      Boolean(teamScheduleRange.startDate) &&
-      Boolean(teamScheduleRange.endDate) &&
-      (canViewTeamSchedule || needsTeamScheduleForShift),
+    enabled: canLoadTeamSchedule,
   });
   const swapOptionsQuery = useQuery({
     queryKey: [
@@ -805,12 +809,22 @@ export default function ShiftDetailScreen() {
   const canSubmitRequest = Boolean(
     linkedEmployeeId && shiftEntry && requestMode === "swap" && selectedTargetEntry,
   );
-  const contentState = getMobileQueryContentState({
-    hasData: Boolean(shiftEntry) && Boolean(bootstrapQuery.data),
-    isLoading:
-      bootstrapQuery.isLoading ||
-      myScheduleQuery.isLoading ||
-      (needsTeamScheduleForShift && teamScheduleQuery.isLoading),
+  // The team schedule counts even when it isn't strictly needed to resolve
+  // *this* shift: the "Working with" section reads from it, so leaving it out
+  // cleared the page skeleton and then painted a second one inside that
+  // section — on your own shift, every single time. Its error is "resolved"
+  // too, because that section renders its own banner for it.
+  // `!canLoadTeamSchedule` first: the query is disabled for a user viewing
+  // their own shift without team-schedule permission, and a disabled query
+  // never resolves, so `hasData` would stay false forever and hand the error
+  // and offline branches a page that had actually loaded fine.
+  const teamScheduleResolved =
+    !canLoadTeamSchedule ||
+    teamScheduleQuery.data !== undefined ||
+    Boolean(teamScheduleQuery.error);
+  const contentState = useMobileContentState({
+    hasData: Boolean(shiftEntry) && Boolean(bootstrapQuery.data) && teamScheduleResolved,
+    isLoading: bootstrapQuery.isLoading || myScheduleQuery.isLoading || teamScheduleQuery.isLoading,
     error:
       bootstrapQuery.error ??
       myScheduleQuery.error ??
@@ -867,12 +881,11 @@ export default function ShiftDetailScreen() {
     getScheduleEntryAbsenceTypeId(shiftEntry) == null &&
     !isGeneralDetailEntry(shiftEntry),
   );
+  // No `isLoading` term: the screen's own gate now waits on the team schedule,
+  // so by the time this renders the list is either populated or errored.
   const shouldRenderShiftmatesSection = Boolean(
     shouldShowShiftmates &&
-    (teamScheduleQuery.isLoading ||
-      teamScheduleQuery.error ||
-      shiftmates.length > 0 ||
-      hasGroupedShiftmates),
+    (teamScheduleQuery.error || shiftmates.length > 0 || hasGroupedShiftmates),
   );
   const manualRefresh = useManualRefresh(() =>
     Promise.all([
@@ -968,7 +981,7 @@ export default function ShiftDetailScreen() {
           ? `Your ${shiftLabel} shift on ${shiftDateLabel} will be offered to teammates for pickup.`
           : `${indefiniteArticle(options?.absenceTypeLabel ?? "selected") === "an" ? "An" : "A"} ${options?.absenceTypeLabel ?? "selected"} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.`,
       confirmLabel: type === "pickup" ? "Offer Shift" : "Submit Call-off",
-      confirmTone: type === "calloff" ? "dangerFilled" : "primary",
+      confirmTone: type === "calloff" ? "danger" : "primary",
       onConfirm: () =>
         submitCoverageRequest(type, {
           absenceTypeId: options?.absenceTypeId,
@@ -1046,9 +1059,9 @@ export default function ShiftDetailScreen() {
       onRefresh={manualRefresh.refresh}
     >
       {contentState.kind === "loading" ? (
-        <View style={styles.loadingState}>
-          <DetailSkeleton sections={2} />
-        </View>
+        contentState.showSkeleton ? (
+          <ShiftDetailSkeleton />
+        ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try again"
@@ -1162,9 +1175,7 @@ export default function ShiftDetailScreen() {
           {shouldRenderShiftmatesSection ? (
             <View style={styles.sectionBlock}>
               <Text style={styles.sectionTitle}>Working with</Text>
-              {teamScheduleQuery.isLoading ? (
-                <ListSkeleton rows={2} showSectionHeader={false} />
-              ) : teamScheduleQuery.error ? (
+              {teamScheduleQuery.error ? (
                 <StatusBanner
                   body={getQueryErrorMessage(
                     teamScheduleQuery.error,

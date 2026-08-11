@@ -1,5 +1,10 @@
 import { ORG_ROLE_LABELS, getHighlightedOrgRole, type OrgRole } from "@dubgrid/domain";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
 type MobileOrgRole = OrgRole | null;
 
@@ -31,9 +36,8 @@ export function getMobileOrgRoleBadge(
         paddingVertical: 4,
       },
       textStyle: {
-        ...mobileText.caption,
+        ...mobileTextWeighted("caption", "bold"),
         color: mobileColors.warningText,
-        fontWeight: "700" as const,
       },
     };
   }
@@ -52,9 +56,8 @@ export function getMobileOrgRoleBadge(
       paddingVertical: 4,
     },
     textStyle: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "bold"),
       color: mobileColors.brand,
-      fontWeight: "700" as const,
     },
   };
 }

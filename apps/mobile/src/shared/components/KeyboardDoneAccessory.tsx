@@ -62,11 +62,23 @@ export function useKeyboardDoneAccessory({
 function KeyboardDoneAccessory({ nativeID }: { nativeID: string }) {
   return (
     // No bar of its own: the button floats over whatever sits between the
-    // keyboard and the screen. The row still spans the keyboard's width, so
-    // `alignItems` is what holds the button at content width on the right.
+    // keyboard and the screen. The row spans the keyboard's width, so the
+    // button has to opt out of stretching — `fullWidth` defaults to true for
+    // text buttons, and `alignSelf: "stretch"` on the child would make this
+    // span edge to edge.
+    //
+    // Placement has to come from `justifyContent` on a real row: opting out of
+    // full width gives the button `alignSelf: "flex-start"`, and that beats any
+    // `alignItems` the parent sets, which pinned the button to the left.
     <InputAccessoryView backgroundColor="transparent" nativeID={nativeID}>
       <View style={styles.row}>
-        <Button compact label="Done" onPress={() => Keyboard.dismiss()} tone="secondary" />
+        <Button
+          fullWidth={false}
+          label="Done"
+          onPress={() => Keyboard.dismiss()}
+          size="sm"
+          tone="secondary"
+        />
       </View>
     </InputAccessoryView>
   );
@@ -74,7 +86,8 @@ function KeyboardDoneAccessory({ nativeID }: { nativeID: string }) {
 
 const styles = StyleSheet.create({
   row: {
-    alignItems: "flex-end",
+    flexDirection: "row",
+    justifyContent: "flex-end",
     backgroundColor: "transparent",
     paddingHorizontal: 12,
     paddingVertical: 6,

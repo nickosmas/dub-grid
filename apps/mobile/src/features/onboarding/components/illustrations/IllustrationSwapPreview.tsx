@@ -2,115 +2,219 @@ import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
 import { useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, type MobileColors } from "../../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../../shared/theme/tokens";
+import { IllustrationFrame, MockButton } from "./illustration-primitives";
+
+/**
+ * The Requests tab: the tab strip
+ * (`shared/components/ScrollableTabStrip.tsx`) above a swap request awaiting
+ * the viewer's answer (`RequestCard` in
+ * `shift-requests/screens/RequestsScreen.tsx`).
+ */
+const TABS = [
+  { key: "available", label: "Available", count: 3, active: true },
+  { key: "mine", label: "Mine", count: 1, active: false },
+  { key: "history", label: "History", count: undefined, active: false },
+] as const;
 
 export function IllustrationSwapPreview() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
   return (
-    <View accessible={false} style={styles.stack}>
+    <IllustrationFrame gap={20}>
+      <View style={styles.tabStrip}>
+        {TABS.map((tab) => (
+          <View key={tab.key} style={[styles.tab, tab.active && styles.tabActive]}>
+            <Text
+              style={[styles.tabLabel, tab.active ? styles.tabLabelActive : styles.tabLabelIdle]}
+            >
+              {tab.label}
+            </Text>
+            {tab.count === undefined ? null : (
+              <View style={[styles.tabBadge, tab.active && styles.tabBadgeActive]}>
+                <Text style={[styles.tabBadgeText, tab.active && styles.tabBadgeTextActive]}>
+                  {tab.count}
+                </Text>
+              </View>
+            )}
+          </View>
+        ))}
+      </View>
+
       <View style={styles.card}>
-        <Text style={styles.label}>YOU GIVE</Text>
-        <Text style={styles.shiftName}>Day Shift</Text>
-        <Text style={styles.shiftMeta}>Fri, May 15 · 7:00 AM – 3:30 PM</Text>
-        <Text style={styles.shiftSub}>Skilled Nursing</Text>
-      </View>
-
-      <View style={styles.arrowChip}>
-        <Ionicons color={mobileColors.brand} name="swap-vertical" size={18} />
-      </View>
-
-      <View style={[styles.card, styles.cardReceive]}>
-        <Text style={styles.label}>YOU GET</Text>
-        <View style={styles.titleRow}>
-          <Text style={styles.shiftName}>Evening Shift</Text>
-          <View style={styles.supervisorPill}>
-            <Text style={styles.supervisorText}>SUPERVISOR</Text>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardTitleRow}>
+            <View style={styles.cardIconFrame}>
+              <Ionicons color={mobileColors.brand} name="swap-horizontal-outline" size={18} />
+            </View>
+            <View style={styles.titleColumn}>
+              <Text style={styles.requestTitle}>Laura Marshall</Text>
+              <Text style={styles.metaText}>Swap request</Text>
+              <View style={styles.shiftPillRow}>
+                <View style={styles.shiftPill}>
+                  <Text style={styles.shiftPillText}>Day Shift</Text>
+                </View>
+                <Text style={styles.shiftTimeText}>7:00 AM - 3:30 PM</Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.statusChip}>
+            <Text style={styles.statusChipText}>Open</Text>
           </View>
         </View>
-        <Text style={styles.shiftMeta}>Fri, May 15 · 3:30 PM – 12:00 AM</Text>
-        <Text style={styles.shiftSub}>From Laura Marshall</Text>
+        <View style={styles.cardActions}>
+          <MockButton label="Accept" />
+          <MockButton label="Decline" tone="neutral" />
+        </View>
       </View>
-    </View>
+    </IllustrationFrame>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    stack: {
-      width: 296,
-      alignItems: "stretch",
-      gap: 8,
+    tabStrip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: mobileSpace.sm,
+    },
+    tab: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: mobileSpace.sm,
+      minHeight: 36,
+      paddingHorizontal: 14,
+      paddingVertical: mobileSpace.sm,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.controlNeutralBg,
+    },
+    tabActive: {
+      backgroundColor: mobileColors.brand,
+    },
+    tabLabel: {
+      ...mobileText.bodyStrong,
+      flexShrink: 1,
+    },
+    tabLabelIdle: {
+      color: mobileColors.textSecondary,
+    },
+    tabLabelActive: {
+      color: mobileColors.onBrandText,
+    },
+    tabBadge: {
+      minWidth: 20,
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.surface,
+    },
+    tabBadgeActive: {
+      backgroundColor: "rgba(255, 255, 255, 0.22)",
+    },
+    tabBadgeText: {
+      ...mobileText.badge,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+      includeFontPadding: false,
+    },
+    tabBadgeTextActive: {
+      color: mobileColors.textInverse,
     },
     card: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      gap: 2,
       borderWidth: 1,
       borderColor: mobileColors.borderSubtle,
-      shadowColor: mobileColors.shadow,
-      shadowOpacity: 0.06,
-      shadowRadius: 14,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 3,
+      padding: 16,
+      gap: 10,
     },
-    cardReceive: {
-      borderColor: mobileColors.brandBorder,
-      backgroundColor: mobileColors.brandSoft,
-    },
-    label: {
-      color: mobileColors.textMuted,
-      fontSize: 10,
-      fontWeight: "700",
-      letterSpacing: 1.1,
-      marginBottom: 2,
-    },
-    titleRow: {
+    cardHeader: {
       flexDirection: "row",
-      alignItems: "center",
       justifyContent: "space-between",
-      gap: 8,
+      alignItems: "flex-start",
+      gap: 12,
     },
-    shiftName: {
-      color: mobileColors.textPrimary,
-      fontSize: 15,
-      fontWeight: "700",
+    cardTitleRow: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
     },
-    shiftMeta: {
-      color: mobileColors.textSecondary,
-      fontSize: 12,
-      fontWeight: "500",
-      marginTop: 2,
-    },
-    shiftSub: {
-      color: mobileColors.textMuted,
-      fontSize: 12,
-    },
-    supervisorPill: {
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
-      backgroundColor: mobileColors.warningSoft,
-    },
-    supervisorText: {
-      color: mobileColors.warningText,
-      fontSize: 9,
-      fontWeight: "700",
-      letterSpacing: 0.6,
-    },
-    arrowChip: {
-      alignSelf: "center",
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: mobileColors.brandSoft,
+    cardIconFrame: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       alignItems: "center",
       justifyContent: "center",
+      backgroundColor: mobileColors.brandSoft,
+    },
+    titleColumn: {
+      flex: 1,
+      minWidth: 0,
+      gap: 10,
+    },
+    requestTitle: {
+      ...mobileText.cardTitle,
+      color: mobileColors.textPrimary,
+    },
+    metaText: {
+      ...mobileText.body,
+      color: mobileColors.textMuted,
+    },
+    shiftPillRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 8,
+    },
+    // A shift with no stored colour runs on brand tokens, which is the most
+    // common case on a fresh organization.
+    shiftPill: {
+      borderRadius: mobileRadii.pill,
       borderWidth: 1,
       borderColor: mobileColors.brandBorder,
-      marginVertical: -16,
-      zIndex: 2,
+      backgroundColor: mobileColors.brandSoft,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    shiftPillText: {
+      ...mobileTextWeighted("meta", "semibold"),
+      color: mobileColors.brand,
+      includeFontPadding: false,
+    },
+    shiftTimeText: {
+      ...mobileTextWeighted("rowTitle", "medium"),
+      color: mobileColors.textMuted,
+      includeFontPadding: false,
+    },
+    statusChip: {
+      borderRadius: mobileRadii.pill,
+      borderWidth: 1,
+      borderColor: mobileColors.brandBorder,
+      backgroundColor: mobileColors.brandSoft,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      alignSelf: "flex-start",
+    },
+    statusChipText: {
+      ...mobileTextWeighted("caption", "semibold"),
+      color: mobileColors.brand,
+      includeFontPadding: false,
+    },
+    cardActions: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginLeft: 42,
+      paddingTop: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: mobileColors.borderSubtle,
     },
   });

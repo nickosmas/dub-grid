@@ -5,6 +5,7 @@ import { createReactNativeModule, createSafeAreaContextModule } from "../../../t
 const useSessionState = vi.fn();
 const useBootstrap = vi.fn();
 const useAdminDashboard = vi.fn();
+const useMyScheduleQuery = vi.fn();
 const invalidateQueries = vi.fn();
 let capturedOnRefresh: (() => Promise<unknown>) | undefined;
 
@@ -30,6 +31,10 @@ vi.mock("../../auth/hooks/useBootstrap", () => ({
 
 vi.mock("../hooks/useAdminDashboard", () => ({
   useAdminDashboard,
+}));
+
+vi.mock("../hooks/useMyScheduleQuery", () => ({
+  useMyScheduleQuery,
 }));
 
 vi.mock("../components/MyScheduleCard", () => ({
@@ -126,20 +131,48 @@ describe("AdminHomeScreen", () => {
     useSessionState.mockReset();
     useBootstrap.mockReset();
     useAdminDashboard.mockReset();
+    useMyScheduleQuery.mockReset();
+    useMyScheduleQuery.mockReturnValue({ isLoading: false, data: undefined });
     invalidateQueries.mockReset();
     routerPush.mockReset();
     capturedOnRefresh = undefined;
     useSessionState.mockReturnValue({ accessToken: "token-1" });
   });
 
-  it("shows skeleton placeholders while either query is loading", () => {
+  it("shows skeleton placeholders while either query is loading", async () => {
     useBootstrap.mockReturnValue({ isLoading: true, data: undefined });
     useAdminDashboard.mockReturnValue({ isLoading: true, isError: false, data: undefined });
 
     render(<AdminHomeScreen />);
 
-    expect(screen.getByTestId("hero-skeleton")).toBeInTheDocument();
-    expect(screen.getAllByTestId("list-skeleton").length).toBeGreaterThan(0);
+    // Nothing is painted for the first beat, so a fast response never flashes a
+    // skeleton it then immediately replaces.
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+
+    expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
+    expect(screen.getAllByTestId("skeleton")).toHaveLength(1);
+  });
+
+  // The card used to own this query and render null while it loaded, so it
+  // appeared *after* the page skeleton cleared and pushed the cards below it
+  // down. One gate, one skeleton, one swap.
+  it("keeps the one skeleton up until the schedule card's query resolves too", async () => {
+    useBootstrap.mockReturnValue({
+      isLoading: false,
+      data: makeBootstrapData({ effectiveRole: "admin", focusAreaIds: [1], departmentIds: [1] }),
+    });
+    useAdminDashboard.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: EMPTY_DASHBOARD_DATA,
+    });
+    useMyScheduleQuery.mockReturnValue({ isLoading: true, data: undefined });
+
+    render(<AdminHomeScreen />);
+
+    expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
+    expect(screen.getAllByTestId("skeleton")).toHaveLength(1);
+    expect(screen.queryByText("my-schedule-card")).not.toBeInTheDocument();
   });
 
   it("shows a retry state when the dashboard query fails", () => {

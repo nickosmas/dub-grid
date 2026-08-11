@@ -1,8 +1,10 @@
 import { StyleSheet } from "react-native";
 import {
   mobileRadii,
+  mobileSpace,
   mobileSpacing,
   mobileText,
+  mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 
@@ -11,63 +13,6 @@ import {
  */
 export const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    loadingState: {
-      gap: 14,
-    },
-    tabRow: {
-      marginHorizontal: -mobileSpacing.screenX,
-    },
-    tabRowContent: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingHorizontal: mobileSpacing.screenX,
-      paddingVertical: 2,
-    },
-    tabButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      minHeight: 36,
-      maxWidth: 180,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surface,
-    },
-    tabButtonActive: {
-      borderColor: mobileColors.brand,
-      backgroundColor: mobileColors.brand,
-    },
-    tabButtonText: {
-      fontSize: 14,
-      fontWeight: "700",
-      color: mobileColors.textSecondary,
-    },
-    tabButtonTextActive: {
-      color: mobileColors.textInverse,
-    },
-    tabBadge: {
-      minWidth: 20,
-      paddingHorizontal: 6,
-      paddingVertical: 3,
-      borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.surfaceSecondary,
-    },
-    tabBadgeActive: {
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
-    },
-    tabBadgeText: {
-      ...mobileText.badge,
-      color: mobileColors.textMuted,
-      textAlign: "center",
-      includeFontPadding: false,
-    },
-    tabBadgeTextActive: {
-      color: mobileColors.textInverse,
-    },
     section: {
       gap: 10,
     },
@@ -85,7 +30,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       padding: 16,
       gap: 10,
     },
@@ -165,9 +110,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       gap: 12,
     },
     shiftTitleTimeText: {
-      ...mobileText.rowTitle,
+      ...mobileTextWeighted("rowTitle", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
       // Matches the pill's text below: Android's default font padding throws
       // off vertical centering against the bordered/padded pill next to it.
       includeFontPadding: false,
@@ -182,9 +126,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       gap: 10,
     },
     splitShiftPanelLabel: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "bold"),
       color: mobileColors.textMuted,
-      fontWeight: "700",
     },
     shiftPill: {
       borderRadius: mobileRadii.pill,
@@ -193,8 +136,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: 8,
     },
     shiftPillText: {
-      ...mobileText.meta,
-      fontWeight: "600",
+      ...mobileTextWeighted("meta", "semibold"),
       includeFontPadding: false,
     },
     statusChip: {
@@ -207,9 +149,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       alignSelf: "flex-start",
     },
     statusChipText: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "semibold"),
       color: mobileColors.textSecondary,
-      fontWeight: "600",
       includeFontPadding: false,
     },
     metaText: {
@@ -262,8 +203,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       fontSize: 12,
     },
     jobPillValueText: {
-      ...mobileText.meta,
-      fontWeight: "600",
+      ...mobileTextWeighted("meta", "semibold"),
       includeFontPadding: false,
     },
     jobPillValueTextCompact: {

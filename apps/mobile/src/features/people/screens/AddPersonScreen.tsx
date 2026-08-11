@@ -10,12 +10,13 @@ import {
 } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
 import { Screen } from "../../../shared/components/Screen";
-import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { createMobilePerson, createMobilePersonInvitation } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useToast } from "../../../shared/providers/ToastProvider";
+import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
+import { PersonFormSkeleton } from "../components/PersonFormSkeleton";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
@@ -30,6 +31,10 @@ export default function AddPersonScreen() {
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
   const bootstrapQuery = useBootstrap(accessToken);
+  // Bootstrap is usually warm here — the tab that got you to this form already
+  // read it — so the placeholder only paints if the wait is long enough to be
+  // worth acknowledging.
+  const showSkeleton = useSkeletonGate(bootstrapQuery.isLoading);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -74,26 +79,38 @@ export default function AddPersonScreen() {
         email: normalizedEmail,
       });
 
+      let invitationSent = true;
+
       if (normalizedEmail) {
         try {
           await createMobilePersonInvitation(accessToken!, result.person.id, {
             email: normalizedEmail,
           });
         } catch {
-          // The person was created; a failed invite send isn't fatal here —
-          // an admin can resend it from the person's detail screen.
+          // The person was created, so this isn't fatal and must not roll the
+          // create back. It does have to be said out loud, though: silently
+          // swallowing it leaves an admin believing an invite is on its way.
+          invitationSent = false;
         }
       }
 
-      return result;
+      return { ...result, invitationSent };
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ["mobile", "people"] });
-      pushToast({
-        tone: "success",
-        title: "Person added",
-        message: `${firstName} ${lastName} was added to your roster.`,
-      });
+      pushToast(
+        result.invitationSent
+          ? {
+              tone: "success",
+              title: "Person added",
+              message: `${firstName} ${lastName} was added to your roster.`,
+            }
+          : {
+              tone: "warning",
+              title: "Person added, invitation not sent",
+              message: `${firstName} ${lastName} is on your roster. Resend the invitation from their profile.`,
+            },
+      );
       router.back();
     },
     onError: (error) => {
@@ -116,11 +133,7 @@ export default function AddPersonScreen() {
   // "Select at least one <focus area>" error, which reads as broken rather
   // than loading.
   if (bootstrapQuery.isLoading) {
-    return (
-      <Screen>
-        <DetailSkeleton sections={3} />
-      </Screen>
-    );
+    return <Screen>{showSkeleton ? <PersonFormSkeleton /> : null}</Screen>;
   }
 
   return (

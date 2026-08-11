@@ -7,6 +7,7 @@ import { PageShell, Card } from "@/components/auth/AuthCard";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
+import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
@@ -98,16 +99,21 @@ function ResetPasswordContent() {
     if (state === "form") firstFieldRef.current?.focus();
   }, [state]);
 
+  // Derived so the warning appears as the user types the confirmation, rather
+  // than only after they submit.
+  const mismatchError = getPasswordMismatchError(password, confirmPassword);
+  const canSubmit = isPasswordAcceptable(password) && mismatchError === null;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
 
-    if (password !== confirmPassword) {
-      setFormError("Passwords do not match");
+    if (mismatchError) {
+      setFormError(mismatchError);
       return;
     }
-    if (password.length < 10) {
-      setFormError("Password must be at least 10 characters");
+    if (!isPasswordAcceptable(password)) {
+      setFormError("Choose a stronger password.");
       return;
     }
 
@@ -180,7 +186,8 @@ function ResetPasswordContent() {
                 marginBottom: "24px",
               }}
             >
-              Choose a strong password with at least 10 characters.
+              Choose a strong password: at least 10 characters, with a mix of uppercase letters,
+              numbers, and symbols.
             </p>
 
             <form
@@ -225,27 +232,31 @@ function ResetPasswordContent() {
                   showPassword={showPassword}
                   onToggle={() => setShowPassword((v) => !v)}
                   autoComplete="new-password"
-                  ariaDescribedBy={formError ? "reset-form-error" : undefined}
+                  ariaDescribedBy={
+                    mismatchError
+                      ? "reset-confirm-error"
+                      : formError
+                        ? "reset-form-error"
+                        : undefined
+                  }
                   disabled={loading}
                 />
+                {mismatchError && (
+                  <p className="dg-form-error" id="reset-confirm-error">
+                    {mismatchError}
+                  </p>
+                )}
               </div>
 
               {formError && (
-                <p
-                  id="reset-form-error"
-                  style={{
-                    color: "var(--color-danger-dark)",
-                    fontSize: "var(--dg-fs-body-sm)",
-                    margin: 0,
-                  }}
-                >
+                <p className="dg-form-error" id="reset-form-error">
                   {formError}
                 </p>
               )}
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !canSubmit}
                 className="dg-btn dg-btn-primary dg-btn-lg"
                 style={{
                   marginTop: "4px",

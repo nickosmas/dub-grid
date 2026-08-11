@@ -15,7 +15,7 @@ import { StyleSheet, Text, View, type GestureResponderEvent } from "react-native
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetworkStatus } from "./NetworkStateProvider";
 import { useMobileColors } from "./ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import { mobileRadii, mobileText, mobileTextWeighted, type MobileColors } from "../theme/tokens";
 
 export type ToastTone = "error" | "success" | "info" | "warning";
 
@@ -119,11 +119,17 @@ export function ToastProvider({ children }: PropsWithChildren) {
 
   const pushToast = useCallback(
     (toast: ToastInput) => {
-      setQueue((current) => {
-        if (isOffline) {
-          return current;
-        }
+      if (isOffline) {
+        // Anything failing right now is failing for one reason, and the banner
+        // already names it, so queueing these would only flood the user with
+        // stale errors on reconnect. Re-assert the banner instead: it
+        // auto-dismisses after a few seconds, and without this a mutation
+        // attempted later in an offline session produced no feedback at all.
+        setIsOfflineBannerDismissed(false);
+        return;
+      }
 
+      setQueue((current) => {
         if (
           toast.dedupeKey &&
           (activeToast?.dedupeKey === toast.dedupeKey ||
@@ -359,8 +365,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textInverse,
     },
     toastMessage: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: TOAST_MESSAGE_COLOR,
-      fontWeight: "500",
     },
   });

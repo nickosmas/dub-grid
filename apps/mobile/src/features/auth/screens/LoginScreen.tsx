@@ -4,23 +4,11 @@ import { ApiResponseError } from "@dubgrid/api-client";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import { Redirect, router } from "expo-router";
-import {
-  KeyboardAvoidingView,
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppSplashScreen } from "../../../shared/components/AppSplashScreen";
 import { Button } from "../../../shared/components/Button";
-import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
-import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
+import { AuthShell } from "../components/AuthShell";
 import {
   useIsConsentDecisionPending,
   useRecheckConsentDecision,
@@ -33,14 +21,19 @@ import {
   verifyMobileTotpFactor,
 } from "../../../shared/lib/api";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
-import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
 import { loadLastOrg, saveHasSeenOnboarding, saveLastOrg } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
 type Stage = "organization" | "credentials" | "mfa";
 
@@ -50,7 +43,6 @@ type PendingMfaLogin = MobileAuthLoginResponse & {
 };
 
 const SESSION_HANDOFF_TIMEOUT_MS = 15_000;
-const MAX_COLUMN_WIDTH = 380;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isValidEmail(value: string): boolean {
@@ -110,7 +102,6 @@ export default function LoginScreen() {
   const { accessToken, isLoading } = useSessionState();
   const isConsentDecisionPending = useIsConsentDecisionPending();
   const recheckConsentDecision = useRecheckConsentDecision();
-  const insets = useSafeAreaInsets();
   const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const mfaInputRef = useRef<TextInput>(null);
@@ -379,336 +370,267 @@ export default function LoginScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Pressable
-        style={styles.brandHeader}
-        onLongPress={isDevBuild ? () => void handleDevResetFirstRun() : undefined}
-      >
-        <Image
-          accessibilityIgnoresInvertColors
-          accessibilityLabel="DubGrid logo"
-          source={require("../../../../assets/images/logo-blue.png")}
-          style={styles.brandMark}
-        />
-        <DubGridWordmark fontSize={20} color={mobileColors.textPrimary} />
-      </Pressable>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.keyboardArea}
-      >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            {
-              paddingBottom: getScreenBottomPadding("stack", insets.bottom),
-            },
-          ]}
-          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.column}>
-            {stage === "organization" ? (
-              <View style={styles.stage}>
-                <View style={styles.header}>
-                  <Text style={styles.title}>Sign in</Text>
-                  <Text style={styles.subtitle}>Enter the subdomain for your team.</Text>
-                </View>
-
-                <View style={styles.fields}>
-                  <View
-                    style={[
-                      styles.inputRow,
-                      focusedField === "organization" && styles.inputRowFocused,
-                      error ? styles.inputRowError : null,
-                    ]}
-                  >
-                    <TextInput
-                      accessibilityLabel="Organization"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      inputAccessoryViewID={inputAccessoryViewID}
-                      placeholder="yourorg"
-                      placeholderTextColor={mobileColors.placeholderText}
-                      returnKeyType="go"
-                      style={[styles.input, styles.inputFlex]}
-                      value={orgSlug}
-                      onBlur={() => setFocusedField(null)}
-                      onChangeText={(value) => {
-                        setOrgSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
-                        setError(null);
-                      }}
-                      onSubmitEditing={() => {
-                        void handleOrganizationContinue();
-                      }}
-                      onFocus={() => setFocusedField("organization")}
-                    />
-                    <View style={styles.suffix}>
-                      <Text style={styles.suffixText}>{orgSuffix}</Text>
-                    </View>
-                  </View>
-
-                  {error ? <InlineError message={error} /> : null}
-                </View>
-
-                <View style={styles.actions}>
-                  <Button
-                    disabled={orgLoading || !orgSlug.trim()}
-                    label="Continue"
-                    loading={orgLoading}
-                    onPress={() => {
-                      void handleOrganizationContinue();
-                    }}
-                  />
-
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: showOrgHelp }}
-                    android_ripple={{ color: mobileColors.rippleNeutral }}
-                    style={styles.link}
-                    onPress={() => setShowOrgHelp((current) => !current)}
-                  >
-                    <Text style={styles.linkText}>Need help with your subdomain?</Text>
-                  </Pressable>
-
-                  {showOrgHelp ? (
-                    <Text style={styles.helperText}>
-                      Your subdomain is the first part of your organization URL - for example, the{" "}
-                      <Text style={styles.helperStrong}>yourorg</Text> in{" "}
-                      <Text style={styles.helperStrong}>yourorg{orgSuffix}</Text>.
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            ) : stage === "credentials" ? (
-              <View style={styles.stage}>
-                <View style={styles.header}>
-                  <Text style={styles.title}>Welcome back!</Text>
-                  <Text style={styles.subtitle}>{orgSubtitle}</Text>
-                </View>
-
-                <View style={styles.fields}>
-                  <View
-                    style={[
-                      styles.inputRow,
-                      focusedField === "email" && styles.inputRowFocused,
-                      error ? styles.inputRowError : null,
-                    ]}
-                  >
-                    <TextInput
-                      accessibilityLabel="Email"
-                      ref={emailInputRef}
-                      autoCapitalize="none"
-                      autoComplete="email"
-                      autoCorrect={false}
-                      blurOnSubmit={false}
-                      inputAccessoryViewID={inputAccessoryViewID}
-                      keyboardType="email-address"
-                      placeholder="Email"
-                      placeholderTextColor={mobileColors.placeholderText}
-                      returnKeyType="next"
-                      style={[styles.input, styles.inputFlex]}
-                      textContentType="emailAddress"
-                      value={email}
-                      onBlur={() => setFocusedField(null)}
-                      onChangeText={setEmail}
-                      onFocus={() => setFocusedField("email")}
-                      onSubmitEditing={() => passwordInputRef.current?.focus()}
-                    />
-                  </View>
-
-                  <View
-                    style={[
-                      styles.inputRow,
-                      focusedField === "password" && styles.inputRowFocused,
-                      error ? styles.inputRowError : null,
-                    ]}
-                  >
-                    <TextInput
-                      accessibilityLabel="Password"
-                      ref={passwordInputRef}
-                      autoCapitalize="none"
-                      autoComplete="password"
-                      autoCorrect={false}
-                      inputAccessoryViewID={inputAccessoryViewID}
-                      placeholder="Password"
-                      placeholderTextColor={mobileColors.placeholderText}
-                      returnKeyType="done"
-                      secureTextEntry={!showPassword}
-                      style={[styles.input, styles.inputFlex]}
-                      textContentType="password"
-                      value={password}
-                      onBlur={() => setFocusedField(null)}
-                      onChangeText={setPassword}
-                      onFocus={() => setFocusedField("password")}
-                      onSubmitEditing={() => {
-                        void handleLogin();
-                      }}
-                    />
-                    <Pressable
-                      accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                      accessibilityRole="button"
-                      hitSlop={10}
-                      style={styles.eyeButton}
-                      onPress={() => setShowPassword((current) => !current)}
-                    >
-                      <Ionicons
-                        color={mobileColors.textMuted}
-                        name={showPassword ? "eye-off-outline" : "eye-outline"}
-                        size={20}
-                      />
-                    </Pressable>
-                  </View>
-
-                  {error ? <InlineError message={error} /> : null}
-                </View>
-
-                <View style={styles.actions}>
-                  <Button
-                    disabled={submitting || !isValidEmail(email) || !password}
-                    label="Sign In"
-                    loading={submitting}
-                    onPress={() => {
-                      void handleLogin();
-                    }}
-                  />
-
-                  <View style={styles.linkRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      android_ripple={{ color: mobileColors.rippleNeutral }}
-                      style={styles.link}
-                      onPress={switchOrganization}
-                    >
-                      <Text style={styles.linkText}>Switch organization</Text>
-                    </Pressable>
-                    <Text style={styles.linkSeparator}>·</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      android_ripple={{ color: mobileColors.rippleNeutral }}
-                      style={styles.link}
-                      onPress={() => {
-                        void openInAppBrowser(`${apiBaseUrl}/forgot-password`, mobileColors);
-                      }}
-                    >
-                      <Text style={styles.linkText}>Forgot password?</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.stage}>
-                <View style={styles.header}>
-                  <Text style={styles.title}>Two-factor authentication</Text>
-                  <Text style={styles.subtitle}>
-                    Enter the 6-digit code from your authenticator app.
-                  </Text>
-                </View>
-
-                <View style={styles.fields}>
-                  <View
-                    style={[styles.inputRow, styles.codeRow, error ? styles.inputRowError : null]}
-                  >
-                    <TextInput
-                      ref={mfaInputRef}
-                      accessibilityLabel="Verification code"
-                      autoComplete="one-time-code"
-                      inputAccessoryViewID={inputAccessoryViewID}
-                      inputMode="numeric"
-                      keyboardType="number-pad"
-                      maxLength={6}
-                      onChangeText={(value) => {
-                        setMfaCode(value.replace(/\D/g, "").slice(0, 6));
-                        setError(null);
-                      }}
-                      placeholder="000000"
-                      placeholderTextColor={mobileColors.placeholderText}
-                      returnKeyType="done"
-                      style={[styles.input, styles.codeInput]}
-                      textContentType="oneTimeCode"
-                      value={mfaCode}
-                      onSubmitEditing={() => {
-                        void handleMfaVerify();
-                      }}
-                    />
-                  </View>
-
-                  {error ? <InlineError message={error} /> : null}
-                </View>
-
-                <View style={styles.actions}>
-                  <Button
-                    disabled={submitting || mfaCode.length !== 6}
-                    label="Verify and Sign In"
-                    loading={submitting}
-                    onPress={() => {
-                      void handleMfaVerify();
-                    }}
-                  />
-
-                  <Pressable
-                    accessibilityRole="button"
-                    android_ripple={{ color: mobileColors.rippleNeutral }}
-                    style={styles.link}
-                    onPress={() => {
-                      setStage("credentials");
-                      setPendingMfaLogin(null);
-                      setMfaCode("");
-                      setError(null);
-                    }}
-                  >
-                    <Text style={styles.linkText}>Back to sign in</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
+    <AuthShell
+      footer={keyboardDoneAccessory}
+      onBrandLongPress={isDevBuild ? () => void handleDevResetFirstRun() : undefined}
+    >
+      {stage === "organization" ? (
+        <View style={styles.stage}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Sign in</Text>
+            <Text style={styles.subtitle}>Enter the subdomain for your team.</Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-      {/* Rendered once for the whole screen: iOS floats it above the keyboard
-          rather than laying it out here, and every stage's field points at it. */}
-      {keyboardDoneAccessory}
-    </SafeAreaView>
+
+          <View style={styles.fields}>
+            <View
+              style={[
+                styles.inputRow,
+                focusedField === "organization" && styles.inputRowFocused,
+                error ? styles.inputRowError : null,
+              ]}
+            >
+              <TextInput
+                accessibilityLabel="Organization"
+                autoCapitalize="none"
+                autoCorrect={false}
+                inputAccessoryViewID={inputAccessoryViewID}
+                placeholder="yourorg"
+                placeholderTextColor={mobileColors.placeholderText}
+                returnKeyType="go"
+                style={[styles.input, styles.inputFlex]}
+                value={orgSlug}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={(value) => {
+                  setOrgSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                  setError(null);
+                }}
+                onSubmitEditing={() => {
+                  void handleOrganizationContinue();
+                }}
+                onFocus={() => setFocusedField("organization")}
+              />
+              <View style={styles.suffix}>
+                <Text style={styles.suffixText}>{orgSuffix}</Text>
+              </View>
+            </View>
+
+            {error ? <InlineError message={error} /> : null}
+          </View>
+
+          <View style={styles.actions}>
+            <Button
+              disabled={orgLoading || !orgSlug.trim()}
+              label="Continue"
+              loading={orgLoading}
+              onPress={() => {
+                void handleOrganizationContinue();
+              }}
+            />
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showOrgHelp }}
+              android_ripple={{ color: mobileColors.rippleNeutral }}
+              style={styles.link}
+              onPress={() => setShowOrgHelp((current) => !current)}
+            >
+              <Text style={styles.linkText}>Need help with your subdomain?</Text>
+            </Pressable>
+
+            {showOrgHelp ? (
+              <Text style={styles.helperText}>
+                Your subdomain is the first part of your organization URL - for example, the{" "}
+                <Text style={styles.helperStrong}>yourorg</Text> in{" "}
+                <Text style={styles.helperStrong}>yourorg{orgSuffix}</Text>.
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ) : stage === "credentials" ? (
+        <View style={styles.stage}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Welcome back!</Text>
+            <Text style={styles.subtitle}>{orgSubtitle}</Text>
+          </View>
+
+          <View style={styles.fields}>
+            <View
+              style={[
+                styles.inputRow,
+                focusedField === "email" && styles.inputRowFocused,
+                error ? styles.inputRowError : null,
+              ]}
+            >
+              <TextInput
+                accessibilityLabel="Email"
+                ref={emailInputRef}
+                autoCapitalize="none"
+                autoComplete="email"
+                autoCorrect={false}
+                blurOnSubmit={false}
+                inputAccessoryViewID={inputAccessoryViewID}
+                keyboardType="email-address"
+                placeholder="Email"
+                placeholderTextColor={mobileColors.placeholderText}
+                returnKeyType="next"
+                style={[styles.input, styles.inputFlex]}
+                textContentType="emailAddress"
+                value={email}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={setEmail}
+                onFocus={() => setFocusedField("email")}
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
+              />
+            </View>
+
+            <View
+              style={[
+                styles.inputRow,
+                focusedField === "password" && styles.inputRowFocused,
+                error ? styles.inputRowError : null,
+              ]}
+            >
+              <TextInput
+                accessibilityLabel="Password"
+                ref={passwordInputRef}
+                autoCapitalize="none"
+                autoComplete="password"
+                autoCorrect={false}
+                inputAccessoryViewID={inputAccessoryViewID}
+                placeholder="Password"
+                placeholderTextColor={mobileColors.placeholderText}
+                returnKeyType="done"
+                secureTextEntry={!showPassword}
+                style={[styles.input, styles.inputFlex]}
+                textContentType="password"
+                value={password}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={setPassword}
+                onFocus={() => setFocusedField("password")}
+                onSubmitEditing={() => {
+                  void handleLogin();
+                }}
+              />
+              <View style={styles.eyeButton}>
+                <Button
+                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                  icon={showPassword ? "eye-off-outline" : "eye-outline"}
+                  iconOnly
+                  onPress={() => setShowPassword((current) => !current)}
+                  tone="ghost"
+                />
+              </View>
+            </View>
+
+            {error ? <InlineError message={error} /> : null}
+          </View>
+
+          <View style={styles.actions}>
+            <Button
+              disabled={submitting || !isValidEmail(email) || !password}
+              label="Sign In"
+              loading={submitting}
+              onPress={() => {
+                void handleLogin();
+              }}
+            />
+
+            <View style={styles.linkRow}>
+              <Pressable
+                accessibilityRole="button"
+                android_ripple={{ color: mobileColors.rippleNeutral }}
+                style={styles.link}
+                onPress={switchOrganization}
+              >
+                <Text style={styles.linkText}>Switch organization</Text>
+              </Pressable>
+              <Text style={styles.linkSeparator}>·</Text>
+              <Pressable
+                accessibilityRole="button"
+                android_ripple={{ color: mobileColors.rippleNeutral }}
+                style={styles.link}
+                onPress={() => {
+                  // Native now, rather than handing the user off to the
+                  // web app in a browser sheet mid sign-in.
+                  router.push({
+                    pathname: "/(auth)/forgot-password",
+                    params: { email },
+                  });
+                }}
+              >
+                <Text style={styles.linkText}>Forgot password?</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.stage}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Two-factor authentication</Text>
+            <Text style={styles.subtitle}>Enter the 6-digit code from your authenticator app.</Text>
+          </View>
+
+          <View style={styles.fields}>
+            <View style={[styles.inputRow, styles.codeRow, error ? styles.inputRowError : null]}>
+              <TextInput
+                ref={mfaInputRef}
+                accessibilityLabel="Verification code"
+                autoComplete="one-time-code"
+                inputAccessoryViewID={inputAccessoryViewID}
+                inputMode="numeric"
+                keyboardType="number-pad"
+                maxLength={6}
+                onChangeText={(value) => {
+                  setMfaCode(value.replace(/\D/g, "").slice(0, 6));
+                  setError(null);
+                }}
+                placeholder="000000"
+                placeholderTextColor={mobileColors.placeholderText}
+                returnKeyType="done"
+                style={[styles.input, styles.codeInput]}
+                textContentType="oneTimeCode"
+                value={mfaCode}
+                onSubmitEditing={() => {
+                  void handleMfaVerify();
+                }}
+              />
+            </View>
+
+            {error ? <InlineError message={error} /> : null}
+          </View>
+
+          <View style={styles.actions}>
+            <Button
+              disabled={submitting || mfaCode.length !== 6}
+              label="Verify and Sign In"
+              loading={submitting}
+              onPress={() => {
+                void handleMfaVerify();
+              }}
+            />
+
+            <Pressable
+              accessibilityRole="button"
+              android_ripple={{ color: mobileColors.rippleNeutral }}
+              style={styles.link}
+              onPress={() => {
+                setStage("credentials");
+                setPendingMfaLogin(null);
+                setMfaCode("");
+                setError(null);
+              }}
+            >
+              <Text style={styles.linkText}>Back to sign in</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </AuthShell>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: mobileColors.background,
-    },
-    keyboardArea: {
-      flex: 1,
-    },
-    scrollContent: {
-      // `justifyContent: "center"` causes the centered column to re-center
-      // as the keyboard opens — the available height shrinks and content
-      // jumps upward. Pin to the top with a generous offset so the layout
-      // is stable on focus.
-      flexGrow: 1,
-      justifyContent: "flex-start",
-      alignItems: "center",
-      paddingHorizontal: 24,
-      paddingTop: 72,
-    },
-    column: {
-      width: "100%",
-      maxWidth: MAX_COLUMN_WIDTH,
-      gap: 36,
-    },
-    brandHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      paddingHorizontal: 24,
-      paddingTop: 8,
-      paddingBottom: 4,
-    },
-    brandMark: {
-      width: 28,
-      height: 28,
-    },
     stage: {
       gap: 24,
     },
@@ -785,11 +707,13 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileText.bodyStrong,
       color: mobileColors.textMuted,
     },
+    // Centres the round toggle inside the field's trailing edge. The button
+    // brings its own 44pt target, so this only handles the inset.
     eyeButton: {
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: 14,
-      alignSelf: "stretch",
+      paddingRight: mobileSpace.xs,
+      alignSelf: "center",
     },
     actions: {
       gap: 16,
@@ -821,8 +745,7 @@ const createStyles = (mobileColors: MobileColors) =>
       textAlign: "center",
     },
     helperStrong: {
-      ...mobileText.meta,
-      fontWeight: "700",
+      ...mobileTextWeighted("meta", "bold"),
       color: mobileColors.textPrimary,
     },
     errorRow: {

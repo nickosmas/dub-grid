@@ -92,12 +92,13 @@ describe("ProfileNotificationsScreen", () => {
     useMutation.mockReturnValue({ isPending: false, mutate: vi.fn() });
   });
 
-  it("shows a loading skeleton while preferences are loading", () => {
+  it("shows a loading skeleton while preferences are loading", async () => {
     useQuery.mockReturnValue({ data: undefined, isLoading: true, error: null, refetch: vi.fn() });
 
     render(<ProfileNotificationsScreen />);
 
-    expect(screen.getByTestId("detail-skeleton")).toBeInTheDocument();
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
   });
 
   it("shows an error state with retry when preferences fail to load", () => {

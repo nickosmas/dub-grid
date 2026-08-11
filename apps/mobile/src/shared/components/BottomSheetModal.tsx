@@ -11,9 +11,10 @@ import {
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
+import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
+import { AppText } from "./AppText";
 import { useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
-import { useMobileColors } from "../providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 
 /** Padding below the sheet content, on top of the device's own bottom inset. */
 const SHEET_CONTENT_BOTTOM_PADDING = mobileSpace["2xl"];
@@ -24,6 +25,9 @@ export function BottomSheetModal({
   dismissDisabled = false,
   scrollable = false,
   accessibilityLabel = "Dismiss",
+  accessibilityRole,
+  showGrabber,
+  header,
   footer,
   children,
 }: {
@@ -32,6 +36,19 @@ export function BottomSheetModal({
   dismissDisabled?: boolean;
   scrollable?: boolean;
   accessibilityLabel?: string;
+  /** Set "alert" for a blocking sheet the user must answer before continuing. */
+  accessibilityRole?: "alert";
+  /**
+   * Defaults to hidden on a non-dismissable sheet: a grabber advertises "drag
+   * me away", which is a lie when the sheet can't be dismissed.
+   */
+  showGrabber?: boolean;
+  /**
+   * Rendered in the sheet's non-scrolling top region, which is also the drag
+   * region. Put a sheet's title here rather than in `children` so the whole
+   * header drags, not just the grabber.
+   */
+  header?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
 }) {
@@ -41,10 +58,12 @@ export function BottomSheetModal({
   // snapshot goes stale on rotation and on foldables.
   const { height: windowHeight } = useWindowDimensions();
   const bottomPadding = SHEET_CONTENT_BOTTOM_PADDING + insets.bottom;
+  const isDark = useIsDarkMode();
   const styles = useMemo(
-    () => createStyles(mobileColors, windowHeight, bottomPadding),
-    [mobileColors, windowHeight, bottomPadding],
+    () => createStyles(mobileColors, isDark, windowHeight, bottomPadding),
+    [mobileColors, isDark, windowHeight, bottomPadding],
   );
+  const grabberVisible = showGrabber ?? !dismissDisabled;
   const handleDismiss = () => {
     if (dismissDisabled) return;
     onDismiss();
@@ -76,15 +95,30 @@ export function BottomSheetModal({
             pointerEvents="none"
             style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
           />
-          <Pressable
-            accessibilityLabel={accessibilityLabel}
-            style={StyleSheet.absoluteFill}
-            onPress={handleDismiss}
-          />
+          {/* Tapping outside dismisses, so there is nothing to tap when the
+              sheet is blocking. */}
+          {dismissDisabled ? null : (
+            <Pressable
+              accessibilityLabel={accessibilityLabel}
+              style={StyleSheet.absoluteFill}
+              onPress={handleDismiss}
+            />
+          )}
           <GestureDetector gesture={gesture}>
-            <Animated.View style={[styles.sheet, sheetStyle]}>
-              <View style={styles.grabberArea}>
-                <View style={styles.grabber} />
+            <Animated.View accessibilityRole={accessibilityRole} style={[styles.sheet, sheetStyle]}>
+              {/* The drag region. Deliberately tall and outside the ScrollView:
+                  a touch starting here can never be claimed by the scrolling
+                  body, so the sheet always drags — without the user having to
+                  hit the 40x4 handle itself. */}
+              <View style={styles.dragRegion}>
+                {grabberVisible ? (
+                  <View style={styles.grabberArea}>
+                    <View style={styles.grabber} />
+                  </View>
+                ) : (
+                  <View style={styles.grabberSpacer} />
+                )}
+                {header ? <View style={styles.header}>{header}</View> : null}
               </View>
               {scrollable ? (
                 <Animated.ScrollView
@@ -112,10 +146,29 @@ export function BottomSheetModal({
   );
 }
 
-const createStyles = (mobileColors: MobileColors, windowHeight: number, bottomPadding: number) =>
+const createStyles = (
+  mobileColors: MobileColors,
+  isDark: boolean,
+  windowHeight: number,
+  bottomPadding: number,
+) =>
   StyleSheet.create({
     gestureRoot: {
       flex: 1,
+    },
+    // Keeps the top inset consistent whether or not the grabber is drawn.
+    grabberSpacer: {
+      height: mobileSpace.lg,
+    },
+    // A comfortable drag target even on a sheet with no header. 44pt is the
+    // minimum touch target, and the whole strip drags.
+    dragRegion: {
+      minHeight: 44,
+      justifyContent: "center",
+    },
+    header: {
+      paddingHorizontal: mobileSpace.xl,
+      paddingBottom: mobileSpace.md,
     },
     root: {
       flex: 1,
@@ -128,16 +181,14 @@ const createStyles = (mobileColors: MobileColors, windowHeight: number, bottomPa
     sheet: {
       width: "100%",
       maxHeight: Math.round(windowHeight * 0.92),
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      borderWidth: 1,
+      borderTopLeftRadius: mobileRadii.card + 8,
+      borderTopRightRadius: mobileRadii.card + 8,
+      // Dark mode keeps the hairline; its shadow is invisible against a
+      // near-black page, so the edge is what separates sheet from backdrop.
+      borderWidth: isDark ? 1 : 0,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surface,
-      shadowColor: mobileColors.textPrimary,
-      shadowOffset: { width: 0, height: -8 },
-      shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
-      shadowRadius: 28,
-      elevation: 16,
+      ...mobileElevation("sheet", isDark),
     },
     // Full-width so the grabber is comfortable to catch, and it carries the
     // sheet's top padding so the visual spacing is unchanged.
@@ -171,5 +222,69 @@ const createStyles = (mobileColors: MobileColors, windowHeight: number, bottomPa
       paddingHorizontal: 20,
       paddingTop: 14,
       paddingBottom: bottomPadding,
+    },
+  });
+
+/**
+ * Title + body + optional link, as used by the blocking consent and terms
+ * sheets. Extracted because those two were byte-for-byte copies of each other's
+ * chrome and copy layout.
+ */
+export function SheetCopy({
+  title,
+  body,
+  linkLabel,
+  onLinkPress,
+  error,
+}: {
+  title: string;
+  body: string;
+  linkLabel?: string;
+  onLinkPress?: () => void;
+  error?: string | null;
+}) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createCopyStyles(mobileColors), [mobileColors]);
+
+  return (
+    <View style={styles.copy}>
+      <AppText variant="sectionTitle">{title}</AppText>
+      <AppText tone="secondary" variant="body">
+        {body}
+      </AppText>
+      {linkLabel && onLinkPress ? (
+        <Pressable accessibilityRole="link" hitSlop={8} onPress={onLinkPress}>
+          <AppText style={styles.link} tone="brand" variant="bodyStrong">
+            {linkLabel}
+          </AppText>
+        </Pressable>
+      ) : null}
+      {error ? (
+        <AppText tone="danger" variant="meta">
+          {error}
+        </AppText>
+      ) : null}
+    </View>
+  );
+}
+
+/** Stacked full-width actions, primary first. */
+export function SheetActions({ children }: { children: ReactNode }) {
+  return <View style={sheetActionStyles.actions}>{children}</View>;
+}
+
+const sheetActionStyles = StyleSheet.create({
+  actions: {
+    gap: mobileSpace.sm,
+  },
+});
+
+const createCopyStyles = (_mobileColors: MobileColors) =>
+  StyleSheet.create({
+    copy: {
+      gap: mobileSpace.sm,
+    },
+    link: {
+      marginTop: mobileSpace.xs,
     },
   });

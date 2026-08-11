@@ -1,15 +1,15 @@
 import { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import type { MobileNotification } from "@dubgrid/contracts";
 import { extractNotificationAction } from "@dubgrid/domain";
+import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SearchBar } from "../../../shared/components/SearchBar";
-import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -29,13 +29,16 @@ import {
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { queryClient } from "../../../shared/lib/query-client";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { setBootstrapUnreadCount } from "../lib/unread-cache";
+import { CardRowListSkeleton } from "../../../shared/components/skeleton";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileRadii,
   mobileSpacing,
   mobileText,
+  mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -155,6 +158,11 @@ export default function NotificationsScreen() {
     },
     getNextPageParam: (lastPage) =>
       lastPage.notifications.length >= PAGE_SIZE ? lastPage.nextCursor : null,
+    // Search text and the filter chip are both in the query key, so every
+    // keystroke is a new query. Without this the list blanks to nothing while
+    // the new key resolves; with it the previous results stay on screen and
+    // simply swap when the new ones land.
+    placeholderData: keepPreviousData,
   });
 
   const notifications = useMemo(
@@ -184,18 +192,19 @@ export default function NotificationsScreen() {
     onChange: handleRealtimeChange,
   });
 
-  const contentState = getMobileQueryContentState({
-    hasData: notifications.length > 0,
+  const contentState = useMobileContentState({
+    // "The query resolved", not "the list is non-empty". Search and filter are
+    // both in the query key, so a keystroke used to empty `notifications` while
+    // `isLoading` flipped back to true, repainting the skeleton over a list the
+    // user was reading. An empty *result* is the `empty` state, not `loading`.
+    hasData: notificationsQuery.data !== undefined,
+    isEmpty: notifications.length === 0,
     isLoading: notificationsQuery.isLoading,
     error: notificationsQuery.error,
   });
 
   function syncBootstrapUnread(count: number) {
-    queryClient.setQueryData(
-      ["mobile", "bootstrap", accessToken],
-      (current: { unreadNotificationCount: number } | undefined) =>
-        current ? { ...current, unreadNotificationCount: count } : current,
-    );
+    setBootstrapUnreadCount(queryClient, accessToken, count);
   }
 
   const handleRowPress = useCallback(
@@ -333,9 +342,9 @@ export default function NotificationsScreen() {
       ) : null}
 
       {contentState.kind === "loading" ? (
-        <View style={styles.loadingState}>
-          <ListSkeleton rows={4} showSectionHeader={false} />
-        </View>
+        contentState.showSkeleton ? (
+          <CardRowListSkeleton rows={4} />
+        ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try again"
@@ -360,17 +369,18 @@ export default function NotificationsScreen() {
         />
       ) : (
         <View style={styles.list}>
-          {notifications.map((notification) => (
-            <NotificationCard
-              key={notification.id}
-              notification={notification}
-              onPress={() => {
-                void handleRowPress(notification);
-              }}
-              onArchive={() => {
-                void handleArchive(notification);
-              }}
-            />
+          {notifications.map((notification, index) => (
+            <AnimatedListItem index={index} key={notification.id}>
+              <NotificationCard
+                notification={notification}
+                onPress={() => {
+                  void handleRowPress(notification);
+                }}
+                onArchive={() => {
+                  void handleArchive(notification);
+                }}
+              />
+            </AnimatedListItem>
           ))}
           {notificationsQuery.hasNextPage ? (
             <Button
@@ -382,9 +392,6 @@ export default function NotificationsScreen() {
                 void notificationsQuery.fetchNextPage();
               }}
             />
-          ) : null}
-          {notificationsQuery.isFetchingNextPage ? (
-            <ActivityIndicator color={mobileColors.brand} />
           ) : null}
         </View>
       )}
@@ -469,18 +476,19 @@ function NotificationCard({ notification, onPress, onArchive }: NotificationCard
       </View>
       <View style={styles.cardActions}>
         {action && actionSupported ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={action.label}
+          <Button
+            fullWidth={false}
+            icon="arrow-forward"
+            iconPosition="trailing"
+            label={action.label}
             onPress={(event) => {
+              // Sits inside a pressable row; without this the row navigates too.
               event.stopPropagation?.();
               openNotificationAction(action.href);
             }}
-            style={({ pressed }) => [styles.ctaPill, pressed && styles.ctaPillPressed]}
-          >
-            <Text style={styles.ctaPillLabel}>{action.label}</Text>
-            <Ionicons name="arrow-forward" size={14} color={mobileColors.brand} />
-          </Pressable>
+            size="sm"
+            tone="secondary"
+          />
         ) : action ? (
           <View style={styles.webOnlyHint}>
             <Ionicons name="globe-outline" size={14} color={mobileColors.textMuted} />
@@ -489,22 +497,18 @@ function NotificationCard({ notification, onPress, onArchive }: NotificationCard
         ) : (
           <View />
         )}
-        <Pressable
-          accessibilityRole="button"
+        <Button
           accessibilityLabel={isArchived ? "Restore from archive" : "Archive"}
+          icon={isArchived ? "archive" : "archive-outline"}
+          iconOnly
           onPress={(event) => {
+            // Sits inside a pressable row; without this the row navigates too.
             event.stopPropagation?.();
             onArchive();
           }}
-          style={({ pressed }) => [styles.archiveButton, pressed && styles.archiveButtonPressed]}
-          hitSlop={6}
-        >
-          <Ionicons
-            name={isArchived ? "archive" : "archive-outline"}
-            size={16}
-            color={mobileColors.textMuted}
-          />
-        </Pressable>
+          size="sm"
+          tone="ghost"
+        />
       </View>
     </Pressable>
   );
@@ -576,9 +580,6 @@ const createStyles = (mobileColors: MobileColors) =>
       justifyContent: "space-between",
       gap: 12,
     },
-    loadingState: {
-      gap: 14,
-    },
     actionCopy: {
       ...mobileText.sectionTitle,
       color: mobileColors.textPrimary,
@@ -592,7 +593,7 @@ const createStyles = (mobileColors: MobileColors) =>
       padding: 16,
       gap: 10,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
     },
     alertCardMuted: {
       backgroundColor: mobileColors.surfaceSecondary,
@@ -652,8 +653,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSubtle,
     },
     priorityChip: {
-      ...mobileText.caption,
-      fontWeight: "700",
+      ...mobileTextWeighted("caption", "bold"),
       color: mobileColors.danger,
       letterSpacing: 0.5,
     },
@@ -680,23 +680,6 @@ const createStyles = (mobileColors: MobileColors) =>
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: mobileColors.borderSubtle,
     },
-    ctaPill: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.brandSoft,
-    },
-    ctaPillPressed: {
-      backgroundColor: mobileColors.brandBorder,
-    },
-    ctaPillLabel: {
-      ...mobileText.label,
-      color: mobileColors.brand,
-      fontWeight: "600",
-    },
     webOnlyHint: {
       flexDirection: "row",
       alignItems: "center",
@@ -707,21 +690,7 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surfaceMuted,
     },
     webOnlyHintLabel: {
-      ...mobileText.label,
+      ...mobileTextWeighted("label", "semibold"),
       color: mobileColors.textMuted,
-      fontWeight: "600",
-    },
-    archiveButton: {
-      width: 36,
-      height: 36,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surface,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    archiveButtonPressed: {
-      backgroundColor: mobileColors.surfaceSecondary,
     },
   });

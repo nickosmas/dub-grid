@@ -1,15 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  Linking,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from "react-native";
+import { Linking, StyleSheet, Text, TextInput, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   MobileBootstrapResponse,
@@ -32,7 +24,6 @@ import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
@@ -48,12 +39,25 @@ import {
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { singularLabelNoun } from "../../../shared/lib/labels";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
-import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
+import {
+  useIsDarkMode,
+  useMobileColors,
+  useThemeMode,
+} from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
-import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
+import {
+  mobileIconToneColor,
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
+import {
+  CollapsedHeaderTitle,
+  useCollapsedHeader,
+} from "../../../shared/navigation/CollapsedHeaderTitle";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
@@ -66,6 +70,7 @@ import {
   ProfileSection,
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
+import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
 import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
 type ConfirmAction = "deactivate" | "activate" | "remove" | null;
@@ -119,6 +124,7 @@ function makeDraft(person: MobilePerson): EditDraft {
 export default function PersonDetailScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
   const { resolvedTheme } = useThemeMode();
   const params = useLocalSearchParams<{ id?: string }>();
   const personId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -128,13 +134,15 @@ export default function PersonDetailScreen() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<EditDraft | null>(null);
+  /** The person the draft was last built from, so the sync below runs once. */
+  const [draftSource, setDraftSource] = useState<MobilePerson | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const [showDiscardCancelConfirmation, setShowDiscardCancelConfirmation] = useState(false);
   const [inactiveNote, setInactiveNote] = useState("");
-  const [showCollapsedHeader, setShowCollapsedHeader] = useState(false);
+  const { handleScroll, showCollapsedHeader } = useCollapsedHeader();
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
 
@@ -153,8 +161,12 @@ export default function PersonDetailScreen() {
     rawPerson && (canManageEmployees || rawPerson.status === "active") ? rawPerson : null;
   const isSelf = Boolean(currentUserId && person?.userId && person.userId === currentUserId);
   const canEdit = canManageEmployees && person?.status !== "removed";
-  const contentState = getMobileQueryContentState({
-    hasData: personQuery.data !== undefined,
+  const contentState = useMobileContentState({
+    // Bootstrap belongs in both halves, not just `isLoading`. `person` above is
+    // gated on `canManageEmployees`, which comes from bootstrap: with only the
+    // person query resolved, an inactive teammate reads as null and the screen
+    // renders "Person not found" until bootstrap lands and corrects it.
+    hasData: personQuery.data !== undefined && bootstrapQuery.data !== undefined,
     isLoading: personQuery.isLoading || bootstrapQuery.isLoading,
     error: personQuery.error ?? bootstrapQuery.error,
   });
@@ -165,12 +177,21 @@ export default function PersonDetailScreen() {
     }
   }, [isSelf]);
 
-  useEffect(() => {
-    if (person && !editing) {
-      setDraft(makeDraft(person));
-      setInactiveNote(person.statusNote);
-    }
-  }, [editing, person]);
+  // Adjusted during render, not in an effect. An effect runs *after* the
+  // browser paints, so on the frame where `person` first arrived the draft was
+  // still null and the screen below rendered "Person not found" before
+  // correcting itself — a flash on every single load. Setting state during
+  // render makes React discard this pass and re-run immediately, before
+  // anything reaches the screen.
+  //
+  // Only keys off the person's identity: every path that leaves `editing`
+  // (save, cancel, discard) already rebuilds the draft itself, so there is
+  // nothing to re-sync on that transition.
+  if (person && !editing && person !== draftSource) {
+    setDraftSource(person);
+    setDraft(makeDraft(person));
+    setInactiveNote(person.statusNote);
+  }
 
   const maps = useMemo(() => buildLookupMaps(bootstrapQuery.data), [bootstrapQuery.data]);
   // Declared up here rather than with the other labels below because
@@ -370,9 +391,11 @@ export default function PersonDetailScreen() {
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
       >
-        <View style={styles.loadingState}>
-          <ListSkeleton rows={4} showSectionHeader={false} />
-        </View>
+        {/* Nothing at all for a blip: a skeleton that appears and vanishes
+            inside a few frames reads as a glitch, not as loading. */}
+        {contentState.showSkeleton ? (
+          <ProfileSkeleton rowsPerSection={4} sections={3} showQuickActions />
+        ) : null}
       </Screen>
     );
   }
@@ -438,13 +461,6 @@ export default function PersonDetailScreen() {
     : person.pendingInvitation
       ? "Invitation pending"
       : "No app invitation sent";
-
-  function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const shouldShowHeader = event.nativeEvent.contentOffset.y > 88;
-    setShowCollapsedHeader((current) =>
-      current === shouldShowHeader ? current : shouldShowHeader,
-    );
-  }
 
   function confirmStatusAction() {
     if (!confirmAction || !person) return;
@@ -522,9 +538,7 @@ export default function PersonDetailScreen() {
         }
       />
 
-      <Stack.Screen
-        options={createDetailStackOptions(mobileColors, showCollapsedHeader ? fullName : "")}
-      />
+      <CollapsedHeaderTitle title={showCollapsedHeader ? fullName : ""} />
 
       <ProfileHero
         avatarStyle={{
@@ -547,40 +561,46 @@ export default function PersonDetailScreen() {
 
       {!editing ? (
         <View style={styles.quickActions}>
+          {/*
+           * Plain white pills: the colour lives in the icon, so three adjacent
+           * actions read as one set instead of three competing fills.
+           */}
           <Button
             compact
             disabled={!person.phone}
             label="Call"
             leadingAccessory={
-              <Ionicons color={mobileColors.successText} name="call-outline" size={18} />
+              <Ionicons color={mobileIconToneColor("green", isDark)} name="call" size={18} />
             }
             onPress={() => {
               if (person.phone) void Linking.openURL(`tel:${person.phone}`);
             }}
-            tone="success"
+            tone="plain"
           />
           <Button
             compact
             disabled={!person.email}
             label="Email"
-            leadingAccessory={<Ionicons color={mobileColors.brand} name="mail-outline" size={18} />}
+            leadingAccessory={
+              <Ionicons color={mobileIconToneColor("blue", isDark)} name="mail" size={18} />
+            }
             onPress={() => {
               if (person.email) void Linking.openURL(`mailto:${person.email}`);
             }}
-            tone="secondary"
+            tone="plain"
           />
           {canEdit ? (
             <Button
               compact
               label="Edit"
               leadingAccessory={
-                <Ionicons color={mobileColors.brand} name="create-outline" size={18} />
+                <Ionicons color={mobileIconToneColor("teal", isDark)} name="create" size={18} />
               }
               onPress={() => {
                 setEditing(true);
                 setDraft(makeDraft(person));
               }}
-              tone="secondary"
+              tone="plain"
             />
           ) : null}
         </View>
@@ -707,7 +727,7 @@ export default function PersonDetailScreen() {
                 disabled={statusMutation.isPending || isSelf}
                 label="Mark Inactive"
                 onPress={() => setConfirmAction("deactivate")}
-                tone="warningFilled"
+                tone="warning"
               />
             ) : null}
             {person.status !== "active" ? (
@@ -725,7 +745,7 @@ export default function PersonDetailScreen() {
                 disabled={statusMutation.isPending || isSelf}
                 label="Remove"
                 onPress={() => setConfirmAction("remove")}
-                tone="dangerFilled"
+                tone="danger"
               />
             ) : null}
             {!person.userId && person.status !== "removed" && person.email ? (
@@ -771,7 +791,7 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body="Your edits will be lost."
         confirmLabel="Discard"
-        confirmTone="dangerFilled"
+        confirmTone="danger"
         onCancel={() => setShowDiscardCancelConfirmation(false)}
         onConfirm={() => {
           setShowDiscardCancelConfirmation(false);
@@ -786,10 +806,10 @@ export default function PersonDetailScreen() {
         confirmLabel={statusConfirmationLabel}
         confirmTone={
           confirmAction === "deactivate"
-            ? "warningFilled"
+            ? "warning"
             : confirmAction === "activate"
               ? "primary"
-              : "dangerFilled"
+              : "danger"
         }
         loading={statusMutation.isPending}
         onCancel={() => setConfirmAction(null)}
@@ -814,7 +834,7 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body={invitationConfirmationBody}
         confirmLabel={invitationConfirmationLabel}
-        confirmTone={invitationConfirmAction === "revoke" ? "dangerFilled" : "primary"}
+        confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
         loading={invitationMutation.isPending}
         onCancel={() => setInvitationConfirmAction(null)}
         onConfirm={confirmInvitationAction}
@@ -1187,9 +1207,6 @@ function EditPanel({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    loadingState: {
-      gap: 14,
-    },
     quickActions: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -1243,16 +1260,15 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     modalInfoPanel: {
       backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       gap: 8,
       padding: 16,
     },
     modalInfoTitle: {
-      ...mobileText.rowTitle,
+      ...mobileTextWeighted("rowTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     modalInfoText: {
       ...mobileText.body,

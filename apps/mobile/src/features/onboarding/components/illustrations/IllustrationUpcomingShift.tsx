@@ -1,191 +1,312 @@
 import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
-import { useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, type MobileColors } from "../../../../shared/theme/tokens";
+import { LinearGradient } from "expo-linear-gradient";
+import { getAvatarTone } from "@dubgrid/design-tokens";
+import { useIsDarkMode, useMobileColors } from "../../../../shared/providers/ThemeModeProvider";
+import { mobileText, mobileTextWeighted, type MobileColors } from "../../../../shared/theme/tokens";
+import { IllustrationFrame } from "./illustration-primitives";
 
-const AVATARS = [
-  { bg: "#DBEAFE", fg: "#1D4ED8", initials: "BT" },
-  { bg: "#FEF3C7", fg: "#92400E", initials: "RC" },
-  { bg: "#FCE7F3", fg: "#9D174D", initials: "RB" },
-];
+/**
+ * The shift hero card that opens the Home tab, mirroring `MeHeroCard` in
+ * `schedule/screens/ScheduleScreen.tsx`. Gradient, card fill, shadow and
+ * collaborator strip colours are that card's own constants.
+ */
+const HERO_GRADIENT_LIGHT = ["#142579", "#2C49CC", "#6E90FF"] as const;
+const HERO_GRADIENT_DARK = ["#0A1442", "#1D3AA0", "#2075FF"] as const;
+const HERO_GRADIENT_LOCATIONS = [0, 0.55, 1] as const;
+const HERO_GRADIENT_START = { x: 0, y: 1 } as const;
+const HERO_GRADIENT_END = { x: 1, y: 0 } as const;
+const HERO_BACKGROUND_LIGHT = "#2946C7";
+const HERO_BACKGROUND_DARK = "#152238";
+const HERO_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
+const HERO_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
+const HERO_COLLABORATOR_BACKGROUND_LIGHT = "#3A55CB";
+const HERO_COLLABORATOR_BACKGROUND_DARK = "#1E2F66";
+
+/**
+ * Avatar tones are seeded off the employee id in the real card, so these ids
+ * (not the initials) are what fix each avatar's colour here too.
+ */
+const SHIFTMATES = [
+  { id: "onboarding-shiftmate-1", initials: "BT" },
+  { id: "onboarding-shiftmate-2", initials: "RC" },
+  { id: "onboarding-shiftmate-3", initials: "RB" },
+] as const;
 
 export function IllustrationUpcomingShift() {
   const mobileColors = useMobileColors();
+  const isDark = useIsDarkMode();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const collaboratorBackground = {
+    backgroundColor: isDark
+      ? HERO_COLLABORATOR_BACKGROUND_DARK
+      : HERO_COLLABORATOR_BACKGROUND_LIGHT,
+  };
+
   return (
-    <View accessible={false} style={styles.card}>
-      <View style={styles.topRow}>
-        <View style={styles.pill}>
-          <View style={styles.pillDot} />
-          <Text style={styles.pillLabel}>UPCOMING</Text>
-        </View>
-        <View style={styles.dateChip}>
-          <Text style={styles.dateChipDay}>FRI</Text>
-          <Text style={styles.dateChipNum}>15</Text>
-        </View>
-      </View>
-
-      <Text style={styles.shiftTitle}>Day Shift</Text>
-
-      <View style={styles.metaRow}>
-        <Ionicons color="#FFFFFF" name="location-outline" size={14} />
-        <Text style={styles.metaLabel}>Skilled Nursing</Text>
-      </View>
-      <View style={styles.metaRow}>
-        <Ionicons color="#FFFFFF" name="time-outline" size={14} />
-        <Text style={styles.metaLabel}>7:00 AM – 3:30 PM</Text>
-      </View>
-
-      <View style={styles.workingWith}>
-        <View style={styles.workingWithLeft}>
-          <Ionicons color="#FFFFFF" name="people-outline" size={14} />
-          <Text style={styles.workingWithLabel}>Working with</Text>
-        </View>
-        <View style={styles.avatars}>
-          {AVATARS.map((avatar, index) => (
-            <View
-              key={avatar.initials}
-              style={[
-                styles.avatar,
-                {
-                  backgroundColor: avatar.bg,
-                  marginLeft: index === 0 ? 0 : -6,
-                },
-              ]}
-            >
-              <Text style={[styles.avatarText, { color: avatar.fg }]}>{avatar.initials}</Text>
+    <IllustrationFrame>
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: isDark ? HERO_BACKGROUND_DARK : HERO_BACKGROUND_LIGHT,
+            shadowColor: isDark ? HERO_SHADOW_DARK : HERO_SHADOW_LIGHT,
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={isDark ? HERO_GRADIENT_DARK : HERO_GRADIENT_LIGHT}
+          end={HERO_GRADIENT_END}
+          locations={HERO_GRADIENT_LOCATIONS}
+          start={HERO_GRADIENT_START}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <View style={styles.headerCopy}>
+              <View style={styles.badge}>
+                <View style={styles.badgeDot} />
+                <Text style={styles.badgeText}>Upcoming</Text>
+              </View>
+              <Text style={styles.title}>Day Shift</Text>
             </View>
-          ))}
-          <View style={[styles.avatar, styles.avatarMore]}>
-            <Text style={styles.avatarMoreText}>+2</Text>
+            <View style={styles.dateTile}>
+              <Text style={styles.dateWeekday}>FRI</Text>
+              <Text style={styles.dateDay}>15</Text>
+            </View>
+          </View>
+
+          <View style={styles.areaRow}>
+            <Ionicons color="rgba(255, 255, 255, 0.82)" name="location-outline" size={18} />
+            <Text style={styles.areaLabel}>Skilled Nursing</Text>
+          </View>
+
+          <View style={styles.scheduleRow}>
+            <View style={styles.timeRow}>
+              <Ionicons color="rgba(255, 255, 255, 0.82)" name="time-outline" size={24} />
+              <Text style={styles.timeText}>7:00 AM - 3:30 PM</Text>
+            </View>
+            <Text style={styles.progressLabel}>Starts in 2h</Text>
+          </View>
+
+          <View style={[styles.collaborators, collaboratorBackground]}>
+            <View style={styles.collaboratorLabelRow}>
+              <Ionicons color="rgba(255, 255, 255, 0.76)" name="people-outline" size={22} />
+              <Text style={styles.collaboratorLabel}>Working with</Text>
+            </View>
+            <View style={styles.avatarStack}>
+              {SHIFTMATES.map((shiftmate, index) => {
+                const avatarTone = getAvatarTone(shiftmate.id, isDark);
+
+                return (
+                  <View
+                    key={shiftmate.id}
+                    style={[
+                      styles.avatarFrame,
+                      collaboratorBackground,
+                      index > 0 && styles.avatarFrameOverlap,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.avatar,
+                        {
+                          backgroundColor: avatarTone.backgroundColor,
+                          borderColor: avatarTone.borderColor,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.avatarText, { color: avatarTone.textColor }]}>
+                        {shiftmate.initials}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+              <View style={[styles.avatarFrame, collaboratorBackground, styles.avatarFrameOverlap]}>
+                <View style={styles.avatarOverflow}>
+                  <Text style={styles.avatarOverflowText}>+2</Text>
+                </View>
+              </View>
+            </View>
           </View>
         </View>
       </View>
-    </View>
+    </IllustrationFrame>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     card: {
-      width: 296,
-      backgroundColor: mobileColors.brand,
-      borderRadius: mobileRadii.card,
-      padding: 18,
-      gap: 8,
-      shadowColor: "#1E3A8A",
-      shadowOpacity: 0.18,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 6,
+      position: "relative",
+      overflow: "hidden",
+      borderRadius: 24,
+      paddingHorizontal: 18,
+      paddingVertical: 18,
+      shadowOffset: {
+        width: 0,
+        height: 14,
+      },
+      shadowOpacity: 1,
+      shadowRadius: 28,
+      elevation: 5,
     },
-    topRow: {
+    content: {
+      gap: 11,
+    },
+    header: {
       flexDirection: "row",
       alignItems: "flex-start",
       justifyContent: "space-between",
-      marginBottom: 6,
+      gap: 12,
     },
-    pill: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
+    headerCopy: {
+      flex: 1,
+      minWidth: 0,
+      gap: 10,
     },
-    pillDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: "#BFDBFE",
-    },
-    pillLabel: {
-      color: "#DBEAFE",
-      fontSize: 11,
-      fontWeight: "700",
-      letterSpacing: 1.2,
-    },
-    dateChip: {
-      width: 44,
-      paddingVertical: 6,
-      borderRadius: 10,
-      backgroundColor: "rgba(255,255,255,0.16)",
-      alignItems: "center",
-    },
-    dateChipDay: {
-      color: "#FFFFFF",
-      fontSize: 10,
-      fontWeight: "700",
-      letterSpacing: 0.6,
-    },
-    dateChipNum: {
-      color: "#FFFFFF",
-      fontSize: 18,
-      fontWeight: "700",
-      lineHeight: 22,
-    },
-    shiftTitle: {
-      color: "#FFFFFF",
-      fontSize: 22,
-      fontWeight: "700",
-      letterSpacing: -0.2,
-      marginTop: 6,
-      marginBottom: 4,
-    },
-    metaRow: {
+    badge: {
+      alignSelf: "flex-start",
       flexDirection: "row",
       alignItems: "center",
       gap: 8,
     },
-    metaLabel: {
-      color: "#E0EAFE",
-      fontSize: 13,
-      fontWeight: "600",
+    badgeDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 4.5,
+      backgroundColor: "#BFDBFE",
     },
-    workingWith: {
-      marginTop: 10,
-      paddingTop: 12,
-      paddingBottom: 4,
-      paddingHorizontal: 12,
-      borderRadius: 12,
-      backgroundColor: "rgba(255,255,255,0.10)",
+    badgeText: {
+      ...mobileText.label,
+      color: mobileColors.textInverse,
+      textTransform: "uppercase",
+    },
+    title: {
+      ...mobileText.heroMetric,
+      flexShrink: 1,
+      minWidth: 0,
+      color: mobileColors.textInverse,
+    },
+    dateTile: {
+      minWidth: 58,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.22)",
+      backgroundColor: "rgba(255, 255, 255, 0.14)",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    dateWeekday: {
+      ...mobileText.label,
+      color: "rgba(255, 255, 255, 0.72)",
+    },
+    dateDay: {
+      ...mobileText.heroMetric,
+      color: mobileColors.textInverse,
+    },
+    areaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 2,
+    },
+    areaLabel: {
+      ...mobileText.rowTitle,
+      color: "rgba(255, 255, 255, 0.86)",
+    },
+    scheduleRow: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      height: 44,
+      flexWrap: "wrap",
+      gap: 10,
+      marginTop: 6,
     },
-    workingWithLeft: {
+    timeRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 8,
+      flex: 1,
+      gap: 9,
+      minWidth: 0,
     },
-    workingWithLabel: {
-      color: "#FFFFFF",
-      fontSize: 12,
-      fontWeight: "600",
+    timeText: {
+      ...mobileText.sectionTitle,
+      color: mobileColors.textInverse,
+      flexShrink: 1,
     },
-    avatars: {
+    progressLabel: {
+      ...mobileText.rowTitle,
+      color: "rgba(255, 255, 255, 0.86)",
+      flexShrink: 0,
+    },
+    collaborators: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: "rgba(255, 255, 255, 0.14)",
       flexDirection: "row",
       alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      marginTop: 6,
+      marginBottom: 6,
+    },
+    collaboratorLabelRow: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 9,
+    },
+    collaboratorLabel: {
+      ...mobileText.rowTitle,
+      color: "rgba(255, 255, 255, 0.84)",
+      flexShrink: 1,
+    },
+    avatarStack: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexShrink: 0,
+    },
+    avatarFrame: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      padding: 2,
+    },
+    avatarFrameOverlap: {
+      marginLeft: -10,
     },
     avatar: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      borderWidth: 1,
       alignItems: "center",
       justifyContent: "center",
-      borderWidth: 1.5,
-      borderColor: mobileColors.brand,
     },
     avatarText: {
-      fontSize: 10,
-      fontWeight: "700",
+      ...mobileTextWeighted("meta", "semibold"),
     },
-    avatarMore: {
-      backgroundColor: "#BFDBFE",
-      marginLeft: -6,
+    avatarOverflow: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      borderWidth: 1,
+      borderColor: "#93C5FD",
+      backgroundColor: "#DBEAFE",
+      alignItems: "center",
+      justifyContent: "center",
     },
-    avatarMoreText: {
+    avatarOverflowText: {
+      ...mobileText.bodyStrong,
       color: "#1D4ED8",
-      fontSize: 10,
-      fontWeight: "700",
     },
   });

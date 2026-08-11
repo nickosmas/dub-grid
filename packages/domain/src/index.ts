@@ -4,6 +4,7 @@ export * from "./employment-status";
 export * from "./notification-metadata";
 export * from "./org-roles";
 export * from "./organization";
+export * from "./password";
 export * from "./permissions";
 export * from "./requests";
 export * from "./self-guard";

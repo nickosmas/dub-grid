@@ -91,6 +91,14 @@ function RootLayoutContent({
                           <Stack.Screen name="index" options={{ headerShown: false }} />
                           <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
                           <Stack.Screen
+                            name="(auth)/forgot-password"
+                            options={{ headerShown: false }}
+                          />
+                          <Stack.Screen
+                            name="(auth)/reset-password"
+                            options={{ headerShown: false }}
+                          />
+                          <Stack.Screen
                             name="(auth)/onboarding"
                             options={{ headerShown: false, animation: "fade" }}
                           />

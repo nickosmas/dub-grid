@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { createReactNativeModule } from "../test/native";
 
 const useSessionState = vi.fn();
 const useBootstrap = vi.fn();
@@ -8,19 +9,11 @@ const triggerIconMock = vi.fn();
 const stackScreenMock = vi.fn();
 const handleExpiredMobileSession = vi.fn();
 
-vi.mock("react-native", async () => {
-  const React = await import("react");
-
-  return {
-    AppState: {
-      addEventListener: vi.fn(() => ({ remove: vi.fn() })),
-    },
-    Platform: {
-      OS: "ios",
-    },
-    View: ({ children }: { children: React.ReactNode }) => React.createElement("div", {}, children),
-  };
-});
+// The shared emulation rather than a three-export hand-roll: the tab layout
+// pulls in Button, which pulls in Reanimated, which needs most of the module.
+vi.mock("react-native", async () =>
+  createReactNativeModule(await import("react"), { platformOS: "ios" }),
+);
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: {
@@ -177,6 +170,24 @@ describe("TabsLayout", () => {
     expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
   });
 
+  // Holding here is what keeps the Home tab from picking a screen — and a
+  // skeleton shape — before it knows whether this is an admin. Every
+  // `canView*` permission is also false until bootstrap lands, so releasing
+  // early made the tab bar itself pop tabs in afterwards.
+  it("keeps the splash up until bootstrap resolves, not just the session", () => {
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
+
+    render(<TabsLayout />);
+
+    expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
+  });
+
   it("uses SF symbols on iOS and Android vector icon sources for the native tabs", () => {
     render(<TabsLayout />);
 
@@ -202,7 +213,7 @@ describe("TabsLayout", () => {
     render(<PeopleLayout />);
     render(<ProfileLayout />);
 
-    expect(stackScreenMock).toHaveBeenCalledTimes(11);
+    expect(stackScreenMock).toHaveBeenCalledTimes(10);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
     const profileOptions = stackScreenMock.mock.calls[4]?.[0].options;
@@ -268,7 +279,6 @@ describe("TabsLayout", () => {
       "security",
       "notifications",
       "privacy",
-      "appearance",
     ]);
   });
 

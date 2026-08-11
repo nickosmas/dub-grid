@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { BottomSheetModal } from "./BottomSheetModal";
 import { Button } from "./Button";
+import { PressableRow } from "./PressableRow";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
 
@@ -46,11 +47,13 @@ export function FilterSheet({
           <Button compact label="Done" tone="primary" onPress={onDone} />
         </>
       }
+      // The title lives in the sheet's drag region rather than the scrolling
+      // body, so dragging anywhere on the header closes the sheet.
+      header={<Text style={styles.sheetTitle}>{title}</Text>}
       onDismiss={onDismiss}
       scrollable
       visible={visible}
     >
-      <Text style={styles.sheetTitle}>{title}</Text>
       {children}
     </BottomSheetModal>
   );
@@ -81,19 +84,13 @@ export function SelectionRow({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.selectionRow, pressed && styles.selectionRowPressed]}
-    >
+    <PressableRow onPress={onPress} selected={selected} style={styles.selectionRow}>
       <View style={styles.selectionRowCopy}>
         <Text style={styles.selectionRowTitle}>{label}</Text>
         {detail ? <Text style={styles.selectionRowDetail}>{detail}</Text> : null}
       </View>
       {selected ? <Ionicons color={mobileColors.brand} name="checkmark" size={20} /> : null}
-    </Pressable>
+    </PressableRow>
   );
 }
 
@@ -108,29 +105,19 @@ export function FilterButton({
   accessibilityLabel: string;
   onPress: () => void;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   return (
-    <Pressable
+    <Button
       accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      accessibilityState={{ expanded }}
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+      expanded={expanded}
+      fullWidth
+      icon="options-outline"
+      label="Filter"
       onPress={onPress}
-      style={[styles.filterButton, activeCount > 0 && styles.filterButtonActive]}
-    >
-      <Ionicons
-        color={activeCount > 0 ? mobileColors.textInverse : mobileColors.textSecondary}
-        name="options-outline"
-        size={16}
-      />
-      <Text
-        numberOfLines={1}
-        style={[styles.filterButtonText, activeCount > 0 && styles.filterButtonTextActive]}
-      >
-        Filter
-      </Text>
-    </Pressable>
+      size="sm"
+      // Promotes to a solid brand fill once any filter is on, so an active
+      // filter set is visible without opening the sheet.
+      tone={activeCount > 0 ? "primary" : "neutral"}
+    />
   );
 }
 
@@ -151,35 +138,11 @@ const createStyles = (mobileColors: MobileColors) =>
     footerSpacer: {
       flex: 1,
     },
-    filterButton: {
-      minHeight: 46,
-      alignItems: "center",
-      backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      flexDirection: "row",
-      gap: 8,
-      justifyContent: "center",
-      paddingHorizontal: 14,
-    },
-    filterButtonActive: {
-      backgroundColor: mobileColors.brand,
-      borderColor: mobileColors.brand,
-    },
-    filterButtonText: {
-      color: mobileColors.textSecondary,
-      fontSize: 14,
-      fontWeight: "700",
-    },
-    filterButtonTextActive: {
-      color: mobileColors.textInverse,
-    },
     selectionList: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       overflow: "hidden",
     },
     selectionRow: {
@@ -191,9 +154,6 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 12,
       paddingHorizontal: 16,
       paddingVertical: 12,
-    },
-    selectionRowPressed: {
-      opacity: 0.64,
     },
     selectionRowCopy: {
       flex: 1,

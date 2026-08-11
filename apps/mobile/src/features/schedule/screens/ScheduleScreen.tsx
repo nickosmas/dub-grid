@@ -23,7 +23,7 @@ import {
   type AppStateStatus,
   type GestureResponderEvent,
 } from "react-native";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,9 +41,10 @@ import Reanimated, {
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { HeroSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
 import { Card, Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
+import { ScrollableTabStrip } from "../../../shared/components/ScrollableTabStrip";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { ScheduleMeSkeleton, ScheduleTeamSkeleton } from "../components/ScheduleSkeleton";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import {
   getMySchedule,
@@ -54,7 +55,7 @@ import {
 import { getAvatarTone, type AvatarTone } from "@dubgrid/design-tokens";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { hapticSelection } from "../../../shared/lib/haptics";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import {
   useIsDarkMode,
   useMobileColors,
@@ -63,6 +64,7 @@ import {
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
+  mobileMotion,
   mobileRadii,
   mobileSpacing,
   mobileText,
@@ -201,6 +203,18 @@ const ME_HERO_CARD_GRADIENT_DARK = ["#0A1442", "#1D3AA0", "#2075FF"] as const;
 const ME_HERO_CARD_GRADIENT_LOCATIONS = [0, 0.55, 1] as const;
 const ME_HERO_CARD_GRADIENT_START = { x: 0, y: 1 } as const;
 const ME_HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
+/**
+ * Week/month swipe springs, named so the two feels are legible and so the
+ * schedule shares the app's motion vocabulary.
+ *
+ * These stay on the legacy `Animated` API rather than Reanimated: they already
+ * run with `useNativeDriver: true`, so the transform is on the UI thread either
+ * way, and the gesture is driven by raw touch handlers whose behaviour is
+ * covered by tests.
+ */
+const SWIPE_CANCEL_SPRING = mobileMotion.spring.gentle;
+const SWIPE_SETTLE_SPRING = mobileMotion.spring.snappy;
+
 const ME_HERO_CARD_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
 const ME_HERO_CARD_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
@@ -625,7 +639,8 @@ function formatOpenShiftCardCountLabel(count: number): string {
 
 export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -669,21 +684,27 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const canLoadSchedule = Boolean(accessToken) && (!isTeamScope || canViewTeamSchedule);
   const canLoadRequests = Boolean(accessToken) && !isTeamScope;
   const canLoadMeTeamSchedule = Boolean(accessToken) && !isTeamScope && canViewTeamSchedule;
+  // These three are keyed by the visible date range. Without `keepPreviousData`,
+  // paging to the next week drops each of them to `isLoading` and flashes a
+  // skeleton over a schedule the user was already reading.
   const scheduleQuery = useQuery({
     queryKey: ["mobile", "schedule", scope, accessToken, range.startDate, range.endDate],
     queryFn: () =>
       isTeamScope ? getOrgSchedule(accessToken!, range) : getMySchedule(accessToken!, range),
     enabled: canLoadSchedule,
+    placeholderData: keepPreviousData,
   });
   const meTeamScheduleQuery = useQuery({
     queryKey: ["mobile", "schedule", "team", accessToken, range.startDate, range.endDate],
     queryFn: () => getOrgSchedule(accessToken!, range),
     enabled: canLoadMeTeamSchedule,
+    placeholderData: keepPreviousData,
   });
   const requestsQuery = useQuery({
     queryKey: ["mobile", "requests", accessToken, range.startDate, range.endDate],
     queryFn: () => getShiftRequests(accessToken!, range),
     enabled: canLoadRequests,
+    placeholderData: keepPreviousData,
   });
   const refetchBootstrap = bootstrapQuery.refetch;
   const refetchSchedule = scheduleQuery.refetch;
@@ -869,8 +890,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       return [];
     }
 
-    return buildTeamScheduleFocusAreaTabs(bootstrapQuery.data?.focusAreas ?? [], scheduleEntries);
-  }, [bootstrapQuery.data?.focusAreas, isBlockedTeamView, scheduleEntries]);
+    // Tabs come from the whole range so they don't appear and vanish as the
+    // user moves between days; the badges count only the selected day.
+    return buildTeamScheduleFocusAreaTabs(
+      bootstrapQuery.data?.focusAreas ?? [],
+      scheduleEntries,
+      selectedDayTeamEntries,
+    );
+  }, [bootstrapQuery.data?.focusAreas, isBlockedTeamView, scheduleEntries, selectedDayTeamEntries]);
   const defaultTeamFocusAreaKey = useMemo(() => {
     const homeFocusAreaId = linkedEmployee?.focusAreaIds[0] ?? null;
     if (homeFocusAreaId != null) {
@@ -985,9 +1012,20 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     () => buildTeamScheduleShiftGroupsForView(selectedEntries),
     [selectedEntries],
   );
-  const contentState = getMobileQueryContentState({
-    hasData: Boolean(activeData) && Boolean(bootstrapQuery.data),
-    isLoading: scheduleQuery.isLoading || bootstrapQuery.isLoading,
+  // Requests are folded in because the personal view renders cover requests and
+  // open shifts inline. Left out, they cleared the page skeleton and then
+  // painted two more of their own underneath it. "Resolved" rather than
+  // "succeeded": those sections show their own error banner, so a failed
+  // request fetch must not take the whole schedule to an error screen.
+  // A disabled query never resolves: in team scope `canLoadRequests` is false,
+  // so without the short-circuit `hasData` stayed false forever and every error
+  // or offline moment repainted the whole tab over a schedule already on
+  // screen. Same shape as AdminHomeScreen's `managementOnly ||`.
+  const requestsResolved =
+    !canLoadRequests || requestsQuery.data !== undefined || Boolean(requestsQuery.error);
+  const contentState = useMobileContentState({
+    hasData: Boolean(activeData) && Boolean(bootstrapQuery.data) && requestsResolved,
+    isLoading: scheduleQuery.isLoading || bootstrapQuery.isLoading || requestsQuery.isLoading,
     error: scheduleQuery.error ?? bootstrapQuery.error,
   });
   const emptyStateTitle = "Nothing to show yet";
@@ -1101,9 +1139,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     weekTransitionRef.current?.stop();
     const resetAnimation = Animated.spring(weekStripTranslateX, {
       toValue: 0,
-      damping: 18,
-      stiffness: 220,
-      mass: 0.7,
+      ...SWIPE_CANCEL_SPRING,
       useNativeDriver: true,
     });
 
@@ -1126,9 +1162,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
     const settleAnimation = Animated.spring(weekStripTranslateX, {
       toValue: 0,
-      damping: 22,
-      stiffness: 260,
-      mass: 0.8,
+      ...SWIPE_SETTLE_SPRING,
       useNativeDriver: true,
     });
 
@@ -1219,9 +1253,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     monthTransitionRef.current?.stop();
     const resetAnimation = Animated.spring(monthSwipeTranslateX, {
       toValue: 0,
-      damping: 18,
-      stiffness: 220,
-      mass: 0.7,
+      ...SWIPE_CANCEL_SPRING,
       useNativeDriver: true,
     });
 
@@ -1249,9 +1281,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
     const settleAnimation = Animated.spring(monthSwipeTranslateX, {
       toValue: 0,
-      damping: 22,
-      stiffness: 260,
-      mass: 0.8,
+      ...SWIPE_SETTLE_SPRING,
       useNativeDriver: true,
     });
 
@@ -1627,53 +1657,21 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     >
       <View>
         {isTeamScope && teamFocusAreaTabs.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.focusAreaPillListContent}
-            style={styles.focusAreaPillList}
-          >
-            {teamFocusAreaTabs.map((tab) => {
-              const isActive = tab.key === activeTeamFocusAreaKey;
-
-              return (
-                <Pressable
-                  key={tab.key}
-                  accessibilityLabel={`Select ${tab.label}`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isActive }}
-                  onPress={() => {
-                    handleSelectFocusArea(tab.key);
-                  }}
-                  style={({ pressed }) => [
-                    styles.focusAreaPill,
-                    isActive && styles.focusAreaPillActive,
-                    pressed && styles.focusAreaPillPressed,
-                  ]}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.focusAreaPillText, isActive && styles.focusAreaPillTextActive]}
-                  >
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+          <ScrollableTabStrip
+            accessibilityLabel="Focus areas"
+            activeKey={activeTeamFocusAreaKey}
+            onSelect={handleSelectFocusArea}
+            tabs={teamFocusAreaTabs}
+          />
         ) : null}
         {contentState.kind === "loading" ? (
-          <View style={styles.loadingState}>
-            {!isTeamScope ? (
-              <>
-                <HeroSkeleton />
-                <ListSkeleton rows={2} />
-                <ListSkeleton rows={2} />
-              </>
+          contentState.showSkeleton ? (
+            isTeamScope ? (
+              <ScheduleTeamSkeleton />
             ) : (
-              <ListSkeleton rows={4} showSectionHeader={false} />
-            )}
-          </View>
+              <ScheduleMeSkeleton />
+            )
+          ) : null
         ) : contentState.kind === "error" ? (
           <StatusBanner
             actionLabel="Try again"
@@ -1724,7 +1722,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             {isMeScheduleEmpty ? null : (
               <>
                 <ShiftCoverRequestsSection
-                  isLoading={requestsQuery.isLoading}
                   linkedEmployeeId={linkedEmployee?.id ?? null}
                   pendingAction={pendingAction}
                   onRespond={(requestId, accept) => {
@@ -1742,7 +1739,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                   requestsError={requestsQuery.error}
                 />
                 <OpenShiftsSection
-                  isLoading={requestsQuery.isLoading}
                   linkedEmployeeId={linkedEmployee?.id ?? null}
                   pendingAction={pendingAction}
                   now={now}
@@ -1831,7 +1827,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
           confirmTone={
             requestActionConfirmation?.feedback.confirmStyle === "destructive"
-              ? "dangerFilled"
+              ? "danger"
               : "primary"
           }
           onCancel={() => setRequestActionConfirmation(null)}
@@ -1871,7 +1867,8 @@ function MonthDayCell({
   accessible?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <Pressable
@@ -1921,7 +1918,8 @@ function IconControlButton({
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <Pressable
@@ -1942,7 +1940,8 @@ function IconControlButton({
 
 function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <Pressable
@@ -2011,7 +2010,8 @@ function getRequestJobChip(
 
 function MentoredPill() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
@@ -2030,7 +2030,8 @@ function MeSectionHeader({
   onAction?: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={styles.meSectionHeader}>
@@ -2058,7 +2059,8 @@ function JobPill({
   isMentored?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
@@ -2148,7 +2150,8 @@ function MeTypePill({
   isMentored?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
@@ -2176,8 +2179,9 @@ function MeTypePill({
 
 function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { resolvedTheme } = useThemeMode();
+  const isDark = resolvedTheme === "dark";
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (entries.length === 0) {
     return null;
@@ -2185,7 +2189,6 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
 
   const visibleEntries = entries.slice(0, 3);
   const overflowCount = entries.length - visibleEntries.length;
-  const isDark = resolvedTheme === "dark";
   const collaboratorBackground = {
     backgroundColor: isDark
       ? ME_HERO_COLLABORATOR_BACKGROUND_DARK
@@ -2265,8 +2268,8 @@ function MeHeroCard({
   onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (!featuredItem) {
     return (
@@ -2466,8 +2469,8 @@ function UpcomingShiftsSection({
   todayDate: string;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (items.length === 0) {
     return null;
@@ -2627,7 +2630,8 @@ function UpcomingShiftsSection({
 
 function UpcomingShiftDashedDivider() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View
@@ -2647,7 +2651,6 @@ function OpenShiftsSection({
   openShifts,
   scheduleEntries,
   linkedEmployeeId,
-  isLoading,
   pendingAction,
   now,
   requestsError,
@@ -2661,7 +2664,6 @@ function OpenShiftsSection({
   openShifts: MobileOpenShift[];
   scheduleEntries: MobileScheduleEntry[];
   linkedEmployeeId: string | null;
-  isLoading: boolean;
   pendingAction: PendingRequestAction;
   now: Date;
   requestsError: unknown;
@@ -2675,8 +2677,8 @@ function OpenShiftsSection({
   onSeeAll: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [stackCardHeights, setStackCardHeights] = useState<Record<string, number>>({});
   const availableOpenShiftFeed = useMemo(
@@ -2936,7 +2938,7 @@ function OpenShiftsSection({
     );
   };
 
-  if (!isLoading && !requestsError && availableOpenShiftFeed.totalCount === 0) {
+  if (!requestsError && availableOpenShiftFeed.totalCount === 0) {
     return null;
   }
 
@@ -2944,9 +2946,7 @@ function OpenShiftsSection({
     <View style={styles.meSectionBlock}>
       <MeSectionHeader actionLabel="See all" onAction={onSeeAll} title="Open Shifts" />
 
-      {isLoading ? (
-        <ListSkeleton rows={2} showSectionHeader={false} />
-      ) : requestsError ? (
+      {requestsError ? (
         <StatusBanner
           body="We couldn't load open shifts right now."
           title="Could not load open shifts"
@@ -3059,23 +3059,22 @@ function OpenShiftsSection({
 function ShiftCoverRequestsSection({
   requests,
   linkedEmployeeId,
-  isLoading,
   pendingAction,
   requestsError,
   onRespond,
 }: {
   requests: MobileShiftRequest[];
   linkedEmployeeId: string | null;
-  isLoading: boolean;
   pendingAction: PendingRequestAction;
   requestsError: unknown;
   onRespond: (requestId: string, accept: boolean) => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { resolvedTheme } = useThemeMode();
 
-  if (!isLoading && !requestsError && requests.length === 0) {
+  if (!requestsError && requests.length === 0) {
     return null;
   }
 
@@ -3083,9 +3082,7 @@ function ShiftCoverRequestsSection({
     <View style={styles.meSectionBlock}>
       <MeSectionHeader title="Needs Your Response" />
 
-      {isLoading ? (
-        <ListSkeleton rows={2} showSectionHeader={false} />
-      ) : requestsError ? (
+      {requestsError ? (
         <StatusBanner
           body="We couldn't load cover requests right now."
           title="Could not load requests"
@@ -3199,7 +3196,8 @@ function TeamShiftMemberRow({
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { resolvedTheme } = useThemeMode();
   const { entry, segment } = row;
   const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");

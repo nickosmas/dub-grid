@@ -2,11 +2,10 @@ import { useMemo, useState } from "react";
 import { router } from "expo-router";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
-import { HeroSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { queryClient } from "../../../shared/lib/query-client";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { isManagementOnly } from "../../auth/hooks/employmentStatus";
@@ -16,7 +15,9 @@ import {
   type DashboardPeriodMode,
 } from "../../../shared/lib/dates";
 import { useAdminDashboard } from "../hooks/useAdminDashboard";
+import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 import { DashboardHeader } from "../components/DashboardHeader";
+import { DashboardHeaderSkeleton, DashboardSkeleton } from "../components/DashboardSkeleton";
 import { DashboardHeroCard } from "../components/DashboardHeroCard";
 import { ActionQueueCard } from "../components/ActionQueueCard";
 import { MyScheduleCard } from "../components/MyScheduleCard";
@@ -37,10 +38,19 @@ export function AdminHomeScreen() {
     [periodMode, payPeriodStartDate],
   );
   const dashboardQuery = useAdminDashboard(accessToken, range);
-  // MyScheduleCard owns its own query (["mobile", "dashboard", "my-schedule",
-  // accessToken]) rather than being lifted here, so a manual pull-to-refresh
-  // reaches it via the shared ["mobile", "dashboard"] key prefix — the same
-  // mechanism the realtime invalidation path uses.
+  const role = bootstrapQuery.data?.effectiveRole;
+  const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
+  const managementOnly = isManagementOnly(
+    linkedEmployee?.focusAreaIds ?? [],
+    linkedEmployee?.departmentIds ?? [],
+  );
+  // Shares its key with MyScheduleCard's own call, so this is one fetch, not
+  // two. Read here purely so the card's data gates the page's single skeleton
+  // instead of the card popping in after it. Skipped entirely for
+  // management-only users, who never see the card.
+  const myScheduleQuery = useMyScheduleQuery(accessToken, { enabled: !managementOnly });
+  // Pull-to-refresh still reaches the card through the shared ["mobile",
+  // "dashboard"] key prefix — the same mechanism realtime invalidation uses.
   const manualRefresh = useManualRefresh(() =>
     Promise.all([
       dashboardQuery.refetch(),
@@ -49,19 +59,38 @@ export function AdminHomeScreen() {
     ]),
   );
 
-  const contentState = getMobileQueryContentState({
-    hasData: dashboardQuery.data !== undefined,
-    isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading,
+  // "Resolved", not "succeeded": a failed schedule card should not take the
+  // whole dashboard to an error screen, it just renders empty. But it does
+  // have to finish before the skeleton comes down, or it lands afterwards and
+  // shifts every card below it.
+  const myScheduleResolved =
+    managementOnly || myScheduleQuery.data !== undefined || Boolean(myScheduleQuery.error);
+  const contentState = useMobileContentState({
+    // Both halves of the first paint, so the page shows one skeleton once
+    // rather than clearing it and then filling a card in underneath.
+    hasData:
+      dashboardQuery.data !== undefined && bootstrapQuery.data !== undefined && myScheduleResolved,
+    isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading || myScheduleQuery.isLoading,
     error: dashboardQuery.error ?? bootstrapQuery.error,
   });
 
   if (contentState.kind === "loading") {
     return (
-      <Screen title="Home" subtitle="Organization overview" bottomPaddingMode="tabbed">
-        <HeroSkeleton />
-        <ListSkeleton rows={2} />
-        <ListSkeleton rows={3} />
-        <ListSkeleton rows={2} showSectionHeader={false} />
+      <Screen
+        title="Home"
+        subtitle="Organization overview"
+        bottomPaddingMode="tabbed"
+        stickyHeader={contentState.showSkeleton ? <DashboardHeaderSkeleton /> : undefined}
+      >
+        {contentState.showSkeleton ? (
+          <DashboardSkeleton
+            // Both default to shown: until bootstrap resolves the most common
+            // shape is the admin one, and guessing wrong costs one card of
+            // silhouette rather than a layout jump.
+            showActionQueue={role === undefined || role === "admin"}
+            showMySchedule={!managementOnly}
+          />
+        ) : null}
       </Screen>
     );
   }
@@ -115,12 +144,6 @@ export function AdminHomeScreen() {
   }
 
   const data = dashboardQuery.data;
-  const role = bootstrapQuery.data?.effectiveRole;
-  const linkedEmployee = bootstrapQuery.data?.linkedEmployee ?? null;
-  const managementOnly = isManagementOnly(
-    linkedEmployee?.focusAreaIds ?? [],
-    linkedEmployee?.departmentIds ?? [],
-  );
   // Prefer the linked employee record's name — it's always populated from the
   // employees table. auth user_metadata.first_name (user.firstName) is often
   // empty for invited accounts, and email is the last resort, mirroring web's

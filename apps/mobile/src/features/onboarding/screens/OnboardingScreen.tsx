@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, { useAnimatedScrollHandler, useSharedValue } from "react-native-reanimated";
 import { Button } from "../../../shared/components/Button";
 import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
+import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";
 import { hapticSelection } from "../../../shared/lib/haptics";
 import { saveHasSeenOnboarding } from "../../../shared/lib/session";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -95,6 +96,8 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView edges={["top", "bottom"]} style={styles.root}>
+      {/* A brand halo behind the header, fading out before the copy starts. */}
+      <GradientBackdrop height="100%" kind="aurora" />
       <View style={styles.headerRow}>
         <View style={styles.brand}>
           <Image
@@ -129,13 +132,15 @@ export default function OnboardingScreen() {
           onMomentumScrollEnd={handleMomentumScrollEnd}
           decelerationRate="fast"
         >
-          {SLIDES.map((slide) => (
+          {SLIDES.map((slide, index) => (
             <OnboardingCard
               key={slide.title}
               visual={slide.visual}
               title={slide.title}
               body={slide.body}
               width={pageWidth}
+              index={index}
+              scrollX={scrollX}
             />
           ))}
         </AnimatedScrollView>

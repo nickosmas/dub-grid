@@ -35,6 +35,8 @@ apps/mobile/
     +not-found.tsx                  # Unmatched-route fallback
     (auth)/
       login.tsx
+      forgot-password.tsx           # Native reset request (was a web hand-off)
+      reset-password.tsx            # Code entry + new password
       onboarding.tsx
     (tabs)/
       _layout.tsx  _layout.android.tsx  _layout.web.tsx
@@ -55,9 +57,11 @@ apps/mobile/
       components/                   # Shared primitives (ConfigurationScreen, etc.)
       hooks/
       lib/                          # env.ts, query-client, error helpers
+      motion/                       # useMotionPreference, usePressAnimation,
+                                    #   AnimatedListItem, Collapsible
       navigation/
       providers/                    # AuthSessionProvider
-      theme/
+      theme/                        # tokens.ts adapter + useElevation
 ```
 
 ## App Identifiers (High Risk)
@@ -76,6 +80,34 @@ absence types, schedule rules, coverage, activity log) have no mobile
 surface, front or backend, by design — these are admin/config-heavy
 workflows that reasonably stay desktop-only. Don't treat their absence as
 a gap to fill; confirm with the user before adding any of them to mobile.
+
+## Password Reset (spans mobile + email templates)
+
+Mobile resets in-app rather than opening the web page. The flow is
+`resetPasswordForEmail` → a 6-digit code from the email → `verifyOtp({ type:
+"recovery" })` → `updateUser` → `signOut({ scope: "global" })`. No deep link and
+no `additional_redirect_urls` entry is involved.
+
+- **Use `createEphemeralSupabaseClient()` for every call in this flow.**
+  `verifyOtp` returns a real session; on the persistent client it lands in
+  SecureStore, `AuthSessionProvider` picks it up, and `LoginScreen`'s
+  `if (accessToken) return <Redirect href="/(tabs)/home" />` drops the user into
+  the tab tree mid-reset with no organization session. `ResetPasswordScreen.test.tsx`
+  asserts `getSupabaseClient` is never called — keep that guard.
+- The code comes from `{{ .Token }}` in `supabase/templates/recovery.html`,
+  generated from `apps/web/src/emails/auth/RecoveryEmail.tsx` via
+  `npm --workspace @dubgrid/web run email:build`. The template keeps
+  `{{ .ConfirmationURL }}` too, because web still follows the link.
+- **Changing that template requires updating remote Supabase's template in the
+  dashboard**; `supabase/templates/*.html` is local config only.
+- The request step advances even when the address has no account
+  (anti-enumeration). Only rate limiting and network failures surface inline.
+- **Strength rules and match checking live in `@dubgrid/domain`
+  (`packages/domain/src/password.ts`), not per-app.** Web and mobile previously
+  enforced different bars from byte-duplicated rule sets. Use
+  `isPasswordAcceptable` and `getPasswordMismatchError`; the latter returns null
+  while the confirmation is empty, so the warning appears as the user diverges
+  rather than on submit.
 
 ## Gates and Boundaries
 
@@ -130,6 +162,132 @@ keeps receiving the previous user's notifications.
 - Use `apps/mobile/.env.example` for variable names only.
 - Do not read or print `apps/mobile/.env.local`.
 
+## Design System
+
+Tokens live in `packages/design-tokens` with a `mobile*` prefix and are
+re-exported through `src/shared/theme/tokens.ts`. That adapter is the only
+import path screens should use. **The package is shared with `apps/web`** — add
+`mobile*`-prefixed groups rather than changing existing tokens.
+
+### Reach for these before inventing anything
+
+| Need                        | Use                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| Any text                    | `<AppText variant tone>` — carries a theme-correct color by default                         |
+| Any button                  | `<Button>` — solid fill, no border, pill, sizes `sm`/`md`/`lg`, `iconOnly`                  |
+| A pressable list row        | `<PressableRow>` — background highlight on iOS, ripple on Android                           |
+| A scrolling tab strip       | `<ScrollableTabStrip>` — pill tabs, optional count badges, scrolls the active tab into view |
+| A pressable that is neither | `usePressAnimation()`                                                                       |
+| Status/metadata/filter pill | `<Chip>`                                                                                    |
+| Segmented toggle            | `<SegmentedControl>`                                                                        |
+| Shadow                      | `mobileElevation(level, isDark)` or `useElevation(level)`                                   |
+| Duration / spring / easing  | `useMotionPreference()` — never a raw number                                                |
+| Soft brand wash             | `<GradientBackdrop kind>`                                                                   |
+| List entrance               | `<AnimatedListItem index>`                                                                  |
+| Show/hide a block           | `<Collapsible open>`                                                                        |
+| Bottom sheet                | `<BottomSheetModal>` (`dismissDisabled` for blocking gates)                                 |
+| Auth screen frame           | `<AuthShell>` + `<AuthField>`                                                               |
+| Loading placeholder         | a `*Skeleton` colocated with the screen, built on `shared/components/skeleton`              |
+| Which state a screen is in  | `useMobileContentState({ hasData, isLoading, error, isEmpty })`                             |
+
+### Skeletons
+
+Primitives live in `src/shared/components/skeleton`: `SkeletonBlock`,
+`SkeletonCircle`, `SkeletonIcon`, `SkeletonLine`, `SkeletonPill`,
+`SkeletonCardSurface`, `SkeletonGroup`. Compositions are per screen, colocated
+in that feature's `components/` folder. Three rules:
+
+- **A skeleton reuses the real screen's own styles**, not a copy of its numbers
+  (`ScheduleMeSkeleton` imports `scheduleScreenStyles`, `SkeletonCardSurface`
+  shares `getCardSurfaceStyle` with `Card`). A copy drifts the first time a
+  padding changes and nothing catches it. Use `SkeletonLine variant="body"`
+  rather than a hardcoded height: it sizes the bar from the typography token
+  and reserves the token's full line height, so no swap shifts the layout.
+- **One skeleton per screen, shown once.** Every query the first paint needs
+  folds into that screen's single `contentState` — including its `hasData`, or
+  the gate clears while a folded query is still in flight. A nested skeleton
+  inside a section is always wrong: it paints a second wave _after_ the page
+  skeleton has already gone. A parent that picks between two screens must not
+  guess while it is still loading either: `app/(tabs)/home/index.tsx` used to
+  fall through to the personal schedule until bootstrap named the role, so an
+  admin got that screen's skeleton and then the dashboard's.
+- **Whatever appears in `isLoading` must appear in `hasData` too.** They are
+  the two halves of one question, and the gate leaves `loading` as soon as
+  _either_ says it can. A query in only `isLoading` clears the skeleton with
+  its own data still missing, and whatever the screen derives from it renders
+  wrong for a frame — `PersonDetailScreen` flashed "Person not found" this way,
+  because the person is gated on a bootstrap permission.
+- **Nothing the render branches on may be synced in an effect.** Effects run
+  after the paint, so an effect-derived value is one frame behind the data it
+  mirrors, and the branch above it paints the wrong state first. Derive during
+  render, or adjust state during render with the stored-previous-value pattern
+  (`PersonDetailScreen`'s edit draft). This is the React rule in the root
+  `CLAUDE.md`, and a terminal state flashing before content is what breaking it
+  looks like.
+- **Never branch on a raw `isLoading`.** Go through `useMobileContentState`
+  and render on `showSkeleton` (or `useSkeletonGate` where there is no error or
+  empty state to model). Its `hasData` means "the query resolved"; pass
+  `isEmpty` separately on any screen whose query key carries a search or filter.
+
+Animation is one app-wide clock (`useSkeletonWave`, a module-level
+`makeMutable`) driving a single band of light across the window, so every block
+sweeps in phase. It is off entirely under reduce motion.
+
+### Rules
+
+- **Buttons and chips are solid, borderless and pill-shaped.** Every tone. Do
+  not add `borderWidth` back.
+- **Soft control fills come from `controlNeutralBg` / `controlSecondaryBg`,
+  not `surfaceSecondary` / `brandSoft`.** The shared tokens measure ~1.04:1
+  against the page, which is not a perceivable edge for a borderless control.
+  `controlSecondaryFg` pairs with the secondary fill: the standard `brand` blue
+  on it measures 4.02:1 and fails AA. `src/shared/theme/contrast.test.ts` pins
+  all of this.
+- **`iconOnly` buttons must not carry vertical padding.** The fixed width/height
+  is the box; padding on top of it squeezes the content below the glyph's line
+  height and `overflow: "hidden"` clips it.
+- **`fullWidth` defaults to true for text buttons.** A button inside a row that
+  positions with `alignItems` needs `fullWidth={false}`, because
+  `alignSelf: "stretch"` on the child wins.
+- **Cards are borderless in light mode with `mobileElevation("card")`, and keep
+  the hairline `borderSubtle` in dark mode** — a shadow is invisible against a
+  near-black page, so the edge is what separates card from background.
+- **Never override `fontWeight` on a `mobileText` token.** Each token names a
+  specific DM Sans family file, so changing only the weight leaves family and
+  weight disagreeing: iOS honors the family, Android may synthesize a fake
+  weight. Use `mobileTextWeighted(variant, weight)`, which moves both.
+- **Route every duration through `useMotionPreference().d()`.** It returns 0
+  when the OS reduce-motion setting is on, which is what makes that setting
+  apply app-wide from one place.
+- **Call `d`/`spring`/`timing` during render, never inside a worklet.** They are
+  plain functions, and Reanimated serializes a captured non-worklet function as
+  a remote-function _object_ — so `useAnimatedStyle(() => ({ opacity:
+withTiming(1, timing("emphasized", 200)) }))` throws `timing is not a function
+(it is Object)` on the UI thread and takes the whole app down. Resolve the
+  config first (`useMemo`, since it returns a fresh object) and let the worklet
+  close over the value. The unit tests cannot catch this: the harness stubs
+  Reanimated, so worklets run as ordinary JS and the call succeeds.
+- **iOS scales on press; Android does not.** Material's ripple _is_ the state
+  layer, and scaling on top of it reads as a rendering bug. `usePressAnimation`
+  already handles this — don't add a scale on Android.
+- **There is no SVG or blur dependency, deliberately.** `react-native-svg` is a
+  native module whose `src/utils/fetchData.ts` imports `buffer` without
+  declaring it, so Metro fails to resolve it; `expo-blur` is iOS-only anyway
+  (Android's `dimezisBlurView` snapshots and blurs every frame and janks on
+  mid-range devices). Vector art is built from views plus
+  `expo-linear-gradient`; frosted surfaces use `surface` + elevation. Adding
+  either back means a dev-client rebuild, and `react-native-svg` also needs
+  `buffer` installed explicitly.
+- **Android `elevation` needs an opaque background** and reorders sibling z
+  order. Never apply a level to a transparent wrapper.
+- Style factories that use elevation take `(mobileColors, isDark)`; keep the
+  `createStyles` + `useMemo` idiom.
+- **Never put `flex: 1` on a child of an auto-width row** (`alignSelf:
+"flex-start"` / `"center"`). Yoga collapses it to zero width and the control
+  renders empty. Measure with `onLayout` instead — that is what
+  `SegmentedControl` and `ScrollableTabStrip` do, and both had to be fixed after
+  shipping this exact bug.
+
 ## UI Rules
 
 - Follow existing screen/component patterns in `src/features` and `src/shared`.
@@ -137,6 +295,24 @@ keeps receiving the previous user's notifications.
   and offline/network handling.
 - Use existing shared primitives before adding new components.
 - Avoid layout changes outside the requested screen or component.
+
+## Test Harness Gotchas
+
+- **Native modules are aliased to shims in `vitest.config.mts`**, not mocked per
+  test. A new native dependency needs a shim there or every file that
+  transitively imports it fails to collect.
+- **`src/test/reanimated-stub.tsx` is an allowlist.** A Reanimated API it does
+  not export is `undefined` at import time in every test that reaches it. Add
+  the export before using the API.
+- **`src/test/native.tsx` is a partial react-native emulation** that most screen
+  tests swap in via `vi.mock("react-native", …)`. Vitest's mock proxy _throws_ on
+  accessing an export it lacks, so only wrap primitives that module also
+  provides.
+- **The `style` prop is dropped before reaching the DOM.** Styles are not
+  assertable, which makes visual change cheap but means style logic worth
+  pinning has to be extracted as a pure function (see `getTextToneColors`).
+- **`npm test` does not rebuild `packages/`.** Run `npm run build:packages` from
+  the repo root after any token change or you will chase phantom failures.
 
 ## Verification
 

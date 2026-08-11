@@ -52,7 +52,7 @@ describe("PendingApprovalsExpandedScreen", () => {
     useExpandedDashboardQuery.mockReset();
   });
 
-  it("shows a loading state while the dashboard query is loading", () => {
+  it("shows a loading state while the dashboard query is loading", async () => {
     useExpandedDashboardQuery.mockReturnValue({
       dashboardQuery: { isLoading: true, isError: false, data: undefined },
       bootstrapQuery: { isLoading: true, data: undefined },
@@ -60,7 +60,10 @@ describe("PendingApprovalsExpandedScreen", () => {
 
     render(<PendingApprovalsExpandedScreen />);
 
-    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
+    // Gated now, so nothing paints for the first beat and a warm cache
+    // never flashes a skeleton it immediately replaces.
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
     expect(screen.queryByText("Loading pending approvals")).not.toBeInTheDocument();
   });
 

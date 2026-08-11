@@ -8,7 +8,6 @@ import { extractNotificationAction, formatNotificationMetadata } from "@dubgrid/
 import { Button } from "../../../shared/components/Button";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
-import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
   bulkUpdateNotifications,
@@ -17,9 +16,17 @@ import {
 } from "../../../shared/lib/api";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
+import { NotificationDetailSkeleton } from "../components/NotificationDetailSkeleton";
+import { setBootstrapUnreadCount } from "../lib/unread-cache";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import {
   isNotificationActionSupportedOnMobile,
@@ -107,6 +114,12 @@ export default function NotificationDetailScreen() {
   });
 
   const notification = cachedNotification ?? detailQuery.data ?? null;
+  // In flight, or not started yet because the access token has not hydrated.
+  const isResolvingNotification =
+    detailQuery.isLoading || (!accessToken && Boolean(id) && !cachedNotification);
+  // Almost always a cache hit from the list you tapped through, so the
+  // placeholder only paints when the fallback fetch actually takes a moment.
+  const showSkeleton = useSkeletonGate(!notification && isResolvingNotification);
 
   const manualRefresh = useManualRefresh(async () => {
     await detailQuery.refetch();
@@ -115,11 +128,14 @@ export default function NotificationDetailScreen() {
   const handleMarkRead = useCallback(async () => {
     if (!accessToken || !notification || notification.readAt) return;
     try {
-      await markNotificationRead(accessToken, notification.id);
+      const response = await markNotificationRead(accessToken, notification.id);
+      // Drop the badge here rather than waiting for a bootstrap refetch, which
+      // otherwise leaves a count on screen for an alert already being read.
+      setBootstrapUnreadCount(queryClient, accessToken, response.unreadCount);
     } catch {
       // best-effort; UI updates via query refetch on parent
     }
-  }, [accessToken, notification]);
+  }, [accessToken, notification, queryClient]);
 
   // Auto mark-read once when an unread notification is opened.
   useEffect(() => {
@@ -191,12 +207,12 @@ export default function NotificationDetailScreen() {
     );
   }
 
-  if (!notification && detailQuery.isLoading) {
-    return (
-      <Screen title="Alert">
-        <DetailSkeleton />
-      </Screen>
-    );
+  // `isLoading` alone is not enough: while the session is still hydrating the
+  // query is disabled, so it reports "not loading" with no data, and the branch
+  // below declared the alert missing until the token arrived. "Still resolving"
+  // has to cover the not-yet-started case too.
+  if (!notification && isResolvingNotification) {
+    return <Screen title="Alert">{showSkeleton ? <NotificationDetailSkeleton /> : null}</Screen>;
   }
 
   if (!notification) {
@@ -311,8 +327,7 @@ const createStyles = (mobileColors: MobileColors) =>
       justifyContent: "center",
     },
     priorityChip: {
-      ...mobileText.caption,
-      fontWeight: "700",
+      ...mobileTextWeighted("caption", "bold"),
       letterSpacing: 0.5,
       paddingHorizontal: 8,
       paddingVertical: 4,
@@ -358,13 +373,12 @@ const createStyles = (mobileColors: MobileColors) =>
       borderRadius: mobileRadii.card,
       padding: 14,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       gap: 8,
     },
     metadataTitle: {
-      ...mobileText.label,
+      ...mobileTextWeighted("label", "bold"),
       color: mobileColors.textPrimary,
-      fontWeight: "700",
       marginBottom: 4,
     },
     metadataRow: {
@@ -400,8 +414,7 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surface,
     },
     actionLabel: {
-      ...mobileText.label,
+      ...mobileTextWeighted("label", "semibold"),
       color: mobileColors.textPrimary,
-      fontWeight: "600",
     },
   });

@@ -67,7 +67,12 @@ vi.mock("../features/auth/screens/OrganizationLockedScreen", async () => {
   const React = await import("react");
   return {
     OrganizationLockedScreen: ({ message }: { message: string }) =>
-      React.createElement("section", {}, React.createElement("h1", {}, "Organization unavailable"), message),
+      React.createElement(
+        "section",
+        {},
+        React.createElement("h1", {}, "Organization unavailable"),
+        message,
+      ),
   };
 });
 

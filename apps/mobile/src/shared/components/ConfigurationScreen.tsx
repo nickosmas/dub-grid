@@ -104,7 +104,7 @@ const createStyles = (mobileColors: MobileColors) =>
       padding: 18,
       gap: 12,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
     },
     eyebrow: {
       ...mobileText.label,

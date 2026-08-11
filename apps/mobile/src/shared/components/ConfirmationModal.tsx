@@ -14,14 +14,20 @@ import Animated from "react-native-reanimated";
 import { Button, type ButtonTone } from "./Button";
 import { hapticImpact } from "../lib/haptics";
 import { useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
-import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
+import {
+  mobileElevation,
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../theme/tokens";
 
 const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
 
 type ConfirmationTone = Extract<
   ButtonTone,
-  "primary" | "secondary" | "neutral" | "danger" | "dangerFilled" | "warningFilled"
+  "primary" | "secondary" | "neutral" | "danger" | "warning"
 >;
 
 export function ConfirmationModal({
@@ -48,11 +54,12 @@ export function ConfirmationModal({
   onConfirm: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   // Read live rather than at module scope: a module-scope `Dimensions.get`
   // snapshot goes stale on rotation and on foldables.
   const { height: windowHeight } = useWindowDimensions();
-  const isDestructive = confirmTone === "danger" || confirmTone === "dangerFilled";
+  const isDestructive = confirmTone === "danger";
 
   const handleConfirm = () => {
     if (isDestructive) {
@@ -133,7 +140,7 @@ export function ConfirmationModal({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     gestureRoot: {
       flex: 1,
@@ -148,19 +155,15 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     sheet: {
       width: "100%",
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      borderWidth: 1,
+      borderTopLeftRadius: mobileRadii.card + 8,
+      borderTopRightRadius: mobileRadii.card + 8,
+      borderWidth: isDark ? 1 : 0,
       borderColor: mobileColors.borderSubtle,
       backgroundColor: mobileColors.surface,
-      paddingHorizontal: 20,
+      paddingHorizontal: mobileSpace.xl,
       paddingBottom: SHEET_BOTTOM_PADDING,
-      gap: 20,
-      shadowColor: mobileColors.textPrimary,
-      shadowOffset: { width: 0, height: -8 },
-      shadowOpacity: Platform.OS === "ios" ? 0.18 : 0,
-      shadowRadius: 28,
-      elevation: 16,
+      gap: mobileSpace.xl,
+      ...mobileElevation("sheet", isDark),
     },
     // Carries the sheet's top padding so the visual spacing is unchanged now
     // that the grabber sits in its own row.

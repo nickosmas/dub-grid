@@ -17,6 +17,14 @@ export {
 } from "./avatar-tone";
 
 export {
+  mobileIconToneTokens,
+  getMobileIconToneColor,
+  MOBILE_DECORATIVE_ICON_TONES,
+  type MobileIconTone,
+  type MobileIconToneName,
+} from "./icon-tone";
+
+export {
   getReadableTextColor,
   borderColor,
   toDarkPillColors,
@@ -26,6 +34,32 @@ export {
 } from "./pill-colors";
 
 export { getHeroGradientCss, heroGradientTokens, type HeroGradientStops } from "./hero-gradient";
+
+export {
+  getSoftGradientCss,
+  getSoftGradientStops,
+  softGradientTokens,
+  type SoftGradientKind,
+  type SoftGradientStops,
+} from "./soft-gradient";
+
+export {
+  darkMobileElevationTokens,
+  getMobileElevation,
+  mobileElevationTokens,
+  type MobileElevation,
+  type MobileElevationLevel,
+} from "./elevation";
+
+export {
+  getMobileEasingCurve,
+  mobileMotionTokens,
+  type MobileDurationName,
+  type MobileEasingCurve,
+  type MobileEasingName,
+  type MobileSpringConfig,
+  type MobileSpringName,
+} from "./motion";
 
 export { resolveJobChipTone, type JobChipTone, type JobChipToneContext } from "./job-chip-tone";
 
@@ -162,7 +196,13 @@ export const colorTokens = lightColorTokens;
  */
 export const spacingTokens = {
   screenX: 16,
-  sectionGap: 16,
+  /** Vertical rhythm between cards/sections on a mobile screen. */
+  sectionGap: 20,
+  /**
+   * @deprecated Disagrees with the real card gap. `Screen.tsx`'s Card uses
+   * `mobileSpacingTokens.md` (12); this 8 is only still read by
+   * OrganizationLockedScreen. Migrate that call site and remove.
+   */
   cardGap: 8,
 } as const;
 

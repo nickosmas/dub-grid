@@ -36,7 +36,17 @@ export function useTabsGate(): TabsGateResult {
   // depended on the whole query object, so it was torn down and re-added on
   // every render.
 
-  if (isLoading) {
+  // Bootstrap blocks alongside the session, because until it lands nobody
+  // knows who this is. The Home tab has to pick between the admin dashboard
+  // and the personal schedule, and defaulting to one meant an admin got the
+  // schedule's skeleton first and the dashboard's second — two waves, the
+  // first of them the wrong shape. The tab bar has the same problem: every
+  // `canView*` below is false while bootstrap is in flight, so tabs popped in
+  // afterwards.
+  //
+  // `isLoading` (not `isFetching`) so this is the cold first load only —
+  // refetches and org switches keep showing the screen you are on.
+  if (isLoading || bootstrapQuery.isLoading) {
     return {
       kind: "blocked",
       element: <AppSplashScreen />,

@@ -1,6 +1,23 @@
 import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
 import { Platform } from "react-native";
-import type { MobileColors } from "../theme/tokens";
+import { mobileMotion, type MobileColors } from "../theme/tokens";
+
+const isIOS = Platform.OS === "ios";
+
+/**
+ * Screen transitions come from the native stack, not from Reanimated.
+ *
+ * iOS "default" is the real UIKit push, including the interactive back swipe
+ * and the parallax on the outgoing screen. Android gets its own slide at the
+ * Material duration. Hand-rolling either would be strictly worse than the
+ * platform's own.
+ */
+export function createStackTransitionOptions(): NativeStackNavigationOptions {
+  return {
+    animation: isIOS ? "default" : "slide_from_right",
+    animationDuration: isIOS ? undefined : mobileMotion.duration.base,
+  };
+}
 
 export function createCommonStackOptions(mobileColors: MobileColors): NativeStackNavigationOptions {
   return {
@@ -23,6 +40,7 @@ export function createCommonStackOptions(mobileColors: MobileColors): NativeStac
     contentStyle: {
       backgroundColor: mobileColors.background,
     },
+    ...createStackTransitionOptions(),
   };
 }
 
@@ -30,7 +48,7 @@ export function createTopLevelStackOptions(
   mobileColors: MobileColors,
   title: string,
 ): NativeStackNavigationOptions {
-  const useLargeTitle = Platform.OS === "ios";
+  const useLargeTitle = isIOS;
   const common = createCommonStackOptions(mobileColors);
 
   return {
@@ -51,5 +69,8 @@ export function createDetailStackOptions(
     title,
     headerLargeTitle: false,
     headerLargeTitleEnabled: false,
+    // Full-width back swipe on iOS: a detail screen is a dead end, so the whole
+    // surface should dismiss it rather than just the left edge.
+    fullScreenGestureEnabled: isIOS,
   };
 }

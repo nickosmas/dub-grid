@@ -11,9 +11,16 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { Chip } from "../../../shared/components/Chip";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -221,16 +228,9 @@ export function ProfileNavRow({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+    <PressableRow
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.row,
-        styles.navRow,
-        !isLast && styles.rowDivider,
-        pressed && styles.rowPressed,
-      ]}
+      style={[styles.row, styles.navRow, !isLast && styles.rowDivider]}
     >
       <ProfileIcon name={iconName} />
       <View style={styles.rowCopy}>
@@ -242,7 +242,7 @@ export function ProfileNavRow({
         ) : null}
       </View>
       <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
-    </Pressable>
+    </PressableRow>
   );
 }
 
@@ -333,27 +333,14 @@ export function ProfileChoiceGroup<TId extends string | number>({
     <View style={styles.chipGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <View style={styles.chipRow}>
-        {items.map((item) => {
-          const selected = selectedIds.includes(item.id);
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-              key={item.id}
-              onPress={() => onToggle(item.id)}
-              style={({ pressed }) => [
-                styles.chip,
-                selected && styles.chipSelected,
-                pressed && styles.chipPressed,
-              ]}
-            >
-              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                {item.abbr || item.name}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {items.map((item) => (
+          <Chip
+            key={item.id}
+            label={item.abbr || item.name}
+            onPress={() => onToggle(item.id)}
+            selected={selectedIds.includes(item.id)}
+          />
+        ))}
       </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
@@ -362,13 +349,26 @@ export function ProfileChoiceGroup<TId extends string | number>({
 
 export function ProfileIcon({
   name,
-  tone = "neutral",
+  tone,
 }: {
   name: IconName;
+  /**
+   * Semantic override, for the rare row whose meaning is the colour. Left off,
+   * the icon is monochrome like every other row.
+   */
   tone?: "neutral" | "brand" | "danger" | "success";
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
+  const semanticColor =
+    tone === "brand"
+      ? mobileColors.brand
+      : tone === "danger"
+        ? mobileColors.dangerText
+        : tone === "success"
+          ? mobileColors.successText
+          : null;
 
   return (
     <View
@@ -380,15 +380,13 @@ export function ProfileIcon({
       ]}
     >
       <Ionicons
-        color={
-          tone === "brand"
-            ? mobileColors.brand
-            : tone === "danger"
-              ? mobileColors.dangerText
-              : tone === "success"
-                ? mobileColors.successText
-                : mobileColors.textSecondary
-        }
+        // Monochrome: a settings list is a list of labels, and a hue per row
+        // competes with them for attention while meaning nothing. `textPrimary`
+        // rather than a literal black, so the glyph inverts with the theme.
+        color={semanticColor ?? mobileColors.textPrimary}
+        // The outline glyph, as passed. An outline at full-strength ink weighs
+        // the same as a gray solid but keeps its detail, which is what tells
+        // one row's icon from the next.
         name={name}
         size={18}
       />
@@ -473,9 +471,8 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: 5,
     },
     heroBadgeText: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "semibold"),
       color: mobileColors.brand,
-      fontWeight: "600",
     },
     heroBadgeContrast: {
       backgroundColor: mobileColors.textPrimary,
@@ -506,17 +503,15 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSubtle,
     },
     heroMetaValue: {
-      ...mobileText.rowTitle,
+      ...mobileTextWeighted("rowTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     section: {
       gap: 10,
     },
     sectionTitle: {
-      ...mobileText.label,
+      ...mobileTextWeighted("label", "medium"),
       color: mobileColors.textSubtle,
-      fontWeight: "500",
       letterSpacing: 0.4,
       textTransform: "uppercase",
     },
@@ -527,7 +522,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     panel: {
       backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       gap: 14,
@@ -535,7 +530,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     list: {
       backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       overflow: "hidden",
@@ -554,9 +549,6 @@ const createStyles = (mobileColors: MobileColors) =>
     navRow: {
       minHeight: 70,
     },
-    rowPressed: {
-      opacity: 0.64,
-    },
     rowDivider: {
       borderBottomColor: mobileColors.borderSubtle,
       borderBottomWidth: StyleSheet.hairlineWidth,
@@ -571,26 +563,23 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSubtle,
     },
     rowValue: {
-      ...mobileText.rowTitle,
+      ...mobileTextWeighted("rowTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     rowDetail: {
       ...mobileText.body,
       color: mobileColors.textMuted,
     },
     navLabel: {
-      ...mobileText.cardTitle,
+      ...mobileTextWeighted("cardTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     field: {
       gap: 7,
     },
     fieldLabel: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "medium"),
       color: mobileColors.textSubtle,
-      fontWeight: "500",
     },
     input: {
       // Explicit regular weight — don't spread a `mobileText.*` token that
@@ -653,35 +642,15 @@ const createStyles = (mobileColors: MobileColors) =>
       flexWrap: "wrap",
       gap: 8,
     },
-    chip: {
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-    },
-    chipSelected: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brand,
-    },
-    chipPressed: {
-      opacity: 0.64,
-    },
-    chipText: {
-      ...mobileText.caption,
-      color: mobileColors.textSecondary,
-      fontWeight: "500",
-    },
-    chipTextSelected: {
-      color: mobileColors.brand,
-      fontWeight: "600",
-    },
     iconBadge: {
       alignItems: "center",
-      backgroundColor: mobileColors.surfaceSecondary,
+      // White rather than a gray tint: the tile is a frame for the glyph, not a
+      // second surface, and a gray fill under a black glyph flattens both.
+      backgroundColor: mobileColors.surface,
       borderColor: mobileColors.borderSubtle,
-      borderRadius: 16,
+      // A rounded square, not a circle: 16 on a 32px box is a full circle, and
+      // the squircle reads as a tile the icon sits in rather than a bubble.
+      borderRadius: 10,
       borderWidth: 1,
       height: 32,
       justifyContent: "center",

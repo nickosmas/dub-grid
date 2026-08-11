@@ -1,28 +1,20 @@
-import { router, Stack } from "expo-router";
+import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { getOrgRoleLabel } from "@dubgrid/domain";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import {
-  Alert,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from "react-native";
+import { Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { ModalHeader } from "../../../shared/components/ModalHeader";
-import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import { createDetailStackOptions } from "../../../shared/navigation/top-level-stack";
+import {
+  CollapsedHeaderTitle,
+  useCollapsedHeader,
+} from "../../../shared/navigation/CollapsedHeaderTitle";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   getProfile,
@@ -38,10 +30,11 @@ import {
   getInlineErrorMessageOrToast,
   pushClientFriendlyErrorToast,
 } from "../../../shared/lib/errors";
-import { getMobileQueryContentState, getQueryErrorMessage } from "../../../shared/lib/query-state";
+import { getQueryErrorMessage } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { saveLastOrg } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { mobileText, mobileTextWeighted, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
@@ -61,6 +54,8 @@ import {
   useProfilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
 import { PendingRequestsCard } from "../components/PendingRequestsCard";
+import { AppearanceSheet, getThemePreferenceLabel } from "../components/AppearanceSheet";
+import { ProfileSkeleton } from "../components/ProfileSkeleton";
 
 type OrganizationSwitchClient = {
   rpc: (
@@ -86,7 +81,7 @@ export default function ProfileScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const profilePrimitiveStyles = useProfilePrimitiveStyles();
-  const { resolvedTheme } = useThemeMode();
+  const { preference, resolvedTheme } = useThemeMode();
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -94,7 +89,8 @@ export default function ProfileScreen() {
   const [isSwitchModalVisible, setIsSwitchModalVisible] = useState(false);
   const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<ProfileConfirmation | null>(null);
-  const [showCollapsedHeader, setShowCollapsedHeader] = useState(false);
+  const { handleScroll, showCollapsedHeader } = useCollapsedHeader();
+  const [isAppearanceSheetVisible, setIsAppearanceSheetVisible] = useState(false);
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
     queryFn: () => getProfile(accessToken!),
@@ -133,7 +129,7 @@ export default function ProfileScreen() {
     },
   });
   const profile = profileQuery.data ?? null;
-  const contentState = getMobileQueryContentState({
+  const contentState = useMobileContentState({
     hasData: Boolean(profile),
     isLoading: profileQuery.isLoading,
     error: profileQuery.error,
@@ -259,13 +255,6 @@ export default function ProfileScreen() {
     : "You'll be signed out on this device.";
   const confirmationLabel = "Sign Out";
 
-  function handleScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const shouldShowHeader = event.nativeEvent.contentOffset.y > 88;
-    setShowCollapsedHeader((current) =>
-      current === shouldShowHeader ? current : shouldShowHeader,
-    );
-  }
-
   return (
     <Screen
       bottomPaddingMode="tabbed"
@@ -276,13 +265,13 @@ export default function ProfileScreen() {
       onScroll={handleScroll}
       scrollEventThrottle={16}
     >
-      <Stack.Screen
-        options={createDetailStackOptions(mobileColors, showCollapsedHeader ? displayName : "")}
-      />
+      <CollapsedHeaderTitle title={showCollapsedHeader ? displayName : ""} />
       {contentState.kind === "loading" ? (
-        <View style={styles.loadingState}>
-          <DetailSkeleton sections={3} />
-        </View>
+        // Nothing at all for a blip: a skeleton that appears and vanishes
+        // inside a few frames reads as a glitch, not as loading.
+        contentState.showSkeleton ? (
+          <ProfileSkeleton rowsPerSection={3} sections={3} />
+        ) : null
       ) : contentState.kind === "error" ? (
         <>
           <StatusBanner
@@ -421,7 +410,8 @@ export default function ProfileScreen() {
                 iconName="color-palette-outline"
                 isLast
                 label="Appearance"
-                onPress={() => router.push("/(tabs)/profile/appearance")}
+                value={getThemePreferenceLabel(preference)}
+                onPress={() => setIsAppearanceSheetVisible(true)}
               />
             </ProfileList>
           </ProfileSection>
@@ -513,12 +503,16 @@ export default function ProfileScreen() {
       <ConfirmationModal
         body={confirmationBody}
         confirmLabel={confirmationLabel}
-        confirmTone="dangerFilled"
+        confirmTone="danger"
         loading={isSigningOut}
         onCancel={() => setPendingConfirmation(null)}
         onConfirm={confirmProfileAction}
         title={confirmationTitle}
         visible={pendingConfirmation != null}
+      />
+      <AppearanceSheet
+        visible={isAppearanceSheetVisible}
+        onDismiss={() => setIsAppearanceSheetVisible(false)}
       />
     </Screen>
   );
@@ -558,7 +552,7 @@ function OrganizationOptionRow({
         selected: membership.isCurrent,
         busy: switching,
       }}
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+      android_ripple={{ color: mobileColors.rippleNeutral }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -588,9 +582,6 @@ function OrganizationOptionRow({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    loadingState: {
-      gap: 14,
-    },
     orgOptionRow: {
       alignItems: "center",
       flexDirection: "row",
@@ -603,7 +594,7 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surfaceSecondary,
     },
     orgOptionPressed: {
-      opacity: 0.64,
+      backgroundColor: mobileColors.navActiveBg,
     },
     orgOptionDivider: {
       borderBottomColor: mobileColors.borderSubtle,
@@ -621,17 +612,15 @@ const createStyles = (mobileColors: MobileColors) =>
       minWidth: 0,
     },
     orgOptionName: {
-      ...mobileText.cardTitle,
+      ...mobileTextWeighted("cardTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     orgOptionMeta: {
       ...mobileText.body,
       color: mobileColors.textMuted,
     },
     orgOptionStatus: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "medium"),
       color: mobileColors.textSubtle,
-      fontWeight: "500",
     },
   });

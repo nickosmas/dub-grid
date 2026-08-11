@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileOpenShift,
   MobileScheduleEntrySegment,
@@ -12,14 +12,19 @@ import type {
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ListSkeleton } from "../../../shared/components/Skeleton";
 import { Screen } from "../../../shared/components/Screen";
+import { ScrollableTabStrip } from "../../../shared/components/ScrollableTabStrip";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
 import { getMySchedule, getShiftRequests, updateShiftRequest } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { CardRowListSkeleton } from "../../../shared/components/skeleton";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import {
+  optimisticPatch,
+  useOptimisticMutation,
+} from "../../../shared/hooks/useOptimisticMutation";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
@@ -57,6 +62,29 @@ import {
 import { createStyles } from "./requestsScreenStyles";
 
 const ACTIVE_REQUEST_STATUSES = new Set(["open", "pending_approval"]);
+
+type ShiftRequestsResponse = Awaited<ReturnType<typeof getShiftRequests>>;
+
+/**
+ * The status an action lands on, for the actions whose outcome the client can
+ * state with certainty.
+ *
+ * `claim`, `respond` and `volunteer_open_shift` cascade into schedule cells,
+ * coverage and open-shift availability that only the server resolves, so they
+ * return null and wait rather than guessing. Being confidently wrong about
+ * who is working is worse than being slow about it.
+ */
+function getOptimisticRequestStatus(body: RequestActionBody): MobileShiftRequest["status"] | null {
+  if (body.action === "resolve") {
+    return body.approved ? "approved" : "rejected";
+  }
+
+  if (body.action === "cancel") {
+    return "cancelled";
+  }
+
+  return null;
+}
 
 type RequestTab = "available" | "all" | "mine" | "approval" | "history";
 type RequestActionBody =
@@ -405,11 +433,23 @@ export default function RequestsScreen() {
   const canEditShifts = Boolean(bootstrapQuery.data?.permissions.canEditShifts);
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
   const canViewAllRequests = canApprove || canEditShifts || canManageEmployees;
+  const requestsQueryKey = useMemo(
+    () =>
+      ["mobile", "requests", accessToken, requestRange.startDate, requestRange.endDate] as const,
+    [accessToken, requestRange.startDate, requestRange.endDate],
+  );
   const requestsQuery = useQuery({
-    queryKey: ["mobile", "requests", accessToken, requestRange.startDate, requestRange.endDate],
+    queryKey: requestsQueryKey,
     queryFn: () => getShiftRequests(accessToken!, requestRange),
     enabled: Boolean(accessToken),
+    // Keyed by the visible range: hold the previous page rather than flashing a
+    // skeleton when the user changes it.
+    placeholderData: keepPreviousData,
   });
+  // Named rather than inline so the content-state gate below can ask the same
+  // question: a query that is never enabled is also never "resolved".
+  const canLoadAvailabilitySchedule =
+    Boolean(accessToken) && Boolean(linkedEmployeeId) && !canViewAllRequests;
   const availabilityScheduleQuery = useQuery({
     queryKey: [
       "mobile",
@@ -420,7 +460,7 @@ export default function RequestsScreen() {
       requestRange.endDate,
     ],
     queryFn: () => getMySchedule(accessToken!, requestRange),
-    enabled: Boolean(accessToken) && Boolean(linkedEmployeeId) && !canViewAllRequests,
+    enabled: canLoadAvailabilitySchedule,
   });
   const refreshRequests = useCallback(() => {
     const refreshes: Array<Promise<unknown>> = [requestsQuery.refetch()];
@@ -436,28 +476,45 @@ export default function RequestsScreen() {
     orgId: bootstrapQuery.data?.currentOrg.id ?? null,
     onChange: refreshRequests,
   });
-  const requestActionMutation = useMutation({
+  const requestActionMutation = useOptimisticMutation({
     mutationFn: async (input: { requestId: string; body: RequestActionBody }) =>
       updateShiftRequest(accessToken!, input.requestId, input.body),
-    onError: (error) => {
-      pushClientFriendlyErrorToast(pushToast, {
-        error,
-        title: "Could not update request",
-        fallbackMessage: "We couldn't update that shift request.",
-      });
-    },
-    onSuccess: async (_, variables) => {
-      const refreshes: Array<Promise<unknown>> = [requestsQuery.refetch()];
+    patches: (input) => {
+      const status = getOptimisticRequestStatus(input.body);
 
-      if (linkedEmployeeId && !canViewAllRequests) {
-        refreshes.push(availabilityScheduleQuery.refetch());
+      if (!status) {
+        return [];
       }
 
-      await Promise.all(refreshes);
-      pushToast({
-        tone: "success",
-        ...getMobileRequestActionSuccessToast(variables.body),
-      });
+      return [
+        optimisticPatch<ShiftRequestsResponse, typeof input>(requestsQueryKey, (previous) =>
+          previous
+            ? {
+                ...previous,
+                requests: previous.requests.map((request) =>
+                  request.id === input.requestId ? { ...request, status } : request,
+                ),
+              }
+            : previous,
+        ),
+      ];
+    },
+    successToast: (_data, variables) => ({
+      tone: "success",
+      ...getMobileRequestActionSuccessToast(variables.body),
+    }),
+    errorToast: {
+      title: "Could not update request",
+      fallbackMessage: "We couldn't update that shift request.",
+    },
+    announceOnSuccess: (_data, variables) =>
+      getMobileRequestActionSuccessToast(variables.body).title ?? null,
+    onSuccess: async () => {
+      // The user's own availability view is derived from schedule cells the
+      // server rewrites on approval, so it has to come from the server.
+      if (linkedEmployeeId && !canViewAllRequests) {
+        await availabilityScheduleQuery.refetch();
+      }
     },
   });
   const runRequestAction = useCallback(
@@ -557,13 +614,27 @@ export default function RequestsScreen() {
     () => requests.filter((request) => !ACTIVE_REQUEST_STATUSES.has(request.status)),
     [requests],
   );
-  const contentState = getMobileQueryContentState({
+  const contentState = useMobileContentState({
+    // "The queries resolved", not "some derived bucket is non-empty". The old
+    // form re-entered `loading` any time a refetch transiently emptied every
+    // bucket, repainting the skeleton over content that was already on screen.
+    // Every query named in `isLoading` is named here too, bootstrap included:
+    // the tab counts and permissions come from it, so clearing the skeleton
+    // without it shows an empty, wrong-looking set of tabs for a frame.
+    // The availability query is disabled for anyone who can view all requests,
+    // and a disabled query never resolves, so requiring its data left `hasData`
+    // false forever for admins and approvers: every error or offline moment
+    // repainted the whole screen over requests already on it.
     hasData:
-      availableOpenShiftFeed.totalCount > 0 ||
-      allRequests.length > 0 ||
-      myRequests.length > 0 ||
-      approvalRequests.length > 0 ||
-      historyRequests.length > 0,
+      requestsQuery.data !== undefined &&
+      (!canLoadAvailabilitySchedule || availabilityScheduleQuery.data !== undefined) &&
+      bootstrapQuery.data !== undefined,
+    isEmpty:
+      availableOpenShiftFeed.totalCount === 0 &&
+      allRequests.length === 0 &&
+      myRequests.length === 0 &&
+      approvalRequests.length === 0 &&
+      historyRequests.length === 0,
     isLoading:
       requestsQuery.isLoading || bootstrapQuery.isLoading || availabilityScheduleQuery.isLoading,
     error: requestsQuery.error ?? bootstrapQuery.error ?? availabilityScheduleQuery.error,
@@ -690,46 +761,17 @@ export default function RequestsScreen() {
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabRowContent}
-        style={styles.tabRow}
-      >
-        {visibleTabs.map((tab) => {
-          const isActive = activeTab === tab.key;
-
-          return (
-            <Pressable
-              key={tab.key}
-              accessibilityState={{ selected: isActive }}
-              accessibilityRole="tab"
-              android_ripple={{ color: mobileColors.rippleNeutral }}
-              // The pill is 36pt tall by design; pad the touch area out to the
-              // 44pt minimum without changing how it looks.
-              hitSlop={{ bottom: 4, top: 4 }}
-              onPress={() => setSelectedTab(tab.key)}
-              style={[styles.tabButton, isActive && styles.tabButtonActive]}
-            >
-              <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
-                {tab.label}
-              </Text>
-              {tab.count > 0 ? (
-                <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
-                  <Text style={[styles.tabBadgeText, isActive && styles.tabBadgeTextActive]}>
-                    {tab.count}
-                  </Text>
-                </View>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <ScrollableTabStrip
+        accessibilityLabel="Request filters"
+        activeKey={activeTab}
+        onSelect={(key) => setSelectedTab(key as typeof activeTab)}
+        tabs={visibleTabs}
+      />
 
       {contentState.kind === "loading" ? (
-        <View style={styles.loadingState}>
-          <ListSkeleton rows={4} showSectionHeader={false} />
-        </View>
+        contentState.showSkeleton ? (
+          <CardRowListSkeleton rows={4} />
+        ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try again"
@@ -889,9 +931,7 @@ export default function RequestsScreen() {
         body={requestActionConfirmation?.feedback.message}
         confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
         confirmTone={
-          requestActionConfirmation?.feedback.confirmStyle === "destructive"
-            ? "dangerFilled"
-            : "primary"
+          requestActionConfirmation?.feedback.confirmStyle === "destructive" ? "danger" : "primary"
         }
         onCancel={() => setRequestActionConfirmation(null)}
         onConfirm={confirmRequestAction}

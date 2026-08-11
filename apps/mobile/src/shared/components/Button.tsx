@@ -1,203 +1,303 @@
 import type { PropsWithChildren, ReactNode } from "react";
 import { useMemo } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import { hapticSelection } from "../lib/haptics";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent,
+} from "react-native";
+import Animated from "react-native-reanimated";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { usePressAnimation, type PressHaptic } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import {
+  mobileMotion,
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../theme/tokens";
 
 export type ButtonTone =
   | "primary"
   | "secondary"
   | "neutral"
   | "danger"
-  | "dangerFilled"
-  | "warningFilled"
   | "success"
-  | "link"
-  | "ghost";
+  | "warning"
+  /**
+   * A plain white pill whose colour comes from its icon rather than its fill.
+   * Still solid and borderless like every other tone — it separates from the
+   * tinted page the same way a card does.
+   */
+  | "plain"
+  | "ghost"
+  | "link";
+
+export type ButtonSize = "sm" | "md" | "lg";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * The `warning` fill is `#F59E0B` in *both* themes, so its label colour can be
+ * theme-fixed too, and it has to be: white on that amber is about 2.0:1 and the
+ * `warningText` brown is about 2.8:1, both well under the 4.5:1 floor. This
+ * near-black clears it comfortably. It is the one tone whose label is not white
+ * or a theme token.
+ */
+const WARNING_LABEL = "#1C1917";
+
+const SIZE = {
+  sm: { minHeight: 36, paddingHorizontal: 14, gap: 6, icon: 16, iconOnly: 36 },
+  md: { minHeight: 48, paddingHorizontal: 20, gap: 8, icon: 18, iconOnly: 44 },
+  lg: { minHeight: 56, paddingHorizontal: 24, gap: 10, icon: 20, iconOnly: 52 },
+} as const;
+
+const LABEL_VARIANT = {
+  sm: "bodyStrong",
+  md: "rowTitle",
+  lg: "cardTitle",
+} as const satisfies Record<ButtonSize, keyof typeof mobileText>;
 
 export function Button({
   children,
   label,
   tone = "primary",
-  disabled = false,
+  size,
   compact = false,
+  icon,
+  iconPosition = "leading",
+  iconOnly = false,
+  accessibilityLabel,
   leadingAccessory,
+  selected,
+  expanded,
+  disabled = false,
   loading = false,
+  fullWidth,
+  haptic = "selection",
   onPress,
 }: PropsWithChildren<{
   label?: string;
   tone?: ButtonTone;
-  disabled?: boolean;
+  size?: ButtonSize;
+  /** @deprecated pass `size="sm"`. */
   compact?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
+  iconPosition?: "leading" | "trailing";
+  /** Circular icon button. Requires `accessibilityLabel`, since it has no text. */
+  iconOnly?: boolean;
+  accessibilityLabel?: string;
+  /** @deprecated pass `icon`, or a node for genuinely custom accessories. */
   leadingAccessory?: ReactNode;
+  /** Toggle state for segment/filter usage. Surfaced to assistive tech. */
+  selected?: boolean;
+  /** Set when the button opens a sheet or panel, so screen readers announce it. */
+  expanded?: boolean;
+  disabled?: boolean;
   loading?: boolean;
-  onPress: () => void;
+  /** Defaults to true for text buttons, false for `iconOnly`. */
+  fullWidth?: boolean;
+  haptic?: PressHaptic;
+  /**
+   * The press event is forwarded, so a button nested inside a pressable row can
+   * call `stopPropagation` and keep the row from also firing.
+   */
+  onPress: (event: GestureResponderEvent) => void;
 }>) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const content = children ?? label;
+
+  const resolvedSize: ButtonSize = size ?? (compact ? "sm" : "md");
+  const metrics = SIZE[resolvedSize];
   const isDisabled = disabled || loading;
-  const spinnerColor =
-    tone === "primary" || tone === "dangerFilled" || tone === "warningFilled"
-      ? mobileColors.textInverse
-      : tone === "danger"
-        ? mobileColors.dangerText
-        : tone === "neutral" || tone === "ghost"
-          ? mobileColors.textMuted
-          : mobileColors.brand;
-  const rippleColor =
-    tone === "primary" || tone === "dangerFilled" || tone === "warningFilled"
-      ? mobileColors.ripplePrimary
-      : tone === "danger"
-        ? mobileColors.rippleDanger
-        : mobileColors.rippleNeutral;
+  const stretches = fullWidth ?? !iconOnly;
+
+  const labelColor = resolveLabelColor(tone, mobileColors);
+  const rippleColor = resolveRippleColor(tone, mobileColors);
+  const isBorderlessRipple = tone === "ghost" || tone === "link" || iconOnly;
+
+  const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
+    enabled: !isDisabled,
+    haptic,
+    rippleBorderless: isBorderlessRipple,
+    rippleColor,
+    // A small circular target needs a deeper press to register at all.
+    scale: iconOnly ? mobileMotion.press.iconOnlyScale : mobileMotion.press.scale,
+  });
+
+  const content = children ?? label;
+  const iconNode = icon ? (
+    <Ionicons color={labelColor} name={icon} size={metrics.icon} />
+  ) : (
+    leadingAccessory
+  );
 
   return (
-    <Pressable
+    <AnimatedPressable
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled, busy: loading }}
-      android_ripple={isDisabled ? undefined : { color: rippleColor }}
+      accessibilityState={{ disabled: isDisabled, busy: loading, selected, expanded }}
+      android_ripple={androidRipple}
       disabled={isDisabled}
-      onPress={() => {
-        hapticSelection();
-        onPress();
-      }}
-      style={({ pressed }) => [
+      onPress={onPress}
+      {...pressHandlers}
+      style={[
         styles.button,
-        compact && styles.buttonCompact,
-        tone === "primary" && styles.buttonPrimary,
-        tone === "secondary" && styles.buttonSecondary,
-        tone === "neutral" && styles.buttonNeutral,
-        tone === "danger" && styles.buttonDanger,
-        tone === "dangerFilled" && styles.buttonDangerFilled,
-        tone === "warningFilled" && styles.buttonWarningFilled,
-        tone === "success" && styles.buttonSuccess,
-        tone === "link" && styles.buttonLink,
-        tone === "ghost" && styles.buttonGhost,
-        pressed && !isDisabled && styles.buttonPressed,
+        {
+          minHeight: metrics.minHeight,
+          paddingHorizontal: iconOnly ? 0 : metrics.paddingHorizontal,
+        },
+        // An icon-only button is a fixed square, so its own width/height define
+        // the box. Leaving the base vertical padding on top of that squeezes the
+        // content box below the glyph's line height, and `overflow: "hidden"`
+        // then clips the icon.
+        iconOnly && {
+          width: metrics.iconOnly,
+          height: metrics.iconOnly,
+          paddingVertical: 0,
+        },
+        stretches ? styles.buttonFullWidth : styles.buttonHugging,
+        styles[TONE_STYLE[tone]],
         isDisabled && styles.buttonDisabled,
+        animatedStyle,
       ]}
     >
-      <View style={styles.content}>
+      <View style={[styles.content, { gap: iconOnly ? 0 : metrics.gap }]}>
         {loading ? (
-          <ActivityIndicator color={spinnerColor} size="small" />
-        ) : leadingAccessory ? (
-          <View style={styles.leadingAccessory}>{leadingAccessory}</View>
+          <ActivityIndicator color={labelColor} size="small" style={styles.spinner} />
         ) : null}
-        <Text
-          style={[
-            styles.label,
-            tone === "primary" && styles.labelPrimary,
-            tone === "secondary" && styles.labelSecondary,
-            tone === "neutral" && styles.labelNeutral,
-            tone === "danger" && styles.labelDanger,
-            tone === "dangerFilled" && styles.labelFilled,
-            tone === "warningFilled" && styles.labelFilled,
-            tone === "success" && styles.labelSuccess,
-            tone === "link" && styles.labelLink,
-            tone === "ghost" && styles.labelGhost,
-          ]}
-        >
-          {content}
-        </Text>
+        {!iconOnly && iconPosition === "leading" ? iconNode : null}
+        {iconOnly ? (
+          iconNode
+        ) : content ? (
+          // Kept mounted while loading so the button doesn't resize under the
+          // finger; the spinner overlays it.
+          <Text
+            style={[
+              mobileText[LABEL_VARIANT[resolvedSize]],
+              { color: labelColor },
+              loading && styles.labelHidden,
+            ]}
+          >
+            {content}
+          </Text>
+        ) : null}
+        {!iconOnly && iconPosition === "trailing" ? iconNode : null}
       </View>
-    </Pressable>
+    </AnimatedPressable>
   );
+}
+
+const TONE_STYLE = {
+  primary: "tonePrimary",
+  secondary: "toneSecondary",
+  neutral: "toneNeutral",
+  danger: "toneDanger",
+  success: "toneSuccess",
+  warning: "toneWarning",
+  plain: "tonePlain",
+  ghost: "toneGhost",
+  link: "toneLink",
+} as const satisfies Record<ButtonTone, string>;
+
+function resolveLabelColor(tone: ButtonTone, mobileColors: MobileColors): string {
+  switch (tone) {
+    case "primary":
+      return mobileColors.onBrandText;
+    case "secondary":
+      // Paired with the darker secondary fill; the standard brand blue on that
+      // fill measures 4.03:1 and fails AA.
+      return mobileColors.controlSecondaryFg;
+    case "link":
+      return mobileColors.brand;
+    case "neutral":
+      return mobileColors.textSecondary;
+    case "plain":
+      // Full-strength text on a white fill. The colour on this tone belongs to
+      // the icon, so the label stays neutral and lets it lead.
+      return mobileColors.textPrimary;
+    case "danger":
+    case "success":
+      return mobileColors.textInverse;
+    case "warning":
+      return WARNING_LABEL;
+    case "ghost":
+    default:
+      return mobileColors.textMuted;
+  }
+}
+
+function resolveRippleColor(tone: ButtonTone, mobileColors: MobileColors): string {
+  if (tone === "primary" || tone === "danger" || tone === "success" || tone === "warning") {
+    return mobileColors.ripplePrimary;
+  }
+  return mobileColors.rippleNeutral;
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     button: {
-      minHeight: 48,
-      borderRadius: mobileRadii.control,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderWidth: 1,
+      // Pill and borderless across every tone. A solid fill carries the button;
+      // an outline on top of it is the thing that dates the look.
+      borderRadius: mobileRadii.pill,
+      borderWidth: 0,
+      paddingVertical: mobileSpace.md,
       justifyContent: "center",
+      alignItems: "center",
+      overflow: "hidden",
     },
-    buttonCompact: {
-      minHeight: 44,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+    buttonFullWidth: {
+      alignSelf: "stretch",
     },
-    buttonPressed: {
-      transform: [{ scale: 0.98 }],
+    buttonHugging: {
+      alignSelf: "flex-start",
     },
     buttonDisabled: {
-      opacity: 0.5,
+      // Deeper than the old 0.5: solid fills stay legible when dimmed, so they
+      // need to fade further before they read as unavailable.
+      opacity: 0.4,
     },
-    buttonPrimary: {
+    tonePrimary: {
       backgroundColor: mobileColors.brand,
-      borderColor: mobileColors.brand,
     },
-    buttonSecondary: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
+    toneSecondary: {
+      backgroundColor: mobileColors.controlSecondaryBg,
     },
-    buttonNeutral: {
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.borderSubtle,
+    toneNeutral: {
+      backgroundColor: mobileColors.controlNeutralBg,
     },
-    buttonDanger: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-    },
-    buttonDangerFilled: {
+    toneDanger: {
       backgroundColor: mobileColors.danger,
-      borderColor: mobileColors.danger,
     },
-    buttonWarningFilled: {
+    toneSuccess: {
+      backgroundColor: mobileColors.success,
+    },
+    toneWarning: {
       backgroundColor: mobileColors.warning,
-      borderColor: mobileColors.warning,
     },
-    buttonSuccess: {
-      backgroundColor: mobileColors.successSoft,
-      borderColor: mobileColors.successBorder,
+    tonePlain: {
+      backgroundColor: mobileColors.surface,
     },
-    buttonLink: {
+    toneGhost: {
       backgroundColor: "transparent",
-      borderColor: "transparent",
     },
-    buttonGhost: {
+    toneLink: {
       backgroundColor: "transparent",
-      borderColor: "transparent",
     },
     content: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
     },
-    leadingAccessory: {
+    spinner: {
+      ...StyleSheet.absoluteFillObject,
       alignItems: "center",
       justifyContent: "center",
     },
-    label: {
-      ...mobileText.bodyStrong,
-    },
-    labelPrimary: {
-      color: mobileColors.textInverse,
-    },
-    labelSecondary: {
-      color: mobileColors.brand,
-    },
-    labelNeutral: {
-      color: mobileColors.textSecondary,
-    },
-    labelDanger: {
-      color: mobileColors.dangerText,
-    },
-    labelFilled: {
-      color: mobileColors.textInverse,
-    },
-    labelSuccess: {
-      color: mobileColors.successText,
-    },
-    labelLink: {
-      color: mobileColors.brand,
-    },
-    labelGhost: {
-      color: mobileColors.textMuted,
+    labelHidden: {
+      opacity: 0,
     },
   });

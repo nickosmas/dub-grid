@@ -17,6 +17,7 @@ vi.mock("react-native", async () => createReactNativeModule(await import("react"
 
 vi.mock("@tanstack/react-query", () => ({
   QueryClient: class QueryClient {},
+  keepPreviousData: Symbol("keepPreviousData"),
   onlineManager: {
     isOnline: () => true,
   },
@@ -149,6 +150,31 @@ describe("NotificationsScreen", () => {
     render(<NotificationsScreen />);
 
     expect(screen.getByText("No alerts yet")).toBeInTheDocument();
+  });
+
+  // Search and filter are both in the query key, so a keystroke starts a new
+  // query. `hasData` used to be derived from the rendered list's length, which
+  // meant the skeleton repainted over alerts the user was mid-read.
+  it("does not repaint a skeleton over alerts that are already on screen", async () => {
+    useInfiniteQuery.mockReturnValue(
+      buildInfiniteQueryResult({ notifications: [SAMPLE_NOTIFICATION], unreadCount: 1 }),
+    );
+
+    render(<NotificationsScreen />);
+    expect(screen.getByText("Pickup available")).toBeInTheDocument();
+
+    // A new key resolving: still fetching, and the derived list is momentarily
+    // empty, but the query itself has previous data to show.
+    useInfiniteQuery.mockReturnValue({
+      ...buildInfiniteQueryResult({ notifications: [], isLoading: true }),
+      data: { pages: [{ notifications: [], unreadCount: 0, nextCursor: null }] },
+    });
+
+    fireEvent.click(screen.getByText("Unread"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+    });
   });
 
   it("opens the detail screen when an alert is tapped and marks it read first", async () => {

@@ -191,6 +191,34 @@ describe("AddPersonScreen", () => {
     });
   });
 
+  it("says so when the person was created but the invitation could not be sent", async () => {
+    createMobilePerson.mockResolvedValue({
+      success: true,
+      person: { id: "emp-1" },
+    });
+    createMobilePersonInvitation.mockRejectedValue(new Error("smtp down"));
+    renderWithMutation();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Torres" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "nia@dubgrid.com" },
+    });
+    fireEvent.click(screen.getByText("Skilled Nursing"));
+    fireEvent.click(screen.getByRole("button", { name: "Add person" }));
+
+    await waitFor(() => {
+      expect(pushToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tone: "warning",
+          title: "Person added, invitation not sent",
+        }),
+      );
+    });
+    // The person really was created, so this stays a success path.
+    expect(routerBack).toHaveBeenCalled();
+  });
+
   it("shows an error toast when creation fails", async () => {
     createMobilePerson.mockRejectedValue(new Error("boom"));
     renderWithMutation();

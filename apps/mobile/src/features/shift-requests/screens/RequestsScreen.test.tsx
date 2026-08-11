@@ -4,6 +4,16 @@ import { createReactNativeModule, createScreenModule } from "../../../test/nativ
 
 const useMutation = vi.fn();
 const useQuery = vi.fn();
+// `useOptimisticMutation` reaches for the client to patch and roll back the
+// cache. One shared stub so tests can assert what the lifecycle wrote.
+const queryClientStub = {
+  cancelQueries: vi.fn(),
+  getQueryData: vi.fn(),
+  setQueryData: vi.fn(),
+  removeQueries: vi.fn(),
+  invalidateQueries: vi.fn(),
+};
+const useQueryClient = vi.fn(() => queryClientStub);
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
@@ -19,8 +29,10 @@ vi.mock("@tanstack/react-query", () => ({
   onlineManager: {
     isOnline: () => true,
   },
+  keepPreviousData: (previousData: unknown) => previousData,
   useMutation,
   useQuery,
+  useQueryClient,
 }));
 
 vi.mock("expo-router", () => ({
@@ -55,6 +67,9 @@ describe("RequestsScreen", () => {
 
     useMutation.mockReset();
     useQuery.mockReset();
+    for (const stub of Object.values(queryClientStub)) {
+      stub.mockReset();
+    }
     useAccessToken.mockReset();
     useBootstrap.mockReset();
     useLocalSearchParams.mockReset();
@@ -95,7 +110,7 @@ describe("RequestsScreen", () => {
     vi.useRealTimers();
   });
 
-  it("shows the loading state before requests are available", () => {
+  it("shows the loading state before requests are available", async () => {
     useQuery.mockReturnValue({
       data: undefined,
       error: null,
@@ -106,9 +121,12 @@ describe("RequestsScreen", () => {
 
     render(<RequestsScreen />);
 
+    // Held back briefly so a fast response never flashes a skeleton.
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+
     // Skeletons carry the loading state on their own; a headline over them
     // repeats what their shape already says.
-    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
+    expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
     expect(screen.queryByText("Loading shift requests")).not.toBeInTheDocument();
     expect(screen.queryByText(/Bringing your active requests/)).not.toBeInTheDocument();
   });
@@ -162,12 +180,78 @@ describe("RequestsScreen", () => {
       });
     });
 
-    expect(refetch).toHaveBeenCalled();
     expect(pushToast).toHaveBeenCalledWith({
       tone: "success",
       title: "Request approved",
       message: "The staffing change was finalized.",
     });
+  });
+
+  it("marks a resolved request approved in the cache before the request returns", async () => {
+    useQuery.mockReturnValue({
+      data: { openShifts: [], requests: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    const mutationConfig = useMutation.mock.calls[0][0] as {
+      onMutate: (variables: {
+        requestId: string;
+        body: { action: string; approved?: boolean };
+      }) => Promise<unknown>;
+    };
+
+    queryClientStub.getQueryData.mockReturnValue({
+      openShifts: [],
+      requests: [{ id: "request-1", status: "pending_approval" }],
+    });
+
+    await act(async () => {
+      await mutationConfig.onMutate({
+        requestId: "request-1",
+        body: { action: "resolve", approved: true },
+      });
+    });
+
+    // Cancel first, or an in-flight refetch lands on top of the patch.
+    expect(queryClientStub.cancelQueries).toHaveBeenCalled();
+    const [, updater] = queryClientStub.setQueryData.mock.calls[0];
+    expect(
+      (updater as (previous: unknown) => { requests: { status: string }[] })({
+        openShifts: [],
+        requests: [{ id: "request-1", status: "pending_approval" }],
+      }).requests[0].status,
+    ).toBe("approved");
+  });
+
+  it("leaves a claim to the server rather than guessing the resulting status", async () => {
+    useQuery.mockReturnValue({
+      data: { openShifts: [], requests: [] },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<RequestsScreen />);
+
+    const mutationConfig = useMutation.mock.calls[0][0] as {
+      onMutate: (variables: { requestId: string; body: { action: string } }) => Promise<unknown>;
+    };
+
+    await act(async () => {
+      await mutationConfig.onMutate({
+        requestId: "request-1",
+        body: { action: "claim", claimerEmpId: "emp-1" } as never,
+      });
+    });
+
+    // Claiming cascades into schedule cells the client cannot predict.
+    expect(queryClientStub.setQueryData).not.toHaveBeenCalled();
   });
 
   it("shows the empty state when no requests exist", () => {

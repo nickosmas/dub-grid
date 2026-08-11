@@ -18,7 +18,8 @@ import {
   SelectionSection,
 } from "../../../shared/components/FilterSheet";
 import { SearchBar } from "../../../shared/components/SearchBar";
-import { ListSkeleton } from "../../../shared/components/Skeleton";
+import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
@@ -29,12 +30,13 @@ import {
 } from "../../../shared/lib/api";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
 type StatusFilter = "active" | "inactive";
@@ -202,8 +204,11 @@ export default function PeopleScreen() {
   const peopleError = peopleQuery.error ?? bootstrapQuery.error;
   const currentUserId = bootstrapQuery.data?.user?.id ?? null;
   const currentEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
-  const contentState = getMobileQueryContentState({
-    hasData: peopleQuery.data !== undefined,
+  const contentState = useMobileContentState({
+    // Bootstrap is in both halves. `canManageEmployees` decides which people
+    // are visible at all, so clearing the skeleton on the people query alone
+    // shows a list that then rewrites itself when bootstrap lands.
+    hasData: peopleQuery.data !== undefined && bootstrapQuery.data !== undefined,
     isLoading: peopleQuery.isLoading || bootstrapQuery.isLoading,
     error: peopleError,
   });
@@ -365,9 +370,9 @@ export default function PeopleScreen() {
       ) : null}
 
       {contentState.kind === "loading" ? (
-        <View style={styles.loadingState}>
-          <ListSkeleton rows={4} showSectionHeader={false} />
-        </View>
+        contentState.showSkeleton ? (
+          <PersonListSkeleton rows={6} />
+        ) : null
       ) : contentState.kind === "error" && contentState.reason === "unauthorized" ? (
         <StatusBanner
           body="Your current role does not include mobile staff visibility for this organization."
@@ -430,29 +435,30 @@ export default function PeopleScreen() {
                 isSelf || canManageEmployees || !person.managementDepartmentIds?.length;
 
               return (
-                <PersonRow
-                  key={person.id}
-                  accessHint={canManageEmployees ? accessHint : null}
-                  id={person.id}
-                  employmentType={person.employmentType}
-                  isLast={index === filteredPeople.length - 1}
-                  name={getFullName(person)}
-                  navigable={navigable}
-                  orgRole={person.orgRole}
-                  onPress={() => {
-                    if (isSelf) {
-                      router.push("/(tabs)/profile");
-                      return;
-                    }
-                    router.push({
-                      pathname: "/(tabs)/people/[id]",
-                      params: { id: person.id },
-                    });
-                  }}
-                  showStatus={canManageEmployees}
-                  status={person.status}
-                  subtitle={subtitle}
-                />
+                <AnimatedListItem index={index} key={person.id}>
+                  <PersonRow
+                    accessHint={canManageEmployees ? accessHint : null}
+                    id={person.id}
+                    employmentType={person.employmentType}
+                    isLast={index === filteredPeople.length - 1}
+                    name={getFullName(person)}
+                    navigable={navigable}
+                    orgRole={person.orgRole}
+                    onPress={() => {
+                      if (isSelf) {
+                        router.push("/(tabs)/profile");
+                        return;
+                      }
+                      router.push({
+                        pathname: "/(tabs)/people/[id]",
+                        params: { id: person.id },
+                      });
+                    }}
+                    showStatus={canManageEmployees}
+                    status={person.status}
+                    subtitle={subtitle}
+                  />
+                </AnimatedListItem>
               );
             })}
           </View>
@@ -471,7 +477,7 @@ export default function PeopleScreen() {
         confirmTone={
           profileRequestConfirmation?.request.type === "account_deletion" &&
           profileRequestConfirmation.action === "approve"
-            ? "dangerFilled"
+            ? "danger"
             : profileRequestConfirmation?.action === "reject"
               ? "danger"
               : "primary"
@@ -546,18 +552,11 @@ function PersonRow({
       .join("") || "?";
 
   return (
-    <Pressable
+    <PressableRow
       accessibilityLabel={name}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !navigable }}
-      android_ripple={navigable ? { color: "rgba(15, 23, 42, 0.08)" } : undefined}
       disabled={!navigable}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.personRow,
-        !isLast && styles.personRowDivider,
-        navigable && pressed && styles.personRowPressed,
-      ]}
+      style={[styles.personRow, !isLast && styles.personRowDivider]}
     >
       <View
         style={[
@@ -593,15 +592,12 @@ function PersonRow({
       {navigable ? (
         <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
       ) : null}
-    </Pressable>
+    </PressableRow>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    loadingState: {
-      gap: 14,
-    },
     section: {
       gap: 10,
     },
@@ -627,7 +623,7 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       overflow: "hidden",
     },
     personRow: {
@@ -657,9 +653,6 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 8,
-    },
-    personRowPressed: {
-      opacity: 0.62,
     },
     personAvatar: {
       alignItems: "center",

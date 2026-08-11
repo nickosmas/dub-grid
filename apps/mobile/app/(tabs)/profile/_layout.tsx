@@ -31,10 +31,6 @@ export default function ProfileLayout() {
         name="privacy"
         options={createDetailStackOptions(mobileColors, "Privacy & data")}
       />
-      <Stack.Screen
-        name="appearance"
-        options={createDetailStackOptions(mobileColors, "Appearance")}
-      />
     </Stack>
   );
 }

@@ -4,21 +4,26 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   getProfileNotificationPreferences,
   saveProfileNotificationPreferences,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import {
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { usePushRegistration } from "../../notifications/hooks/usePushRegistration";
 import { ProfilePanel, ProfileSection } from "../components/ProfilePrimitives";
+import { ProfileSkeleton } from "../components/ProfileSkeleton";
 
 const CATEGORIES = [
   {
@@ -149,7 +154,7 @@ export default function ProfileNotificationsScreen() {
     }
   };
 
-  const contentState = getMobileQueryContentState({
+  const contentState = useMobileContentState({
     hasData: Boolean(prefsQuery.data),
     isLoading: prefsQuery.isLoading,
     error: prefsQuery.error,
@@ -169,7 +174,9 @@ export default function ProfileNotificationsScreen() {
       onRefresh={manualRefresh.refresh}
     >
       {contentState.kind === "loading" ? (
-        <DetailSkeleton />
+        contentState.showSkeleton ? (
+          <ProfileSkeleton rowVariant="toggle" rowsPerSection={3} sections={2} showHero={false} />
+        ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try again"
@@ -285,9 +292,8 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 4,
     },
     rowTitle: {
-      ...mobileText.cardTitle,
+      ...mobileTextWeighted("cardTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     rowDescription: {
       ...mobileText.caption,
@@ -319,9 +325,8 @@ const createStyles = (mobileColors: MobileColors) =>
       borderColor: mobileColors.borderSubtle,
     },
     channelLabel: {
-      ...mobileText.label,
+      ...mobileTextWeighted("label", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     savingNote: {
       ...mobileText.caption,

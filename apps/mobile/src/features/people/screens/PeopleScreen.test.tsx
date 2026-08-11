@@ -113,7 +113,7 @@ describe("PeopleScreen", () => {
     });
   });
 
-  it("shows the loading state while the directory is being fetched", () => {
+  it("shows the loading state while the directory is being fetched", async () => {
     useQuery.mockReturnValue({
       data: undefined,
       error: null,
@@ -124,7 +124,10 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
+    // Held back briefly so a fast response never flashes a skeleton.
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+
+    expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
     expect(screen.queryByText("Loading directory")).not.toBeInTheDocument();
   });
 

@@ -8,6 +8,7 @@ import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
+import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
 import { parseHost, buildSubdomainHost } from "@/lib/subdomain";
 import * as Sentry from "@/lib/sentry";
 import {
@@ -72,16 +73,20 @@ function AcceptInviteContent() {
     return `${window.location.protocol}//${host}/login`;
   }
 
+  // Derived so the warning appears as the user types the confirmation.
+  const mismatchError = getPasswordMismatchError(password, confirmPassword);
+  const canSubmit = isPasswordAcceptable(password) && mismatchError === null;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
 
-    if (password !== confirmPassword) {
-      setFormError("Passwords do not match");
+    if (mismatchError) {
+      setFormError(mismatchError);
       return;
     }
-    if (password.length < 10) {
-      setFormError("Password must be at least 10 characters");
+    if (!isPasswordAcceptable(password)) {
+      setFormError("Choose a stronger password.");
       return;
     }
 
@@ -272,19 +277,23 @@ function AcceptInviteContent() {
                   onChange={setConfirmPassword}
                   showPassword={showPassword}
                   onToggle={() => setShowPassword(!showPassword)}
-                  ariaDescribedBy={formError ? "invite-form-error" : undefined}
+                  ariaDescribedBy={
+                    mismatchError
+                      ? "invite-confirm-error"
+                      : formError
+                        ? "invite-form-error"
+                        : undefined
+                  }
                 />
+                {mismatchError && (
+                  <p className="dg-form-error" id="invite-confirm-error">
+                    {mismatchError}
+                  </p>
+                )}
               </div>
 
               {formError && (
-                <p
-                  id="invite-form-error"
-                  style={{
-                    color: "var(--color-danger-dark)",
-                    fontSize: "var(--dg-fs-body-sm)",
-                    margin: 0,
-                  }}
-                >
+                <p className="dg-form-error" id="invite-form-error">
                   {formError}
                 </p>
               )}
@@ -335,7 +344,7 @@ function AcceptInviteContent() {
 
               <button
                 type="submit"
-                disabled={loading || !termsAccepted}
+                disabled={loading || !termsAccepted || !canSubmit}
                 className="dg-btn dg-btn-primary dg-btn-lg"
                 style={{ marginTop: "4px", width: "100%" }}
               >

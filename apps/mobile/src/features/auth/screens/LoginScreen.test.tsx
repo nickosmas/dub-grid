@@ -12,6 +12,7 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
 }));
 
+const routerPush = vi.fn();
 const routerReplace = vi.fn();
 const useSessionState = vi.fn();
 const getSupabaseClient = vi.fn();
@@ -29,6 +30,7 @@ vi.mock("expo-router", async () => {
   return {
     Redirect: ({ href }: { href: string }) => React.createElement("div", {}, `redirect:${href}`),
     router: {
+      push: routerPush,
       replace: routerReplace,
     },
   };
@@ -280,8 +282,9 @@ describe("LoginScreen", () => {
   });
 
   // Resetting a password in Safari would strand the user outside a half-filled
-  // sign-in; the in-app browser hands them straight back to it.
-  it("opens password reset in an in-app browser", async () => {
+  // sign-in; a native screen keeps them inside the app rather than handing
+  // them off to the web app in a browser sheet.
+  it("routes to the native password reset screen, carrying the typed email", async () => {
     lookupOrganization.mockResolvedValue({
       organization: {
         id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
@@ -289,8 +292,7 @@ describe("LoginScreen", () => {
         slug: "dubgrid-health",
       },
     });
-    const { openedUrls } = await import("../../../test/shims/expo-web-browser");
-    openedUrls.length = 0;
+    routerPush.mockClear();
 
     render(<LoginScreen />);
 
@@ -300,11 +302,18 @@ describe("LoginScreen", () => {
     fireEvent.click(screen.getByText("Continue"));
     await screen.findByPlaceholderText("Email");
 
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "nurse@dubgrid.test" },
+    });
+
     await act(async () => {
       fireEvent.click(screen.getByText("Forgot password?"));
     });
 
-    expect(openedUrls.at(-1)?.url).toBe("https://dubgrid.com/forgot-password");
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(auth)/forgot-password",
+      params: { email: "nurse@dubgrid.test" },
+    });
   });
 
   it("signs in successfully and routes into the Home tab", async () => {

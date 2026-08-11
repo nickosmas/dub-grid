@@ -1,5 +1,12 @@
 import { StyleSheet } from "react-native";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileMotion,
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
 /**
  * Fixed pixel geometry shared by the screen and its stylesheet.
@@ -17,9 +24,6 @@ export const ACTION_SEGMENT_OPTION_RADIUS = Math.min(
  */
 export const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    loadingState: {
-      gap: 14,
-    },
     shiftDetailCard: {
       backgroundColor: mobileColors.surface,
       borderRadius: 20,
@@ -94,27 +98,28 @@ export const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       gap: 10,
     },
+    // Mirrors the shared Button at size lg: solid fill, no border, pill. The JSX
+    // still hand-rolls the Pressable because these buttons flex to share a row;
+    // it converts to <Button fullWidth> when this screen is next opened.
     detailActionButton: {
       flex: 1,
       minHeight: 56,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: mobileColors.dangerBorder,
+      borderRadius: mobileRadii.pill,
+      borderWidth: 0,
       backgroundColor: mobileColors.dangerSoft,
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: 12,
-      paddingVertical: 12,
+      paddingHorizontal: mobileSpace.md,
+      paddingVertical: mobileSpace.md,
     },
     detailActionButtonSecondary: {
-      borderColor: mobileColors.brandBorder,
       backgroundColor: mobileColors.brandSoft,
     },
     detailActionButtonPressed: {
-      transform: [{ scale: 0.98 }],
+      transform: [{ scale: mobileMotion.press.scale }],
     },
     detailActionButtonDisabled: {
-      opacity: 0.5,
+      opacity: 0.4,
     },
     detailActionButtonContent: {
       flexDirection: "row",
@@ -200,9 +205,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     detailSummaryText: {
-      ...mobileText.body,
+      ...mobileTextWeighted("body", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     detailFocusAreaRow: {
       flexDirection: "row",
@@ -250,8 +254,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       textTransform: "none",
     },
     detailJobChipValueText: {
-      ...mobileText.badge,
-      fontWeight: "600",
+      ...mobileTextWeighted("badge", "semibold"),
     },
     mentoredPill: {
       alignSelf: "flex-start",
@@ -284,9 +287,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     detailSegmentMeta: {
-      ...mobileText.body,
+      ...mobileTextWeighted("body", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     sectionBlock: {
       gap: 12,
@@ -332,9 +334,8 @@ export const createStyles = (mobileColors: MobileColors) =>
     },
     shiftmateSegmentTime: {
       flexShrink: 0,
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "semibold"),
       color: mobileColors.textMuted,
-      fontWeight: "600",
     },
     shiftmateRow: {
       flexDirection: "row",
@@ -382,9 +383,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       gap: 8,
     },
     shiftmateMeta: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     supportingSegmentList: {
       gap: 8,
@@ -402,9 +402,8 @@ export const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSecondary,
     },
     supportingSegmentMeta: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     sectionTitle: {
       ...mobileText.screenTitle,
@@ -433,7 +432,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       padding: 16,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       backgroundColor: mobileColors.surface,
     },
     actionSegmentPanel: {
@@ -457,7 +456,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       paddingVertical: 12,
       gap: 6,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
     },
     swapSummaryLabel: {
       ...mobileText.label,
@@ -469,19 +468,16 @@ export const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     swapSummaryDate: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     swapSummaryNote: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textMuted,
-      fontWeight: "500",
     },
     swapSummaryMeta: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: mobileColors.textSecondary,
-      fontWeight: "500",
     },
     coverageOptionList: {
       gap: 10,
@@ -490,7 +486,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       padding: 16,
       gap: 8,
       position: "relative",
@@ -642,11 +638,10 @@ export const createStyles = (mobileColors: MobileColors) =>
       opacity: 0.5,
     },
     swapWeekRangeLabel: {
-      ...mobileText.rowTitle,
+      ...mobileTextWeighted("rowTitle", "bold"),
       color: mobileColors.textPrimary,
       flex: 1,
       textAlign: "center",
-      fontWeight: "800",
     },
     swapDateGrid: {
       flexDirection: "row",
@@ -716,7 +711,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       padding: 14,
       gap: 8,
     },
@@ -739,8 +734,7 @@ export const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
     },
     swapOptionDetail: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "semibold"),
       color: mobileColors.textSecondary,
-      fontWeight: "600",
     },
   });
