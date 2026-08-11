@@ -364,11 +364,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
       <PageShell signInDisclaimer={!orgNotFound}>
         <Card>
           {/* Logo — links to apex landing page */}
-          <a
-            href={apexHref}
-            className="dg-auth-logo-block"
-            style={{ marginBottom: "32px" }}
-          >
+          <a href={apexHref} className="dg-auth-logo-block" style={{ marginBottom: "32px" }}>
             <DubGridLogo size={52} />
             <DubGridWordmark />
           </a>

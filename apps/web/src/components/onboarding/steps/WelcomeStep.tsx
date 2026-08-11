@@ -2,12 +2,7 @@
 
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { useOrganizationData, useOrgClaims } from "@/hooks";
-import {
-  DashboardIcon,
-  ScheduleIcon,
-  PeopleIcon,
-  ShieldIcon,
-} from "@/components/icons/NavIcons";
+import { DashboardIcon, ScheduleIcon, PeopleIcon, ShieldIcon } from "@/components/icons/NavIcons";
 
 interface WelcomeStepProps {
   role: string;

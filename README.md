@@ -226,20 +226,20 @@ empty string for any secret that isn't set (it does not fail the step), so a mis
 secret here shows up as a confusing runtime/build failure rather than a clear error —
 double-check all of these are set before relying on the `build` job passing.
 
-| Secret                               | Source                                                                  |
-| ------------------------------------ | ----------------------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`           | Supabase project API settings (same value as `apps/web/.env.example`)   |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`      | Supabase project API settings                                           |
-| `SUPABASE_SECRET_KEY`          | Supabase project API settings (server-only, never expose to the client) |
-| `NEXT_PUBLIC_SITE_URL`               | The deployed site origin (e.g. `https://app.example.com`)               |
-| `NEXT_PUBLIC_BASE_DOMAIN`            | The base domain used for subdomain routing                              |
-| `NEXT_PUBLIC_SENTRY_DSN`             | Sentry project settings                                                 |
-| `SENTRY_AUTH_TOKEN`                  | Sentry account → Auth Tokens (used for release/source-map upload)       |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe dashboard → API keys                                             |
-| `NEXT_PUBLIC_POSTHOG_KEY`            | PostHog project settings                                                |
-| `NEXT_PUBLIC_POSTHOG_HOST`           | PostHog project settings                                                |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`    | Google Cloud Console → APIs & Services → Credentials                    |
-| `NEXT_PUBLIC_VERCEL_URL`             | Vercel project settings                                                 |
+| Secret                                 | Source                                                                  |
+| -------------------------------------- | ----------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project API settings (same value as `apps/web/.env.example`)   |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase project API settings                                           |
+| `SUPABASE_SECRET_KEY`                  | Supabase project API settings (server-only, never expose to the client) |
+| `NEXT_PUBLIC_SITE_URL`                 | The deployed site origin (e.g. `https://app.example.com`)               |
+| `NEXT_PUBLIC_BASE_DOMAIN`              | The base domain used for subdomain routing                              |
+| `NEXT_PUBLIC_SENTRY_DSN`               | Sentry project settings                                                 |
+| `SENTRY_AUTH_TOKEN`                    | Sentry account → Auth Tokens (used for release/source-map upload)       |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`   | Stripe dashboard → API keys                                             |
+| `NEXT_PUBLIC_POSTHOG_KEY`              | PostHog project settings                                                |
+| `NEXT_PUBLIC_POSTHOG_HOST`             | PostHog project settings                                                |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`      | Google Cloud Console → APIs & Services → Credentials                    |
+| `NEXT_PUBLIC_VERCEL_URL`               | Vercel project settings                                                 |
 
 `TURBO_TEAM`/`TURBO_TOKEN` (documented above) are also read by the `type-check`,
 `test`, and `build` jobs, but are optional — CI still passes without them, just without

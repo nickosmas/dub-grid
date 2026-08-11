@@ -45,14 +45,10 @@ export function createRequestSupabaseClient(req: NextRequest) {
  * client the same way they do with the cookie-based one.
  */
 export function createTokenScopedClient(accessToken: string) {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    requireSupabasePublishableKey(),
-    {
-      auth: { autoRefreshToken: false, persistSession: false },
-      global: { headers: { Authorization: `Bearer ${accessToken}` } },
-    },
-  );
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, requireSupabasePublishableKey(), {
+    auth: { autoRefreshToken: false, persistSession: false },
+    global: { headers: { Authorization: `Bearer ${accessToken}` } },
+  });
 }
 
 /**
@@ -63,11 +59,9 @@ export function createTokenScopedClient(accessToken: string) {
  * service_role to the signed-in user's JWT for the rest of the process.
  */
 export function createAnonClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    requireSupabasePublishableKey(),
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, requireSupabasePublishableKey(), {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
 
 export async function requireAuthenticatedSession(req: NextRequest): Promise<AuthResult> {

@@ -96,7 +96,9 @@ for (const key of ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"
     problems.push(`${key} is a hosted Supabase key but NEXT_PUBLIC_SUPABASE_URL points at local`);
   }
   if (!isLocalUrl && !isHostedKey && value.startsWith("eyJ")) {
-    problems.push(`${key} is a local demo key but NEXT_PUBLIC_SUPABASE_URL points at a hosted project`);
+    problems.push(
+      `${key} is a local demo key but NEXT_PUBLIC_SUPABASE_URL points at a hosted project`,
+    );
   }
 }
 

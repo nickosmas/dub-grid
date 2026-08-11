@@ -159,13 +159,13 @@ If a secret is compromised:
 
 ### What to check per secret
 
-| Secret                      | Check                                                   |
-| --------------------------- | ------------------------------------------------------- |
-| `SUPABASE_SECRET_KEY` | Supabase audit logs for unexpected service-role queries |
-| `STRIPE_SECRET_KEY`         | Stripe Dashboard > Logs for unexpected API calls        |
-| `STRIPE_WEBHOOK_SECRET`     | Stripe webhook delivery logs for signature failures     |
-| `RESEND_API_KEY`            | Resend logs for unexpected email sends                  |
-| `UPSTASH_REDIS_REST_TOKEN`  | Upstash logs for unexpected key reads/writes            |
+| Secret                     | Check                                                   |
+| -------------------------- | ------------------------------------------------------- |
+| `SUPABASE_SECRET_KEY`      | Supabase audit logs for unexpected service-role queries |
+| `STRIPE_SECRET_KEY`        | Stripe Dashboard > Logs for unexpected API calls        |
+| `STRIPE_WEBHOOK_SECRET`    | Stripe webhook delivery logs for signature failures     |
+| `RESEND_API_KEY`           | Resend logs for unexpected email sends                  |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash logs for unexpected key reads/writes            |
 
 ---
 

@@ -3166,4 +3166,3 @@ function getHeroStatusLabel(status: HeroStatus): string {
 function formatEmployeeName(employee: Employee): string {
   return `${employee.firstName} ${employee.lastName}`.trim() || "Staff";
 }
-

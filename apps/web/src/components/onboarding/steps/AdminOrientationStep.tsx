@@ -1,12 +1,7 @@
 "use client";
 
 import StepLayout from "../StepLayout";
-import {
-  DashboardIcon,
-  ScheduleIcon,
-  PeopleIcon,
-  SettingsIcon,
-} from "@/components/icons/NavIcons";
+import { DashboardIcon, ScheduleIcon, PeopleIcon, SettingsIcon } from "@/components/icons/NavIcons";
 
 interface AdminOrientationStepProps {
   onNext: () => void;
