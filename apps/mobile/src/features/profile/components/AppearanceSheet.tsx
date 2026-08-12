@@ -3,7 +3,7 @@ import { useMemo, type ComponentProps } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { AppText } from "../../../shared/components/AppText";
-import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
+import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { usePressAnimation } from "../../../shared/motion/usePressAnimation";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import type { ThemePreference } from "../../../shared/lib/theme-preference";
@@ -64,7 +64,7 @@ export function AppearanceSheet({
   return (
     <BottomSheetModal
       // The title sits in the sheet's drag region so the whole header drags.
-      header={<AppText variant="sectionTitle">Display mode</AppText>}
+      header={<SheetHeader title="Display mode" />}
       onDismiss={onDismiss}
       visible={visible}
     >

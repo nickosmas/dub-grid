@@ -13,6 +13,7 @@ import {
   BottomSheetModal,
   SheetActions,
   SheetCopy,
+  SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -102,6 +103,7 @@ export function ConsentGate({ children }: PropsWithChildren) {
       <BottomSheetModal
         accessibilityRole="alert"
         dismissDisabled
+        header={<SheetHeader title="Your privacy" />}
         onDismiss={() => {}}
         visible={needsDecision === true}
       >
@@ -111,7 +113,6 @@ export function ConsentGate({ children }: PropsWithChildren) {
           // In-app: leaving for Safari mid-decision would drop the user out of
           // a sheet they still have to answer.
           onLinkPress={() => void openInAppBrowser(getLegalUrls().cookies, mobileColors)}
-          title="Your privacy"
         />
         <SheetActions>
           <Button

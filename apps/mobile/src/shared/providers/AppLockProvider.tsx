@@ -1,14 +1,18 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
   useSyncExternalStore,
   type PropsWithChildren,
 } from "react";
 import * as LocalAuthentication from "expo-local-authentication";
-import { AppState, Modal, StyleSheet, Text, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { AppState } from "react-native";
+import {
+  BottomSheetModal,
+  SheetActions,
+  SheetCopy,
+  SheetHeader,
+} from "../components/BottomSheetModal";
 import { Button } from "../components/Button";
 import {
   appLockUnsupported,
@@ -16,9 +20,7 @@ import {
   loadAppLockEnabled,
   subscribeAppLockEnabled,
 } from "../lib/app-lock";
-import { mobileText, type MobileColors } from "../theme/tokens";
 import { useSessionState } from "./AuthSessionProvider";
-import { useMobileColors } from "./ThemeModeProvider";
 
 function useAppLockEnabled(): boolean {
   useEffect(() => {
@@ -36,8 +38,6 @@ function useAppLockEnabled(): boolean {
  * enforcement point, this is just a gate in front of it.
  */
 export function AppLockProvider({ children }: PropsWithChildren) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { accessToken } = useSessionState();
   const enabled = useAppLockEnabled();
   const [locked, setLocked] = useState(false);
@@ -105,50 +105,27 @@ export function AppLockProvider({ children }: PropsWithChildren) {
   return (
     <>
       {children}
-      <Modal
-        animationType="fade"
-        onRequestClose={() => {}}
-        presentationStyle="overFullScreen"
-        transparent
+      {/* `backdrop="cover"` is load-bearing, not cosmetic: the lock exists to
+          keep the app's content off the screen, so the usual translucent scrim
+          would defeat it. `dismissDisabled` is what makes the sheet blocking —
+          the only way past it is the device check. */}
+      <BottomSheetModal
+        accessibilityRole="alert"
+        backdrop="cover"
+        dismissDisabled
+        header={<SheetHeader icon="lock-closed-outline" title="DubGrid is locked" />}
         visible={showLock}
+        onDismiss={() => {}}
       >
-        <View style={styles.root}>
-          <View accessibilityRole="alert" style={styles.card}>
-            <Ionicons color={mobileColors.brand} name="lock-closed-outline" size={32} />
-            <Text style={styles.title}>DubGrid is locked</Text>
-            <Text style={styles.body}>Verify it's you to continue.</Text>
-            <Button
-              disabled={authenticating}
-              label={authenticating ? "Verifying…" : "Unlock"}
-              onPress={() => void attemptUnlock()}
-            />
-          </View>
-        </View>
-      </Modal>
+        <SheetCopy body="Verify it's you to continue." />
+        <SheetActions>
+          <Button
+            disabled={authenticating}
+            label={authenticating ? "Verifying…" : "Unlock"}
+            onPress={() => void attemptUnlock()}
+          />
+        </SheetActions>
+      </BottomSheetModal>
     </>
   );
 }
-
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    root: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.surface,
-    },
-    card: {
-      alignItems: "center",
-      gap: 12,
-      paddingHorizontal: 32,
-    },
-    title: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textPrimary,
-    },
-    body: {
-      ...mobileText.body,
-      color: mobileColors.textSecondary,
-      textAlign: "center",
-    },
-  });

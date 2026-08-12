@@ -29,8 +29,10 @@ function pickDomProps(input: Record<string, any>) {
       key === "style" ||
       key === "hitSlop" ||
       key === "animationType" ||
-      key === "allowSwipeDismissal" ||
       key === "presentationStyle" ||
+      key === "navigationBarTranslucent" ||
+      key === "statusBarTranslucent" ||
+      key === "bounces" ||
       key === "transparent" ||
       key === "visible" ||
       key === "onRequestClose" ||

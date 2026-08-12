@@ -153,6 +153,12 @@ Reach for the shared primitive before inventing one:
 - **`<Chip>`**, **`<SegmentedControl>`**, **`<ScrollableTabStrip>`**,
   **`<GradientBackdrop>`**, **`<AnimatedListItem>`**, **`<Collapsible>`**,
   **`<BottomSheetModal>`** (its `header` slot renders in the drag region).
+- **`<BottomSheetModal>` is the only modal design** — there is no full-screen
+  modal, no centred alert card and no ✕ close button. Titles go in the `header`
+  slot via **`<SheetHeader>`**; stacked actions go in **`<SheetActions>`**,
+  primary first; confirmations use **`<ConfirmationModal>`**. A sheet holding
+  unsaved input routes `onDismiss` into a discard confirmation rather than
+  closing.
 - **`<AuthShell>` / `<AuthField>`** — every public auth screen.
 - **`shared/components/skeleton`** primitives (`SkeletonBlock`, `SkeletonLine`,
   `SkeletonCardSurface`, `SkeletonGroup`) for loading placeholders. Skeletons

@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { BottomSheetModal } from "./BottomSheetModal";
+import { BottomSheetModal, SheetHeader } from "./BottomSheetModal";
 import { Button } from "./Button";
 import { PressableRow } from "./PressableRow";
 import { useMobileColors } from "../providers/ThemeModeProvider";
@@ -49,7 +49,7 @@ export function FilterSheet({
       }
       // The title lives in the sheet's drag region rather than the scrolling
       // body, so dragging anywhere on the header closes the sheet.
-      header={<Text style={styles.sheetTitle}>{title}</Text>}
+      header={<SheetHeader title={title} />}
       onDismiss={onDismiss}
       scrollable
       visible={visible}
@@ -130,10 +130,6 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileText.label,
       color: mobileColors.textSubtle,
       textTransform: "uppercase",
-    },
-    sheetTitle: {
-      ...mobileText.heroMetric,
-      color: mobileColors.textPrimary,
     },
     footerSpacer: {
       flex: 1,

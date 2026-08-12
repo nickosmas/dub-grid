@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, type ComponentType, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type RefObject,
+} from "react";
 import { Gesture } from "react-native-gesture-handler";
 import Animated, {
   Extrapolation,
@@ -60,13 +68,19 @@ export function useSheetDragToDismiss({
   useEffect(() => {
     dismissRef.current = onDismiss;
   }, [onDismiss]);
+  // A drag parks the sheet off-screen before handing over to `onDismiss`, which
+  // is free to keep the sheet open (a dirty form asking to discard first). Bump
+  // a counter so the position effect below re-runs and re-reads `visible`,
+  // rather than leaving the sheet mounted but stranded past the bottom edge.
+  const [dragDismissCount, setDragDismissCount] = useState(0);
   const dismiss = useCallback(() => {
+    setDragDismissCount((count) => count + 1);
     dismissRef.current();
   }, []);
 
   useEffect(() => {
     translateY.value = withTiming(visible ? 0 : travel, OPEN_TIMING);
-  }, [translateY, travel, visible]);
+  }, [dragDismissCount, translateY, travel, visible]);
 
   const scrollHandler = useAnimatedScrollHandler((event) => {
     scrollOffset.value = event.contentOffset.y;

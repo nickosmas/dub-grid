@@ -185,10 +185,34 @@ import path screens should use. **The package is shared with `apps/web`** — ad
 | Soft brand wash             | `<GradientBackdrop kind>`                                                                   |
 | List entrance               | `<AnimatedListItem index>`                                                                  |
 | Show/hide a block           | `<Collapsible open>`                                                                        |
-| Bottom sheet                | `<BottomSheetModal>` (`dismissDisabled` for blocking gates)                                 |
+| Any modal at all            | `<BottomSheetModal>` (`dismissDisabled` for blocking gates)                                 |
+| A sheet's title             | `<SheetHeader title subtitle>` in the `header` slot — never a title in the body             |
+| A confirmation              | `<ConfirmationModal>` — primary action first, cancel below                                  |
 | Auth screen frame           | `<AuthShell>` + `<AuthField>`                                                               |
 | Loading placeholder         | a `*Skeleton` colocated with the screen, built on `shared/components/skeleton`              |
 | Which state a screen is in  | `useMobileContentState({ hasData, isLoading, error, isEmpty })`                             |
+
+### Modals and sheets
+
+There is **one** modal design: the bottom sheet. Grabber, 40pt top corners,
+full-bleed to the bottom edge, drag/tap-outside/back to dismiss. There is no
+full-screen modal, no centred alert card and no close (✕) button anywhere —
+`ModalHeader` was deleted once every caller moved onto the sheet, and a long
+multi-step form (the shift swap/drop flow) is a `scrollable` sheet, not a page.
+
+- **Titles go in the `header` slot** via `<SheetHeader>`, which puts them in the
+  drag region. A title rendered in the body scrolls out of view and takes its
+  drag target with it.
+- **Stacked actions go in `<SheetActions>`, primary first.** The `footer` slot
+  is a bordered row, for a `Clear all` / `Done` pair — not for a submit stack.
+- **`backdrop="cover"`** paints out the app behind the sheet instead of dimming
+  it. Only the app lock wants this, and for it the choice is a security one.
+- **A sheet holding unsaved input must guard its dismissal.** Route `onDismiss`
+  into a `<ConfirmationModal>` and leave `visible` true; a dragged sheet settles
+  back into place on its own (`useSheetDragToDismiss` re-runs its position
+  effect after every dismissal attempt, not just when `visible` flips).
+- Render that confirmation as a **sibling** of the sheet it guards, never nested
+  inside it — a `Modal` inside a `Modal` does not reliably present on iOS.
 
 ### Skeletons
 

@@ -412,10 +412,6 @@ export const createStyles = (mobileColors: MobileColors) =>
     modalContent: {
       gap: 18,
     },
-    modalActionButtons: {
-      gap: 10,
-      paddingTop: 2,
-    },
     subsection: {
       gap: 14,
     },

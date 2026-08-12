@@ -2376,4 +2376,51 @@ describe("ShiftDetailScreen", () => {
       targetShiftDate: "2026-04-17",
     });
   });
+
+  it("closes the request sheet outright when nothing has been chosen yet", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Swap"));
+    fireEvent.click(screen.getByLabelText("Dismiss"));
+
+    expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
+    expect(screen.queryByText("Back to eligible teammates")).not.toBeInTheDocument();
+  });
+
+  it("confirms before discarding a request sheet with selections in it", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Swap"));
+    selectFridaySwapDate();
+    fireEvent.click(screen.getByText("Chris Hall"));
+    fireEvent.click(screen.getByLabelText("Dismiss"));
+
+    // The sheet is still open behind the confirmation — the swap the user
+    // picked is right there to go back to.
+    expect(screen.getByText("Discard this request?")).toBeInTheDocument();
+    expect(screen.getByText("You give")).toBeInTheDocument();
+
+    confirmDialog("Discard");
+
+    expect(screen.queryByText("You give")).not.toBeInTheDocument();
+  });
+
+  it("keeps the request sheet and its selections when the discard is cancelled", () => {
+    useMutation.mockReturnValue({ error: null, isPending: false, mutate: vi.fn() });
+
+    render(<ShiftDetailScreen />);
+
+    fireEvent.click(screen.getByText("Swap"));
+    selectFridaySwapDate();
+    fireEvent.click(screen.getByText("Chris Hall"));
+    fireEvent.click(screen.getByLabelText("Dismiss"));
+    confirmDialog("Cancel");
+
+    expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
+    expect(screen.getByText("You give")).toBeInTheDocument();
+  });
 });

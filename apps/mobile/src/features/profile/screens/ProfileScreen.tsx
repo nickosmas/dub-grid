@@ -4,17 +4,13 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { getOrgRoleLabel } from "@dubgrid/domain";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Alert, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ModalHeader } from "../../../shared/components/ModalHeader";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import {
-  CollapsedHeaderTitle,
-  useCollapsedHeader,
-} from "../../../shared/navigation/CollapsedHeaderTitle";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   getProfile,
@@ -25,7 +21,6 @@ import {
   disablePushForCurrentDevice,
   handleExpiredMobileSession,
 } from "../../../shared/lib/auth-reset";
-import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import {
   getInlineErrorMessageOrToast,
   pushClientFriendlyErrorToast,
@@ -40,8 +35,10 @@ import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeMo
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { getMobileOrgRoleBadge } from "../../people/lib/orgRoleBadges";
 import {
+  getProfileInitials,
   ProfileHero,
   ProfileHeroMeta,
   ProfileInfoRow,
@@ -50,7 +47,6 @@ import {
   ProfileSection,
   formatProfileStatus,
   formatProfileValue,
-  getProfileInitials,
   useProfilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
 import { PendingRequestsCard } from "../components/PendingRequestsCard";
@@ -63,7 +59,15 @@ type OrganizationSwitchClient = {
     args?: Record<string, unknown>,
   ) => Promise<{ error: { message: string } | null }>;
 };
-type ProfileConfirmation = { kind: "logout"; force?: boolean };
+type OrganizationMembershipOption = {
+  id: string;
+  slug: string | null;
+  name?: string | null;
+  isCurrent: boolean;
+};
+type ProfileConfirmation =
+  | { kind: "logout"; force?: boolean }
+  | { kind: "switch-org"; force?: undefined; membership: OrganizationMembershipOption };
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -89,7 +93,6 @@ export default function ProfileScreen() {
   const [isSwitchModalVisible, setIsSwitchModalVisible] = useState(false);
   const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<ProfileConfirmation | null>(null);
-  const { handleScroll, showCollapsedHeader } = useCollapsedHeader();
   const [isAppearanceSheetVisible, setIsAppearanceSheetVisible] = useState(false);
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
@@ -183,12 +186,7 @@ export default function ProfileScreen() {
     }
   }
 
-  async function handleSwitchOrganization(input: {
-    id: string;
-    slug: string | null;
-    name?: string | null;
-    isCurrent: boolean;
-  }) {
+  async function handleSwitchOrganization(input: OrganizationMembershipOption) {
     if (input.isCurrent || switchingOrgId) {
       return;
     }
@@ -246,26 +244,38 @@ export default function ProfileScreen() {
     const action = pendingConfirmation;
     setPendingConfirmation(null);
     if (!action) return;
+
+    if (action.kind === "switch-org") {
+      // Close the picker in the same tick as the confirmation: the
+      // refreshSession() cascade (new accessToken → query refetches → realtime
+      // channel rebuild) must not land while a sheet is still mounted over it.
+      setIsSwitchModalVisible(false);
+      void handleSwitchOrganization(action.membership);
+      return;
+    }
+
     void handleLogout();
   }
 
-  const confirmationTitle = pendingConfirmation?.force ? "Force sign out?" : "Sign out?";
-  const confirmationBody = pendingConfirmation?.force
-    ? "You'll be signed out immediately, even if data hasn't synced."
-    : "You'll be signed out on this device.";
-  const confirmationLabel = "Sign Out";
+  const isSwitchConfirmation = pendingConfirmation?.kind === "switch-org";
+  const confirmationTitle = isSwitchConfirmation
+    ? "Switch organization?"
+    : pendingConfirmation?.force
+      ? "Force sign out?"
+      : "Sign out?";
+  const confirmationBody = isSwitchConfirmation
+    ? `You'll switch to ${pendingConfirmation.membership.name ?? "this organization"}.`
+    : pendingConfirmation?.force
+      ? "You'll be signed out immediately, even if data hasn't synced."
+      : "You'll be signed out on this device.";
+  const confirmationLabel = isSwitchConfirmation ? "Switch" : "Sign Out";
 
   return (
     <Screen
       bottomPaddingMode="tabbed"
-      title="Profile"
-      subtitle="Profile"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
-      onScroll={handleScroll}
-      scrollEventThrottle={16}
     >
-      <CollapsedHeaderTitle title={showCollapsedHeader ? displayName : ""} />
       {contentState.kind === "loading" ? (
         // Nothing at all for a blip: a skeleton that appears and vanishes
         // inside a few frames reads as a glitch, not as loading.
@@ -444,66 +454,30 @@ export default function ProfileScreen() {
             </View>
           </ProfileSection>
 
-          <Modal
-            animationType="slide"
-            allowSwipeDismissal
-            onRequestClose={() => setIsSwitchModalVisible(false)}
-            presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"}
+          <BottomSheetModal
+            header={<SheetHeader title="Switch organization" />}
+            scrollable
             visible={isSwitchModalVisible}
+            onDismiss={() => setIsSwitchModalVisible(false)}
           >
-            <Screen
-              bottomPaddingMode="modal"
-              stickyHeader={
-                <ModalHeader
-                  title="Switch organization"
-                  onClose={() => setIsSwitchModalVisible(false)}
+            <ProfileList>
+              {memberships.map((membership, index) => (
+                <OrganizationOptionRow
+                  key={membership.id}
+                  isLast={index === memberships.length - 1}
+                  membership={membership}
+                  switching={switchingOrgId === membership.id}
+                  onPress={() => setPendingConfirmation({ kind: "switch-org", membership })}
                 />
-              }
-              stickyHeaderTopPadding={15}
-            >
-              <ProfileSection title="Organizations">
-                <ProfileList>
-                  {memberships.map((membership, index) => (
-                    <OrganizationOptionRow
-                      key={membership.id}
-                      isLast={index === memberships.length - 1}
-                      membership={membership}
-                      switching={switchingOrgId === membership.id}
-                      onPress={() => {
-                        // Use the native Alert API for confirmation: an iOS
-                        // pageSheet Modal cannot reliably present another RN
-                        // Modal on top, but UIAlertController always can. The
-                        // pageSheet is closed synchronously on confirm so the
-                        // refreshSession() cascade (new accessToken → query
-                        // refetches → realtime channel rebuild) doesn't tear
-                        // down a still-mounted native modal.
-                        Alert.alert(
-                          "Switch organization?",
-                          `You'll switch to ${membership.name ?? "this organization"}.`,
-                          [
-                            { text: "Cancel", style: "cancel" },
-                            {
-                              text: "Switch",
-                              onPress: () => {
-                                setIsSwitchModalVisible(false);
-                                void handleSwitchOrganization(membership);
-                              },
-                            },
-                          ],
-                        );
-                      }}
-                    />
-                  ))}
-                </ProfileList>
-              </ProfileSection>
-            </Screen>
-          </Modal>
+              ))}
+            </ProfileList>
+          </BottomSheetModal>
         </>
       )}
       <ConfirmationModal
         body={confirmationBody}
         confirmLabel={confirmationLabel}
-        confirmTone="danger"
+        confirmTone={isSwitchConfirmation ? "primary" : "danger"}
         loading={isSigningOut}
         onCancel={() => setPendingConfirmation(null)}
         onConfirm={confirmProfileAction}

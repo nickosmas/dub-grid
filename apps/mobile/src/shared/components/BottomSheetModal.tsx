@@ -1,4 +1,5 @@
 import { useMemo, type ReactNode } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -51,6 +52,7 @@ const MODAL_EDGE_TO_EDGE_PROPS = {
 export function BottomSheetModal({
   visible,
   onDismiss,
+  backdrop = "scrim",
   dismissDisabled = false,
   scrollable = false,
   accessibilityLabel = "Dismiss",
@@ -61,7 +63,20 @@ export function BottomSheetModal({
   children,
 }: {
   visible: boolean;
+  /**
+   * Every way out of the sheet — the drag, the outside tap and the Android back
+   * gesture — funnels through here, so a sheet holding unsaved input can route
+   * this into a discard confirmation instead of closing. Leaving `visible` true
+   * settles a dragged sheet back into place rather than stranding it off-screen.
+   */
   onDismiss: () => void;
+  /**
+   * `"scrim"` dims the app behind the sheet. `"cover"` paints it out entirely,
+   * for the app lock, where the whole point is that the content underneath must
+   * not be readable — a translucent scrim there would leak it to whoever picked
+   * the phone up.
+   */
+  backdrop?: "scrim" | "cover";
   dismissDisabled?: boolean;
   scrollable?: boolean;
   accessibilityLabel?: string;
@@ -96,8 +111,8 @@ export function BottomSheetModal({
   const maxHeight = windowHeight - insets.top - SHEET_TOP_GAP;
   const isDark = useIsDarkMode();
   const styles = useMemo(
-    () => createStyles(mobileColors, isDark, maxHeight, bottomPadding),
-    [mobileColors, isDark, maxHeight, bottomPadding],
+    () => createStyles(mobileColors, isDark, maxHeight, bottomPadding, backdrop),
+    [mobileColors, isDark, maxHeight, bottomPadding, backdrop],
   );
   const grabberVisible = showGrabber ?? !dismissDisabled;
   const handleDismiss = () => {
@@ -188,6 +203,7 @@ const createStyles = (
   isDark: boolean,
   maxHeight: number,
   bottomPadding: number,
+  backdrop: "scrim" | "cover",
 ) =>
   StyleSheet.create({
     gestureRoot: {
@@ -213,7 +229,7 @@ const createStyles = (
     },
     // Split out of `root` so it can fade with the sheet as it is dragged down.
     backdrop: {
-      backgroundColor: mobileColors.overlay,
+      backgroundColor: backdrop === "cover" ? mobileColors.surface : mobileColors.overlay,
     },
     sheet: {
       maxHeight,
@@ -261,18 +277,55 @@ const createStyles = (
   });
 
 /**
- * Title + body + optional link, as used by the blocking consent and terms
- * sheets. Extracted because those two were byte-for-byte copies of each other's
- * chrome and copy layout.
+ * The canonical sheet title, for `BottomSheetModal`'s `header` slot.
+ *
+ * Every sheet used to answer this for itself and none of them agreed: the title
+ * was `heroMetric` (24), `screenTitle` (22) or `sectionTitle` (16) depending on
+ * the screen, and half of them rendered it inside the scrolling body, where it
+ * scrolls out of view and isn't part of the drag region. One component, one
+ * step on the ramp, always in the header.
+ */
+export function SheetHeader({
+  title,
+  subtitle,
+  icon,
+}: {
+  title: string;
+  subtitle?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+}) {
+  const mobileColors = useMobileColors();
+
+  return (
+    <View style={sheetHeaderStyles.root}>
+      {icon ? <Ionicons color={mobileColors.brand} name={icon} size={28} /> : null}
+      <AppText variant="screenTitle">{title}</AppText>
+      {subtitle ? (
+        <AppText tone="secondary" variant="body">
+          {subtitle}
+        </AppText>
+      ) : null}
+    </View>
+  );
+}
+
+const sheetHeaderStyles = StyleSheet.create({
+  root: {
+    gap: mobileSpace.xs,
+  },
+});
+
+/**
+ * Body copy + optional link, as used by the blocking consent and terms sheets.
+ * Extracted because those two were byte-for-byte copies of each other's chrome
+ * and copy layout. The title belongs in `SheetHeader`, not here.
  */
 export function SheetCopy({
-  title,
   body,
   linkLabel,
   onLinkPress,
   error,
 }: {
-  title: string;
   body: string;
   linkLabel?: string;
   onLinkPress?: () => void;
@@ -283,7 +336,6 @@ export function SheetCopy({
 
   return (
     <View style={styles.copy}>
-      <AppText variant="sectionTitle">{title}</AppText>
       <AppText tone="secondary" variant="body">
         {body}
       </AppText>

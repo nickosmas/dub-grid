@@ -6,6 +6,7 @@ import {
   BottomSheetModal,
   SheetActions,
   SheetCopy,
+  SheetHeader,
 } from "../../../shared/components/BottomSheetModal";
 import { acceptCurrentTerms } from "../../../shared/lib/api";
 import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
@@ -76,6 +77,7 @@ export function TermsGate({ children }: PropsWithChildren) {
       <BottomSheetModal
         accessibilityRole="alert"
         dismissDisabled
+        header={<SheetHeader title="We've updated our Terms" />}
         onDismiss={() => {}}
         visible={needsAcceptance}
       >
@@ -84,7 +86,6 @@ export function TermsGate({ children }: PropsWithChildren) {
           error={error}
           linkLabel="Read the Terms of Service"
           onLinkPress={() => void openInAppBrowser(getLegalUrls().terms, mobileColors)}
-          title="We've updated our Terms"
         />
         <SheetActions>
           <Button

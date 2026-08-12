@@ -62,9 +62,16 @@ export function ProfileHero({
   style,
   children,
 }: {
-  initials: string;
-  title: string;
-  subtitle: string;
+  /** Omit along with the rest of the identity block to leave only the meta grid. */
+  initials?: string;
+  /**
+   * Omit where the route's native header already carries it — both profile
+   * screens do, so the page doesn't print the name a second time under it. The
+   * avatar and badge stay: they belong to the expanded heading and scroll away
+   * with it, so the collapsed bar is left with the title alone.
+   */
+  title?: string;
+  subtitle?: string;
   badge?: string;
   badgeTone?: "brand" | "contrast" | "warning";
   avatarStyle?: StyleProp<ViewStyle>;
@@ -75,42 +82,57 @@ export function ProfileHero({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
+  // A screen whose native header already names it may want none of the
+  // identity block at all, leaving the meta grid as the whole hero. Rendering
+  // the row anyway would leave its gap above the grid.
+  const hasIdentity = Boolean(initials || title || badge || subtitle);
+
   return (
     <View style={[styles.hero, style]}>
-      <View style={styles.heroTop}>
-        <View style={[styles.avatar, avatarStyle]}>
-          <Text style={[styles.avatarText, avatarTextStyle]}>{initials}</Text>
-        </View>
-        <View style={styles.heroCopy}>
-          <View style={styles.heroTitleRow}>
-            <Text numberOfLines={2} style={styles.heroTitle}>
-              {title}
-            </Text>
-            {badge ? (
-              <View
-                style={[
-                  styles.heroBadge,
-                  badgeTone === "contrast" && styles.heroBadgeContrast,
-                  badgeTone === "warning" && styles.heroBadgeWarning,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.heroBadgeText,
-                    badgeTone === "contrast" && styles.heroBadgeTextContrast,
-                    badgeTone === "warning" && styles.heroBadgeTextWarning,
-                  ]}
-                >
-                  {badge}
-                </Text>
+      {hasIdentity ? (
+        <View style={styles.heroTop}>
+          {initials ? (
+            <View style={[styles.avatar, avatarStyle]}>
+              <Text style={[styles.avatarText, avatarTextStyle]}>{initials}</Text>
+            </View>
+          ) : null}
+          <View style={styles.heroCopy}>
+            {title || badge ? (
+              <View style={styles.heroTitleRow}>
+                {title ? (
+                  <Text numberOfLines={2} style={styles.heroTitle}>
+                    {title}
+                  </Text>
+                ) : null}
+                {badge ? (
+                  <View
+                    style={[
+                      styles.heroBadge,
+                      badgeTone === "contrast" && styles.heroBadgeContrast,
+                      badgeTone === "warning" && styles.heroBadgeWarning,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.heroBadgeText,
+                        badgeTone === "contrast" && styles.heroBadgeTextContrast,
+                        badgeTone === "warning" && styles.heroBadgeTextWarning,
+                      ]}
+                    >
+                      {badge}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
+            {subtitle ? (
+              <Text numberOfLines={1} style={styles.heroSubtitle}>
+                {subtitle}
+              </Text>
+            ) : null}
           </View>
-          <Text numberOfLines={1} style={styles.heroSubtitle}>
-            {subtitle}
-          </Text>
         </View>
-      </View>
+      ) : null}
       {children ? <View style={styles.heroDetail}>{children}</View> : null}
     </View>
   );

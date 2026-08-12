@@ -20,12 +20,19 @@ const loadStoredPushDevice = vi.fn();
 const handleExpiredMobileSession = vi.fn();
 const disablePushForCurrentDevice = vi.fn();
 const pushToast = vi.fn();
+// Every options object the screen hands the native header, in render order.
+const stackScreenOptions: { title?: string }[] = [];
 
 vi.mock("expo-router", () => ({
   router: {
     push: routerPush,
   },
-  Stack: Object.assign(() => null, { Screen: () => null }),
+  Stack: Object.assign(() => null, {
+    Screen: (props: { options?: { title?: string } }) => {
+      stackScreenOptions.push(props.options ?? {});
+      return null;
+    },
+  }),
 }));
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
@@ -190,6 +197,7 @@ beforeAll(async () => {
 
 describe("ProfileScreen", () => {
   beforeEach(() => {
+    stackScreenOptions.length = 0;
     useQuery.mockReset();
     useMutation.mockReset();
     useAccessToken.mockReset();
@@ -240,7 +248,13 @@ describe("ProfileScreen", () => {
   it("shows organization-scoped data on the profile hub", () => {
     render(<ProfileScreen />);
 
+    // The large title names the page — "Profile", from the route — so the
+    // screen tells the header nothing, and the hero is free to carry the
+    // account's own identity: avatar, then name, then role badge.
+    expect(stackScreenOptions).toEqual([]);
     expect(screen.getAllByText("Mina Diaz").length).toBeGreaterThan(0);
+    expect(screen.getByText("MD")).toBeInTheDocument();
+    expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
     expect(screen.getAllByText("DubGrid Health").length).toBeGreaterThan(0);
     expect(screen.getByText("(415) 425-3334")).toBeInTheDocument();
     expect(screen.getByText("ICU")).toBeInTheDocument();
