@@ -19,6 +19,7 @@ import { ConsentGate } from "../src/features/consent/components/ConsentGate";
 import { TermsGate } from "../src/features/consent/components/TermsGate";
 import { ConfigurationScreen } from "../src/shared/components/ConfigurationScreen";
 import { RouteErrorScreen } from "../src/shared/components/RouteErrorScreen";
+import { StartupSplashGate } from "../src/shared/components/StartupSplashGate";
 import { validateMobileEnv } from "../src/shared/lib/env";
 import { queryClient } from "../src/shared/lib/query-client";
 import { AppLockProvider } from "../src/shared/providers/AppLockProvider";
@@ -87,28 +88,30 @@ function RootLayoutContent({
                   <MobileRealtimeProvider>
                     <ConsentGate>
                       <TermsGate>
-                        <Stack screenOptions={createCommonStackOptions(mobileColors)}>
-                          <Stack.Screen name="index" options={{ headerShown: false }} />
-                          <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-                          <Stack.Screen
-                            name="(auth)/forgot-password"
-                            options={{ headerShown: false }}
-                          />
-                          <Stack.Screen
-                            name="(auth)/reset-password"
-                            options={{ headerShown: false }}
-                          />
-                          <Stack.Screen
-                            name="(auth)/onboarding"
-                            options={{ headerShown: false, animation: "fade" }}
-                          />
-                          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                          <Stack.Screen name="alerts" options={{ headerShown: false }} />
-                          <Stack.Screen
-                            name="shift/[employeeId]/[date]"
-                            options={createDetailStackOptions(mobileColors, "Shift Detail")}
-                          />
-                        </Stack>
+                        <StartupSplashGate>
+                          <Stack screenOptions={createCommonStackOptions(mobileColors)}>
+                            <Stack.Screen name="index" options={{ headerShown: false }} />
+                            <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+                            <Stack.Screen
+                              name="(auth)/forgot-password"
+                              options={{ headerShown: false }}
+                            />
+                            <Stack.Screen
+                              name="(auth)/reset-password"
+                              options={{ headerShown: false }}
+                            />
+                            <Stack.Screen
+                              name="(auth)/onboarding"
+                              options={{ headerShown: false, animation: "fade" }}
+                            />
+                            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                            <Stack.Screen name="alerts" options={{ headerShown: false }} />
+                            <Stack.Screen
+                              name="shift/[employeeId]/[date]"
+                              options={createDetailStackOptions(mobileColors, "Shift Detail")}
+                            />
+                          </Stack>
+                        </StartupSplashGate>
                       </TermsGate>
                     </ConsentGate>
                   </MobileRealtimeProvider>

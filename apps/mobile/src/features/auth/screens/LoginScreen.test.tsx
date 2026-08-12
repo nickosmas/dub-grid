@@ -23,6 +23,7 @@ const verifyMobileTotpFactor = vi.fn();
 const loadLastOrg = vi.fn();
 const saveLastOrg = vi.fn();
 const pushToast = vi.fn();
+const getBootstrap = vi.fn();
 
 vi.mock("expo-router", async () => {
   const React = await import("react");
@@ -51,6 +52,7 @@ vi.mock("../../../shared/lib/supabase", () => ({
 }));
 
 vi.mock("../../../shared/lib/api", () => ({
+  getBootstrap,
   loginToOrganization,
   lookupOrganization,
   registerMobileSessionPresence,
@@ -92,6 +94,8 @@ describe("LoginScreen", () => {
     loadLastOrg.mockReset();
     saveLastOrg.mockReset();
     pushToast.mockReset();
+    getBootstrap.mockReset();
+    getBootstrap.mockResolvedValue({ currentOrg: { id: "org-1" } });
 
     useSessionState.mockReturnValue({
       session: null,
@@ -388,6 +392,49 @@ describe("LoginScreen", () => {
     });
     expect(registerMobileSessionPresence).toHaveBeenCalledWith("token-123");
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
+    // Warmed before the handoff, not after it. The tab tree can't draw its tab
+    // bar or pick the Home screen without bootstrap, and the launch splash is
+    // long spent by now, so arriving without it would blank the screen. The
+    // submit button's pending state is what covers this wait.
+    expect(getBootstrap).toHaveBeenCalledWith("token-123");
+    expect(getBootstrap.mock.invocationCallOrder[0]).toBeLessThan(
+      routerReplace.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("still hands off when warming bootstrap fails", async () => {
+    getBootstrap.mockRejectedValue(new Error("offline"));
+    lookupOrganization.mockResolvedValue({
+      organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+    });
+    loginToOrganization.mockResolvedValue({
+      organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
+      session: { accessToken: "token-123", refreshToken: "refresh-123" },
+    });
+    const setSession = vi.fn().mockResolvedValue({ data: {}, error: null });
+    getSupabaseClient.mockReturnValue({ auth: { setSession } });
+
+    render(<LoginScreen />);
+
+    fireEvent.change(screen.getByPlaceholderText("yourorg"), {
+      target: { value: "dubgrid-health" },
+    });
+    fireEvent.click(screen.getByText("Continue"));
+
+    await screen.findByPlaceholderText("Email");
+    fireEvent.change(screen.getByPlaceholderText("Email"), {
+      target: { value: "staff@dubgrid.com" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Password"), {
+      target: { value: "super-secret" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+
+    // A failed warm-up is the tab gate's problem to report, not a reason to
+    // strand the user on the login form with a session already stored.
+    await waitFor(() => {
+      expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
+    });
   });
 
   it("verifies MFA before storing the mobile session", async () => {

@@ -1,6 +1,5 @@
 import { type ReactNode } from "react";
 import { Redirect } from "expo-router";
-import { AppSplashScreen } from "../../../shared/components/AppSplashScreen";
 import { useBootstrap } from "./useBootstrap";
 import { OrganizationLockedScreen } from "../screens/OrganizationLockedScreen";
 import { usePushRegistration } from "../../notifications/hooks/usePushRegistration";
@@ -44,12 +43,18 @@ export function useTabsGate(): TabsGateResult {
   // `canView*` below is false while bootstrap is in flight, so tabs popped in
   // afterwards.
   //
+  // Renders nothing rather than a splash: `StartupSplashGate` owns the one
+  // splash instance and is still covering the screen whenever this is reached
+  // on a cold launch. A second instance here restarted the whole brand
+  // animation mid-handoff, which is what read as a double splash.
+  //
   // `isLoading` (not `isFetching`) so this is the cold first load only —
-  // refetches and org switches keep showing the screen you are on.
+  // refetches and org switches keep showing the screen you are on. Bootstrap is
+  // keyed by user id, so a token refresh no longer lands back in here either.
   if (isLoading || bootstrapQuery.isLoading) {
     return {
       kind: "blocked",
-      element: <AppSplashScreen />,
+      element: null,
     };
   }
 

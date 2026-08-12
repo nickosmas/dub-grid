@@ -3,7 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
 const routerReplace = vi.fn();
-const saveHasSeenOnboarding = vi.fn(() => Promise.resolve());
+const markHasSeenOnboarding = vi.fn(() => Promise.resolve());
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -21,8 +21,11 @@ vi.mock("expo-router", () => ({
   },
 }));
 
-vi.mock("../../../shared/lib/session", () => ({
-  saveHasSeenOnboarding,
+// Goes through the hook, not straight to storage: it writes the new value
+// into the query cache too, so the launch gate and index route don't keep
+// reading a stale first-run flag for the rest of the session.
+vi.mock("../../auth/hooks/useHasSeenOnboarding", () => ({
+  markHasSeenOnboarding,
 }));
 
 let OnboardingScreen: (typeof import("./OnboardingScreen"))["default"];
@@ -34,7 +37,7 @@ beforeAll(async () => {
 describe("OnboardingScreen", () => {
   beforeEach(() => {
     routerReplace.mockReset();
-    saveHasSeenOnboarding.mockClear();
+    markHasSeenOnboarding.mockClear();
   });
 
   it("renders all three value-prop slides", () => {
@@ -51,7 +54,7 @@ describe("OnboardingScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
 
     await vi.waitFor(() => {
-      expect(saveHasSeenOnboarding).toHaveBeenCalledWith(true);
+      expect(markHasSeenOnboarding).toHaveBeenCalledWith(true);
     });
     expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
   });
@@ -72,7 +75,7 @@ describe("OnboardingScreen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    expect(saveHasSeenOnboarding).not.toHaveBeenCalled();
+    expect(markHasSeenOnboarding).not.toHaveBeenCalled();
     expect(routerReplace).not.toHaveBeenCalled();
   });
 });

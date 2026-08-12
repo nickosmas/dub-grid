@@ -14,7 +14,7 @@ import { Button } from "../../../shared/components/Button";
 import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
 import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";
 import { hapticSelection } from "../../../shared/lib/haptics";
-import { saveHasSeenOnboarding } from "../../../shared/lib/session";
+import { markHasSeenOnboarding } from "../../auth/hooks/useHasSeenOnboarding";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import type { MobileColors } from "../../../shared/theme/tokens";
 import { OnboardingCard } from "../components/OnboardingCard";
@@ -72,7 +72,7 @@ export default function OnboardingScreen() {
   );
 
   const completeOnboarding = useCallback(async () => {
-    await saveHasSeenOnboarding(true);
+    await markHasSeenOnboarding(true);
     router.replace("/(auth)/login");
   }, []);
 

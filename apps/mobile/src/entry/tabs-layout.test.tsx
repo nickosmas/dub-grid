@@ -162,19 +162,24 @@ describe("TabsLayout", () => {
     });
   });
 
-  it("shows the app splash screen instead of a spinner while the session is restoring", () => {
+  // StartupSplashGate, above the router, owns the app's one splash and is still
+  // covering the screen whenever this is reached on a cold launch. Rendering a
+  // second instance here restarted the brand animation mid-handoff, which is
+  // what read as the splash showing twice.
+  it("renders nothing rather than a second splash while the session is restoring", () => {
     useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
 
-    render(<TabsLayout />);
+    const { container } = render(<TabsLayout />);
 
-    expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
+    expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
-  // Holding here is what keeps the Home tab from picking a screen — and a
-  // skeleton shape — before it knows whether this is an admin. Every
+  // Holding here is what keeps the Home tab from picking a screen (and a
+  // skeleton shape) before it knows whether this is an admin. Every
   // `canView*` permission is also false until bootstrap lands, so releasing
   // early made the tab bar itself pop tabs in afterwards.
-  it("keeps the splash up until bootstrap resolves, not just the session", () => {
+  it("keeps blocking until bootstrap resolves, not just the session", () => {
     useBootstrap.mockReturnValue({
       data: undefined,
       error: null,
@@ -183,9 +188,10 @@ describe("TabsLayout", () => {
       refetch: vi.fn(),
     });
 
-    render(<TabsLayout />);
+    const { container } = render(<TabsLayout />);
 
-    expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
+    expect(stackScreenMock).not.toHaveBeenCalled();
   });
 
   it("uses SF symbols on iOS and Android vector icon sources for the native tabs", () => {
@@ -208,11 +214,11 @@ describe("TabsLayout", () => {
     }
   });
 
-  // The large-title screens used to assert *no* header background, leaving iOS
-  // to fall back on the navigation theme's `card` (white) and its own
-  // scroll-edge material. That put a visible seam above a page sitting on
-  // `background` (slate-50), so both header surfaces are now painted with the
-  // page's own background instead. Detail screens never took that branch.
+  // The large-title screens carry no header background at all: an explicit one
+  // makes an iOS 26 large title invisible, and painting it via
+  // `headerBackground` makes the header translucent and stops it collapsing.
+  // The page's own `background` shows through instead. Detail screens keep the
+  // plain opaque header — they have no large title to lose.
   it("uses native stack headers for request, people, and profile tab pages", () => {
     render(<RequestsLayout />);
     render(<PeopleLayout />);
@@ -228,33 +234,33 @@ describe("TabsLayout", () => {
       options: {
         headerLargeTitle: true,
         headerLargeTitleEnabled: true,
-        headerStyle: { backgroundColor: expect.any(String) },
+        // No background of any kind: an explicit one makes an iOS 26 large
+        // title invisible, and `headerBackground` costs it the collapse.
+        headerStyle: undefined,
         title: "Requests",
       },
     });
-    expect(requestsOptions).toMatchObject({
-      headerLargeStyle: { backgroundColor: expect.any(String) },
-    });
+    expect(requestsOptions).not.toHaveProperty("headerLargeStyle");
     expect(stackScreenMock.mock.calls[1]?.[0]).toMatchObject({
       name: "index",
       options: {
         headerLargeTitle: true,
         headerLargeTitleEnabled: true,
-        headerStyle: { backgroundColor: expect.any(String) },
+        // No background of any kind: an explicit one makes an iOS 26 large
+        // title invisible, and `headerBackground` costs it the collapse.
+        headerStyle: undefined,
         title: "People",
       },
     });
-    expect(peopleOptions).toMatchObject({
-      headerLargeStyle: { backgroundColor: expect.any(String) },
-    });
+    expect(peopleOptions).not.toHaveProperty("headerLargeStyle");
+    // The People and Profile sections take large titles at every level, so
+    // their pushed screens opt in too, and follow the same no-background rule.
     expect(stackScreenMock.mock.calls[2]?.[0]).toMatchObject({
       name: "add",
       options: {
-        headerLargeTitle: false,
-        headerLargeTitleEnabled: false,
-        headerStyle: {
-          backgroundColor: expect.any(String),
-        },
+        headerLargeTitle: true,
+        headerLargeTitleEnabled: true,
+        headerStyle: undefined,
         title: "Add Person",
       },
     });
@@ -262,27 +268,27 @@ describe("TabsLayout", () => {
     expect(stackScreenMock.mock.calls[3]?.[0]).toMatchObject({
       name: "[id]",
       options: {
-        headerLargeTitle: false,
-        headerLargeTitleEnabled: false,
-        headerStyle: {
-          backgroundColor: expect.any(String),
-        },
+        headerLargeTitle: true,
+        headerLargeTitleEnabled: true,
+        headerStyle: undefined,
+        // Never transparent: that is what costs a large title its collapse.
         title: "Person",
       },
     });
     expect(peopleDetailOptions).not.toHaveProperty("headerLargeStyle");
+    expect(peopleDetailOptions).not.toHaveProperty("headerTransparent");
     expect(stackScreenMock.mock.calls[4]?.[0]).toMatchObject({
       name: "index",
       options: {
         headerLargeTitle: true,
         headerLargeTitleEnabled: true,
-        headerStyle: { backgroundColor: expect.any(String) },
+        // No background of any kind: an explicit one makes an iOS 26 large
+        // title invisible, and `headerBackground` costs it the collapse.
+        headerStyle: undefined,
         title: "Profile",
       },
     });
-    expect(profileOptions).toMatchObject({
-      headerLargeStyle: { backgroundColor: expect.any(String) },
-    });
+    expect(profileOptions).not.toHaveProperty("headerLargeStyle");
     expect(profileOptions).not.toHaveProperty("headerRight");
     expect(stackScreenMock.mock.calls.slice(5).map((call) => call[0]?.name)).toEqual([
       "account",

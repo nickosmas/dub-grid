@@ -81,7 +81,7 @@ describe("useMobilePermissionsRealtime", () => {
     channels[0]?.onCalls[0]?.handler();
 
     expect(refetchQueries).toHaveBeenCalledWith({
-      queryKey: ["mobile", "bootstrap", "token-1"],
+      queryKey: ["mobile", "bootstrap"],
       type: "active",
     });
   });

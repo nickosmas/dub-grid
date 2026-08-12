@@ -120,12 +120,14 @@ describe("TabsLayoutAndroid", () => {
     useBootstrap.mockReturnValue(bootstrap());
   });
 
-  it("shows the app splash screen while the session is restoring", () => {
+  // The one splash lives in StartupSplashGate, above the router; a second
+  // instance here restarts the brand animation mid-handoff.
+  it("renders nothing rather than a second splash while the session is restoring", () => {
     useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
 
     render(<TabsLayoutAndroid />);
 
-    expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
+    expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
   });
 
   it("redirects to login without a session", () => {

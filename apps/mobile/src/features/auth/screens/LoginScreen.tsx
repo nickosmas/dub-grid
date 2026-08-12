@@ -5,7 +5,6 @@ import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import { Redirect, router } from "expo-router";
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { AppSplashScreen } from "../../../shared/components/AppSplashScreen";
 import { Button } from "../../../shared/components/Button";
 import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { AuthShell } from "../components/AuthShell";
@@ -15,14 +14,19 @@ import {
 } from "../../consent/components/ConsentGate";
 import { clearStoredConsent } from "../../consent/lib/consent";
 import {
+  getBootstrap,
   loginToOrganization,
   lookupOrganization,
   registerMobileSessionPresence,
   verifyMobileTotpFactor,
 } from "../../../shared/lib/api";
+import { BOOTSTRAP_QUERY_KEY_PREFIX } from "../hooks/useBootstrap";
+import { getUserIdFromAccessToken } from "../../../shared/lib/access-token";
+import { queryClient } from "../../../shared/lib/query-client";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
-import { loadLastOrg, saveHasSeenOnboarding, saveLastOrg } from "../../../shared/lib/session";
+import { loadLastOrg, saveLastOrg } from "../../../shared/lib/session";
+import { markHasSeenOnboarding } from "../hooks/useHasSeenOnboarding";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
@@ -179,8 +183,11 @@ export default function LoginScreen() {
     };
   }, [isConsentDecisionPending]);
 
+  // No splash here: the only time the session is still restoring is launch, and
+  // `StartupSplashGate` is already covering the screen with the app's one
+  // splash instance. Rendering another would restart the brand animation.
   if (isLoading) {
-    return <AppSplashScreen />;
+    return null;
   }
 
   if (accessToken) {
@@ -207,6 +214,18 @@ export default function LoginScreen() {
     }
 
     registerMobileSessionPresence(session.accessToken).catch(() => {});
+
+    // Warm bootstrap before handing off. The tab tree can't draw its tab bar or
+    // pick the Home screen without it, and the launch splash is long spent by
+    // now, so arriving without it would blank the screen. The submit button
+    // stays in its pending state for this, which is the honest place to show
+    // the wait. `prefetchQuery` never rejects: a failed bootstrap should still
+    // let the user through to the tab gate's locked/error handling.
+    await queryClient.prefetchQuery({
+      queryKey: [...BOOTSTRAP_QUERY_KEY_PREFIX, getUserIdFromAccessToken(session.accessToken)],
+      queryFn: () => getBootstrap(session.accessToken),
+    });
+
     router.replace("/(tabs)/home");
   }
 
@@ -359,7 +378,7 @@ export default function LoginScreen() {
   // otherwise lands on a device that has already seen and decided everything.
   async function handleDevResetFirstRun() {
     if (!isDevBuild) return;
-    await Promise.all([saveHasSeenOnboarding(false), clearStoredConsent()]);
+    await Promise.all([markHasSeenOnboarding(false), clearStoredConsent()]);
     recheckConsentDecision();
     pushToast({
       title: "First run reset",

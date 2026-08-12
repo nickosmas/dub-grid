@@ -80,8 +80,18 @@ vi.mock("../providers/AuthSessionProvider", async () => {
   return {
     AuthSessionProvider: ({ children }: { children: React.ReactNode }) =>
       React.createElement("div", { "data-testid": "auth-provider" }, children),
+    useSessionState: () => ({ session: null, accessToken: null, isLoading: false }),
   };
 });
+
+vi.mock("../../features/auth/hooks/useBootstrap", () => ({
+  BOOTSTRAP_QUERY_KEY_PREFIX: ["mobile", "bootstrap"],
+  useBootstrap: () => ({ data: undefined, isLoading: false }),
+}));
+
+vi.mock("../../features/auth/hooks/useHasSeenOnboarding", () => ({
+  useHasSeenOnboarding: () => ({ data: true, isLoading: false }),
+}));
 
 vi.mock("../providers/AppLockProvider", async () => {
   const React = await import("react");
