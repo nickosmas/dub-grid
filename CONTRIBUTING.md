@@ -9,7 +9,33 @@ DubGrid is proprietary software. All contributions must be authorized.
 1. Follow the [Getting Started](README.md#getting-started) guide.
 2. Ensure the Supabase CLI is installed and `supabase start` runs cleanly.
 3. Run `npm run db:reset` to apply migrations and seed the local database.
-4. Run `npm test` to confirm everything passes before making changes.
+4. Run `npm run hooks:install` to enable the repo's git hooks (see below).
+5. Run `npm test` to confirm everything passes before making changes.
+
+### Git Hooks
+
+The hooks live in `.githooks/` and are version-controlled, but git only picks
+them up once `core.hooksPath` points at that directory. That setting is local to
+each clone, so **every clone has to run it once**:
+
+```bash
+npm run hooks:install
+```
+
+Without it nothing breaks, you just lose the safety net and land formatting and
+lint errors in CI instead.
+
+- **pre-commit** — Prettier and ESLint over the _staged files only_, so it stays
+  fast. Lint errors block; the repo's known warnings do not.
+- **pre-push** — `type-check` and the full `test` suite, both through Turborepo,
+  so unchanged workspaces replay from cache.
+
+Bypass with `--no-verify` on either command when you genuinely need to.
+
+We deliberately do not use husky: it installs itself through a `prepare` script,
+and install scripts are disabled repo-wide (see
+[Changing Dependencies](#changing-dependencies)). `.githooks/` needs no
+dependency at all.
 
 ---
 

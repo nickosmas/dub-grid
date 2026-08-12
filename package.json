@@ -21,6 +21,7 @@
     "dev:webpack": "turbo run dev:webpack --filter=@dubgrid/web",
     "build": "turbo run build --filter=@dubgrid/web",
     "start": "npm --workspace @dubgrid/web run start",
+    "hooks:install": "git config core.hooksPath .githooks && echo 'Git hooks enabled (.githooks)'",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
