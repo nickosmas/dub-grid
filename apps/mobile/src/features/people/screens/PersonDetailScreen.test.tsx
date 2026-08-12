@@ -9,6 +9,8 @@ const useQueryClient = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
+// Every options object the screen hands the native header, in render order.
+const stackScreenOptions: { title?: string }[] = [];
 const pushToast = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
@@ -32,7 +34,10 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("expo-router", () => ({
   Stack: {
-    Screen: () => null,
+    Screen: (props: { options?: { title?: string } }) => {
+      stackScreenOptions.push(props.options ?? {});
+      return null;
+    },
   },
   useLocalSearchParams,
 }));
@@ -94,6 +99,7 @@ describe("PersonDetailScreen", () => {
     useLocalSearchParams.mockReset();
     pushToast.mockReset();
     emptyStateTitles.length = 0;
+    stackScreenOptions.length = 0;
 
     useAccessToken.mockReturnValue("token-123");
     useLocalSearchParams.mockReturnValue({
@@ -253,6 +259,59 @@ describe("PersonDetailScreen", () => {
     expect(screen.getAllByText("Charge Nurse").length).toBeGreaterThan(0);
     expect(screen.queryByText("Account access")).not.toBeInTheDocument();
     expect(screen.queryByText("Status updated")).not.toBeInTheDocument();
+  });
+
+  // The name belongs to the native header, which collapses it on its own. The
+  // page must not print it again, but the avatar and badge stay: they are page
+  // content, and scroll away like the rest of it.
+  it("names the native header after the person and does not repeat it", () => {
+    useQuery.mockReturnValue({
+      data: {
+        person: {
+          id: "emp-1",
+          firstName: "Mina",
+          lastName: "Diaz",
+          orgRole: "user",
+          employmentType: "full_time",
+          phone: "",
+          email: "mina@dubgrid.com",
+          status: "active",
+          certificationId: null,
+          roleIds: [],
+          seniority: 2,
+          focusAreaIds: [2],
+          departmentIds: [4],
+          deptAdminIds: [],
+          contactNotes: "",
+          statusChangedAt: null,
+          statusNote: "",
+          userId: "user-1",
+          version: 7,
+          pendingInvitation: null,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    // The name belongs to the native header, which collapses it on its own, and
+    // nothing under it restates the identity: no avatar, no status badge, no
+    // email line. The email keeps its own row in Contact.
+    expect(stackScreenOptions).toEqual([{ title: "Mina Diaz" }]);
+    expect(screen.queryByText("MD")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Mina Diaz")).toHaveLength(1);
+    expect(screen.getByText("Name")).toBeInTheDocument();
+    expect(screen.getAllByText("mina@dubgrid.com")).toHaveLength(1);
+
+    // The org role had no home but the badge, so removing that badge would have
+    // taken the permission tier off the page with it. This fixture is a plain
+    // user, whose tier never had a badge at all — it showed the status instead.
+    expect(screen.getByText("Access")).toBeInTheDocument();
+    expect(screen.getByText("User")).toBeInTheDocument();
   });
 
   it("omits the account access section even when the person still needs app access", () => {

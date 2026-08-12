@@ -42,7 +42,10 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Card, Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
-import { ScrollableTabStrip } from "../../../shared/components/ScrollableTabStrip";
+import {
+  ScrollableTabStrip,
+  ScrollableTabStripSkeleton,
+} from "../../../shared/components/ScrollableTabStrip";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { ScheduleMeSkeleton, ScheduleTeamSkeleton } from "../components/ScheduleSkeleton";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
@@ -1656,7 +1659,15 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       stickyHeaderShellStyle={styles.scheduleCalendarStickyHeaderShell}
     >
       <View>
-        {isTeamScope && teamFocusAreaTabs.length > 0 ? (
+        {/* The focus-area pills carry per-day counts, so they can't paint before
+            the schedule resolves without every badge popping in behind them.
+            While loading there is no tab list yet either — it comes from
+            bootstrap — so the skeleton stands in at a fixed width. */}
+        {isTeamScope && contentState.kind === "loading" ? (
+          contentState.showSkeleton ? (
+            <ScrollableTabStripSkeleton tabs={4} />
+          ) : null
+        ) : isTeamScope && teamFocusAreaTabs.length > 0 ? (
           <ScrollableTabStrip
             accessibilityLabel="Focus areas"
             activeKey={activeTeamFocusAreaKey}

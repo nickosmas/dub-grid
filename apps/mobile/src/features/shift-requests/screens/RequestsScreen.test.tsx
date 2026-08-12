@@ -129,6 +129,12 @@ describe("RequestsScreen", () => {
     expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
     expect(screen.queryByText("Loading shift requests")).not.toBeInTheDocument();
     expect(screen.queryByText(/Bringing your active requests/)).not.toBeInTheDocument();
+
+    // Every tab counts something, and the counts are 0 until the queries land.
+    // Painting the real strip here made each badge pop in afterwards and shove
+    // the pills along the moment the screen finished loading.
+    expect(screen.queryByRole("tab", { name: "Available" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Mine" })).not.toBeInTheDocument();
   });
 
   it("shows a retryable query error state", () => {

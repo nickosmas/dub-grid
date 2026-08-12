@@ -196,7 +196,7 @@ export default function NotificationDetailScreen() {
 
   if (!id) {
     return (
-      <Screen title="Alert">
+      <Screen>
         <StatusBanner
           body="The alert id is missing."
           fillScreen
@@ -212,12 +212,12 @@ export default function NotificationDetailScreen() {
   // below declared the alert missing until the token arrived. "Still resolving"
   // has to cover the not-yet-started case too.
   if (!notification && isResolvingNotification) {
-    return <Screen title="Alert">{showSkeleton ? <NotificationDetailSkeleton /> : null}</Screen>;
+    return <Screen>{showSkeleton ? <NotificationDetailSkeleton /> : null}</Screen>;
   }
 
   if (!notification) {
     return (
-      <Screen title="Alert">
+      <Screen>
         <EmptyStateCard
           fillScreen
           iconName="notifications-off-outline"
@@ -231,7 +231,7 @@ export default function NotificationDetailScreen() {
   const isArchived = !!notification.archivedAt;
 
   return (
-    <Screen onRefresh={manualRefresh.refresh} refreshing={manualRefresh.isRefreshing} title="Alert">
+    <Screen onRefresh={manualRefresh.refresh} refreshing={manualRefresh.isRefreshing}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={styles.iconFrame}>

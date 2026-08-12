@@ -13,7 +13,10 @@ import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
-import { ScrollableTabStrip } from "../../../shared/components/ScrollableTabStrip";
+import {
+  ScrollableTabStrip,
+  ScrollableTabStripSkeleton,
+} from "../../../shared/components/ScrollableTabStrip";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useRealtimeNow } from "../../../shared/hooks/useRealtimeNow";
@@ -756,17 +759,25 @@ export default function RequestsScreen() {
   return (
     <Screen
       bottomPaddingMode="tabbed"
-      title="Requests"
-      subtitle="Requests"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
-      <ScrollableTabStrip
-        accessibilityLabel="Request filters"
-        activeKey={activeTab}
-        onSelect={(key) => setSelectedTab(key as typeof activeTab)}
-        tabs={visibleTabs}
-      />
+      {/* Every tab here counts something, and those counts are 0 until the
+          queries land. Painting the real strip first meant each badge popped in
+          afterwards and shoved the pills along, so the strip waits for the same
+          data the list below it is waiting for. */}
+      {contentState.kind === "loading" ? (
+        contentState.showSkeleton ? (
+          <ScrollableTabStripSkeleton tabs={visibleTabs.length} />
+        ) : null
+      ) : (
+        <ScrollableTabStrip
+          accessibilityLabel="Request filters"
+          activeKey={activeTab}
+          onSelect={(key) => setSelectedTab(key as typeof activeTab)}
+          tabs={visibleTabs}
+        />
+      )}
 
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (

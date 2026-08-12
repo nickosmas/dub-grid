@@ -10,26 +10,30 @@ export default function ProfileLayout() {
 
   return (
     <Stack>
+      {/* Large titles all the way down this section, the way Settings does it:
+          each pushed panel reads as a place of its own. */}
       <Stack.Screen name="index" options={createTopLevelStackOptions(mobileColors, "Profile")} />
       <Stack.Screen
         name="account"
-        options={createDetailStackOptions(mobileColors, "Profile details")}
+        options={createDetailStackOptions(mobileColors, "Profile details", { largeTitle: true })}
       />
       <Stack.Screen
         name="work"
-        options={createDetailStackOptions(mobileColors, "Profile details")}
+        options={createDetailStackOptions(mobileColors, "Profile details", { largeTitle: true })}
       />
       <Stack.Screen
         name="security"
-        options={createDetailStackOptions(mobileColors, "Security & sessions")}
+        options={createDetailStackOptions(mobileColors, "Security & sessions", {
+          largeTitle: true,
+        })}
       />
       <Stack.Screen
         name="notifications"
-        options={createDetailStackOptions(mobileColors, "Notifications")}
+        options={createDetailStackOptions(mobileColors, "Notifications", { largeTitle: true })}
       />
       <Stack.Screen
         name="privacy"
-        options={createDetailStackOptions(mobileColors, "Privacy & data")}
+        options={createDetailStackOptions(mobileColors, "Privacy & data", { largeTitle: true })}
       />
     </Stack>
   );

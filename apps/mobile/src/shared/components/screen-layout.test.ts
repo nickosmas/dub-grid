@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getFloatingTabBarClearance } from "./floating-tab-bar-layout";
-import { getScreenBottomPadding } from "./screen-layout";
+import { getScreenBottomPadding, getScreenGutter } from "./screen-layout";
 
 // Read at call time by `getScreenBottomPadding`, so flipping this between tests
 // is enough — no re-import needed.
@@ -50,5 +50,27 @@ describe("getScreenBottomPadding", () => {
 
     expect(getScreenBottomPadding("stack", 24)).toBe(48);
     expect(getScreenBottomPadding("modal", 24)).toBe(40);
+  });
+});
+
+/**
+ * The gutter has to line up with the leading edge of the navigation bar's
+ * title, which is the platform's number rather than ours. On the shared 16, the
+ * first thing under an iOS large title — a hero's meta row, a row of action
+ * buttons — sat a few points to its left.
+ */
+describe("getScreenGutter", () => {
+  it("matches the inset UIKit gives a large title on iOS", () => {
+    platform.OS = "ios";
+
+    expect(getScreenGutter()).toBe(20);
+  });
+
+  // Material starts its top app bar title at 16, so Android keeps the shared
+  // spacing token rather than iOS's number.
+  it("keeps the shared gutter on Android", () => {
+    platform.OS = "android";
+
+    expect(getScreenGutter()).toBe(16);
   });
 });

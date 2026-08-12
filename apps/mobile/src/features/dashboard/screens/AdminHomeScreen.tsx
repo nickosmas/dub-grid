@@ -77,8 +77,6 @@ export function AdminHomeScreen() {
   if (contentState.kind === "loading") {
     return (
       <Screen
-        title="Home"
-        subtitle="Organization overview"
         bottomPaddingMode="tabbed"
         stickyHeader={contentState.showSkeleton ? <DashboardHeaderSkeleton /> : undefined}
       >
@@ -98,7 +96,6 @@ export function AdminHomeScreen() {
   if (contentState.kind === "error") {
     return (
       <Screen
-        title="Home"
         bottomPaddingMode="tabbed"
         refreshing={manualRefresh.isRefreshing}
         onRefresh={manualRefresh.refresh}
@@ -123,8 +120,6 @@ export function AdminHomeScreen() {
   if (!dashboardQuery.data) {
     return (
       <Screen
-        title="Home"
-        subtitle="Organization overview"
         bottomPaddingMode="tabbed"
         refreshing={manualRefresh.isRefreshing}
         onRefresh={manualRefresh.refresh}
@@ -156,8 +151,6 @@ export function AdminHomeScreen() {
 
   return (
     <Screen
-      title="Home"
-      subtitle="Organization overview"
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}

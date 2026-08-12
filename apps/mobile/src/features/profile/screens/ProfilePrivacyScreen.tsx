@@ -54,7 +54,7 @@ export default function ProfilePrivacyScreen() {
   }
 
   return (
-    <Screen bottomPaddingMode="tabbed" title="Privacy & data" subtitle="Privacy & data">
+    <Screen bottomPaddingMode="tabbed">
       <ProfileSection
         title="Cookies & analytics"
         description="Essential data keeps DubGrid working, including error monitoring, and can't be turned off. Analytics is optional and helps us improve the app."

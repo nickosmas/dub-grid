@@ -38,7 +38,7 @@ export default function ActivityExpandedScreen() {
 
   if (contentState.kind === "loading") {
     return (
-      <Screen title="Recent activity" bottomPaddingMode="tabbed">
+      <Screen bottomPaddingMode="tabbed">
         {contentState.showSkeleton ? <DashboardListSkeleton rows={4} variant="feed" /> : null}
       </Screen>
     );
@@ -46,7 +46,7 @@ export default function ActivityExpandedScreen() {
 
   if (contentState.kind === "error") {
     return (
-      <Screen title="Recent activity" bottomPaddingMode="tabbed">
+      <Screen bottomPaddingMode="tabbed">
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
@@ -70,7 +70,7 @@ export default function ActivityExpandedScreen() {
   const activeFilterCount = typeFilter === "all" ? 0 : 1;
 
   return (
-    <Screen title="Recent activity" bottomPaddingMode="tabbed">
+    <Screen bottomPaddingMode="tabbed">
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
         title="Filter activity"

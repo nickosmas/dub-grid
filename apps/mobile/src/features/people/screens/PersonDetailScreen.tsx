@@ -1,3 +1,4 @@
+import { getOrgRoleLabel } from "@dubgrid/domain";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, Text, TextInput, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -20,7 +21,7 @@ import {
   normalizeStaffName,
   normalizeStaffNotes,
 } from "@dubgrid/contracts";
-import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
+import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
@@ -37,15 +38,10 @@ import {
   type MobileAccountLinkChallenge,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import { getAvatarTone } from "../../../shared/lib/avatar-tone";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
-import {
-  useIsDarkMode,
-  useMobileColors,
-  useThemeMode,
-} from "../../../shared/providers/ThemeModeProvider";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileIconToneColor,
@@ -54,10 +50,7 @@ import {
   mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import {
-  CollapsedHeaderTitle,
-  useCollapsedHeader,
-} from "../../../shared/navigation/CollapsedHeaderTitle";
+import { HeaderTitle } from "../../../shared/navigation/HeaderTitle";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
@@ -71,7 +64,6 @@ import {
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
-import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
 type ConfirmAction = "deactivate" | "activate" | "remove" | null;
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
@@ -125,7 +117,6 @@ export default function PersonDetailScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDark = useIsDarkMode();
-  const { resolvedTheme } = useThemeMode();
   const params = useLocalSearchParams<{ id?: string }>();
   const personId = Array.isArray(params.id) ? params.id[0] : params.id;
   const accessToken = useAccessToken();
@@ -142,7 +133,6 @@ export default function PersonDetailScreen() {
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const [showDiscardCancelConfirmation, setShowDiscardCancelConfirmation] = useState(false);
   const [inactiveNote, setInactiveNote] = useState("");
-  const { handleScroll, showCollapsedHeader } = useCollapsedHeader();
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
 
@@ -453,9 +443,8 @@ export default function PersonDetailScreen() {
       ? (maps.certifications.get(person.certificationId) ?? "Unknown")
       : "None";
   const employmentLabel = person.employmentType === "part_time" ? "Part-time" : "Full-time";
-  const avatarTone = getAvatarTone(person.id, resolvedTheme === "dark");
   const fullName = getFullName(person);
-  const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, person.orgRole);
+  const accessLevelText = getOrgRoleLabel(person.orgRole);
   const accessText = person.userId
     ? "Active app account"
     : person.pendingInvitation
@@ -520,10 +509,8 @@ export default function PersonDetailScreen() {
   return (
     <Screen
       bottomPaddingMode="tabbed"
-      onScroll={handleScroll}
       onRefresh={manualRefresh.refresh}
       refreshing={manualRefresh.isRefreshing}
-      scrollEventThrottle={16}
     >
       <AccountLinkChallengeModal
         challenge={accountLinkChallenge}
@@ -538,25 +525,20 @@ export default function PersonDetailScreen() {
         }
       />
 
-      <CollapsedHeaderTitle title={showCollapsedHeader ? fullName : ""} />
+      {/* The native header names the page, and every part of the identity
+          block under it repeated something: the avatar and badge restated the
+          name and the status, and the email has its own row in Contact. What's
+          left is the meta grid. */}
+      <HeaderTitle title={fullName} />
 
-      <ProfileHero
-        avatarStyle={{
-          backgroundColor: avatarTone.backgroundColor,
-          borderColor: avatarTone.borderColor,
-          borderWidth: 1,
-        }}
-        avatarTextStyle={{ color: avatarTone.textColor }}
-        badge={orgRoleBadge?.label ?? formatStatusLabel(person.status)}
-        badgeTone={orgRoleBadge?.tone}
-        initials={getInitials(person)}
-        subtitle={person.email || "No email on file"}
-        title={fullName}
-      >
+      <ProfileHero>
         <ProfileHeroMeta label={roleLabel} value={roleNames} />
         <ProfileHeroMeta label={focusAreaLabel} value={focusAreaNames} />
         <ProfileHeroMeta label="Employment" value={employmentLabel} />
-        <ProfileHeroMeta label="Access" value={accessText} />
+        {/* The org role had no home but the badge, so it moved here rather than
+            leaving with it. Web's People table calls the tier "Access" too. */}
+        <ProfileHeroMeta label="Access" value={accessLevelText} />
+        <ProfileHeroMeta label="App account" value={accessText} />
       </ProfileHero>
 
       {!editing ? (
@@ -628,6 +610,22 @@ export default function PersonDetailScreen() {
         />
       ) : (
         <>
+          <ProfileSection title="Contact">
+            <ProfileList>
+              <ProfileInfoRow
+                iconName="mail-outline"
+                label="Email"
+                value={person.email || "No email on file"}
+              />
+              <ProfileInfoRow
+                iconName="call-outline"
+                isLast
+                label="Phone"
+                value={person.phone || "No phone on file"}
+              />
+            </ProfileList>
+          </ProfileSection>
+
           <ProfileSection title="Staff profile">
             <ProfileList>
               <ProfileInfoRow iconName="person-circle-outline" label="Name" value={fullName} />
@@ -673,22 +671,6 @@ export default function PersonDetailScreen() {
                   value={person.statusNote}
                 />
               ) : null}
-            </ProfileList>
-          </ProfileSection>
-
-          <ProfileSection title="Contact">
-            <ProfileList>
-              <ProfileInfoRow
-                iconName="mail-outline"
-                label="Email"
-                value={person.email || "No email on file"}
-              />
-              <ProfileInfoRow
-                iconName="call-outline"
-                isLast
-                label="Phone"
-                value={person.phone || "No phone on file"}
-              />
             </ProfileList>
           </ProfileSection>
 
@@ -879,12 +861,12 @@ function AccountLinkChallengeModal({
     : "Confirm that this is the right app account.";
 
   return (
-    <BottomSheetModal dismissDisabled={isPending} onDismiss={onCancel} visible={challenge != null}>
-      <View style={styles.sheetHeader}>
-        <Text style={styles.sheetTitle}>{title}</Text>
-        <Text style={styles.sheetSubtitle}>{subtitle}</Text>
-      </View>
-
+    <BottomSheetModal
+      dismissDisabled={isPending}
+      header={<SheetHeader subtitle={subtitle} title={title} />}
+      onDismiss={onCancel}
+      visible={challenge != null}
+    >
       <View style={styles.modalInfoPanel}>
         <Text style={styles.modalInfoTitle}>
           {isMismatch ? "The account name is different" : "Existing app account found"}
@@ -959,14 +941,6 @@ function sameIds(left: number[], right: number[]): boolean {
 function formatIdList(ids: number[], map: Map<number, string>): string {
   const values = ids.map((id) => map.get(id)).filter((value): value is string => Boolean(value));
   return values.length > 0 ? values.join(", ") : "None";
-}
-
-function getInitials(person: MobilePerson): string {
-  const initials = [person.firstName, person.lastName]
-    .map((part) => part.trim().charAt(0).toUpperCase())
-    .filter(Boolean)
-    .join("");
-  return initials || "?";
 }
 
 function EditPanel({
@@ -1246,17 +1220,6 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 10,
-    },
-    sheetHeader: {
-      gap: 4,
-    },
-    sheetTitle: {
-      ...mobileText.heroMetric,
-      color: mobileColors.textPrimary,
-    },
-    sheetSubtitle: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
     },
     modalInfoPanel: {
       backgroundColor: mobileColors.surfaceSecondary,

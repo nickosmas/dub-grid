@@ -24,7 +24,7 @@ export default function PendingApprovalsExpandedScreen() {
 
   if (contentState.kind === "loading") {
     return (
-      <Screen title="Pending approvals" bottomPaddingMode="tabbed">
+      <Screen bottomPaddingMode="tabbed">
         {contentState.showSkeleton ? (
           <DashboardListSkeleton rows={3} showFilterHeader={false} variant="badgeLead" />
         ) : null}
@@ -34,7 +34,7 @@ export default function PendingApprovalsExpandedScreen() {
 
   if (contentState.kind === "error") {
     return (
-      <Screen title="Pending approvals" bottomPaddingMode="tabbed">
+      <Screen bottomPaddingMode="tabbed">
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
@@ -56,7 +56,7 @@ export default function PendingApprovalsExpandedScreen() {
   const requests = dashboardQuery.data.actionQueue;
 
   return (
-    <Screen title="Pending approvals" bottomPaddingMode="tabbed">
+    <Screen bottomPaddingMode="tabbed">
       {requests.length === 0 ? (
         <EmptyStateCard
           iconName="checkmark-circle-outline"

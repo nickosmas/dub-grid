@@ -41,7 +41,7 @@ export default function OpenShiftsExpandedScreen() {
 
   if (contentState.kind === "loading") {
     return (
-      <Screen title="Open shifts" bottomPaddingMode="tabbed">
+      <Screen bottomPaddingMode="tabbed">
         {contentState.showSkeleton ? (
           <DashboardListSkeleton rows={4} variant="trailingBadges" />
         ) : null}
@@ -51,7 +51,7 @@ export default function OpenShiftsExpandedScreen() {
 
   if (contentState.kind === "error") {
     return (
-      <Screen title="Open shifts" bottomPaddingMode="tabbed">
+      <Screen bottomPaddingMode="tabbed">
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
@@ -83,7 +83,7 @@ export default function OpenShiftsExpandedScreen() {
   const activeFilterCount = (urgencyFilter !== "all" ? 1 : 0) + (focusAreaFilter !== "all" ? 1 : 0);
 
   return (
-    <Screen title="Open shifts" bottomPaddingMode="tabbed">
+    <Screen bottomPaddingMode="tabbed">
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
         title="Filter open shifts"

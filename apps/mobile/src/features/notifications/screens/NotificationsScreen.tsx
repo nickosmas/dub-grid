@@ -11,7 +11,10 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SearchBar } from "../../../shared/components/SearchBar";
 import { Screen } from "../../../shared/components/Screen";
-import { ScrollableTabStrip } from "../../../shared/components/ScrollableTabStrip";
+import {
+  ScrollableTabStrip,
+  ScrollableTabStripSkeleton,
+} from "../../../shared/components/ScrollableTabStrip";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
@@ -280,9 +283,10 @@ export default function NotificationsScreen() {
 
   return (
     <Screen
+      // Same as People: the search field sits at the top, so the keyboard
+      // inset buys nothing and costs a jump when the large title recalculates.
+      adjustsForKeyboard={false}
       bottomPaddingMode="stack"
-      title="Alerts"
-      subtitle="Alerts"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
@@ -295,12 +299,21 @@ export default function NotificationsScreen() {
           value={searchInput}
         />
 
-        <ScrollableTabStrip
-          accessibilityLabel="Alert filters"
-          activeKey={filter}
-          onSelect={(key) => setFilter(key as FilterKey)}
-          tabs={filterTabs}
-        />
+        {/* Held back until the facets land: every tab carries a count, and
+            painting the strip first made each badge pop in afterwards and shove
+            the pills along once the screen finished loading. */}
+        {contentState.kind === "loading" ? (
+          contentState.showSkeleton ? (
+            <ScrollableTabStripSkeleton tabs={filterTabs.length} />
+          ) : null
+        ) : (
+          <ScrollableTabStrip
+            accessibilityLabel="Alert filters"
+            activeKey={filter}
+            onSelect={(key) => setFilter(key as FilterKey)}
+            tabs={filterTabs}
+          />
+        )}
       </View>
       {unreadCount > 0 ? (
         <View style={styles.actionRow}>

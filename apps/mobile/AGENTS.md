@@ -148,6 +148,13 @@ keeps receiving the previous user's notifications.
 - Guard platform-specific code with `Platform.OS` or existing helpers.
 - Never set `fontFamily` on `<TextInput>` unless the font is guaranteed loaded —
   an unknown family makes Android `EditText` non-interactive.
+- `<Screen>`'s keyboard insetting costs a visible jump on an iOS
+  `headerLargeTitle` screen: RN writes `contentInset`/`contentOffset` when the
+  keyboard opens, UIKit re-evaluates the large title, and it collapses under
+  the finger. Pass `adjustsForKeyboard={false}` whenever the screen's only
+  input sits at the top (a `<SearchBar>` above a list) — nothing there needed
+  lifting off the keyboard, and `UIScrollView` does no first-responder
+  scrolling of its own, so the page then holds still. Keep it on for forms.
 
 ## API and Contract Rules
 

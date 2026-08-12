@@ -11,8 +11,17 @@ export default function PeopleLayout() {
   return (
     <Stack>
       <Stack.Screen name="index" options={createTopLevelStackOptions(mobileColors, "People")} />
-      <Stack.Screen name="add" options={createDetailStackOptions(mobileColors, "Add Person")} />
-      <Stack.Screen name="[id]" options={createDetailStackOptions(mobileColors, "Person")} />
+      {/* Large titles all the way down this section, the way Settings does it:
+          each pushed screen reads as a place of its own. `[id]`'s title is the
+          person's name, which the screen feeds in once it resolves. */}
+      <Stack.Screen
+        name="add"
+        options={createDetailStackOptions(mobileColors, "Add Person", { largeTitle: true })}
+      />
+      <Stack.Screen
+        name="[id]"
+        options={createDetailStackOptions(mobileColors, "Person", { largeTitle: true })}
+      />
     </Stack>
   );
 }

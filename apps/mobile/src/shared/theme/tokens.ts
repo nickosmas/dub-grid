@@ -61,8 +61,9 @@ import type { TextStyle, ViewStyle } from "react-native";
  * `controlSecondaryFg` its own value apart from `brand`.
  *
  * Every entry clears 4.5:1 against `#FFFFFF`; `contrast.test.ts` holds them
- * there. Each is one step down its Tailwind ramp from the semantic token it
- * shadows, so the family is unchanged and only the depth moves.
+ * there. Each is a step down its Tailwind ramp from the semantic token it
+ * shadows, so the depth moves and, with one exception noted below, the family
+ * does not.
  */
 const BUTTON_SOLID_FILLS = {
   /** blue-600. Matches light `brand`; dark's brighter #2075FF measured 4.16:1. */
@@ -71,8 +72,15 @@ const BUTTON_SOLID_FILLS = {
   buttonDangerBg: "#DC2626",
   /** green-700, below the shared green-500/600 `success`. */
   buttonSuccessBg: "#15803D",
-  /** amber-700, below the shared amber-500 `warning`. */
-  buttonWarningBg: "#B45309",
+  /**
+   * orange-700. The one entry that moves family rather than depth: amber-700
+   * (#B45309) cleared AA but read as brown under a white label, which is not
+   * what "Mark Inactive" should look like. Orange is capped by the same rule as
+   * the rest — orange-600 (#EA580C) is the color people picture when they say
+   * "orange", and it measures 3.56:1 against white, well under the floor. This
+   * is the most orange value that still clears it, at 5.18:1.
+   */
+  buttonWarningBg: "#C2410C",
 } as const;
 
 const MOBILE_LIGHT = {
@@ -174,7 +182,14 @@ export const darkMobileColors = {
   ...MOBILE_DARK,
 } as const;
 export type MobileColors = Record<keyof typeof mobileColors, string>;
-/** Named layout slots (screen gutter, section gap, card gap). */
+/**
+ * Named layout slots (section gap, card gap).
+ *
+ * The screen gutter is `SCREEN_GUTTER` in `components/screen-layout`, not
+ * `screenX` here: it has to line up with the navigation bar's title, which is a
+ * per-platform number, and this module is imported by nearly everything and
+ * stays free of runtime platform checks.
+ */
 export const mobileSpacing = spacingTokens;
 /** The 4/8/12/16/20/24/32/40/48 ramp — reach for this for ad-hoc spacing. */
 export const mobileSpace = mobileSpacingTokens;

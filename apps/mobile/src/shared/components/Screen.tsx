@@ -90,6 +90,7 @@ function createCardIconTone(
 import {
   DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
   getScreenBottomPadding,
+  getScreenGutter,
   type ScreenBottomPaddingMode,
 } from "./screen-layout";
 
@@ -98,8 +99,6 @@ export type { ScreenBottomPaddingMode } from "./screen-layout";
 type ScreenScrollViewProps = ComponentProps<typeof ScrollView>;
 
 export function Screen({
-  title: _title,
-  subtitle: _subtitle,
   stickyHeader,
   stickyHeaderShellStyle,
   stickyHeaderTopPadding,
@@ -110,10 +109,14 @@ export function Screen({
   onRefresh,
   onScroll,
   scrollEventThrottle,
+  adjustsForKeyboard = true,
   bottomPaddingMode = DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
 }: PropsWithChildren<{
-  title?: string;
-  subtitle?: string;
+  // No `title`/`subtitle` here on purpose. A page's title is the native header's
+  // (`createTopLevelStackOptions` / `createDetailStackOptions` on its route), or
+  // it belongs to a `stickyHeader` the screen builds itself. These props used to
+  // exist and were silently discarded, so a screen could pass `title="People"`,
+  // render nothing, and give no hint about where the real title comes from.
   stickyHeader?: ReactNode;
   stickyHeaderShellStyle?: StyleProp<ViewStyle>;
   stickyHeaderTopPadding?: number;
@@ -123,6 +126,13 @@ export function Screen({
   onRefresh?: () => void;
   onScroll?: ScreenScrollViewProps["onScroll"];
   scrollEventThrottle?: number;
+  /**
+   * Set false on a screen whose only input sits at the *top* — a search field
+   * above a list. Keyboard insetting exists to lift fields off the keyboard,
+   * and a field at the top never needed lifting, so all it does there is cost:
+   * see the note on `automaticallyAdjustKeyboardInsets` below.
+   */
+  adjustsForKeyboard?: boolean;
   bottomPaddingMode?: ScreenBottomPaddingMode;
 }>) {
   const mobileColors = useMobileColors();
@@ -192,7 +202,14 @@ export function Screen({
       // so form fields and submit buttons near the bottom of a screen sat
       // behind it. Android resizes the window instead (`adjustResize`), where
       // this prop is ignored.
-      automaticallyAdjustKeyboardInsets
+      //
+      // It is opt-out because it is not free on a `headerLargeTitle` screen:
+      // the inset (and the offset RN writes alongside it) makes UIKit
+      // re-evaluate the large title, which collapses, and the whole page
+      // visibly jumps the instant the keyboard opens. UIScrollView does no
+      // first-responder scrolling of its own, so a screen that turns this off
+      // simply does not move on focus.
+      automaticallyAdjustKeyboardInsets={adjustsForKeyboard}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={{
         paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,
@@ -335,7 +352,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.background,
     },
     content: {
-      paddingHorizontal: mobileSpacing.screenX,
+      paddingHorizontal: getScreenGutter(),
       gap: mobileSpacing.sectionGap,
     },
     contentDefault: {
@@ -354,7 +371,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // content scrolls under this shell and must not show through.
       overflow: "hidden",
       backgroundColor: mobileColors.background,
-      paddingHorizontal: mobileSpacing.screenX,
+      paddingHorizontal: getScreenGutter(),
       paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.lg,
       borderBottomWidth: 1,

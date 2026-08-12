@@ -31,7 +31,7 @@ export default function CoverageExpandedScreen() {
 
   if (contentState.kind === "loading") {
     return (
-      <Screen title="Coverage" bottomPaddingMode="tabbed">
+      <Screen bottomPaddingMode="tabbed">
         {contentState.showSkeleton ? <DashboardListSkeleton rows={4} variant="meter" /> : null}
       </Screen>
     );
@@ -39,7 +39,7 @@ export default function CoverageExpandedScreen() {
 
   if (contentState.kind === "error") {
     return (
-      <Screen title="Coverage" bottomPaddingMode="tabbed">
+      <Screen bottomPaddingMode="tabbed">
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
@@ -67,7 +67,7 @@ export default function CoverageExpandedScreen() {
   const activeFilterCount = focusAreaFilter === "all" ? 0 : 1;
 
   return (
-    <Screen title="Coverage" bottomPaddingMode="tabbed">
+    <Screen bottomPaddingMode="tabbed">
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
         title={`Filter by ${focusAreaLabel.toLowerCase()}`}

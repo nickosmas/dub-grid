@@ -1,11 +1,20 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useRef } from "react";
 import { Pressable, StyleSheet, TextInput, type TextInputProps, View } from "react-native";
-import { Button } from "./Button";
+import Animated from "react-native-reanimated";
+import { usePressAnimation } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, type MobileColors } from "../theme/tokens";
+import { mobileMotion, mobileRadii, type MobileColors } from "../theme/tokens";
 
 const DEFAULT_DEBOUNCE_MS = 300;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * Small enough to read as a clear affordance rather than a second control in
+ * the field. Its touch target comes from `hitSlop`, not from its size.
+ */
+const CLEAR_SIZE = 22;
 
 export type SearchBarProps = {
   value: string;
@@ -19,6 +28,12 @@ export type SearchBarProps = {
   onSubmitEditing?: TextInputProps["onSubmitEditing"];
 };
 
+/**
+ * The app's search field. A screen that puts one above a list should also pass
+ * `adjustsForKeyboard={false}` to its `<Screen>`: a field at the top of the
+ * page never needs lifting off the keyboard, and insetting for it collapses
+ * the iOS large title and jumps the page the moment this is focused.
+ */
 export function SearchBar({
   value,
   onChangeText,
@@ -63,17 +78,36 @@ export function SearchBar({
         style={styles.input}
         value={value}
       />
-      {showClear ? (
-        <Button
-          accessibilityLabel="Clear search"
-          icon="close-circle"
-          iconOnly
-          onPress={() => onChangeText("")}
-          size="sm"
-          tone="ghost"
-        />
-      ) : null}
+      {/* The slot is always mounted, so the input keeps the same width whether
+          or not there is a query. Mounting the button itself on first keystroke
+          re-flowed the field mid-word, which reads as the text jumping. */}
+      <View style={styles.clearSlot}>
+        {showClear ? <ClearButton onPress={() => onChangeText("")} /> : null}
+      </View>
     </View>
+  );
+}
+
+function ClearButton({ onPress }: { onPress: () => void }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
+    rippleBorderless: true,
+    scale: mobileMotion.press.iconOnlyScale,
+  });
+
+  return (
+    <AnimatedPressable
+      accessibilityLabel="Clear search"
+      accessibilityRole="button"
+      android_ripple={androidRipple}
+      hitSlop={12}
+      onPress={onPress}
+      {...pressHandlers}
+      style={[styles.clearButton, animatedStyle]}
+    >
+      <Ionicons color={mobileColors.textSecondary} name="close" size={14} />
+    </AnimatedPressable>
   );
 }
 
@@ -84,12 +118,16 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       backgroundColor: mobileColors.surfaceSecondary,
       borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.control,
+      // Pill, to match the filter and add controls it sits beside.
+      borderRadius: mobileRadii.pill,
       borderWidth: 1,
       flexDirection: "row",
       flex: 1,
       gap: 9,
-      paddingHorizontal: 14,
+      // A pill needs more room at the ends than a 12pt-radius box before its
+      // contents stop looking crowded by the curve.
+      paddingLeft: 16,
+      paddingRight: 12,
     },
     input: {
       // Explicit regular weight — don't spread `mobileText.sectionTitle`,
@@ -103,7 +141,19 @@ const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
       paddingVertical: 12,
     },
-    clearButtonPressed: {
-      transform: [{ scale: 0.96 }],
+    clearSlot: {
+      width: CLEAR_SIZE,
+      height: CLEAR_SIZE,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    clearButton: {
+      width: CLEAR_SIZE,
+      height: CLEAR_SIZE,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.controlNeutralBg,
+      borderRadius: mobileRadii.pill,
+      overflow: "hidden",
     },
   });

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -19,6 +20,7 @@ import {
 } from "../../../shared/components/FilterSheet";
 import { SearchBar } from "../../../shared/components/SearchBar";
 import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
+import { usePressAnimation } from "../../../shared/motion/usePressAnimation";
 import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
@@ -33,11 +35,18 @@ import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileMotion,
+  mobileRadii,
+  mobileText,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type StatusFilter = "active" | "inactive";
 type SortMode = "seniority" | "alphabetical";
@@ -215,9 +224,11 @@ export default function PeopleScreen() {
 
   return (
     <Screen
+      // The only field here is the search bar at the top, which the keyboard
+      // never covers. Insetting for it just collapses the large title and
+      // jumps the page open.
+      adjustsForKeyboard={false}
       bottomPaddingMode="tabbed"
-      title="People"
-      subtitle="People"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
@@ -310,15 +321,7 @@ export default function PeopleScreen() {
             onPress={() => setIsFilterModalVisible(true)}
           />
           {canManageEmployees ? (
-            <Pressable
-              accessibilityLabel="Add person"
-              accessibilityRole="button"
-              android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-              onPress={() => router.push("/people/add")}
-              style={styles.addPersonButton}
-            >
-              <Ionicons color={mobileColors.textInverse} name="person-add-outline" size={18} />
-            </Pressable>
+            <AddPersonButton onPress={() => router.push("/people/add")} />
           ) : null}
         </View>
       </View>
@@ -506,6 +509,33 @@ function countPeopleInManagementDepartment(
     .length;
 }
 
+/**
+ * A circle rather than the shared `<Button iconOnly>`, which caps at 44 and
+ * would sit two points shorter than the search field it lines up with.
+ */
+function AddPersonButton({ onPress }: { onPress: () => void }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
+    rippleBorderless: true,
+    rippleColor: mobileColors.ripplePrimary,
+    scale: mobileMotion.press.iconOnlyScale,
+  });
+
+  return (
+    <AnimatedPressable
+      accessibilityLabel="Add person"
+      accessibilityRole="button"
+      android_ripple={androidRipple}
+      onPress={onPress}
+      {...pressHandlers}
+      style={[styles.addPersonButton, animatedStyle]}
+    >
+      <Ionicons color={mobileColors.textInverse} name="person-add-outline" size={18} />
+    </AnimatedPressable>
+  );
+}
+
 function PersonRow({
   id,
   employmentType,
@@ -614,7 +644,9 @@ const createStyles = (mobileColors: MobileColors) =>
     addPersonButton: {
       alignItems: "center",
       backgroundColor: mobileColors.brand,
-      borderRadius: mobileRadii.control,
+      // Circular: 46 square at the pill radius, matching the search field's
+      // height and the filter pill beside it.
+      borderRadius: mobileRadii.pill,
       height: 46,
       justifyContent: "center",
       width: 46,

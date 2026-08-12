@@ -9,6 +9,8 @@ import {
 } from "react-native";
 import { hapticSelection } from "../lib/haptics";
 import { useMobileColors } from "../providers/ThemeModeProvider";
+import { getScreenGutter } from "./screen-layout";
+import { SkeletonBlock } from "./skeleton";
 import {
   mobileRadii,
   mobileSpace,
@@ -23,9 +25,6 @@ export type ScrollableTab = {
   /** Optional count badge. Omit entirely for strips that don't count anything. */
   count?: number;
 };
-
-/** Breathing room left beside the active tab when it is scrolled into view. */
-const SCROLL_INTO_VIEW_GUTTER = mobileSpacing.screenX;
 
 /**
  * The offset the strip must scroll to for `tab` to sit fully in view, or null
@@ -48,8 +47,10 @@ export function getTabScrollIntoViewOffset({
 }): number | null {
   if (viewportWidth === 0) return null;
 
-  const leftAlignedOffset = Math.max(tab.x - SCROLL_INTO_VIEW_GUTTER, 0);
-  const rightAlignedOffset = tab.x + tab.width + SCROLL_INTO_VIEW_GUTTER - viewportWidth;
+  // Breathing room left beside the tab once it is scrolled in.
+  const gutter = getScreenGutter();
+  const leftAlignedOffset = Math.max(tab.x - gutter, 0);
+  const rightAlignedOffset = tab.x + tab.width + gutter - viewportWidth;
 
   // Only scroll when the tab is actually clipped, so selecting an already
   // visible tab doesn't yank the strip around.
@@ -186,18 +187,61 @@ export function ScrollableTabStrip({
   );
 }
 
+/**
+ * The strip's stand-in for a screen's loading pass.
+ *
+ * A strip whose tabs carry counts must not paint before those counts are known.
+ * Rendering the real one early looks finished, then every badge pops in when the
+ * screen's data lands and shoves each pill along — a second wave, and the thing
+ * that reads as the tabs re-rendering themselves. Screens that count something
+ * render this while their skeleton is up and the real strip once they have data.
+ *
+ * Reuses the strip's own style objects rather than restating its numbers, so the
+ * pill height and gaps can't drift apart from what replaces them.
+ */
+export function ScrollableTabStripSkeleton({
+  tabs,
+  widths = [92, 68, 78, 104],
+}: {
+  /** How many pills to stand in for. Usually the screen's real tab count. */
+  tabs: number;
+  /** Cycled through so the row reads as varied labels rather than a bar chart. */
+  widths?: readonly number[];
+}) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
+  return (
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={[styles.strip, styles.content]}>
+        {Array.from({ length: tabs }, (_, index) => (
+          <SkeletonBlock
+            key={index}
+            height={SKELETON_TAB_HEIGHT}
+            radius={mobileRadii.pill}
+            width={widths[index % widths.length]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+/** The pill's `minHeight`, which is also its resting height at one line. */
+const SKELETON_TAB_HEIGHT = 36;
+
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
     // Negative margin so the strip bleeds to the screen edges while its content
     // still starts at the gutter.
     strip: {
-      marginHorizontal: -mobileSpacing.screenX,
+      marginHorizontal: -getScreenGutter(),
     },
     content: {
       flexDirection: "row",
       alignItems: "center",
       gap: mobileSpace.sm,
-      paddingHorizontal: mobileSpacing.screenX,
+      paddingHorizontal: getScreenGutter(),
       paddingVertical: 2,
     },
     tab: {

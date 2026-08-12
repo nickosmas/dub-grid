@@ -5,6 +5,7 @@ import { useMemo, type ComponentProps, type ComponentType, type ReactNode } from
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { useMotionPreference } from "../motion/useMotionPreference";
+import { getScreenGutter } from "./screen-layout";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 import {
   mobileElevation,
@@ -204,7 +205,7 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       // Derived from the content gutter rather than restated, so the bar stays
       // a step inside the cards it floats over however that gutter moves. Level
       // with them it read as another card in the stack, not as chrome above it.
-      marginHorizontal: mobileSpacing.screenX + TAB_BAR_INSET_BEYOND_CONTENT,
+      marginHorizontal: getScreenGutter() + TAB_BAR_INSET_BEYOND_CONTENT,
       height: FLOATING_TAB_BAR_HEIGHT,
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.pill,

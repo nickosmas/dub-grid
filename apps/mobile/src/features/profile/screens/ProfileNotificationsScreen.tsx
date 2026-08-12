@@ -168,8 +168,6 @@ export default function ProfileNotificationsScreen() {
   return (
     <Screen
       bottomPaddingMode="tabbed"
-      title="Notifications"
-      subtitle="Notifications"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >

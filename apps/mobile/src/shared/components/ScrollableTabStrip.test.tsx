@@ -14,11 +14,13 @@ vi.mock("../lib/haptics", () => ({
 
 let ScrollableTabStrip: (typeof import("./ScrollableTabStrip"))["ScrollableTabStrip"];
 let getTabScrollIntoViewOffset: (typeof import("./ScrollableTabStrip"))["getTabScrollIntoViewOffset"];
+let getScreenGutter: (typeof import("./screen-layout"))["getScreenGutter"];
 
 beforeAll(async () => {
   const scrollableTabStrip = await import("./ScrollableTabStrip");
   ScrollableTabStrip = scrollableTabStrip.ScrollableTabStrip;
   getTabScrollIntoViewOffset = scrollableTabStrip.getTabScrollIntoViewOffset;
+  ({ getScreenGutter } = await import("./screen-layout"));
 });
 
 beforeEach(() => {
@@ -108,7 +110,8 @@ describe("ScrollableTabStrip", () => {
   });
 });
 
-// The gutter is `mobileSpacing.screenX`, 16.
+// Derived, not restated: the gutter is the screen's, which is per-platform
+// because it has to line up with the navigation bar's title.
 describe("getTabScrollIntoViewOffset", () => {
   const VIEWPORT_WIDTH = 390;
 
@@ -123,14 +126,14 @@ describe("getTabScrollIntoViewOffset", () => {
   });
 
   it("scrolls a right-clipped tab in, leaving the gutter beside it", () => {
-    // Right edge at 500, so the strip has to sit at 500 + 16 - 390.
+    // Right edge at 500, so the strip has to sit at 500 + gutter - 390.
     expect(
       getTabScrollIntoViewOffset({
         scrollOffset: 0,
         tab: { x: 420, width: 80 },
         viewportWidth: VIEWPORT_WIDTH,
       }),
-    ).toBe(126);
+    ).toBe(500 + getScreenGutter() - VIEWPORT_WIDTH);
   });
 
   // The old math compared against 0 rather than the live scroll offset, so a
@@ -143,7 +146,7 @@ describe("getTabScrollIntoViewOffset", () => {
         tab: { x: 220, width: 80 },
         viewportWidth: VIEWPORT_WIDTH,
       }),
-    ).toBe(204);
+    ).toBe(220 - getScreenGutter());
   });
 
   it("never scrolls past the start of the strip for the first tab", () => {
