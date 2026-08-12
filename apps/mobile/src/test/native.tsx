@@ -40,6 +40,7 @@ function pickDomProps(input: Record<string, any>) {
       key === "contentInsetAdjustmentBehavior" ||
       key === "automaticallyAdjustContentInsets" ||
       key === "automaticallyAdjustsScrollIndicatorInsets" ||
+      key === "scrollEventThrottle" ||
       key === "stickyHeaderIndices" ||
       key === "onStartShouldSetResponder" ||
       key === "onLayout" ||

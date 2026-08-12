@@ -25,4 +25,19 @@ describe("top-level stack options", () => {
       headerLargeTitleEnabled: expect.any(Boolean),
     });
   });
+
+  // The large-title branch used to leave `headerStyle` unset, which fell
+  // through to the navigation theme's `card` — pure white — while the page
+  // under it sits on `background`, slate-50. A visible seam on iOS.
+  it("paints both header surfaces with the page's own background", () => {
+    const options = createTopLevelStackOptions(mobileColors, "Profile");
+
+    expect(options.headerStyle).toMatchObject({
+      backgroundColor: mobileColors.background,
+    });
+    expect(options.headerLargeStyle).toMatchObject({
+      backgroundColor: mobileColors.background,
+    });
+    expect(mobileColors.background).not.toBe(mobileColors.surface);
+  });
 });

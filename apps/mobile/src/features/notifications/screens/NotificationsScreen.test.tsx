@@ -152,6 +152,23 @@ describe("NotificationsScreen", () => {
     expect(screen.getByText("No alerts yet")).toBeInTheDocument();
   });
 
+  // The filter row was a third hand-rolled chip strip, so selecting a filter
+  // that sat off the right edge left it scrolled out of view. It now rides on
+  // ScrollableTabStrip, which is what scrolls the active tab back in.
+  it("renders the filters as a scrollable tab strip", () => {
+    useInfiniteQuery.mockReturnValue(buildInfiniteQueryResult());
+
+    render(<NotificationsScreen />);
+
+    expect(screen.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "true");
+    for (const label of ["Unread", "Schedule", "Requests", "System", "Archived"]) {
+      expect(screen.getByRole("tab", { name: label })).toHaveAttribute("aria-selected", "false");
+    }
+
+    fireEvent.click(screen.getByRole("tab", { name: "Archived" }));
+    expect(screen.getByRole("tab", { name: "Archived" })).toHaveAttribute("aria-selected", "true");
+  });
+
   // Search and filter are both in the query key, so a keystroke starts a new
   // query. `hasData` used to be derived from the rendered list's length, which
   // meant the skeleton repainted over alerts the user was mid-read.

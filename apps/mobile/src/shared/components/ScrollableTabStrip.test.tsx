@@ -13,9 +13,12 @@ vi.mock("../lib/haptics", () => ({
 }));
 
 let ScrollableTabStrip: (typeof import("./ScrollableTabStrip"))["ScrollableTabStrip"];
+let getTabScrollIntoViewOffset: (typeof import("./ScrollableTabStrip"))["getTabScrollIntoViewOffset"];
 
 beforeAll(async () => {
-  ScrollableTabStrip = (await import("./ScrollableTabStrip")).ScrollableTabStrip;
+  const scrollableTabStrip = await import("./ScrollableTabStrip");
+  ScrollableTabStrip = scrollableTabStrip.ScrollableTabStrip;
+  getTabScrollIntoViewOffset = scrollableTabStrip.getTabScrollIntoViewOffset;
 });
 
 beforeEach(() => {
@@ -102,5 +105,74 @@ describe("ScrollableTabStrip", () => {
     renderStrip({ activeKey: "does-not-exist" });
 
     expect(screen.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "false");
+  });
+});
+
+// The gutter is `mobileSpacing.screenX`, 16.
+describe("getTabScrollIntoViewOffset", () => {
+  const VIEWPORT_WIDTH = 390;
+
+  it("leaves a fully visible tab alone", () => {
+    expect(
+      getTabScrollIntoViewOffset({
+        scrollOffset: 0,
+        tab: { x: 120, width: 100 },
+        viewportWidth: VIEWPORT_WIDTH,
+      }),
+    ).toBeNull();
+  });
+
+  it("scrolls a right-clipped tab in, leaving the gutter beside it", () => {
+    // Right edge at 500, so the strip has to sit at 500 + 16 - 390.
+    expect(
+      getTabScrollIntoViewOffset({
+        scrollOffset: 0,
+        tab: { x: 420, width: 80 },
+        viewportWidth: VIEWPORT_WIDTH,
+      }),
+    ).toBe(126);
+  });
+
+  // The old math compared against 0 rather than the live scroll offset, so a
+  // tab clipped by the left edge — tappable on its visible sliver, or made
+  // active by something other than a tap — never scrolled back into view.
+  it("scrolls a left-clipped tab back in", () => {
+    expect(
+      getTabScrollIntoViewOffset({
+        scrollOffset: 300,
+        tab: { x: 220, width: 80 },
+        viewportWidth: VIEWPORT_WIDTH,
+      }),
+    ).toBe(204);
+  });
+
+  it("never scrolls past the start of the strip for the first tab", () => {
+    expect(
+      getTabScrollIntoViewOffset({
+        scrollOffset: 200,
+        tab: { x: 16, width: 60 },
+        viewportWidth: VIEWPORT_WIDTH,
+      }),
+    ).toBe(0);
+  });
+
+  it("leaves a visible tab alone even when the strip is scrolled", () => {
+    expect(
+      getTabScrollIntoViewOffset({
+        scrollOffset: 300,
+        tab: { x: 420, width: 80 },
+        viewportWidth: VIEWPORT_WIDTH,
+      }),
+    ).toBeNull();
+  });
+
+  it("waits for the viewport to be measured", () => {
+    expect(
+      getTabScrollIntoViewOffset({
+        scrollOffset: 0,
+        tab: { x: 420, width: 80 },
+        viewportWidth: 0,
+      }),
+    ).toBeNull();
   });
 });

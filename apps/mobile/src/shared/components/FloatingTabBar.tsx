@@ -11,9 +11,14 @@ import {
   mobileMotion,
   mobileRadii,
   mobileSpace,
+  mobileSpacing,
   mobileText,
   type MobileColors,
 } from "../theme/tokens";
+import { FLOATING_TAB_BAR_HEIGHT, getFloatingTabBarMarginBottom } from "./floating-tab-bar-layout";
+
+/** How far inside the content gutter each end of the bar sits. */
+const TAB_BAR_INSET_BEYOND_CONTENT = mobileSpace.sm;
 
 type TabBarRenderer = NonNullable<ComponentProps<typeof Tabs>["tabBar"]>;
 type BottomTabBarProps = Parameters<TabBarRenderer>[0];
@@ -68,9 +73,9 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
     <View
       style={[
         styles.bar,
-        {
-          marginBottom: Math.max(insets.bottom, 8) + 6,
-        },
+        // Shared with `getScreenBottomPadding`, which has to clear exactly this
+        // much for the last row of a screen to be reachable.
+        { marginBottom: getFloatingTabBarMarginBottom(insets.bottom) },
       ]}
     >
       {state.routes.map((route, index) => {
@@ -123,7 +128,7 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
               <config.family
                 name={focused ? config.filled : config.outline}
                 size={22}
-                color={focused ? mobileColors.brand : mobileColors.textSubtle}
+                color={focused ? mobileColors.brand : mobileColors.textPrimary}
               />
             </TabIconPill>
             <Text
@@ -184,17 +189,30 @@ function TabIconPill({
 const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     bar: {
+      // Out of the navigator's flow, so the screen container fills the window
+      // and content passes *under* the bar. Left in flow it took layout height
+      // of its own, which ended every screen in a flat band above it — the bar
+      // read as docked chrome rather than something floating over the page.
+      // Screens clear it with `bottomPaddingMode="tabbed"`.
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-around",
-      marginHorizontal: mobileSpace.lg,
-      height: 68,
+      // Derived from the content gutter rather than restated, so the bar stays
+      // a step inside the cards it floats over however that gutter moves. Level
+      // with them it read as another card in the stack, not as chrome above it.
+      marginHorizontal: mobileSpacing.screenX + TAB_BAR_INSET_BEYOND_CONTENT,
+      height: FLOATING_TAB_BAR_HEIGHT,
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.pill,
       paddingHorizontal: mobileSpace.sm,
-      // A detached bar floating over content, so it takes the `float` level
-      // rather than the hand-tuned platform fork this used to carry.
-      ...mobileElevation("float", isDark),
+      // `floatBar` rather than plain `float`: same downward cast, but composed
+      // so the blur wraps every edge at a readable strength instead of whatever
+      // a single `elevation` number happens to paint.
+      ...mobileElevation("floatBar", isDark),
     },
     tab: {
       flex: 1,
@@ -218,6 +236,8 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       color: mobileColors.brand,
     },
     labelInactive: {
-      color: mobileColors.textSubtle,
+      // Full-strength text, not the muted ramp: a tab is a destination, and
+      // the selected one is already called out by its brand fill and pill.
+      color: mobileColors.textPrimary,
     },
   });

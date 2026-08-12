@@ -16,8 +16,37 @@ import { AppText } from "./AppText";
 import { useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 
-/** Padding below the sheet content, on top of the device's own bottom inset. */
+/** Padding below the sheet content, inside the sheet's own edge. */
 const SHEET_CONTENT_BOTTOM_PADDING = mobileSpace["2xl"];
+
+/**
+ * Breathing room left above a full-height sheet, below the status bar. The
+ * sheet has no margins of its own: it spans the full width and runs off the
+ * bottom edge, so this is the only side it is ever held back from.
+ */
+const SHEET_TOP_GAP = mobileSpace.md;
+
+/**
+ * A sheet is a much bigger surface than a card, and the card radius reads
+ * nearly square across that width — it wants its own step up, past anything on
+ * the shared radius ramp. Sits in the range iOS gives its own sheets (~38-44).
+ *
+ * Top corners only: the bottom two run past the screen edge, where a radius
+ * would cut two backdrop-coloured notches into the very bottom.
+ */
+const SHEET_CORNER_RADIUS = 40;
+
+/**
+ * A modal gets its own native window, which on Android is inset by the system
+ * bars even when the app itself draws edge-to-edge. Translucent on both, so the
+ * sheet's own margins are measured from the true screen edge rather than from
+ * wherever the navigation bar happens to start.
+ * `navigationBarTranslucent` requires `statusBarTranslucent`.
+ */
+const MODAL_EDGE_TO_EDGE_PROPS = {
+  navigationBarTranslucent: true,
+  statusBarTranslucent: true,
+} as const;
 
 export function BottomSheetModal({
   visible,
@@ -57,11 +86,18 @@ export function BottomSheetModal({
   // Read live rather than at module scope: a module-scope `Dimensions.get`
   // snapshot goes stale on rotation and on foldables.
   const { height: windowHeight } = useWindowDimensions();
+  // The sheet runs to the screen's bottom edge, so nothing lifts its content
+  // clear of the system bars any more — that falls back to the content padding.
   const bottomPadding = SHEET_CONTENT_BOTTOM_PADDING + insets.bottom;
+  // Measured against the space that actually exists, not a share of the window.
+  // Once the modal started drawing under the system bars, a percentage of the
+  // full window ran off the top on a tall sheet — grabber, header and all —
+  // with the status bar over whatever was left.
+  const maxHeight = windowHeight - insets.top - SHEET_TOP_GAP;
   const isDark = useIsDarkMode();
   const styles = useMemo(
-    () => createStyles(mobileColors, isDark, windowHeight, bottomPadding),
-    [mobileColors, isDark, windowHeight, bottomPadding],
+    () => createStyles(mobileColors, isDark, maxHeight, bottomPadding),
+    [mobileColors, isDark, maxHeight, bottomPadding],
   );
   const grabberVisible = showGrabber ?? !dismissDisabled;
   const handleDismiss = () => {
@@ -78,6 +114,7 @@ export function BottomSheetModal({
 
   return (
     <Modal
+      {...MODAL_EDGE_TO_EDGE_PROPS}
       animationType="fade"
       onRequestClose={handleDismiss}
       presentationStyle="overFullScreen"
@@ -149,7 +186,7 @@ export function BottomSheetModal({
 const createStyles = (
   mobileColors: MobileColors,
   isDark: boolean,
-  windowHeight: number,
+  maxHeight: number,
   bottomPadding: number,
 ) =>
   StyleSheet.create({
@@ -179,14 +216,12 @@ const createStyles = (
       backgroundColor: mobileColors.overlay,
     },
     sheet: {
-      width: "100%",
-      maxHeight: Math.round(windowHeight * 0.92),
-      borderTopLeftRadius: mobileRadii.card + 8,
-      borderTopRightRadius: mobileRadii.card + 8,
-      // Dark mode keeps the hairline; its shadow is invisible against a
-      // near-black page, so the edge is what separates sheet from backdrop.
-      borderWidth: isDark ? 1 : 0,
-      borderColor: mobileColors.borderSubtle,
+      maxHeight,
+      // No margins and no width of its own: the sheet stretches to the full
+      // screen width by default and meets the bottom edge, so the top two
+      // corners are its only edges ever in view.
+      borderTopLeftRadius: SHEET_CORNER_RADIUS,
+      borderTopRightRadius: SHEET_CORNER_RADIUS,
       backgroundColor: mobileColors.surface,
       ...mobileElevation("sheet", isDark),
     },

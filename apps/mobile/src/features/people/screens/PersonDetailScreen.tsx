@@ -594,7 +594,7 @@ export default function PersonDetailScreen() {
               compact
               label="Edit"
               leadingAccessory={
-                <Ionicons color={mobileIconToneColor("teal", isDark)} name="create" size={18} />
+                <Ionicons color={mobileIconToneColor("orange", isDark)} name="create" size={18} />
               }
               onPress={() => {
                 setEditing(true);

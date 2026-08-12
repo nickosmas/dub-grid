@@ -28,6 +28,37 @@ export type ScrollableTab = {
 const SCROLL_INTO_VIEW_GUTTER = mobileSpacing.screenX;
 
 /**
+ * The offset the strip must scroll to for `tab` to sit fully in view, or null
+ * when it already is.
+ *
+ * Tab offsets are absolute (measured inside the content container), so they
+ * only say whether a tab is clipped once compared against where the strip is
+ * actually scrolled to. Comparing them against 0 makes the left-clipped case
+ * unrepresentable, since no tab can start before the content container's own
+ * leading gutter.
+ */
+export function getTabScrollIntoViewOffset({
+  scrollOffset,
+  tab,
+  viewportWidth,
+}: {
+  scrollOffset: number;
+  tab: { x: number; width: number };
+  viewportWidth: number;
+}): number | null {
+  if (viewportWidth === 0) return null;
+
+  const leftAlignedOffset = Math.max(tab.x - SCROLL_INTO_VIEW_GUTTER, 0);
+  const rightAlignedOffset = tab.x + tab.width + SCROLL_INTO_VIEW_GUTTER - viewportWidth;
+
+  // Only scroll when the tab is actually clipped, so selecting an already
+  // visible tab doesn't yank the strip around.
+  if (scrollOffset > leftAlignedOffset) return leftAlignedOffset;
+  if (scrollOffset < rightAlignedOffset) return rightAlignedOffset;
+  return null;
+}
+
+/**
  * A horizontally scrolling pill tab strip.
  *
  * Replaces two independent implementations — the Requests tab row and the
@@ -59,31 +90,46 @@ export function ScrollableTabStrip({
   // Measured per tab, because labels differ in width — the same reason the
   // segmented control measures rather than assuming equal fractions.
   const layoutsRef = useRef<Record<string, { x: number; width: number }>>({});
+  const scrollOffsetRef = useRef(0);
 
-  const handleTabLayout = useCallback((key: string, event: LayoutChangeEvent) => {
-    const { x, width } = event.nativeEvent.layout;
-    layoutsRef.current[key] = { x, width };
-  }, []);
+  const scrollTabIntoView = useCallback(
+    (key: string) => {
+      const layout = layoutsRef.current[key];
+      if (!layout) return;
+
+      const offset = getTabScrollIntoViewOffset({
+        scrollOffset: scrollOffsetRef.current,
+        tab: layout,
+        viewportWidth,
+      });
+      if (offset === null) return;
+
+      scrollRef.current?.scrollTo({ x: offset, animated: true });
+    },
+    [viewportWidth],
+  );
+
+  const handleTabLayout = useCallback(
+    (key: string, event: LayoutChangeEvent) => {
+      const { x, width } = event.nativeEvent.layout;
+      const previous = layoutsRef.current[key];
+      layoutsRef.current[key] = { x, width };
+
+      // The effect below runs before native layout lands, so a tab that is
+      // already active on first paint — a deep-linked request filter, the
+      // schedule's home focus area — has nothing to measure against yet and
+      // would stay parked off-screen. Align it as its geometry arrives.
+      if (key === activeKey && (previous?.x !== x || previous?.width !== width)) {
+        scrollTabIntoView(key);
+      }
+    },
+    [activeKey, scrollTabIntoView],
+  );
 
   useEffect(() => {
     if (activeKey === null) return;
-    const layout = layoutsRef.current[activeKey];
-    if (!layout || viewportWidth === 0) return;
-
-    const leftEdge = layout.x - SCROLL_INTO_VIEW_GUTTER;
-    const rightOverflow = layout.x + layout.width + SCROLL_INTO_VIEW_GUTTER - viewportWidth;
-
-    // Only scroll when the tab is actually clipped, so selecting an already
-    // visible tab doesn't yank the strip around.
-    if (rightOverflow > 0) {
-      scrollRef.current?.scrollTo({ x: rightOverflow, animated: true });
-    } else if (leftEdge < 0) {
-      scrollRef.current?.scrollTo({
-        x: Math.max(layout.x - SCROLL_INTO_VIEW_GUTTER, 0),
-        animated: true,
-      });
-    }
-  }, [activeKey, viewportWidth]);
+    scrollTabIntoView(activeKey);
+  }, [activeKey, scrollTabIntoView]);
 
   return (
     <ScrollView
@@ -91,7 +137,11 @@ export function ScrollableTabStrip({
       contentContainerStyle={styles.content}
       horizontal
       onLayout={(event) => setViewportWidth(event.nativeEvent.layout.width)}
+      onScroll={(event) => {
+        scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
+      }}
       ref={scrollRef}
+      scrollEventThrottle={16}
       showsHorizontalScrollIndicator={false}
       style={styles.strip}
     >

@@ -133,11 +133,13 @@ export default function AddPersonScreen() {
   // "Select at least one <focus area>" error, which reads as broken rather
   // than loading.
   if (bootstrapQuery.isLoading) {
-    return <Screen>{showSkeleton ? <PersonFormSkeleton /> : null}</Screen>;
+    return (
+      <Screen bottomPaddingMode="tabbed">{showSkeleton ? <PersonFormSkeleton /> : null}</Screen>
+    );
   }
 
   return (
-    <Screen>
+    <Screen bottomPaddingMode="tabbed">
       <ProfileSection title="Basic info">
         <ProfilePanel>
           <ProfileTextInput

@@ -167,7 +167,7 @@ export default function ProfileNotificationsScreen() {
 
   return (
     <Screen
-      bottomPaddingMode="stack"
+      bottomPaddingMode="tabbed"
       title="Notifications"
       subtitle="Notifications"
       refreshing={manualRefresh.isRefreshing}

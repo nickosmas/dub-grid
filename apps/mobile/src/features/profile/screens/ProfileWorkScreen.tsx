@@ -288,7 +288,11 @@ export default function ProfileWorkScreen() {
   }
 
   return (
-    <Screen refreshing={manualRefresh.isRefreshing} onRefresh={manualRefresh.refresh}>
+    <Screen
+      bottomPaddingMode="tabbed"
+      refreshing={manualRefresh.isRefreshing}
+      onRefresh={manualRefresh.refresh}
+    >
       {contentState.kind === "loading" ? (
         contentState.showSkeleton ? (
           <ProfileSkeleton rowsPerSection={3} sections={3} showHero={false} />

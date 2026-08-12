@@ -56,7 +56,13 @@ export function createTopLevelStackOptions(
     title,
     headerLargeTitle: useLargeTitle,
     headerLargeTitleEnabled: useLargeTitle,
-    headerStyle: useLargeTitle ? undefined : common.headerStyle,
+    // Both surfaces take the page's own background. Dropping `headerStyle` for
+    // large titles let the header fall through to the navigation theme's
+    // `card`, which is pure white, while the page under it sits on `background`
+    // — slate-50, faintly blue. That seam is only visible on iOS, since Android
+    // never takes the large-title branch, and `headerLargeStyle` is what paints
+    // the expanded title's own strip.
+    headerLargeStyle: { backgroundColor: mobileColors.background },
   };
 }
 

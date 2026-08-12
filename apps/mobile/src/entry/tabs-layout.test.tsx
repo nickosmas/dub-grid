@@ -208,6 +208,11 @@ describe("TabsLayout", () => {
     }
   });
 
+  // The large-title screens used to assert *no* header background, leaving iOS
+  // to fall back on the navigation theme's `card` (white) and its own
+  // scroll-edge material. That put a visible seam above a page sitting on
+  // `background` (slate-50), so both header surfaces are now painted with the
+  // page's own background instead. Detail screens never took that branch.
   it("uses native stack headers for request, people, and profile tab pages", () => {
     render(<RequestsLayout />);
     render(<PeopleLayout />);
@@ -223,21 +228,25 @@ describe("TabsLayout", () => {
       options: {
         headerLargeTitle: true,
         headerLargeTitleEnabled: true,
-        headerStyle: undefined,
+        headerStyle: { backgroundColor: expect.any(String) },
         title: "Requests",
       },
     });
-    expect(requestsOptions).not.toHaveProperty("headerLargeStyle");
+    expect(requestsOptions).toMatchObject({
+      headerLargeStyle: { backgroundColor: expect.any(String) },
+    });
     expect(stackScreenMock.mock.calls[1]?.[0]).toMatchObject({
       name: "index",
       options: {
         headerLargeTitle: true,
         headerLargeTitleEnabled: true,
-        headerStyle: undefined,
+        headerStyle: { backgroundColor: expect.any(String) },
         title: "People",
       },
     });
-    expect(peopleOptions).not.toHaveProperty("headerLargeStyle");
+    expect(peopleOptions).toMatchObject({
+      headerLargeStyle: { backgroundColor: expect.any(String) },
+    });
     expect(stackScreenMock.mock.calls[2]?.[0]).toMatchObject({
       name: "add",
       options: {
@@ -267,11 +276,13 @@ describe("TabsLayout", () => {
       options: {
         headerLargeTitle: true,
         headerLargeTitleEnabled: true,
-        headerStyle: undefined,
+        headerStyle: { backgroundColor: expect.any(String) },
         title: "Profile",
       },
     });
-    expect(profileOptions).not.toHaveProperty("headerLargeStyle");
+    expect(profileOptions).toMatchObject({
+      headerLargeStyle: { backgroundColor: expect.any(String) },
+    });
     expect(profileOptions).not.toHaveProperty("headerRight");
     expect(stackScreenMock.mock.calls.slice(5).map((call) => call[0]?.name)).toEqual([
       "account",

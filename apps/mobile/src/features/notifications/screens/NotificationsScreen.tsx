@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import { ConfirmationModal } from "../../../shared/components/ConfirmationModal"
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SearchBar } from "../../../shared/components/SearchBar";
 import { Screen } from "../../../shared/components/Screen";
+import { ScrollableTabStrip } from "../../../shared/components/ScrollableTabStrip";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
@@ -36,31 +37,22 @@ import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileRadii,
-  mobileSpacing,
   mobileText,
   mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 
-type FilterChip =
-  | { key: "all"; label: "All" }
-  | { key: "unread"; label: "Unread" }
-  | { key: "schedule"; label: "Schedule" }
-  | { key: "shift_requests"; label: "Requests" }
-  | { key: "system"; label: "System" }
-  | { key: "archived"; label: "Archived" };
-
-const FILTER_CHIPS: FilterChip[] = [
+const FILTERS = [
   { key: "all", label: "All" },
   { key: "unread", label: "Unread" },
   { key: "schedule", label: "Schedule" },
   { key: "shift_requests", label: "Requests" },
   { key: "system", label: "System" },
   { key: "archived", label: "Archived" },
-];
+] as const;
 
-type FilterKey = FilterChip["key"];
+type FilterKey = (typeof FILTERS)[number]["key"];
 
 const PAGE_SIZE = 25;
 
@@ -131,7 +123,7 @@ export default function NotificationsScreen() {
   const facetsQuery = useNotificationFacets(accessToken);
   const facets = facetsQuery.data;
 
-  const chipCounts: Record<FilterKey, number> = {
+  const filterCounts: Record<FilterKey, number> = {
     all: facets?.totalInbox ?? 0,
     unread: facets?.totalUnread ?? 0,
     schedule: facets?.byCategory?.schedule ?? 0,
@@ -139,6 +131,11 @@ export default function NotificationsScreen() {
     system: facets?.byCategory?.system ?? 0,
     archived: facets?.totalArchived ?? 0,
   };
+  const filterTabs = FILTERS.map((entry) => ({
+    key: entry.key,
+    label: entry.label,
+    count: filterCounts[entry.key],
+  }));
 
   const queryKey = getNotificationsQueryKey(accessToken, filter, debouncedSearch);
 
@@ -298,35 +295,12 @@ export default function NotificationsScreen() {
           value={searchInput}
         />
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.chipScroll}
-          contentContainerStyle={styles.chipRow}
-        >
-          {FILTER_CHIPS.map((chip) => {
-            const active = filter === chip.key;
-            const count = chipCounts[chip.key];
-            return (
-              <Pressable
-                key={chip.key}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                onPress={() => setFilter(chip.key)}
-                style={[styles.chip, active && styles.chipActive]}
-              >
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>{chip.label}</Text>
-                {count > 0 ? (
-                  <View style={[styles.chipBadge, active && styles.chipBadgeActive]}>
-                    <Text style={[styles.chipBadgeText, active && styles.chipBadgeTextActive]}>
-                      {count > 9 ? "9+" : count}
-                    </Text>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        <ScrollableTabStrip
+          accessibilityLabel="Alert filters"
+          activeKey={filter}
+          onSelect={(key) => setFilter(key as FilterKey)}
+          tabs={filterTabs}
+        />
       </View>
       {unreadCount > 0 ? (
         <View style={styles.actionRow}>
@@ -519,60 +493,6 @@ const createStyles = (mobileColors: MobileColors) =>
     headerArea: {
       gap: 10,
       paddingBottom: 10,
-    },
-    chipScroll: {
-      marginHorizontal: -mobileSpacing.screenX,
-    },
-    chipRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingHorizontal: mobileSpacing.screenX,
-      paddingVertical: 2,
-    },
-    chip: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      minHeight: 36,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surface,
-    },
-    chipActive: {
-      borderColor: mobileColors.brand,
-      backgroundColor: mobileColors.brand,
-    },
-    chipText: {
-      fontSize: 14,
-      fontWeight: "700",
-      color: mobileColors.textSecondary,
-    },
-    chipTextActive: {
-      color: mobileColors.textInverse,
-    },
-    chipBadge: {
-      minWidth: 20,
-      paddingHorizontal: 6,
-      paddingVertical: 3,
-      borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.surfaceSecondary,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    chipBadgeActive: {
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
-    },
-    chipBadgeText: {
-      ...mobileText.badge,
-      color: mobileColors.textMuted,
-      textAlign: "center",
-    },
-    chipBadgeTextActive: {
-      color: mobileColors.textInverse,
     },
     actionRow: {
       flexDirection: "row",

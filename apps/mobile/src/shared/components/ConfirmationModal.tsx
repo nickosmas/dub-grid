@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button, type ButtonTone } from "./Button";
 import { hapticImpact } from "../lib/haptics";
 import { useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
@@ -23,7 +24,34 @@ import {
   type MobileColors,
 } from "../theme/tokens";
 
-const SHEET_BOTTOM_PADDING = Platform.OS === "ios" ? 40 : 24;
+/**
+ * Padding below the actions, inside the sheet's own edge — the same rule
+ * `BottomSheetModal` uses. It replaces a fixed 40/24 platform fork that stood
+ * in for the device inset, which the sheet's bottom margin now carries.
+ */
+const SHEET_CONTENT_BOTTOM_PADDING = mobileSpace["2xl"];
+
+/**
+ * A sheet is a much bigger surface than a card, and the card radius reads
+ * nearly square across that width — it wants its own step up, past anything on
+ * the shared radius ramp. Sits in the range iOS gives its own sheets (~38-44).
+ *
+ * Top corners only: the bottom two run past the screen edge, where a radius
+ * would cut two backdrop-coloured notches into the very bottom.
+ */
+const SHEET_CORNER_RADIUS = 40;
+
+/**
+ * A modal gets its own native window, which on Android is inset by the system
+ * bars even when the app itself draws edge-to-edge. Translucent on both, so the
+ * sheet's own margins are measured from the true screen edge rather than from
+ * wherever the navigation bar happens to start.
+ * `navigationBarTranslucent` requires `statusBarTranslucent`.
+ */
+const MODAL_EDGE_TO_EDGE_PROPS = {
+  navigationBarTranslucent: true,
+  statusBarTranslucent: true,
+} as const;
 
 type ConfirmationTone = Extract<
   ButtonTone,
@@ -55,7 +83,14 @@ export function ConfirmationModal({
 }) {
   const mobileColors = useMobileColors();
   const isDark = useIsDarkMode();
-  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
+  const insets = useSafeAreaInsets();
+  // The sheet runs to the screen's bottom edge, so nothing lifts its actions
+  // clear of the system bars any more — that falls back to the content padding.
+  const bottomPadding = SHEET_CONTENT_BOTTOM_PADDING + insets.bottom;
+  const styles = useMemo(
+    () => createStyles(mobileColors, isDark, bottomPadding),
+    [mobileColors, isDark, bottomPadding],
+  );
   // Read live rather than at module scope: a module-scope `Dimensions.get`
   // snapshot goes stale on rotation and on foldables.
   const { height: windowHeight } = useWindowDimensions();
@@ -83,6 +118,7 @@ export function ConfirmationModal({
 
   return (
     <Modal
+      {...MODAL_EDGE_TO_EDGE_PROPS}
       animationType="fade"
       onRequestClose={handleCancel}
       presentationStyle="overFullScreen"
@@ -140,7 +176,7 @@ export function ConfirmationModal({
   );
 }
 
-const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean, bottomPadding: number) =>
   StyleSheet.create({
     gestureRoot: {
       flex: 1,
@@ -154,14 +190,14 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       backgroundColor: mobileColors.overlay,
     },
     sheet: {
-      width: "100%",
-      borderTopLeftRadius: mobileRadii.card + 8,
-      borderTopRightRadius: mobileRadii.card + 8,
-      borderWidth: isDark ? 1 : 0,
-      borderColor: mobileColors.borderSubtle,
+      // No margins and no width of its own: the sheet stretches to the full
+      // screen width by default and meets the bottom edge, so the top two
+      // corners are its only edges ever in view.
+      borderTopLeftRadius: SHEET_CORNER_RADIUS,
+      borderTopRightRadius: SHEET_CORNER_RADIUS,
       backgroundColor: mobileColors.surface,
       paddingHorizontal: mobileSpace.xl,
-      paddingBottom: SHEET_BOTTOM_PADDING,
+      paddingBottom: bottomPadding,
       gap: mobileSpace.xl,
       ...mobileElevation("sheet", isDark),
     },
