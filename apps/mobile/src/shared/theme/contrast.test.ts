@@ -97,3 +97,57 @@ describe("dark mode control contrast", () => {
     ).toBeGreaterThanOrEqual(AA_TEXT);
   });
 });
+
+/**
+ * `<Button>`'s solid tones, which the checks above never reached: they cover the
+ * two *soft* control fills and `brand`, so the four saturated fills a button can
+ * take went unasserted, and `warning` shipped a white label on amber-500 at
+ * 2.15:1 without anything failing.
+ *
+ * Every solid tone renders the same white label, so each fill is the only thing
+ * deciding whether that label clears AA. Both themes are checked because the
+ * fills are theme-fixed, which is a claim worth holding rather than assuming.
+ */
+describe("solid button tone contrast", () => {
+  const SOLID_TONES = ["buttonPrimaryBg", "buttonDangerBg", "buttonSuccessBg", "buttonWarningBg"];
+
+  for (const [theme, colors] of [
+    ["light", mobileColors],
+    ["dark", darkMobileColors],
+  ] as const) {
+    it(`keeps every solid ${theme} button label at AA against its own fill`, () => {
+      for (const tone of SOLID_TONES) {
+        const fill = colors[tone as keyof typeof colors];
+        // `primary` labels with `onBrandText` and the rest with `textInverse`;
+        // both are white, so one assertion covers what the component renders.
+        expect(
+          contrastRatio(colors.textInverse, fill),
+          `${tone} on ${fill}`,
+        ).toBeGreaterThanOrEqual(AA_TEXT);
+      }
+    });
+
+    it(`keeps the solid ${theme} button fills fixed across themes`, () => {
+      for (const tone of SOLID_TONES) {
+        expect(colors[tone as keyof typeof colors]).toBe(mobileColors[tone as keyof typeof colors]);
+      }
+    });
+  }
+
+  /**
+   * The reason the `button*Bg` ramp exists apart from the semantic tokens. If a
+   * later change points a solid tone back at one of these, the check above
+   * catches it — this one records what that change would cost.
+   */
+  it("would fail AA if the solid tones reused the shared semantic tokens", () => {
+    for (const [label, fill] of [
+      ["danger", mobileColors.danger],
+      ["success", mobileColors.success],
+      ["warning", mobileColors.warning],
+      ["dark success", darkMobileColors.success],
+      ["dark brand", darkMobileColors.brand],
+    ] as const) {
+      expect(contrastRatio(mobileColors.textInverse, fill), label).toBeLessThan(AA_TEXT);
+    }
+  });
+});

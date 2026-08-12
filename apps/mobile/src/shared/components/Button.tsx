@@ -40,15 +40,6 @@ export type ButtonSize = "sm" | "md" | "lg";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-/**
- * The `warning` fill is `#F59E0B` in *both* themes, so its label colour can be
- * theme-fixed too, and it has to be: white on that amber is about 2.0:1 and the
- * `warningText` brown is about 2.8:1, both well under the 4.5:1 floor. This
- * near-black clears it comfortably. It is the one tone whose label is not white
- * or a theme token.
- */
-const WARNING_LABEL = "#1C1917";
-
 const SIZE = {
   sm: { minHeight: 36, paddingHorizontal: 14, gap: 6, icon: 16, iconOnly: 36 },
   md: { minHeight: 48, paddingHorizontal: 20, gap: 8, icon: 18, iconOnly: 44 },
@@ -221,9 +212,12 @@ function resolveLabelColor(tone: ButtonTone, mobileColors: MobileColors): string
       return mobileColors.textPrimary;
     case "danger":
     case "success":
-      return mobileColors.textInverse;
+    // Every solid tone takes the same white label, which is what lets these
+    // three share a branch. It is the `button*Bg` fills, not this colour, that
+    // carry the contrast: on the shared `danger`/`success`/`warning` tokens
+    // white measures 3.76:1, 2.28:1 and 2.15:1, all under the 4.5:1 floor.
     case "warning":
-      return WARNING_LABEL;
+      return mobileColors.textInverse;
     case "ghost":
     default:
       return mobileColors.textMuted;
@@ -260,8 +254,11 @@ const createStyles = (mobileColors: MobileColors) =>
       // need to fade further before they read as unavailable.
       opacity: 0.4,
     },
+    // The four solid tones take the `button*Bg` ramp rather than the shared
+    // semantic tokens: those are tuned for icons and banners, where the colour
+    // sits beside text, and they fail AA under this button's white label.
     tonePrimary: {
-      backgroundColor: mobileColors.brand,
+      backgroundColor: mobileColors.buttonPrimaryBg,
     },
     toneSecondary: {
       backgroundColor: mobileColors.controlSecondaryBg,
@@ -270,13 +267,13 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.controlNeutralBg,
     },
     toneDanger: {
-      backgroundColor: mobileColors.danger,
+      backgroundColor: mobileColors.buttonDangerBg,
     },
     toneSuccess: {
-      backgroundColor: mobileColors.success,
+      backgroundColor: mobileColors.buttonSuccessBg,
     },
     toneWarning: {
-      backgroundColor: mobileColors.warning,
+      backgroundColor: mobileColors.buttonWarningBg,
     },
     tonePlain: {
       backgroundColor: mobileColors.surface,

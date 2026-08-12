@@ -11,7 +11,6 @@ import {
   mobileRadiusTokens,
   mobileSpacingTokens,
   mobileTypographyTokens,
-  overlayTokens,
   radiusTokens,
   resolveShiftPillColors,
   softGradientTokens,
@@ -47,7 +46,37 @@ import type { TextStyle, ViewStyle } from "react-native";
  * 1.28:1, which is clearly perceivable. The accessibility guarantee is the
  * *label* contrast (13.4:1 neutral, 5.2:1 secondary), not the fill.
  */
+/**
+ * Fills for `<Button>`'s solid tones, which always pair a saturated fill with a
+ * white label. Deliberately fixed across themes, the way `toastToneTokens` are
+ * and the way `warning` already was: a solid button is a high-emphasis control
+ * rather than a themed surface, so it reads the same in both.
+ *
+ * They are *not* the shared `brand`/`success`/`danger`/`warning` semantic
+ * tokens, and must not be folded back into them. Those tint icons, banners and
+ * count badges, where the colour sits next to text rather than under it and a
+ * lighter, more saturated value is the right call. Under a white label the same
+ * values fail WCAG AA badly: amber-500 measures 2.15:1, dark green-500 2.28:1,
+ * red-500 3.76:1. This is the same split, and the same reasoning, that gave
+ * `controlSecondaryFg` its own value apart from `brand`.
+ *
+ * Every entry clears 4.5:1 against `#FFFFFF`; `contrast.test.ts` holds them
+ * there. Each is one step down its Tailwind ramp from the semantic token it
+ * shadows, so the family is unchanged and only the depth moves.
+ */
+const BUTTON_SOLID_FILLS = {
+  /** blue-600. Matches light `brand`; dark's brighter #2075FF measured 4.16:1. */
+  buttonPrimaryBg: "#2563EB",
+  /** red-600, one step down from the shared red-500 `danger`. */
+  buttonDangerBg: "#DC2626",
+  /** green-700, below the shared green-500/600 `success`. */
+  buttonSuccessBg: "#15803D",
+  /** amber-700, below the shared amber-500 `warning`. */
+  buttonWarningBg: "#B45309",
+} as const;
+
 const MOBILE_LIGHT = {
+  ...BUTTON_SOLID_FILLS,
   /**
    * The light page: a soft blue the white cards sit on.
    *
@@ -95,9 +124,17 @@ const MOBILE_LIGHT = {
    * two used to be 0.85 and 0.07, which read as two different effects.
    */
   skeletonHighlight: "rgba(255,255,255,0.62)",
+  /**
+   * Sheet/modal scrim. Deeper than the shared `overlayTokens.background` it
+   * replaces (0.45), so a sheet reads as taking over the screen rather than
+   * floating on a lightly tinted page. Keeps that token's navy cast, which
+   * belongs with this theme's blue-tinted page.
+   */
+  overlay: "rgba(10, 20, 40, 0.6)",
 } as const;
 
 const MOBILE_DARK = {
+  ...BUTTON_SOLID_FILLS,
   /** Dark surfaces already separate well, so the page background is unchanged. */
   background: darkColorTokens.background,
   controlNeutralBg: "#26262B",
@@ -120,17 +157,21 @@ const MOBILE_DARK = {
    * same strength in both themes.
    */
   skeletonHighlight: "rgba(255,255,255,0.055)",
+  /**
+   * Sheet/modal scrim. Pure black, unlike the light theme's: the shared navy
+   * scrim over a near-black page had nothing to darken and only pushed the
+   * whole screen bluer. Black at a higher alpha darkens instead of tinting.
+   */
+  overlay: "rgba(0, 0, 0, 0.72)",
 } as const;
 
 export const mobileColors = {
   ...colorTokens,
   ...MOBILE_LIGHT,
-  overlay: overlayTokens.background,
 } as const;
 export const darkMobileColors = {
   ...darkColorTokens,
   ...MOBILE_DARK,
-  overlay: overlayTokens.background,
 } as const;
 export type MobileColors = Record<keyof typeof mobileColors, string>;
 /** Named layout slots (screen gutter, section gap, card gap). */
