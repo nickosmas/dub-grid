@@ -8,7 +8,7 @@
     "ensure-local-env": "node ../../scripts/ensure-mobile-local-env.mjs",
     "predev": "npm run prepare-shared-packages && npm run ensure-local-env",
     "prelan": "npm run prepare-shared-packages && npm run ensure-local-env",
-    "prephone": "npm run prepare-shared-packages",
+    "prephone": "npm run prepare-shared-packages && npm run ensure-local-env",
     "prestart": "npm run prepare-shared-packages && npm run ensure-local-env",
     "preandroid": "npm run prepare-shared-packages && npm run ensure-local-env",
     "preios": "npm run prepare-shared-packages && npm run ensure-local-env",

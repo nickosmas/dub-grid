@@ -56,7 +56,14 @@ function regenerate(reason) {
     console.warn(
       "[ensure-mobile-local-env] Could not refresh apps/mobile/.env.local automatically. Run `npm run use:mobile:local` (or `npm run use:mobile:remote`) manually before signing in from a device.",
     );
+    return;
   }
+
+  // EXPO_PUBLIC_* values are inlined at transform time, and Metro will happily
+  // serve half the modules from cache with the old address still baked in.
+  console.warn(
+    "[ensure-mobile-local-env] The addresses changed. If Expo was already running, restart it with `--clear` — a warm Metro cache keeps serving the old ones.",
+  );
 }
 
 function main() {

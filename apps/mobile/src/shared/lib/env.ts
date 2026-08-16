@@ -1,4 +1,5 @@
 import { Platform, type PlatformOSType } from "react-native";
+import { getDevServerHost } from "./devServerHost";
 
 type MobileEnvKey =
   "EXPO_PUBLIC_SUPABASE_URL" | "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" | "EXPO_PUBLIC_API_BASE_URL";
@@ -78,10 +79,41 @@ function isHostedSupabaseKey(key: string): boolean {
   return key.startsWith("sb_publishable_") || key.startsWith("sb_secret_");
 }
 
-export function validateMobileEnv(platform: PlatformOSType = Platform.OS): MobileEnvValidation {
-  const supabaseUrl = readEnvValue("EXPO_PUBLIC_SUPABASE_URL");
+/**
+ * Repoint a URL that means "the dev machine" at wherever that machine is right
+ * now. Applied before validation so the messages, the Configuration screen and
+ * every request all describe the same host.
+ */
+export function withDevServerHost(value: string, devServerHost: string | null): string {
+  if (!value || !devServerHost) return value;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return value;
+  }
+
+  // Hosted URLs are a deliberate choice (`npm run use:mobile:remote`) and must
+  // survive untouched; only a loopback or LAN address names the dev machine.
+  if (!isLoopbackHost(parsed.hostname) && !isPrivateIpv4Host(parsed.hostname)) return value;
+  if (parsed.hostname === devServerHost) return value;
+
+  parsed.hostname = devServerHost;
+  const rewritten = parsed.toString();
+
+  // `URL.toString()` adds a trailing slash for a bare origin; keep the shape of
+  // what was configured so nothing downstream sees a spurious change.
+  return value.endsWith("/") ? rewritten : rewritten.replace(/\/$/, "");
+}
+
+export function validateMobileEnv(
+  platform: PlatformOSType = Platform.OS,
+  devServerHost: string | null = getDevServerHost(),
+): MobileEnvValidation {
+  const supabaseUrl = withDevServerHost(readEnvValue("EXPO_PUBLIC_SUPABASE_URL"), devServerHost);
   const supabaseAnonKey = readEnvValue("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
-  const apiBaseUrl = readEnvValue("EXPO_PUBLIC_API_BASE_URL");
+  const apiBaseUrl = withDevServerHost(readEnvValue("EXPO_PUBLIC_API_BASE_URL"), devServerHost);
 
   const issues: MobileEnvIssue[] = [];
 
