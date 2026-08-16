@@ -211,13 +211,16 @@ function resolveLabelColor(tone: ButtonTone, mobileColors: MobileColors): string
       // the icon, so the label stays neutral and lets it lead.
       return mobileColors.textPrimary;
     case "danger":
+    // Both take the same white label, which is what lets them share a branch.
+    // It is the `button*Bg` fills, not this colour, that carry the contrast: on
+    // the shared `danger`/`success` tokens white measures 3.76:1 and 2.28:1,
+    // both under the 4.5:1 floor.
     case "success":
-    // Every solid tone takes the same white label, which is what lets these
-    // three share a branch. It is the `button*Bg` fills, not this colour, that
-    // carry the contrast: on the shared `danger`/`success`/`warning` tokens
-    // white measures 3.76:1, 2.28:1 and 2.15:1, all under the 4.5:1 floor.
-    case "warning":
       return mobileColors.textInverse;
+    // The one solid tone that inverts that. Its fill is web's amber, which a
+    // white label sits on at 2.15:1, so the contrast moves to the label.
+    case "warning":
+      return mobileColors.buttonWarningFg;
     case "ghost":
     default:
       return mobileColors.textMuted;

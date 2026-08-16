@@ -367,17 +367,33 @@ const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       left: 0,
       right: 0,
       zIndex: 10,
-      // Clips the header's slice of the wash. Also why the fill stays opaque:
-      // content scrolls under this shell and must not show through.
+      // The fill has to stay opaque: content scrolls under this shell and must
+      // not show through. `overflow: hidden` clips whatever the header draws to
+      // the shell's own bounds.
       overflow: "hidden",
-      backgroundColor: mobileColors.background,
+      // `surface`, not `background` — this is the app bar on the only two
+      // screens that have one (the dashboard and both schedule scopes; every
+      // other screen takes the native header instead). White chrome over the
+      // slate page reads as a bar sitting above the content rather than as more
+      // page, and it matches the tab bar at the other end of the screen, which
+      // is already `surface`. It also puts the status-bar strip on white, since
+      // both of those routes run `headerShown: false` and this shell is what
+      // reaches under the notch.
+      backgroundColor: mobileColors.surface,
       paddingHorizontal: getScreenGutter(),
       paddingTop: mobileSpace.sm,
       paddingBottom: mobileSpace.lg,
       borderBottomWidth: 1,
       borderBottomColor: mobileColors.borderSubtle,
-      // Sits above the scrolling content on Android, where `elevation` (not
-      // zIndex) decides draw order.
+      // The level named for exactly this ("hairline lift: sticky headers once
+      // the content scrolls under them"). The fill and the hairline do the
+      // separating; the shadow only keeps the bar from looking pasted on.
+      ...mobileElevation("raised", isDark),
+      // ...but not its `elevation: 1`. On Android that number is also the draw
+      // order, and the cards scrolling underneath sit at the `card` level's 2 —
+      // at 1 the header would render *behind* them. This shell is an earlier
+      // sibling than the scroll view, so it loses ties too, and has to clear
+      // both outright.
       elevation: 4,
     },
     overlayLayer: {

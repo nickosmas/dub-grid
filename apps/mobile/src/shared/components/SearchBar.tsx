@@ -116,7 +116,17 @@ const createStyles = (mobileColors: MobileColors) =>
     field: {
       minHeight: 46,
       alignItems: "center",
-      backgroundColor: mobileColors.surfaceSecondary,
+      // White, like every other enterable surface. `surfaceSecondary` made the
+      // field a *recessed* gray, which is the older iOS search idiom and reads
+      // as a filled control rather than something to type in — and against the
+      // slate page it had almost nothing to separate it (1.02:1), so the border
+      // was carrying the whole shape. Both screens that use this put it in page
+      // content, never in the white header bar, so the fill has the page to
+      // stand against. `surface`, not a literal, so dark mode gets its card
+      // color instead of a white slab.
+      backgroundColor: mobileColors.surface,
+      // Kept: at 1.12:1 the fill alone is a card-strength edge, and this is an
+      // interactive target that should read as crisper than a card.
       borderColor: mobileColors.borderSubtle,
       // Pill, to match the filter and add controls it sits beside.
       borderRadius: mobileRadii.pill,

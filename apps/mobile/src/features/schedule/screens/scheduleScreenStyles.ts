@@ -36,21 +36,20 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       gap: 16,
     },
     scheduleCalendarStickyHeaderShell: {
-      // Was `borderSubtle`, a gray bar that read as separate chrome and sat on
-      // top of the page wash. Matching the page lets the header's slice of the
-      // gradient through; the border and shadow below still separate it from
-      // the content scrolling underneath.
-      backgroundColor: mobileColors.background,
+      // Everything this used to restate — the fill, the shadow, the Android
+      // elevation — now comes from `Screen`'s own `stickyHeaderShell`, which
+      // paints the bar `surface` and lifts it at the `raised` level. Overriding
+      // the fill here is what made this header the one that stayed page-colored
+      // when that shell went white, and the local `elevation: 2` quietly undid
+      // the shell's draw-order fix, letting `card`-level tiles paint over the
+      // bar on Android.
+      //
+      // What is left is the one thing the schedule genuinely needs differently:
+      // a thinner but darker divider. The grid scrolling under this bar is far
+      // denser than the dashboard's stack of cards, and `borderSubtle` gets
+      // lost against it.
       borderBottomWidth: 0.5,
       borderBottomColor: mobileColors.border,
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 8,
-      elevation: 2,
     },
     mePage: {
       gap: 22,
@@ -123,17 +122,25 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     meTodayButton: {
       minHeight: 36,
       borderRadius: mobileRadii.pill,
-      borderWidth: 0,
-      backgroundColor: mobileColors.brandSoft,
+      // Same outlined chrome as `iconControlButton`, which it sits beside — the
+      // two are one row of header controls and have to read as one set.
+      borderWidth: 1,
+      borderColor: mobileColors.border,
+      backgroundColor: mobileColors.surface,
       justifyContent: "center",
       paddingHorizontal: 14,
+      ...mobileElevation("raised", isDark),
     },
     meTodayButtonPressed: {
       transform: [{ scale: mobileMotion.press.scale }],
     },
     meTodayButtonText: {
       ...mobileText.bodyStrong,
-      color: mobileColors.brand,
+      // Stays `controlSecondaryFg` even though the fill is now white, because
+      // it is the one blue that clears AA in *both* themes here: 6.70:1 on
+      // white and 8.52:1 on the dark bar. Plain `brand` passes in light (5.17:1)
+      // and lands at 4.499:1 in dark, which is under the line.
+      color: mobileColors.controlSecondaryFg,
     },
     meHeroCard: {
       position: "relative",
@@ -1087,11 +1094,21 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
       width: 44,
       height: 44,
       borderRadius: mobileRadii.pill,
-      borderWidth: 0,
-      backgroundColor: mobileColors.surfaceSecondary,
+      // Outlined chrome: the week chevrons and the alerts bell share this, and
+      // both sit *on* the header bar, which is now the same `surface` they are.
+      // So the edge is the control — `border` (1.49:1 on white, 1.39:1 on the
+      // dark bar), not `borderSubtle`, which at 1.23:1 leaves a 44pt target
+      // reading as a floating icon with no button around it.
+      borderWidth: 1,
+      borderColor: mobileColors.border,
+      backgroundColor: mobileColors.surface,
       alignItems: "center",
       justifyContent: "center",
-      ...mobileElevation("card", isDark),
+      // Down from `card`. A 12pt-blur shadow under a white pill on a white bar
+      // reads as a smudge, and with the outline above it there are two
+      // separators doing one job. `raised` keeps the control from looking
+      // printed on without competing with its own edge.
+      ...mobileElevation("raised", isDark),
     },
     iconControlButtonPressed: {
       transform: [{ scale: mobileMotion.press.iconOnlyScale }],

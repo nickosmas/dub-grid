@@ -38,17 +38,32 @@ describe("light mode control contrast", () => {
   });
 
   /**
-   * The page is a brand-tinted blue, not a neutral gray. Asserted because the
-   * whole point of the value is the tint: a neutral that happened to hit the
-   * same contrast ratio would pass the check above while looking wrong.
+   * The page is a subtle slate gray, not a brand-tinted blue. Asserted because
+   * the ratio above says nothing about hue: the earlier blue page (#EAF1FC, a
+   * 18-step blue-over-red tint) hit the same separation while making every
+   * screen read as a tinted surface instead of white content on neutral chrome.
+   *
+   * The tint still has to be *there*, just small — the light ramp is slate, and
+   * a fully neutral gray goes warm-dead beside the brand. Both fills that share
+   * this ground are held to the same window, so a later "let's warm the grays"
+   * pass can't split the family.
    */
-  it("keeps the page blue rather than gray", () => {
-    const [red, green, blue] = [1, 3, 5].map((offset) =>
-      parseInt(mobileColors.background.slice(offset, offset + 2), 16),
-    );
+  it("keeps the page and its neutral fills a subtle slate gray", () => {
+    for (const [name, hex] of [
+      ["background", mobileColors.background],
+      ["controlNeutralBg", mobileColors.controlNeutralBg],
+      ["skeletonBase", mobileColors.skeletonBase],
+    ] as const) {
+      const [red, green, blue] = [1, 3, 5].map((offset) =>
+        parseInt(hex.slice(offset, offset + 2), 16),
+      );
 
-    expect(blue).toBeGreaterThan(red);
-    expect(blue).toBeGreaterThan(green);
+      // Slate, so cool: blue leads, and green sits between the two.
+      expect(blue, `${name} (${hex}) should be slate-tinted`).toBeGreaterThan(red);
+      expect(green, `${name} (${hex}) should be slate-tinted`).toBeGreaterThanOrEqual(red);
+      // Gray, so barely: the retired blue page ran a 18-step spread.
+      expect(blue - red, `${name} (${hex}) should read gray, not blue`).toBeLessThanOrEqual(12);
+    }
   });
 
   it("keeps soft control fills perceivable on a card and on the page", () => {
@@ -104,31 +119,38 @@ describe("dark mode control contrast", () => {
  * take went unasserted, and `warning` shipped a white label on amber-500 at
  * 2.15:1 without anything failing.
  *
- * Every solid tone renders the same white label, so each fill is the only thing
- * deciding whether that label clears AA. Both themes are checked because the
- * fills are theme-fixed, which is a claim worth holding rather than assuming.
+ * Each pair is the fill and the label `resolveLabelColor` actually returns for
+ * that tone — three white, and `warning` dark on web's amber. Reading the pair
+ * from the component's own rule is the point: asserting white against every
+ * fill is what let the amber ship. Both themes are checked because the fills
+ * are theme-fixed, which is a claim worth holding rather than assuming.
  */
 describe("solid button tone contrast", () => {
-  const SOLID_TONES = ["buttonPrimaryBg", "buttonDangerBg", "buttonSuccessBg", "buttonWarningBg"];
+  const SOLID_TONES = [
+    // `primary` labels with `onBrandText` and the other white tones with
+    // `textInverse`; both are white, so `textInverse` covers all three.
+    ["buttonPrimaryBg", "textInverse"],
+    ["buttonDangerBg", "textInverse"],
+    ["buttonSuccessBg", "textInverse"],
+    ["buttonWarningBg", "buttonWarningFg"],
+  ] as const;
 
   for (const [theme, colors] of [
     ["light", mobileColors],
     ["dark", darkMobileColors],
   ] as const) {
     it(`keeps every solid ${theme} button label at AA against its own fill`, () => {
-      for (const tone of SOLID_TONES) {
+      for (const [tone, label] of SOLID_TONES) {
         const fill = colors[tone as keyof typeof colors];
-        // `primary` labels with `onBrandText` and the rest with `textInverse`;
-        // both are white, so one assertion covers what the component renders.
         expect(
-          contrastRatio(colors.textInverse, fill),
-          `${tone} on ${fill}`,
+          contrastRatio(colors[label as keyof typeof colors], fill),
+          `${label} on ${tone} (${fill})`,
         ).toBeGreaterThanOrEqual(AA_TEXT);
       }
     });
 
     it(`keeps the solid ${theme} button fills fixed across themes`, () => {
-      for (const tone of SOLID_TONES) {
+      for (const [tone] of SOLID_TONES) {
         expect(colors[tone as keyof typeof colors]).toBe(mobileColors[tone as keyof typeof colors]);
       }
     });
@@ -143,11 +165,21 @@ describe("solid button tone contrast", () => {
     for (const [label, fill] of [
       ["danger", mobileColors.danger],
       ["success", mobileColors.success],
-      ["warning", mobileColors.warning],
       ["dark success", darkMobileColors.success],
       ["dark brand", darkMobileColors.brand],
     ] as const) {
       expect(contrastRatio(mobileColors.textInverse, fill), label).toBeLessThan(AA_TEXT);
     }
+  });
+
+  /**
+   * The warning tone is the one that *does* take a semantic token as its fill,
+   * to match web's Deactivate button. It can only do that because the label
+   * moved: this records both halves, so pointing it back at a white label fails
+   * here rather than shipping web's own 2.15:1.
+   */
+  it("pairs web's amber with a dark label rather than a white one", () => {
+    expect(mobileColors.buttonWarningBg).toBe(mobileColors.warning);
+    expect(contrastRatio(mobileColors.textInverse, mobileColors.warning)).toBeLessThan(AA_TEXT);
   });
 });

@@ -47,23 +47,24 @@ import type { TextStyle, ViewStyle } from "react-native";
  * *label* contrast (13.4:1 neutral, 5.2:1 secondary), not the fill.
  */
 /**
- * Fills for `<Button>`'s solid tones, which always pair a saturated fill with a
- * white label. Deliberately fixed across themes, the way `toastToneTokens` are
- * and the way `warning` already was: a solid button is a high-emphasis control
- * rather than a themed surface, so it reads the same in both.
+ * Fills for `<Button>`'s solid tones. Deliberately fixed across themes, the way
+ * `toastToneTokens` are and the way `warning` already was: a solid button is a
+ * high-emphasis control rather than a themed surface, so it reads the same in
+ * both.
  *
- * They are *not* the shared `brand`/`success`/`danger`/`warning` semantic
+ * Three of them are *not* the shared `brand`/`success`/`danger` semantic
  * tokens, and must not be folded back into them. Those tint icons, banners and
  * count badges, where the colour sits next to text rather than under it and a
  * lighter, more saturated value is the right call. Under a white label the same
- * values fail WCAG AA badly: amber-500 measures 2.15:1, dark green-500 2.28:1,
- * red-500 3.76:1. This is the same split, and the same reasoning, that gave
- * `controlSecondaryFg` its own value apart from `brand`.
+ * values fail WCAG AA badly: dark green-500 measures 2.28:1, red-500 3.76:1.
+ * This is the same split, and the same reasoning, that gave
+ * `controlSecondaryFg` its own value apart from `brand`. Each is a step down
+ * its Tailwind ramp from the semantic token it shadows, so the depth moves and
+ * the family does not.
  *
- * Every entry clears 4.5:1 against `#FFFFFF`; `contrast.test.ts` holds them
- * there. Each is a step down its Tailwind ramp from the semantic token it
- * shadows, so the depth moves and, with one exception noted below, the family
- * does not.
+ * `warning` is the exception, and it is the one tone the two apps share by
+ * value: see `buttonWarningBg`. `contrast.test.ts` holds every fill at 4.5:1
+ * against the label it actually renders — which is white for all but that one.
  */
 const BUTTON_SOLID_FILLS = {
   /** blue-600. Matches light `brand`; dark's brighter #2075FF measured 4.16:1. */
@@ -73,32 +74,59 @@ const BUTTON_SOLID_FILLS = {
   /** green-700, below the shared green-500/600 `success`. */
   buttonSuccessBg: "#15803D",
   /**
-   * orange-700. The one entry that moves family rather than depth: amber-700
-   * (#B45309) cleared AA but read as brown under a white label, which is not
-   * what "Mark Inactive" should look like. Orange is capped by the same rule as
-   * the rest — orange-600 (#EA580C) is the color people picture when they say
-   * "orange", and it measures 3.56:1 against white, well under the floor. This
-   * is the most orange value that still clears it, at 5.18:1.
+   * amber-500 — the web app's `--color-warning`, which is what
+   * `.dg-btn-warning-filled` paints Deactivate with. The two apps show the same
+   * action in the same orange, so this is a shared value rather than a
+   * mobile-only pick.
+   *
+   * It got there the other way round from its neighbours. Holding a white label
+   * capped the fill at orange-700 (#C2410C, 5.18:1) — the burnt, nearly brown
+   * end of the range, and visibly not web's amber. Darkening the *label*
+   * instead frees the fill: `buttonWarningFg` on this measures 6.97:1, better
+   * than the white-on-orange-700 it replaces, so parity costs no contrast.
    */
-  buttonWarningBg: "#C2410C",
+  buttonWarningBg: "#F59E0B",
+  /**
+   * amber-950, the only solid-tone label that is not white.
+   *
+   * Web pairs its amber with white at 2.15:1, which is the one part of that
+   * button not worth copying. Deep warm brown stays inside the amber family, so
+   * the button still reads as one colour rather than as a black label dropped
+   * on orange.
+   */
+  buttonWarningFg: "#451A03",
 } as const;
 
 const MOBILE_LIGHT = {
   ...BUTTON_SOLID_FILLS,
   /**
-   * The light page: a soft blue the white cards sit on.
+   * The light page: a subtle gray the white cards sit on.
    *
-   * Same hue as the brand wash gradient's lightest stop (#F1F6FF), nudged
-   * darker. That exact value measures only 1.06:1 against a white card, which
-   * is not a perceivable edge; this lands at 1.14:1, so the page reads as blue
-   * without cards dissolving into it. The earlier neutral (#EBEFF5) hit the
-   * same ratio but gray, which read as dirty next to the brand.
+   * The page ground is chrome, not brand. It carries the header bar (on iOS the
+   * large-title header is transparent and shows this color through it) and the
+   * ground between cards, and a blue that strong made every screen read as a
+   * tinted surface rather than as white content on a neutral page. Blue now
+   * appears where it means something — the brand wash on the splash and auth
+   * shells, `controlSecondaryBg`, the button and icon tones.
+   *
+   * Gray, not colorless: it stays in the slate family the rest of the light ramp
+   * uses (`surfaceSecondary` #F1F5F9, `borderSubtle` #E2E8F0), so blue sits 7
+   * steps above red rather than sharing it. That tint is what keeps it from
+   * going warm-dead next to the brand, which is what sank the earlier #EBEFF5.
+   *
+   * Light, and about as light as it can go: 1.12:1 against a white card. That
+   * is the floor `contrast.test.ts` holds for card separation, and it is a floor
+   * rather than a preference — `cardBorder` is transparent in light mode, so
+   * this ratio is the *only* thing drawing a card's edge, with the shadow. The
+   * next step up the slate ramp (#F1F5F9) measures 1.096:1 and cards start
+   * dissolving into the page. Anything lighter than this has to buy a hairline
+   * border back first.
    *
    * Dark mode is untouched — its surfaces already separate on their own.
    */
-  background: "#EAF1FC",
-  /** Neutral control fill. On a white card: 1.10 -> 1.28. */
-  controlNeutralBg: "#DDE4ED",
+  background: "#EFF2F6",
+  /** Neutral control fill. On a white card: 1.10 -> 1.29. Same slate as the page. */
+  controlNeutralBg: "#DFE3E9",
   /** Secondary control fill. On a white card: 1.09 -> 1.28. */
   controlSecondaryBg: "#D6E4FB",
   /**
@@ -118,13 +146,14 @@ const MOBILE_LIGHT = {
   cardBorder: "transparent",
   /**
    * Skeleton placeholder fill. Has to read on *both* grounds a skeleton lands
-   * on: a white card and the `#EAF1FC` page. `borderSubtle` (#E2E8F0) was the
+   * on: a white card and the `#EFF2F6` page. `borderSubtle` (#E2E8F0) was the
    * old fill and measures 1.13:1 on white, which barely registers as a shape;
-   * this lands at 1.24:1 there and 1.09:1 on the page, so a block is legible
-   * wherever it sits. Same blue-tinted slate family as the rest of the light
-   * ramp.
+   * this lands at 1.30:1 there and 1.16:1 on the page, so a block is legible
+   * wherever it sits. Held at the page's old, darker value on purpose: a
+   * placeholder wants *more* presence than the ground it sits on, so it did not
+   * follow the page lighter.
    */
-  skeletonBase: "#DCE4EE",
+  skeletonBase: "#DEE2E8",
   /**
    * The travelling shimmer band. White at partial alpha rather than a lighter
    * solid, so the band works over the fill above without a second token per
@@ -135,10 +164,11 @@ const MOBILE_LIGHT = {
   /**
    * Sheet/modal scrim. Deeper than the shared `overlayTokens.background` it
    * replaces (0.45), so a sheet reads as taking over the screen rather than
-   * floating on a lightly tinted page. Keeps that token's navy cast, which
-   * belongs with this theme's blue-tinted page.
+   * floating on a lightly tinted page. The shared token's navy cast (10,20,40)
+   * came from the page being blue; over a slate page it reads as a blue wash
+   * over gray, so the same darkness is carried on a near-neutral slate instead.
    */
-  overlay: "rgba(10, 20, 40, 0.6)",
+  overlay: "rgba(12, 17, 26, 0.6)",
 } as const;
 
 const MOBILE_DARK = {
