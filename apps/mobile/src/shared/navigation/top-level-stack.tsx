@@ -1,6 +1,6 @@
 import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
 import { Platform } from "react-native";
-import { mobileMotion, type MobileColors } from "../theme/tokens";
+import { mobileMotion, mobileTypography, type MobileColors } from "../theme/tokens";
 
 const isIOS = Platform.OS === "ios";
 
@@ -28,14 +28,22 @@ export function createCommonStackOptions(mobileColors: MobileColors): NativeStac
     headerStyle: {
       backgroundColor: mobileColors.background,
     },
+    // The header title is the one piece of chrome on every screen, so it has to
+    // be DM Sans like the page under it. Naming the bold *family* is the only
+    // way to say that: a bare `fontWeight: "700"` leaves the bar in the system
+    // font, and pairing the two makes Android bold an already-bold file twice.
     headerTitleStyle: {
       color: mobileColors.textPrimary,
-      fontWeight: "700",
+      fontFamily: mobileTypography.fontFamily.bold,
     },
-    headerLargeTitleStyle: {
-      color: mobileColors.textPrimary,
-      fontWeight: "700",
-    },
+    // iOS-only, per LARGE_TITLE_HEADER below: react-native-screens implements no
+    // `largeTitle*` prop on Android and logs a warning for each one that is set.
+    headerLargeTitleStyle: isIOS
+      ? {
+          color: mobileColors.textPrimary,
+          fontFamily: mobileTypography.fontFamily.bold,
+        }
+      : undefined,
     headerLargeTitleShadowVisible: false,
     contentStyle: {
       backgroundColor: mobileColors.background,

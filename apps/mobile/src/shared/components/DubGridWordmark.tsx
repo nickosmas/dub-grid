@@ -45,8 +45,9 @@ export function DubGridWordmark({
 
 const styles = StyleSheet.create({
   wordmark: {
+    // Family only. The file is already bold, and adding `fontWeight: "700"`
+    // next to it drops Android onto the system font instead.
     fontFamily: "DMSans_700Bold",
-    fontWeight: "700",
     // includeFontPadding (Android) leaves visible whitespace above and below
     // the glyph baseline that throws off the brand spacing.
     includeFontPadding: false,

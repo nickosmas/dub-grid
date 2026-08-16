@@ -309,15 +309,15 @@ export type MobileTextVariant = keyof typeof mobileTypographyTokens.text;
 export type MobileTextWeight = keyof typeof mobileTypographyTokens.fontWeight;
 
 /**
- * A typography token at a different weight, with the font *family* moved to
- * match.
+ * A typography token at a different weight, expressed the only way DM Sans
+ * understands it: by swapping the font *family*.
  *
- * DM Sans is loaded as four separate family files, and every `mobileText` token
- * sets both a family and its matching `fontWeight`. Overriding only the weight
- * (`{ ...mobileText.body, fontWeight: "500" }`) leaves the two disagreeing:
- * iOS honours the family and renders regular, while Android may synthesize a
- * fake medium. The result is text that renders at different weights on the two
- * platforms from the same style.
+ * DM Sans is loaded as four separate single-weight family files, so weight is
+ * a property of the family name, not of `fontWeight`. Reaching for the numeric
+ * weight instead (`{ ...mobileText.body, fontWeight: "500" }`) leaves the two
+ * disagreeing: iOS honours the family and renders regular, while Android goes
+ * looking for a bold face this one-face family doesn't have and falls back to
+ * the system font. Same style, two different typefaces.
  *
  * DM Sans has no weight above 700, so heavier requests resolve to bold.
  */
@@ -328,6 +328,5 @@ export function mobileTextWeighted(
   return {
     ...mobileTypographyTokens.text[variant],
     fontFamily: mobileTypographyTokens.fontFamily[weight],
-    fontWeight: mobileTypographyTokens.fontWeight[weight],
   };
 }

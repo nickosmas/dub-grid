@@ -313,78 +313,84 @@ export const mobileTypographyTokens = {
     semibold: "600",
     bold: "700",
   },
+  /**
+   * Weight lives in `fontFamily` alone - these tokens deliberately carry no
+   * `fontWeight`, and adding one back silently breaks Android.
+   *
+   * DM Sans ships as four separate single-weight files, and `expo-font`
+   * registers each one under its own family name at style NORMAL only. Naming a
+   * numeric weight next to the family reads as harmless (`DMSans_700Bold` is
+   * already 700) but sends Android down a different path: it asks that
+   * one-face family for a BOLD face, finds none registered and no
+   * `DMSans_700Bold_bold` asset to load, and falls back to the *system* font.
+   * The text renders in Roboto, at roughly the right weight, which is why this
+   * hid for so long - only anything at 500 and up was affected, since 400
+   * resolves to the NORMAL face that is actually there. iOS resolves the family
+   * either way, so it looked correct there throughout.
+   *
+   * To render a token at a different weight, move the family:
+   * `mobileTextWeighted(variant, weight)`.
+   */
   text: {
     screenTitle: {
       fontFamily: "DMSans_700Bold",
       fontSize: 22,
       lineHeight: 28,
-      fontWeight: "700",
     },
     heroMetric: {
       fontFamily: "DMSans_700Bold",
       fontSize: 24,
       lineHeight: 30,
-      fontWeight: "700",
     },
     sectionTitle: {
       fontFamily: "DMSans_700Bold",
       fontSize: 16,
       lineHeight: 22,
-      fontWeight: "700",
     },
     cardTitle: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 16,
       lineHeight: 22,
-      fontWeight: "600",
     },
     rowTitle: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 15,
       lineHeight: 21,
-      fontWeight: "600",
     },
     body: {
       fontFamily: "DMSans_400Regular",
       fontSize: 14,
       lineHeight: 21,
-      fontWeight: "400",
     },
     bodyStrong: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 14,
       lineHeight: 21,
-      fontWeight: "600",
     },
     meta: {
       fontFamily: "DMSans_400Regular",
       fontSize: 13,
       lineHeight: 18,
-      fontWeight: "400",
     },
     label: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 12,
       lineHeight: 16,
-      fontWeight: "600",
     },
     caption: {
       fontFamily: "DMSans_400Regular",
       fontSize: 12,
       lineHeight: 16,
-      fontWeight: "400",
     },
     badge: {
       fontFamily: "DMSans_700Bold",
       fontSize: 11,
       lineHeight: 14,
-      fontWeight: "700",
     },
     micro: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 10,
       lineHeight: 12,
-      fontWeight: "600",
     },
   },
 } as const;

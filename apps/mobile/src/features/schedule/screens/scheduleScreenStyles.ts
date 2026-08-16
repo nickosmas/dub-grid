@@ -6,6 +6,7 @@ import {
   mobileSpacing,
   mobileText,
   mobileTextWeighted,
+  mobileTypography,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 
@@ -384,8 +385,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     meHeroDetailText: {
       color: "rgba(255, 255, 255, 0.88)",
+      fontFamily: mobileTypography.fontFamily.semibold,
       fontSize: 14,
-      fontWeight: "600",
       lineHeight: 20,
     },
     meHeroDetailTextMuted: {
@@ -1125,8 +1126,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     monthCalendarWeekdayLabel: {
       flex: 1,
       color: mobileColors.textSubtle,
+      fontFamily: mobileTypography.fontFamily.bold,
       fontSize: 12,
-      fontWeight: "700",
       textAlign: "center",
     },
     monthCalendarWeeks: {
@@ -1178,8 +1179,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     dateHighlightText: {
       color: mobileColors.textPrimary,
+      fontFamily: mobileTypography.fontFamily.bold,
       fontSize: 15,
-      fontWeight: "700",
     },
     dateHighlightTextSelected: {
       color: mobileColors.textInverse,
@@ -1204,8 +1205,8 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     alertBadgeText: {
       color: mobileColors.textInverse,
+      fontFamily: mobileTypography.fontFamily.bold,
       fontSize: 10,
-      fontWeight: "700",
     },
     groupsList: {
       gap: mobileSpacing.sectionGap,
@@ -1380,13 +1381,13 @@ export const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
     },
     compactSegmentTitle: {
       color: mobileColors.textSecondary,
+      fontFamily: mobileTypography.fontFamily.bold,
       fontSize: 13,
-      fontWeight: "700",
     },
     compactSegmentMeta: {
       color: mobileColors.textMuted,
+      fontFamily: mobileTypography.fontFamily.semibold,
       fontSize: 13,
-      fontWeight: "600",
     },
     heroSegmentList: {
       gap: 12,

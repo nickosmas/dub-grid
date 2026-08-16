@@ -179,11 +179,13 @@ Reach for the shared primitive before inventing one:
 
 Two rules that are easy to get wrong and silent when you do:
 
-- **Never override `fontWeight` on a `mobileText` token.** Each token names a
-  specific DM Sans family file, so changing only the weight leaves the two
-  disagreeing — iOS honors the family, Android may synthesize a fake weight, and
-  the same style renders differently per platform. Use
-  `mobileTextWeighted(variant, weight)`.
+- **Weight is carried by `fontFamily`, never by `fontWeight`.** DM Sans loads as
+  four single-weight files registered one family name each, so a style that
+  names both (`DMSans_700Bold` + `fontWeight: "700"`) makes Android hunt for a
+  bold face that family hasn't got and fall back to Roboto, while iOS renders it
+  correctly — and a bare `fontWeight` with no family is Roboto everywhere. Use a
+  `mobileText` token, `mobileTextWeighted(variant, weight)`, or
+  `mobileTypography.fontFamily.*`. `<TextInput>` is the one exception.
 - **`expo-blur` is iOS-only**, and Android `elevation` needs an opaque
   background and reorders sibling z order.
 - **Never put `flex: 1` on a child of an auto-width row.** Yoga collapses it to

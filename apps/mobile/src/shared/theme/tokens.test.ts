@@ -13,6 +13,7 @@ import {
   mobileRadii,
   mobileSpacing,
   mobileText,
+  mobileTextWeighted,
   mobileTypography,
   mobileDarkenTone,
   mobileVisiblePillBorder,
@@ -98,7 +99,6 @@ describe("shared design token derivation", () => {
           "screenTitle": {
             "fontFamily": "DMSans_700Bold",
             "fontSize": 22,
-            "fontWeight": "700",
             "lineHeight": 28,
           },
           "screenX": 16,
@@ -110,7 +110,6 @@ describe("shared design token derivation", () => {
           "screenTitle": {
             "fontFamily": "DMSans_700Bold",
             "fontSize": 22,
-            "fontWeight": "700",
             "lineHeight": 28,
           },
           "screenX": 16,
@@ -123,6 +122,47 @@ describe("shared design token derivation", () => {
         },
       }
     `);
+  });
+});
+
+describe("DM Sans weights", () => {
+  // Regression guard for an Android-only, silent font fallback. expo-font
+  // registers each DM Sans file under its own family name at style NORMAL, so a
+  // style naming both the family and a numeric weight of 500+ sends Android
+  // hunting for a bold face that family doesn't have — and it lands on the
+  // system font. Every heading in the app rendered in Roboto on Android once.
+  // iOS resolves the family regardless, so nothing here is visible in an iOS
+  // build or in this jsdom suite; the assertions are the only thing standing
+  // between a re-added `fontWeight` and shipping Roboto again.
+  it("carries no fontWeight on any text token", () => {
+    for (const [variant, style] of Object.entries(mobileText)) {
+      expect(style, `mobileText.${variant} must name its weight via fontFamily alone`).not.toEqual(
+        expect.objectContaining({ fontWeight: expect.anything() }),
+      );
+      expect(style.fontFamily, `mobileText.${variant} must name a DM Sans family`).toMatch(
+        /^DMSans_/,
+      );
+    }
+  });
+
+  it("moves the family, not the weight, when re-weighting a token", () => {
+    const medium = mobileTextWeighted("body", "medium");
+
+    expect(medium.fontFamily).toBe("DMSans_500Medium");
+    expect(medium.fontWeight).toBeUndefined();
+    // Everything else about the token survives the swap.
+    expect(medium.fontSize).toBe(mobileText.body.fontSize);
+    expect(medium.lineHeight).toBe(mobileText.body.lineHeight);
+  });
+
+  it("maps every family alias to a real DM Sans file", () => {
+    expect(mobileTypography.fontFamily).toEqual({
+      base: "DMSans_400Regular",
+      regular: "DMSans_400Regular",
+      medium: "DMSans_500Medium",
+      semibold: "DMSans_600SemiBold",
+      bold: "DMSans_700Bold",
+    });
   });
 });
 

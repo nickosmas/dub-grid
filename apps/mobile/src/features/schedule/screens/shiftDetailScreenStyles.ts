@@ -5,6 +5,7 @@ import {
   mobileSpace,
   mobileText,
   mobileTextWeighted,
+  mobileTypography,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 
@@ -144,8 +145,10 @@ export const createStyles = (mobileColors: MobileColors) =>
       ...mobileText.meta,
       color: mobileColors.textSubtle,
     },
+    // Nested inside detailPublishedText, so it inherits that token's size and
+    // only needs to move the family up a weight.
     detailPublishedName: {
-      fontWeight: "600",
+      fontFamily: mobileTypography.fontFamily.semibold,
       color: mobileColors.textMuted,
     },
     detailInfoRow: {
@@ -671,9 +674,10 @@ export const createStyles = (mobileColors: MobileColors) =>
       textTransform: "uppercase",
     },
     swapDateChipDay: {
+      // 800 was never reachable - DM Sans stops at 700.
+      fontFamily: mobileTypography.fontFamily.bold,
       fontSize: 20,
       lineHeight: 24,
-      fontWeight: "800",
       color: mobileColors.textPrimary,
     },
     swapDateChipTextActive: {

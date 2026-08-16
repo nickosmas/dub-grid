@@ -46,6 +46,7 @@ import {
   mobileRadii,
   mobileText,
   mobileTextWeighted,
+  mobileTypography,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -1100,7 +1101,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     passwordHintTextMet: {
       color: mobileColors.successText,
-      fontWeight: "500",
+      fontFamily: mobileTypography.fontFamily.medium,
     },
     passwordVisibilityButton: {
       alignItems: "center",

@@ -283,10 +283,27 @@ sweeps in phase. It is off entirely under reduce motion.
 - **Cards are borderless in light mode with `mobileElevation("card")`, and keep
   the hairline `borderSubtle` in dark mode** — a shadow is invisible against a
   near-black page, so the edge is what separates card from background.
-- **Never override `fontWeight` on a `mobileText` token.** Each token names a
-  specific DM Sans family file, so changing only the weight leaves family and
-  weight disagreeing: iOS honors the family, Android may synthesize a fake
-  weight. Use `mobileTextWeighted(variant, weight)`, which moves both.
+- **Never set `fontWeight` next to a DM Sans `fontFamily`, and never set one
+  without the other.** Weight on mobile is carried entirely by the family name.
+  DM Sans loads as four single-weight files, and `expo-font` registers each
+  under its own family at style NORMAL only, so the two mistakes fail in
+  opposite directions and both land on the system font on Android:
+  - `fontFamily` + `fontWeight: "600"` — Android asks that one-face family for a
+    bold face, finds none and no `DMSans_600SemiBold_bold` asset to load, and
+    falls back to **Roboto**. Only 400 escapes, since it maps to the NORMAL face
+    that is really there. iOS resolves the family either way, so an iOS build
+    and the jsdom suite both look fine while Android ships the wrong typeface.
+  - `fontWeight` alone, no family — nothing ever pointed at DM Sans, so it is
+    Roboto at that weight on both platforms.
+
+  So: spread a `mobileText` token, or `mobileTextWeighted(variant, weight)` for
+  a different weight, or name a `mobileTypography.fontFamily.*` alias directly
+  when there is no size to inherit (a nested `<Text>`, a `headerTitleStyle`, a
+  native tab `labelStyle`). `mobileText` tokens carry no
+  `fontWeight` at all, and `tokens.test.ts` asserts they never regain one.
+  The one deliberate exception is `<TextInput>`, which keeps a bare `fontWeight`
+  and the system font on purpose — see the `fontFamily`/`EditText` note above.
+
 - **Route every duration through `useMotionPreference().d()`.** It returns 0
   when the OS reduce-motion setting is on, which is what makes that setting
   apply app-wide from one place.

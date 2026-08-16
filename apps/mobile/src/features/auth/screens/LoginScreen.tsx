@@ -36,6 +36,7 @@ import {
   mobileSpace,
   mobileText,
   mobileTextWeighted,
+  mobileTypography,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 
@@ -671,7 +672,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     subtitleStrong: {
       color: mobileColors.textPrimary,
-      fontWeight: "700",
+      fontFamily: mobileTypography.fontFamily.bold,
     },
     fields: {
       gap: 12,
