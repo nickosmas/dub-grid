@@ -16,6 +16,35 @@ import {
 import { getCardSurfaceStyle } from "../Screen";
 import { SKELETON_WAVE_HOLD_POINT, useSkeletonWave } from "./useSkeletonWave";
 
+/** Leading `rgb(`/`rgba(` channels, so only the alpha has to be rewritten. */
+const RGB_CHANNELS = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/;
+
+/**
+ * The band's three gradient stops: the highlight fading in and back out through
+ * its *own* colour at zero alpha.
+ *
+ * The outer stops are deliberately not `"transparent"`, which resolves to
+ * `rgba(0,0,0,0)`. iOS draws the gradient with `CGGradient` in device RGB,
+ * which interpolates the channels un-premultiplied: a ramp from black-at-0 to
+ * white-at-0.62 passes through grey, so the band picks up a dirty shoulder on
+ * each edge and the highlight only reads clean at its centre. Android's Skia
+ * shader premultiplies and fades to nothing, which is why the identical code
+ * has always looked better there.
+ *
+ * Holding the RGB identical across all three stops leaves the two engines with
+ * only the alpha to interpolate, which they agree on, so both platforms draw
+ * the same band.
+ */
+export function skeletonBandColors(highlight: string): readonly [string, string, string] {
+  const channels = RGB_CHANNELS.exec(highlight.trim());
+  // A non-`rgb()` token falls through to an opaque edge on purpose: that reads
+  // as an obvious hard-edged bar, rather than silently restoring the grey
+  // shoulder this exists to remove.
+  const edge = channels ? `rgba(${channels[1]},${channels[2]},${channels[3]},0)` : highlight;
+
+  return [edge, highlight, edge];
+}
+
 /**
  * The atom every other skeleton shape is built from: a filled block that lets
  * the app-wide shimmer band pass through it.
@@ -38,6 +67,10 @@ export function SkeletonBlock({
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const bandColors = useMemo(
+    () => skeletonBandColors(mobileColors.skeletonHighlight),
+    [mobileColors.skeletonHighlight],
+  );
   const { wave, bandWidth, bandStartX, bandEndX, enabled } = useSkeletonWave();
 
   const viewRef = useRef<View>(null);
@@ -73,7 +106,7 @@ export function SkeletonBlock({
       {enabled ? (
         <Animated.View pointerEvents="none" style={[styles.band, { width: bandWidth }, bandStyle]}>
           <LinearGradient
-            colors={["transparent", mobileColors.skeletonHighlight, "transparent"]}
+            colors={bandColors}
             end={{ x: 1, y: 0 }}
             start={{ x: 0, y: 0 }}
             style={StyleSheet.absoluteFill}
