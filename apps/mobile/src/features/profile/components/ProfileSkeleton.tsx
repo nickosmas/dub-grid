@@ -66,22 +66,33 @@ function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
 }
 
 /** The hero: avatar, name, badge, subtitle and the wrapped meta grid. */
-function ProfileHeroSkeleton({ metaItems }: { metaItems: number }) {
+function ProfileHeroSkeleton({
+  metaItems,
+  showIdentity,
+  showTitle,
+}: {
+  metaItems: number;
+  showIdentity: boolean;
+  showTitle: boolean;
+}) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (
     <View style={styles.hero}>
-      <View style={styles.heroTop}>
-        <SkeletonCircle size={AVATAR_SIZE} />
-        <View style={styles.heroCopy}>
-          <View style={styles.heroTitleRow}>
-            <SkeletonLine variant="screenTitle" width="52%" />
-            <SkeletonPill height={26} width={62} />
+      {showTitle ? <SkeletonLine variant="screenTitle" width="56%" /> : null}
+      {showIdentity ? (
+        <View style={styles.heroTop}>
+          <SkeletonCircle size={AVATAR_SIZE} />
+          <View style={styles.heroCopy}>
+            <View style={styles.heroTitleRow}>
+              <SkeletonLine variant="screenTitle" width="52%" />
+              <SkeletonPill height={26} width={62} />
+            </View>
+            <SkeletonLine variant="body" width="64%" />
           </View>
-          <SkeletonLine variant="body" width="64%" />
         </View>
-      </View>
+      ) : null}
       {metaItems > 0 ? (
         <View style={styles.heroDetail}>
           {skeletonRows(metaItems, (index) => (
@@ -110,6 +121,8 @@ export function ProfileSkeleton({
   rowsPerSection = 3,
   metaItems = 4,
   showHero = true,
+  showHeroIdentity = true,
+  showTitle = false,
   showQuickActions = false,
   rowVariant = "info",
 }: {
@@ -117,6 +130,20 @@ export function ProfileSkeleton({
   rowsPerSection?: number;
   metaItems?: number;
   showHero?: boolean;
+  /**
+   * Off for a screen whose `ProfileHero` is the meta grid alone — the person
+   * detail page passes no `initials`, `title` or `badge`, so drawing an avatar
+   * and a name here would promise a block that never arrives.
+   */
+  showHeroIdentity?: boolean;
+  /**
+   * Stands in for a native header title that is itself data.
+   *
+   * The platform's title is a string on the navigation item, not a view, so a
+   * placeholder cannot be drawn in the bar — the page draws it instead, and the
+   * screen leaves the real title empty until the name resolves.
+   */
+  showTitle?: boolean;
   showQuickActions?: boolean;
   rowVariant?: ProfileRowVariant;
 }) {
@@ -125,7 +152,13 @@ export function ProfileSkeleton({
 
   return (
     <SkeletonGroup style={styles.page}>
-      {showHero ? <ProfileHeroSkeleton metaItems={metaItems} /> : null}
+      {showHero ? (
+        <ProfileHeroSkeleton
+          metaItems={metaItems}
+          showIdentity={showHeroIdentity}
+          showTitle={showTitle}
+        />
+      ) : null}
       {showQuickActions ? (
         <View style={styles.quickActions}>
           <SkeletonPill height={36} width={112} />

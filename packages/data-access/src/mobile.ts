@@ -127,7 +127,7 @@ export interface MobileOrganizationMembershipRow extends Pick<
 
 export interface MobileManagementMembershipRow extends Pick<
   DbOrganizationMembership,
-  "user_id" | "department_ids" | "dept_admin_ids" | "org_role"
+  "user_id" | "department_ids" | "dept_admin_ids" | "org_role" | "updated_at"
 > {}
 
 export interface MobileEmbeddedEmployeeRow {
@@ -222,12 +222,16 @@ export interface MobileInvitationRow extends Pick<
   | "id"
   | "org_id"
   | "email"
+  | "role_to_assign"
   | "token"
   | "expires_at"
   | "accepted_at"
   | "revoked_at"
   | "updated_at"
   | "employee_id"
+  | "first_name"
+  | "last_name"
+  | "phone"
   | "department_ids"
   | "dept_admin_ids"
 > {}
@@ -479,7 +483,7 @@ export async function fetchMobileManagementMembershipRowsByUserIds(
 
   const { data, error } = await serviceClient
     .from("organization_memberships")
-    .select("user_id, department_ids, dept_admin_ids, org_role")
+    .select("user_id, department_ids, dept_admin_ids, org_role, updated_at")
     .eq("org_id", orgId)
     .in("user_id", uniqueUserIds)
     .is("archived_at", null);
@@ -494,13 +498,122 @@ export async function fetchMobileManagementMembershipRowsByUserIds(
       department_ids: number[] | null;
       dept_admin_ids: number[] | null;
       org_role: string;
+      updated_at: string | null;
     }>
   ).map((row) => ({
     user_id: row.user_id,
     department_ids: row.department_ids ?? [],
     dept_admin_ids: row.dept_admin_ids ?? [],
     org_role: row.org_role,
+    updated_at: row.updated_at ?? null,
   }));
+}
+
+export interface MobileManagementRosterRows {
+  memberships: Array<
+    MobileManagementMembershipRow & {
+      first_name: string | null;
+      last_name: string | null;
+      email: string | null;
+      employee_id: string | null;
+      employee_status: string | null;
+      phone: string | null;
+    }
+  >;
+  invitations: MobileInvitationRow[];
+}
+
+/**
+ * The management roster: everyone whose access is scoped to one or more
+ * management departments, whether they have an account already or are still
+ * only an invitation, and whether or not they also have a staff profile.
+ *
+ * Built from the two source tables rather than through `get_org_directory`
+ * because that RPC pages over the whole people union (staff included) before
+ * anything is filtered — a management user past the first page would simply be
+ * missing from the roster. Memberships and pending invitations are both small
+ * next to the employee table, so this reads less, not more.
+ */
+export async function fetchMobileManagementRosterRows(
+  serviceClient: SupabaseClient,
+  orgId: string,
+): Promise<MobileManagementRosterRows> {
+  const [membershipResult, invitationResult] = await Promise.all([
+    serviceClient
+      .from("organization_memberships")
+      .select("user_id, org_role, department_ids, dept_admin_ids, updated_at, phone")
+      .eq("org_id", orgId)
+      .is("archived_at", null),
+    serviceClient
+      .from("invitations")
+      .select(INVITATION_COLS)
+      .eq("org_id", orgId)
+      .is("accepted_at", null)
+      .is("revoked_at", null),
+  ]);
+
+  if (membershipResult.error) throw membershipResult.error;
+  if (invitationResult.error) throw invitationResult.error;
+
+  const managementMemberships = (
+    (membershipResult.data ?? []) as Array<{
+      user_id: string;
+      org_role: string;
+      department_ids: number[] | null;
+      dept_admin_ids: number[] | null;
+      updated_at: string | null;
+      phone: string | null;
+    }>
+  ).filter((row) => (row.department_ids ?? []).length > 0);
+
+  const invitations = ((invitationResult.data ?? []) as MobileInvitationRow[]).filter(
+    (row) => (row.department_ids ?? []).length > 0,
+  );
+
+  const userIds = managementMemberships.map((row) => row.user_id);
+  const [profiles, employeeResult, users] = await Promise.all([
+    fetchProfileNameRowsByIds(serviceClient, userIds),
+    userIds.length > 0
+      ? serviceClient
+          .from("employees")
+          .select("id, user_id, status")
+          .eq("org_id", orgId)
+          .in("user_id", userIds)
+          .is("archived_at", null)
+      : Promise.resolve({ data: [], error: null }),
+    // One lookup per management user. The roster is a handful of people, not
+    // the staff table, so this stays cheap.
+    Promise.all(userIds.map((userId) => serviceClient.auth.admin.getUserById(userId))),
+  ]);
+
+  if (employeeResult.error) throw employeeResult.error;
+
+  const profileById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const employeeByUserId = new Map(
+    ((employeeResult.data ?? []) as Array<{ id: string; user_id: string; status: string }>).map(
+      (row) => [row.user_id, row],
+    ),
+  );
+  const emailByUserId = new Map(
+    users.map((result, index) => [userIds[index], result.data.user?.email ?? null]),
+  );
+
+  return {
+    memberships: managementMemberships.map((row) => ({
+      user_id: row.user_id,
+      org_role: row.org_role,
+      department_ids: row.department_ids ?? [],
+      dept_admin_ids: row.dept_admin_ids ?? [],
+      updated_at: row.updated_at ?? null,
+      first_name: profileById.get(row.user_id)?.first_name ?? null,
+      last_name: profileById.get(row.user_id)?.last_name ?? null,
+      email: emailByUserId.get(row.user_id) ?? null,
+      employee_id: employeeByUserId.get(row.user_id)?.id ?? null,
+      employee_status: employeeByUserId.get(row.user_id)?.status ?? null,
+      phone: row.phone ?? null,
+    })),
+    invitations,
+  };
 }
 
 export async function fetchMobileOrganizationRowById(
@@ -1147,10 +1260,17 @@ export async function createMobileEmployeeInvitationRow(
   serviceClient: SupabaseClient,
   input: {
     orgId: string;
-    employeeId: string;
+    /** Null for a management-only invite, which has no staff profile behind it. */
+    employeeId: string | null;
     invitedBy: string;
     email: string;
-    roleToAssign: "user" | "admin";
+    roleToAssign: "user" | "admin" | "super_admin";
+    firstName?: string | null;
+    lastName?: string | null;
+    phone?: string | null;
+    /** Management departments the invite grants once accepted. */
+    departmentIds?: number[];
+    deptAdminIds?: number[];
   },
 ): Promise<MobileInvitationRow> {
   const { data, error } = await serviceClient
@@ -1161,6 +1281,11 @@ export async function createMobileEmployeeInvitationRow(
       invited_by: input.invitedBy,
       email: input.email.toLowerCase(),
       role_to_assign: input.roleToAssign,
+      ...(input.firstName === undefined ? {} : { first_name: input.firstName }),
+      ...(input.lastName === undefined ? {} : { last_name: input.lastName }),
+      ...(input.phone === undefined ? {} : { phone: input.phone }),
+      ...(input.departmentIds === undefined ? {} : { department_ids: input.departmentIds }),
+      ...(input.deptAdminIds === undefined ? {} : { dept_admin_ids: input.deptAdminIds }),
     })
     .select(INVITATION_COLS)
     .single();
@@ -1168,6 +1293,102 @@ export async function createMobileEmployeeInvitationRow(
   if (error) throw error;
 
   return data as MobileInvitationRow;
+}
+
+/**
+ * Re-point a pending invitation at a different role or set of management
+ * departments. Guarded on `expectedUpdatedAt` like every other invitation write
+ * here: a null return means someone else changed the row first.
+ */
+export async function updateMobileInvitationAssignmentsRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    invitationId: string;
+    expectedUpdatedAt: string | null;
+    roleToAssign: "user" | "admin" | "super_admin";
+    departmentIds: number[];
+    deptAdminIds: number[];
+  },
+): Promise<MobileInvitationRow | null> {
+  let query = serviceClient
+    .from("invitations")
+    .update({
+      role_to_assign: input.roleToAssign,
+      department_ids: input.departmentIds,
+      dept_admin_ids: input.deptAdminIds,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("org_id", input.orgId)
+    .eq("id", input.invitationId)
+    .is("accepted_at", null)
+    .is("revoked_at", null);
+
+  query = input.expectedUpdatedAt
+    ? query.eq("updated_at", input.expectedUpdatedAt)
+    : query.is("updated_at", null);
+
+  const { data, error } = await query.select(INVITATION_COLS).maybeSingle();
+
+  if (error) throw error;
+
+  return (data as MobileInvitationRow | null | undefined) ?? null;
+}
+
+/**
+ * Set a member's org role and management departments in one guarded write.
+ * A null return means the `expectedUpdatedAt` check lost — the caller should
+ * 409 rather than retry, since the values it was editing are stale.
+ */
+export async function updateMobileMembershipAccessRow(
+  serviceClient: SupabaseClient,
+  input: {
+    orgId: string;
+    userId: string;
+    expectedUpdatedAt: string | null;
+    orgRole?: "user" | "admin" | "super_admin";
+    departmentIds: number[];
+    deptAdminIds: number[];
+  },
+): Promise<MobileManagementMembershipRow | null> {
+  let query = serviceClient
+    .from("organization_memberships")
+    .update({
+      ...(input.orgRole ? { org_role: input.orgRole } : {}),
+      department_ids: input.departmentIds,
+      dept_admin_ids: input.deptAdminIds,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("org_id", input.orgId)
+    .eq("user_id", input.userId)
+    .is("archived_at", null);
+
+  query = input.expectedUpdatedAt
+    ? query.eq("updated_at", input.expectedUpdatedAt)
+    : query.is("updated_at", null);
+
+  const { data, error } = await query
+    .select("user_id, department_ids, dept_admin_ids, org_role, updated_at")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const row = data as {
+    user_id: string;
+    department_ids: number[] | null;
+    dept_admin_ids: number[] | null;
+    org_role: string;
+    updated_at: string | null;
+  };
+
+  return {
+    user_id: row.user_id,
+    department_ids: row.department_ids ?? [],
+    dept_admin_ids: row.dept_admin_ids ?? [],
+    org_role: row.org_role,
+    updated_at: row.updated_at ?? null,
+  };
 }
 
 export async function refreshMobileEmployeeInvitationRow(

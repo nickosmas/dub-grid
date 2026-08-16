@@ -22,6 +22,11 @@ export default function PeopleLayout() {
         name="[id]"
         options={createDetailStackOptions(mobileColors, "Person", { largeTitle: true })}
       />
+      {/* A static segment, so it never competes with `[id]` for a match. */}
+      <Stack.Screen
+        name="management/[personId]"
+        options={createDetailStackOptions(mobileColors, "Management", { largeTitle: true })}
+      />
     </Stack>
   );
 }

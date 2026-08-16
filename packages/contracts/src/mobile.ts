@@ -107,6 +107,13 @@ export const mobilePermissionsSchema = z.object({
   canManageCoverageRequirements: z.boolean(),
   canApproveShiftRequests: z.boolean(),
   canViewDashboardAnalytics: z.boolean(),
+  /**
+   * Grant/revoke management access and set org roles — web gates this on
+   * super_admin or gridmaster rather than on an admin permission. Defaults to
+   * false so a newer client talking to an older server parses and simply
+   * doesn't offer the affordance, rather than failing the whole bootstrap.
+   */
+  canManageManagementAccess: z.boolean().default(false),
 });
 
 export const mobileOrgConfigSchema = z.object({
@@ -739,12 +746,20 @@ export const mobilePersonSchema = z.object({
   statusNote: z.string().default(""),
   userId: z.string().uuid().nullable().default(null),
   version: z.number().int().nonnegative().default(0),
+  /**
+   * The linked membership row's `updated_at`, for optimistic concurrency on the
+   * management-access write path. `version` covers the employees row only, and
+   * management access lives on the membership, so the two need separate guards.
+   */
+  membershipUpdatedAt: z.string().nullable().default(null),
   pendingInvitation: z
     .object({
       id: z.string().uuid(),
       email: z.string().email(),
       expiresAt: z.string(),
       updatedAt: z.string().nullable(),
+      /** The org role this invite grants once accepted. */
+      roleToAssign: mobileRoleSchema.nullable().default(null),
     })
     .nullable()
     .default(null),
@@ -837,6 +852,100 @@ export const mobilePersonInvitationResponseSchema = z.object({
     .enum(["invitation_sent", "invitation_resent", "invitation_revoked", "account_linked"])
     .optional(),
   person: mobilePersonSchema,
+});
+
+/**
+ * Management access for someone who already has a staff profile. Which branch
+ * the server takes is decided server-side by whether the staff row is linked to
+ * an account: a linked person gets their membership updated, an unlinked one
+ * gets an invitation carrying the role and departments.
+ */
+export const mobileManagementAccessBodySchema = z.object({
+  orgRole: mobileRoleSchema,
+  managementDepartmentIds: z.array(z.number().int()).min(1),
+  /** Only read on the invitation branch; a linked account uses its own email. */
+  email: z.string().trim().email().optional(),
+  expectedMembershipUpdatedAt: z.string().nullable().default(null),
+  expectedInvitationUpdatedAt: z.string().nullable().default(null),
+});
+
+export const mobileManagementAccessRemoveBodySchema = z.object({
+  expectedMembershipUpdatedAt: z.string().nullable().default(null),
+  expectedInvitationUpdatedAt: z.string().nullable().default(null),
+});
+
+export const mobileManagementAccessResponseSchema = z.object({
+  success: z.literal(true),
+  result: z.enum(["membership_updated", "invitation_sent", "access_removed"]),
+  person: mobilePersonSchema,
+});
+
+/**
+ * Someone on the management roster. Deliberately not a `MobilePerson`: a
+ * management user may have no staff profile at all (and a pending one has no
+ * account either), so there is no employee UUID to key them by. `id` is a
+ * composite the server understands — `u:<userId>` for a member, `inv:<id>` for
+ * a pending invitation — mirroring the directory RPC's own person_id.
+ */
+export const mobileManagementUserSchema = z.object({
+  id: z.string().min(1),
+  source: z.enum(["member", "pending_invite"]),
+  userId: z.string().uuid().nullable().default(null),
+  /** Set when they also have a staff profile, so the app can link across. */
+  employeeId: z.string().uuid().nullable().default(null),
+  employeeStatus: z.enum(["active", "inactive", "removed"]).nullable().default(null),
+  firstName: z.string().default(""),
+  lastName: z.string().default(""),
+  email: z.string().default(""),
+  phone: z.string().default(""),
+  orgRole: mobileRoleSchema.nullable().default(null),
+  managementDepartmentIds: z.array(z.number().int()).default([]),
+  managementDeptAdminIds: z.array(z.number().int()).default([]),
+  /** Optimistic-concurrency guard for whichever row backs this person. */
+  updatedAt: z.string().nullable().default(null),
+  invitationId: z.string().uuid().nullable().default(null),
+  invitationExpiresAt: z.string().nullable().default(null),
+});
+
+export const mobileManagementUsersResponseSchema = z.object({
+  managementUsers: z.array(mobileManagementUserSchema),
+});
+
+export const mobileManagementUserUpdateBodySchema = z.object({
+  orgRole: mobileRoleSchema,
+  managementDepartmentIds: z.array(z.number().int()).min(1),
+  expectedUpdatedAt: z.string().nullable().default(null),
+});
+
+export const mobileManagementUserRemoveBodySchema = z.object({
+  expectedUpdatedAt: z.string().nullable().default(null),
+});
+
+/** Invite someone straight into management, with no staff profile behind it. */
+export const mobileManagementUserInviteBodySchema = z.object({
+  email: z.string().trim().email(),
+  firstName: staffNameSchema,
+  lastName: staffNameSchema,
+  phone: optionalUsPhoneSchema.default(""),
+  orgRole: mobileRoleSchema,
+  managementDepartmentIds: z.array(z.number().int()).min(1),
+});
+
+export const mobileManagementUserInvitationActionBodySchema = z.object({
+  action: z.enum(["resend", "revoke"]),
+  expectedUpdatedAt: z.string().nullable().default(null),
+});
+
+export const mobileManagementUserResponseSchema = z.object({
+  success: z.literal(true),
+  result: z.enum([
+    "membership_updated",
+    "invitation_sent",
+    "invitation_resent",
+    "invitation_revoked",
+    "access_removed",
+  ]),
+  managementUser: mobileManagementUserSchema.nullable().default(null),
 });
 
 export const mobileNotificationPrioritySchema = z.enum(["low", "normal", "high", "critical"]);
@@ -1024,3 +1133,17 @@ export type MobilePersonInvitationCreateBody = z.infer<
 export type MobilePersonInvitationActionBody = z.infer<
   typeof mobilePersonInvitationActionBodySchema
 >;
+export type MobileManagementAccessBody = z.infer<typeof mobileManagementAccessBodySchema>;
+export type MobileManagementAccessRemoveBody = z.infer<
+  typeof mobileManagementAccessRemoveBodySchema
+>;
+export type MobileManagementAccessResponse = z.infer<typeof mobileManagementAccessResponseSchema>;
+export type MobileManagementUser = z.infer<typeof mobileManagementUserSchema>;
+export type MobileManagementUsersResponse = z.infer<typeof mobileManagementUsersResponseSchema>;
+export type MobileManagementUserUpdateBody = z.infer<typeof mobileManagementUserUpdateBodySchema>;
+export type MobileManagementUserRemoveBody = z.infer<typeof mobileManagementUserRemoveBodySchema>;
+export type MobileManagementUserInviteBody = z.infer<typeof mobileManagementUserInviteBodySchema>;
+export type MobileManagementUserInvitationActionBody = z.infer<
+  typeof mobileManagementUserInvitationActionBodySchema
+>;
+export type MobileManagementUserResponse = z.infer<typeof mobileManagementUserResponseSchema>;

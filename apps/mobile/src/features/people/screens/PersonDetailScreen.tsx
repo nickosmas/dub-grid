@@ -25,15 +25,18 @@ import { BottomSheetModal, SheetHeader } from "../../../shared/components/Bottom
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import {
   createMobilePersonInvitation,
   getMobilePerson,
   parseMobileAccountLinkChallenge,
+  removeMobilePersonManagementAccess,
   resendMobilePersonInvitation,
   revokeMobilePersonInvitation,
   updateMobilePerson,
+  updateMobilePersonManagementAccess,
   updateMobilePersonStatus,
   type MobileAccountLinkChallenge,
 } from "../../../shared/lib/api";
@@ -64,9 +67,21 @@ import {
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
+import {
+  hasManagementAccess,
+  ManagementAccessSheet,
+  type ManagementAccessDraft,
+} from "../components/ManagementAccessSheet";
 
 type ConfirmAction = "deactivate" | "activate" | "remove" | null;
 type InvitationConfirmAction = "create" | "resend" | "revoke" | null;
+/**
+ * Which way the one Deactivate button ends up going. Web asks the same question
+ * in the same place (EmployeeStatusActions' unified confirm) rather than
+ * spending two peer buttons on it, and the primary action's verb and tone
+ * follow the answer.
+ */
+type DeactivateOutcome = "inactive" | "remove";
 
 type EditDraft = {
   firstName: string;
@@ -128,6 +143,7 @@ export default function PersonDetailScreen() {
   /** The person the draft was last built from, so the sync below runs once. */
   const [draftSource, setDraftSource] = useState<MobilePerson | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [deactivateOutcome, setDeactivateOutcome] = useState<DeactivateOutcome>("inactive");
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
@@ -135,6 +151,7 @@ export default function PersonDetailScreen() {
   const [inactiveNote, setInactiveNote] = useState("");
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
+  const [showManagementAccess, setShowManagementAccess] = useState(false);
 
   const personQuery = useQuery({
     queryKey: ["mobile", "person", accessToken, personId],
@@ -145,6 +162,11 @@ export default function PersonDetailScreen() {
     Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]),
   );
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
+  // Super-admin/gridmaster only, the same bar web holds management access
+  // behind — it is not one of the admin permissions.
+  const canManageManagementAccess = Boolean(
+    bootstrapQuery.data?.permissions.canManageManagementAccess,
+  );
   const currentUserId = bootstrapQuery.data?.user?.id ?? null;
   const rawPerson = personQuery.data?.person ?? null;
   const person =
@@ -246,6 +268,7 @@ export default function PersonDetailScreen() {
     onSuccess: async (result, variables) => {
       updateCachedPerson(result.person);
       setConfirmAction(null);
+      setDeactivateOutcome("inactive");
       setInactiveNote("");
       await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
       pushToast({
@@ -323,6 +346,49 @@ export default function PersonDetailScreen() {
     },
   });
 
+  const managementAccessMutation = useMutation({
+    mutationFn: async (input: { draft: ManagementAccessDraft } | { remove: true }) => {
+      if (!person) throw new Error("Person unavailable");
+      const guards = {
+        expectedMembershipUpdatedAt: person.membershipUpdatedAt,
+        expectedInvitationUpdatedAt: person.pendingInvitation?.updatedAt ?? null,
+      };
+      return "remove" in input
+        ? removeMobilePersonManagementAccess(accessToken!, person.id, guards)
+        : updateMobilePersonManagementAccess(accessToken!, person.id, {
+            ...guards,
+            orgRole: input.draft.orgRole,
+            managementDepartmentIds: input.draft.managementDepartmentIds,
+            email: person.email || undefined,
+          });
+    },
+    onError: (error) => {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not update management access",
+        fallbackMessage: "We couldn't update their management access right now.",
+      });
+    },
+    onSuccess: async (result) => {
+      updateCachedPerson(result.person);
+      setShowManagementAccess(false);
+      await Promise.all([personQuery.refetch(), bootstrapQuery.refetch()]);
+      pushToast({
+        tone: "success",
+        title:
+          result.result === "access_removed"
+            ? "Management access removed"
+            : result.result === "invitation_sent"
+              ? "Management invitation sent"
+              : "Management access updated",
+        message:
+          result.result === "invitation_sent"
+            ? "They'll join management once they accept."
+            : "Their management access was updated.",
+      });
+    },
+  });
+
   function handleSave() {
     if (!person || !draft) return;
     const firstNameError = getStaffNameError(draft.firstName, "First name");
@@ -381,10 +447,24 @@ export default function PersonDetailScreen() {
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
       >
+        {/* The title is the person's name, so there is nothing truthful to put
+            in the bar yet. It stays empty rather than falling back to the
+            layout's "Person", and the skeleton below carries a stand-in line
+            for it — the native title is a string, not a view, so the
+            placeholder cannot live in the header itself. */}
+        <HeaderTitle title="" />
+
         {/* Nothing at all for a blip: a skeleton that appears and vanishes
             inside a few frames reads as a glitch, not as loading. */}
         {contentState.showSkeleton ? (
-          <ProfileSkeleton rowsPerSection={4} sections={3} showQuickActions />
+          <ProfileSkeleton
+            metaItems={5}
+            rowsPerSection={4}
+            sections={3}
+            showHeroIdentity={false}
+            showQuickActions
+            showTitle
+          />
         ) : null}
       </Screen>
     );
@@ -397,6 +477,11 @@ export default function PersonDetailScreen() {
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
       >
+        {/* The loading branch above emptied the title and nothing puts it
+            back — `setOptions` is not reverted when that branch unmounts — so
+            each terminal state names itself. */}
+        <HeaderTitle title="Person" />
+
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
@@ -418,6 +503,8 @@ export default function PersonDetailScreen() {
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
       >
+        <HeaderTitle title="Person" />
+
         <EmptyStateCard
           fillScreen
           body="This teammate isn't in your directory anymore."
@@ -432,6 +519,9 @@ export default function PersonDetailScreen() {
   const certificationLabel =
     bootstrapQuery.data?.currentOrg.labels.certification ?? "Certification";
   const departmentLabel = bootstrapQuery.data?.currentOrg.labels.department ?? "Departments";
+  const managementDepartments = (bootstrapQuery.data?.departments ?? []).filter(
+    (department) => department.type === "management",
+  );
   const focusAreaNames = formatIdList(person.focusAreaIds, maps.focusAreas);
   const scheduledDepartmentNames = formatIdList(
     getScheduledDepartmentIds(person.focusAreaIds, bootstrapQuery.data),
@@ -444,6 +534,10 @@ export default function PersonDetailScreen() {
       : "None";
   const employmentLabel = person.employmentType === "part_time" ? "Part-time" : "Full-time";
   const fullName = getFullName(person);
+  // Management-only people have a staff row but no focus areas, so they were
+  // never on the grid — telling them they'll come "off the schedule" would be
+  // describing something that never happened. Same split web makes.
+  const isOnSchedule = person.focusAreaIds.length > 0;
   const accessLevelText = getOrgRoleLabel(person.orgRole);
   const accessText = person.userId
     ? "Active app account"
@@ -451,17 +545,28 @@ export default function PersonDetailScreen() {
       ? "Invitation pending"
       : "No app invitation sent";
 
+  // The Deactivate sheet carries both outcomes, so what the confirm actually
+  // does comes from the selected option, not from which button opened it.
+  const deactivateRemoves = confirmAction === "deactivate" && deactivateOutcome === "remove";
+  const resolvedStatusAction =
+    confirmAction === "deactivate" && deactivateRemoves ? "remove" : confirmAction;
+
   function confirmStatusAction() {
-    if (!confirmAction || !person) return;
+    if (!resolvedStatusAction || !person) return;
 
     statusMutation.mutate({
-      action: confirmAction,
+      action: resolvedStatusAction,
       expectedVersion: person.version,
       note:
-        confirmAction === "deactivate" || confirmAction === "remove"
+        resolvedStatusAction === "deactivate" || resolvedStatusAction === "remove"
           ? inactiveNote.trim() || undefined
           : undefined,
     });
+  }
+
+  function closeStatusConfirmation() {
+    setConfirmAction(null);
+    setDeactivateOutcome("inactive");
   }
 
   function confirmInvitationAction() {
@@ -471,19 +576,23 @@ export default function PersonDetailScreen() {
 
   const statusConfirmationTitle =
     confirmAction === "deactivate"
-      ? `Mark ${getFullName(person)} inactive?`
+      ? `Deactivate ${getFullName(person)}?`
       : confirmAction === "activate"
         ? `Activate ${getFullName(person)}?`
         : `Remove ${getFullName(person)}?`;
+  // The Deactivate sheet has no body of its own: the two options below carry
+  // the copy, and a paragraph above them would only say it a third time.
   const statusConfirmationBody =
     confirmAction === "deactivate"
-      ? "They'll be hidden from active scheduling and shift requests. Their history stays intact."
+      ? undefined
       : confirmAction === "activate"
         ? "They'll return to active staff lists and scheduling."
         : "They'll lose access and be removed from active staff lists. Their history stays intact.";
   const statusConfirmationLabel =
     confirmAction === "deactivate"
-      ? "Mark Inactive"
+      ? deactivateRemoves
+        ? "Remove"
+        : "Mark Inactive"
       : confirmAction === "activate"
         ? "Activate"
         : "Remove";
@@ -702,34 +811,12 @@ export default function PersonDetailScreen() {
 
       {canManageEmployees && !editing ? (
         <ProfileSection title="Actions">
+          {/*
+           * Access first, status last, the way web's staff panel orders them:
+           * granting someone the app is the everyday action, and the one that
+           * takes them off it sits at the bottom on its own.
+           */}
           <View style={styles.actionStack}>
-            {person.status === "active" ? (
-              <Button
-                compact
-                disabled={statusMutation.isPending || isSelf}
-                label="Mark Inactive"
-                onPress={() => setConfirmAction("deactivate")}
-                tone="warning"
-              />
-            ) : null}
-            {person.status !== "active" ? (
-              <Button
-                compact
-                disabled={statusMutation.isPending || isSelf}
-                label={statusMutation.isPending ? "Updating..." : "Activate"}
-                onPress={() => setConfirmAction("activate")}
-                tone="success"
-              />
-            ) : null}
-            {person.status !== "removed" ? (
-              <Button
-                compact
-                disabled={statusMutation.isPending || isSelf}
-                label="Remove"
-                onPress={() => setConfirmAction("remove")}
-                tone="danger"
-              />
-            ) : null}
             {!person.userId && person.status !== "removed" && person.email ? (
               person.pendingInvitation ? (
                 <View style={styles.actionRow}>
@@ -757,6 +844,47 @@ export default function PersonDetailScreen() {
                   tone="link"
                 />
               )
+            ) : null}
+            {canManageManagementAccess && person.status !== "removed" && !isSelf ? (
+              <Button
+                compact
+                disabled={managementAccessMutation.isPending}
+                label={hasManagementAccess(person) ? "Edit Management Access" : "Add to Management"}
+                onPress={() => setShowManagementAccess(true)}
+                tone="secondary"
+              />
+            ) : null}
+            {person.status !== "active" ? (
+              <Button
+                compact
+                disabled={statusMutation.isPending || isSelf}
+                label={statusMutation.isPending ? "Updating..." : "Activate"}
+                onPress={() => setConfirmAction("activate")}
+                tone="success"
+              />
+            ) : null}
+            {person.status === "active" ? (
+              <Button
+                compact
+                disabled={statusMutation.isPending || isSelf}
+                label="Deactivate"
+                onPress={() => {
+                  setDeactivateOutcome("inactive");
+                  setConfirmAction("deactivate");
+                }}
+                tone="warning"
+              />
+            ) : null}
+            {/* Only reachable once someone is already inactive. While they're
+                active, Remove is the second option inside Deactivate. */}
+            {person.status === "inactive" ? (
+              <Button
+                compact
+                disabled={statusMutation.isPending || isSelf}
+                label="Remove"
+                onPress={() => setConfirmAction("remove")}
+                tone="danger"
+              />
             ) : null}
           </View>
         </ProfileSection>
@@ -788,22 +916,44 @@ export default function PersonDetailScreen() {
         confirmLabel={statusConfirmationLabel}
         confirmTone={
           confirmAction === "deactivate"
-            ? "warning"
+            ? deactivateRemoves
+              ? "danger"
+              : "warning"
             : confirmAction === "activate"
               ? "primary"
               : "danger"
         }
         loading={statusMutation.isPending}
-        onCancel={() => setConfirmAction(null)}
+        onCancel={closeStatusConfirmation}
         onConfirm={confirmStatusAction}
         title={statusConfirmationTitle}
         visible={confirmAction != null}
       >
+        {confirmAction === "deactivate" ? (
+          <SelectionSection label="What should happen">
+            <SelectionRow
+              detail={
+                isOnSchedule
+                  ? "They'll be temporarily off the schedule. You can reactivate them anytime."
+                  : "They'll temporarily lose management access. You can reactivate them anytime."
+              }
+              label="Mark inactive"
+              onPress={() => setDeactivateOutcome("inactive")}
+              selected={!deactivateRemoves}
+            />
+            <SelectionRow
+              detail="They'll lose access and won't appear in active staff. You can reactivate them later."
+              label="Remove from staff"
+              onPress={() => setDeactivateOutcome("remove")}
+              selected={deactivateRemoves}
+            />
+          </SelectionSection>
+        ) : null}
         {confirmAction === "deactivate" || confirmAction === "remove" ? (
           <TextInput
             onChangeText={setInactiveNote}
             placeholder={
-              confirmAction === "remove"
+              resolvedStatusAction === "remove"
                 ? "Reason (optional) - e.g. Left the company"
                 : "Reason (optional) - e.g. On leave until June"
             }
@@ -813,6 +963,16 @@ export default function PersonDetailScreen() {
           />
         ) : null}
       </ConfirmationModal>
+      <ManagementAccessSheet
+        departmentLabel={departmentLabel}
+        isPending={managementAccessMutation.isPending}
+        managementDepartments={managementDepartments}
+        onDismiss={() => setShowManagementAccess(false)}
+        onRemove={() => managementAccessMutation.mutate({ remove: true })}
+        onSubmit={(nextDraft) => managementAccessMutation.mutate({ draft: nextDraft })}
+        person={person}
+        visible={showManagementAccess}
+      />
       <ConfirmationModal
         body={invitationConfirmationBody}
         confirmLabel={invitationConfirmationLabel}

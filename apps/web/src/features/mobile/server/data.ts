@@ -1668,12 +1668,15 @@ export async function fetchMobilePeople(
     orgRole: toMobileOrgRole(
       row.user_id ? managementMembershipByUserId.get(row.user_id)?.org_role : null,
     ),
+    membershipUpdatedAt:
+      (row.user_id ? managementMembershipByUserId.get(row.user_id)?.updated_at : null) ?? null,
     pendingInvitation: invitationByEmployeeId.get(row.id)
       ? {
           id: invitationByEmployeeId.get(row.id)!.id,
           email: invitationByEmployeeId.get(row.id)!.email,
           expiresAt: invitationByEmployeeId.get(row.id)!.expires_at,
           updatedAt: invitationByEmployeeId.get(row.id)!.updated_at ?? null,
+          roleToAssign: toMobileOrgRole(invitationByEmployeeId.get(row.id)!.role_to_assign),
         }
       : null,
   }));

@@ -224,10 +224,10 @@ describe("TabsLayout", () => {
     render(<PeopleLayout />);
     render(<ProfileLayout />);
 
-    expect(stackScreenMock).toHaveBeenCalledTimes(10);
+    expect(stackScreenMock).toHaveBeenCalledTimes(11);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
-    const profileOptions = stackScreenMock.mock.calls[4]?.[0].options;
+    const profileOptions = stackScreenMock.mock.calls[5]?.[0].options;
 
     expect(stackScreenMock.mock.calls[0]?.[0]).toMatchObject({
       name: "index",
@@ -277,7 +277,19 @@ describe("TabsLayout", () => {
     });
     expect(peopleDetailOptions).not.toHaveProperty("headerLargeStyle");
     expect(peopleDetailOptions).not.toHaveProperty("headerTransparent");
+    // Registered under its static `management/` segment so it never competes
+    // with `[id]` for a match, and takes the same large title as the rest of
+    // the section.
     expect(stackScreenMock.mock.calls[4]?.[0]).toMatchObject({
+      name: "management/[personId]",
+      options: {
+        headerLargeTitle: true,
+        headerLargeTitleEnabled: true,
+        headerStyle: undefined,
+        title: "Management",
+      },
+    });
+    expect(stackScreenMock.mock.calls[5]?.[0]).toMatchObject({
       name: "index",
       options: {
         headerLargeTitle: true,
@@ -290,7 +302,7 @@ describe("TabsLayout", () => {
     });
     expect(profileOptions).not.toHaveProperty("headerLargeStyle");
     expect(profileOptions).not.toHaveProperty("headerRight");
-    expect(stackScreenMock.mock.calls.slice(5).map((call) => call[0]?.name)).toEqual([
+    expect(stackScreenMock.mock.calls.slice(6).map((call) => call[0]?.name)).toEqual([
       "account",
       "work",
       "security",

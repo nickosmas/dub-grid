@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileDepartment,
+  MobileManagementUserInviteBody,
   MobilePerson,
   MobileProfileChangeRequest,
 } from "@dubgrid/contracts";
@@ -25,9 +26,12 @@ import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { SegmentedControl } from "../../../shared/components/SegmentedControl";
 import {
   getAdminProfileChangeRequests,
+  getManagementUsers,
   getPeople,
+  inviteMobileManagementUser,
   updateProfileChangeRequest,
 } from "../../../shared/lib/api";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
@@ -43,12 +47,15 @@ import {
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type StatusFilter = "active" | "inactive";
+/** Which half of the directory the list is showing, mirroring web's toggle. */
+type RosterTab = "schedule" | "management";
 type SortMode = "seniority" | "alphabetical";
 type MobileOrgRole = "super_admin" | "admin" | "user" | null;
 type ProfileRequestConfirmation = {
@@ -78,13 +85,25 @@ export default function PeopleScreen() {
     "all",
   );
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const [rosterTab, setRosterTab] = useState<RosterTab>("schedule");
+  const [showInviteManagementUser, setShowInviteManagementUser] = useState(false);
   const [profileRequestConfirmation, setProfileRequestConfirmation] =
     useState<ProfileRequestConfirmation>(null);
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
+  const canManageManagementAccess = Boolean(
+    bootstrapQuery.data?.permissions.canManageManagementAccess,
+  );
   const peopleQuery = useQuery({
     queryKey: ["mobile", "people", accessToken],
     queryFn: () => getPeople(accessToken!),
     enabled: Boolean(accessToken),
+  });
+  // The roster is a different union from the staff directory: it includes
+  // people with no `employees` row at all, who the people endpoint can't see.
+  const managementUsersQuery = useQuery({
+    queryKey: ["mobile", "management-users", accessToken],
+    queryFn: () => getManagementUsers(accessToken!),
+    enabled: Boolean(accessToken) && (canManageManagementAccess || canManageEmployees),
   });
   const profileRequestsQuery = useQuery({
     queryKey: ["mobile", "profile-change-requests", "admin", accessToken],
@@ -110,8 +129,33 @@ export default function PeopleScreen() {
       });
     },
   });
+  const inviteManagementUserMutation = useMutation({
+    mutationFn: (body: MobileManagementUserInviteBody) =>
+      inviteMobileManagementUser(accessToken!, body),
+    onSuccess: async () => {
+      setShowInviteManagementUser(false);
+      await managementUsersQuery.refetch();
+      pushToast({
+        tone: "success",
+        title: "Management invitation sent",
+        message: "They'll join management once they accept.",
+      });
+    },
+    onError: (error) => {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not send invitation",
+        fallbackMessage: "We couldn't send that management invitation right now.",
+      });
+    },
+  });
   const manualRefresh = useManualRefresh(() =>
-    Promise.all([peopleQuery.refetch(), bootstrapQuery.refetch(), profileRequestsQuery.refetch()]),
+    Promise.all([
+      peopleQuery.refetch(),
+      bootstrapQuery.refetch(),
+      profileRequestsQuery.refetch(),
+      managementUsersQuery.refetch(),
+    ]),
   );
   function clearFilters() {
     setFocusFilterId("all");
@@ -147,6 +191,11 @@ export default function PeopleScreen() {
       ),
     [bootstrapQuery.data?.departments],
   );
+  const departmentLabel = bootstrapQuery.data?.currentOrg.labels.department ?? "Departments";
+  // The toggle only appears where there is a second half to switch to: web
+  // hides it for orgs with no management departments for the same reason.
+  const canSeeManagementRoster =
+    (canManageManagementAccess || canManageEmployees) && managementDepartments.length > 0;
   const filteredPeople = useMemo(() => {
     const normalizedSearch = searchValue.trim().toLowerCase();
 
@@ -211,14 +260,41 @@ export default function PeopleScreen() {
     (canManageEmployees && statusFilter === "inactive" ? 1 : 0) +
     (sortMode === "alphabetical" ? 1 : 0);
   const peopleError = peopleQuery.error ?? bootstrapQuery.error;
+  const isManagementTab = rosterTab === "management" && canSeeManagementRoster;
+  const managementUsers = managementUsersQuery.data?.managementUsers ?? [];
+  const filteredManagementUsers = useMemo(() => {
+    const normalizedSearch = searchValue.trim().toLowerCase();
+    return managementUsers.filter((managementUser) => {
+      const fullName = `${managementUser.firstName} ${managementUser.lastName}`
+        .trim()
+        .toLowerCase();
+      const matchesSearch =
+        !normalizedSearch ||
+        fullName.includes(normalizedSearch) ||
+        managementUser.email.toLowerCase().includes(normalizedSearch) ||
+        managementUser.phone.toLowerCase().includes(normalizedSearch);
+      const matchesDepartment =
+        managementDepartmentFilterId === "all"
+          ? true
+          : managementUser.managementDepartmentIds.includes(managementDepartmentFilterId);
+      return matchesSearch && matchesDepartment;
+    });
+  }, [managementDepartmentFilterId, managementUsers, searchValue]);
   const currentUserId = bootstrapQuery.data?.user?.id ?? null;
   const currentEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
   const contentState = useMobileContentState({
     // Bootstrap is in both halves. `canManageEmployees` decides which people
     // are visible at all, so clearing the skeleton on the people query alone
     // shows a list that then rewrites itself when bootstrap lands.
-    hasData: peopleQuery.data !== undefined && bootstrapQuery.data !== undefined,
-    isLoading: peopleQuery.isLoading || bootstrapQuery.isLoading,
+    //
+    // The roster is folded in the same way, but only once bootstrap says the
+    // viewer can see it — naming a disabled query here unconditionally would
+    // pin `hasData` false forever, since a disabled query never resolves.
+    hasData:
+      peopleQuery.data !== undefined &&
+      bootstrapQuery.data !== undefined &&
+      (!canSeeManagementRoster || managementUsersQuery.data !== undefined),
+    isLoading: peopleQuery.isLoading || bootstrapQuery.isLoading || managementUsersQuery.isLoading,
     error: peopleError,
   });
 
@@ -307,11 +383,24 @@ export default function PeopleScreen() {
       </FilterSheet>
 
       <View style={styles.section}>
+        {canSeeManagementRoster ? (
+          <View style={styles.rosterTabs}>
+            <SegmentedControl
+              accessibilityLabel="Directory section"
+              onChange={setRosterTab}
+              options={[
+                { value: "schedule", label: `Schedule (${visiblePeople.length})` },
+                { value: "management", label: `Management (${managementUsers.length})` },
+              ]}
+              value={rosterTab}
+            />
+          </View>
+        ) : null}
         <View style={styles.searchBarRow}>
           <SearchBar
             accessibilityLabel="Search people"
             onChangeText={setSearchValue}
-            placeholder="Search people"
+            placeholder={isManagementTab ? "Search management" : "Search people"}
             value={searchValue}
           />
           <FilterButton
@@ -320,8 +409,18 @@ export default function PeopleScreen() {
             expanded={isFilterModalVisible}
             onPress={() => setIsFilterModalVisible(true)}
           />
-          {canManageEmployees ? (
-            <AddPersonButton onPress={() => router.push("/people/add")} />
+          {isManagementTab ? (
+            canManageManagementAccess ? (
+              <AddPersonButton
+                accessibilityLabel="Invite management user"
+                onPress={() => setShowInviteManagementUser(true)}
+              />
+            ) : null
+          ) : canManageEmployees ? (
+            <AddPersonButton
+              accessibilityLabel="Add person"
+              onPress={() => router.push("/people/add")}
+            />
           ) : null}
         </View>
       </View>
@@ -395,6 +494,69 @@ export default function PeopleScreen() {
             void peopleQuery.refetch();
           }}
         />
+      ) : isManagementTab ? (
+        managementUsers.length === 0 ? (
+          <EmptyStateCard
+            fillScreen
+            body="Nobody has management access yet. Invite someone, or add a teammate to management from their staff profile."
+            iconName="briefcase-outline"
+            title="No management users yet"
+          />
+        ) : filteredManagementUsers.length === 0 ? (
+          <EmptyStateCard
+            fillScreen
+            body="Try a different name, email, or management department."
+            iconName="search-outline"
+            title="No matches"
+          />
+        ) : (
+          <View style={styles.section}>
+            <View>
+              {filteredManagementUsers.map((managementUser, index) => {
+                const departmentNames = managementUser.managementDepartmentIds
+                  .map(
+                    (departmentId) =>
+                      managementDepartments.find((department) => department.id === departmentId)
+                        ?.name ?? null,
+                  )
+                  .filter((value): value is string => Boolean(value));
+
+                return (
+                  <AnimatedListItem index={index} key={managementUser.id}>
+                    <PersonRow
+                      accessHint={
+                        managementUser.source === "pending_invite"
+                          ? "Invitation pending"
+                          : "App access"
+                      }
+                      id={managementUser.id}
+                      employmentType={null}
+                      isLast={index === filteredManagementUsers.length - 1}
+                      name={
+                        `${managementUser.firstName} ${managementUser.lastName}`.trim() ||
+                        managementUser.email ||
+                        "Unnamed person"
+                      }
+                      navigable
+                      orgRole={managementUser.orgRole}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(tabs)/people/management/[personId]",
+                          params: { personId: managementUser.id },
+                        })
+                      }
+                      showStatus={false}
+                      status="active"
+                      subtitle={
+                        departmentNames.join(", ") || managementUser.email || "No departments"
+                      }
+                    />
+                  </AnimatedListItem>
+                );
+              })}
+            </View>
+          </View>
+        )
       ) : visiblePeople.length === 0 ? (
         <EmptyStateCard
           fillScreen
@@ -467,6 +629,14 @@ export default function PeopleScreen() {
           </View>
         </View>
       )}
+      <ManagementUserInviteSheet
+        departmentLabel={departmentLabel}
+        isPending={inviteManagementUserMutation.isPending}
+        managementDepartments={managementDepartments}
+        onDismiss={() => setShowInviteManagementUser(false)}
+        onSubmit={(body) => inviteManagementUserMutation.mutate(body)}
+        visible={showInviteManagementUser}
+      />
       <ConfirmationModal
         body={
           profileRequestConfirmation?.request.type === "account_deletion" &&
@@ -513,7 +683,13 @@ function countPeopleInManagementDepartment(
  * A circle rather than the shared `<Button iconOnly>`, which caps at 44 and
  * would sit two points shorter than the search field it lines up with.
  */
-function AddPersonButton({ onPress }: { onPress: () => void }) {
+function AddPersonButton({
+  accessibilityLabel,
+  onPress,
+}: {
+  accessibilityLabel: string;
+  onPress: () => void;
+}) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
@@ -524,7 +700,7 @@ function AddPersonButton({ onPress }: { onPress: () => void }) {
 
   return (
     <AnimatedPressable
-      accessibilityLabel="Add person"
+      accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       android_ripple={androidRipple}
       onPress={onPress}
@@ -550,7 +726,8 @@ function PersonRow({
   onPress,
 }: {
   id: string;
-  employmentType: MobilePerson["employmentType"];
+  /** Null for a management-only user, who was never on the schedule. */
+  employmentType: MobilePerson["employmentType"] | null;
   name: string;
   navigable: boolean;
   orgRole: MobileOrgRole;
@@ -565,7 +742,7 @@ function PersonRow({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { resolvedTheme } = useThemeMode();
   const secondaryDetail = [
-    employmentType === "part_time" ? "PT" : "FT",
+    employmentType === null ? null : employmentType === "part_time" ? "PT" : "FT",
     accessHint,
     showStatus ? formatStatusLabel(status) : null,
   ]
@@ -640,6 +817,12 @@ const createStyles = (mobileColors: MobileColors) =>
       alignItems: "center",
       flexDirection: "row",
       gap: 10,
+    },
+    rosterTabs: {
+      // The control sizes to its own labels, so it needs a start-aligned row
+      // rather than stretching across the gutter.
+      alignItems: "flex-start",
+      marginBottom: 10,
     },
     addPersonButton: {
       alignItems: "center",

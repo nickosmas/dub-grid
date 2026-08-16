@@ -73,6 +73,7 @@ describe("PeopleScreen", () => {
     useAccessToken.mockReturnValue("token-123");
     useBootstrap.mockReturnValue({
       data: {
+        currentOrg: { labels: { department: "Departments" } },
         focusAreas: [
           {
             id: 2,
@@ -348,6 +349,7 @@ describe("PeopleScreen", () => {
   it("hides inactive staff and status pills from regular users", () => {
     useBootstrap.mockReturnValue({
       data: {
+        currentOrg: { labels: { department: "Departments" } },
         focusAreas: [{ id: 2, name: "Skilled Nursing" }],
         permissions: {
           canManageEmployees: false,
@@ -422,6 +424,7 @@ describe("PeopleScreen", () => {
   it("shows management users to regular users without opening their profile", () => {
     useBootstrap.mockReturnValue({
       data: {
+        currentOrg: { labels: { department: "Departments" } },
         focusAreas: [{ id: 2, name: "Skilled Nursing" }],
         permissions: {
           canManageEmployees: false,
