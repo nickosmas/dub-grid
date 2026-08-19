@@ -220,9 +220,9 @@ export default function NotificationDetailScreen() {
       <Screen>
         <EmptyStateCard
           fillScreen
+          body="That alert is no longer accessible."
           iconName="notifications-off-outline"
           title="Alert not available"
-          body="That alert is no longer accessible."
         />
       </Screen>
     );

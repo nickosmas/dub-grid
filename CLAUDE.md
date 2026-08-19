@@ -78,6 +78,13 @@
   (+ its `WorkspaceKind`/`workspaceKind` TS mapping — the real-vs-sandbox flavor; renaming
   needs a migration) and the marketing landing line. The generic word for a UI area
   (e.g. "the People section") is not the tenant — reword, don't call it "organization".
+- **No decorative "AI" iconography** anywhere in either app. The four-point sparkle
+  (Ionicons `sparkles*`, lucide `Sparkle`/`Sparkles`/`Wand*`, the ✨ and 🪄 emoji)
+  reads as "AI feature" and makes the product look generated rather than designed.
+  Nothing here is AI-powered, so an icon must name what it stands for. Enforced by
+  `design/no-decorative-ai-icons` (`eslint-rules/no-decorative-ai-icons.mjs`).
+  Stars and the word "magic" are fine — a star is a real favorite affordance, and
+  `MagicLinkEmail` is the standard Supabase term for passwordless sign-in
 - **Testing**: Run `npm test` (vitest) after changes. Tests use jsdom + Testing Library
 - **Cookie consent version**: When adding/removing cookies, changing analytics providers,
   or updating the cookie/privacy policy, bump `CONSENT_VERSION` in
@@ -178,6 +185,18 @@ Reach for the shared primitive before inventing one:
   never route a Cancel that navigates through `onClose` — it re-enters the guard
   and asks twice.
 - **`<AuthShell>` / `<AuthField>`** — every public auth screen.
+- **`<EmptyStateCard>`** for every empty state. Always **centred**, and the icon
+  badge is always a **circle** — the rounded square stays the card _header's_
+  shape (`cardIconFrame`). A full-page empty gets a 60pt `brandSoft`/`brandBorder`
+  badge with a brand glyph; inside a card it is a 48pt badge in the card's own
+  `surface`, lifted with `mobileElevation("raised")` and carrying a muted glyph.
+  `iconName` is **required** — it used to default to `sparkles-outline`, which is
+  how the AI sparkle reached every screen that forgot one. `compact` renders
+  inside a card or `ProfileSection` and wraps itself in a `surfaceSecondary`
+  panel; that panel is load-bearing, since centred copy loose under a card's
+  left-aligned header reads as misaligned. Full-page variants own the viewport and
+  take no panel. `actionVariant="link"` gives the action a trailing arrow instead
+  of a filled pill, for an empty state pointing at a fuller view of the same thing.
 - **`shared/components/skeleton`** primitives (`SkeletonBlock`, `SkeletonLine`,
   `SkeletonCardSurface`, `SkeletonGroup`) for loading placeholders. Skeletons
   are per screen and colocated with it, and they **reuse that screen's own

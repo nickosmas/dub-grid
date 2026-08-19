@@ -109,7 +109,7 @@ export default function ActivityExpandedScreen() {
       </View>
 
       {filtered.length === 0 ? (
-        <EmptyStateCard iconName="sparkles-outline" title="No activity matches this filter" />
+        <EmptyStateCard iconName="options-outline" title="No activity matches this filter" />
       ) : (
         <View style={styles.list}>
           {filtered.map((item, index) => (

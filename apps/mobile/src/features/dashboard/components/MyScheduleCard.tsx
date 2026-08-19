@@ -247,8 +247,11 @@ export function MyScheduleCard({
           </ScrollView>
         ) : (
           <EmptyStateCard
+            actionLabel={onExpand ? "View full schedule" : undefined}
+            actionVariant="link"
             compact
-            iconName="calendar-outline"
+            iconName="calendar-clear-outline"
+            onAction={onExpand}
             title="You're not scheduled this week"
           />
         )

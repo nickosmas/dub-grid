@@ -196,6 +196,7 @@ import path screens should use. **The package is shared with `apps/web`** — ad
 | A sheet's title             | `<SheetHeader title subtitle>` in the `header` slot — never a title in the body             |
 | A confirmation              | `<ConfirmationModal>` — primary action first, cancel below                                  |
 | Auth screen frame           | `<AuthShell>` + `<AuthField>`                                                               |
+| An empty state              | `<EmptyStateCard iconName>` — centred; `compact` inside a card adds its panel               |
 | Loading placeholder         | a `*Skeleton` colocated with the screen, built on `shared/components/skeleton`              |
 | Which state a screen is in  | `useMobileContentState({ hasData, isLoading, error, isEmpty })`                             |
 
@@ -277,6 +278,32 @@ sweeps in phase. It is off entirely under reduce motion.
 - **`iconOnly` buttons must not carry vertical padding.** The fixed width/height
   is the box; padding on top of it squeezes the content below the glyph's line
   height and `overflow: "hidden"` clips it.
+- **`EmptyStateCard` is centred, and `compact` is what earns the centring.**
+  Every variant centres its icon badge over its copy, and that badge is always a
+  **circle** — the rounded square is the card _header's_ shape (`cardIconFrame`),
+  where it reads as chrome rather than as content. A full-page empty gets a 60pt
+  `brandSoft`/`brandBorder` circle with a brand glyph; `compact` gets a 48pt
+  circle in the card's own `surface`, lifted with `mobileElevation("raised")` and
+  carrying a **muted** glyph, so it stays a quiet placeholder inside an otherwise
+  busy dashboard rather than competing with the card's header.
+  `iconName` is **required**: it used to default to `sparkles-outline`, so every
+  caller that omitted an icon quietly shipped the four-point "AI" sparkle.
+  The part that is easy to get wrong is the panel. `compact` renders inside a
+  container with its own left-aligned header (`Card`, `ProfileSection`) and wraps
+  itself in a `surfaceSecondary` panel at `mobileRadii.control` — one step tighter
+  than the card's radius, so it nests rather than traces. That panel is
+  load-bearing, not decoration: centred copy sitting loose under a left-aligned
+  card header, in place of left-aligned rows, reads as misaligned, and bounding it
+  is what makes the centring deliberate. `fillScreen` and the plain variant own
+  the viewport with nothing to align against, so they take **no** panel — a small
+  tinted box stranded mid-screen reads as a stray card. Empty state inside a
+  card ⇒ `compact`.
+- **Decorative "AI" iconography is lint-enforced out of the codebase.** The
+  `design/no-decorative-ai-icons` rule fails the build on `sparkles*`, lucide
+  `Sparkle`/`Wand*`, and the sparkle/wand emoji. It carries its own `files`
+  globs because **nothing under `apps/mobile/app/` is otherwise linted** — those
+  route files match no other config block's globs, so ESLint skips them
+  entirely.
 - **`fullWidth` defaults to true for text buttons.** A button inside a row that
   positions with `alignItems` needs `fullWidth={false}`, because
   `alignSelf: "stretch"` on the child wins.

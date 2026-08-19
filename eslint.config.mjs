@@ -4,11 +4,18 @@ import reactHooks from "./node_modules/eslint-config-next/node_modules/eslint-pl
 import tseslint from "./node_modules/eslint-config-next/node_modules/typescript-eslint/dist/index.js";
 import eslintConfigPrettier from "eslint-config-prettier";
 import { noHtmlTitleAttribute, noRawTooltipImport } from "./eslint-rules/no-raw-title-tooltip.mjs";
+import { noDecorativeAiIcons } from "./eslint-rules/no-decorative-ai-icons.mjs";
 
 const tooltipPlugin = {
   rules: {
     "no-html-title-attribute": noHtmlTitleAttribute,
     "no-raw-tooltip-import": noRawTooltipImport,
+  },
+};
+
+const designPlugin = {
+  rules: {
+    "no-decorative-ai-icons": noDecorativeAiIcons,
   },
 };
 
@@ -120,6 +127,23 @@ const eslintConfig = defineConfig([
     rules: {
       "tooltip/no-html-title-attribute": "warn",
       "tooltip/no-raw-tooltip-import": "error",
+    },
+  },
+  {
+    // Carries its own `files` on purpose. The Expo Router route files under
+    // apps/mobile/app match no other block's globs, so they are currently
+    // unlinted entirely — and one of the sparkles this rule bans lived there.
+    // Listing the globs here enforces the rule in routes without switching the
+    // full ruleset on for that directory, which is a separate, larger change.
+    files: [
+      "apps/web/src/**/*.{ts,tsx}",
+      "apps/mobile/src/**/*.{ts,tsx}",
+      "apps/mobile/app/**/*.{ts,tsx}",
+      "packages/*/src/**/*.{ts,tsx}",
+    ],
+    plugins: { design: designPlugin },
+    rules: {
+      "design/no-decorative-ai-icons": "error",
     },
   },
   {
