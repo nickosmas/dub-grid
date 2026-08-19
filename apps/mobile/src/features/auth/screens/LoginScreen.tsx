@@ -20,8 +20,7 @@ import {
   registerMobileSessionPresence,
   verifyMobileTotpFactor,
 } from "../../../shared/lib/api";
-import { BOOTSTRAP_QUERY_KEY_PREFIX } from "../hooks/useBootstrap";
-import { getUserIdFromAccessToken } from "../../../shared/lib/access-token";
+import { buildBootstrapQueryKey } from "../hooks/useBootstrap";
 import { queryClient } from "../../../shared/lib/query-client";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
@@ -223,7 +222,7 @@ export default function LoginScreen() {
     // the wait. `prefetchQuery` never rejects: a failed bootstrap should still
     // let the user through to the tab gate's locked/error handling.
     await queryClient.prefetchQuery({
-      queryKey: [...BOOTSTRAP_QUERY_KEY_PREFIX, getUserIdFromAccessToken(session.accessToken)],
+      queryKey: buildBootstrapQueryKey(session.accessToken),
       queryFn: () => getBootstrap(session.accessToken),
     });
 

@@ -25,14 +25,14 @@ function optionsFor(token: string | null): QueryOptions {
   return useQuery.mock.calls.at(-1)?.[0] as QueryOptions;
 }
 
-/** A structurally real access token: header.payload.signature, `sub` claim. */
-function tokenFor(userId: string, issuedAt = "issued"): string {
+/** A structurally real access token: header.payload.signature, claims in the payload. */
+function tokenFor(userId: string, issuedAt = "issued", orgId: string | null = "org-1"): string {
   const encode = (value: object) =>
     btoa(JSON.stringify(value)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
   return [
     encode({ alg: "HS256", typ: "JWT" }),
-    encode({ sub: userId, iat: issuedAt }),
+    encode(orgId ? { sub: userId, org_id: orgId, iat: issuedAt } : { sub: userId, iat: issuedAt }),
     "signature",
   ].join(".");
 }
@@ -47,8 +47,44 @@ describe("useBootstrap", () => {
   // user on the same device could read the previous account's bootstrap out of
   // the cache: org, permissions and linked employee included.
   it("keys the cache per user", () => {
-    expect(optionsFor(tokenFor("user-aaa")).queryKey).toEqual(["mobile", "bootstrap", "user-aaa"]);
-    expect(optionsFor(tokenFor("user-bbb")).queryKey).toEqual(["mobile", "bootstrap", "user-bbb"]);
+    expect(optionsFor(tokenFor("user-aaa")).queryKey).toEqual([
+      "mobile",
+      "bootstrap",
+      "user-aaa",
+      "org-1",
+    ]);
+    expect(optionsFor(tokenFor("user-bbb")).queryKey).toEqual([
+      "mobile",
+      "bootstrap",
+      "user-bbb",
+      "org-1",
+    ]);
+  });
+
+  // The tenancy half of the key, and the reason it exists. `sub` does not change
+  // across an org switch, so a user-only key is byte-identical either side of
+  // one: the switch clears the cache, but an observer that refetches on the OLD
+  // token before the new session propagates writes the previous org's bootstrap
+  // — org, permissions, memberships, feature flags — onto the exact key the new
+  // org then reads, and staleTime serves it as fresh.
+  it("keys the cache per organization, so a switch cannot reuse the previous org's entry", () => {
+    const inOrgA = optionsFor(tokenFor("user-aaa", "issued", "org-a"));
+    const inOrgB = optionsFor(tokenFor("user-aaa", "issued", "org-b"));
+
+    expect(inOrgA.queryKey).not.toEqual(inOrgB.queryKey);
+    expect(inOrgA.queryKey).toEqual(["mobile", "bootstrap", "user-aaa", "org-a"]);
+    expect(inOrgB.queryKey).toEqual(["mobile", "bootstrap", "user-aaa", "org-b"]);
+  });
+
+  // A gridmaster, or a user whose membership the access-token hook refused, has
+  // no org claim at all. That is its own cache identity, not a shared one.
+  it("gives a token with no org claim its own key", () => {
+    expect(optionsFor(tokenFor("user-aaa", "issued", null)).queryKey).toEqual([
+      "mobile",
+      "bootstrap",
+      "user-aaa",
+      null,
+    ]);
   });
 
   // Supabase runs with `autoRefreshToken`, so the token string rotates on its
@@ -65,7 +101,7 @@ describe("useBootstrap", () => {
   // A token we can't read still has to produce a usable key. Sign-out clears
   // the whole query cache, so nothing of a previous account survives under it.
   it("falls back to a null user segment for an unreadable token", () => {
-    expect(optionsFor("not-a-jwt").queryKey).toEqual(["mobile", "bootstrap", null]);
+    expect(optionsFor("not-a-jwt").queryKey).toEqual(["mobile", "bootstrap", null, null]);
   });
 
   // Enabled is driven off the token so a signed-out render never fires a

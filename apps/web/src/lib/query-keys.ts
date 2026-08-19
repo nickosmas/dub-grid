@@ -61,12 +61,23 @@ export const queryKeys = {
     notificationPrefs: (userId: string) => ["account", userId, "notificationPrefs"] as const,
     terms: (userId: string) => ["account", userId, "terms"] as const,
   },
+  // Every endpoint behind these keys is org-filtered server-side (it reads
+  // claims.org_id), so the org belongs in the key: a user in two orgs would
+  // otherwise read one org's alerts out of the cache while signed into the
+  // other. Today web only changes org via a full document load, which throws
+  // the cache away — this keeps that from being the only thing protecting it.
+  // `all` stays a bare user prefix on purpose: it exists to invalidate every
+  // variant below, and it still matches them with the org segment inserted.
   notifications: {
     all: (userId: string) => ["notifications", userId] as const,
-    unreadCount: (userId: string) => ["notifications", userId, "unreadCount"] as const,
-    recent: (userId: string) => ["notifications", userId, "recent"] as const,
-    search: (userId: string) => ["notifications", userId, "search"] as const,
-    facets: (userId: string) => ["notifications", userId, "facets"] as const,
+    unreadCount: (userId: string, orgId: string | null) =>
+      ["notifications", userId, orgId ?? "no-org", "unreadCount"] as const,
+    recent: (userId: string, orgId: string | null) =>
+      ["notifications", userId, orgId ?? "no-org", "recent"] as const,
+    search: (userId: string, orgId: string | null) =>
+      ["notifications", userId, orgId ?? "no-org", "search"] as const,
+    facets: (userId: string, orgId: string | null) =>
+      ["notifications", userId, orgId ?? "no-org", "facets"] as const,
   },
   gridmaster: {
     all: () => ["gm"] as const,

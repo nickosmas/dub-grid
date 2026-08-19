@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { buildBootstrapQueryKey } from "../../auth/hooks/useBootstrap";
 
 /**
  * Patches the unread badge straight into the bootstrap cache.
@@ -10,6 +11,11 @@ import type { QueryClient } from "@tanstack/react-query";
  *
  * The endpoints return the authoritative post-write count, so this is a patch
  * with a server number, not an optimistic guess.
+ *
+ * Goes through `buildBootstrapQueryKey` rather than restating the key: this
+ * wrote to `["mobile","bootstrap", accessToken]` while the query itself was
+ * keyed on the token's claims, so every call was a silent no-op and the badge
+ * never got its patch.
  */
 export function setBootstrapUnreadCount(
   queryClient: QueryClient,
@@ -17,7 +23,7 @@ export function setBootstrapUnreadCount(
   count: number,
 ): void {
   queryClient.setQueryData(
-    ["mobile", "bootstrap", accessToken],
+    buildBootstrapQueryKey(accessToken),
     (current: { unreadNotificationCount: number } | undefined) =>
       current ? { ...current, unreadNotificationCount: count } : current,
   );
