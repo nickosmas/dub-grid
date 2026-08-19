@@ -310,6 +310,10 @@ export async function middleware(req: NextRequest) {
               .from("organization_memberships")
               .select("org_role, org_id, organizations!inner(slug)")
               .eq("user_id", userId)
+              // Removal is a soft archive, so without this an ex-member still
+              // matched: the subdomain-mismatch redirect below was skipped and
+              // their old org_role was restored from the archived row.
+              .is("archived_at", null)
               .eq("organizations.slug", subdomain)
               .maybeSingle<{ org_role: string; org_id: string; organizations: { slug: string } }>();
             return data;

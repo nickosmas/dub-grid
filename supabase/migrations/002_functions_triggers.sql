@@ -19,21 +19,27 @@ AS $$
 $$;
 
 
--- Per-session org context: prefer the org_id claim baked into this device's
--- JWT (written by custom_access_token_hook from user_sessions.active_org_id)
--- so each device stays isolated. Falls back to profiles.org_id only when the
--- claim is absent (legacy tokens issued before the hook started writing it).
--- Reading profiles.org_id directly here would leak a sibling device's
--- switch_org into this session, hiding/showing rows it shouldn't.
+-- Per-session org context: the org_id claim baked into this device's JWT
+-- (written by custom_access_token_hook from user_sessions.active_org_id), so
+-- each device stays isolated.
+--
+-- The claim is the ONLY source, and a missing claim means no org — NULL, which
+-- every `org_id = public.caller_org_id()` policy evaluates to NULL and so
+-- matches no rows. This function has to fail closed, because the hook strips
+-- org_id precisely when the membership is invalid (archived membership,
+-- archived/suspended org, deactivated user). It used to fall back to
+-- profiles.org_id "for legacy tokens", which inverted that: a member removed
+-- from an org lost the claim, fell through to profiles.org_id — which nothing
+-- nulls on a soft archive — and kept SELECT on the entire org forever, as a
+-- non-member. profiles.org_id is a per-user default for the NEXT sign-in, not a
+-- session's identity; reading it here would also leak a sibling device's
+-- switch_org into this session.
 CREATE OR REPLACE FUNCTION public.caller_org_id()
 RETURNS UUID
 LANGUAGE SQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
-  SELECT COALESCE(
-    NULLIF(auth.jwt() ->> 'org_id', '')::UUID,
-    (SELECT org_id FROM public.profiles WHERE id = auth.uid())
-  );
+  SELECT NULLIF(auth.jwt() ->> 'org_id', '')::UUID;
 $$;
 
 
@@ -476,6 +482,71 @@ BEGIN
 END;
 $$;
 
+-- Membership ARCHIVED → the same teardown as a delete.
+--
+-- Removing someone from an organization is a soft archive everywhere in the app
+-- (DELETE /api/organizations/access sets archived_at; nothing hard-deletes the
+-- row), so on_membership_deleted above never fired for a real removal. That left
+-- two holes, both closed here:
+--
+--   1. profiles.org_id kept pointing at the org the user was just removed from.
+--      Paired with the old caller_org_id() fallback that was a permanent, total
+--      read leak; caller_org_id() now fails closed, and this keeps the stale
+--      pointer from resurfacing through get_my_organizations or a fresh sign-in.
+--   2. No jwt_refresh_locks row, so the already-minted token kept its org_id and
+--      org_role until it expired — up to an hour of continued admin access after
+--      removal. The lock makes the next refresh 403 and sign the device out.
+--
+-- Deliberately a trigger function rather than a callable helper shared with
+-- on_membership_deleted: a function returning `trigger` cannot be reached over
+-- PostgREST, so the blanket EXECUTE grant in 004 cannot turn "clear any user's
+-- org pointer" into an RPC.
+CREATE OR REPLACE FUNCTION public.on_membership_archived()
+RETURNS TRIGGER
+LANGUAGE PLPGSQL SECURITY DEFINER
+SET search_path = 'public'
+AS $$
+DECLARE
+  -- Read BEFORE the UPDATE below nulls it, or the lock check that reuses it
+  -- would always see false.
+  v_was_default BOOLEAN;
+BEGIN
+  v_was_default := EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = NEW.user_id AND org_id = NEW.org_id
+  );
+
+  IF v_was_default THEN
+    UPDATE public.profiles
+    SET org_id = NULL, updated_at = NOW()
+    WHERE id = NEW.user_id;
+  END IF;
+
+  -- Kill the outstanding tokens, but only when one of them can still be
+  -- claiming THIS org: either it is the user's default for a fresh sign-in, or
+  -- some device's session is pinned to it. profiles.org_id alone is not the
+  -- test, because org context is per session — a phone can sit in the archived
+  -- org while the profile default points elsewhere.
+  --
+  -- Conditional because the lock is per USER, not per session: it 403s the next
+  -- refresh on every device they own. Firing it unconditionally would sign
+  -- someone out of the org they are actively working in because they were
+  -- removed from an unrelated one they had not touched in months.
+  IF v_was_default OR EXISTS (
+    SELECT 1 FROM public.user_sessions
+    WHERE user_id = NEW.user_id AND active_org_id = NEW.org_id
+  ) THEN
+    INSERT INTO public.jwt_refresh_locks (user_id, locked_until, reason)
+      VALUES (NEW.user_id, NOW() + INTERVAL '5 seconds', 'membership_removed')
+    ON CONFLICT (user_id) DO UPDATE
+      SET locked_until = NOW() + INTERVAL '5 seconds',
+          reason       = 'membership_removed';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- 5. ATTACH TRIGGERS TO TABLES
@@ -554,6 +625,15 @@ CREATE TRIGGER trg_log_permission_change
 CREATE TRIGGER trg_membership_deleted
   AFTER DELETE ON public.organization_memberships
   FOR EACH ROW EXECUTE FUNCTION public.on_membership_deleted();
+
+-- The path removals actually take. Fires only on the null → set transition, so
+-- re-archiving an already-archived row (or any other UPDATE touching the column)
+-- cannot re-lock a user out of a session they have since legitimately rebuilt.
+CREATE TRIGGER trg_membership_archived
+  AFTER UPDATE OF archived_at ON public.organization_memberships
+  FOR EACH ROW
+  WHEN (OLD.archived_at IS NULL AND NEW.archived_at IS NOT NULL)
+  EXECUTE FUNCTION public.on_membership_archived();
 
 -- Guard: prevent direct UPDATE of org_role on organization_memberships.
 -- All role changes must go through change_user_role() RPC which sets the
@@ -1118,12 +1198,26 @@ SET search_path = 'public'
 AS $$
 DECLARE
   v_uid        UUID;
+  v_session_id UUID;
   v_active_oid UUID;
 BEGIN
   v_uid := auth.uid();
+  v_session_id := NULLIF(auth.jwt() ->> 'session_id', '')::UUID;
 
-  SELECT p.org_id INTO v_active_oid
-  FROM public.profiles p WHERE p.id = v_uid;
+  -- `is_active` means "the org THIS device is in", so it has to resolve the
+  -- same way custom_access_token_hook resolves the claims: the calling
+  -- session's active_org_id first, profiles.org_id only as the no-session-row
+  -- fallback. Reading profiles.org_id alone reported another device's most
+  -- recent switch_org as this device's current org — and the mobile login flow
+  -- believes it, skipping switch_org + refreshSession whenever is_active is
+  -- true, which left the app showing one org's name over another org's data.
+  SELECT COALESCE(
+    (SELECT s.active_org_id
+       FROM public.user_sessions s
+      WHERE s.supabase_session_id = v_session_id
+        AND s.user_id = v_uid),
+    (SELECT p.org_id FROM public.profiles p WHERE p.id = v_uid)
+  ) INTO v_active_oid;
 
   IF public.is_gridmaster() THEN
     RETURN QUERY
@@ -8338,7 +8432,13 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_schedule_cell_snapshot_payload(UUID, UUID, DATE, TEXT) TO authenticated;
+-- NOT granted to authenticated: this takes a raw p_org_id and, being SECURITY
+-- DEFINER, consults no RLS and no caller_org_id(), so a direct RPC call was a
+-- read of any org's schedule cells for anyone holding the UUIDs. It is an
+-- internal: ~23 SQL callers reach it from inside other SECURITY DEFINER
+-- functions (which run as the owner, so the revoke does not affect them), and
+-- the only TypeScript caller uses the service client. See the revoke in 004,
+-- which is where it has to live to survive that file's blanket grant.
 GRANT EXECUTE ON FUNCTION public.write_schedule_cell_snapshot(UUID, UUID, DATE, TEXT, TEXT, BIGINT[], BIGINT[], BIGINT, TEXT, TEXT, UUID, BOOLEAN, BIGINT, BIGINT, BOOLEAN[]) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.write_schedule_cell_snapshot_internal(

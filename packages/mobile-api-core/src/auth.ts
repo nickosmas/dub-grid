@@ -225,12 +225,54 @@ async function loadMobileMemberships(sessionClient: SupabaseClient): Promise<Org
   return (membershipsResult.data ?? []) as OrgMembership[];
 }
 
+/**
+ * The `org_id` this access token actually carries, or null if it carries none.
+ *
+ * Read locally rather than round-tripped: the caller has just been handed this
+ * token by GoTrue, and the value is only used to decide whether a switch is
+ * still needed. Every request it leads to is authorized server-side against the
+ * same token, so a forged one gains nothing here.
+ */
+function readTokenOrgId(accessToken: string): string | null {
+  const payload = accessToken.split(".")[1];
+  if (!payload) {
+    return null;
+  }
+
+  try {
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const claims = JSON.parse(
+      typeof atob === "function" ? atob(padded) : Buffer.from(padded, "base64").toString("binary"),
+    ) as { org_id?: unknown };
+
+    return typeof claims.org_id === "string" && claims.org_id.length > 0 ? claims.org_id : null;
+  } catch {
+    // Unreadable token → treat it as carrying no org, which makes the caller
+    // switch. A redundant switch is harmless; a skipped one is the bug below.
+    return null;
+  }
+}
+
 async function switchMobileOrgIfNeeded(
   sessionClient: SupabaseClient,
   session: SignedInSession,
   membership: OrgMembership,
 ): Promise<SignedInSession> {
-  if (membership.is_active) {
+  // Decided from THIS token's own org_id, not from `membership.is_active`.
+  //
+  // `is_active` comes from get_my_organizations, which resolved it from the
+  // user's global profile default. Another device switching orgs moved that
+  // default, so this device could be told "you are already in org B" while the
+  // token it just received still said org A — and this function would return
+  // without switching or refreshing. The login response then reported org B
+  // while every subsequent API call resolved org A from the claim: B's name and
+  // branding over A's roster, schedule and permissions.
+  //
+  // The token is the only thing the API actually trusts, so it is the only
+  // thing worth comparing. This stays correct against a database where
+  // get_my_organizations has not been fixed yet.
+  if (readTokenOrgId(session.access_token) === membership.org_id) {
     return session;
   }
 
@@ -323,13 +365,21 @@ export async function resolveMobileAuthContext<
     throw new MobileApiRequestError(403, "No active organization membership found");
   }
 
+  // The claim, or nothing. This used to fall back to `membershipRows[0]`, and
+  // that query has no ORDER BY — so a token whose org claim the access-token
+  // hook had stripped (its org archived or suspended, its membership revoked)
+  // silently adopted an arbitrary one of the user's other organizations and
+  // built the whole PermissionContext for it, which meant writes landed there
+  // too. Refusing is the only safe reading of "this token names no org": the
+  // client's answer is to switch deliberately, which re-mints the claim.
   const currentOrgId =
-    typeof claims.org_id === "string" && claims.org_id.length > 0
-      ? claims.org_id
-      : (membershipRows[0]?.organization.id ?? null);
+    typeof claims.org_id === "string" && claims.org_id.length > 0 ? claims.org_id : null;
 
   if (!currentOrgId) {
-    throw new MobileApiRequestError(403, "Missing organization context");
+    throw new MobileApiRequestError(
+      403,
+      "Your session is not tied to an organization. Sign in again to pick one.",
+    );
   }
 
   const currentMembership = membershipRows.find(

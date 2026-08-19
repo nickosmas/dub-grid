@@ -12,7 +12,7 @@ import { getValidPort } from "@/lib/subdomain";
 import { withThemeParam } from "@/lib/theme-preference";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { markAuthTransition } from "@/lib/auth-transition";
-import { setUserViewActive } from "@/hooks";
+import { clearPermsCache, setUserViewActive } from "@/hooks";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { EmailPasswordForm } from "@/components/auth/EmailPasswordForm";
@@ -84,9 +84,22 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     }
     // Fresh login = previous session ended. Wipe any sandbox left over from
     // that session (involuntary logout / browser close that never ran the
-    // explicit exit) so stale sandbox data is never resumed. Fire-and-forget:
-    // never block or fail sign-in.
-    void exitSandbox().catch(() => {});
+    // explicit exit) so stale sandbox data is never resumed.
+    //
+    // Awaited, not fire-and-forget: the caller hard-navigates immediately after
+    // this returns, which aborted the in-flight request often enough that the
+    // sandbox routinely survived the switch — and a surviving sandbox cookie
+    // pins every later request to a clone of the org the user just left, at an
+    // elevated role. Failure is still non-fatal, because the switch route now
+    // clears the cookie server-side; this call is what deletes the org row.
+    try {
+      await exitSandbox();
+    } catch {
+      // Non-fatal: never block sign-in on sandbox teardown.
+    }
+    // The prior org's permissions are cached in a module-level singleton keyed
+    // by user id, which a same-user org switch does not invalidate on its own.
+    clearPermsCache();
     return true;
   }
 

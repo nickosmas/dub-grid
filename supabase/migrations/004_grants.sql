@@ -179,3 +179,55 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   GRANT USAGE, SELECT ON SEQUENCES TO authenticated;
+
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- 4. INTERNAL FUNCTIONS — REVOKED LAST
+--
+-- `GRANT EXECUTE ON ALL FUNCTIONS ... TO authenticated` above is a blanket
+-- grant over the whole schema, and it runs AFTER 002 creates these functions.
+-- It therefore silently undid the REVOKE that 002 does on
+-- custom_access_token_hook, and handed out the SECURITY DEFINER internals that
+-- were never meant to be reachable from PostgREST.
+--
+-- These REVOKEs must stay at the very END of the last migration: anything that
+-- re-runs a blanket grant after this point re-opens all of it. Whenever a new
+-- SECURITY DEFINER function is added that has no internal tenancy check, it
+-- belongs on this list too.
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- The access-token hook. Reachable as an RPC, it minted and returned any
+-- user's claims (org_id, org_slug, org_role, platform_role) for an attacker-
+-- supplied user_id — a cross-tenant membership oracle — and, being VOLATILE,
+-- also wrote user_sessions rows and profiles.last_sign_in_at for that user.
+-- Only GoTrue (supabase_auth_admin) and the server (service_role) call it.
+REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO service_role;
+
+-- Schedule snapshot internals. Both take a raw org id / cell id and neither
+-- consults caller_org_id(), because both are only ever called from inside other
+-- (guarded) SQL functions — there is no TypeScript caller for either. Exposed,
+-- they are a cross-tenant write and a cross-tenant delete.
+REVOKE EXECUTE ON FUNCTION public.sync_schedule_cell_snapshot(
+  UUID, UUID, TEXT, TEXT, BIGINT, TEXT, TEXT, BIGINT[], BIGINT[], BOOLEAN[]
+) FROM PUBLIC, anon, authenticated;
+
+REVOKE EXECUTE ON FUNCTION public.prune_empty_schedule_cell(UUID)
+  FROM PUBLIC, anon, authenticated;
+
+-- Same shape: a raw p_org_id, SECURITY DEFINER, no RLS and no caller_org_id()
+-- check, so a direct RPC call read any org's schedule cells given the UUIDs.
+--
+-- Revoked rather than guarded from inside. An internal `p_org_id =
+-- caller_org_id()` predicate looked tempting, but ~23 other SQL functions call
+-- this one, several of them reachable with the service client — and a guard
+-- that fails there returns ZERO ROWS rather than an error, so a wrong
+-- assumption about what auth.jwt() holds for service_role would have silently
+-- emptied the schedule instead of failing loudly. The revoke cannot do that:
+-- the SQL callers are SECURITY DEFINER (they execute as the owner, so it does
+-- not touch them), the sole TypeScript caller uses service_role (still
+-- granted), and anything unexpected gets a hard "permission denied".
+REVOKE EXECUTE ON FUNCTION public.get_schedule_cell_snapshot_payload(UUID, UUID, DATE, TEXT)
+  FROM PUBLIC, anon, authenticated;
