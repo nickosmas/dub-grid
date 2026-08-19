@@ -8,6 +8,22 @@ export const alertMock = vi.fn();
 export const keyboardDismissMock = vi.fn();
 export const announceForAccessibilityMock = vi.fn();
 
+/**
+ * Live `Keyboard.addListener` subscriptions, so a test can drive the keyboard.
+ * The real events come from the platform, and a hook that answers them has no
+ * other way to be exercised.
+ */
+const keyboardListeners = new Map<string, Set<(event: unknown) => void>>();
+
+/** Names the component under test is currently subscribed to, in order. */
+export function subscribedKeyboardEvents(): string[] {
+  return [...keyboardListeners].filter(([, handlers]) => handlers.size > 0).map(([name]) => name);
+}
+
+export function emitKeyboardEvent(name: string, event: unknown = {}): void {
+  for (const handler of [...(keyboardListeners.get(name) ?? [])]) handler(event);
+}
+
 function pickDomProps(input: Record<string, any>) {
   const output: Record<string, any> = {};
 
@@ -361,11 +377,17 @@ export function createReactNativeModule(
     InputAccessoryView,
     Keyboard: {
       dismiss: keyboardDismissMock,
-      addListener: () => ({
-        remove() {
-          return undefined;
-        },
-      }),
+      addListener: (name: string, handler: (event: unknown) => void) => {
+        const handlers = keyboardListeners.get(name) ?? new Set<(event: unknown) => void>();
+        handlers.add(handler);
+        keyboardListeners.set(name, handlers);
+
+        return {
+          remove() {
+            handlers.delete(handler);
+          },
+        };
+      },
     },
     KeyboardAvoidingView,
     Image,

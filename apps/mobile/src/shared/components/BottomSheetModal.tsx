@@ -1,24 +1,33 @@
 import { useMemo, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { mobileElevation, mobileRadii, mobileSpace, type MobileColors } from "../theme/tokens";
 import { AppText } from "./AppText";
-import { useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
+import { useKeyboardInset } from "../hooks/useKeyboardInset";
+import { SHEET_OVERDRAG_LIMIT, useSheetDragToDismiss } from "../hooks/useSheetDragToDismiss";
 import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 
 /** Padding below the sheet content, inside the sheet's own edge. */
 const SHEET_CONTENT_BOTTOM_PADDING = mobileSpace["2xl"];
+
+/**
+ * Space between the sheet's top edge and the first thing inside it, whether that
+ * is the grabber or the header. The same step as the padding under the last
+ * thing, so the surface is inset by one number on both ends: at a 40pt corner
+ * radius, a title closer than this reads as crowded by the curve.
+ */
+const SHEET_CONTENT_TOP_PADDING = mobileSpace["3xl"];
+
+/**
+ * Where the grabber sits inside that padding, with the remainder falling below
+ * it — so a sheet with a grabber and one without hold their header at the same
+ * height. Both are derived rather than picked, which is what keeps them equal.
+ */
+const GRABBER_TOP_INSET = mobileSpace.md;
+const GRABBER_HEIGHT = 4;
 
 /**
  * Breathing room left above a full-height sheet, below the status bar. The
@@ -37,18 +46,6 @@ const SHEET_TOP_GAP = mobileSpace.md;
  */
 const SHEET_CORNER_RADIUS = 40;
 
-/**
- * A modal gets its own native window, which on Android is inset by the system
- * bars even when the app itself draws edge-to-edge. Translucent on both, so the
- * sheet's own margins are measured from the true screen edge rather than from
- * wherever the navigation bar happens to start.
- * `navigationBarTranslucent` requires `statusBarTranslucent`.
- */
-const MODAL_EDGE_TO_EDGE_PROPS = {
-  navigationBarTranslucent: true,
-  statusBarTranslucent: true,
-} as const;
-
 export function BottomSheetModal({
   visible,
   onDismiss,
@@ -57,7 +54,6 @@ export function BottomSheetModal({
   scrollable = false,
   accessibilityLabel = "Dismiss",
   accessibilityRole,
-  showGrabber,
   header,
   footer,
   children,
@@ -83,11 +79,6 @@ export function BottomSheetModal({
   /** Set "alert" for a blocking sheet the user must answer before continuing. */
   accessibilityRole?: "alert";
   /**
-   * Defaults to hidden on a non-dismissable sheet: a grabber advertises "drag
-   * me away", which is a lie when the sheet can't be dismissed.
-   */
-  showGrabber?: boolean;
-  /**
    * Rendered in the sheet's non-scrolling top region, which is also the drag
    * region. Put a sheet's title here rather than in `children` so the whole
    * header drags, not just the grabber.
@@ -101,26 +92,32 @@ export function BottomSheetModal({
   // Read live rather than at module scope: a module-scope `Dimensions.get`
   // snapshot goes stale on rotation and on foldables.
   const { height: windowHeight } = useWindowDimensions();
-  // The sheet runs to the screen's bottom edge, so nothing lifts its content
+  // The sheet lifts itself over the keyboard. `KeyboardAvoidingView` cannot do
+  // this job here — see `useKeyboardInset` for the bottom strip it leaks.
+  const keyboardInset = useKeyboardInset();
+  // The sheet runs to the modal's bottom edge, so nothing lifts its content
   // clear of the system bars any more — that falls back to the content padding.
   const bottomPadding = SHEET_CONTENT_BOTTOM_PADDING + insets.bottom;
-  // Measured against the space that actually exists, not a share of the window.
-  // Once the modal started drawing under the system bars, a percentage of the
-  // full window ran off the top on a tall sheet — grabber, header and all —
-  // with the status bar over whatever was left.
-  const maxHeight = windowHeight - insets.top - SHEET_TOP_GAP;
+  const topGap = insets.top + SHEET_TOP_GAP;
   const isDark = useIsDarkMode();
   const styles = useMemo(
-    () => createStyles(mobileColors, isDark, maxHeight, bottomPadding, backdrop),
-    [mobileColors, isDark, maxHeight, bottomPadding, backdrop],
+    () => createStyles(mobileColors, isDark, topGap, bottomPadding, backdrop, keyboardInset),
+    [mobileColors, isDark, topGap, bottomPadding, backdrop, keyboardInset],
   );
-  const grabberVisible = showGrabber ?? !dismissDisabled;
   const handleDismiss = () => {
     if (dismissDisabled) return;
     onDismiss();
   };
-  const { backdropStyle, gesture, scrollHandler, scrollRef, sheetStyle } = useSheetDragToDismiss({
-    enabled: !dismissDisabled,
+  const {
+    backdropStyle,
+    gesture,
+    onScrollContentSizeChange,
+    onScrollViewLayout,
+    scrollHandler,
+    scrollRef,
+    sheetStyle,
+  } = useSheetDragToDismiss({
+    dismissible: !dismissDisabled,
     onDismiss: handleDismiss,
     scrollable,
     travel: windowHeight,
@@ -128,21 +125,36 @@ export function BottomSheetModal({
   });
 
   return (
+    // Both translucency props, always, and they only mean anything on Android.
+    // The app itself is edge-to-edge and paints under the navigation bar, but a
+    // modal is its own window and does not inherit that: React Native decides
+    // per modal, from `statusBarTranslucent`, whether to set `fitsSystemWindows`
+    // on the frame it wraps the React root in (`ReactModalHostView.contentView`).
+    // Left false, that frame is padded by the system bar insets, so everything
+    // React draws in the modal — the sheet *and* the backdrop that is supposed
+    // to dim behind it — stops a navigation bar short of the bottom of the
+    // screen, with the undimmed app showing through the strip underneath.
+    //
+    // They come as a pair. `navigationBarTranslucent` alone is the worse
+    // version of the same bug (React Native warns about it): the dialog window
+    // goes edge-to-edge while that frame keeps insetting the root, so the gap
+    // grows to the full status-plus-navigation bar. `statusBarTranslucent`
+    // alone drops the padding but leaves the window fitted to the system bars,
+    // which just moves the same strip. Only both together give the sheet a
+    // window that reaches the bottom edge and a root that fills it.
     <Modal
-      {...MODAL_EDGE_TO_EDGE_PROPS}
       animationType="fade"
+      navigationBarTranslucent
       onRequestClose={handleDismiss}
       presentationStyle="overFullScreen"
+      statusBarTranslucent
       transparent
       visible={visible}
     >
       {/* A Modal renders in its own native view hierarchy, which sits outside
           the root provider, so gesture-handler needs its own root in here. */}
       <GestureHandlerRootView style={styles.gestureRoot}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.root}
-        >
+        <View style={styles.root}>
           <Animated.View
             pointerEvents="none"
             style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
@@ -163,22 +175,28 @@ export function BottomSheetModal({
                   body, so the sheet always drags — without the user having to
                   hit the 40x4 handle itself. */}
               <View style={styles.dragRegion}>
-                {grabberVisible ? (
-                  <View style={styles.grabberArea}>
-                    <View style={styles.grabber} />
-                  </View>
-                ) : (
-                  <View style={styles.grabberSpacer} />
-                )}
+                {/* Every sheet carries the handle, blocking ones included: it is
+                    what marks the top of the sheet as the thing you grab, and a
+                    blocking sheet answers that grab by following the finger a
+                    little and settling back rather than by not moving. */}
+                <View style={styles.grabberArea}>
+                  <View style={styles.grabber} />
+                </View>
                 {header ? <View style={styles.header}>{header}</View> : null}
               </View>
               {scrollable ? (
                 <Animated.ScrollView
                   ref={scrollRef}
-                  // No rubber-banding at the top edge: that bounce is where the
-                  // sheet drag takes over, and the two fighting reads as jitter.
+                  // No rubber-banding at either edge: both are where the sheet's
+                  // own drag takes over, and the two fighting reads as jitter.
+                  // `bounces` is the iOS half of that, `overScrollMode` Android's.
                   bounces={false}
+                  overScrollMode="never"
                   contentContainerStyle={[styles.body, footer ? styles.bodyWithFooter : null]}
+                  // The two together say whether the list has anywhere left to
+                  // scroll, which is what decides who owns an upward drag.
+                  onContentSizeChange={onScrollContentSizeChange}
+                  onLayout={onScrollViewLayout}
                   onScroll={scrollHandler}
                   scrollEventThrottle={16}
                   showsVerticalScrollIndicator={false}
@@ -192,7 +210,7 @@ export function BottomSheetModal({
               {footer ? <View style={styles.footer}>{footer}</View> : null}
             </Animated.View>
           </GestureDetector>
-        </KeyboardAvoidingView>
+        </View>
       </GestureHandlerRootView>
     </Modal>
   );
@@ -201,17 +219,14 @@ export function BottomSheetModal({
 const createStyles = (
   mobileColors: MobileColors,
   isDark: boolean,
-  maxHeight: number,
+  topGap: number,
   bottomPadding: number,
   backdrop: "scrim" | "cover",
+  keyboardInset: number,
 ) =>
   StyleSheet.create({
     gestureRoot: {
       flex: 1,
-    },
-    // Keeps the top inset consistent whether or not the grabber is drawn.
-    grabberSpacer: {
-      height: mobileSpace.lg,
     },
     // A comfortable drag target even on a sheet with no header. 44pt is the
     // minimum touch target, and the whole strip drags.
@@ -232,8 +247,25 @@ const createStyles = (
       backgroundColor: backdrop === "cover" ? mobileColors.surface : mobileColors.overlay,
     },
     sheet: {
-      maxHeight,
-      // No margins and no width of its own: the sheet stretches to the full
+      // The height a tall sheet is held to, expressed against the box the modal
+      // actually got rather than a measurement of the window: those two differ
+      // whenever the modal's window and the app's window are inset differently,
+      // and the sheet then either runs off the top or stops short of the bottom.
+      // The margin is what a full-height sheet leaves clear of the status bar,
+      // and `flexShrink` is what makes it a ceiling rather than an overflow.
+      marginTop: topGap,
+      flexShrink: 1,
+      // Surface enough to cover an upward overdrag, hanging off the bottom of the
+      // screen: the padding adds it, the negative margin keeps the content where
+      // it was. Without it, lifting the sheet slides its square bottom corners
+      // into view over a strip of dimmed page, when what should read is a sheet
+      // pinned to the edge with only its top moving.
+      paddingBottom: SHEET_OVERDRAG_LIMIT,
+      // Plus whatever the keyboard is covering, so a sheet with a field in it
+      // rides above it. Folded into the same margin rather than handed to a
+      // `KeyboardAvoidingView` wrapper, which would take the backdrop up with it.
+      marginBottom: keyboardInset - SHEET_OVERDRAG_LIMIT,
+      // No side margins and no width of its own: the sheet stretches to the full
       // screen width by default and meets the bottom edge, so the top two
       // corners are its only edges ever in view.
       borderTopLeftRadius: SHEET_CORNER_RADIUS,
@@ -245,12 +277,12 @@ const createStyles = (
     // sheet's top padding so the visual spacing is unchanged.
     grabberArea: {
       alignItems: "center",
-      paddingBottom: 6,
-      paddingTop: 10,
+      paddingTop: GRABBER_TOP_INSET,
+      paddingBottom: SHEET_CONTENT_TOP_PADDING - GRABBER_TOP_INSET - GRABBER_HEIGHT,
     },
     grabber: {
       width: 40,
-      height: 4,
+      height: GRABBER_HEIGHT,
       borderRadius: mobileRadii.pill,
       backgroundColor: mobileColors.border,
     },

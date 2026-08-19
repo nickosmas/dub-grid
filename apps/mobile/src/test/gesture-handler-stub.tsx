@@ -6,6 +6,8 @@ type GestureHandler = (event: GestureEvent) => void;
 
 type ChainableGesture = {
   __handlers: Partial<Record<string, GestureHandler>>;
+  /** Args each config method was called with, for asserting a gesture's setup. */
+  __config: Partial<Record<string, unknown[]>>;
 } & Record<string, (...args: unknown[]) => ChainableGesture>;
 
 // Methods that register a callback vitest can invoke directly to drive a
@@ -47,7 +49,7 @@ const GESTURE_CONFIG_METHODS = [
 export const capturedPanGestures: ChainableGesture[] = [];
 
 function createChainableGesture(): ChainableGesture {
-  const gesture = { __handlers: {} } as ChainableGesture;
+  const gesture = { __handlers: {}, __config: {} } as ChainableGesture;
 
   for (const method of GESTURE_HANDLER_METHODS) {
     gesture[method] = (handler: unknown) => {
@@ -57,7 +59,10 @@ function createChainableGesture(): ChainableGesture {
   }
 
   for (const method of GESTURE_CONFIG_METHODS) {
-    gesture[method] = () => gesture;
+    gesture[method] = (...args: unknown[]) => {
+      gesture.__config[method] = args;
+      return gesture;
+    };
   }
 
   return gesture;

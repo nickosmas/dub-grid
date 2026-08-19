@@ -34,6 +34,7 @@ describe("mobile shared state components", () => {
         <EmptyStateCard
           actionLabel="Explore"
           body="Nothing has landed here yet."
+          iconName="cube-outline"
           onAction={onExplore}
           title="No items yet"
         />

@@ -211,6 +211,22 @@ multi-step form (the shift swap/drop flow) is a `scrollable` sheet, not a page.
 - **Titles go in the `header` slot** via `<SheetHeader>`, which puts them in the
   drag region. A title rendered in the body scrolls out of view and takes its
   drag target with it.
+- **Every sheet shows the grabber and answers the drag, `dismissDisabled` ones
+  included.** There is no `showGrabber` prop to opt out of. A blocking sheet
+  follows the finger against rubber-band resistance (`resistSheetOverdrag`, max
+  32pt) and settles back rather than sitting inert; an _upward_ drag gets that
+  same resistance on every sheet, since none of them expand. Only a downward drag
+  on a dismissable sheet closes anything. A sheet that ignores the gesture reads
+  as a frozen app, which is why hiding the handle was the wrong answer.
+- **On a `scrollable` sheet the list gets the drag only while it can still move.**
+  `useSheetDragToDismiss` decides per frame from the scroll position and the
+  measured content/viewport (`onScrollContentSizeChange` + `onScrollViewLayout`,
+  both wired to the sheet's `ScrollView`), then rebases so the handover is
+  continuous: past the top the sheet drags down, past the bottom it stretches up,
+  and a short list that cannot scroll at all hands over both. Measure rather than
+  wait for a scroll event — a sheet whose content never fills it never fires one.
+  The list's own overscroll stays off (`bounces` / `overScrollMode`) so only one
+  of the two effects ever answers a drag.
 - **Stacked actions go in `<SheetActions>`, primary first.** The `footer` slot
   is a bordered row, for a `Clear all` / `Done` pair — not for a submit stack.
 - **`backdrop="cover"`** paints out the app behind the sheet instead of dimming
@@ -221,6 +237,65 @@ multi-step form (the shift swap/drop flow) is a `scrollable` sheet, not a page.
   effect after every dismissal attempt, not just when `visible` flips).
 - Render that confirmation as a **sibling** of the sheet it guards, never nested
   inside it — a `Modal` inside a `Modal` does not reliably present on iOS.
+- **The `<Modal>` keeps `statusBarTranslucent` _and_ `navigationBarTranslucent`,
+  as a pair.** A modal is its own Android window and does not inherit the app's
+  edge-to-edge treatment: React Native reads `statusBarTranslucent` to decide
+  whether to set `fitsSystemWindows` on the frame it wraps the React root in, so
+  with the props off the sheet **and its backdrop** stop a navigation bar short
+  of the bottom edge and the undimmed app shows through the strip. Setting only
+  `navigationBarTranslucent` is the worse version of the same bug (React Native
+  warns about it) — the window goes edge-to-edge while the root stays inset, and
+  the gap grows to the full status-plus-navigation bar. Neither prop does
+  anything on iOS.
+- **Never wrap the sheet in a `KeyboardAvoidingView`.** It lifts itself over the
+  keyboard by `useKeyboardInset()` instead. On Android React Native runs
+  `keyboardDidHide` through the same handler as a frame change, and that event
+  reports `screenY` as the _height_ of the visible display frame rather than as
+  its bottom edge; inside a full-screen modal the two differ by the system bars,
+  so the view keeps a bottom inset the size of the navigation bar long after the
+  keyboard is gone. The sheet **and its backdrop** both live in that box, so both
+  lifted off the bottom of the screen and the undimmed app showed through the
+  strip underneath. `useKeyboardInset` answers a hide with zero whatever the
+  event's coordinates say, and only the sheet reads it — the backdrop always
+  spans the whole modal.
+
+### Unsaved changes
+
+Nothing holding user input may be thrown away silently. There is one guard for
+this — never hand-roll the `hasUnsavedChanges` + `showDiscardConfirmation` +
+`close()` triad again, which had drifted across five copies before it was
+shared.
+
+- **`useUnsavedChangesGuard()`** owns the decision. Point the sheet's
+  `onDismiss` _and_ its Cancel button at `guard.requestClose`, and render
+  `<ConfirmationModal {...guard.confirmationProps} />` as a sibling. Its
+  `onDiscard` runs on **every** exit through the guard, clean or dirty: it is
+  the reset, not a side effect of confirming.
+- **`useNavigationDiscardGuard(guard)`** adds back navigation to that same
+  guard, for a screen with an inline editor. One guard, one confirmation, three
+  triggers — a second guard would mean two modals racing. It covers stack
+  removal only: `router.replace`, `<Redirect>`, tab switches and deep links do
+  not fire `beforeRemove`.
+- **Keep `isDirty` tight** (`editing && hasChanges`, not `editing`). Every
+  detail screen sets `fullScreenGestureEnabled`, so on iOS the whole surface is
+  a back-swipe target and a loose flag interrupts ordinary navigation.
+- **Compute dirtiness once, at module scope**, and pass it into the edit panel
+  (`profileDraftHasChanges`, `personDraftHasChanges`). Computed inside the panel
+  the screen can't see it; computed twice, Cancel and the back button disagree
+  about whether to ask.
+- **Never route a screen's Cancel through `onClose` when that close is a
+  navigation.** `router.back()` re-enters this same hook and asks again. Let the
+  button call `router.back()` plainly and let the nav guard intercept it once.
+- **Disarm the guard once a save succeeds** (`disabled: isPending || isSuccess`)
+  where the success handler navigates away with the fields still filled in.
+- Never set `headerBackButtonMenuEnabled: true` on a guarded screen —
+  react-navigation warns, and native-stack forces it off while removal is
+  prevented.
+- Tests reach the guard through `src/test/shims/react-navigation-native`:
+  `pressBack()` returns whether it was prevented, `navigatedActions` records
+  what got through. Assert the action **lands** after Discard —
+  `usePreventRemove` reads the render-time flag, so a guard that dispatches
+  before React commits it vetoes its own exit and the back button dies silently.
 
 ### Skeletons
 

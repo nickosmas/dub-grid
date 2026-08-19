@@ -49,15 +49,14 @@ export function ConfirmationModal({
   return (
     <BottomSheetModal
       accessibilityRole="alert"
-      // A pending confirmation can't be dragged or tapped away, but it keeps its
-      // grabber: hiding it mid-request would make the sheet jump.
+      // A pending confirmation can't be dragged or tapped away; the grabber
+      // stays, as it does on every sheet, and the drag settles back instead.
       dismissDisabled={loading}
       header={<SheetHeader title={title} />}
       // The shared sheet caps its height, which this dialog never used to do.
       // Callers pass a `children` form (the People status-change reason), and
       // with the keyboard up that content would otherwise clip below the fold.
       scrollable
-      showGrabber
       visible={visible}
       onDismiss={onCancel}
     >
