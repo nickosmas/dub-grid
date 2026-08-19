@@ -4,13 +4,26 @@ import Animated, { useAnimatedStyle, withSpring, withTiming } from "react-native
 import { hapticSelection } from "../lib/haptics";
 import { useMotionPreference } from "../motion/useMotionPreference";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileMotion, mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import {
+  mobileMotion,
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../theme/tokens";
 
 export type SegmentedControlSize = "sm" | "md";
 
 export type SegmentedOption<Value extends string> = {
   value: Value;
   label: string;
+  /**
+   * Optional count badge, drawn exactly as `ScrollableTabStrip` draws its own —
+   * a count belongs in a pill beside the label, not spelled into it as
+   * `Label (12)`. Omit entirely for controls that don't count anything; a zero
+   * renders no badge, same as the strip.
+   */
+  count?: number;
 };
 
 const SIZE = {
@@ -129,6 +142,13 @@ export function SegmentedControl<Value extends string>({
             >
               {option.label}
             </Text>
+            {option.count !== undefined && option.count > 0 ? (
+              <View style={[styles.badge, selected && styles.badgeSelected]}>
+                <Text style={[styles.badgeText, selected && styles.badgeTextSelected]}>
+                  {option.count}
+                </Text>
+              </View>
+            ) : null}
           </Pressable>
         );
       })}
@@ -161,6 +181,8 @@ const createStyles = (mobileColors: MobileColors) =>
     // label. Adding flex here collapses every segment to zero width.
     segment: {
       alignItems: "center",
+      flexDirection: "row",
+      gap: mobileSpace.sm,
       justifyContent: "center",
     },
     labelIdle: {
@@ -168,5 +190,24 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     labelSelected: {
       color: mobileColors.onBrandText,
+    },
+    badge: {
+      minWidth: 20,
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: mobileRadii.pill,
+      backgroundColor: mobileColors.surface,
+    },
+    badgeSelected: {
+      backgroundColor: "rgba(255, 255, 255, 0.22)",
+    },
+    badgeText: {
+      ...mobileText.badge,
+      color: mobileColors.textMuted,
+      textAlign: "center",
+      includeFontPadding: false,
+    },
+    badgeTextSelected: {
+      color: mobileColors.textInverse,
     },
   });

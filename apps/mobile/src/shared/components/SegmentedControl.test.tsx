@@ -57,6 +57,26 @@ describe("SegmentedControl", () => {
     expect(screen.getByText("2 Weeks")).toBeInTheDocument();
   });
 
+  // Counts render as a badge beside the label, the way `ScrollableTabStrip`
+  // draws them — People's roster tabs once spelled theirs into the label as
+  // "Schedule (12)", which is the same number in a different vocabulary.
+  it("shows a count badge only for positive counts", () => {
+    render(
+      <SegmentedControl
+        onChange={vi.fn()}
+        options={[
+          { value: "schedule", label: "Schedule", count: 12 },
+          { value: "management", label: "Management", count: 0 },
+        ]}
+        value="schedule"
+      />,
+    );
+
+    expect(screen.getByText("Schedule")).toBeInTheDocument();
+    expect(screen.getByText("12")).toBeInTheDocument();
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
+  });
+
   it("reports the selected option to assistive tech", () => {
     renderControl({ value: "week" });
 

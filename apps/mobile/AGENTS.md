@@ -186,7 +186,7 @@ import path screens should use. **The package is shared with `apps/web`** — ad
 | A scrolling tab strip       | `<ScrollableTabStrip>` — pill tabs, optional count badges, scrolls the active tab into view |
 | A pressable that is neither | `usePressAnimation()`                                                                       |
 | Status/metadata/filter pill | `<Chip>`                                                                                    |
-| Segmented toggle            | `<SegmentedControl>`                                                                        |
+| Segmented toggle            | `<SegmentedControl>` — sliding thumb, optional count badges (same pill as the strip's)      |
 | Shadow                      | `mobileElevation(level, isDark)` or `useElevation(level)`                                   |
 | Duration / spring / easing  | `useMotionPreference()` — never a raw number                                                |
 | Soft brand wash             | `<GradientBackdrop kind>`                                                                   |
