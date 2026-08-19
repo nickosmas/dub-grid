@@ -2418,7 +2418,9 @@ describe("ShiftDetailScreen", () => {
     selectFridaySwapDate();
     fireEvent.click(screen.getByText("Chris Hall"));
     fireEvent.click(screen.getByLabelText("Dismiss"));
-    confirmDialog("Cancel");
+    // Not "Cancel": the sheet's own dismiss button is Cancel, so the
+    // confirmation would be asking the user to cancel their cancel.
+    confirmDialog("Keep Editing");
 
     expect(screen.queryByText("Discard this request?")).not.toBeInTheDocument();
     expect(screen.getByText("You give")).toBeInTheDocument();

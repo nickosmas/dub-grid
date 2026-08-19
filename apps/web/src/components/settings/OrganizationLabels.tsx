@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { Organization } from "@/types";
 import {
   OrganizationSettingsConflictError,
@@ -12,6 +12,7 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import { getLineTextError, normalizeLineText } from "@/lib/form-validation";
 import { SectionCard, labelStyle } from "./shared";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 
 export default function OrganizationLabels({
@@ -71,15 +72,9 @@ export default function OrganizationLabels({
     form.certificationLabel !== organization.certificationLabel ||
     form.roleLabel !== organization.roleLabel;
 
-  // Warn before navigating away with unsaved changes
-  useEffect(() => {
-    if (!isModified) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isModified]);
+  // Covers both the sidebar click and the tab close; the provider owns the
+  // `beforeunload` this panel used to register for itself.
+  useNavigationGuard("organization-labels", { isDirty: () => isModified });
 
   const lastSaveErrorRef = useRef<unknown>(null);
 

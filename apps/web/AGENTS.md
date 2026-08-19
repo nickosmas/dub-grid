@@ -128,6 +128,33 @@ Shared primitives — use before creating alternatives:
 
 Font: DM Sans only (`var(--font-dm-sans)`). Never Geist.
 
+## Unsaved Changes
+
+Nothing holding user input may be thrown away silently. Two guards, by surface —
+they compose, and a modal that wants both is fine:
+
+- **A modal guards its own dismissal.** `useUnsavedChangesPrompt` returns
+  `{ requestClose, unsavedChangesDialog }`; wire `requestClose` into
+  `<Modal onRequestClose>`, which is the single veto point for Escape, the
+  backdrop and the X button. Render `unsavedChangesDialog` as a sibling.
+- **A page-level editor guards navigation.** `useNavigationGuard(id, { isDirty })`
+  registers with `NavigationGuardProvider` (mounted around `<AppShell>` in
+  `app/layout.tsx`), which asks before an in-app link click and before tab
+  close/refresh. Never add a bare `beforeunload` — the provider owns it, and a
+  second one prompts twice.
+
+The provider intercepts with one capture-phase click listener on `document`
+rather than per-`Link` `onNavigate`, so links added later are covered by
+default. That listener's skip-list (modifier clicks, `target`, `download`,
+cross-origin, `mailto:`, in-page hashes) is the whole risk surface — a missed
+case breaks cmd-click app-wide, so every branch has a test in
+`__tests__/NavigationGuardProvider.test.tsx`. It resumes a confirmed navigation
+by **replaying the original click**, not by calling `router.push`, so a
+`<Link replace>` stays a replace.
+
+Deliberately not covered, and documented as such: browser Back/Forward, and
+programmatic `router.push`.
+
 ## Mobile API Contract Safety
 
 - `apps/web/src/app/api/mobile/v1/` serves the mobile app.

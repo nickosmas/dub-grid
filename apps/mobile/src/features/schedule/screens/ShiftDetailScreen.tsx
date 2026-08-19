@@ -35,6 +35,7 @@ import {
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { getQueryErrorMessage } from "../../../shared/lib/query-state";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
   useIsDarkMode,
   useMobileColors,
@@ -921,22 +922,17 @@ export default function ShiftDetailScreen() {
       selectedCalloffAbsenceTypeId != null ||
       selectedRequesterSegmentIndex !== firstRequestableRequesterSegmentIndex);
 
-  function handleRequestSheetDismiss() {
-    if (!hasUnsavedRequestInput) {
-      resetRequestMode(null);
-      return;
-    }
-
-    // Leaving the sheet open is what makes this a guard: a dragged sheet
-    // settles back into place while this confirmation sits on top of it.
-    setPendingConfirmation({
-      title: "Discard this request?",
-      body: "Your selections won't be saved.",
-      confirmLabel: "Discard",
-      confirmTone: "danger",
-      onConfirm: () => resetRequestMode(null),
-    });
-  }
+  // Leaving the sheet open is what makes this a guard: a dragged sheet settles
+  // back into place while the confirmation sits on top of it. Resetting the
+  // mode is also what closes the sheet, so it is the discard and the close at
+  // once.
+  const requestGuard = useUnsavedChangesGuard({
+    isDirty: hasUnsavedRequestInput,
+    disabled: createRequestMutation.isPending,
+    title: "Discard this request?",
+    body: "Your selections won't be saved.",
+    onDiscard: () => resetRequestMode(null),
+  });
 
   function submitSwapRequest() {
     if (!linkedEmployeeId || !shiftEntry || requestMode !== "swap") {
@@ -1268,7 +1264,7 @@ export default function ShiftDetailScreen() {
         header={<SheetHeader title={getRequestModeTitle(requestMode)} />}
         scrollable
         visible={requestMode != null}
-        onDismiss={handleRequestSheetDismiss}
+        onDismiss={requestGuard.requestClose}
       >
         <View style={styles.modalContent}>
           {actionSegmentOptions.length > 1 && shiftEntry ? (
@@ -1661,6 +1657,10 @@ export default function ShiftDetailScreen() {
         title={pendingConfirmation?.title ?? "Confirm action?"}
         visible={pendingConfirmation != null}
       />
+      {/* Separate from the descriptor modal above, which routes the request
+          sheet's own buttons. The two are never visible together: this one is
+          only ever raised by a dismissal, which the buttons don't perform. */}
+      <ConfirmationModal {...requestGuard.confirmationProps} />
     </Screen>
   );
 }

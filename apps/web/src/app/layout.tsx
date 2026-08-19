@@ -39,6 +39,7 @@ import AuthProvider from "@/components/AuthProvider";
 import QueryProvider from "@/components/QueryProvider";
 import AppShell from "@/components/AppShell";
 import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
+import { NavigationGuardProvider } from "@/components/NavigationGuardProvider";
 import ConsentGatedAnalytics from "@/components/ConsentGatedAnalytics";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/hint";
@@ -87,7 +88,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <OnboardingGate>
                     <MobileSubNavProvider>
                       <TooltipProvider delay={TOOLTIP_DELAY_MS}>
-                        <AppShell>{children}</AppShell>
+                        {/* Wraps the whole shell so it sees every nav link,
+                            not just the ones inside a given page. */}
+                        <NavigationGuardProvider>
+                          <AppShell>{children}</AppShell>
+                        </NavigationGuardProvider>
                       </TooltipProvider>
                     </MobileSubNavProvider>
                   </OnboardingGate>

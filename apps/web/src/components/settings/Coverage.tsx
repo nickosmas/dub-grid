@@ -21,6 +21,7 @@ import { isDefaultShiftSystemJob, isRegularStaffSystemJob } from "@/lib/system-j
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import { EmptyState } from "@/components/EmptyState";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { EDITOR_ACTION_LABELS, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
 
@@ -580,6 +581,10 @@ function FocusAreaCoverageCard({
   }
 
   const isDirty = serializeDrafts(drafts) !== initialKey;
+
+  // The sidebar is one click away and this panel is a route away from being
+  // unmounted, so navigating is the way these edits get lost.
+  useNavigationGuard(`coverage:${focusArea.id}`, { isDirty: () => isDirty });
 
   const draftFor = (option: AssignableShiftOption): CoverageDraft =>
     drafts[requirementKey(focusArea.id, option)] ??

@@ -9,13 +9,16 @@ import {
   normalizeStaffName,
 } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
+import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { createMobilePerson, createMobilePersonInvitation } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useToast } from "../../../shared/providers/ToastProvider";
+import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
 import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { PersonFormSkeleton } from "../components/PersonFormSkeleton";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
@@ -43,6 +46,16 @@ export default function AddPersonScreen() {
   const [certificationId, setCertificationId] = useState<number | null>(null);
   const [focusAreaIds, setFocusAreaIds] = useState<number[]>([]);
   const [focusedField, setFocusedField] = useState<"firstName" | "lastName" | "email" | null>(null);
+
+  // Anything typed or picked counts: this form starts empty, so any departure
+  // from that is work the user did.
+  const hasUnsavedChanges =
+    firstName.trim() !== "" ||
+    lastName.trim() !== "" ||
+    email.trim() !== "" ||
+    employmentType !== "full_time" ||
+    certificationId !== null ||
+    focusAreaIds.length > 0;
 
   const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
   const certificationLabel =
@@ -121,6 +134,23 @@ export default function AddPersonScreen() {
       });
     },
   });
+
+  // Header back, Android hardware back, the iOS back swipe and the Cancel
+  // button all reach the guard the same way: through the stack removal they
+  // each dispatch. Cancel deliberately keeps its plain `router.back()` rather
+  // than closing through the guard, which would ask, navigate, and be asked
+  // again by this same hook.
+  //
+  // `isSuccess` disarms it, because the success handler navigates away with the
+  // fields still filled in — without it a saved person would be met with
+  // "discard your changes?" on the way out.
+  const guard = useUnsavedChangesGuard({
+    isDirty: hasUnsavedChanges,
+    disabled: createMutation.isPending || createMutation.isSuccess,
+    title: "Discard this staff profile?",
+    body: "The details you filled in won't be saved.",
+  });
+  useNavigationDiscardGuard(guard);
 
   function toggleFocusArea(id: number) {
     setFocusAreaIds((current) =>
@@ -243,6 +273,8 @@ export default function AddPersonScreen() {
           tone="neutral"
         />
       </View>
+
+      <ConfirmationModal {...guard.confirmationProps} />
     </Screen>
   );
 }

@@ -27,6 +27,7 @@ import {
   getOptionalUsPhoneFieldError,
   normalizeLineText,
 } from "@/lib/form-validation";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 
 export default function OrganizationGeneral({
@@ -92,15 +93,9 @@ export default function OrganizationGeneral({
   const phoneError = getOptionalUsPhoneFieldError(form.phone);
   const hasValidationErrors = Boolean(nameError || phoneError);
 
-  // Warn before navigating away with unsaved changes
-  useEffect(() => {
-    if (!isModified) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isModified]);
+  // Covers both the sidebar click and the tab close; the provider owns the
+  // `beforeunload` this panel used to register for itself.
+  useNavigationGuard("organization-general", { isDirty: () => isModified });
 
   // Tracks whether the most recent handleSave call completed successfully.
   // Wizard mode reads this after `save()` returns to decide whether to advance.

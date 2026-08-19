@@ -19,6 +19,7 @@ import {
 } from "@/lib/form-validation";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { toast } from "sonner";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 
 export default function StringListSettings({
@@ -133,9 +134,12 @@ export default function StringListSettings({
   }, [local, rowErrors]);
   const hasValidationErrors =
     rowErrors.some((row) => row.name || row.abbr) || Boolean(duplicateName);
+  // Only meaningful while editing: the draft is reseeded from `items` on entry
+  // and on close, so outside edit mode a stale draft would report dirty and the
+  // navigation guard would prompt on a page nobody has touched.
   const isDirty = useMemo(
-    () => JSON.stringify(nonEmpty(local)) !== JSON.stringify(items),
-    [local, items, nonEmpty],
+    () => isEditing && JSON.stringify(nonEmpty(local)) !== JSON.stringify(items),
+    [isEditing, local, items, nonEmpty],
   );
 
   const displayList = isEditing ? local : items;
@@ -249,6 +253,8 @@ export default function StringListSettings({
       setSaving(false);
     }
   };
+
+  useNavigationGuard(`string-list:${label}`, { isDirty: () => isDirty });
 
   useRegisterWizardEditor(
     `string-list:${label}`,

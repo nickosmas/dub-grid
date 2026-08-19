@@ -25,6 +25,7 @@ import { SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 import { useSmoothReorder } from "./useSmoothReorder";
 import type { DependencyInfo } from "@/features/settings/client";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -401,13 +402,18 @@ function DepartmentSection({
     Boolean(duplicateDepartmentName) ||
     Boolean(duplicateFocusAreaName);
 
+  // Only meaningful while editing. Outside edit mode there is no draft to
+  // compare: `localDepts`/`localFAs` stay empty until `handleEnterEdit` seeds
+  // them from props, so an ungated comparison reports every populated page as
+  // dirty and the navigation guard prompts on a page nobody has touched.
   const isDirty = useMemo(() => {
+    if (!isEditing) return false;
     const deptsDirty = JSON.stringify(nonEmpty(localDepts)) !== JSON.stringify(depts);
     if (type === "management") return deptsDirty;
     const faDirty =
       JSON.stringify(localFAs.filter((fa) => fa.name.trim())) !== JSON.stringify(propFAs);
     return deptsDirty || faDirty;
-  }, [localDepts, depts, localFAs, propFAs, nonEmpty, type]);
+  }, [isEditing, localDepts, depts, localFAs, propFAs, nonEmpty, type]);
 
   const displayList = isEditing ? localDepts : depts;
 
@@ -796,6 +802,8 @@ function DepartmentSection({
   };
 
   // Register with wizard so Continue can save this section.
+  useNavigationGuard(`departments:${type}`, { isDirty: () => isDirty });
+
   useRegisterWizardEditor(
     `departments:${type}`,
     {

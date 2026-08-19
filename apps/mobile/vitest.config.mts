@@ -99,6 +99,16 @@ export default defineConfig(async () => {
           find: /^react-native-safe-area-context$/,
           replacement: path.resolve(__dirname, "./src/test/shims/safe-area-context.tsx"),
         },
+        // @react-navigation/native's hooks (useNavigation, useRoute,
+        // usePreventRemoveContext) all throw outside a NavigationContainer, so
+        // any screen using usePreventRemove would fail to render in every one
+        // of its tests. The shim registers guards for real and exposes
+        // `pressBack()`, so the guard stays testable rather than being silently
+        // disabled by a no-op mock.
+        {
+          find: /^@react-navigation\/native$/,
+          replacement: path.resolve(__dirname, "./src/test/shims/react-navigation-native.ts"),
+        },
       ],
     },
     test: {

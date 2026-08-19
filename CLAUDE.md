@@ -131,6 +131,12 @@ Shared primitives to reach for before inventing a layout:
 - `<ErrorBoundary>` and `<NotFoundBoundary>` (`components/RouteBoundary.tsx`)
   — every segment `error.tsx` and `not-found.tsx` should delegate to these
   rather than re-render the chrome.
+- **Unsaved input is never discarded silently**, by one of two guards. A modal
+  wires `useUnsavedChangesPrompt`'s `requestClose` into `<Modal onRequestClose>`
+  (the single veto for Escape, backdrop and X). A page-level editor calls
+  `useNavigationGuard(id, { isDirty })`, which asks before an in-app link click
+  and before tab close. Never hand-roll a `beforeunload` — `NavigationGuardProvider`
+  owns it, and a second one prompts twice. Full detail in `apps/web/AGENTS.md`.
 
 ---
 
@@ -158,7 +164,19 @@ Reach for the shared primitive before inventing one:
   slot via **`<SheetHeader>`**; stacked actions go in **`<SheetActions>`**,
   primary first; confirmations use **`<ConfirmationModal>`**. A sheet holding
   unsaved input routes `onDismiss` into a discard confirmation rather than
-  closing.
+  closing. Every sheet keeps its grabber and moves when dragged, blocking ones
+  included: they resist and settle back instead of refusing to move, and an
+  upward drag resists on every sheet. Never size anything inside a `<Modal>`
+  from window metrics.
+- **`useUnsavedChangesGuard()`** is that discard confirmation, and the only
+  implementation of it — never hand-roll a `hasUnsavedChanges` +
+  `showDiscardConfirmation` + `close()` triad. A sheet points both `onDismiss`
+  and its Cancel button at `guard.requestClose`; a screen with an inline editor
+  adds **`useNavigationDiscardGuard(guard)`** so header back, Android back and
+  the iOS back swipe ask through that same one confirmation. Keep `isDirty`
+  tight (`editing && hasChanges`), compute dirtiness once at module scope, and
+  never route a Cancel that navigates through `onClose` — it re-enters the guard
+  and asks twice.
 - **`<AuthShell>` / `<AuthField>`** — every public auth screen.
 - **`shared/components/skeleton`** primitives (`SkeletonBlock`, `SkeletonLine`,
   `SkeletonCardSurface`, `SkeletonGroup`) for loading placeholders. Skeletons
