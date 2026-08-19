@@ -112,15 +112,35 @@ describe("ShiftRequestBoard", () => {
     });
     renderBoard({ openPickups: [request] });
 
-    expect(screen.getByText(/Day Shift · Registered Nurse shift on/)).toBeInTheDocument();
-    expect(screen.queryByText(/D RN shift on/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Day Shift · Registered Nurse on/)).toBeInTheDocument();
+    expect(screen.queryByText(/D RN on/)).not.toBeInTheDocument();
   });
 
   it("falls back to the abbreviated label when a request has no resolvable segments", () => {
     const request = makeRequest({ requesterShiftLabel: "Day", requesterSegments: [] });
     renderBoard({ openPickups: [request] });
 
-    expect(screen.getByText(/Day shift on/)).toBeInTheDocument();
+    expect(screen.getByText(/Day on/)).toBeInTheDocument();
+  });
+
+  it("falls back to the abbreviated label when segments came back without names", () => {
+    const request = makeRequest({
+      requesterShiftLabel: "D · M",
+      requesterSegments: [
+        {
+          shiftId: 34,
+          jobId: 20,
+          label: "",
+          shiftName: null,
+          jobName: null,
+          showJobOnGrid: true,
+        },
+      ],
+    });
+    renderBoard({ openPickups: [request] });
+
+    expect(screen.getByText(/D · M on/)).toBeInTheDocument();
+    expect(screen.queryByText(/\? on/)).not.toBeInTheDocument();
   });
 
   it("claims an available open pickup", async () => {

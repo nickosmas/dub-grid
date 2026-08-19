@@ -531,9 +531,8 @@ export function ScheduleTab({
                       </TableCell>
                       <TableCell className="text-[13px]">{request.requesterShiftDate}</TableCell>
                       <TableCell className="text-[13px] font-semibold">
-                        {request.requesterSegments?.length
-                          ? joinShiftJobSegmentNames(request.requesterSegments)
-                          : request.requesterShiftLabel}
+                        {joinShiftJobSegmentNames(request.requesterSegments ?? []) ||
+                          request.requesterShiftLabel}
                       </TableCell>
                       <TableCell>
                         <span

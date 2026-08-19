@@ -242,12 +242,11 @@ export default function ShiftRequestBoard({
           isDarkTheme,
         )
       : null;
-    const requesterLabel = req.requesterSegments?.length
-      ? joinShiftJobSegmentNames(req.requesterSegments)
-      : req.requesterShiftLabel;
-    const targetLabel = req.targetSegments?.length
-      ? joinShiftJobSegmentNames(req.targetSegments)
-      : req.targetShiftLabel;
+    // Segments only carry names once the server resolved them; fall back to the
+    // abbreviated label whenever the join comes back empty.
+    const requesterLabel =
+      joinShiftJobSegmentNames(req.requesterSegments ?? []) || req.requesterShiftLabel;
+    const targetLabel = joinShiftJobSegmentNames(req.targetSegments ?? []) || req.targetShiftLabel;
 
     return (
       <div
@@ -311,7 +310,7 @@ export default function ShiftRequestBoard({
               color: "var(--color-text-secondary)",
             }}
           >
-            {requesterLabel} shift on {formatShiftDate(req.requesterShiftDate)}
+            {requesterLabel} on {formatShiftDate(req.requesterShiftDate)}
           </span>
 
           {isSwap && req.targetName && req.targetShiftLabel && req.targetShiftDate && (
@@ -383,7 +382,7 @@ export default function ShiftRequestBoard({
 
   function renderActions(req: ShiftRequest, isOwnRequest: boolean, isTarget: boolean) {
     const actions: React.ReactNode[] = [];
-    const requestLabel = `${req.requesterShiftLabel} shift on ${formatShiftDate(req.requesterShiftDate)}`;
+    const requestLabel = `${req.requesterShiftLabel} on ${formatShiftDate(req.requesterShiftDate)}`;
 
     // Claim button: open pickup that isn't mine
     if (

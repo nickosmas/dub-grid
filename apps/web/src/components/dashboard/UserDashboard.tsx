@@ -3089,9 +3089,12 @@ function formatRequestShiftLabel(
   const shift = shiftId != null ? (shiftById.get(shiftId) ?? null) : null;
 
   return expandShiftDisplayLabel({
+    // The abbreviation is what lets the raw label's job suffix expand to a
+    // name; only the resolved segments carry it.
+    jobAbbr: request.requesterSegments?.[0]?.jobAbbr ?? null,
     jobName: segment?.jobName ?? null,
     rawLabel: request.requesterShiftLabel,
-    shiftAbbr: shift?.abbr ?? null,
+    shiftAbbr: shift?.abbr ?? request.requesterSegments?.[0]?.shiftAbbr ?? null,
     shiftName: segment?.shiftName ?? shift?.name ?? null,
   });
 }
