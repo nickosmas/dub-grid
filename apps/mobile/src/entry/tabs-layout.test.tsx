@@ -224,7 +224,11 @@ describe("TabsLayout", () => {
     render(<PeopleLayout />);
     render(<ProfileLayout />);
 
-    expect(stackScreenMock).toHaveBeenCalledTimes(11);
+    // Profile contributes nine: index, account, work, security, and the three
+    // security flows split out of it (password, two-factor, sessions), plus
+    // notifications and privacy. People contributes three now that the
+    // management profile is retired: index, add, and the one person page.
+    expect(stackScreenMock).toHaveBeenCalledTimes(13);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
     const profileOptions = stackScreenMock.mock.calls[5]?.[0].options;
@@ -264,32 +268,19 @@ describe("TabsLayout", () => {
         title: "Add Person",
       },
     });
-    const peopleDetailOptions = stackScreenMock.mock.calls[3]?.[0].options;
+    // The person page is the section's exception: its heading is the centered
+    // identity block the screen draws, so it takes a plain static title. A
+    // large title here would be the person's name printed a second time, in a
+    // bar the page has already named under the avatar.
     expect(stackScreenMock.mock.calls[3]?.[0]).toMatchObject({
       name: "[id]",
       options: {
-        headerLargeTitle: true,
-        headerLargeTitleEnabled: true,
-        headerStyle: undefined,
-        // Never transparent: that is what costs a large title its collapse.
-        title: "Person",
+        headerLargeTitle: false,
+        headerLargeTitleEnabled: false,
+        title: "Staff Profile",
       },
     });
-    expect(peopleDetailOptions).not.toHaveProperty("headerLargeStyle");
-    expect(peopleDetailOptions).not.toHaveProperty("headerTransparent");
-    // Registered under its static `management/` segment so it never competes
-    // with `[id]` for a match, and takes the same large title as the rest of
-    // the section.
     expect(stackScreenMock.mock.calls[4]?.[0]).toMatchObject({
-      name: "management/[personId]",
-      options: {
-        headerLargeTitle: true,
-        headerLargeTitleEnabled: true,
-        headerStyle: undefined,
-        title: "Management",
-      },
-    });
-    expect(stackScreenMock.mock.calls[5]?.[0]).toMatchObject({
       name: "index",
       options: {
         headerLargeTitle: true,
@@ -302,10 +293,15 @@ describe("TabsLayout", () => {
     });
     expect(profileOptions).not.toHaveProperty("headerLargeStyle");
     expect(profileOptions).not.toHaveProperty("headerRight");
-    expect(stackScreenMock.mock.calls.slice(6).map((call) => call[0]?.name)).toEqual([
+    expect(stackScreenMock.mock.calls.slice(5).map((call) => call[0]?.name)).toEqual([
       "account",
       "work",
       "security",
+      // The three flows lifted out of the security page, registered next to it
+      // so the section reads in the order it is navigated.
+      "password",
+      "two-factor",
+      "sessions",
       "notifications",
       "privacy",
     ]);

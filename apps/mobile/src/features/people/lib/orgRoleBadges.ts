@@ -1,4 +1,9 @@
-import { ORG_ROLE_LABELS, getHighlightedOrgRole, type OrgRole } from "@dubgrid/domain";
+import {
+  ORG_ROLE_LABELS,
+  getHighlightedOrgRole,
+  getOrgRoleLabel,
+  type OrgRole,
+} from "@dubgrid/domain";
 import {
   mobileRadii,
   mobileText,
@@ -11,6 +16,25 @@ type MobileOrgRole = OrgRole | null;
 // The labels and the which-roles-get-badged rule are shared with web via
 // `@dubgrid/domain`; only the styling below is mobile-specific.
 export { ORG_ROLE_LABELS, getHighlightedOrgRole };
+
+/**
+ * Which access badge a hero prints, with no styling attached.
+ *
+ * `ProfileHero` owns the pill itself, so a hero only ever needed the label and
+ * the tone — the styled factory below is for the rows that draw their own pill
+ * (the People list). Unlike that one this never returns null: a hero badges
+ * every tier, User included, because on a page about one person the access
+ * level is a fact about them rather than a highlight on a list.
+ */
+export function getMobileOrgRoleHeroBadge(role: MobileOrgRole | null | undefined): {
+  label: string;
+  tone: "brand" | "warning";
+} {
+  return {
+    label: getOrgRoleLabel(role),
+    tone: getHighlightedOrgRole(role) === "super_admin" ? "warning" : "brand",
+  };
+}
 
 export function getMobileOrgRoleBadge(
   mobileColors: MobileColors,

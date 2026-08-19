@@ -22,6 +22,8 @@ import {
   type SegmentedOption,
 } from "../../../shared/components/SegmentedControl";
 import { ProfileTextInput } from "../../profile/components/ProfilePrimitives";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
+import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
 import type { ManagementAccessRole } from "./ManagementAccessSheet";
@@ -65,14 +67,12 @@ function getEmailError(value: string): string | null {
  */
 export function ManagementUserInviteSheet({
   visible,
-  departmentLabel,
   managementDepartments,
   isPending,
   onDismiss,
   onSubmit,
 }: {
   visible: boolean;
-  departmentLabel: string;
   managementDepartments: MobileDepartment[];
   isPending: boolean;
   onDismiss: () => void;
@@ -82,7 +82,6 @@ export function ManagementUserInviteSheet({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [draft, setDraft] = useState<InviteDraft>(EMPTY_DRAFT);
   const [wasVisible, setWasVisible] = useState(visible);
-  const [showDiscardConfirmation, setShowDiscardConfirmation] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
 
   // Cleared on each open rather than on close, so the fields are never seen
@@ -101,7 +100,7 @@ export function ManagementUserInviteSheet({
   const phoneError = getOptionalUsPhoneError(draft.phone);
   const departmentError =
     draft.managementDepartmentIds.length === 0
-      ? `Select at least one management ${departmentLabel.toLowerCase()}`
+      ? `Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}`
       : null;
   const isValid =
     !firstNameError && !lastNameError && !emailError && !phoneError && !departmentError;
@@ -112,10 +111,15 @@ export function ManagementUserInviteSheet({
     draft.phone !== "" ||
     draft.managementDepartmentIds.length > 0;
 
-  function close() {
-    setShowDiscardConfirmation(false);
-    onDismiss();
-  }
+  // Deliberately no `onDiscard`: the draft is cleared on open, above, so that
+  // the fields are never seen emptying themselves as the sheet slides away.
+  const guard = useUnsavedChangesGuard({
+    isDirty: hasUnsavedChanges,
+    disabled: isPending,
+    title: "Discard this invitation?",
+    body: "The invitation you were filling in will be lost.",
+    onClose: onDismiss,
+  });
 
   function submit() {
     if (!isValid) {
@@ -143,18 +147,11 @@ export function ManagementUserInviteSheet({
         }
         scrollable
         visible={visible}
-        onDismiss={() => {
-          if (isPending) return;
-          if (hasUnsavedChanges) {
-            setShowDiscardConfirmation(true);
-            return;
-          }
-          close();
-        }}
+        onDismiss={guard.requestClose}
       >
         {managementDepartments.length === 0 ? (
           <AppText tone="secondary" variant="body">
-            {`There are no management ${departmentLabel.toLowerCase()} yet. Add one on the web app, under Settings, before inviting anyone into management.`}
+            {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one on the web app, under Settings, before inviting anyone into management.`}
           </AppText>
         ) : (
           <View style={styles.body}>
@@ -207,7 +204,7 @@ export function ManagementUserInviteSheet({
 
             <View style={styles.field}>
               <AppText tone="secondary" variant="label">
-                {`Management ${departmentLabel}`}
+                {MANAGEMENT_DEPARTMENT_LABELS.plural}
               </AppText>
               <View style={styles.chipRow}>
                 {managementDepartments.map((department) => (
@@ -245,24 +242,11 @@ export function ManagementUserInviteSheet({
             onPress={submit}
             tone="primary"
           />
-          <Button
-            disabled={isPending}
-            label="Cancel"
-            onPress={() => (hasUnsavedChanges ? setShowDiscardConfirmation(true) : close())}
-            tone="neutral"
-          />
+          <Button disabled={isPending} label="Cancel" onPress={guard.requestClose} tone="neutral" />
         </SheetActions>
       </BottomSheetModal>
 
-      <ConfirmationModal
-        body="The invitation you were filling in will be lost."
-        confirmLabel="Discard"
-        confirmTone="danger"
-        onCancel={() => setShowDiscardConfirmation(false)}
-        onConfirm={close}
-        title="Discard this invitation?"
-        visible={showDiscardConfirmation}
-      />
+      <ConfirmationModal {...guard.confirmationProps} />
     </>
   );
 }

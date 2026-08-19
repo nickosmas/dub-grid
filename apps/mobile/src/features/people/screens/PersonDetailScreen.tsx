@@ -1,4 +1,3 @@
-import { getOrgRoleLabel } from "@dubgrid/domain";
 import { useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, Text, TextInput, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -23,6 +22,7 @@ import {
 } from "@dubgrid/contracts";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
+import { Chip } from "../../../shared/components/Chip";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { SelectionRow, SelectionSection } from "../../../shared/components/FilterSheet";
@@ -40,10 +40,18 @@ import {
   updateMobilePersonStatus,
   type MobileAccountLinkChallenge,
 } from "../../../shared/lib/api";
+import { getAvatarTone } from "../../../shared/lib/avatar-tone";
+import {
+  getDepartmentNames,
+  getScheduledDepartmentNames,
+  MANAGEMENT_DEPARTMENT_LABELS,
+} from "../../../shared/lib/departments";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
@@ -53,20 +61,25 @@ import {
   mobileTextWeighted,
   type MobileColors,
 } from "../../../shared/theme/tokens";
-import { HeaderTitle } from "../../../shared/navigation/HeaderTitle";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
+  getProfileInitials,
+  ProfileActionRow,
+  ProfileActionStack,
   ProfileChoiceGroup,
   ProfileHero,
-  ProfileHeroMeta,
+  ProfileHeroFacts,
+  ProfileHeroFactsRow,
   ProfileInfoRow,
   ProfileList,
   ProfilePanel,
+  ProfileQuickActions,
   ProfileSection,
   ProfileTextInput,
 } from "../../profile/components/ProfilePrimitives";
 import { ProfileSkeleton } from "../../profile/components/ProfileSkeleton";
+import { getMobileOrgRoleHeroBadge } from "../lib/orgRoleBadges";
 import {
   hasManagementAccess,
   ManagementAccessSheet,
@@ -128,6 +141,32 @@ function makeDraft(person: MobilePerson): EditDraft {
   };
 }
 
+/**
+ * Whether the draft differs from the saved person.
+ *
+ * Module scope, and used by both the edit panel's buttons and the screen's
+ * unsaved-changes guard. While this lived inside the panel the screen couldn't
+ * see it, so back navigation had no idea there was anything to lose; computing
+ * it twice would be worse still, because then Cancel and the back button could
+ * disagree about whether to ask.
+ */
+function personDraftHasChanges(draft: EditDraft, person: MobilePerson): boolean {
+  const saved = makeDraft(person);
+
+  return (
+    draft.firstName.trim() !== saved.firstName ||
+    draft.lastName.trim() !== saved.lastName ||
+    draft.employmentType !== saved.employmentType ||
+    draft.phone.trim() !== saved.phone ||
+    draft.email.trim() !== saved.email ||
+    draft.contactNotes !== saved.contactNotes ||
+    draft.certificationId !== saved.certificationId ||
+    !sameIds(draft.focusAreaIds, saved.focusAreaIds) ||
+    !sameIds(draft.roleIds, saved.roleIds) ||
+    !sameIds(draft.departmentIds, saved.departmentIds)
+  );
+}
+
 export default function PersonDetailScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -147,7 +186,6 @@ export default function PersonDetailScreen() {
   const [invitationConfirmAction, setInvitationConfirmAction] =
     useState<InvitationConfirmAction>(null);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
-  const [showDiscardCancelConfirmation, setShowDiscardCancelConfirmation] = useState(false);
   const [inactiveNote, setInactiveNote] = useState("");
   const [accountLinkChallenge, setAccountLinkChallenge] =
     useState<MobileAccountLinkChallenge | null>(null);
@@ -389,6 +427,22 @@ export default function PersonDetailScreen() {
     },
   });
 
+  const hasChanges = Boolean(draft && person && personDraftHasChanges(draft, person));
+  // `editing && hasChanges`, not just `editing`: on iOS the whole screen is a
+  // back-swipe target, so a guard that fired for an untouched open panel would
+  // put a confirmation in front of an ordinary swipe back.
+  const guard = useUnsavedChangesGuard({
+    isDirty: editing && hasChanges,
+    disabled: updateMutation.isPending,
+    onDiscard: () => {
+      if (person) setDraft(makeDraft(person));
+    },
+    onClose: () => setEditing(false),
+  });
+  // Header back, Android hardware back and the iOS back swipe ask too, through
+  // this same confirmation rather than a second one of their own.
+  useNavigationDiscardGuard(guard);
+
   function handleSave() {
     if (!person || !draft) return;
     const firstNameError = getStaffNameError(draft.firstName, "First name");
@@ -447,23 +501,16 @@ export default function PersonDetailScreen() {
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
       >
-        {/* The title is the person's name, so there is nothing truthful to put
-            in the bar yet. It stays empty rather than falling back to the
-            layout's "Person", and the skeleton below carries a stand-in line
-            for it — the native title is a string, not a view, so the
-            placeholder cannot live in the header itself. */}
-        <HeaderTitle title="" />
-
         {/* Nothing at all for a blip: a skeleton that appears and vanishes
             inside a few frames reads as a glitch, not as loading. */}
         {contentState.showSkeleton ? (
           <ProfileSkeleton
-            metaItems={5}
+            heroAlign="center"
+            heroChips={2}
+            metaItems={0}
             rowsPerSection={4}
             sections={3}
-            showHeroIdentity={false}
             showQuickActions
-            showTitle
           />
         ) : null}
       </Screen>
@@ -477,11 +524,6 @@ export default function PersonDetailScreen() {
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
       >
-        {/* The loading branch above emptied the title and nothing puts it
-            back — `setOptions` is not reverted when that branch unmounts — so
-            each terminal state names itself. */}
-        <HeaderTitle title="Person" />
-
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
@@ -503,8 +545,6 @@ export default function PersonDetailScreen() {
         onRefresh={manualRefresh.refresh}
         refreshing={manualRefresh.isRefreshing}
       >
-        <HeaderTitle title="Person" />
-
         <EmptyStateCard
           fillScreen
           body="This teammate isn't in your directory anymore."
@@ -523,11 +563,17 @@ export default function PersonDetailScreen() {
     (department) => department.type === "management",
   );
   const focusAreaNames = formatIdList(person.focusAreaIds, maps.focusAreas);
-  const scheduledDepartmentNames = formatIdList(
-    getScheduledDepartmentIds(person.focusAreaIds, bootstrapQuery.data),
-    maps.departments,
+  const scheduledDepartmentNames = formatNameList(
+    getScheduledDepartmentNames(
+      person.focusAreaIds,
+      bootstrapQuery.data?.focusAreas,
+      bootstrapQuery.data?.departments,
+    ),
   );
   const roleNames = formatIdList(person.roleIds, maps.roles);
+  const managementDepartmentNames = formatNameList(
+    getDepartmentNames(person.managementDepartmentIds, bootstrapQuery.data?.departments),
+  );
   const certificationName =
     person.certificationId != null
       ? (maps.certifications.get(person.certificationId) ?? "Unknown")
@@ -538,12 +584,23 @@ export default function PersonDetailScreen() {
   // never on the grid — telling them they'll come "off the schedule" would be
   // describing something that never happened. Same split web makes.
   const isOnSchedule = person.focusAreaIds.length > 0;
-  const accessLevelText = getOrgRoleLabel(person.orgRole);
-  const accessText = person.userId
-    ? "Active app account"
+  const orgRoleBadge = getMobileOrgRoleHeroBadge(person.orgRole);
+  // The three app-account states, as one chip. Only the middle one is a state
+  // anyone has to act on, so it is the only one that takes a colour.
+  const accountChip = person.userId
+    ? {
+        label: "Active app account",
+        tone: "neutral" as const,
+        icon: "phone-portrait-outline" as const,
+      }
     : person.pendingInvitation
-      ? "Invitation pending"
-      : "No app invitation sent";
+      ? { label: "Invitation pending", tone: "warning" as const, icon: "mail-outline" as const }
+      : {
+          label: "No app invitation sent",
+          tone: "neutral" as const,
+          icon: "mail-open-outline" as const,
+        };
+  const avatarTone = getAvatarTone(person.id, isDark);
 
   // The Deactivate sheet carries both outcomes, so what the confirm actually
   // does comes from the selected option, not from which button opened it.
@@ -567,6 +624,9 @@ export default function PersonDetailScreen() {
   function closeStatusConfirmation() {
     setConfirmAction(null);
     setDeactivateOutcome("inactive");
+    // The note is typed inside this modal and never survives it, so clearing it
+    // here stops the next status change opening with the last one's reason.
+    setInactiveNote("");
   }
 
   function confirmInvitationAction() {
@@ -634,28 +694,42 @@ export default function PersonDetailScreen() {
         }
       />
 
-      {/* The native header names the page, and every part of the identity
-          block under it repeated something: the avatar and badge restated the
-          name and the status, and the email has its own row in Contact. What's
-          left is the meta grid. */}
-      <HeaderTitle title={fullName} />
-
-      <ProfileHero>
-        <ProfileHeroMeta label={roleLabel} value={roleNames} />
-        <ProfileHeroMeta label={focusAreaLabel} value={focusAreaNames} />
-        <ProfileHeroMeta label="Employment" value={employmentLabel} />
-        {/* The org role had no home but the badge, so it moved here rather than
-            leaving with it. Web's People table calls the tier "Access" too. */}
-        <ProfileHeroMeta label="Access" value={accessLevelText} />
-        <ProfileHeroMeta label="App account" value={accessText} />
+      {/* The page's heading is the identity block below, so the route keeps a
+          plain static title rather than the person's name — printing the name
+          in the bar and again under the avatar is the duplication this block
+          was built to avoid. It carries the same three facts the old meta grid
+          did, and no more: the org tier as its badge (web's People table calls
+          it "Access" too), then status and where their app account stands. */}
+      <ProfileHero
+        align="center"
+        badge={orgRoleBadge.label}
+        badgeTone={orgRoleBadge.tone}
+        avatarStyle={{
+          backgroundColor: avatarTone.backgroundColor,
+          borderColor: avatarTone.borderColor,
+          borderWidth: 1,
+        }}
+        avatarTextStyle={{ color: avatarTone.textColor }}
+        initials={getProfileInitials(fullName)}
+        statusTone={person.status === "active" ? "success" : "muted"}
+        title={fullName}
+      >
+        {/* Every chip on one line. The access tier is the hero's badge now,
+            the same pill the profile tab and the People rows print, rather
+            than a muted line of its own down here. */}
+        <ProfileHeroFacts>
+          <ProfileHeroFactsRow>
+            <Chip
+              label={formatStatusLabel(person.status)}
+              tone={person.status === "active" ? "success" : "neutral"}
+            />
+            <Chip icon={accountChip.icon} label={accountChip.label} tone={accountChip.tone} />
+          </ProfileHeroFactsRow>
+        </ProfileHeroFacts>
       </ProfileHero>
 
       {!editing ? (
-        <View style={styles.quickActions}>
-          {/*
-           * Plain white pills: the colour lives in the icon, so three adjacent
-           * actions read as one set instead of three competing fills.
-           */}
+        <ProfileQuickActions>
           <Button
             compact
             disabled={!person.phone}
@@ -694,7 +768,7 @@ export default function PersonDetailScreen() {
               tone="plain"
             />
           ) : null}
-        </View>
+        </ProfileQuickActions>
       ) : null}
 
       {editing ? (
@@ -705,15 +779,11 @@ export default function PersonDetailScreen() {
           draft={draft}
           focusAreaLabel={focusAreaLabel}
           focusAreas={bootstrapQuery.data?.focusAreas ?? []}
-          onCancel={() => {
-            setEditing(false);
-            setDraft(makeDraft(person));
-          }}
-          onCancelWithChanges={() => setShowDiscardCancelConfirmation(true)}
+          hasChanges={hasChanges}
+          onCancel={guard.requestClose}
           onChange={setDraft}
-          onDiscard={() => setDraft(makeDraft(person))}
+          onDiscard={guard.discard}
           onSave={handleSave}
-          original={person}
           roleLabel={roleLabel}
           roles={bootstrapQuery.data?.roles ?? []}
         />
@@ -735,13 +805,18 @@ export default function PersonDetailScreen() {
             </ProfileList>
           </ProfileSection>
 
-          <ProfileSection title="Staff profile">
+          {/* Split the way the edit panel below splits the same fields: what
+              the person is hired as here, where they are placed under
+              Assignments. The name row is gone with it, since the native header
+              already carries it. */}
+          <ProfileSection title="Staffing">
             <ProfileList>
-              <ProfileInfoRow iconName="person-circle-outline" label="Name" value={fullName} />
+              {/* Web prints this beside the name in its staff header, and it is
+                  how people are identified in payroll conversations. */}
               <ProfileInfoRow
-                iconName="pulse-outline"
-                label="Status"
-                value={formatStatusLabel(person.status)}
+                iconName="card-outline"
+                label="Employee ID"
+                value={`#${person.employeeNumber}`}
               />
               <ProfileInfoRow
                 iconName="briefcase-outline"
@@ -749,20 +824,10 @@ export default function PersonDetailScreen() {
                 value={employmentLabel}
               />
               <ProfileInfoRow
-                iconName="people-circle-outline"
-                label={roleLabel}
-                value={roleNames}
-              />
-              <ProfileInfoRow
                 iconName="ribbon-outline"
+                isLast={!canManageEmployees || (!person.statusChangedAt && !person.statusNote)}
                 label={certificationLabel}
                 value={certificationName}
-              />
-              <ProfileInfoRow
-                iconName="albums-outline"
-                isLast={!canManageEmployees || (!person.statusChangedAt && !person.statusNote)}
-                label={focusAreaLabel}
-                value={focusAreaNames}
               />
               {canManageEmployees && person.statusChangedAt ? (
                 <ProfileInfoRow
@@ -776,7 +841,7 @@ export default function PersonDetailScreen() {
                 <ProfileInfoRow
                   iconName="document-text-outline"
                   isLast
-                  label="Note"
+                  label="Status note"
                   value={person.statusNote}
                 />
               ) : null}
@@ -785,16 +850,37 @@ export default function PersonDetailScreen() {
 
           <ProfileSection title="Assignments">
             <ProfileList>
+              {/* The two kinds of department are different facts about a
+                  person — where they are scheduled, and what they manage — so
+                  they take a row each rather than one merged list. The
+                  management row sits directly under its scheduled counterpart
+                  instead of in a section of its own, which read as a second
+                  Assignments block for anyone who had both. */}
               <ProfileInfoRow
                 iconName="business-outline"
                 label={departmentLabel}
                 value={scheduledDepartmentNames}
               />
+              {/* Gated on the departments themselves, not on
+                  `hasManagementAccess`: that is also true for a plain staff app
+                  invitation, and would print an empty row for one. */}
+              {person.managementDepartmentIds.length > 0 ? (
+                <ProfileInfoRow
+                  iconName="briefcase-outline"
+                  label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+                  value={managementDepartmentNames}
+                />
+              ) : null}
               <ProfileInfoRow
                 iconName="albums-outline"
-                isLast
                 label={focusAreaLabel}
                 value={focusAreaNames}
+              />
+              <ProfileInfoRow
+                iconName="people-circle-outline"
+                isLast
+                label={roleLabel}
+                value={roleNames}
               />
             </ProfileList>
           </ProfileSection>
@@ -809,17 +895,20 @@ export default function PersonDetailScreen() {
         </>
       )}
 
+      {/* The section is untitled: every button in here already names its own
+          action, so a heading over them can only say "Actions" — the one word
+          they have in common and the one that tells the reader nothing. */}
       {canManageEmployees && !editing ? (
-        <ProfileSection title="Actions">
+        <ProfileSection>
           {/*
            * Access first, status last, the way web's staff panel orders them:
            * granting someone the app is the everyday action, and the one that
            * takes them off it sits at the bottom on its own.
            */}
-          <View style={styles.actionStack}>
+          <ProfileActionStack>
             {!person.userId && person.status !== "removed" && person.email ? (
               person.pendingInvitation ? (
-                <View style={styles.actionRow}>
+                <ProfileActionRow>
                   <Button
                     compact
                     disabled={invitationMutation.isPending}
@@ -834,7 +923,7 @@ export default function PersonDetailScreen() {
                     onPress={() => setInvitationConfirmAction("revoke")}
                     tone="danger"
                   />
-                </View>
+                </ProfileActionRow>
               ) : (
                 <Button
                   compact
@@ -886,7 +975,7 @@ export default function PersonDetailScreen() {
                 tone="danger"
               />
             ) : null}
-          </View>
+          </ProfileActionStack>
         </ProfileSection>
       ) : null}
       <ConfirmationModal
@@ -898,19 +987,7 @@ export default function PersonDetailScreen() {
         title="Save these changes?"
         visible={showSaveConfirmation}
       />
-      <ConfirmationModal
-        body="Your edits will be lost."
-        confirmLabel="Discard"
-        confirmTone="danger"
-        onCancel={() => setShowDiscardCancelConfirmation(false)}
-        onConfirm={() => {
-          setShowDiscardCancelConfirmation(false);
-          setEditing(false);
-          setDraft(makeDraft(person));
-        }}
-        title="Discard unsaved changes?"
-        visible={showDiscardCancelConfirmation}
-      />
+      <ConfirmationModal {...guard.confirmationProps} />
       <ConfirmationModal
         body={statusConfirmationBody}
         confirmLabel={statusConfirmationLabel}
@@ -964,7 +1041,6 @@ export default function PersonDetailScreen() {
         ) : null}
       </ConfirmationModal>
       <ManagementAccessSheet
-        departmentLabel={departmentLabel}
         isPending={managementAccessMutation.isPending}
         managementDepartments={managementDepartments}
         onDismiss={() => setShowManagementAccess(false)}
@@ -1063,32 +1139,7 @@ function buildLookupMaps(data: MobileBootstrapResponse | undefined) {
     focusAreas: new Map((data?.focusAreas ?? []).map((item) => [item.id, item.name])),
     roles: new Map((data?.roles ?? []).map((item) => [item.id, item.name])),
     certifications: new Map((data?.certifications ?? []).map((item) => [item.id, item.name])),
-    departments: new Map((data?.departments ?? []).map((item) => [item.id, item.name])),
   };
-}
-
-function getScheduledDepartmentIds(
-  focusAreaIds: number[],
-  data: MobileBootstrapResponse | undefined,
-): number[] {
-  const selectedFocusAreas = new Set(focusAreaIds);
-  const seen = new Set<number>();
-  const departmentIds: number[] = [];
-
-  for (const focusArea of data?.focusAreas ?? []) {
-    if (
-      !selectedFocusAreas.has(focusArea.id) ||
-      focusArea.departmentId == null ||
-      seen.has(focusArea.departmentId)
-    ) {
-      continue;
-    }
-
-    seen.add(focusArea.departmentId);
-    departmentIds.push(focusArea.departmentId);
-  }
-
-  return departmentIds;
 }
 
 function sameIds(left: number[], right: number[]): boolean {
@@ -1099,8 +1150,13 @@ function sameIds(left: number[], right: number[]): boolean {
 }
 
 function formatIdList(ids: number[], map: Map<number, string>): string {
-  const values = ids.map((id) => map.get(id)).filter((value): value is string => Boolean(value));
-  return values.length > 0 ? values.join(", ") : "None";
+  return formatNameList(
+    ids.map((id) => map.get(id)).filter((value): value is string => Boolean(value)),
+  );
+}
+
+function formatNameList(names: string[]): string {
+  return names.length > 0 ? names.join(", ") : "None";
 }
 
 function EditPanel({
@@ -1112,10 +1168,9 @@ function EditPanel({
   certifications,
   roleLabel,
   roles,
-  original,
+  hasChanges,
   onChange,
   onCancel,
-  onCancelWithChanges,
   onDiscard,
   onSave,
 }: {
@@ -1127,10 +1182,9 @@ function EditPanel({
   certifications: MobileNamedItem[];
   roleLabel: string;
   roles: MobileNamedItem[];
-  original: MobilePerson;
+  hasChanges: boolean;
   onChange: (draft: EditDraft) => void;
   onCancel: () => void;
-  onCancelWithChanges: () => void;
   onDiscard: () => void;
   onSave: () => void;
 }) {
@@ -1151,17 +1205,6 @@ function EditPanel({
         : null,
   };
   const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
-  const hasChanges =
-    draft.firstName.trim() !== original.firstName ||
-    draft.lastName.trim() !== original.lastName ||
-    draft.employmentType !== original.employmentType ||
-    draft.phone.trim() !== original.phone ||
-    draft.email.trim() !== original.email ||
-    draft.contactNotes !== original.contactNotes ||
-    draft.certificationId !== original.certificationId ||
-    !sameIds(draft.focusAreaIds, original.focusAreaIds) ||
-    !sameIds(draft.roleIds, original.roleIds) ||
-    !sameIds(draft.departmentIds, original.departmentIds);
   const setField = <K extends keyof EditDraft>(key: K, value: EditDraft[K]) => {
     onChange({ ...draft, [key]: value });
   };
@@ -1327,13 +1370,7 @@ function EditPanel({
           onPress={onDiscard}
           tone="neutral"
         />
-        <Button
-          compact
-          disabled={disabled}
-          label="Cancel"
-          onPress={hasChanges ? onCancelWithChanges : onCancel}
-          tone="ghost"
-        />
+        <Button compact disabled={disabled} label="Cancel" onPress={onCancel} tone="ghost" />
       </View>
     </>
   );
@@ -1341,12 +1378,6 @@ function EditPanel({
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    quickActions: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 10,
-      paddingBottom: 16,
-    },
     actionsRow: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -1371,15 +1402,6 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
       paddingHorizontal: 14,
       paddingVertical: 13,
-    },
-    actionStack: {
-      gap: 10,
-      paddingTop: 12,
-    },
-    actionRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 10,
     },
     modalInfoPanel: {
       backgroundColor: mobileColors.surfaceSecondary,

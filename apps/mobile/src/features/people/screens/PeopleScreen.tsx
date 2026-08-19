@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileDepartment,
+  MobileManagementUser,
   MobileManagementUserInviteBody,
   MobilePerson,
   MobileProfileChangeRequest,
@@ -35,6 +36,7 @@ import {
   updateProfileChangeRequest,
 } from "../../../shared/lib/api";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
+import { getDepartmentNames } from "../../../shared/lib/departments";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
@@ -47,6 +49,7 @@ import {
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { ManagementUserActionsSheet } from "../components/ManagementUserActionsSheet";
 import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
@@ -87,6 +90,10 @@ export default function PeopleScreen() {
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [rosterTab, setRosterTab] = useState<RosterTab>("schedule");
   const [showInviteManagementUser, setShowInviteManagementUser] = useState(false);
+  /** The roster row whose actions sheet is open, for rows with no staff profile. */
+  const [managementUserActions, setManagementUserActions] = useState<MobileManagementUser | null>(
+    null,
+  );
   const [profileRequestConfirmation, setProfileRequestConfirmation] =
     useState<ProfileRequestConfirmation>(null);
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
@@ -191,7 +198,6 @@ export default function PeopleScreen() {
       ),
     [bootstrapQuery.data?.departments],
   );
-  const departmentLabel = bootstrapQuery.data?.currentOrg.labels.department ?? "Departments";
   // The toggle only appears where there is a second half to switch to: web
   // hides it for orgs with no management departments for the same reason.
   const canSeeManagementRoster =
@@ -389,8 +395,8 @@ export default function PeopleScreen() {
               accessibilityLabel="Directory section"
               onChange={setRosterTab}
               options={[
-                { value: "schedule", label: `Schedule (${visiblePeople.length})` },
-                { value: "management", label: `Management (${managementUsers.length})` },
+                { value: "schedule", label: "Schedule", count: visiblePeople.length },
+                { value: "management", label: "Management", count: managementUsers.length },
               ]}
               value={rosterTab}
             />
@@ -513,13 +519,13 @@ export default function PeopleScreen() {
           <View style={styles.section}>
             <View>
               {filteredManagementUsers.map((managementUser, index) => {
-                const departmentNames = managementUser.managementDepartmentIds
-                  .map(
-                    (departmentId) =>
-                      managementDepartments.find((department) => department.id === departmentId)
-                        ?.name ?? null,
-                  )
-                  .filter((value): value is string => Boolean(value));
+                const isSelf = Boolean(
+                  currentUserId && managementUser.userId && managementUser.userId === currentUserId,
+                );
+                const departmentNames = getDepartmentNames(
+                  managementUser.managementDepartmentIds,
+                  managementDepartments,
+                );
 
                 return (
                   <AnimatedListItem index={index} key={managementUser.id}>
@@ -539,12 +545,28 @@ export default function PeopleScreen() {
                       }
                       navigable
                       orgRole={managementUser.orgRole}
-                      onPress={() =>
-                        router.push({
-                          pathname: "/(tabs)/people/management/[personId]",
-                          params: { personId: managementUser.id },
-                        })
-                      }
+                      onPress={() => {
+                        // Every row opens the one profile page there is. Your
+                        // own goes to the profile tab, which owns the only page
+                        // that can edit you; everyone else's opens their staff
+                        // profile, which carries their management access along
+                        // with the rest of their record.
+                        if (isSelf) {
+                          router.push("/(tabs)/profile");
+                          return;
+                        }
+                        if (managementUser.employeeId) {
+                          router.push({
+                            pathname: "/(tabs)/people/[id]",
+                            params: { id: managementUser.employeeId },
+                          });
+                          return;
+                        }
+                        // No staff profile to open: a management-only
+                        // invitation has no `employees` row until it is
+                        // accepted. Its handful of actions come up here.
+                        setManagementUserActions(managementUser);
+                      }}
                       showStatus={false}
                       status="active"
                       subtitle={
@@ -629,8 +651,13 @@ export default function PeopleScreen() {
           </View>
         </View>
       )}
+      <ManagementUserActionsSheet
+        managementDepartments={managementDepartments}
+        managementUser={managementUserActions}
+        onDismiss={() => setManagementUserActions(null)}
+      />
+
       <ManagementUserInviteSheet
-        departmentLabel={departmentLabel}
         isPending={inviteManagementUserMutation.isPending}
         managementDepartments={managementDepartments}
         onDismiss={() => setShowInviteManagementUser(false)}

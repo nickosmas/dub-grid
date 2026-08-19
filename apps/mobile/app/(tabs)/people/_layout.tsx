@@ -11,22 +11,18 @@ export default function PeopleLayout() {
   return (
     <Stack>
       <Stack.Screen name="index" options={createTopLevelStackOptions(mobileColors, "People")} />
-      {/* Large titles all the way down this section, the way Settings does it:
-          each pushed screen reads as a place of its own. `[id]`'s title is the
-          person's name, which the screen feeds in once it resolves. */}
+      {/* Large titles for the forms, the way Settings does it: each pushed
+          screen reads as a place of its own. The person page is the exception —
+          its heading is the centered identity block it draws itself, so it
+          takes a plain static title and prints the name once, under the
+          avatar, rather than in the bar as well. */}
       <Stack.Screen
         name="add"
         options={createDetailStackOptions(mobileColors, "Add Person", { largeTitle: true })}
       />
-      <Stack.Screen
-        name="[id]"
-        options={createDetailStackOptions(mobileColors, "Person", { largeTitle: true })}
-      />
-      {/* A static segment, so it never competes with `[id]` for a match. */}
-      <Stack.Screen
-        name="management/[personId]"
-        options={createDetailStackOptions(mobileColors, "Management", { largeTitle: true })}
-      />
+      {/* The one profile page there is: management users open it too, since
+          their access lives on the same record. */}
+      <Stack.Screen name="[id]" options={createDetailStackOptions(mobileColors, "Staff Profile")} />
     </Stack>
   );
 }

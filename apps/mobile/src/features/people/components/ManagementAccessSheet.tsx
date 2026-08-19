@@ -14,6 +14,8 @@ import {
   SegmentedControl,
   type SegmentedOption,
 } from "../../../shared/components/SegmentedControl";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
+import { MANAGEMENT_DEPARTMENT_LABELS } from "../../../shared/lib/departments";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
 
@@ -61,7 +63,6 @@ export function hasManagementAccess(person: MobilePerson): boolean {
 export function ManagementAccessSheet({
   visible,
   person,
-  departmentLabel,
   managementDepartments,
   isPending,
   onDismiss,
@@ -70,7 +71,6 @@ export function ManagementAccessSheet({
 }: {
   visible: boolean;
   person: MobilePerson;
-  departmentLabel: string;
   managementDepartments: MobileDepartment[];
   isPending: boolean;
   onDismiss: () => void;
@@ -84,7 +84,6 @@ export function ManagementAccessSheet({
   );
   const [draft, setDraft] = useState<ManagementAccessDraft>(baseline);
   const [wasVisible, setWasVisible] = useState(visible);
-  const [showDiscardConfirmation, setShowDiscardConfirmation] = useState(false);
   const [showRemoveConfirmation, setShowRemoveConfirmation] = useState(false);
 
   // Reseed on open rather than on every `person` identity change: a background
@@ -110,8 +109,15 @@ export function ManagementAccessSheet({
   const hasUnsavedChanges =
     draft.orgRole !== baseline.orgRole ||
     !sameIds(draft.managementDepartmentIds, baseline.managementDepartmentIds);
+  // Dirtiness is part of it, not just validity: a Save that is live on an
+  // untouched sheet invites a no-op write, and the same `hasUnsavedChanges`
+  // already decides whether closing asks — so the button and the discard
+  // prompt can never disagree about whether there is anything to save.
   const canSubmit =
-    !isPending && draft.managementDepartmentIds.length > 0 && managementDepartments.length > 0;
+    !isPending &&
+    hasUnsavedChanges &&
+    draft.managementDepartmentIds.length > 0 &&
+    managementDepartments.length > 0;
 
   function toggleDepartment(departmentId: number) {
     setDraft((current) => ({
@@ -122,11 +128,15 @@ export function ManagementAccessSheet({
     }));
   }
 
-  function close() {
-    setDraft(baseline);
-    setShowDiscardConfirmation(false);
-    onDismiss();
-  }
+  // Every way out funnels through here, so an edit in progress asks before it
+  // is thrown away rather than vanishing on an outside tap.
+  const guard = useUnsavedChangesGuard({
+    isDirty: hasUnsavedChanges,
+    disabled: isPending,
+    body: "Your changes to their management access will be lost.",
+    onDiscard: () => setDraft(baseline),
+    onClose: onDismiss,
+  });
 
   return (
     <>
@@ -139,20 +149,11 @@ export function ManagementAccessSheet({
         }
         scrollable
         visible={visible}
-        // Every way out funnels through here, so an edit in progress asks
-        // before it is thrown away rather than vanishing on an outside tap.
-        onDismiss={() => {
-          if (isPending) return;
-          if (hasUnsavedChanges) {
-            setShowDiscardConfirmation(true);
-            return;
-          }
-          close();
-        }}
+        onDismiss={guard.requestClose}
       >
         {managementDepartments.length === 0 ? (
           <AppText tone="secondary" variant="body">
-            {`There are no management ${departmentLabel.toLowerCase()} yet. Add one on the web app, under Settings, before granting management access.`}
+            {`There are no ${MANAGEMENT_DEPARTMENT_LABELS.pluralLower} yet. Add one on the web app, under Settings, before granting management access.`}
           </AppText>
         ) : (
           <View style={styles.body}>
@@ -171,7 +172,7 @@ export function ManagementAccessSheet({
 
             <View style={styles.field}>
               <AppText tone="secondary" variant="label">
-                {`Management ${departmentLabel}`}
+                {MANAGEMENT_DEPARTMENT_LABELS.plural}
               </AppText>
               <View style={styles.chipRow}>
                 {managementDepartments.map((department) => (
@@ -185,7 +186,7 @@ export function ManagementAccessSheet({
               </View>
               {draft.managementDepartmentIds.length === 0 ? (
                 <AppText tone="danger" variant="meta">
-                  {`Select at least one management ${departmentLabel.toLowerCase()}`}
+                  {`Select at least one ${MANAGEMENT_DEPARTMENT_LABELS.singularLower}`}
                 </AppText>
               ) : null}
             </View>
@@ -219,24 +220,11 @@ export function ManagementAccessSheet({
               tone="danger"
             />
           ) : null}
-          <Button
-            disabled={isPending}
-            label="Cancel"
-            onPress={() => (hasUnsavedChanges ? setShowDiscardConfirmation(true) : close())}
-            tone="neutral"
-          />
+          <Button disabled={isPending} label="Cancel" onPress={guard.requestClose} tone="neutral" />
         </SheetActions>
       </BottomSheetModal>
 
-      <ConfirmationModal
-        body="Your changes to their management access will be lost."
-        confirmLabel="Discard"
-        confirmTone="danger"
-        onCancel={() => setShowDiscardConfirmation(false)}
-        onConfirm={close}
-        title="Discard unsaved changes?"
-        visible={showDiscardConfirmation}
-      />
+      <ConfirmationModal {...guard.confirmationProps} />
 
       <ConfirmationModal
         body="They'll come off the management roster. Their staff profile and schedule stay exactly as they are."
