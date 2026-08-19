@@ -22,7 +22,14 @@ import {
 } from "../lib/app-lock";
 import { useSessionState } from "./AuthSessionProvider";
 
-function useAppLockEnabled(): boolean {
+/**
+ * The app-lock setting, live.
+ *
+ * Exported so the security screen's switch reads the same external store the
+ * lock itself runs on, instead of mirroring the stored value into local state
+ * in an effect where the two can drift apart.
+ */
+export function useAppLockEnabled(): boolean {
   useEffect(() => {
     void loadAppLockEnabled();
   }, []);

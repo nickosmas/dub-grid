@@ -28,6 +28,18 @@ export default function ProfileLayout() {
         })}
       />
       <Stack.Screen
+        name="password"
+        options={createDetailStackOptions(mobileColors, "Change password", { largeTitle: true })}
+      />
+      <Stack.Screen
+        name="two-factor"
+        options={createDetailStackOptions(mobileColors, "Two-factor", { largeTitle: true })}
+      />
+      <Stack.Screen
+        name="sessions"
+        options={createDetailStackOptions(mobileColors, "Devices", { largeTitle: true })}
+      />
+      <Stack.Screen
         name="notifications"
         options={createDetailStackOptions(mobileColors, "Notifications", { largeTitle: true })}
       />

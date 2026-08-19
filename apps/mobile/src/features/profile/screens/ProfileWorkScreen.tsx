@@ -23,6 +23,8 @@ import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
   createProfileChangeRequest,
   getProfile,
@@ -30,6 +32,11 @@ import {
   updateProfileAccount,
   updateProfilePhone,
 } from "../../../shared/lib/api";
+import {
+  getDepartmentNames,
+  getScheduledDepartmentNames,
+  MANAGEMENT_DEPARTMENT_LABELS,
+} from "../../../shared/lib/departments";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { singularLabelNoun } from "../../../shared/lib/labels";
 import { queryClient } from "../../../shared/lib/query-client";
@@ -46,7 +53,6 @@ import {
   ProfileSection,
   ProfileTextInput,
   formatProfileStatus,
-  formatProfileValue,
 } from "../components/ProfilePrimitives";
 import { ProfileSkeleton } from "../components/ProfileSkeleton";
 
@@ -90,14 +96,46 @@ function arrayEqual(left: number[], right: number[]) {
   return left.every((value, index) => value === right[index]);
 }
 
+/**
+ * Whether the draft differs from what is saved.
+ *
+ * Module scope, and used by both the edit panel's buttons and the screen's
+ * unsaved-changes guard. While this lived inside the panel the screen couldn't
+ * see it, so back navigation had no idea there was anything to lose; computing
+ * it twice would be worse still, because then Cancel and the back button could
+ * disagree about whether to ask.
+ *
+ * `requestNote` deliberately doesn't count, matching the Save button: the note
+ * only ever accompanies a change, so on its own there is nothing to send.
+ */
+function profileDraftHasChanges(
+  draft: ProfileDraft,
+  profile: MobileProfileResponse,
+  linkedEmployee: LinkedEmployee | null,
+): boolean {
+  const saved = makeDraft(profile, linkedEmployee);
+
+  return (
+    draft.firstName.trim() !== saved.firstName.trim() ||
+    draft.lastName.trim() !== saved.lastName.trim() ||
+    draft.email.trim().toLowerCase() !== saved.email.trim().toLowerCase() ||
+    (linkedEmployee != null &&
+      (draft.phone.trim() !== saved.phone ||
+        draft.employmentType !== saved.employmentType ||
+        draft.certificationId !== saved.certificationId ||
+        !arrayEqual(draft.focusAreaIds, saved.focusAreaIds) ||
+        !arrayEqual(draft.roleIds, saved.roleIds)))
+  );
+}
+
 export default function ProfileWorkScreen() {
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ProfileDraft | null>(null);
-  const [pendingConfirmation, setPendingConfirmation] = useState<"save" | "discardCancel" | null>(
-    null,
-  );
+  // Only the save confirmation now: the discard half belongs to the guard,
+  // which has to answer to back navigation as well as to the Cancel button.
+  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const profileQuery = useQuery({
     queryKey: ["mobile", "profile", accessToken],
     queryFn: () => getProfile(accessToken!),
@@ -139,6 +177,15 @@ export default function ProfileWorkScreen() {
       .filter((value): value is string => Boolean(value)) ?? [];
   const employmentLabel =
     linkedEmployee?.employmentType === "part_time" ? "Part-time" : "Full-time";
+  const departmentNames = getScheduledDepartmentNames(
+    linkedEmployee?.focusAreaIds ?? [],
+    focusAreas,
+    bootstrapQuery.data?.departments,
+  );
+  const managementDepartmentNames = getDepartmentNames(
+    profile?.managementDepartmentIds ?? [],
+    bootstrapQuery.data?.departments,
+  );
   const certificationName = linkedEmployee
     ? linkedEmployee.certificationId == null
       ? "None"
@@ -274,18 +321,27 @@ export default function ProfileWorkScreen() {
     setEditing(true);
   }
 
-  function cancelEditing() {
-    if (profile) {
-      setDraft(makeDraft(profile, linkedEmployee));
-    }
-    setEditing(false);
-  }
-
   function discardChanges() {
     if (profile) {
       setDraft(makeDraft(profile, linkedEmployee));
     }
   }
+
+  const hasChanges = Boolean(
+    profile && draft && profileDraftHasChanges(draft, profile, linkedEmployee),
+  );
+  // `editing && hasChanges`, not just `editing`: on iOS the whole screen is a
+  // back-swipe target, so a guard that fired for an untouched open panel would
+  // put a confirmation in front of an ordinary swipe back.
+  const guard = useUnsavedChangesGuard({
+    isDirty: editing && hasChanges,
+    disabled: saveMutation.isPending,
+    onDiscard: discardChanges,
+    onClose: () => setEditing(false),
+  });
+  // Header back, Android hardware back and the iOS back swipe ask too, through
+  // this same confirmation rather than a second one of their own.
+  useNavigationDiscardGuard(guard);
 
   return (
     <Screen
@@ -321,22 +377,11 @@ export default function ProfileWorkScreen() {
             <StatusBanner body={PENDING_PROFILE_CHANGE_MESSAGE} title="Request pending" />
           ) : null}
 
-          <ProfileSection title="Organization">
-            <ProfileList>
-              <ProfileInfoRow
-                iconName="business-outline"
-                label="Organization"
-                value={profile.currentOrg.name}
-              />
-              <ProfileInfoRow
-                iconName="compass-outline"
-                isLast
-                label="Organization"
-                value={formatProfileValue(profile.currentOrg.slug)}
-              />
-            </ProfileList>
-          </ProfileSection>
-
+          {/* No organization block here. This page is the account and staff
+              record it can edit; which organization that record lives in is the
+              profile hub's job, and printing it again above the editable fields
+              made the first thing on "Profile details" the one thing on it that
+              isn't a profile detail. */}
           {editing && draft ? (
             <EditPanel
               canEditProfileDirectly={canEditProfileDirectly}
@@ -348,8 +393,8 @@ export default function ProfileWorkScreen() {
               focusAreas={focusAreas}
               hasLinkedEmployee={Boolean(linkedEmployee)}
               isNameRequest={isNameRequest}
-              onCancel={cancelEditing}
-              onCancelWithChanges={() => setPendingConfirmation("discardCancel")}
+              hasChanges={hasChanges}
+              onCancel={guard.requestClose}
               onChange={setDraft}
               onDiscard={discardChanges}
               onSave={() => {
@@ -378,22 +423,8 @@ export default function ProfileWorkScreen() {
                   });
                   return;
                 }
-                setPendingConfirmation("save");
+                setShowSaveConfirmation(true);
               }}
-              originalEmail={profile.user.email ?? ""}
-              originalFirstName={profile.user.firstName ?? ""}
-              originalLastName={profile.user.lastName ?? ""}
-              originalPhone={linkedEmployee?.phone ?? ""}
-              originalWork={
-                linkedEmployee
-                  ? {
-                      employmentType: linkedEmployee.employmentType,
-                      certificationId: linkedEmployee.certificationId,
-                      focusAreaIds: linkedEmployee.focusAreaIds,
-                      roleIds: linkedEmployee.roleIds,
-                    }
-                  : null
-              }
               roleLabel={profile.currentOrg.labels.role}
               roles={roles}
             />
@@ -436,6 +467,15 @@ export default function ProfileWorkScreen() {
                       label="Status"
                       value={formatProfileStatus(linkedEmployee.status)}
                     />
+                    {/* The number web prints beside your name on a staff
+                        profile, and the one an admin will ask you for. */}
+                    {linkedEmployee.employeeNumber != null ? (
+                      <ProfileInfoRow
+                        iconName="card-outline"
+                        label="Employee ID"
+                        value={`#${linkedEmployee.employeeNumber}`}
+                      />
+                    ) : null}
                     <ProfileInfoRow
                       iconName="briefcase-outline"
                       label="Employment"
@@ -446,6 +486,22 @@ export default function ProfileWorkScreen() {
                       label={profile.currentOrg.labels.certification}
                       value={certificationName}
                     />
+                    <ProfileInfoRow
+                      iconName="business-outline"
+                      label={profile.currentOrg.labels.department}
+                      value={departmentNames.length > 0 ? departmentNames.join(", ") : "Not set"}
+                    />
+                    {/* Its own row beside the scheduled one: where you are
+                        scheduled and what you manage are different facts, and
+                        a management-only account has the second without the
+                        first. */}
+                    {managementDepartmentNames.length > 0 ? (
+                      <ProfileInfoRow
+                        iconName="briefcase-outline"
+                        label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+                        value={managementDepartmentNames.join(", ")}
+                      />
+                    ) : null}
                     <ProfileInfoRow
                       iconName="albums-outline"
                       label={profile.currentOrg.labels.focusArea}
@@ -467,6 +523,7 @@ export default function ProfileWorkScreen() {
                         ? "Open the People tab to link your account to a staff profile."
                         : "Ask an admin to link your account to a staff profile."
                     }
+                    compact
                     iconName="person-circle-outline"
                     title="Not linked to a staff profile"
                   />
@@ -492,26 +549,15 @@ export default function ProfileWorkScreen() {
         }
         confirmLabel={isNameRequest ? "Send request" : "Save"}
         loading={saveMutation.isPending}
-        onCancel={() => setPendingConfirmation(null)}
+        onCancel={() => setShowSaveConfirmation(false)}
         onConfirm={() => {
-          setPendingConfirmation(null);
+          setShowSaveConfirmation(false);
           saveMutation.mutate();
         }}
         title={isNameRequest ? "Send name change request?" : "Save these changes?"}
-        visible={pendingConfirmation === "save"}
+        visible={showSaveConfirmation}
       />
-      <ConfirmationModal
-        body="Your edits will be lost."
-        confirmLabel="Discard"
-        confirmTone="danger"
-        onCancel={() => setPendingConfirmation(null)}
-        onConfirm={() => {
-          setPendingConfirmation(null);
-          cancelEditing();
-        }}
-        title="Discard unsaved changes?"
-        visible={pendingConfirmation === "discardCancel"}
-      />
+      <ConfirmationModal {...guard.confirmationProps} />
     </Screen>
   );
 }
@@ -524,18 +570,13 @@ function EditPanel({
   draft,
   focusAreaLabel,
   focusAreas,
+  hasChanges,
   hasLinkedEmployee,
   isNameRequest,
   onCancel,
-  onCancelWithChanges,
   onChange,
   onDiscard,
   onSave,
-  originalEmail,
-  originalFirstName,
-  originalLastName,
-  originalPhone,
-  originalWork,
   roleLabel,
   roles,
 }: {
@@ -546,23 +587,13 @@ function EditPanel({
   draft: ProfileDraft;
   focusAreaLabel: string;
   focusAreas: MobileFocusArea[];
+  hasChanges: boolean;
   hasLinkedEmployee: boolean;
   isNameRequest: boolean;
   onCancel: () => void;
-  onCancelWithChanges: () => void;
   onChange: (draft: ProfileDraft) => void;
   onDiscard: () => void;
   onSave: () => void;
-  originalEmail: string;
-  originalFirstName: string;
-  originalLastName: string;
-  originalPhone: string;
-  originalWork: {
-    employmentType: LinkedEmployee["employmentType"];
-    certificationId: number | null;
-    focusAreaIds: number[];
-    roleIds: number[];
-  } | null;
   roleLabel: string;
   roles: MobileNamedItem[];
 }) {
@@ -582,19 +613,6 @@ function EditPanel({
         : null,
   };
   const hasValidationErrors = Object.values(fieldErrors).some(Boolean);
-
-  const nameChanged =
-    draft.firstName.trim() !== originalFirstName || draft.lastName.trim() !== originalLastName;
-  const emailChanged = draft.email.trim().toLowerCase() !== originalEmail.trim().toLowerCase();
-  const phoneChanged = hasLinkedEmployee && draft.phone.trim() !== originalPhone;
-  const workChanged = Boolean(
-    originalWork &&
-    (draft.employmentType !== originalWork.employmentType ||
-      draft.certificationId !== originalWork.certificationId ||
-      !arrayEqual(draft.focusAreaIds, originalWork.focusAreaIds) ||
-      !arrayEqual(draft.roleIds, originalWork.roleIds)),
-  );
-  const hasChanges = nameChanged || emailChanged || phoneChanged || workChanged;
 
   const setField = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => {
     onChange({ ...draft, [key]: value });
@@ -732,7 +750,7 @@ function EditPanel({
         </>
       ) : null}
 
-      {!canEditProfileDirectly && nameChanged ? (
+      {isNameRequest ? (
         <ProfileSection
           description="You can't change your own name directly. Add an optional note and send the request to your admin for review."
           title="Name change request"
@@ -777,13 +795,7 @@ function EditPanel({
           onPress={onDiscard}
           tone="neutral"
         />
-        <Button
-          compact
-          disabled={disabled}
-          label="Cancel"
-          onPress={hasChanges ? onCancelWithChanges : onCancel}
-          tone="ghost"
-        />
+        <Button compact disabled={disabled} label="Cancel" onPress={onCancel} tone="ghost" />
       </View>
     </>
   );

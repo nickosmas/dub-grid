@@ -162,6 +162,12 @@ export const mobileProfileLinkedEmployeeSchema = mobileLinkedEmployeeSchema
     roleIds: z.array(z.number().int()).default([]),
     contactNotes: z.string().default(""),
     version: z.number().int().nonnegative().default(0),
+    /**
+     * The staff number web prints beside the name on a staff profile. Nullable
+     * rather than defaulted to 0, so a client talking to an older server that
+     * doesn't send it shows nothing instead of claiming employee #0.
+     */
+    employeeNumber: z.number().int().nullable().default(null),
   })
   .nullable();
 
@@ -228,6 +234,14 @@ export const mobileProfileResponseSchema = z.object({
   effectiveRole: mobileRoleSchema,
   linkedEmployee: mobileProfileLinkedEmployeeSchema,
   focusAreas: z.array(mobileFocusAreaSchema),
+  /**
+   * The management departments this account's own membership carries. Non-empty
+   * is exactly what makes someone a management user — the roster query filters
+   * memberships on the same field — so the profile screen reads this rather
+   * than inferring management from an org role, which any staff member can
+   * hold without managing anything.
+   */
+  managementDepartmentIds: z.array(z.number().int()).default([]),
   pendingProfileChangeRequest: z.boolean().default(false),
   pendingAccountDeletionRequest: z.boolean().default(false),
 });

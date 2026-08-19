@@ -13,6 +13,12 @@ const fetchNotificationPreferences = vi.fn();
 const saveNotificationPreferences = vi.fn();
 const fetchUserSessionOverviewForUser = vi.fn();
 const revokeUserSessionForUser = vi.fn();
+const fetchMobileManagementMembershipRowsByUserIds = vi.fn();
+
+vi.mock("@dubgrid/data-access", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@dubgrid/data-access")>()),
+  fetchMobileManagementMembershipRowsByUserIds,
+}));
 
 vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
@@ -89,8 +95,10 @@ describe("mobile profile routes", () => {
       departmentIds: [],
       contactNotes: "",
       version: 4,
+      employeeNumber: 42,
     });
     fetchMobileFocusAreas.mockResolvedValue([{ id: 2, name: "ICU" }]);
+    fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([]);
     listOwnProfileChangeRequests.mockResolvedValue([]);
     mapOrganizationToMobileConfig.mockReturnValue({
       id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
@@ -135,11 +143,46 @@ describe("mobile profile routes", () => {
       },
       linkedEmployee: {
         focusAreaIds: [2],
+        employeeNumber: 42,
       },
       focusAreas: [{ id: 2, name: "ICU" }],
+      managementDepartmentIds: [],
       pendingProfileChangeRequest: false,
       pendingAccountDeletionRequest: false,
     });
+  });
+
+  // The profile screen says whether you are a management user, and the only
+  // thing that decides that is the membership's own department list — an org
+  // role says nothing about it.
+  it("returns the caller's own management departments", async () => {
+    fetchMobileManagementMembershipRowsByUserIds.mockResolvedValue([
+      {
+        user_id: "8af6f242-c060-4920-a7db-91b4cb66fd26",
+        department_ids: [10, 11],
+        dept_admin_ids: [],
+        org_role: "admin",
+        updated_at: null,
+      },
+      {
+        user_id: "00000000-0000-4000-8000-000000000000",
+        department_ids: [12],
+        dept_admin_ids: [],
+        org_role: "admin",
+        updated_at: null,
+      },
+    ]);
+
+    const { GET } = await import("./profile");
+    const response = await GET(new Request("http://localhost/api/mobile/v1/profile") as never);
+    const payload = await response.json();
+
+    expect(fetchMobileManagementMembershipRowsByUserIds).toHaveBeenCalledWith(
+      {},
+      "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+      ["8af6f242-c060-4920-a7db-91b4cb66fd26"],
+    );
+    expect(payload.managementDepartmentIds).toEqual([10, 11]);
   });
 
   it("returns pending profile change request state for the mobile profile", async () => {

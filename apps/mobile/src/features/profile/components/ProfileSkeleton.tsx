@@ -10,9 +10,12 @@ import {
 } from "../../../shared/components/skeleton";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileRadii, mobileSpacing, type MobileColors } from "../../../shared/theme/tokens";
+import type { ProfileHeroAlign } from "./ProfilePrimitives";
 
 /** `avatar` in ProfilePrimitives. */
 const AVATAR_SIZE = 64;
+/** `avatar` + `avatarLarge`, the size a centered hero's avatar takes. */
+const CENTERED_AVATAR_SIZE = 96;
 /** `iconBadge` in ProfilePrimitives. */
 const ICON_BADGE_SIZE = 32;
 
@@ -67,21 +70,29 @@ function ProfileRow({ variant }: { variant: ProfileRowVariant }) {
 
 /** The hero: avatar, name, badge, subtitle and the wrapped meta grid. */
 function ProfileHeroSkeleton({
+  align,
+  chips,
   metaItems,
-  showIdentity,
-  showTitle,
+  subtitle,
 }: {
+  align: ProfileHeroAlign;
+  chips: number;
   metaItems: number;
-  showIdentity: boolean;
-  showTitle: boolean;
+  subtitle: boolean;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isCentered = align === "center";
 
   return (
-    <View style={styles.hero}>
-      {showTitle ? <SkeletonLine variant="screenTitle" width="56%" /> : null}
-      {showIdentity ? (
+    <View style={[styles.hero, isCentered && styles.heroCentered]}>
+      {isCentered ? (
+        <>
+          <SkeletonCircle size={CENTERED_AVATAR_SIZE} />
+          <SkeletonLine variant="screenTitle" width="54%" />
+          {subtitle ? <SkeletonLine variant="body" width="46%" /> : null}
+        </>
+      ) : (
         <View style={styles.heroTop}>
           <SkeletonCircle size={AVATAR_SIZE} />
           <View style={styles.heroCopy}>
@@ -92,11 +103,25 @@ function ProfileHeroSkeleton({
             <SkeletonLine variant="body" width="64%" />
           </View>
         </View>
+      )}
+      {chips > 0 ? (
+        <View style={styles.heroChips}>
+          {skeletonRows(chips, (index) => (
+            <SkeletonPill
+              height={26}
+              key={`profile-chip-${index}`}
+              width={index === 0 ? 104 : 136}
+            />
+          ))}
+        </View>
       ) : null}
       {metaItems > 0 ? (
-        <View style={styles.heroDetail}>
+        <View style={[styles.heroDetail, isCentered && styles.heroDetailCentered]}>
           {skeletonRows(metaItems, (index) => (
-            <View key={`profile-meta-${index}`} style={styles.heroMetaItem}>
+            <View
+              key={`profile-meta-${index}`}
+              style={[styles.heroMetaItem, isCentered && styles.heroMetaItemCentered]}
+            >
               <SkeletonLine variant="caption" width="56%" />
               <SkeletonLine variant="rowTitle" width="78%" />
             </View>
@@ -111,39 +136,33 @@ function ProfileHeroSkeleton({
  * The placeholder every profile-shaped screen uses: the user's own profile,
  * a teammate's detail page, and the three profile settings screens.
  *
- * Built from the same vocabulary as `ProfilePrimitives` — a 64pt avatar hero,
- * a wrapped meta grid, then framed 16-radius lists of 66pt rows — because that
- * is what actually replaces it. The generic detail skeleton it supersedes drew
- * none of the frames and sized the avatar as a 56×64 rectangle.
+ * Built from the same vocabulary as `ProfilePrimitives` — a 64pt avatar hero
+ * (96pt where the real one is centered), a wrapped meta grid, then framed
+ * 16-radius lists of 66pt rows — because that is what actually replaces it. The
+ * generic detail skeleton it supersedes drew none of the frames and sized the
+ * avatar as a 56×64 rectangle.
  */
 export function ProfileSkeleton({
   sections = 3,
   rowsPerSection = 3,
   metaItems = 4,
+  heroAlign = "row",
+  heroChips = 0,
+  heroSubtitle = false,
   showHero = true,
-  showHeroIdentity = true,
-  showTitle = false,
   showQuickActions = false,
   rowVariant = "info",
 }: {
   sections?: number;
   rowsPerSection?: number;
   metaItems?: number;
+  /** Match the screen's own `ProfileHero`, or the silhouette shifts on load. */
+  heroAlign?: ProfileHeroAlign;
+  /** Chips the hero prints under the name, drawn as a centered pill row. */
+  heroChips?: number;
+  /** On where the centered hero carries a subtitle under the name. */
+  heroSubtitle?: boolean;
   showHero?: boolean;
-  /**
-   * Off for a screen whose `ProfileHero` is the meta grid alone — the person
-   * detail page passes no `initials`, `title` or `badge`, so drawing an avatar
-   * and a name here would promise a block that never arrives.
-   */
-  showHeroIdentity?: boolean;
-  /**
-   * Stands in for a native header title that is itself data.
-   *
-   * The platform's title is a string on the navigation item, not a view, so a
-   * placeholder cannot be drawn in the bar — the page draws it instead, and the
-   * screen leaves the real title empty until the name resolves.
-   */
-  showTitle?: boolean;
   showQuickActions?: boolean;
   rowVariant?: ProfileRowVariant;
 }) {
@@ -154,13 +173,14 @@ export function ProfileSkeleton({
     <SkeletonGroup style={styles.page}>
       {showHero ? (
         <ProfileHeroSkeleton
+          align={heroAlign}
+          chips={heroChips}
           metaItems={metaItems}
-          showIdentity={showHeroIdentity}
-          showTitle={showTitle}
+          subtitle={heroSubtitle}
         />
       ) : null}
       {showQuickActions ? (
-        <View style={styles.quickActions}>
+        <View style={[styles.quickActions, heroAlign === "center" && styles.quickActionsCentered]}>
           <SkeletonPill height={36} width={112} />
           <SkeletonPill height={36} width={96} />
           <SkeletonPill height={36} width={88} />
@@ -194,6 +214,16 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 14,
       paddingTop: 4,
     },
+    heroCentered: {
+      alignItems: "center",
+      paddingTop: 8,
+    },
+    heroChips: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      justifyContent: "center",
+    },
     heroTop: {
       alignItems: "center",
       flexDirection: "row",
@@ -211,20 +241,30 @@ const createStyles = (mobileColors: MobileColors) =>
       minWidth: 0,
     },
     heroDetail: {
+      alignSelf: "stretch",
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 10,
+    },
+    heroDetailCentered: {
+      justifyContent: "center",
     },
     heroMetaItem: {
       flex: 1,
       gap: 3,
       minWidth: 120,
     },
+    heroMetaItemCentered: {
+      alignItems: "center",
+    },
     quickActions: {
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 10,
       paddingBottom: 16,
+    },
+    quickActionsCentered: {
+      justifyContent: "center",
     },
     section: {
       gap: 10,

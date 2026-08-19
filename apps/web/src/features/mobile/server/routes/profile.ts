@@ -17,6 +17,7 @@ import {
   updateSelfMfaStatus,
   recordCurrentTermsAcceptance,
 } from "@/features/account/server";
+import { fetchMobileManagementMembershipRowsByUserIds } from "@dubgrid/data-access";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import {
   fetchLinkedEmployeeForUser,
@@ -50,16 +51,24 @@ async function buildMobileProfilePayload(auth: Awaited<ReturnType<typeof require
     return auth;
   }
 
-  const [profile, linkedEmployee, focusAreas, changeRequests] = await Promise.all([
-    fetchSelfProfileSnapshot(auth.user.id),
-    fetchLinkedEmployeeForUser(auth.serviceClient, auth.currentOrg.id, auth.user.id),
-    fetchMobileFocusAreas(auth.serviceClient, auth.currentOrg.id),
-    listOwnProfileChangeRequests({
-      serviceClient: auth.serviceClient,
-      userId: auth.user.id,
-      orgId: auth.currentOrg.id,
-    }),
-  ]);
+  const [profile, linkedEmployee, focusAreas, changeRequests, managementMemberships] =
+    await Promise.all([
+      fetchSelfProfileSnapshot(auth.user.id),
+      fetchLinkedEmployeeForUser(auth.serviceClient, auth.currentOrg.id, auth.user.id),
+      fetchMobileFocusAreas(auth.serviceClient, auth.currentOrg.id),
+      listOwnProfileChangeRequests({
+        serviceClient: auth.serviceClient,
+        userId: auth.user.id,
+        orgId: auth.currentOrg.id,
+      }),
+      // The membership row this account's management access lives on. The
+      // auth context already reads the same table for the org role, but it
+      // keeps only the role and the admin permissions, and management
+      // departments are neither.
+      fetchMobileManagementMembershipRowsByUserIds(auth.serviceClient, auth.currentOrg.id, [
+        auth.user.id,
+      ]),
+    ]);
   const metadataName = readUserMetadataName(auth.user.user_metadata);
   const firstName = profile?.firstName ?? metadataName.firstName;
   const lastName = profile?.lastName ?? metadataName.lastName;
@@ -99,9 +108,12 @@ async function buildMobileProfilePayload(auth: Awaited<ReturnType<typeof require
           departmentIds: linkedEmployee.departmentIds,
           contactNotes: linkedEmployee.contactNotes,
           version: linkedEmployee.version,
+          employeeNumber: linkedEmployee.employeeNumber,
         }
       : null,
     focusAreas,
+    managementDepartmentIds:
+      managementMemberships.find((row) => row.user_id === auth.user.id)?.department_ids ?? [],
     pendingProfileChangeRequest: changeRequests.some(
       (request) => request.type === "profile_update" && request.status === "pending",
     ),

@@ -55,8 +55,12 @@ export default function ProfilePrivacyScreen() {
 
   return (
     <Screen bottomPaddingMode="tabbed">
+      {/* "Analytics", not "Cookies & analytics": that title came over from the
+          web consent banner, and a native app sets no cookies. `analytics` is
+          the only user-controlled flag here (see consent.ts). The cookie policy
+          still has a home below, under Policies, because it documents the site. */}
       <ProfileSection
-        title="Cookies & analytics"
+        title="Analytics"
         description="Essential data keeps DubGrid working, including error monitoring, and can't be turned off. Analytics is optional and helps us improve the app."
       >
         <ProfilePanel>

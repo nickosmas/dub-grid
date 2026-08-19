@@ -3,13 +3,16 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import type { MobileProfileChangeRequest } from "@dubgrid/contracts";
 import { getOrgRoleLabel } from "@dubgrid/domain";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { AppText } from "../../../shared/components/AppText";
 import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
+import { SelectionCheck } from "../../../shared/components/SelectionCheck";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
@@ -29,25 +32,36 @@ import { getQueryErrorMessage } from "../../../shared/lib/query-state";
 import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { saveLastOrg } from "../../../shared/lib/session";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
-import { mobileText, mobileTextWeighted, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileMotion,
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
+import { useMotionPreference } from "../../../shared/motion/useMotionPreference";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { queryClient } from "../../../shared/lib/query-client";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
-import { getMobileOrgRoleBadge } from "../../people/lib/orgRoleBadges";
+import {
+  getDepartmentNames,
+  getScheduledDepartmentNames,
+  MANAGEMENT_DEPARTMENT_LABELS,
+} from "../../../shared/lib/departments";
+import { getMobileOrgRoleHeroBadge } from "../../people/lib/orgRoleBadges";
 import {
   getProfileInitials,
   ProfileHero,
-  ProfileHeroMeta,
+  ProfileIcon,
   ProfileInfoRow,
   ProfileList,
   ProfileNavRow,
   ProfileSection,
-  formatProfileStatus,
   formatProfileValue,
-  useProfilePrimitiveStyles,
 } from "../components/ProfilePrimitives";
 import { PendingRequestsCard } from "../components/PendingRequestsCard";
 import { AppearanceSheet, getThemePreferenceLabel } from "../components/AppearanceSheet";
@@ -69,6 +83,9 @@ type ProfileConfirmation =
   | { kind: "logout"; force?: boolean }
   | { kind: "switch-org"; force?: undefined; membership: OrganizationMembershipOption };
 
+/** How far the selected organization row is lifted off the group's edges. */
+const ORG_OPTION_INSET = 6;
+
 function formatDate(value: string | null): string {
   if (!value) {
     return "Not available";
@@ -84,14 +101,13 @@ function formatDate(value: string | null): string {
 export default function ProfileScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const profilePrimitiveStyles = useProfilePrimitiveStyles();
   const { preference, resolvedTheme } = useThemeMode();
   const accessToken = useAccessToken();
   const { pushToast } = useToast();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isSwitchModalVisible, setIsSwitchModalVisible] = useState(false);
-  const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null);
+  const [switchingOrg, setSwitchingOrg] = useState<OrganizationMembershipOption | null>(null);
   const [pendingConfirmation, setPendingConfirmation] = useState<ProfileConfirmation | null>(null);
   const [isAppearanceSheetVisible, setIsAppearanceSheetVisible] = useState(false);
   const profileQuery = useQuery({
@@ -133,25 +149,38 @@ export default function ProfileScreen() {
   });
   const profile = profileQuery.data ?? null;
   const contentState = useMobileContentState({
-    hasData: Boolean(profile),
-    isLoading: profileQuery.isLoading,
-    error: profileQuery.error,
+    // Bootstrap sits in all three halves now that the management section reads
+    // department names from it. Gating on the profile alone would paint that
+    // section with its departments still unresolved, and leaving bootstrap out
+    // of `hasData` while naming it in `isLoading` would land the screen on the
+    // "Profile unavailable" card the moment bootstrap outlives the profile.
+    hasData: Boolean(profile) && bootstrapQuery.data !== undefined,
+    isLoading: profileQuery.isLoading || bootstrapQuery.isLoading,
+    error: profileQuery.error ?? bootstrapQuery.error,
   });
   const displayName =
     [profile?.user.firstName, profile?.user.lastName].filter(Boolean).join(" ").trim() ||
     profile?.user.email ||
     "DubGrid user";
-  const focusAreaNames =
-    profile?.linkedEmployee?.focusAreaIds
-      .map((id) => profile.focusAreas.find((focusArea) => focusArea.id === id)?.name)
-      .filter((value): value is string => Boolean(value)) ?? [];
   const memberships = bootstrapQuery.data?.memberships ?? [];
   const canSwitchOrganizations = memberships.length > 1;
-  const orgRoleBadge = getMobileOrgRoleBadge(mobileColors, profile?.effectiveRole);
-  const roleLabel = orgRoleBadge?.label ?? getOrgRoleLabel(profile?.effectiveRole);
+  // The hero's own badge, shared with both person pages: `ProfileHero` draws
+  // the pill, so all this decides is the label and the tone.
+  const orgRoleBadge = getMobileOrgRoleHeroBadge(profile?.effectiveRole);
   const avatarSeed = profile?.linkedEmployee?.id ?? profile?.user.id ?? "";
   const avatarTone = avatarSeed ? getAvatarTone(avatarSeed, resolvedTheme === "dark") : null;
-  const staffStatusLabel = formatProfileStatus(profile?.linkedEmployee?.status);
+  const departmentLabel = profile?.currentOrg.labels.department ?? "Departments";
+  // A management user is someone whose membership carries departments — an org
+  // role doesn't make one, and plenty of admins manage nothing.
+  const managementDepartmentNames = getDepartmentNames(
+    profile?.managementDepartmentIds ?? [],
+    bootstrapQuery.data?.departments,
+  );
+  const scheduledDepartmentNames = getScheduledDepartmentNames(
+    profile?.linkedEmployee?.focusAreaIds ?? [],
+    bootstrapQuery.data?.focusAreas ?? profile?.focusAreas,
+    bootstrapQuery.data?.departments,
+  );
 
   async function handleLogout() {
     setIsSigningOut(true);
@@ -187,11 +216,14 @@ export default function ProfileScreen() {
   }
 
   async function handleSwitchOrganization(input: OrganizationMembershipOption) {
-    if (input.isCurrent || switchingOrgId) {
+    if (input.isCurrent || switchingOrg) {
       return;
     }
 
-    setSwitchingOrgId(input.id);
+    // The whole membership, not just its id: the overlay below names the org
+    // being switched to, and `memberships` is about to be thrown away with the
+    // rest of the previous org's cached data.
+    setSwitchingOrg(input);
 
     try {
       const supabase = getSupabaseClient();
@@ -219,16 +251,35 @@ export default function ProfileScreen() {
         return;
       }
 
-      await saveLastOrg({ slug: input.slug, name: input.name });
-
       // Drop the previous org's data outright rather than marking it stale —
       // `invalidateQueries` keeps rendering the old rows until each refetch
       // lands, which flashes another tenant's people and schedule. Web resets
       // just as hard (clear + hard navigation) for the same reason. Resetting
       // to Home also re-derives tab visibility from the new bootstrap instead
       // of leaving the old org's tabs on screen.
+      //
+      // This runs the instant the session moves, before anything that can fail.
+      // `saveLastOrg` used to sit above it, so a rejected SecureStore write
+      // threw past BOTH the reset and the navigation, leaving the new org's
+      // token pointed at the previous org's fully populated cache — the exact
+      // state the reset exists to prevent.
+      // `replace` only rewrites the active navigator, so a person or shift
+      // detail route pushed under the old org survives in its own tab's
+      // history. That is deliberate rather than overlooked: every mobile read
+      // is scoped server-side to the token's org (`auth.currentOrg.id`), and
+      // every query key carries the access token, so such a route refetches
+      // under the new session and 404s. It fails closed and shows a "not
+      // found" state; it cannot render the previous org's row.
       queryClient.clear();
       router.replace("/(tabs)/home");
+
+      // Last, and deliberately not awaited into the critical path: remembering
+      // the org for the next launch is a convenience, and it must never be able
+      // to hold up (or cancel) the teardown above. It still needs its own
+      // catch — `setStoredValue` does not swallow SecureStore failures, and an
+      // unhandled rejection is a red box in dev over a write nobody is waiting
+      // on. Worst case the next launch offers the previous org's slug.
+      saveLastOrg({ slug: input.slug, name: input.name }).catch(() => {});
     } catch (error) {
       pushClientFriendlyErrorToast(pushToast, {
         error,
@@ -236,7 +287,9 @@ export default function ProfileScreen() {
         title: "Could not switch organization",
       });
     } finally {
-      setSwitchingOrgId(null);
+      // Cleared on success too, in the same commit as the navigation away: a
+      // latched overlay would still be up if the user came back to this tab.
+      setSwitchingOrg(null);
     }
   }
 
@@ -275,12 +328,27 @@ export default function ProfileScreen() {
       bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
+      // Passed only while a switch is in flight: `renderOverlay` costs the
+      // screen its native scroll root, which is what drives the iOS large
+      // title, so this screen must not hold one open the rest of the time.
+      renderOverlay={
+        switchingOrg
+          ? () => <OrganizationSwitchOverlay name={switchingOrg.name ?? "your organization"} />
+          : undefined
+      }
     >
       {contentState.kind === "loading" ? (
         // Nothing at all for a blip: a skeleton that appears and vanishes
         // inside a few frames reads as a glitch, not as loading.
         contentState.showSkeleton ? (
-          <ProfileSkeleton rowsPerSection={3} sections={3} />
+          <ProfileSkeleton
+            heroAlign="center"
+            heroChips={1}
+            heroSubtitle
+            metaItems={0}
+            rowsPerSection={3}
+            sections={3}
+          />
         ) : null
       ) : contentState.kind === "error" ? (
         <>
@@ -320,7 +388,12 @@ export default function ProfileScreen() {
         />
       ) : (
         <>
+          {/* Centered, the same way both person pages are: this page's subject is
+              a person, and a left-aligned 64pt avatar reads as a settings row
+              rather than as the heading it is. The route keeps its large
+              "Profile" title, which names the tab, not the person. */}
           <ProfileHero
+            align="center"
             avatarStyle={
               avatarTone
                 ? {
@@ -331,19 +404,21 @@ export default function ProfileScreen() {
                 : undefined
             }
             avatarTextStyle={avatarTone ? { color: avatarTone.textColor } : undefined}
-            badge={roleLabel}
-            badgeTone={orgRoleBadge?.tone}
+            badge={orgRoleBadge.label}
+            badgeTone={orgRoleBadge.tone}
             initials={getProfileInitials(displayName)}
             title={displayName}
             subtitle={profile.user.email || "No email on file"}
             style={{ paddingBottom: 16 }}
           >
-            <ProfileHeroMeta label="Organization" value={profile.currentOrg.name} />
-            <ProfileHeroMeta
-              label="Phone"
-              value={formatProfileValue(profile.linkedEmployee?.phone)}
-            />
-            <ProfileHeroMeta label="Date joined" value={formatDate(profile.user.createdAt)} />
+            {/* One quiet line, where a three-cell grid used to sit. The
+                organization moved down to the section named after it and the
+                phone number lives on "Profile details", so the grid was mostly
+                restating things the page says better further down — and a
+                stat strip is the wrong weight for a heading anyway. */}
+            <AppText align="center" tone="subtle" variant="meta">
+              {`Joined ${formatDate(profile.user.createdAt)}`}
+            </AppText>
           </ProfileHero>
 
           <PendingRequestsCard
@@ -356,45 +431,60 @@ export default function ProfileScreen() {
             onCancel={(request) => cancelChangeRequestMutation.mutate(request)}
           />
 
-          <ProfileSection title="Organization details">
+          {/* Where you are, and nothing more: the staff status and focus areas
+              that used to sit here are the "Profile details" page's own "Staff
+              profile" section. The hub says where you are; the detail pages
+              hold the detail. The name is a row again now that the hero's meta
+              grid is gone — "Switch organization" below carries it too, but
+              only for the people who have somewhere to switch to. */}
+          <ProfileSection title="Organization">
             <ProfileList>
               <ProfileInfoRow
                 iconName="business-outline"
-                label="Organization"
+                label="Name"
                 value={profile.currentOrg.name}
               />
               <ProfileInfoRow
                 iconName="compass-outline"
-                label="Organization"
+                isLast
+                label="Subdomain"
                 value={formatProfileValue(profile.currentOrg.slug)}
               />
-              <ProfileInfoRow iconName="shield-checkmark-outline" label="Role" value={roleLabel} />
-              {profile.linkedEmployee ? (
-                <>
-                  <ProfileInfoRow
-                    iconName="person-circle-outline"
-                    label="Staff status"
-                    value={staffStatusLabel}
-                  />
-                  <ProfileInfoRow
-                    iconName="albums-outline"
-                    isLast
-                    label={profile.currentOrg.labels.focusArea}
-                    value={focusAreaNames.length > 0 ? focusAreaNames.join(", ") : "Not set"}
-                  />
-                </>
-              ) : (
-                <ProfileInfoRow
-                  iconName="person-remove-outline"
-                  isLast
-                  label="Staff profile"
-                  value="Not linked"
-                />
-              )}
             </ProfileList>
           </ProfileSection>
 
-          <ProfileSection title="Details">
+          {/* Where you sit in the org, which is the hub's own subject — the
+              staff detail it used to be tangled with stays on "Profile
+              details". Both kinds get a row: where you are scheduled and what
+              you manage are different facts, and plenty of people have one
+              without the other. */}
+          {scheduledDepartmentNames.length > 0 || managementDepartmentNames.length > 0 ? (
+            <ProfileSection title="Departments">
+              <ProfileList>
+                {scheduledDepartmentNames.length > 0 ? (
+                  <ProfileInfoRow
+                    iconName="business-outline"
+                    isLast={managementDepartmentNames.length === 0}
+                    label={departmentLabel}
+                    value={scheduledDepartmentNames.join(", ")}
+                  />
+                ) : null}
+                {managementDepartmentNames.length > 0 ? (
+                  <ProfileInfoRow
+                    iconName="briefcase-outline"
+                    isLast
+                    label={MANAGEMENT_DEPARTMENT_LABELS.plural}
+                    value={managementDepartmentNames.join(", ")}
+                  />
+                ) : null}
+              </ProfileList>
+            </ProfileSection>
+          ) : null}
+
+          {/* "Settings", not "Details": the first row in this list is itself
+              called "Profile details", so that heading read as a section about
+              one of its own rows. */}
+          <ProfileSection title="Settings">
             <ProfileList>
               <ProfileNavRow
                 iconName="id-card-outline"
@@ -418,11 +508,24 @@ export default function ProfileScreen() {
               />
               <ProfileNavRow
                 iconName="color-palette-outline"
-                isLast
+                isLast={!canSwitchOrganizations}
                 label="Appearance"
                 value={getThemePreferenceLabel(preference)}
                 onPress={() => setIsAppearanceSheetVisible(true)}
               />
+              {/* A row, not a button beside Sign Out: switching organizations
+                  opens a picker, exactly like Appearance does, and pairing it
+                  with the one genuinely destructive action made the two read as
+                  equals. */}
+              {canSwitchOrganizations ? (
+                <ProfileNavRow
+                  iconName="swap-horizontal-outline"
+                  isLast
+                  label="Switch organization"
+                  value={profile.currentOrg.name}
+                  onPress={() => setIsSwitchModalVisible(true)}
+                />
+              ) : null}
             </ProfileList>
           </ProfileSection>
 
@@ -432,26 +535,21 @@ export default function ProfileScreen() {
               title="Could not sign out"
             />
           ) : null}
-          <ProfileSection title="Account actions">
-            <View style={profilePrimitiveStyles.actionsStack}>
-              <Button
-                disabled={isSigningOut}
-                label={isSigningOut ? "Signing Out..." : "Sign Out"}
-                onPress={() => {
-                  setPendingConfirmation({ kind: "logout" });
-                }}
-                tone="danger"
-              />
-              {canSwitchOrganizations ? (
-                <Button
-                  label="Switch organization"
-                  onPress={() => {
-                    setIsSwitchModalVisible(true);
-                  }}
-                  tone="secondary"
-                />
-              ) : null}
-            </View>
+          {/* Untitled: the button says "Sign Out", so a heading over it can only
+              restate it more vaguely. Set apart from the settings list above it
+              by more than the shared section gap, the same way the person
+              page sets its action stack off from the sections above it: at the
+              standard 20 the one destructive action on the screen reads as the
+              last row of that list, close enough to be hit on the way past. */}
+          <ProfileSection style={styles.signOutSection}>
+            <Button
+              disabled={isSigningOut}
+              label={isSigningOut ? "Signing Out..." : "Sign Out"}
+              onPress={() => {
+                setPendingConfirmation({ kind: "logout" });
+              }}
+              tone="danger"
+            />
           </ProfileSection>
 
           <BottomSheetModal
@@ -464,9 +562,15 @@ export default function ProfileScreen() {
               {memberships.map((membership, index) => (
                 <OrganizationOptionRow
                   key={membership.id}
-                  isLast={index === memberships.length - 1}
                   membership={membership}
-                  switching={switchingOrgId === membership.id}
+                  // No rule against the selected row on either side: it lifts
+                  // off the group as its own card, and a hairline running into
+                  // its rounded edge would undo exactly that.
+                  showDivider={
+                    index < memberships.length - 1 &&
+                    !membership.isCurrent &&
+                    !memberships[index + 1]?.isCurrent
+                  }
                   onPress={() => setPendingConfirmation({ kind: "switch-org", membership })}
                 />
               ))}
@@ -492,10 +596,41 @@ export default function ProfileScreen() {
   );
 }
 
+/**
+ * The switch itself is two network round trips (the RPC, then the session
+ * refresh) with a cache wipe and a tab reset behind them, and the picker that
+ * raised it is already closed by the time any of that starts — see
+ * `confirmProfileAction`. Without this the screen simply sat there showing the
+ * org being left, then jumped to Home.
+ *
+ * Opaque and touch-blocking on purpose: everything underneath still belongs to
+ * the previous organization, so it must neither show through nor be pressable
+ * while the session it was fetched under is being replaced.
+ */
+function OrganizationSwitchOverlay({ name }: { name: string }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { d } = useMotionPreference();
+
+  return (
+    <Animated.View
+      accessibilityLabel={`Switching to ${name}`}
+      accessible
+      entering={FadeIn.duration(d(mobileMotion.duration.fast))}
+      style={styles.switchOverlay}
+    >
+      <ActivityIndicator color={mobileColors.brand} size="large" />
+      <AppText align="center" variant="cardTitle">{`Switching to ${name}`}</AppText>
+      <AppText align="center" tone="muted" variant="body">
+        We're loading everything for this organization.
+      </AppText>
+    </Animated.View>
+  );
+}
+
 function OrganizationOptionRow({
   membership,
-  switching,
-  isLast,
+  showDivider,
   onPress,
 }: {
   membership: {
@@ -505,80 +640,115 @@ function OrganizationOptionRow({
     name?: string;
     orgRole?: string | null;
   };
-  switching: boolean;
-  isLast: boolean;
+  showDivider: boolean;
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const disabled = membership.isCurrent || switching;
-  const statusLabel = membership.isCurrent
-    ? "Selected"
-    : switching
-      ? "Switching..."
-      : "Tap to switch";
+  const name = membership.name ?? "Organization";
+  // The role label the rest of the app uses, not the raw `admin`/`user` enum,
+  // and the app's own separator rather than a hyphen — which was ambiguous
+  // against slugs that are themselves hyphenated ("dubgrid-health - admin").
+  const meta = [membership.slug ?? "organization", getOrgRoleLabel(membership.orgRole)]
+    .filter(Boolean)
+    .join(" · ");
 
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{
-        disabled,
-        selected: membership.isCurrent,
-        busy: switching,
-      }}
-      android_ripple={{ color: mobileColors.rippleNeutral }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.orgOptionRow,
-        !isLast && styles.orgOptionDivider,
-        membership.isCurrent && styles.orgOptionCurrent,
-        pressed && !disabled && styles.orgOptionPressed,
-      ]}
-    >
-      <View style={styles.orgOptionIcon}>
-        <Ionicons
-          color={membership.isCurrent ? mobileColors.brand : mobileColors.textSecondary}
-          name={membership.isCurrent ? "checkmark" : "business-outline"}
-          size={18}
-        />
-      </View>
+  const body = (
+    <>
+      {/* Every row keeps the building glyph and the selected one tints its
+          tile brand, so the icon column stays scannable. Swapping the glyph
+          itself for a bare checkmark left the current row as the only one
+          without an organization icon. */}
+      <ProfileIcon name="business-outline" tone={membership.isCurrent ? "brand" : undefined} />
       <View style={styles.orgOptionCopy}>
-        <Text style={styles.orgOptionName}>{membership.name ?? "Organization"}</Text>
-        <Text style={styles.orgOptionMeta}>
-          {membership.slug ?? "organization"} - {membership.orgRole ?? "user"}
+        <Text
+          numberOfLines={1}
+          style={[styles.orgOptionName, membership.isCurrent && styles.orgOptionNameCurrent]}
+        >
+          {name}
+        </Text>
+        <Text numberOfLines={1} style={styles.orgOptionMeta}>
+          {meta}
         </Text>
       </View>
-      <Text style={styles.orgOptionStatus}>{statusLabel}</Text>
-    </Pressable>
+      {/* The row's own accessibilityLabel already says "current organization",
+          so the mark is decorative here. */}
+      {membership.isCurrent ? <SelectionCheck /> : null}
+    </>
+  );
+
+  // The current organization is a status, not an option: rendering it as a
+  // disabled row would fade the one row that should read strongest, and
+  // rendering it pressable would fire a selection haptic for a press that
+  // can't do anything.
+  if (membership.isCurrent) {
+    return (
+      <View style={styles.orgOptionSlot}>
+        <View
+          accessibilityLabel={`${name}, current organization`}
+          style={[styles.orgOptionRow, styles.orgOptionCurrent]}
+        >
+          {body}
+        </View>
+      </View>
+    );
+  }
+
+  // Two boxes on purpose. The outer slot is full-bleed and owns the divider, so
+  // the list keeps its flush grouped look. The inner box is the inset, rounded,
+  // `overflow: hidden` surface — which is what gives the press highlight and the
+  // Android ripple the same rounded shape the selected row has, instead of a
+  // square band spanning the whole group.
+  return (
+    <View style={[styles.orgOptionSlot, showDivider && styles.orgOptionDivider]}>
+      <PressableRow accessibilityLabel={name} style={styles.orgOptionRow} onPress={onPress}>
+        {body}
+      </PressableRow>
+    </View>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
+    /**
+     * The full-bleed box a row occupies. Carries the divider and nothing else,
+     * so the list reads as one flush group.
+     */
+    orgOptionSlot: {},
+    /**
+     * The row's own surface, inset inside its slot and fully rounded. Every row
+     * has this shape; on an unselected row it is simply transparent until
+     * something paints it, which is what makes the press highlight and the
+     * Android ripple round rather than a square band across the group.
+     *
+     * `overflow: hidden` is what clips the ripple to the radius on Android —
+     * without it the ripple ignores `borderRadius` entirely.
+     */
     orgOptionRow: {
       alignItems: "center",
+      borderRadius: mobileRadii.control,
       flexDirection: "row",
       gap: 12,
+      margin: ORG_OPTION_INSET,
       minHeight: 70,
-      paddingHorizontal: 16,
+      overflow: "hidden",
+      // The inset is taken back out of the horizontal padding so the icon and
+      // the text stay on the same vertical lines the flush rows used, rather
+      // than being shunted inward by the margin.
+      paddingHorizontal: 16 - ORG_OPTION_INSET,
       paddingVertical: 12,
     },
     orgOptionCurrent: {
-      backgroundColor: mobileColors.surfaceSecondary,
-    },
-    orgOptionPressed: {
-      backgroundColor: mobileColors.navActiveBg,
+      // A control fill, not `surfaceSecondary`: these rows sit on `surface`
+      // inside the sheet, where that token is all but invisible — the selected
+      // row was carrying its selection almost entirely in the word "Selected".
+      // Paired with the shared inset shape above, this is the one row that
+      // reads as its own item rather than a band spanning the group.
+      backgroundColor: mobileColors.controlSecondaryBg,
     },
     orgOptionDivider: {
       borderBottomColor: mobileColors.borderSubtle,
       borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    orgOptionIcon: {
-      alignItems: "center",
-      height: 32,
-      justifyContent: "center",
-      width: 32,
     },
     orgOptionCopy: {
       flex: 1,
@@ -589,12 +759,28 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileTextWeighted("cardTitle", "medium"),
       color: mobileColors.textPrimary,
     },
+    orgOptionNameCurrent: {
+      ...mobileTextWeighted("cardTitle", "semibold"),
+    },
     orgOptionMeta: {
       ...mobileText.body,
       color: mobileColors.textMuted,
     },
-    orgOptionStatus: {
-      ...mobileTextWeighted("caption", "medium"),
-      color: mobileColors.textSubtle,
+    signOutSection: {
+      // Twice the 12 the person page's `actionStack` opens above its buttons,
+      // on top of the 20 the screen already puts between sections. Sign Out
+      // ends the screen rather than sitting among sibling actions, so it takes
+      // the wider break.
+      paddingTop: mobileSpace["2xl"],
+    },
+    switchOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: mobileSpace.md,
+      paddingHorizontal: mobileSpace.xl,
+      // `background`, not `surface`: this stands in for the whole page, and it
+      // has to be opaque or the org being left reads through it.
+      backgroundColor: mobileColors.background,
     },
   });
