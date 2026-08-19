@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Tabs } from "expo-router";
-import { useMemo, type ComponentProps, type ComponentType, type ReactNode } from "react";
+import { useMemo, type ComponentProps, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { useMotionPreference } from "../motion/useMotionPreference";
@@ -24,47 +24,68 @@ const TAB_BAR_INSET_BEYOND_CONTENT = mobileSpace.sm;
 type TabBarRenderer = NonNullable<ComponentProps<typeof Tabs>["tabBar"]>;
 type BottomTabBarProps = Parameters<TabBarRenderer>[0];
 
-type IconFamily = ComponentType<{
-  name: string;
-  size?: number;
-  color?: string;
-}>;
+/** Icon size inside the selected-tab pill. */
+const TAB_ICON_SIZE = 22;
 
-const TAB_CONFIG: Record<
-  string,
-  { label: string; family: IconFamily; outline: string; filled: string }
-> = {
+/**
+ * Discriminated by family so each glyph name is checked against that family's
+ * own glyph union. Casting the components to a shared `{ name: string }` shape
+ * instead widens the name to `string`, and a misspelled glyph then compiles
+ * clean and renders an empty pill.
+ */
+type TabIcon =
+  | {
+      family: "ionicons";
+      outline: ComponentProps<typeof Ionicons>["name"];
+      filled: ComponentProps<typeof Ionicons>["name"];
+    }
+  | {
+      family: "material-community";
+      outline: ComponentProps<typeof MaterialCommunityIcons>["name"];
+      filled: ComponentProps<typeof MaterialCommunityIcons>["name"];
+    };
+
+const TAB_CONFIG: Record<string, { label: string; icon: TabIcon }> = {
   home: {
     label: "Home",
-    family: MaterialCommunityIcons as unknown as IconFamily,
-    outline: "home-outline",
-    filled: "home",
+    icon: { family: "material-community", outline: "home-outline", filled: "home" },
   },
   team: {
     label: "Schedule",
-    family: Ionicons as unknown as IconFamily,
-    outline: "calendar-outline",
-    filled: "calendar",
+    icon: { family: "ionicons", outline: "calendar-outline", filled: "calendar" },
   },
   requests: {
     label: "Requests",
-    family: Ionicons as unknown as IconFamily,
-    outline: "swap-horizontal-outline",
-    filled: "swap-horizontal",
+    icon: { family: "ionicons", outline: "swap-horizontal-outline", filled: "swap-horizontal" },
   },
   people: {
     label: "People",
-    family: Ionicons as unknown as IconFamily,
-    outline: "people-outline",
-    filled: "people",
+    icon: { family: "ionicons", outline: "people-outline", filled: "people" },
   },
   profile: {
     label: "Profile",
-    family: Ionicons as unknown as IconFamily,
-    outline: "person-circle-outline",
-    filled: "person-circle",
+    icon: { family: "ionicons", outline: "person-circle-outline", filled: "person-circle" },
   },
 };
+
+/**
+ * Narrows on `family` before reading the glyph name, so each branch hands its
+ * component a name from that component's own union.
+ */
+function TabGlyph({ icon, focused, color }: { icon: TabIcon; focused: boolean; color: string }) {
+  if (icon.family === "ionicons") {
+    return (
+      <Ionicons name={focused ? icon.filled : icon.outline} size={TAB_ICON_SIZE} color={color} />
+    );
+  }
+  return (
+    <MaterialCommunityIcons
+      name={focused ? icon.filled : icon.outline}
+      size={TAB_ICON_SIZE}
+      color={color}
+    />
+  );
+}
 
 export function FloatingTabBar({ state, descriptors, navigation, insets }: BottomTabBarProps) {
   const mobileColors = useMobileColors();
@@ -126,9 +147,9 @@ export function FloatingTabBar({ state, descriptors, navigation, insets }: Botto
             style={styles.tab}
           >
             <TabIconPill focused={focused} style={styles.iconPill}>
-              <config.family
-                name={focused ? config.filled : config.outline}
-                size={22}
+              <TabGlyph
+                icon={config.icon}
+                focused={focused}
                 color={focused ? mobileColors.brand : mobileColors.textPrimary}
               />
             </TabIconPill>
