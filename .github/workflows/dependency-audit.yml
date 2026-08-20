@@ -38,8 +38,11 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
 
-      # Known advisories.
-      - run: npm audit --audit-level=high
+      # Known advisories. Wrapped rather than bare `npm audit --audit-level=high`
+      # so a finding with no fix upstream can be allowlisted individually, with a
+      # reason and an expiry, instead of the whole gate being dropped to
+      # `critical` to get green. See scripts/audit-check.mjs.
+      - run: npm run deps:audit
 
       # Registry signatures across the installed tree. Catches a tarball that
       # doesn't match what the registry attests it published — the case

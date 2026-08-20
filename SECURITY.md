@@ -89,7 +89,9 @@ Applied to every response:
 - Env vars validated at startup via Zod (`apps/web/src/lib/env.ts`); strict validation in production
 - `protobufjs` pinned to `7.5.9` and `fast-uri` to `^3.1.2` via scoped npm overrides in root `package.json`
 - `react` and `react-dom` pinned to `19.2.3` in root `overrides` to enforce a single copy
-- `npm audit`: 0 critical, 0 high, 0 low (3 moderate in `hono` via `@modelcontextprotocol/sdk` dev CLI only)
+- `npm audit`: 0 critical, 0 unreviewed high (8 high in the Metro/`image-size`
+  build chain are allowlisted with an expiry — see below), 3 moderate in `hono`
+  via the `@modelcontextprotocol/sdk` dev CLI only
 
 ### Supply-Chain Controls
 
@@ -111,11 +113,20 @@ controls assume a dependency will eventually be malicious.
 - **Updates arrive on a cooldown** (`.github/dependabot.yml`): 3 days for
   patches, 7 for minors, 14 for majors, so the ecosystem has time to detect and
   unpublish a bad release before we take it.
-- **CI verifies more than advisories.** `npm audit --audit-level=high` for known
+- **CI verifies more than advisories.** `npm run deps:audit` for known
   CVEs, `npm audit signatures` for registry attestation over the installed tree,
   `npm run deps:scan` for known-bad versions / worm markers / planted
   persistence files, and an advisory freshness job that flags any version
   published inside the cooldown window.
+- **An advisory with no fix is allowlisted, never waved through.** When upstream
+  has published no patched version, `scripts/audit-check.mjs` can suppress that
+  specific GHSA — with a written reason and a `reviewBy` date. Past the date it
+  blocks again, and an entry that stops matching anything also blocks, so the
+  list cannot rot into a permanent waiver. Everything else fails the build as
+  before. Lowering `--audit-level` to get green is the thing this exists to
+  prevent. Currently allowlisted: `image-size` (GHSA-w3rx-r6r6-pgpr,
+  GHSA-5p2g-fcmc-qvqq) and the Metro/Expo chain that depends on it — build-time
+  only, no patched release exists at any version, review by 2026-11-01.
 - **Actions are pinned to commit SHAs**, and every workflow declares
   `permissions: contents: read`, so a dependency executing in CI cannot inherit
   a token that writes to the repo.
