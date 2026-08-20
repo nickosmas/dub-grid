@@ -17,6 +17,6 @@
     "test": "vitest run --config vitest.config.ts src"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.104.1"
+    "@supabase/supabase-js": "2.112.3"
   }
 }
