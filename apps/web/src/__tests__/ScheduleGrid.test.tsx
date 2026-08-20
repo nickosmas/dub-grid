@@ -2845,4 +2845,292 @@ describe("ScheduleGrid", () => {
     expect(nightLabel.style.display).toBe("-webkit-box");
     expect(nightLabel.style.overflowWrap).toBe("break-word");
   });
+
+  // A pill carrying shift, job and a custom time is three lines of type in a
+  // 52px cell, which used to overflow and clip the time off the bottom.
+  it("puts shift and job on one line with a middot in code mode", () => {
+    observedWidth = 1600;
+
+    const jobAssignment: AssignmentDefinition = {
+      id: 11,
+      orgId: "org-1",
+      label: "DS",
+      name: "Day Shift Supervisor",
+      color: "#E5F3E8",
+      border: "#2E9930",
+      text: "#1A3D1B",
+      categoryId: 1,
+      focusAreaId: 1,
+      jobId: 101,
+      sortOrder: 1,
+    };
+    const jobs: JobDefinition[] = [
+      {
+        id: 101,
+        orgId: "org-1",
+        name: "Supervisor",
+        abbr: "S",
+        showOnGrid: true,
+        assignmentMode: "with_shift",
+        eligibilityMode: "and",
+        focusAreaId: null,
+        focusAreaIds: [],
+        departmentIds: [],
+        applicableShiftIds: [],
+        eligibleRoleIds: [],
+        requiredCertificationIds: [],
+        color: "#E5F3E8",
+        border: "#2E9930",
+        text: "#1A3D1B",
+        shiftTimeOverrides: {},
+        shiftColorOverrides: {},
+        defaultStartTime: null,
+        defaultEndTime: null,
+        defaultDurationHours: null,
+        defaultDurationMinutes: null,
+        sortOrder: 1,
+        systemKey: null,
+        archivedAt: null,
+      },
+    ];
+
+    renderGrid({
+      assignments: [jobAssignment],
+      jobs,
+      shiftForKey: () => "DS",
+      assignmentIdsForKey: () => [11],
+      getShiftStyle: getShiftStyleFromCodes([jobAssignment]),
+      getCustomShiftTimes: () => ({ start: "09:30", end: "17:45" }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const time = Array.from(pill.querySelectorAll("span")).find((span) =>
+      span.textContent?.startsWith("9:30"),
+    ) as HTMLElement;
+    const job = Array.from(pill.querySelectorAll("span")).find(
+      (span) => span.textContent === "S",
+    ) as HTMLElement;
+    const shift = Array.from(pill.querySelectorAll("span")).find(
+      (span) => span.textContent === "D",
+    ) as HTMLElement;
+
+    expect(time).toBeTruthy();
+    // Code mode: one- or two-character labels share a line, separated by a
+    // middot, so the time gets a line of its own without a row each.
+    expect(shift.parentElement).toBe(job.parentElement);
+    expect(shift.parentElement).toHaveStyle({ flexDirection: "row" });
+    expect(shift.parentElement?.textContent).toBe("D·S");
+    // The smaller job code sits on the shift code's baseline, not its centre.
+    expect(shift.parentElement).toHaveStyle({ alignItems: "baseline" });
+    expect(time.parentElement).toBe(pill);
+    expect(shift).toHaveStyle({ fontSize: "var(--dg-fs-title)" });
+  });
+
+  it("gives shift, job and custom time a row each in name mode", () => {
+    observedWidth = 1600;
+
+    const jobAssignment: AssignmentDefinition = {
+      id: 11,
+      orgId: "org-1",
+      label: "DS",
+      name: "Day Shift Supervisor",
+      color: "#E5F3E8",
+      border: "#2E9930",
+      text: "#1A3D1B",
+      categoryId: 1,
+      focusAreaId: 1,
+      jobId: 101,
+      sortOrder: 1,
+    };
+    const jobs: JobDefinition[] = [
+      {
+        id: 101,
+        orgId: "org-1",
+        name: "Supervisor",
+        abbr: "S",
+        showOnGrid: true,
+        assignmentMode: "with_shift",
+        eligibilityMode: "and",
+        focusAreaId: null,
+        focusAreaIds: [],
+        departmentIds: [],
+        applicableShiftIds: [],
+        eligibleRoleIds: [],
+        requiredCertificationIds: [],
+        color: "#E5F3E8",
+        border: "#2E9930",
+        text: "#1A3D1B",
+        shiftTimeOverrides: {},
+        shiftColorOverrides: {},
+        defaultStartTime: null,
+        defaultEndTime: null,
+        defaultDurationHours: null,
+        defaultDurationMinutes: null,
+        sortOrder: 1,
+        systemKey: null,
+        archivedAt: null,
+      },
+    ];
+
+    renderGrid({
+      shiftDisplayMode: "name",
+      assignments: [jobAssignment],
+      jobs,
+      shiftForKey: () => "DS",
+      assignmentIdsForKey: () => [11],
+      getShiftStyle: getShiftStyleFromCodes([jobAssignment]),
+      getCustomShiftTimes: () => ({ start: "09:30", end: "17:45" }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const spans = Array.from(pill.querySelectorAll("span"));
+    const time = spans.find((span) => span.textContent?.startsWith("9:30")) as HTMLElement;
+    const job = spans.find((span) => span.textContent === "Supervisor") as HTMLElement;
+    const shift = spans.find((span) => span.textContent === "Day") as HTMLElement;
+
+    // Spelled-out labels each earn a row, and no middot joins them.
+    expect(shift.parentElement).toBe(job.parentElement);
+    expect(shift.parentElement).toHaveStyle({ flexDirection: "column" });
+    expect(shift.parentElement?.textContent).toBe("DaySupervisor");
+    // Stepped down a size so three rows fit the 52px cell instead of clipping.
+    expect(job).toHaveStyle({ fontSize: "var(--dg-fs-micro)" });
+    expect(time).toHaveStyle({ fontSize: "var(--dg-fs-micro)" });
+  });
+
+  it("keeps shift and job on separate rows in name mode without a custom time", () => {
+    observedWidth = 1600;
+
+    const jobAssignment: AssignmentDefinition = {
+      id: 11,
+      orgId: "org-1",
+      label: "DS",
+      name: "Day Shift Supervisor",
+      color: "#E5F3E8",
+      border: "#2E9930",
+      text: "#1A3D1B",
+      categoryId: 1,
+      focusAreaId: 1,
+      jobId: 101,
+      sortOrder: 1,
+    };
+    const jobs: JobDefinition[] = [
+      {
+        id: 101,
+        orgId: "org-1",
+        name: "Supervisor",
+        abbr: "S",
+        showOnGrid: true,
+        assignmentMode: "with_shift",
+        eligibilityMode: "and",
+        focusAreaId: null,
+        focusAreaIds: [],
+        departmentIds: [],
+        applicableShiftIds: [],
+        eligibleRoleIds: [],
+        requiredCertificationIds: [],
+        color: "#E5F3E8",
+        border: "#2E9930",
+        text: "#1A3D1B",
+        shiftTimeOverrides: {},
+        shiftColorOverrides: {},
+        defaultStartTime: null,
+        defaultEndTime: null,
+        defaultDurationHours: null,
+        defaultDurationMinutes: null,
+        sortOrder: 1,
+        systemKey: null,
+        archivedAt: null,
+      },
+    ];
+
+    renderGrid({
+      shiftDisplayMode: "name",
+      assignments: [jobAssignment],
+      jobs,
+      shiftForKey: () => "DS",
+      assignmentIdsForKey: () => [11],
+      getShiftStyle: getShiftStyleFromCodes([jobAssignment]),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const job = Array.from(pill.querySelectorAll("span")).find(
+      (span) => span.textContent === "Supervisor",
+    ) as HTMLElement;
+
+    expect(job.parentElement).toHaveStyle({ flexDirection: "column" });
+    expect(job.parentElement?.textContent).toBe("DaySupervisor");
+  });
+
+  it("still shares the line in code mode when a pill has no custom time", () => {
+    observedWidth = 1600;
+
+    const jobAssignment: AssignmentDefinition = {
+      id: 11,
+      orgId: "org-1",
+      label: "DS",
+      name: "Day Shift Supervisor",
+      color: "#E5F3E8",
+      border: "#2E9930",
+      text: "#1A3D1B",
+      categoryId: 1,
+      focusAreaId: 1,
+      jobId: 101,
+      sortOrder: 1,
+    };
+    const jobs: JobDefinition[] = [
+      {
+        id: 101,
+        orgId: "org-1",
+        name: "Supervisor",
+        abbr: "S",
+        showOnGrid: true,
+        assignmentMode: "with_shift",
+        eligibilityMode: "and",
+        focusAreaId: null,
+        focusAreaIds: [],
+        departmentIds: [],
+        applicableShiftIds: [],
+        eligibleRoleIds: [],
+        requiredCertificationIds: [],
+        color: "#E5F3E8",
+        border: "#2E9930",
+        text: "#1A3D1B",
+        shiftTimeOverrides: {},
+        shiftColorOverrides: {},
+        defaultStartTime: null,
+        defaultEndTime: null,
+        defaultDurationHours: null,
+        defaultDurationMinutes: null,
+        sortOrder: 1,
+        systemKey: null,
+        archivedAt: null,
+      },
+    ];
+
+    renderGrid({
+      assignments: [jobAssignment],
+      jobs,
+      shiftForKey: () => "DS",
+      assignmentIdsForKey: () => [11],
+      getShiftStyle: getShiftStyleFromCodes([jobAssignment]),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement;
+    const job = Array.from(pill.querySelectorAll("span")).find(
+      (span) => span.textContent === "S",
+    ) as HTMLElement;
+
+    // Code mode shares the line whether or not a time follows.
+    expect(job.parentElement).toHaveStyle({ flexDirection: "row" });
+    expect(job.parentElement?.textContent).toBe("D·S");
+    expect(job.parentElement).toHaveStyle({ alignItems: "baseline" });
+    const shift = Array.from(pill.querySelectorAll("span")).find(
+      (span) => span.textContent === "D",
+    ) as HTMLElement;
+    expect(shift).toHaveStyle({ fontSize: "var(--dg-fs-title)" });
+  });
 });

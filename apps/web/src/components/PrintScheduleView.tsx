@@ -525,6 +525,12 @@ function PrintSection({
                                 ? getReadableTextOnSurface(style.color, style.text)
                                 : style.text;
                               const showSingleSecondaryLine = !!displayParts.secondaryLabel;
+                              // Matches ScheduleGrid: a row per item in name mode (stepped down
+                              // a size when a time joins them), shift · job always on one line
+                              // in code mode.
+                              const singleIsThreeRow =
+                                showSingleSecondaryLine && !!customTimes && isNameMode;
+                              const singleInlinesSecondary = showSingleSecondaryLine && !isNameMode;
                               const singleDisplayLabel = displayParts.primaryLabel;
                               return (
                                 <div
@@ -577,11 +583,18 @@ function PrintSection({
                                     <div
                                       style={{
                                         display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                        gap: showSingleSecondaryLine ? "0.12em" : 0,
+                                        flexDirection: singleInlinesSecondary ? "row" : "column",
+                                        alignItems: singleInlinesSecondary ? "baseline" : "center",
+                                        justifyContent: "center",
+                                        flexWrap: "nowrap",
+                                        gap: singleInlinesSecondary
+                                          ? "0.2em"
+                                          : showSingleSecondaryLine
+                                            ? "0.12em"
+                                            : 0,
                                         maxWidth: "100%",
                                         minWidth: 0,
+                                        overflow: "hidden",
                                       }}
                                     >
                                       <span
@@ -595,6 +608,7 @@ function PrintSection({
                                                 overflow: "hidden",
                                                 textOverflow: "ellipsis",
                                                 maxWidth: "100%",
+                                                minWidth: 0,
                                               }),
                                         }}
                                       >
@@ -602,17 +616,32 @@ function PrintSection({
                                           ? pillText(singleDisplayLabel, 14)
                                           : singleDisplayLabel}
                                       </span>
-                                      {showSingleSecondaryLine ? (
+                                      {singleInlinesSecondary && (
                                         <span
+                                          aria-hidden="true"
                                           style={{
                                             fontSize: "0.7em",
                                             fontWeight: 700,
                                             lineHeight: 1.3,
+                                            opacity: 0.5,
+                                            flexShrink: 0,
+                                          }}
+                                        >
+                                          ·
+                                        </span>
+                                      )}
+                                      {showSingleSecondaryLine ? (
+                                        <span
+                                          style={{
+                                            fontSize: singleIsThreeRow ? "0.62em" : "0.7em",
+                                            fontWeight: 700,
+                                            lineHeight: singleIsThreeRow ? 1.2 : 1.3,
                                             opacity: 0.78,
                                             whiteSpace: "nowrap",
                                             overflow: "hidden",
                                             textOverflow: "ellipsis",
                                             maxWidth: "100%",
+                                            minWidth: 0,
                                           }}
                                         >
                                           {isNameMode
@@ -625,10 +654,10 @@ function PrintSection({
                                   {customTimes && (
                                     <span
                                       style={{
-                                        fontSize: "0.75em",
+                                        fontSize: singleIsThreeRow ? "0.62em" : "0.75em",
                                         fontWeight: 500,
                                         lineHeight: 1,
-                                        marginTop: "0.3em",
+                                        marginTop: singleIsThreeRow ? "0.12em" : "0.3em",
                                         opacity: 0.7,
                                         letterSpacing: "0.02em",
                                       }}
