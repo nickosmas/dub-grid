@@ -2902,35 +2902,6 @@ function SchedulerContent() {
     [computeEditSessionDirty],
   );
 
-  const handleCustomTimeChange = useCallback(
-    (start: string | null, end: string | null) => {
-      updateEditSessionDraft((prev) => {
-        if (!prev.draftShift) {
-          return {
-            draftShift: prev.draftShift,
-            draftNotes: prev.draftNotes,
-          };
-        }
-
-        const updated = {
-          ...prev.draftShift,
-          customStartTime: start,
-          customEndTime: end,
-        };
-        const draftKind = computeScheduleEntryDraftKind(updated);
-        return {
-          draftShift: {
-            ...updated,
-            isDraft: draftKind !== null,
-            draftKind,
-          },
-          draftNotes: prev.draftNotes,
-        };
-      });
-    },
-    [updateEditSessionDraft],
-  );
-
   const buildShiftDeleteUpdate = useCallback(
     (empId: string, dateKey: string): ShiftDeleteUpdate | null => {
       const key = `${empId}_${dateKey}`;
@@ -3376,6 +3347,43 @@ function SchedulerContent() {
       }));
     },
     [buildDraftShiftFromInput, updateEditSessionDraft],
+  );
+
+  // Rebuilt through buildDraftShiftFromInput rather than by setting the entry's
+  // top-level customStartTime/customEndTime: those are derived from the entry's
+  // effective snapshot, and buildEntryPayload reads the snapshot back out when
+  // it builds an upsert. Patching only the derived fields left the snapshot
+  // without the time, so saving a shift whose assignment also changed (every
+  // brand-new shift) posted customStartTime: null.
+  const handleCustomTimeChange = useCallback(
+    (start: string | null, end: string | null) => {
+      updateEditSessionDraft((prev) => {
+        if (!prev.draftShift) {
+          return {
+            draftShift: prev.draftShift,
+            draftNotes: prev.draftNotes,
+          };
+        }
+
+        const input = buildEntryPayload(prev.draftShift);
+        if (input.kind !== "worked") {
+          return {
+            draftShift: prev.draftShift,
+            draftNotes: prev.draftNotes,
+          };
+        }
+
+        return {
+          draftShift: buildDraftShiftFromInput(prev.draftShift, {
+            ...input,
+            customStartTime: start,
+            customEndTime: end,
+          }),
+          draftNotes: prev.draftNotes,
+        };
+      });
+    },
+    [buildDraftShiftFromInput, buildEntryPayload, updateEditSessionDraft],
   );
 
   const handleConfirmEditPanel = useCallback(
