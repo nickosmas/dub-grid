@@ -4330,22 +4330,37 @@ GRANT EXECUTE ON FUNCTION public.find_matching_schedule_segment_ordinal(BIGINT[]
 
 -- ── assert_non_overlapping_work_assignment_times ────────────────────────────
 -- Prevents saving a worked cell whose ordered segments have overlapping
--- effective time windows after resolving custom/job/shift timing.
+-- effective time windows after resolving custom/job/shift timing. Only enforced
+-- for orgs with `enforce_conflict_prevention` on ("When enabled, overlapping
+-- shifts cannot be saved") — otherwise overlaps are a warning, not a block.
+
+DROP FUNCTION IF EXISTS public.assert_non_overlapping_work_assignment_times(BIGINT[], BIGINT[], TEXT, TEXT);
 
 CREATE OR REPLACE FUNCTION public.assert_non_overlapping_work_assignment_times(
+  p_org_id UUID,
   p_shift_ids BIGINT[],
   p_job_ids BIGINT[],
   p_custom_start TEXT DEFAULT NULL,
   p_custom_end TEXT DEFAULT NULL
 )
 RETURNS VOID
-LANGUAGE PLPGSQL STABLE
+LANGUAGE PLPGSQL STABLE SECURITY DEFINER
 SET search_path = 'public'
 AS $$
 DECLARE
   v_overlap RECORD;
 BEGIN
   IF array_length(p_job_ids, 1) IS NULL OR array_length(p_job_ids, 1) < 2 THEN
+    RETURN;
+  END IF;
+
+  -- Overlaps are only a hard error for orgs that opted into conflict
+  -- prevention; everyone else gets the schedule editor's soft warning and is
+  -- free to save the cell anyway.
+  IF NOT COALESCE(
+    (SELECT o.enforce_conflict_prevention FROM public.organizations o WHERE o.id = p_org_id),
+    FALSE
+  ) THEN
     RETURN;
   END IF;
 
@@ -4385,7 +4400,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.assert_non_overlapping_work_assignment_times(BIGINT[], BIGINT[], TEXT, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.assert_non_overlapping_work_assignment_times(UUID, BIGINT[], BIGINT[], TEXT, TEXT) TO authenticated;
 
 
 -- ── create_shift_request ────────────────────────────────────────────────────
@@ -8327,6 +8342,7 @@ BEGIN
 
   IF p_state_kind = 'worked' THEN
     PERFORM public.assert_non_overlapping_work_assignment_times(
+      p_org_id,
       COALESCE(p_shift_ids, '{}'::BIGINT[]),
       COALESCE(p_job_ids, '{}'::BIGINT[]),
       p_custom_start_time,
@@ -8503,6 +8519,7 @@ BEGIN
 
   IF p_state_kind = 'worked' THEN
     PERFORM public.assert_non_overlapping_work_assignment_times(
+      p_org_id,
       COALESCE(p_shift_ids, '{}'::BIGINT[]),
       COALESCE(p_job_ids, '{}'::BIGINT[]),
       p_custom_start_time,
