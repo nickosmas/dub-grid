@@ -360,7 +360,7 @@ export async function saveCertifications(
     toRow: (item, sortOrder) => ({
       name: item.name,
       abbr: item.abbr,
-      department_id: item.departmentId ?? null,
+      department_ids: item.departmentIds ?? [],
       sort_order: sortOrder,
     }),
   });
@@ -429,7 +429,7 @@ export async function saveOrganizationRoles(
       name: item.name,
       abbr: item.abbr,
       is_schedule_role: item.isScheduleRole ?? true,
-      department_id: item.departmentId ?? null,
+      department_ids: item.departmentIds ?? [],
       sort_order: sortOrder,
     }),
   });

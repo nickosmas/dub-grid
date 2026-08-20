@@ -225,13 +225,18 @@ export default function StringListSettings({
           disallowUrl: true,
         }),
       isScheduleRole: showScheduleRoleToggle ? (it.isScheduleRole ?? true) : it.isScheduleRole,
+      // Also applied here, not just on toggle, so rows that predate the rule
+      // are normalized rather than persisting a second spelling of org-wide.
+      departmentIds: collapseIfEveryDepartment(it.departmentIds ?? []),
       sortOrder: i,
     }));
 
-    const keys = cleaned.map((it) => `${it.name.toLowerCase()}::${it.departmentId ?? ""}`);
+    // A name no longer needs duplicating per department now that one item can
+    // list several, so uniqueness is by name alone (matching the DB index).
+    const keys = cleaned.map((it) => it.name.toLowerCase());
     const dupes = keys.filter((k, i) => k && keys.indexOf(k) !== i);
     if (dupes.length > 0) {
-      const dupeName = dupes[0].split("::")[0];
+      const dupeName = dupes[0];
       lastSaveErrorRef.current = new Error(`Duplicate name: "${dupeName}"`);
       setError(`Duplicate name: "${dupeName}"`);
       return;
@@ -328,9 +333,40 @@ export default function StringListSettings({
     setLocal((prev) => prev.map((item, idx) => (idx === i ? { ...item, [field]: value } : item)));
   };
 
-  const handleDeptChange = (i: number, value: string) => {
-    const departmentId = value === "" ? null : Number(value);
-    setLocal((prev) => prev.map((item, idx) => (idx === i ? { ...item, departmentId } : item)));
+  /**
+   * Selecting every department says the same thing as org-wide, so store the
+   * org-wide form. They are not merely equivalent today: org-wide also picks up
+   * departments added later, which is what someone selecting all of them means.
+   *
+   * Skipped when there is only one department, where "all" and "that one" are
+   * the same set and collapsing would leave the picker unable to scope at all.
+   */
+  const collapseIfEveryDepartment = useCallback(
+    (departmentIds: number[]): number[] =>
+      activeDepts.length > 1 && activeDepts.every((d) => departmentIds.includes(d.id))
+        ? []
+        : departmentIds,
+    [activeDepts],
+  );
+
+  const handleDeptToggle = (i: number, departmentId: number) => {
+    setLocal((prev) =>
+      prev.map((item, idx) => {
+        if (idx !== i) return item;
+        const current = item.departmentIds ?? [];
+        const next = current.includes(departmentId)
+          ? current.filter((id) => id !== departmentId)
+          : [...current, departmentId];
+        return { ...item, departmentIds: collapseIfEveryDepartment(next) };
+      }),
+    );
+  };
+
+  /** Clearing every department is what "org-wide" means. */
+  const handleDeptClear = (i: number) => {
+    setLocal((prev) =>
+      prev.map((item, idx) => (idx === i ? { ...item, departmentIds: [] } : item)),
+    );
   };
 
   const handleNameKeyDown = (
@@ -772,20 +808,27 @@ export default function StringListSettings({
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       draggable={false}
+                      style={{ display: "flex", flexWrap: "wrap", gap: 4 }}
                     >
-                      <CustomSelect
-                        value={item.departmentId != null ? String(item.departmentId) : ""}
-                        options={[
-                          { value: "", label: "Org-wide" },
-                          ...activeDepts.map((d) => ({ value: String(d.id), label: d.name })),
-                        ]}
-                        onChange={(val) => handleDeptChange(i, val)}
-                        fontSize="var(--dg-fs-label)"
+                      {/* Multi-select: an item can belong to several
+                          departments, and selecting none means org-wide. */}
+                      <DeptToggle
+                        label="Org-wide"
+                        selected={(item.departmentIds ?? []).length === 0}
+                        onClick={() => handleDeptClear(i)}
                       />
+                      {activeDepts.map((d) => (
+                        <DeptToggle
+                          key={d.id}
+                          label={d.name}
+                          selected={(item.departmentIds ?? []).includes(d.id)}
+                          onClick={() => handleDeptToggle(i, d.id)}
+                        />
+                      ))}
                     </div>
                   ) : (
-                    <div>
-                      {item.departmentId ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {(item.departmentIds ?? []).length > 0 ? (
                         <span
                           style={{
                             fontSize: "var(--dg-fs-label)",
@@ -793,7 +836,10 @@ export default function StringListSettings({
                             color: "var(--color-text-secondary)",
                           }}
                         >
-                          {deptMap.get(item.departmentId)?.name ?? "—"}
+                          {(item.departmentIds ?? [])
+                            .map((id) => deptMap.get(id)?.name)
+                            .filter(Boolean)
+                            .join(", ") || "—"}
                         </span>
                       ) : (
                         <span
@@ -972,4 +1018,39 @@ export default function StringListSettings({
   }
 
   return content;
+}
+
+/**
+ * One department in the multi-select. A pill rather than a checkbox row so the
+ * whole set stays readable inside a table cell.
+ */
+function DeptToggle({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      style={{
+        padding: "2px 8px",
+        borderRadius: 20,
+        fontSize: "var(--dg-fs-footnote)",
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+        cursor: "pointer",
+        background: selected ? "var(--color-brand-bg)" : "var(--color-bg-secondary)",
+        border: `1px solid ${selected ? "var(--color-brand-border)" : "var(--color-border-light)"}`,
+        color: selected ? "var(--color-brand)" : "var(--color-text-secondary)",
+      }}
+    >
+      {label}
+    </button>
+  );
 }

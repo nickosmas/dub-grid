@@ -189,7 +189,10 @@ CREATE TABLE public.organization_memberships (
 CREATE TABLE public.organization_roles (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   org_id        UUID NOT NULL,
-  department_id BIGINT,
+  -- Scheduled departments this role belongs to. Empty = org-wide. A role can
+  -- span departments (a Charge Nurse covering Nursing and Emergency), so this
+  -- is an array rather than a single FK.
+  department_ids BIGINT[] NOT NULL DEFAULT '{}',
   name          TEXT NOT NULL,
   abbr          TEXT NOT NULL,
   is_schedule_role BOOLEAN NOT NULL DEFAULT true,
@@ -222,7 +225,10 @@ ALTER TABLE ONLY public.focus_areas REPLICA IDENTITY FULL;
 CREATE TABLE public.certifications (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   org_id        UUID NOT NULL,
-  department_id BIGINT,
+  -- Scheduled departments this credential belongs to. Empty = org-wide. This is
+  -- what the People page groups staff by, and a credential can legitimately
+  -- span departments (an RN covering Nursing and Emergency), so it is an array.
+  department_ids BIGINT[] NOT NULL DEFAULT '{}',
   name          TEXT NOT NULL,
   abbr          TEXT NOT NULL,
   sort_order    INTEGER NOT NULL DEFAULT 0,
@@ -1054,15 +1060,12 @@ ALTER TABLE public.departments
 ALTER TABLE public.focus_areas
   ADD CONSTRAINT focus_areas_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
 
-ALTER TABLE public.organization_roles
-  ADD CONSTRAINT organization_roles_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
-
-ALTER TABLE public.certifications
-  ADD CONSTRAINT certifications_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE SET NULL;
-
--- NOTE: organization_memberships.department_ids, invitations.department_ids, and
--- employees.department_ids are BIGINT[] arrays — no FK constraints (same pattern as
--- employees.focus_area_ids and employees.role_ids). Integrity enforced at app layer.
+-- NOTE: organization_memberships.department_ids, invitations.department_ids,
+-- employees.department_ids, organization_roles.department_ids and
+-- certifications.department_ids are BIGINT[] arrays — no FK constraints (same
+-- pattern as employees.focus_area_ids and employees.role_ids). Integrity
+-- enforced at app layer: DepartmentsSettings clears a deleted department from
+-- these arrays, the same way it deletes child focus areas first.
 
 -- employees
 ALTER TABLE public.employees
@@ -1242,10 +1245,12 @@ CREATE INDEX idx_org_memberships_org_user ON public.organization_memberships(org
 
 -- organization_roles
 CREATE INDEX idx_organization_roles_org_id ON public.organization_roles(org_id);
-CREATE UNIQUE INDEX organization_roles_org_name_dept_active_unique ON public.organization_roles(org_id, name, COALESCE(department_id, -1)) WHERE archived_at IS NULL;
+-- A name no longer needs duplicating per department now that a role can list
+-- several, so uniqueness is simply per-org.
+CREATE UNIQUE INDEX organization_roles_org_name_active_unique ON public.organization_roles(org_id, name) WHERE archived_at IS NULL;
 CREATE INDEX idx_organization_roles_active ON public.organization_roles(org_id) WHERE archived_at IS NULL;
 CREATE INDEX idx_organization_roles_schedule_active ON public.organization_roles(org_id) WHERE archived_at IS NULL AND is_schedule_role = true;
-CREATE INDEX idx_organization_roles_department_id ON public.organization_roles(department_id) WHERE department_id IS NOT NULL;
+CREATE INDEX idx_organization_roles_department_ids ON public.organization_roles USING GIN (department_ids);
 
 -- focus_areas
 CREATE INDEX idx_focus_areas_org_id ON public.focus_areas(org_id);
@@ -1254,9 +1259,9 @@ CREATE INDEX idx_focus_areas_active ON public.focus_areas(org_id) WHERE archived
 
 -- certifications
 CREATE INDEX idx_certifications_org_id ON public.certifications(org_id);
-CREATE UNIQUE INDEX certifications_org_name_dept_active_unique ON public.certifications(org_id, name, COALESCE(department_id, -1)) WHERE archived_at IS NULL;
+CREATE UNIQUE INDEX certifications_org_name_active_unique ON public.certifications(org_id, name) WHERE archived_at IS NULL;
 CREATE INDEX idx_certifications_active ON public.certifications(org_id) WHERE archived_at IS NULL;
-CREATE INDEX idx_certifications_department_id ON public.certifications(department_id) WHERE department_id IS NOT NULL;
+CREATE INDEX idx_certifications_department_ids ON public.certifications USING GIN (department_ids);
 
 -- departments
 CREATE INDEX idx_departments_org_id ON public.departments(org_id);

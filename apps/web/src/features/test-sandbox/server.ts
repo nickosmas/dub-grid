@@ -100,19 +100,18 @@ async function cloneOrgIntoSandbox(
     cloneOrgTable(svc, "indicator_types", sourceOrgId, sandboxOrgId),
   ]);
 
-  // Phase 2 — depend on departments. Certifications has a
-  // department_id FK that ON DELETE SET NULLs to source departments if
-  // we forget to remap it — meaning cloned certs end up linked to the
-  // source organization's departments. Remap fixes that.
+  // Phase 2 — depend on departments. Certifications and roles carry
+  // department_ids referencing the source organization's departments, so
+  // without remapping the cloned rows would point back at the source org.
   const [focusAreaMap, roleMap, certificationMap] = await Promise.all([
     cloneOrgTable(svc, "focus_areas", sourceOrgId, sandboxOrgId, [
       { col: "department_id", map: departmentMap },
     ]),
     cloneOrgTable(svc, "organization_roles", sourceOrgId, sandboxOrgId, [
-      { col: "department_id", map: departmentMap },
+      { col: "department_ids", map: departmentMap, isArray: true },
     ]),
     cloneOrgTable(svc, "certifications", sourceOrgId, sandboxOrgId, [
-      { col: "department_id", map: departmentMap },
+      { col: "department_ids", map: departmentMap, isArray: true },
     ]),
   ]);
 

@@ -141,33 +141,45 @@ BEGIN
   WHERE org_id = source_org
   ORDER BY sort_order;
 
-  INSERT INTO public.certifications (org_id, department_id, name, abbr, sort_order)
+  INSERT INTO public.certifications (org_id, department_ids, name, abbr, sort_order)
   SELECT
     target_org,
-    target_dept.id,
+    COALESCE(
+      (
+        SELECT array_agg(target_dept.id ORDER BY target_dept.id)
+        FROM unnest(source_cert.department_ids) AS source_dept_id
+        JOIN public.departments source_dept ON source_dept.id = source_dept_id
+        JOIN public.departments target_dept
+          ON target_dept.org_id = target_org
+         AND target_dept.name = source_dept.name
+      ),
+      ARRAY[]::bigint[]
+    ),
     source_cert.name,
     source_cert.abbr,
     source_cert.sort_order
   FROM public.certifications source_cert
-  LEFT JOIN public.departments source_dept ON source_dept.id = source_cert.department_id
-  LEFT JOIN public.departments target_dept
-    ON target_dept.org_id = target_org
-   AND target_dept.name = source_dept.name
   WHERE source_cert.org_id = source_org
   ORDER BY source_cert.sort_order;
 
-  INSERT INTO public.organization_roles (org_id, department_id, name, abbr, sort_order)
+  INSERT INTO public.organization_roles (org_id, department_ids, name, abbr, sort_order)
   SELECT
     target_org,
-    target_dept.id,
+    COALESCE(
+      (
+        SELECT array_agg(target_dept.id ORDER BY target_dept.id)
+        FROM unnest(source_role.department_ids) AS source_dept_id
+        JOIN public.departments source_dept ON source_dept.id = source_dept_id
+        JOIN public.departments target_dept
+          ON target_dept.org_id = target_org
+         AND target_dept.name = source_dept.name
+      ),
+      ARRAY[]::bigint[]
+    ),
     source_role.name,
     source_role.abbr,
     source_role.sort_order
   FROM public.organization_roles source_role
-  LEFT JOIN public.departments source_dept ON source_dept.id = source_role.department_id
-  LEFT JOIN public.departments target_dept
-    ON target_dept.org_id = target_org
-   AND target_dept.name = source_dept.name
   WHERE source_role.org_id = source_org
   ORDER BY source_role.sort_order;
 
@@ -319,8 +331,8 @@ BEGIN
     ('Grace', 'Kamiti', 'JLCSN', ARRAY['Supv']::text[], 22, ARRAY['Night Shift']::text[]),
     ('Stephen', 'Onsabwa', 'JLCSN', ARRAY['Supv']::text[], 23, ARRAY['Night Shift']::text[]),
     ('Aicha', 'Langel', 'JLCSN', ARRAY['DVCSN']::text[], 24, ARRAY['Visiting CSNS']::text[]),
-    ('Sherry', 'Otieno', 'Other', ARRAY['Act Cor']::text[], 25, ARRAY['Sheltered Care']::text[]),
-    ('Deborah', 'Gray', 'Other', ARRAY['SC/Act. Cor']::text[], 26, ARRAY['Sheltered Care']::text[])
+    ('Sherry', 'Otieno', NULL, ARRAY['Act Cor']::text[], 25, ARRAY['Sheltered Care']::text[]),
+    ('Deborah', 'Gray', NULL, ARRAY['SC/Act. Cor']::text[], 26, ARRAY['Sheltered Care']::text[])
   )
   INSERT INTO public.employees (
     org_id,
@@ -354,7 +366,8 @@ BEGIN
     ),
     'active'
   FROM employee_seed
-  JOIN public.certifications cert
+  -- LEFT so support staff, who hold no certification, are still inserted.
+  LEFT JOIN public.certifications cert
     ON cert.org_id = target_org
    AND cert.abbr = employee_seed.cert_abbr
   ON CONFLICT (org_id, first_name, last_name) WHERE archived_at IS NULL DO UPDATE

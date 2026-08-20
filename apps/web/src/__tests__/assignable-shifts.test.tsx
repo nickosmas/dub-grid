@@ -94,7 +94,7 @@ const orgRoles: NamedItem[] = [
     abbr: "SUP",
     isScheduleRole: true,
     sortOrder: 0,
-    departmentId: null,
+    departmentIds: [],
   },
   {
     id: 9,
@@ -103,7 +103,7 @@ const orgRoles: NamedItem[] = [
     abbr: "MEN",
     isScheduleRole: true,
     sortOrder: 2,
-    departmentId: null,
+    departmentIds: [],
   },
   {
     id: 8,
@@ -112,7 +112,7 @@ const orgRoles: NamedItem[] = [
     abbr: "DIR",
     isScheduleRole: false,
     sortOrder: 1,
-    departmentId: null,
+    departmentIds: [],
   },
 ];
 
@@ -123,7 +123,7 @@ const certifications: NamedItem[] = [
     name: "CSN III",
     abbr: "CSN3",
     sortOrder: 0,
-    departmentId: null,
+    departmentIds: [],
   },
   {
     id: 2,
@@ -131,7 +131,7 @@ const certifications: NamedItem[] = [
     name: "CSN II",
     abbr: "CSN2",
     sortOrder: 1,
-    departmentId: null,
+    departmentIds: [],
   },
 ];
 

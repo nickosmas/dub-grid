@@ -241,9 +241,9 @@ export const SHIFT_CATEGORY_COLS =
   "id, org_id, name, abbr, start_time, end_time, color, sort_order, focus_area_id, break_minutes, archived_at";
 export const JOB_COLS =
   "id, org_id, name, abbr, show_on_grid, assignment_mode, eligibility_mode, focus_area_ids, department_ids, applicable_shift_ids, eligible_role_ids, required_certification_ids, color, border_color, text_color, job_shift_overrides(shift_id, start_time, end_time, color), default_start_time, default_end_time, default_duration_hours, default_duration_minutes, sort_order, system_key, archived_at";
-export const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_id, sort_order, archived_at";
+export const NAMED_ITEM_COLS = "id, org_id, name, abbr, department_ids, sort_order, archived_at";
 export const ORG_ROLE_COLS =
-  "id, org_id, name, abbr, is_schedule_role, department_id, sort_order, archived_at";
+  "id, org_id, name, abbr, is_schedule_role, department_ids, sort_order, archived_at";
 export const EMPLOYEE_COLS =
   "id, org_id, employee_number, first_name, last_name, employment_type, status, status_changed_at, status_note, certification_id, role_ids, seniority, focus_area_ids, phone, email, contact_notes, archived_at, user_id, department_ids, dept_admin_ids, version, created_at";
 export const COVERAGE_REQ_COLS =
