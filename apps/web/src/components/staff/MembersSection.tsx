@@ -16,7 +16,11 @@ import {
   updatePendingInvitation,
 } from "@/features/organization/client";
 import { updateEmployeeIdentity } from "@/features/employees/client";
-import { isSelfAction } from "@dubgrid/domain";
+import {
+  countStaffByCertification,
+  isSelfAction,
+  summarizeStaffByCredential,
+} from "@dubgrid/domain";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 import { useAuth } from "@/components/AuthProvider";
 import * as Sentry from "@/lib/sentry";
@@ -52,6 +56,7 @@ import {
   TableRow as UITableRow,
 } from "@/components/ui/table";
 import { BulkImportModal } from "./BulkImportModal";
+import { DirectoryCertificationCards } from "./DirectoryCertificationCards";
 import { DirectorySummaryCards } from "./DirectorySummaryCards";
 import { EmployeeManagementAccessModal } from "./EmployeeManagementAccessModal";
 import { ManagementStaffPanel } from "./ManagementStaffPanel";
@@ -809,6 +814,14 @@ export function MembersSection({
     [employees],
   );
 
+  // Same basis as the other summary cards (active, on-schedule), so the four
+  // numbers reconcile rather than reflecting the filtered table.
+  const credentialSummary = useMemo(() => summarizeStaffByCredential(employees), [employees]);
+  const certificationCounts = useMemo(
+    () => countStaffByCertification(employees, certifications),
+    [employees, certifications],
+  );
+
   const tabs: {
     key: EmployeeTab;
     label: string;
@@ -948,6 +961,18 @@ export function MembersSection({
             fullTimeCount={employmentSummary.fullTime}
             partTimeCount={employmentSummary.partTime}
           />
+
+          {!showManagement && (
+            <DirectoryCertificationCards
+              counts={certificationCounts}
+              certifications={certifications}
+              certificationLabel={certificationLabel}
+              certifiedCount={credentialSummary.certified}
+              uncertifiedCount={credentialSummary.uncertified}
+              selectedCertification={filterCertification}
+              onSelectCertification={setFilterCertification}
+            />
+          )}
 
           <div className="flex items-center gap-3 overflow-x-auto">
             <div className="flex min-w-0 items-center gap-2">

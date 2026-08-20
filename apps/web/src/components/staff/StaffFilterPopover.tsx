@@ -7,6 +7,7 @@ import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type {
   AccountLinkFilter,
+  CertificationFilter,
   ContactPresenceFilter,
   EmploymentTypeFilter,
 } from "./useStaffFilters";
@@ -23,8 +24,8 @@ interface StaffFilterPopoverProps {
   onFilterDepartmentAdminOnlyChange: (value: boolean) => void;
   filterFocusArea: number | null;
   onFilterFocusAreaChange: (id: number | null) => void;
-  filterCertification: number | null;
-  onFilterCertificationChange: (id: number | null) => void;
+  filterCertification: CertificationFilter;
+  onFilterCertificationChange: (value: CertificationFilter) => void;
   filterRole: number | null;
   onFilterRoleChange: (id: number | null) => void;
   filterAccountLink: AccountLinkFilter;
@@ -165,6 +166,20 @@ export function StaffFilterPopover({
                 onClick={() => onFilterCertificationChange(null)}
               >
                 All
+              </FilterChip>
+              {/* The two presence cases, matching the People page's
+                  certified/support counts. */}
+              <FilterChip
+                active={filterCertification === "any"}
+                onClick={() => onFilterCertificationChange("any")}
+              >
+                Certified staff
+              </FilterChip>
+              <FilterChip
+                active={filterCertification === "none"}
+                onClick={() => onFilterCertificationChange("none")}
+              >
+                Not certified
               </FilterChip>
               {certifications.map((certification) => (
                 <FilterChip
