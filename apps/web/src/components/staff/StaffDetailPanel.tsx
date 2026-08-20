@@ -428,7 +428,11 @@ export function StaffDetailPanel({
                             : undefined
                         }
                       >
-                        <ButtonLoading loading={revokingInvite} spinnerSize={12}>
+                        <ButtonLoading
+                          loading={revokingInvite}
+                          loadingLabel="Sending"
+                          spinnerSize={12}
+                        >
                           Reinvite
                         </ButtonLoading>
                       </button>
@@ -447,7 +451,11 @@ export function StaffDetailPanel({
                             : undefined
                         }
                       >
-                        <ButtonLoading loading={revokingInvite} spinnerSize={12}>
+                        <ButtonLoading
+                          loading={revokingInvite}
+                          loadingLabel="Revoking"
+                          spinnerSize={12}
+                        >
                           Revoke
                         </ButtonLoading>
                       </button>
@@ -594,6 +602,7 @@ export function StaffDetailPanel({
           confirmLabel={
             pendingInvitationAction === "reinvite" ? "Reissue Invitation" : "Revoke Invitation"
           }
+          confirmPendingLabel={pendingInvitationAction === "reinvite" ? "Reissuing" : "Revoking"}
           variant={pendingInvitationAction === "reinvite" ? "warning" : "danger"}
           isLoading={revokingInvite}
           onConfirm={() => {

@@ -19,6 +19,7 @@ import {
 } from "@/types";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 // Users tab for the gridmaster OrganizationDetail view.
 
@@ -239,7 +240,9 @@ export function UsersTab({
               disabled={adding}
               style={{ fontSize: "var(--dg-fs-caption)" }}
             >
-              {adding ? "Adding…" : "Add"}
+              <ButtonLoading loading={adding} loadingLabel="Adding">
+                Add
+              </ButtonLoading>
             </button>
           </div>
         </form>
@@ -501,6 +504,7 @@ export function UsersTab({
           title="Remove User"
           message={`Remove "${removeConfirm.email ?? removeConfirm.id}" from this organization? They will lose access.`}
           confirmLabel="Remove"
+          confirmPendingLabel="Removing"
           variant="danger"
           isLoading={removing}
           onConfirm={handleRemove}
@@ -513,6 +517,7 @@ export function UsersTab({
           title="Change Organization Role"
           message={`Change ${roleChangeConfirm.user.email ?? "this user"} from ${formatOrganizationRoleLabel(roleChangeConfirm.user.orgRole)} to ${formatOrganizationRoleLabel(roleChangeConfirm.newRole)}?`}
           confirmLabel="Change Role"
+          confirmPendingLabel="Changing Role"
           variant="warning"
           isLoading={changingRole === roleChangeConfirm.user.id}
           onConfirm={handleConfirmRoleChange}
@@ -525,6 +530,7 @@ export function UsersTab({
           title="Add Organization User"
           message={`Add "${addUserConfirm.email}" as ${formatOrganizationRoleLabel(addUserConfirm.role)} for this organization?`}
           confirmLabel="Add User"
+          confirmPendingLabel="Adding"
           variant="warning"
           isLoading={adding}
           onConfirm={handleConfirmAddUser}

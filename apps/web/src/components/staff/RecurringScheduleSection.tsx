@@ -46,6 +46,7 @@ import type {
   ShiftDisplayMode,
   ShiftJobSegment,
 } from "@/types";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 type ShiftCellPopoverProps = {
   anchorRef: HTMLElement | null;
@@ -964,7 +965,9 @@ export function RecurringScheduleSection({
               className="dg-btn dg-btn-primary"
               style={{ padding: "6px 18px", fontSize: "var(--dg-fs-caption)" }}
             >
-              {saving ? "Saving..." : "Save Changes"}
+              <ButtonLoading loading={saving} loadingLabel="Saving">
+                Save Changes
+              </ButtonLoading>
             </button>
           </div>
         </div>
@@ -1383,6 +1386,7 @@ export function RecurringScheduleSection({
               : `Discard ${dirtyCount} recurring schedule draft change${dirtyCount === 1 ? "" : "s"}? This cannot be undone.`
           }
           confirmLabel={pendingRecurringAction === "save" ? "Save Changes" : "Discard"}
+          confirmPendingLabel={pendingRecurringAction === "save" ? "Saving" : "Discarding"}
           variant={pendingRecurringAction === "save" ? "warning" : "danger"}
           isLoading={saving}
           onConfirm={() => {

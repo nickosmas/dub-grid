@@ -99,7 +99,13 @@ export function OrganizationLockedScreen({
         </View>
 
         <View style={styles.actions}>
-          <Button label="Try again" loading={isRetrying} onPress={onRetry} tone="primary" />
+          <Button
+            label="Try again"
+            loading={isRetrying}
+            loadingLabel="Retrying"
+            onPress={onRetry}
+            tone="primary"
+          />
           {isSuperAdmin ? (
             <Button
               label="Manage billing on web"

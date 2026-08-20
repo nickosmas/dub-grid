@@ -14,7 +14,8 @@ import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
-import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import {
   getCodeError,
@@ -731,7 +732,9 @@ function ShiftCategoriesSettings({
               }
               className="dg-btn dg-btn-primary dg-btn-sm"
             >
-              {getEditorSaveLabel(isSavingThis)}
+              <ButtonLoading loading={isSavingThis} loadingLabel={EDITOR_ACTION_LABELS.saving}>
+                {EDITOR_ACTION_LABELS.save}
+              </ButtonLoading>
             </button>
           }
         />

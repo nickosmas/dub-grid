@@ -62,17 +62,24 @@ describe("Button", () => {
     expect(hapticSelection).not.toHaveBeenCalled();
   });
 
-  it("blocks press while loading, and keeps the label mounted so it can't resize", () => {
+  it("blocks press while loading, and says what it is doing", () => {
     const onPress = vi.fn();
-    render(<Button label="Signing in" loading onPress={onPress} />);
+    render(<Button label="Sign in" loading loadingLabel="Signing in" onPress={onPress} />);
 
-    const button = screen.getByRole("button", { name: "Signing in" });
+    const button = screen.getByRole("button", { name: "Sign in" });
     expect(button).toBeDisabled();
     fireEvent.click(button);
     expect(onPress).not.toHaveBeenCalled();
 
-    // Hidden via opacity rather than unmounted, so the width doesn't jump.
+    // The label is never dropped for the spinner: it moves to the same action
+    // in progress, so the button still says what it is working on.
     expect(screen.getByText("Signing in")).toBeInTheDocument();
+    expect(screen.queryByText("Sign in")).not.toBeInTheDocument();
+  });
+
+  it("keeps its own label while loading when no loadingLabel is given", () => {
+    render(<Button label="Working" loading onPress={vi.fn()} />);
+    expect(screen.getByText("Working")).toBeInTheDocument();
   });
 
   it("marks itself busy and disabled for assistive tech while loading", () => {

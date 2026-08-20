@@ -23,7 +23,8 @@ import * as Sentry from "@/lib/sentry";
 import { EmptyState } from "@/components/EmptyState";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
-import { EDITOR_ACTION_LABELS, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -728,7 +729,9 @@ function FocusAreaCoverageCard({
                   disabled={saving || !canEdit || !isDirty}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
-                  {getEditorSaveLabel(saving)}
+                  <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
+                    {EDITOR_ACTION_LABELS.save}
+                  </ButtonLoading>
                 </button>
               }
             />

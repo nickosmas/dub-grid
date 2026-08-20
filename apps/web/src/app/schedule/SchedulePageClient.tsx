@@ -5901,6 +5901,7 @@ function SchedulerContent() {
             {pendingCoverageGapVolunteer && currentEmpId && (
               <ConfirmDialog
                 confirmLabel="Volunteer"
+                confirmPendingLabel="Volunteering"
                 isLoading={isCoverageGapVolunteerPending}
                 message={
                   <>
@@ -6422,6 +6423,7 @@ function SchedulerContent() {
                   : `Publish ${draftBreakdown.totalChanges} unpublished change${draftBreakdown.totalChanges === 1 ? "" : "s"} for ${currentPublishWindow.label}? ${publishSummary}.`
               }
               confirmLabel="Publish"
+              confirmPendingLabel="Publishing"
               variant={allCoverageGaps.length > 0 ? "warning" : "info"}
               isLoading={isPublishing}
               onConfirm={() => {
@@ -6437,6 +6439,7 @@ function SchedulerContent() {
               title="Auto Fill Shifts?"
               message={`This will fill ${autoFillPreview.count} empty schedule slot${autoFillPreview.count === 1 ? "" : "s"} for ${autoFillPreview.dateRange} using recurring templates. Existing visible shifts will not be overwritten.`}
               confirmLabel="Fill Shifts"
+              confirmPendingLabel="Filling"
               variant="info"
               isLoading={isApplyingRecurring}
               onConfirm={handleApplyRecurring}
@@ -6481,6 +6484,7 @@ function SchedulerContent() {
                 return `${copyLine} ${breakdown.totalSkipped} will be skipped: ${description}.`;
               })()}
               confirmLabel="Import Shifts"
+              confirmPendingLabel="Importing"
               variant="info"
               isLoading={isImportingPrevious}
               onConfirm={handleImportPrevious}

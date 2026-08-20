@@ -263,7 +263,9 @@ export default function AddPersonScreen() {
       <View style={{ flexDirection: "row", gap: 10 }}>
         <Button
           disabled={!canSubmit || createMutation.isPending}
-          label={createMutation.isPending ? "Adding..." : "Add person"}
+          label="Add person"
+          loading={createMutation.isPending}
+          loadingLabel="Adding"
           onPress={() => createMutation.mutate()}
         />
         <Button

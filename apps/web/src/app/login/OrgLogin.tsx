@@ -421,6 +421,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 loading={loading}
                 onSubmit={handleSubmit}
                 submitLabel="Sign In"
+                submitPendingLabel="Signing In"
                 forgotPasswordHref="/forgot-password"
               />
             </>

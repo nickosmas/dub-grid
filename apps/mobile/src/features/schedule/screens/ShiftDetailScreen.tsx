@@ -120,6 +120,7 @@ type ShiftDetailConfirmation = {
   title: string;
   body: string;
   confirmLabel: string;
+  confirmPendingLabel: string;
   confirmTone?: "primary" | "danger";
   onConfirm: () => void;
 } | null;
@@ -999,6 +1000,7 @@ export default function ShiftDetailScreen() {
           ? `Your ${shiftLabel} shift on ${shiftDateLabel} will be offered to teammates for pickup.`
           : `${indefiniteArticle(options?.absenceTypeLabel ?? "selected") === "an" ? "An" : "A"} ${options?.absenceTypeLabel ?? "selected"} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.`,
       confirmLabel: type === "pickup" ? "Offer Shift" : "Submit Call-off",
+      confirmPendingLabel: type === "pickup" ? "Offering" : "Submitting",
       confirmTone: type === "calloff" ? "danger" : "primary",
       onConfirm: () =>
         submitCoverageRequest(type, {
@@ -1025,6 +1027,7 @@ export default function ShiftDetailScreen() {
       title: "Send a pickup request?",
       body: `${entry.employeeName} will be asked to pick up your ${shiftLabel} shift on ${shiftDateLabel} so you can use ${absenceTypeLabel}.`,
       confirmLabel: "Send Request",
+      confirmPendingLabel: "Sending",
       onConfirm: () =>
         submitCoverageRequest("pickup", {
           targetEmpId: entry.employeeId,
@@ -1049,6 +1052,7 @@ export default function ShiftDetailScreen() {
       title: "Send this swap request?",
       body: `You'll swap your ${requesterLabel} shift on ${formatShiftDate(shiftEntry.date)} for ${selectedTargetEntry.employeeName}'s ${targetLabel} shift on ${formatShiftDate(selectedTargetEntry.date)}.`,
       confirmLabel: "Send Swap",
+      confirmPendingLabel: "Sending",
       onConfirm: submitSwapRequest,
     });
   }
@@ -1584,7 +1588,9 @@ export default function ShiftDetailScreen() {
             <SheetActions>
               <Button
                 disabled={!canSubmitRequest || createRequestMutation.isPending}
-                label={createRequestMutation.isPending ? "Submitting..." : "Submit"}
+                label="Submit"
+                loading={createRequestMutation.isPending}
+                loadingLabel="Submitting"
                 onPress={handleSubmitRequest}
               />
               <Button
@@ -1605,8 +1611,9 @@ export default function ShiftDetailScreen() {
           shiftEntry ? (
             <SheetActions>
               <Button
-                disabled={createRequestMutation.isPending}
-                label={createRequestMutation.isPending ? "Submitting..." : "Submit"}
+                label="Submit"
+                loading={createRequestMutation.isPending}
+                loadingLabel="Submitting"
                 onPress={() => confirmTargetedPickupRequest(selectedTargetedPickupEntry)}
               />
               <Button
@@ -1624,8 +1631,9 @@ export default function ShiftDetailScreen() {
           shiftEntry ? (
             <SheetActions>
               <Button
-                disabled={createRequestMutation.isPending}
-                label={createRequestMutation.isPending ? "Submitting..." : "Submit"}
+                label="Submit"
+                loading={createRequestMutation.isPending}
+                loadingLabel="Submitting"
                 onPress={() =>
                   confirmCoverageRequest("calloff", {
                     absenceTypeId: selectedCalloffAbsenceType.id,
@@ -1646,6 +1654,7 @@ export default function ShiftDetailScreen() {
       <ConfirmationModal
         body={pendingConfirmation?.body}
         confirmLabel={pendingConfirmation?.confirmLabel ?? "Confirm"}
+        confirmPendingLabel={pendingConfirmation?.confirmPendingLabel ?? "Submitting"}
         confirmTone={pendingConfirmation?.confirmTone ?? "primary"}
         loading={createRequestMutation.isPending}
         onCancel={() => setPendingConfirmation(null)}

@@ -175,6 +175,7 @@ export default function ResetPasswordScreen() {
             <Button
               label="Verify code"
               loading={submitting}
+              loadingLabel="Verifying"
               onPress={() => void verifyCode()}
               size="lg"
             />
@@ -253,6 +254,7 @@ export default function ResetPasswordScreen() {
               disabled={!canSubmitPassword}
               label="Update password"
               loading={submitting}
+              loadingLabel="Updating"
               onPress={() => void savePassword()}
               size="lg"
             />

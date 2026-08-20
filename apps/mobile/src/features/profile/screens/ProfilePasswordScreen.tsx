@@ -373,7 +373,9 @@ export default function ProfilePasswordScreen() {
           <View style={styles.submitRow}>
             <Button
               disabled={!passwordLooksReady || passwordSaving}
-              label={passwordSaving ? "Updating..." : "Update password"}
+              label="Update password"
+              loading={passwordSaving}
+              loadingLabel="Updating"
               onPress={requestPasswordChange}
             />
           </View>
@@ -382,6 +384,7 @@ export default function ProfilePasswordScreen() {
       <ConfirmationModal
         body="You'll be signed out of every device after the password is updated."
         confirmLabel="Update and sign out"
+        confirmPendingLabel="Updating"
         confirmTone="danger"
         loading={passwordSaving}
         onCancel={() => setIsConfirming(false)}

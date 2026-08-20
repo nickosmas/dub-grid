@@ -288,7 +288,9 @@ export default function ProfileTwoFactorScreen() {
           <View style={styles.actionsStack}>
             <Button
               disabled={mfaLoading || mfaVerifyCode.length !== 6}
-              label={mfaLoading ? "Verifying..." : "Verify & enable"}
+              label="Verify & enable"
+              loading={mfaLoading}
+              loadingLabel="Verifying"
               onPress={() => void verifyMfaEnrollment()}
             />
             <Button
@@ -318,8 +320,9 @@ export default function ProfileTwoFactorScreen() {
             />
           ) : (
             <Button
-              disabled={mfaLoading}
-              label={mfaLoading ? "Starting..." : "Enable 2FA"}
+              label="Enable 2FA"
+              loading={mfaLoading}
+              loadingLabel="Starting"
               onPress={() => void startMfaEnrollment()}
             />
           )}
@@ -328,6 +331,7 @@ export default function ProfileTwoFactorScreen() {
       <ConfirmationModal
         body="This will make your account less secure."
         confirmLabel="Disable"
+        confirmPendingLabel="Disabling"
         confirmTone="danger"
         loading={mfaLoading}
         onCancel={() => setIsConfirmingDisable(false)}

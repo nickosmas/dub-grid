@@ -67,6 +67,7 @@ export function Button({
   expanded,
   disabled = false,
   loading = false,
+  loadingLabel,
   fullWidth,
   haptic = "selection",
   onPress,
@@ -89,6 +90,13 @@ export function Button({
   expanded?: boolean;
   disabled?: boolean;
   loading?: boolean;
+  /**
+   * What the button says while `loading`: the same action in progress
+   * ("Saving", not "Save"). The label is never dropped for the spinner, so a
+   * busy button still says what it is doing; without this it keeps `label`,
+   * which reads as work not yet started.
+   */
+  loadingLabel?: string;
   /** Defaults to true for text buttons, false for `iconOnly`. */
   fullWidth?: boolean;
   haptic?: PressHaptic;
@@ -119,7 +127,7 @@ export function Button({
     scale: iconOnly ? mobileMotion.press.iconOnlyScale : mobileMotion.press.scale,
   });
 
-  const content = children ?? label;
+  const content = loading ? (loadingLabel ?? label) : (children ?? label);
   const iconNode = icon ? (
     <Ionicons color={labelColor} name={icon} size={metrics.icon} />
   ) : (
@@ -157,26 +165,18 @@ export function Button({
       ]}
     >
       <View style={[styles.content, { gap: iconOnly ? 0 : metrics.gap }]}>
-        {loading ? (
-          <ActivityIndicator color={labelColor} size="small" style={styles.spinner} />
-        ) : null}
-        {!iconOnly && iconPosition === "leading" ? iconNode : null}
-        {iconOnly ? (
-          iconNode
-        ) : content ? (
-          // Kept mounted while loading so the button doesn't resize under the
-          // finger; the spinner overlays it.
-          <Text
-            style={[
-              mobileText[LABEL_VARIANT[resolvedSize]],
-              { color: labelColor },
-              loading && styles.labelHidden,
-            ]}
-          >
+        {/* The spinner stands in for the icon while the button works, and the
+            label stays beside it: a busy button should still say what it is
+            doing. An icon-only button has no label to keep, so it is the
+            spinner alone. */}
+        {loading ? <ActivityIndicator color={labelColor} size="small" /> : null}
+        {!loading && (iconOnly || iconPosition === "leading") ? iconNode : null}
+        {!iconOnly && content ? (
+          <Text style={[mobileText[LABEL_VARIANT[resolvedSize]], { color: labelColor }]}>
             {content}
           </Text>
         ) : null}
-        {!iconOnly && iconPosition === "trailing" ? iconNode : null}
+        {!loading && !iconOnly && iconPosition === "trailing" ? iconNode : null}
       </View>
     </AnimatedPressable>
   );
@@ -291,13 +291,5 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-    },
-    spinner: {
-      ...StyleSheet.absoluteFillObject,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    labelHidden: {
-      opacity: 0,
     },
   });

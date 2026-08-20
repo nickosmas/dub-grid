@@ -74,6 +74,7 @@ import { StaffReorderListRow, StaffTableRow } from "./StaffTableRow";
 import { useStaffFilters, type EmployeeTab } from "./useStaffFilters";
 import { useStaffReorder } from "./useStaffReorder";
 import { useStaffSelection } from "./useStaffSelection";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 const REORDER_SETTLE_MS = 220;
 
@@ -951,7 +952,9 @@ export function MembersSection({
                 onClick={loadMoreDirectory}
                 disabled={directoryLoadingMore}
               >
-                {directoryLoadingMore ? "Loading…" : "Load more"}
+                <ButtonLoading loading={directoryLoadingMore} loadingLabel="Loading">
+                  Load more
+                </ButtonLoading>
               </button>
             </div>
           )}

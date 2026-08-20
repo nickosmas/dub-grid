@@ -244,8 +244,9 @@ export default function ProfileSessionsScreen() {
               signed in, not on the two ways to sign everything out. */}
           <ProfileSection>
             <Button
-              disabled={sessionScopeLoading != null}
-              label={sessionScopeLoading != null ? "Signing out..." : "Sign out devices..."}
+              label="Sign out devices..."
+              loading={sessionScopeLoading != null}
+              loadingLabel="Signing out"
               onPress={() => setScopeSheetVisible(true)}
               tone="secondary"
             />
@@ -267,6 +268,7 @@ export default function ProfileSessionsScreen() {
       <ConfirmationModal
         body={confirmationBody}
         confirmLabel="Sign Out"
+        confirmPendingLabel="Signing Out"
         confirmTone="danger"
         loading={revokeMutation.isPending || sessionScopeLoading != null}
         onCancel={() => setPendingConfirmation(null)}

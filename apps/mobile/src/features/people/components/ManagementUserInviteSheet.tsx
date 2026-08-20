@@ -239,6 +239,7 @@ export function ManagementUserInviteSheet({
             disabled={isPending || managementDepartments.length === 0}
             label="Send Invitation"
             loading={isPending}
+            loadingLabel="Sending"
             onPress={submit}
             tone="primary"
           />

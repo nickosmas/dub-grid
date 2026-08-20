@@ -162,8 +162,9 @@ export default function DomainSelector() {
               <button type="submit" disabled={loading} className="dg-btn dg-btn-primary dg-btn-lg">
                 <ButtonLoading
                   loading={loading}
+                  loadingLabel="Checking"
                   spinnerColor="var(--color-text-inverse)"
-                  spinnerSize={28}
+                  spinnerSize={20}
                 >
                   Continue
                 </ButtonLoading>

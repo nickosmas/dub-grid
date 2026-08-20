@@ -1,6 +1,7 @@
 "use client";
 
 import Modal from "@/components/Modal";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 export interface ReviewChange {
   key: string;
@@ -161,7 +162,9 @@ export default function ChangeReviewModal({
             onClick={onConfirm}
             disabled={saving}
           >
-            {saving ? "Saving…" : confirmLabel}
+            <ButtonLoading loading={saving} loadingLabel="Saving">
+              {confirmLabel}
+            </ButtonLoading>
           </button>
         </div>
       </div>

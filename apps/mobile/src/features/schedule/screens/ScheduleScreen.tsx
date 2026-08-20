@@ -241,7 +241,6 @@ type RequestActionBody =
   | { action: "respond"; empId: string; accept: boolean };
 type PendingRequestAction = {
   key: string;
-  label: string;
 } | null;
 type RequestActionConfirmation = {
   requestId: string;
@@ -789,10 +788,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
     const { requestId, body, feedback } = requestActionConfirmation;
     setRequestActionConfirmation(null);
-    setPendingAction({
-      key: feedback.key,
-      label: feedback.pendingLabel,
-    });
+    setPendingAction({ key: feedback.key });
     requestActionMutation.mutate(
       { requestId, body },
       {
@@ -2838,11 +2834,12 @@ function OpenShiftsSection({
             disabled={
               Boolean(pendingAction) || !linkedEmployeeId || item.openShift.canVolunteer === false
             }
-            label={isVolunteerLoading ? pendingAction.label : "Volunteer"}
+            label="Volunteer"
             leadingAccessory={
               <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
             }
             loading={isVolunteerLoading}
+            loadingLabel="Volunteering"
             onPress={() => {
               if (item.openShift.canVolunteer === false) {
                 return;
@@ -2927,13 +2924,7 @@ function OpenShiftsSection({
         {cardSurface}
         <Button
           disabled={isPendingVolunteerRequest || Boolean(pendingAction) || !linkedEmployeeId}
-          label={
-            isPendingVolunteerRequest
-              ? "Pending approval"
-              : isClaimLoading
-                ? pendingAction.label
-                : "Claim Shift"
-          }
+          label={isPendingVolunteerRequest ? "Pending approval" : "Claim Shift"}
           leadingAccessory={
             <Ionicons
               color={mobileColors.brand}
@@ -2942,6 +2933,7 @@ function OpenShiftsSection({
             />
           }
           loading={isClaimLoading}
+          loadingLabel="Claiming"
           onPress={() => onClaim(item.request.id)}
           tone="secondary"
         />
@@ -3172,14 +3164,16 @@ function ShiftCoverRequestsSection({
                 <View style={styles.requestActions}>
                   <Button
                     disabled={Boolean(pendingAction) || !linkedEmployeeId}
-                    label={isAcceptLoading ? pendingAction.label : "Accept"}
+                    label="Accept"
                     loading={isAcceptLoading}
+                    loadingLabel="Accepting"
                     onPress={() => onRespond(request.id, true)}
                   />
                   <Button
                     disabled={Boolean(pendingAction) || !linkedEmployeeId}
-                    label={isDeclineLoading ? pendingAction.label : "Decline"}
+                    label="Decline"
                     loading={isDeclineLoading}
+                    loadingLabel="Declining"
                     onPress={() => onRespond(request.id, false)}
                     tone="neutral"
                   />

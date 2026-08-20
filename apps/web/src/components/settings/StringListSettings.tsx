@@ -6,7 +6,8 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { SectionCard } from "./shared";
 import { useSmoothReorder } from "./useSmoothReorder";
@@ -478,7 +479,9 @@ export default function StringListSettings({
           disabled={saving || !isDirty || hasValidationErrors}
           className="dg-btn dg-btn-primary dg-btn-sm"
         >
-          {getEditorSaveLabel(saving)}
+          <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
+            {EDITOR_ACTION_LABELS.save}
+          </ButtonLoading>
         </button>
       }
       style={{

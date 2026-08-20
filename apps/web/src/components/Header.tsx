@@ -388,7 +388,8 @@ export default function Header({ orgName }: HeaderProps) {
     <ConfirmDialog
       title="Exit sandbox to sign out"
       message="You're in sandbox mode. Signing out will permanently discard your sandbox and all its changes."
-      confirmLabel={exitingForLogout ? "Signing out…" : "Exit & sign out"}
+      confirmLabel="Exit & sign out"
+      confirmPendingLabel="Signing out"
       cancelLabel="Cancel"
       variant="danger"
       isLoading={exitingForLogout}

@@ -7,12 +7,19 @@ interface ConfirmDialogProps {
   title: string;
   message: string | React.ReactNode;
   confirmLabel?: string;
+  /**
+   * The confirm action in progress ("Deleting"), shown beside the spinner while
+   * `isLoading`. Falls back to `confirmLabel`, which reads as unfinished work,
+   * so any dialog that can load should pass it.
+   */
+  confirmPendingLabel?: string;
   cancelLabel?: string;
   variant?: "danger" | "warning" | "info";
   isLoading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   secondaryConfirmLabel?: string;
+  secondaryConfirmPendingLabel?: string;
   onSecondaryConfirm?: () => void;
   isSecondaryLoading?: boolean;
   maxWidth?: number;
@@ -25,12 +32,14 @@ export default function ConfirmDialog({
   title,
   message,
   confirmLabel = "Confirm",
+  confirmPendingLabel,
   cancelLabel = "Cancel",
   variant = "danger",
   isLoading = false,
   onConfirm,
   onCancel,
   secondaryConfirmLabel,
+  secondaryConfirmPendingLabel,
   onSecondaryConfirm,
   isSecondaryLoading = false,
   maxWidth = 420,
@@ -90,7 +99,11 @@ export default function ConfirmDialog({
           onClick={onConfirm}
           disabled={actionDisabled || confirmDisabled}
         >
-          <ButtonLoading loading={isLoading} spinnerSize={16}>
+          <ButtonLoading
+            loading={isLoading}
+            loadingLabel={confirmPendingLabel ?? confirmLabel}
+            spinnerSize={16}
+          >
             {confirmLabel}
           </ButtonLoading>
         </button>
@@ -101,7 +114,11 @@ export default function ConfirmDialog({
             onClick={onSecondaryConfirm}
             disabled={actionDisabled || secondaryConfirmDisabled}
           >
-            <ButtonLoading loading={isSecondaryLoading} spinnerSize={16}>
+            <ButtonLoading
+              loading={isSecondaryLoading}
+              loadingLabel={secondaryConfirmPendingLabel ?? secondaryConfirmLabel}
+              spinnerSize={16}
+            >
               {secondaryConfirmLabel}
             </ButtonLoading>
           </button>

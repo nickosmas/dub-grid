@@ -31,6 +31,7 @@ import { formatTimezoneLabel } from "@/lib/timezones";
 import { type Employee, type Organization } from "@/types";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 // Overview tab for the gridmaster OrganizationDetail view.
 
@@ -581,6 +582,7 @@ export function OverviewTab({
               : `Are you sure you want to archive "${organization.name}"? The organization will be hidden from active listings but all data will be preserved.`
           }
           confirmLabel={organization.archivedAt ? "Restore" : "Archive"}
+          confirmPendingLabel={organization.archivedAt ? "Restoring" : "Archiving"}
           variant={organization.archivedAt ? "info" : "danger"}
           isLoading={archiving}
           onConfirm={handleArchive}
@@ -639,7 +641,9 @@ export function OverviewTab({
                 disabled={suspending}
                 style={{ flexShrink: 0 }}
               >
-                {suspending ? "Unsuspending..." : "Unsuspend"}
+                <ButtonLoading loading={suspending} loadingLabel="Unsuspending">
+                  Unsuspend
+                </ButtonLoading>
               </button>
             </>
           ) : (
@@ -727,6 +731,7 @@ export function OverviewTab({
           title="Unsuspend Organization"
           message={`Unsuspend "${organization.name}"? Members will regain access to the app.`}
           confirmLabel="Unsuspend"
+          confirmPendingLabel="Unsuspending"
           variant="warning"
           isLoading={suspending}
           onConfirm={handleUnsuspend}

@@ -126,11 +126,7 @@ export function AppLockProvider({ children }: PropsWithChildren) {
       >
         <SheetCopy body="Verify it's you to continue." />
         <SheetActions>
-          <Button
-            disabled={authenticating}
-            label={authenticating ? "Verifying…" : "Unlock"}
-            onPress={() => void attemptUnlock()}
-          />
+          <Button label="Unlock" loading={authenticating} onPress={() => void attemptUnlock()} />
         </SheetActions>
       </BottomSheetModal>
     </>

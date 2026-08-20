@@ -194,7 +194,7 @@ describe("PersonDetailScreen", () => {
 
     // A chip nests its label in its own wrapper, so the row is one level up.
     const chipRow = screen.getByText("Active").parentElement?.parentElement;
-    const accountRow = screen.getByText("Active app account").parentElement?.parentElement;
+    const accountRow = screen.getByText("App access").parentElement?.parentElement;
 
     expect(chipRow).toBe(accountRow);
     // The tier reads as the same pill the profile tab and the People rows
@@ -460,7 +460,10 @@ describe("PersonDetailScreen", () => {
       "emp-1",
     ]);
     expect(screen.getByText("Super Admin")).toBeInTheDocument();
-    expect(screen.getAllByText("Active app account")).toHaveLength(1);
+    // The account chip never repeats the status chip's word, so "Active"
+    // stays the answer to one question on this header.
+    expect(screen.getAllByText("App access")).toHaveLength(1);
+    expect(screen.queryByText("Active app account")).not.toBeInTheDocument();
     // Each staffing fact is printed exactly once: the hero grid used to preview
     // the sections below it, so the role, the focus areas and the employment
     // type all appeared twice on the way down the page.

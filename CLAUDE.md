@@ -124,6 +124,13 @@ Shared primitives to reach for before inventing a layout:
   centered max-width). Skip it for pages that own their full viewport (the
   schedule grid) or that intentionally go full-width (reports tables).
 - `<Switch>` — replaces hand-rolled 44×24 toggle buttons.
+- `<ButtonLoading>` (`components/ButtonSpinner.tsx`) — the only loading-button
+  treatment. A busy button shows **a spinner and its label**, with the label in
+  the progressive form of its own verb and no ellipsis (`[spinner] Saving`, not
+  `Saving…` and not a spinner with the label hidden), so it still says which
+  action is running. `loadingLabel` is required for that reason; a button with a
+  leading icon passes it as `icon={...}` and the spinner takes its place.
+  `<ConfirmDialog>` takes the same wording as `confirmPendingLabel`.
 - `<EditorActionRow>` — dirty-state save/discard footer used by every
   settings panel; the primary button always sits on the right.
 - `<SectionCard>` (`components/settings/shared.tsx`) — bordered/padded card
@@ -160,6 +167,11 @@ Reach for the shared primitive before inventing one:
   screen re-specifies it.
 - **`<Button>`** — all buttons. Solid fill, zero border, pill, sizes
   `sm`/`md`/`lg`, plus `iconOnly`. Every tone is solid; do not add borders back.
+  `loading` renders a spinner **beside** the label, never over it, and swaps the
+  label to `loadingLabel` — the same verb in progress ("Saving", not "Save"), no
+  ellipsis. `<ConfirmationModal>` takes it as `confirmPendingLabel`. A
+  `disabled` that repeats the loading condition is redundant; `loading` already
+  disables.
 - **`<PressableRow>`** for pressable list rows, **`usePressAnimation()`** for
   anything else pressable. iOS scales on press, Android gets a ripple and **no**
   scale — its ripple is already the state layer.

@@ -674,6 +674,9 @@ export default function PeopleScreen() {
               : "The teammate's profile will stay as it is."
         }
         confirmLabel={profileRequestConfirmation?.action === "approve" ? "Approve" : "Reject"}
+        confirmPendingLabel={
+          profileRequestConfirmation?.action === "approve" ? "Approving" : "Rejecting"
+        }
         confirmTone={
           profileRequestConfirmation?.request.type === "account_deletion" &&
           profileRequestConfirmation.action === "approve"

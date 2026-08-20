@@ -422,7 +422,7 @@ export function EmployeeManagementAccessModal({
               disabled={!canSubmit}
               style={{ opacity: canSubmit ? 1 : 0.5 }}
             >
-              <ButtonLoading loading={saving} spinnerSize={16}>
+              <ButtonLoading loading={saving} loadingLabel="Saving" spinnerSize={16}>
                 Save Access
               </ButtonLoading>
             </button>

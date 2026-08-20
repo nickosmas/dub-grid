@@ -350,8 +350,9 @@ function AcceptInviteContent() {
               >
                 <ButtonLoading
                   loading={loading}
+                  loadingLabel="Setting Password"
                   spinnerColor="var(--color-text-inverse)"
-                  spinnerSize={28}
+                  spinnerSize={20}
                 >
                   Set Password & Accept
                 </ButtonLoading>

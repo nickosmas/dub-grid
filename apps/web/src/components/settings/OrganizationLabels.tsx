@@ -14,6 +14,7 @@ import { SectionCard, labelStyle } from "./shared";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 export default function OrganizationLabels({
   organization,
@@ -288,7 +289,9 @@ export default function OrganizationLabels({
               disabled={!isModified || saving || hasFieldErrors}
               className="dg-btn dg-btn-primary"
             >
-              {saving ? "Saving…" : "Save"}
+              <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
+                {EDITOR_ACTION_LABELS.save}
+              </ButtonLoading>
             </button>
           </div>
         )}

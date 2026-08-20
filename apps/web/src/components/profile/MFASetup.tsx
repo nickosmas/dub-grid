@@ -214,6 +214,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           >
             <ButtonLoading
               loading={loading}
+              loadingLabel="Starting"
               spinnerColor="var(--color-text-inverse)"
               spinnerSize={14}
             >
@@ -242,7 +243,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         </p>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={disableMFA} disabled={loading} className="dg-btn dg-btn-danger">
-            <ButtonLoading loading={loading} spinnerSize={14}>
+            <ButtonLoading loading={loading} loadingLabel="Disabling" spinnerSize={14}>
               Confirm Disable
             </ButtonLoading>
           </button>
@@ -382,6 +383,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         >
           <ButtonLoading
             loading={loading}
+            loadingLabel="Verifying"
             spinnerColor="var(--color-text-inverse)"
             spinnerSize={14}
           >

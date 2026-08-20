@@ -237,6 +237,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                 >
                   <ButtonLoading
                     loading={saving}
+                    loadingLabel="Updating Password"
                     spinnerColor="var(--color-text-inverse)"
                     spinnerSize={16}
                   >
@@ -296,7 +297,11 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               disabled={signingOut !== null}
               className="dg-btn dg-btn-secondary"
             >
-              <ButtonLoading loading={signingOut === "others"} spinnerSize={14}>
+              <ButtonLoading
+                loading={signingOut === "others"}
+                loadingLabel="Signing Out"
+                spinnerSize={14}
+              >
                 Sign out other devices
               </ButtonLoading>
             </button>
@@ -306,7 +311,11 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               disabled={signingOut !== null}
               className="dg-btn dg-btn-danger"
             >
-              <ButtonLoading loading={signingOut === "global"} spinnerSize={14}>
+              <ButtonLoading
+                loading={signingOut === "global"}
+                loadingLabel="Signing Out"
+                spinnerSize={14}
+              >
                 Sign out everywhere
               </ButtonLoading>
             </button>
@@ -330,6 +339,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           title="Update password?"
           message="Confirm that you want to update your password. You will be signed out of every session."
           confirmLabel="Update and sign out"
+          confirmPendingLabel="Updating"
           variant="warning"
           isLoading={saving}
           onConfirm={() => void handlePasswordChange()}

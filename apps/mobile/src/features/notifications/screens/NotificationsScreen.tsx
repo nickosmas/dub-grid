@@ -320,8 +320,9 @@ export default function NotificationsScreen() {
           <Text style={styles.actionCopy}>{unreadCount} unread</Text>
           <Button
             compact
-            disabled={busy}
-            label={busy ? "Updating..." : "Mark all read"}
+            label="Mark all read"
+            loading={busy}
+            loadingLabel="Marking read"
             onPress={() => setConfirmingMarkAllRead(true)}
             tone="secondary"
           />
@@ -373,8 +374,9 @@ export default function NotificationsScreen() {
             <Button
               compact
               tone="secondary"
-              disabled={notificationsQuery.isFetchingNextPage}
-              label={notificationsQuery.isFetchingNextPage ? "Loading..." : "Load more"}
+              label="Load more"
+              loading={notificationsQuery.isFetchingNextPage}
+              loadingLabel="Loading"
               onPress={() => {
                 void notificationsQuery.fetchNextPage();
               }}
@@ -390,6 +392,7 @@ export default function NotificationsScreen() {
         }
         cancelLabel="Cancel"
         confirmLabel="Mark all read"
+        confirmPendingLabel="Marking read"
         confirmTone="primary"
         loading={busy}
         onCancel={() => setConfirmingMarkAllRead(false)}

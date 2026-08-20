@@ -81,8 +81,9 @@ export function SessionDetailSheet({
           {session.isCurrent ? null : (
             <SheetActions>
               <Button
-                disabled={revoking}
-                label={revoking ? "Signing out..." : "Sign out this device"}
+                label="Sign out this device"
+                loading={revoking}
+                loadingLabel="Signing out"
                 onPress={() => onRevoke(session)}
                 tone="danger"
               />

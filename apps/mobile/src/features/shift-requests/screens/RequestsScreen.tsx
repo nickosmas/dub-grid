@@ -104,7 +104,6 @@ type RequestActionBody =
     };
 type PendingRequestAction = {
   key: string;
-  label: string;
 } | null;
 type RequestActionConfirmation = {
   requestId: string;
@@ -537,10 +536,7 @@ export default function RequestsScreen() {
 
     const { requestId, body, feedback } = requestActionConfirmation;
     setRequestActionConfirmation(null);
-    setPendingAction({
-      key: feedback.key,
-      label: feedback.pendingLabel,
-    });
+    setPendingAction({ key: feedback.key });
     requestActionMutation.mutate(
       { requestId, body },
       {
@@ -1097,8 +1093,9 @@ function RequestCard({
                   <Button
                     compact
                     disabled={Boolean(pendingAction)}
-                    label={isLoading ? pendingAction.label : "Cancel"}
+                    label="Cancel"
                     loading={isLoading}
+                    loadingLabel="Cancelling"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1120,8 +1117,9 @@ function RequestCard({
                   <Button
                     compact
                     disabled={Boolean(pendingAction)}
-                    label={isLoading ? pendingAction.label : "Claim"}
+                    label="Claim"
                     loading={isLoading}
+                    loadingLabel="Claiming"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1144,8 +1142,9 @@ function RequestCard({
                   <Button
                     compact
                     disabled={Boolean(pendingAction)}
-                    label={isLoading ? pendingAction.label : "Accept"}
+                    label="Accept"
                     loading={isLoading}
+                    loadingLabel="Accepting"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1165,8 +1164,9 @@ function RequestCard({
                   <Button
                     compact
                     disabled={Boolean(pendingAction)}
-                    label={isLoading ? pendingAction.label : "Decline"}
+                    label="Decline"
                     loading={isLoading}
+                    loadingLabel="Declining"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1190,8 +1190,9 @@ function RequestCard({
                   <Button
                     compact
                     disabled={Boolean(pendingAction)}
-                    label={isLoading ? pendingAction.label : "Approve"}
+                    label="Approve"
                     loading={isLoading}
+                    loadingLabel="Approving"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1210,8 +1211,9 @@ function RequestCard({
                   <Button
                     compact
                     disabled={Boolean(pendingAction)}
-                    label={isLoading ? pendingAction.label : "Reject"}
+                    label="Reject"
                     loading={isLoading}
+                    loadingLabel="Rejecting"
                     onPress={() => {
                       onAction(body);
                     }}
@@ -1329,8 +1331,9 @@ function OpenShiftCard({
               <Button
                 compact
                 disabled={Boolean(pendingAction) || openShift.canVolunteer === false}
-                label={isLoading ? pendingAction.label : "Volunteer"}
+                label="Volunteer"
                 loading={isLoading}
+                loadingLabel="Volunteering"
                 onPress={() => {
                   if (openShift.canVolunteer === false) {
                     return;

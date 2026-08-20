@@ -441,6 +441,7 @@ export default function LoginScreen() {
               disabled={orgLoading || !orgSlug.trim()}
               label="Continue"
               loading={orgLoading}
+              loadingLabel="Checking"
               onPress={() => {
                 void handleOrganizationContinue();
               }}
@@ -549,6 +550,7 @@ export default function LoginScreen() {
               disabled={submitting || !isValidEmail(email) || !password}
               label="Sign In"
               loading={submitting}
+              loadingLabel="Signing In"
               onPress={() => {
                 void handleLogin();
               }}
@@ -623,6 +625,7 @@ export default function LoginScreen() {
               disabled={submitting || mfaCode.length !== 6}
               label="Verify and Sign In"
               loading={submitting}
+              loadingLabel="Verifying"
               onPress={() => {
                 void handleMfaVerify();
               }}

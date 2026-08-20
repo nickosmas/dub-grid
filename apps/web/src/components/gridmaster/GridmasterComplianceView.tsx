@@ -12,6 +12,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import { describeAuditEvent } from "@/lib/activity-log-utils";
 import { formatClientErrorMessage, formatDateTimeLabel } from "@/lib/client-facing";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
@@ -144,8 +145,14 @@ export default function GridmasterComplianceView({
           onClick={() => setExportConfirm(true)}
           disabled={exporting}
         >
-          <Upload size={16} />
-          {exporting ? "Exporting..." : "Export High-Risk Audit"}
+          <ButtonLoading
+            loading={exporting}
+            loadingLabel="Exporting"
+            spinnerSize={16}
+            icon={<Upload size={16} />}
+          >
+            Export High-Risk Audit
+          </ButtonLoading>
         </button>
       </div>
 
@@ -321,6 +328,7 @@ export default function GridmasterComplianceView({
           title="Export High-Risk Audit"
           message="Export up to 1,000 high-risk activity records?"
           confirmLabel="Export"
+          confirmPendingLabel="Exporting"
           variant="warning"
           isLoading={exporting}
           onConfirm={handleExportHighRisk}

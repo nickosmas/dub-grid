@@ -265,8 +265,9 @@ function ResetPasswordContent() {
               >
                 <ButtonLoading
                   loading={loading}
+                  loadingLabel="Resetting Password"
                   spinnerColor="var(--color-text-inverse)"
-                  spinnerSize={28}
+                  spinnerSize={20}
                 >
                   Reset Password
                 </ButtonLoading>

@@ -12,7 +12,8 @@ import {
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import {
   getCodeError,
@@ -834,7 +835,9 @@ function DepartmentSection({
           disabled={saving || !isDirty || hasValidationErrors}
           className="dg-btn dg-btn-primary dg-btn-sm"
         >
-          {getEditorSaveLabel(saving)}
+          <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
+            {EDITOR_ACTION_LABELS.save}
+          </ButtonLoading>
         </button>
       }
       style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}

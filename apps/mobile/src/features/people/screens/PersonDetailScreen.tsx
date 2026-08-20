@@ -585,18 +585,21 @@ export default function PersonDetailScreen() {
   // describing something that never happened. Same split web makes.
   const isOnSchedule = person.focusAreaIds.length > 0;
   const orgRoleBadge = getMobileOrgRoleHeroBadge(person.orgRole);
-  // The three app-account states, as one chip. Only the middle one is a state
-  // anyone has to act on, so it is the only one that takes a colour.
+  // The three app-account states, as one chip, in the same words the People
+  // rows use. None of them says "Active": that word belongs to the staff-status
+  // chip beside this one, and printing it twice made the pair read as two
+  // answers to the same question rather than two different facts. Only the
+  // middle state is one anyone has to act on, so it is the only one with colour.
   const accountChip = person.userId
     ? {
-        label: "Active app account",
+        label: "App access",
         tone: "neutral" as const,
         icon: "phone-portrait-outline" as const,
       }
     : person.pendingInvitation
       ? { label: "Invitation pending", tone: "warning" as const, icon: "mail-outline" as const }
       : {
-          label: "No app invitation sent",
+          label: "No app access",
           tone: "neutral" as const,
           icon: "mail-open-outline" as const,
         };
@@ -656,6 +659,14 @@ export default function PersonDetailScreen() {
       : confirmAction === "activate"
         ? "Activate"
         : "Remove";
+  const statusPendingLabel =
+    confirmAction === "deactivate"
+      ? deactivateRemoves
+        ? "Removing"
+        : "Updating"
+      : confirmAction === "activate"
+        ? "Activating"
+        : "Removing";
   const invitationConfirmationTitle =
     invitationConfirmAction === "create"
       ? "Send invitation?"
@@ -674,6 +685,7 @@ export default function PersonDetailScreen() {
       : invitationConfirmAction === "resend"
         ? "Reissue Invitation"
         : "Revoke Invitation";
+  const invitationPendingLabel = invitationConfirmAction === "revoke" ? "Revoking" : "Sending";
 
   return (
     <Screen
@@ -775,7 +787,7 @@ export default function PersonDetailScreen() {
         <EditPanel
           certificationLabel={certificationLabel}
           certifications={bootstrapQuery.data?.certifications ?? []}
-          disabled={updateMutation.isPending}
+          saving={updateMutation.isPending}
           draft={draft}
           focusAreaLabel={focusAreaLabel}
           focusAreas={bootstrapQuery.data?.focusAreas ?? []}
@@ -911,8 +923,9 @@ export default function PersonDetailScreen() {
                 <ProfileActionRow>
                   <Button
                     compact
-                    disabled={invitationMutation.isPending}
-                    label={invitationMutation.isPending ? "Sending..." : "Reinvite"}
+                    label="Reinvite"
+                    loading={invitationMutation.isPending}
+                    loadingLabel="Sending"
                     onPress={() => setInvitationConfirmAction("resend")}
                     tone="link"
                   />
@@ -927,8 +940,9 @@ export default function PersonDetailScreen() {
               ) : (
                 <Button
                   compact
-                  disabled={invitationMutation.isPending}
-                  label={invitationMutation.isPending ? "Sending..." : "Send Invitation"}
+                  label="Send Invitation"
+                  loading={invitationMutation.isPending}
+                  loadingLabel="Sending"
                   onPress={() => setInvitationConfirmAction("create")}
                   tone="link"
                 />
@@ -947,7 +961,9 @@ export default function PersonDetailScreen() {
               <Button
                 compact
                 disabled={statusMutation.isPending || isSelf}
-                label={statusMutation.isPending ? "Updating..." : "Activate"}
+                label="Activate"
+                loading={statusMutation.isPending}
+                loadingLabel="Activating"
                 onPress={() => setConfirmAction("activate")}
                 tone="success"
               />
@@ -981,6 +997,7 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body="The staff profile will be updated."
         confirmLabel="Save"
+        confirmPendingLabel="Saving"
         loading={updateMutation.isPending}
         onCancel={() => setShowSaveConfirmation(false)}
         onConfirm={confirmSave}
@@ -991,6 +1008,7 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body={statusConfirmationBody}
         confirmLabel={statusConfirmationLabel}
+        confirmPendingLabel={statusPendingLabel}
         confirmTone={
           confirmAction === "deactivate"
             ? deactivateRemoves
@@ -1052,6 +1070,7 @@ export default function PersonDetailScreen() {
       <ConfirmationModal
         body={invitationConfirmationBody}
         confirmLabel={invitationConfirmationLabel}
+        confirmPendingLabel={invitationPendingLabel}
         confirmTone={invitationConfirmAction === "revoke" ? "danger" : "primary"}
         loading={invitationMutation.isPending}
         onCancel={() => setInvitationConfirmAction(null)}
@@ -1122,9 +1141,9 @@ function AccountLinkChallengeModal({
       <View style={styles.modalActionStack}>
         <Button
           disabled={isPending}
-          label={
-            isPending ? "Linking..." : isMismatch ? "Use Account Name" : "Link Existing Account"
-          }
+          label={isMismatch ? "Use Account Name" : "Link Existing Account"}
+          loading={isPending}
+          loadingLabel="Linking"
           onPress={onConfirm}
           tone="secondary"
         />
@@ -1161,7 +1180,7 @@ function formatNameList(names: string[]): string {
 
 function EditPanel({
   draft,
-  disabled,
+  saving,
   focusAreaLabel,
   focusAreas,
   certificationLabel,
@@ -1175,7 +1194,7 @@ function EditPanel({
   onSave,
 }: {
   draft: EditDraft;
-  disabled: boolean;
+  saving: boolean;
   focusAreaLabel: string;
   focusAreas: MobileFocusArea[];
   certificationLabel: string;
@@ -1223,7 +1242,7 @@ function EditPanel({
           <ProfileTextInput
             accessibilityLabel="First name"
             autoCapitalize="words"
-            editable={!disabled}
+            editable={!saving}
             error={fieldErrors.firstName}
             focused={focusedField === "firstName"}
             label="First name"
@@ -1236,7 +1255,7 @@ function EditPanel({
           <ProfileTextInput
             accessibilityLabel="Last name"
             autoCapitalize="words"
-            editable={!disabled}
+            editable={!saving}
             error={fieldErrors.lastName}
             focused={focusedField === "lastName"}
             label="Last name"
@@ -1253,7 +1272,7 @@ function EditPanel({
         <ProfilePanel>
           <ProfileTextInput
             accessibilityLabel="Phone"
-            editable={!disabled}
+            editable={!saving}
             error={fieldErrors.phone}
             focused={focusedField === "phone"}
             keyboardType="phone-pad"
@@ -1272,7 +1291,7 @@ function EditPanel({
           <ProfileTextInput
             accessibilityLabel="Email"
             autoCapitalize="none"
-            editable={!disabled}
+            editable={!saving}
             error={fieldErrors.email}
             focused={focusedField === "email"}
             keyboardType="email-address"
@@ -1342,7 +1361,7 @@ function EditPanel({
         <ProfilePanel>
           <ProfileTextInput
             accessibilityLabel="Internal notes"
-            editable={!disabled}
+            editable={!saving}
             error={fieldErrors.contactNotes}
             focused={focusedField === "contactNotes"}
             label="Internal notes"
@@ -1359,18 +1378,20 @@ function EditPanel({
       <View style={styles.actionsRow}>
         <Button
           compact
-          disabled={disabled || !hasChanges || hasValidationErrors}
-          label={disabled ? "Saving..." : "Save changes"}
+          disabled={saving || !hasChanges || hasValidationErrors}
+          label="Save changes"
+          loading={saving}
+          loadingLabel="Saving"
           onPress={onSave}
         />
         <Button
           compact
-          disabled={disabled || !hasChanges}
+          disabled={saving || !hasChanges}
           label="Discard"
           onPress={onDiscard}
           tone="neutral"
         />
-        <Button compact disabled={disabled} label="Cancel" onPress={onCancel} tone="ghost" />
+        <Button compact disabled={saving} label="Cancel" onPress={onCancel} tone="ghost" />
       </View>
     </>
   );

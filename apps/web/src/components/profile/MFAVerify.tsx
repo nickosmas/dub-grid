@@ -167,8 +167,9 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
           >
             <ButtonLoading
               loading={loading}
+              loadingLabel="Verifying"
               spinnerColor="var(--color-text-inverse)"
-              spinnerSize={28}
+              spinnerSize={20}
             >
               Verify
             </ButtonLoading>

@@ -601,6 +601,7 @@ export default function NotificationBell({
               : `This marks all ${unreadCount} unread alerts as read.`
           }
           confirmLabel="Mark all read"
+          confirmPendingLabel="Marking read"
           variant="info"
           onConfirm={handleConfirmMarkAllRead}
           onCancel={() => setConfirmingMarkAllRead(false)}

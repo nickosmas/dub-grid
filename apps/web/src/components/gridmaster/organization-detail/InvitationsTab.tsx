@@ -7,6 +7,7 @@ import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/cli
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import { useState } from "react";
 import { toast } from "sonner";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 // Invitations tab for the gridmaster OrganizationDetail view.
 
@@ -163,7 +164,9 @@ export function InvitationsTab({
                             onClick={() => setRevokeConfirm(inv)}
                             disabled={revoking === inv.id}
                           >
-                            {revoking === inv.id ? "Revoking..." : "Revoke"}
+                            <ButtonLoading loading={revoking === inv.id} loadingLabel="Revoking">
+                              Revoke
+                            </ButtonLoading>
                           </button>
                         )}
                       </td>
@@ -181,6 +184,7 @@ export function InvitationsTab({
           title="Revoke Invitation"
           message={`Revoke the invitation for "${revokeConfirm.email}"? They will not be able to use the current invite link after this change.`}
           confirmLabel="Revoke Invitation"
+          confirmPendingLabel="Revoking"
           variant="danger"
           isLoading={revoking === revokeConfirm.id}
           onConfirm={() => {

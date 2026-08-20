@@ -18,7 +18,7 @@ import { SectionCard } from "@/components/settings/shared";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { formatClientLabel } from "@/lib/client-facing";
-import { getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import {
   cancelOwnProfileChangeRequest,
@@ -36,6 +36,7 @@ import { AddManagementUserToScheduleModal } from "@/components/staff/AddManageme
 import type { Department, Employee, FocusArea, NamedItem } from "@/types";
 import type { User } from "@supabase/supabase-js";
 import type { Dispatch, SetStateAction } from "react";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 interface ProfilePanelProps {
   user: User | null;
@@ -415,6 +416,7 @@ export function ProfilePanel({
           title: "Save changes?",
           message: "Confirm that you want to save these account and contact changes.",
           confirmLabel: "Confirm save",
+          confirmPendingLabel: EDITOR_ACTION_LABELS.saving,
           variant: "info" as const,
           loading: saving,
         }
@@ -423,6 +425,7 @@ export function ProfilePanel({
             title: "Send request?",
             message: "Confirm that you want to send this name change request.",
             confirmLabel: "Confirm request",
+            confirmPendingLabel: "Sending",
             variant: "info" as const,
             loading: submittingRequest,
           }
@@ -432,6 +435,7 @@ export function ProfilePanel({
               message:
                 "Confirm that you want to request account deletion. An admin will review and approve before your account is removed.",
               confirmLabel: "Request deletion",
+              confirmPendingLabel: "Requesting",
               variant: "danger" as const,
               loading: requestingDeletion,
             }
@@ -525,8 +529,14 @@ export function ProfilePanel({
                   disabled={saving || !hasAnyChanges || hasInvalidDraft}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
-                  <Check size={14} />
-                  {saving ? "Saving..." : "Save changes"}
+                  <ButtonLoading
+                    loading={saving}
+                    loadingLabel={EDITOR_ACTION_LABELS.saving}
+                    spinnerSize={14}
+                    icon={<Check size={14} />}
+                  >
+                    Save changes
+                  </ButtonLoading>
                 </button>
                 <button
                   type="button"
@@ -604,8 +614,14 @@ export function ProfilePanel({
                     disabled={savingAccess || !accessHasChanges || accessWouldOrphan}
                     className="dg-btn dg-btn-primary dg-btn-sm"
                   >
-                    <Check size={14} />
-                    {savingAccess ? "Saving..." : "Save changes"}
+                    <ButtonLoading
+                      loading={savingAccess}
+                      loadingLabel={EDITOR_ACTION_LABELS.saving}
+                      spinnerSize={14}
+                      icon={<Check size={14} />}
+                    >
+                      Save changes
+                    </ButtonLoading>
                   </button>
                   <button
                     type="button"
@@ -682,7 +698,12 @@ export function ProfilePanel({
                   disabled={cancellingId === pendingNameRequest.id}
                   className="dg-btn dg-btn-secondary dg-btn-sm ml-3"
                 >
-                  {cancellingId === pendingNameRequest.id ? "Cancelling..." : "Cancel request"}
+                  <ButtonLoading
+                    loading={cancellingId === pendingNameRequest.id}
+                    loadingLabel="Cancelling"
+                  >
+                    Cancel request
+                  </ButtonLoading>
                 </button>
               </div>
             )}
@@ -734,7 +755,9 @@ export function ProfilePanel({
               onClick={requestNameChange}
               className="dg-btn dg-btn-secondary dg-btn-sm self-start"
             >
-              {submittingRequest ? "Sending..." : "Request name change"}
+              <ButtonLoading loading={submittingRequest} loadingLabel="Sending Request">
+                Request name change
+              </ButtonLoading>
             </button>
             {loadingChangeRequests ? (
               <span
@@ -779,7 +802,12 @@ export function ProfilePanel({
                   disabled={cancellingId === pendingDeletion.id}
                   className="dg-btn dg-btn-secondary dg-btn-sm ml-3"
                 >
-                  {cancellingId === pendingDeletion.id ? "Cancelling..." : "Cancel request"}
+                  <ButtonLoading
+                    loading={cancellingId === pendingDeletion.id}
+                    loadingLabel="Cancelling"
+                  >
+                    Cancel request
+                  </ButtonLoading>
                 </button>
               </div>
             ) : (
@@ -789,8 +817,14 @@ export function ProfilePanel({
                 disabled={requestingDeletion || !orgId}
                 className="dg-btn dg-btn-danger self-start"
               >
-                <Trash2 size={14} style={{ marginRight: 4 }} />
-                {requestingDeletion ? "Requesting..." : "Request account deletion"}
+                <ButtonLoading
+                  loading={requestingDeletion}
+                  loadingLabel="Requesting"
+                  spinnerSize={14}
+                  icon={<Trash2 size={14} style={{ marginRight: 4 }} />}
+                >
+                  Request account deletion
+                </ButtonLoading>
               </button>
             )}
           </div>
@@ -802,6 +836,7 @@ export function ProfilePanel({
           title={confirmation.title}
           message={confirmation.message}
           confirmLabel={confirmation.confirmLabel}
+          confirmPendingLabel={confirmation.confirmPendingLabel}
           variant={confirmation.variant}
           isLoading={confirmation.loading}
           onConfirm={confirmPending}

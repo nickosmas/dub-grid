@@ -120,9 +120,14 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
           boxShadow: "0 4px 16px rgba(37, 99, 235, 0.25)",
         }}
       >
-        <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={20}>
+        <ButtonLoading
+          loading={loading}
+          loadingLabel="Finishing"
+          spinnerColor="var(--color-text-inverse)"
+          spinnerSize={20}
+        >
           {ctaLabel}
-          {!loading && <ArrowRight size={18} />}
+          <ArrowRight size={18} />
         </ButtonLoading>
       </button>
 

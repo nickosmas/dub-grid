@@ -387,7 +387,6 @@ export default function ProfileWorkScreen() {
               canEditProfileDirectly={canEditProfileDirectly}
               certificationLabel={profile.currentOrg.labels.certification}
               certifications={certifications}
-              disabled={saveMutation.isPending}
               draft={draft}
               focusAreaLabel={profile.currentOrg.labels.focusArea}
               focusAreas={focusAreas}
@@ -427,6 +426,7 @@ export default function ProfileWorkScreen() {
               }}
               roleLabel={profile.currentOrg.labels.role}
               roles={roles}
+              saving={saveMutation.isPending}
             />
           ) : (
             <>
@@ -548,6 +548,7 @@ export default function ProfileWorkScreen() {
               : "Your changes will be saved."
         }
         confirmLabel={isNameRequest ? "Send request" : "Save"}
+        confirmPendingLabel={isNameRequest ? "Sending" : "Saving"}
         loading={saveMutation.isPending}
         onCancel={() => setShowSaveConfirmation(false)}
         onConfirm={() => {
@@ -566,7 +567,6 @@ function EditPanel({
   canEditProfileDirectly,
   certificationLabel,
   certifications,
-  disabled,
   draft,
   focusAreaLabel,
   focusAreas,
@@ -579,11 +579,11 @@ function EditPanel({
   onSave,
   roleLabel,
   roles,
+  saving,
 }: {
   canEditProfileDirectly: boolean;
   certificationLabel: string;
   certifications: MobileNamedItem[];
-  disabled: boolean;
   draft: ProfileDraft;
   focusAreaLabel: string;
   focusAreas: MobileFocusArea[];
@@ -596,6 +596,7 @@ function EditPanel({
   onSave: () => void;
   roleLabel: string;
   roles: MobileNamedItem[];
+  saving: boolean;
 }) {
   const [focusedField, setFocusedField] = useState<
     "firstName" | "lastName" | "email" | "phone" | "requestNote" | null
@@ -639,7 +640,7 @@ function EditPanel({
           <ProfileTextInput
             accessibilityLabel="First name"
             autoCapitalize="words"
-            editable={!disabled}
+            editable={!saving}
             error={fieldErrors.firstName}
             focused={focusedField === "firstName"}
             label="First name"
@@ -652,7 +653,7 @@ function EditPanel({
           <ProfileTextInput
             accessibilityLabel="Last name"
             autoCapitalize="words"
-            editable={!disabled}
+            editable={!saving}
             error={fieldErrors.lastName}
             focused={focusedField === "lastName"}
             label="Last name"
@@ -665,7 +666,7 @@ function EditPanel({
           <ProfileTextInput
             accessibilityLabel="Email"
             autoCapitalize="none"
-            editable={!disabled}
+            editable={!saving}
             error={fieldErrors.email}
             focused={focusedField === "email"}
             keyboardType="email-address"
@@ -679,7 +680,7 @@ function EditPanel({
           {hasLinkedEmployee ? (
             <ProfileTextInput
               accessibilityLabel="Phone"
-              editable={!disabled}
+              editable={!saving}
               error={fieldErrors.phone}
               focused={focusedField === "phone"}
               keyboardType="phone-pad"
@@ -758,7 +759,7 @@ function EditPanel({
           <ProfilePanel>
             <ProfileTextInput
               accessibilityLabel="Note for admins"
-              editable={!disabled}
+              editable={!saving}
               error={fieldErrors.requestNote}
               focused={focusedField === "requestNote"}
               label="Note for admins (optional)"
@@ -776,26 +777,20 @@ function EditPanel({
       <View style={styles.actionsRow}>
         <Button
           compact
-          disabled={disabled || !hasChanges || hasValidationErrors}
-          label={
-            disabled
-              ? isNameRequest
-                ? "Sending..."
-                : "Saving..."
-              : isNameRequest
-                ? "Send request"
-                : "Save changes"
-          }
+          disabled={saving || !hasChanges || hasValidationErrors}
+          label={isNameRequest ? "Send request" : "Save changes"}
+          loading={saving}
+          loadingLabel={isNameRequest ? "Sending" : "Saving"}
           onPress={onSave}
         />
         <Button
           compact
-          disabled={disabled || !hasChanges}
+          disabled={saving || !hasChanges}
           label="Discard"
           onPress={onDiscard}
           tone="neutral"
         />
-        <Button compact disabled={disabled} label="Cancel" onPress={onCancel} tone="ghost" />
+        <Button compact disabled={saving} label="Cancel" onPress={onCancel} tone="ghost" />
       </View>
     </>
   );

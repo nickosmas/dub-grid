@@ -1501,6 +1501,9 @@ export default function ShiftEditPanel({
                 ? "Submit call off"
                 : "Submit swap"
         }
+        confirmPendingLabel={
+          pendingRequestConfirmation.kind === "pickup" ? "Offering" : "Submitting"
+        }
         variant={pendingRequestConfirmation.kind === "calloff" ? "danger" : "info"}
         isLoading={isSubmittingRequestConfirmation}
         onConfirm={() => void confirmPendingRequest()}
@@ -4030,7 +4033,11 @@ export default function ShiftEditPanel({
               style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
               disabled={isCreatingRepeatSeries}
             >
-              <ButtonLoading loading={isCreatingRepeatSeries} spinnerSize={16}>
+              <ButtonLoading
+                loading={isCreatingRepeatSeries}
+                loadingLabel="Creating"
+                spinnerSize={16}
+              >
                 {isAbsence ? "Create Repeating Off Day" : "Create Repeating Shift"}
               </ButtonLoading>
             </button>
