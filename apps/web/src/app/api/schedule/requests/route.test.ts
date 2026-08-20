@@ -14,7 +14,7 @@ vi.mock("@/app/api/shared/permissions", () => ({
 }));
 
 vi.mock("@/app/api/shared/schedule", () => ({
-  fetchAssignmentIdByPairMap: vi.fn(),
+  fetchSegmentResolutionMaps: vi.fn(),
 }));
 
 vi.mock("@/features/notifications/server", () => ({

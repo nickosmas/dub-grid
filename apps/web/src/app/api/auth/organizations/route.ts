@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
+import { SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 import logger from "@/lib/logger";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
@@ -64,7 +65,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to switch organization." }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true });
+    // A sandbox must not survive the switch. The cookie is host-only and
+    // path=/, and while it is set the auth layer rewrites org_id to the sandbox
+    // clone and widens org_role to super_admin for every request. Left in
+    // place, the user "switches to org B" and then keeps reading and writing a
+    // clone of org A, at an elevated role, for up to the cookie's week-long
+    // lifetime. Clearing it here (rather than relying on the client's
+    // fire-and-forget exitSandbox) makes the switch itself the guarantee.
+    //
+    // Only the cookie is cleared, not the sandbox org: `exit` deletes the row,
+    // and doing that here would silently destroy work the user never asked to
+    // discard. It is re-attachable by pressing Enter again.
+    const response = NextResponse.json({ success: true });
+    response.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
+    return response;
   } catch (error) {
     logger.error({ error }, "auth organizations POST failed");
     return NextResponse.json({ error: "Failed to switch organization" }, { status: 500 });

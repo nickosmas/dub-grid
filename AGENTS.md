@@ -100,7 +100,7 @@ files unless explicitly requested or required for correctness.
   private keys, cookies, or session values.
 - Do not read `.env.local`, `.env.remote`, or app-local `.env.local` unless
   explicitly necessary; use `.env.example` files for variable name reference only.
-- Server-only secrets: `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`,
+- Server-only secrets: `SUPABASE_SECRET_KEY`, `RESEND_API_KEY`,
   `UPSTASH_REDIS_REST_TOKEN`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
   `SENTRY_AUTH_TOKEN`, `EXPO_ACCESS_TOKEN`, DB passwords and tokens.
 - Public web: `NEXT_PUBLIC_*` (browser-visible). Public mobile: `EXPO_PUBLIC_*` (bundled).
@@ -187,7 +187,7 @@ High-risk changes include:
 ## Database and Supabase Safety
 
 - Never weaken RLS policies or grants without explicit approval.
-- Never use `SUPABASE_SERVICE_ROLE_KEY` in client-side, mobile, or browser-bundled code.
+- Never use `SUPABASE_SECRET_KEY` in client-side, mobile, or browser-bundled code.
 - Do not write destructive SQL unless explicitly requested and rollback is documented.
 - After schema changes: update the relevant migration file, consider `npm run db:reset`,
   run `npm run gen:types` if the generated-types workflow is affected.

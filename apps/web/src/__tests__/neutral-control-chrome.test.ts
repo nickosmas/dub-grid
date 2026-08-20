@@ -149,19 +149,36 @@ describe("shared chrome theming", () => {
     }
   });
 
-  it("uses soft blue tokens for shared active navigation chrome", () => {
-    expect(globalsCss).toMatch(
-      /\.dg-nav-tab\.active\s*\{[\s\S]*background: var\(--color-brand-bg\);[\s\S]*border-color: var\(--color-brand-border\);[\s\S]*color: var\(--color-brand\);[\s\S]*\}/,
-    );
+  it("uses the neutral highlight token for shared active navigation chrome", () => {
+    const activeNavTab = globalsCss.match(/\.dg-nav-tab\.active\s*\{([\s\S]*?)\}/)?.[1] ?? "";
+
+    // Gray background + near-black text, not brand blue — see `navActiveBg`
+    // in @dubgrid/design-tokens.
+    expect(activeNavTab).toContain("background: var(--color-nav-active-bg);");
+    expect(activeNavTab).toContain("color: var(--color-text-primary);");
+    // Highlighting is background + color only — the active tab has no border.
+    expect(activeNavTab).not.toMatch(/border/);
   });
 
   it("uses the navbar-link highlight recipe for app sidebars", () => {
     // SettingsPage delegates its sidebar chrome to SettingsShell, so the
     // highlight recipe lives on the shell now.
     for (const source of [settingsShell, gridmasterPortal, staffView]) {
-      expect(source).toContain("data-[active=true]:bg-[var(--color-brand-bg)]");
-      expect(source).toContain("data-[active=true]:text-[var(--color-brand)]");
+      expect(source).toContain("data-[active=true]:bg-[var(--color-nav-active-bg)]");
+      expect(source).toContain("data-[active=true]:text-[var(--color-text-primary)]");
+      // No border/ring on the active item, matching the navbar tabs.
+      expect(source).not.toMatch(/data-\[active=true\]:ring-/);
+      // Active sidebar chrome is fully neutral: the icon wrapper follows the
+      // label rather than being tinted brand blue.
+      expect(source).not.toMatch(/text-\[var\(--color-brand\)\]/);
     }
+  });
+
+  it("keeps the sidebar menu button's active state borderless", () => {
+    // focus-visible:ring-2 must stay — that is the keyboard focus indicator,
+    // not the active highlight.
+    expect(sidebarPrimitive).not.toMatch(/data-active:ring-/);
+    expect(sidebarPrimitive).toContain("focus-visible:ring-2");
   });
 
   it("keeps audited primary buttons and selectors on theme blue", () => {

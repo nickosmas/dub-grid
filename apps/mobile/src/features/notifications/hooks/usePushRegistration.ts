@@ -80,13 +80,20 @@ export function usePushRegistration(
   const [error, setError] = useState<unknown | null>(null);
   const attemptedKeyRef = useRef<string | null>(null);
 
+  /**
+   * Resolves true only when the device row was actually written for the current
+   * org. The auto-register effect below uses that to decide whether it may stop
+   * trying: the push row is keyed on the Expo token and carries an `org_id`, so
+   * a registration that never lands after an org switch leaves the device
+   * receiving the PREVIOUS org's notifications.
+   */
   async function refreshPushRegistration(options?: {
     requestPermission?: boolean;
     disable?: boolean;
-  }) {
+  }): Promise<boolean> {
     if (pushUnsupported || !accessToken || !currentOrgId) {
       setPermissionState("unsupported");
-      return;
+      return false;
     }
 
     setIsRegistering(true);
@@ -96,7 +103,7 @@ export function usePushRegistration(
       const notifications = await loadNotifications();
       if (!notifications) {
         setPermissionState("unsupported");
-        return;
+        return false;
       }
 
       let permissions = await notifications.getPermissionsAsync();
@@ -112,25 +119,27 @@ export function usePushRegistration(
       if (options?.disable) {
         const storedDevice = await loadStoredPushDevice();
         if (!storedDevice) {
-          return;
+          return true;
         }
 
         await registerPushToken(accessToken, {
           ...storedDevice,
           disabled: true,
         });
-        return;
+        return true;
       }
 
       if (!permissionSnapshot.granted) {
-        return;
+        return false;
       }
 
       const device = await getStoredOrFreshPushDevice(notifications);
       await registerPushToken(accessToken, device);
       await saveStoredPushDevice(device);
+      return true;
     } catch (registrationError) {
       setError(registrationError);
+      return false;
     } finally {
       setIsRegistering(false);
     }
@@ -146,8 +155,18 @@ export function usePushRegistration(
       return;
     }
 
+    // Latched up front so a re-render cannot start a second registration for
+    // the same key, then RELEASED again if that attempt did not land. Latching
+    // once and never releasing meant a registration that failed — offline, a
+    // 5xx, a timeout — was never retried, and after an org switch the device
+    // kept the previous org's id on its push row and went on receiving that
+    // org's notifications.
     attemptedKeyRef.current = nextKey;
-    void refreshPushRegistration({ requestPermission: true });
+    void refreshPushRegistration({ requestPermission: true }).then((registered) => {
+      if (!registered && attemptedKeyRef.current === nextKey) {
+        attemptedKeyRef.current = null;
+      }
+    });
   }, [accessToken, autoRegister, currentOrgId]);
 
   useEffect(() => {

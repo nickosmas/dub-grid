@@ -41,6 +41,7 @@
   --color-brand: var(--dg-color-brand);
   --color-brand-light: var(--dg-color-brand-light);
   --color-brand-bg: var(--dg-color-brand-bg);
+  --color-nav-active-bg: var(--dg-color-nav-active-bg);
   --color-brand-border: var(--dg-color-brand-border);
   --color-primary: var(--dg-color-primary);
   --color-link: var(--dg-color-link);
@@ -90,6 +91,11 @@
    ============================================================ */
 :root {
   /* Shared runtime tokens are injected from @dubgrid/design-tokens in layout.tsx. */
+
+  /* Canonical horizontal page gutter. The header logo and every page's left
+     content edge use this and nothing else, so the logo lands on the same
+     pixel on every route — see PageContainer and Header. */
+  --dg-page-gutter: 16px;
 }
 
 html,
@@ -687,10 +693,11 @@ textarea {
   outline-offset: 2px;
 }
 
+/* Active state is background + color only — no border. The transparent
+   border on the base class stays so the tab's geometry never shifts. */
 .dg-nav-tab.active {
-  background: var(--color-brand-bg);
-  border-color: var(--color-brand-border);
-  color: var(--color-brand);
+  background: var(--color-nav-active-bg);
+  color: var(--color-text-primary);
 }
 
 /* ── Sub Tab (Settings / Contextual Tier 2) ─────────────── */

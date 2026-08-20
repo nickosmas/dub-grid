@@ -1,7 +1,5 @@
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Redirect } from "expo-router";
-import { AppState } from "react-native";
-import { AppSplashScreen } from "../../../shared/components/AppSplashScreen";
 import { useBootstrap } from "./useBootstrap";
 import { OrganizationLockedScreen } from "../screens/OrganizationLockedScreen";
 import { usePushRegistration } from "../../notifications/hooks/usePushRegistration";
@@ -31,26 +29,32 @@ export function useTabsGate(): TabsGateResult {
   usePushRegistration(accessToken, lockedMessage ? null : bootstrapQuery.data?.currentOrg.id);
   usePushResponseHandler(Boolean(accessToken));
 
-  useEffect(() => {
-    if (!accessToken) {
-      return;
-    }
+  // No explicit AppState listener here: `NetworkStateProvider` drives
+  // react-query's `focusManager`, which already refetches bootstrap on
+  // foreground once it's past `staleTime`. The listener this replaced also
+  // depended on the whole query object, so it was torn down and re-added on
+  // every render.
 
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        void bootstrapQuery.refetch();
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [accessToken, bootstrapQuery]);
-
-  if (isLoading) {
+  // Bootstrap blocks alongside the session, because until it lands nobody
+  // knows who this is. The Home tab has to pick between the admin dashboard
+  // and the personal schedule, and defaulting to one meant an admin got the
+  // schedule's skeleton first and the dashboard's second — two waves, the
+  // first of them the wrong shape. The tab bar has the same problem: every
+  // `canView*` below is false while bootstrap is in flight, so tabs popped in
+  // afterwards.
+  //
+  // Renders nothing rather than a splash: `StartupSplashGate` owns the one
+  // splash instance and is still covering the screen whenever this is reached
+  // on a cold launch. A second instance here restarted the whole brand
+  // animation mid-handoff, which is what read as a double splash.
+  //
+  // `isLoading` (not `isFetching`) so this is the cold first load only —
+  // refetches and org switches keep showing the screen you are on. Bootstrap is
+  // keyed by user id, so a token refresh no longer lands back in here either.
+  if (isLoading || bootstrapQuery.isLoading) {
     return {
       kind: "blocked",
-      element: <AppSplashScreen />,
+      element: null,
     };
   }
 

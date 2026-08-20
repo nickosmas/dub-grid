@@ -162,9 +162,37 @@ export function buildScheduleShiftGroups(
     }));
 }
 
+/**
+ * People, not rows: an employee working a split shift has several entries on
+ * the same day and must still count once.
+ */
+function countFocusAreaPeople(
+  entries: ReadonlyArray<ScheduleEntryLike>,
+  focusAreaId: number,
+): number {
+  const employeeIds = new Set<string>();
+
+  for (const entry of entries) {
+    if (getScheduleEntryFocusAreaId(entry) === focusAreaId) {
+      employeeIds.add(entry.employeeId);
+    }
+  }
+
+  return employeeIds.size;
+}
+
+/**
+ * @param entries Decides which tabs exist. Pass the whole loaded range so the
+ *   tab set stays put as the user moves between days.
+ * @param countEntries Decides each badge number. Pass just the selected day —
+ *   counting the full range instead multiplies every badge by the number of
+ *   days loaded, since the same person recurs on each one. Defaults to
+ *   `entries` so existing callers keep their current behaviour.
+ */
 export function buildTeamScheduleFocusAreaTabs(
   focusAreas: ReadonlyArray<MobileFocusArea>,
   entries: ReadonlyArray<ScheduleEntryLike>,
+  countEntries: ReadonlyArray<ScheduleEntryLike> = entries,
 ): TeamScheduleFocusAreaTab[] {
   if (entries.length === 0 && focusAreas.length === 0) {
     return [];
@@ -190,7 +218,7 @@ export function buildTeamScheduleFocusAreaTabs(
   const tabs = Array.from(focusAreasById.values()).map((focusArea) => ({
     key: `focus-area:${focusArea.id}`,
     label: focusArea.name,
-    count: entries.filter((entry) => getScheduleEntryFocusAreaId(entry) === focusArea.id).length,
+    count: countFocusAreaPeople(countEntries, focusArea.id),
     focusAreaId: focusArea.id,
   }));
 

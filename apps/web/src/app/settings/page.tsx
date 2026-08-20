@@ -27,7 +27,7 @@ function BillingRecoverySettings({ orgId }: { orgId: string }) {
           width: "100%",
           maxWidth: 980,
           margin: "0 auto",
-          padding: "32px 40px",
+          padding: "32px var(--dg-page-gutter)",
         }}
       >
         <BillingSettings organization={{ id: orgId }} />

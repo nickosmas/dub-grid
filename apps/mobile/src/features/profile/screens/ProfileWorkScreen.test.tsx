@@ -1,6 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
+import {
+  navigatedActions,
+  pressBack,
+  resetNavigationShim,
+} from "../../../test/shims/react-navigation-native";
 
 const useMutation = vi.fn();
 const useQuery = vi.fn();
@@ -101,18 +106,22 @@ const profileData = {
     departmentIds: [7],
     contactNotes: "",
     version: 4,
+    employeeNumber: 87,
   },
   focusAreas: [
     {
       id: 2,
       name: "ICU",
+      departmentId: 7,
     },
   ],
+  managementDepartmentIds: [10],
   pendingProfileChangeRequest: false,
 };
 
 describe("ProfileWorkScreen", () => {
   beforeEach(() => {
+    resetNavigationShim();
     useMutation.mockReset();
     useQuery.mockReset();
     useAccessToken.mockReset();
@@ -134,6 +143,10 @@ describe("ProfileWorkScreen", () => {
           canManageEmployees: true,
         },
         focusAreas: profileData.focusAreas,
+        departments: [
+          { id: 7, name: "Nursing", abbr: "NUR", type: "scheduled" },
+          { id: 10, name: "Clinical Leadership", abbr: "CL", type: "management" },
+        ],
         certifications: [
           {
             id: 5,
@@ -176,6 +189,32 @@ describe("ProfileWorkScreen", () => {
     expect(screen.queryByRole("button", { name: "RN" })).not.toBeInTheDocument();
   });
 
+  // The staff profile a manager opens names both, and reading your own record
+  // told you neither: which department your focus areas place you in, or the
+  // number an admin will ask you for.
+  it("names your departments and staff number alongside the focus areas", () => {
+    render(<ProfileWorkScreen />);
+
+    expect(screen.getByText("Department")).toBeInTheDocument();
+    expect(screen.getByText("Nursing")).toBeInTheDocument();
+    // The kind you manage is a separate row from the kind you're scheduled in,
+    // and its label is fixed rather than composed from the org's own noun.
+    expect(screen.getByText("Management Departments")).toBeInTheDocument();
+    expect(screen.getByText("Clinical Leadership")).toBeInTheDocument();
+    expect(screen.getByText("Employee ID")).toBeInTheDocument();
+    expect(screen.getByText("#87")).toBeInTheDocument();
+  });
+
+  it("carries no organization block — that is the profile hub's job", () => {
+    render(<ProfileWorkScreen />);
+
+    // This page edits the account and staff record. Which organization that
+    // record lives in used to sit above the editable fields, making the first
+    // thing on "Profile details" the one thing that isn't a profile detail.
+    expect(screen.queryByText("Organization")).not.toBeInTheDocument();
+    expect(screen.queryByText("Subdomain")).not.toBeInTheDocument();
+  });
+
   it("disables Save changes and Discard until a field changes, then saves", async () => {
     render(<ProfileWorkScreen />);
 
@@ -209,5 +248,56 @@ describe("ProfileWorkScreen", () => {
         }),
       );
     });
+  });
+
+  it("goes back without asking while there is nothing to lose", () => {
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    // Open but untouched. On iOS the whole screen is a back-swipe target, so a
+    // guard that fired here would interrupt an ordinary swipe back.
+    act(() => {
+      expect(pressBack()).toBe(false);
+    });
+    expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+  });
+
+  it("asks before a back press throws away an edit, and leaves once discarded", () => {
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "RN" }));
+
+    act(() => {
+      expect(pressBack()).toBe(true);
+    });
+    expect(navigatedActions).toHaveLength(0);
+    expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Discard" }));
+
+    // Asserting the action actually lands is the point: `usePreventRemove`
+    // reads the render-time flag, so a guard that dispatches before React has
+    // committed it vetoes its own exit and the back button silently dies.
+    expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+  });
+
+  it("keeps the edit when the back press is called off", () => {
+    render(<ProfileWorkScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(screen.getByRole("button", { name: "RN" }));
+
+    act(() => {
+      pressBack();
+    });
+    fireEvent.click(
+      within(screen.getByRole("alert")).getByRole("button", { name: "Keep Editing" }),
+    );
+
+    expect(navigatedActions).toHaveLength(0);
+    expect(screen.queryByText("Discard unsaved changes?")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save changes" })).not.toBeDisabled();
   });
 });

@@ -128,7 +128,8 @@ export interface DbNamedItem {
   name: string;
   abbr: string;
   is_schedule_role?: boolean | null;
-  department_id: number | null;
+  /** Scheduled departments this item belongs to. Empty = org-wide. */
+  department_ids: number[];
   sort_order: number;
   archived_at: string | null;
 }

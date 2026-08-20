@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useTheme } from "next-themes";
 import { fetchAccountIdentity, getVerifiedBrowserAuthUser } from "@/features/account/client";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { openConsentPreferences } from "@/components/CookieConsent";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
 import ScheduleGridMockup from "@/components/landing/ScheduleGridMockup";
+import ThemeToggleButton from "@/components/landing/ThemeToggleButton";
 import StaffViewMockup from "@/components/landing/StaffViewMockup";
 import SettingsMockup from "@/components/landing/SettingsMockup";
 import RecurringShiftsMockup from "@/components/landing/RecurringShiftsMockup";
@@ -26,8 +26,6 @@ import {
   Mail,
   Menu,
   ArrowRight,
-  Sun,
-  Moon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -138,32 +136,6 @@ function RevealSection({
     >
       {children}
     </section>
-  );
-}
-
-/* ─── Theme Toggle ────────────────────────────────────── */
-
-function ThemeToggleButton({ className = "" }: { className?: string }) {
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
-
-  return (
-    <button
-      type="button"
-      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-      className={`p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors ${className}`}
-      aria-label={resolvedTheme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-    >
-      {!mounted ? (
-        <span style={{ display: "block", width: 20, height: 20 }} />
-      ) : resolvedTheme === "dark" ? (
-        <Sun size={20} />
-      ) : (
-        <Moon size={20} />
-      )}
-    </button>
   );
 }
 

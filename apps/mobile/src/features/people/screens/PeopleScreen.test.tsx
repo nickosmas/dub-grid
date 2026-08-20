@@ -4,6 +4,7 @@ import { createReactNativeModule, createScreenModule } from "../../../test/nativ
 
 const useMutation = vi.fn();
 const useQuery = vi.fn();
+const useQueryClient = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const pushToast = vi.fn();
@@ -30,6 +31,9 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
     },
     useMutation,
     useQuery,
+    // The roster's actions sheet invalidates through the client directly, and
+    // the real hook needs a provider this harness doesn't mount.
+    useQueryClient,
   };
 });
 
@@ -65,6 +69,8 @@ describe("PeopleScreen", () => {
   beforeEach(() => {
     useMutation.mockReset();
     useQuery.mockReset();
+    useQueryClient.mockReset();
+    useQueryClient.mockReturnValue({ invalidateQueries: vi.fn() });
     useAccessToken.mockReset();
     useBootstrap.mockReset();
     pushToast.mockReset();
@@ -73,6 +79,7 @@ describe("PeopleScreen", () => {
     useAccessToken.mockReturnValue("token-123");
     useBootstrap.mockReturnValue({
       data: {
+        currentOrg: { labels: { department: "Departments" } },
         focusAreas: [
           {
             id: 2,
@@ -113,7 +120,7 @@ describe("PeopleScreen", () => {
     });
   });
 
-  it("shows the loading state while the directory is being fetched", () => {
+  it("shows the loading state while the directory is being fetched", async () => {
     useQuery.mockReturnValue({
       data: undefined,
       error: null,
@@ -124,7 +131,11 @@ describe("PeopleScreen", () => {
 
     render(<PeopleScreen />);
 
-    expect(screen.getByText("Loading directory")).toBeInTheDocument();
+    // Held back briefly so a fast response never flashes a skeleton.
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+
+    expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Loading directory")).not.toBeInTheDocument();
   });
 
   it("shows a locked state when the user lacks directory access", () => {
@@ -202,6 +213,152 @@ describe("PeopleScreen", () => {
       pathname: "/(tabs)/people/[id]",
       params: { id: "emp-1" },
     });
+  });
+
+  // Every roster row opens the one profile page there is: your own goes to the
+  // profile tab, everyone else's to their staff profile, which carries their
+  // management access along with the rest of their record. There used to be a
+  // second profile screen behind these rows saying a subset of the same thing.
+  it("opens management rows in the one profile page there is", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments" } },
+        focusAreas: [],
+        departments: [{ id: 10, name: "Clinical Leadership", abbr: "CL", type: "management" }],
+        user: { id: "user-1" },
+        permissions: {
+          canManageEmployees: true,
+          canManageManagementAccess: true,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    // One object serves both `useQuery` calls the screen makes.
+    useQuery.mockReturnValue({
+      data: {
+        people: [],
+        managementUsers: [
+          {
+            id: "mgmt-1",
+            source: "member",
+            userId: "user-1",
+            employeeId: null,
+            employeeStatus: null,
+            firstName: "Mina",
+            lastName: "Diaz",
+            email: "mina@dubgrid.com",
+            phone: "",
+            orgRole: "super_admin",
+            managementDepartmentIds: [10],
+            managementDeptAdminIds: [],
+            updatedAt: null,
+            invitationId: null,
+            invitationExpiresAt: null,
+          },
+          {
+            id: "mgmt-2",
+            source: "member",
+            userId: "user-2",
+            employeeId: "emp-2",
+            employeeStatus: null,
+            firstName: "Ava",
+            lastName: "Cole",
+            email: "ava@dubgrid.com",
+            phone: "",
+            orgRole: "admin",
+            managementDepartmentIds: [10],
+            managementDeptAdminIds: [],
+            updatedAt: null,
+            invitationId: null,
+            invitationExpiresAt: null,
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByText("Management"));
+
+    fireEvent.click(screen.getByText("Mina Diaz"));
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile");
+
+    routerPush.mockClear();
+    fireEvent.click(screen.getByText("Ava Cole"));
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: "/(tabs)/people/[id]",
+      params: { id: "emp-2" },
+    });
+  });
+
+  // A management-only invitation has no `employees` row until it is accepted,
+  // so there is no staff profile to open — and no second profile screen to
+  // fall back on any more. Its actions come up on the roster instead.
+  it("opens an actions sheet for a management user with no staff profile", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments" } },
+        focusAreas: [],
+        departments: [{ id: 10, name: "Clinical Leadership", abbr: "CL", type: "management" }],
+        user: { id: "user-1" },
+        permissions: {
+          canManageEmployees: true,
+          canManageManagementAccess: true,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [],
+        managementUsers: [
+          {
+            id: "inv:9",
+            source: "pending_invite",
+            userId: null,
+            employeeId: null,
+            employeeStatus: null,
+            firstName: "Jo",
+            lastName: "Park",
+            email: "jo@dubgrid.com",
+            phone: "",
+            orgRole: "admin",
+            managementDepartmentIds: [10],
+            managementDeptAdminIds: [],
+            updatedAt: null,
+            invitationId: "9",
+            invitationExpiresAt: null,
+          },
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByText("Jo Park"));
+
+    expect(routerPush).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Reinvite" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Revoke Invitation" })).toBeInTheDocument();
+    // The sheet names the departments too — the row behind it already does, so
+    // both are on screen.
+    expect(screen.getAllByText("Clinical Leadership").length).toBeGreaterThan(1);
   });
 
   it("navigates to the add-person screen for admins who can manage employees", () => {
@@ -344,6 +501,7 @@ describe("PeopleScreen", () => {
   it("hides inactive staff and status pills from regular users", () => {
     useBootstrap.mockReturnValue({
       data: {
+        currentOrg: { labels: { department: "Departments" } },
         focusAreas: [{ id: 2, name: "Skilled Nursing" }],
         permissions: {
           canManageEmployees: false,
@@ -418,6 +576,7 @@ describe("PeopleScreen", () => {
   it("shows management users to regular users without opening their profile", () => {
     useBootstrap.mockReturnValue({
       data: {
+        currentOrg: { labels: { department: "Departments" } },
         focusAreas: [{ id: 2, name: "Skilled Nursing" }],
         permissions: {
           canManageEmployees: false,

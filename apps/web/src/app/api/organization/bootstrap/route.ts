@@ -75,17 +75,35 @@ async function resolveOrganizationId(
     }
   }
 
-  // Sandbox mode: when the user has an active sandbox cookie matching
-  // their auth id, treat the sandbox org as the bootstrap target. Middleware
-  // already verified the cookie + ownership before this request landed, but
-  // we do the userId check here too as a defense-in-depth before exposing
-  // org data.
+  // Sandbox mode: when the user has an active sandbox cookie matching their
+  // auth id, treat the sandbox org as the bootstrap target.
+  //
+  // The ownership row is re-checked here rather than assumed. Middleware does
+  // verify the cookie, but it never runs on this request — its matcher excludes
+  // `api` — so the previous comment's claim that it had ("middleware already
+  // verified... before this request landed") was not true for any caller. That
+  // left an attacker-supplied Cookie header naming an arbitrary org id, with
+  // only the downstream requireOrgPermissions membership check between it and a
+  // full org bootstrap. This mirrors the same query api-auth.ts runs.
   const sandboxCookieValue = req.cookies.get(SANDBOX_COOKIE_NAME)?.value;
   const sandbox = sandboxCookieValue
     ? getSandboxFromCookie(`${SANDBOX_COOKIE_NAME}=${sandboxCookieValue}`)
     : null;
   if (sandbox && userId && sandbox.userId === userId) {
-    return { orgId: sandbox.sandboxOrgId, isGridmaster: false };
+    const { data: ownedSandbox } = await getServiceClient()
+      .from("organizations")
+      .select("id")
+      .eq("id", sandbox.sandboxOrgId)
+      .eq("workspace_kind", "sandbox")
+      .eq("sandbox_owner_user_id", userId)
+      .is("archived_at", null)
+      .maybeSingle();
+
+    if (ownedSandbox) {
+      return { orgId: ownedSandbox.id, isGridmaster: false };
+    }
+    // Not theirs (or gone): fall through to the real claims rather than
+    // honouring the cookie.
   }
 
   if (claims.platform_role === "gridmaster") {

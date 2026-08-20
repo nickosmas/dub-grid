@@ -821,12 +821,12 @@ async function departmentRefCheckForOrg(
       .from("organization_roles")
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
-      .eq("department_id", deptId),
+      .contains("department_ids", [deptId]),
     serviceClient
       .from("certifications")
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
-      .eq("department_id", deptId),
+      .contains("department_ids", [deptId]),
     serviceClient
       .from("jobs")
       .select("id", { count: "exact", head: true })
@@ -1057,7 +1057,7 @@ async function checkDepartmentDependenciesForOrg(
       .select("id", { count: "exact", head: true })
       .eq("org_id", orgId)
       .is("archived_at", null)
-      .eq("department_id", deptId),
+      .contains("department_ids", [deptId]),
     serviceClient
       .from("jobs")
       .select("id", { count: "exact", head: true })
@@ -1509,7 +1509,7 @@ export async function POST(req: NextRequest) {
             .update({
               name: item.name,
               abbr: item.abbr,
-              department_id: item.departmentId ?? null,
+              department_ids: item.departmentIds ?? [],
               sort_order: sortOrder,
             })
             .eq("org_id", data.orgId)
@@ -1532,7 +1532,7 @@ export async function POST(req: NextRequest) {
               .update({
                 name: item.name,
                 abbr: item.abbr,
-                department_id: item.departmentId ?? null,
+                department_ids: item.departmentIds ?? [],
                 sort_order: sortOrder,
                 archived_at: null,
               })
@@ -1543,7 +1543,7 @@ export async function POST(req: NextRequest) {
               org_id: data.orgId,
               name: item.name,
               abbr: item.abbr,
-              department_id: item.departmentId ?? null,
+              department_ids: item.departmentIds ?? [],
               sort_order: sortOrder,
             });
             if (error) throw error;
@@ -1642,7 +1642,7 @@ export async function POST(req: NextRequest) {
               name: item.name,
               abbr: item.abbr,
               is_schedule_role: item.isScheduleRole ?? true,
-              department_id: item.departmentId ?? null,
+              department_ids: item.departmentIds ?? [],
               sort_order: sortOrder,
             })
             .eq("org_id", data.orgId)
@@ -1666,7 +1666,7 @@ export async function POST(req: NextRequest) {
                 name: item.name,
                 abbr: item.abbr,
                 is_schedule_role: item.isScheduleRole ?? true,
-                department_id: item.departmentId ?? null,
+                department_ids: item.departmentIds ?? [],
                 sort_order: sortOrder,
                 archived_at: null,
               })
@@ -1678,7 +1678,7 @@ export async function POST(req: NextRequest) {
               name: item.name,
               abbr: item.abbr,
               is_schedule_role: item.isScheduleRole ?? true,
-              department_id: item.departmentId ?? null,
+              department_ids: item.departmentIds ?? [],
               sort_order: sortOrder,
             });
             if (error) throw error;

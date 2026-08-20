@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { Suspense } from "react";
 import { DM_Sans, DM_Mono } from "next/font/google";
 import { createStaticWebCssVariables, createThemedCssText } from "@dubgrid/design-tokens";
+import { createThemeSeedScript } from "@/lib/theme-preference";
 import "./globals.css";
 import "@/lib/env";
 
@@ -38,6 +39,7 @@ import AuthProvider from "@/components/AuthProvider";
 import QueryProvider from "@/components/QueryProvider";
 import AppShell from "@/components/AppShell";
 import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
+import { NavigationGuardProvider } from "@/components/NavigationGuardProvider";
 import ConsentGatedAnalytics from "@/components/ConsentGatedAnalytics";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/hint";
@@ -53,6 +55,7 @@ import { isFeatureEnabled } from "@/lib/feature-flags";
 
 const staticWebCssVariables = createStaticWebCssVariables() as CSSProperties;
 const themedCssText = createThemedCssText();
+const themeSeedScript = createThemeSeedScript();
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const posthogEnabled = await isFeatureEnabled("posthog");
@@ -66,6 +69,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     >
       <head>
         <style id="dg-theme-vars" dangerouslySetInnerHTML={{ __html: themedCssText }} />
+        {/* Adopts a theme handed over from the other origin (apex ↔ org
+            subdomain) before next-themes' own script reads localStorage.
+            Must stay in <head> and ahead of <body> so it lands on the first
+            paint — see createThemeSeedScript(). */}
+        <script
+          id="dg-theme-seed"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: themeSeedScript }}
+        />
       </head>
       <body suppressHydrationWarning>
         <ThemeProvider>
@@ -76,7 +88,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <OnboardingGate>
                     <MobileSubNavProvider>
                       <TooltipProvider delay={TOOLTIP_DELAY_MS}>
-                        <AppShell>{children}</AppShell>
+                        {/* Wraps the whole shell so it sees every nav link,
+                            not just the ones inside a given page. */}
+                        <NavigationGuardProvider>
+                          <AppShell>{children}</AppShell>
+                        </NavigationGuardProvider>
                       </TooltipProvider>
                     </MobileSubNavProvider>
                   </OnboardingGate>

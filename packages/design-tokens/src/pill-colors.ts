@@ -241,13 +241,27 @@ export interface ShiftPillColors {
 }
 
 /**
+ * Every pill gets a visible edge. `jobs.border_color` and
+ * `absence_types.border_color` both default to `'transparent'` in the schema
+ * and the color picker never writes anything else, so a stored border is
+ * almost always the transparent sentinel — rendering it literally leaves the
+ * pill as a borderless block of fill. Fall back to the same text-derived tint
+ * dark mode uses so light and dark match.
+ */
+export function visiblePillBorder(border: string | null | undefined, textHex: string): string {
+  const stored = border?.trim();
+  if (!stored || stored === "transparent") return borderColor(textHex);
+  return stored;
+}
+
+/**
  * Pure (non-hook) helper for call sites that build pills inside a loop/map —
  * where calling a hook per-iteration would break the Rules of Hooks. Callers
  * read the active theme once at the top of the component and pass `isDark`
  * down into this function for each pill.
  */
 export function resolveShiftPillColors(style: ShiftPillColors, isDark: boolean): ShiftPillColors {
-  if (!isDark) return style;
+  if (!isDark) return { ...style, border: visiblePillBorder(style.border, style.text) };
 
   const dark = toDarkPillColors(style.color);
   return { color: dark.bg, text: dark.text, border: borderColor(dark.text) };

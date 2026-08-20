@@ -1,10 +1,20 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useRef } from "react";
 import { Pressable, StyleSheet, TextInput, type TextInputProps, View } from "react-native";
+import Animated from "react-native-reanimated";
+import { usePressAnimation } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, type MobileColors } from "../theme/tokens";
+import { mobileMotion, mobileRadii, type MobileColors } from "../theme/tokens";
 
 const DEFAULT_DEBOUNCE_MS = 300;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/**
+ * Small enough to read as a clear affordance rather than a second control in
+ * the field. Its touch target comes from `hitSlop`, not from its size.
+ */
+const CLEAR_SIZE = 22;
 
 export type SearchBarProps = {
   value: string;
@@ -18,6 +28,12 @@ export type SearchBarProps = {
   onSubmitEditing?: TextInputProps["onSubmitEditing"];
 };
 
+/**
+ * The app's search field. A screen that puts one above a list should also pass
+ * `adjustsForKeyboard={false}` to its `<Screen>`: a field at the top of the
+ * page never needs lifting off the keyboard, and insetting for it collapses
+ * the iOS large title and jumps the page the moment this is focused.
+ */
 export function SearchBar({
   value,
   onChangeText,
@@ -62,18 +78,36 @@ export function SearchBar({
         style={styles.input}
         value={value}
       />
-      {showClear ? (
-        <Pressable
-          accessibilityLabel="Clear search"
-          accessibilityRole="button"
-          hitSlop={8}
-          onPress={() => onChangeText("")}
-          style={({ pressed }) => [styles.clearButton, pressed && styles.clearButtonPressed]}
-        >
-          <Ionicons color={mobileColors.textSecondary} name="close-circle" size={20} />
-        </Pressable>
-      ) : null}
+      {/* The slot is always mounted, so the input keeps the same width whether
+          or not there is a query. Mounting the button itself on first keystroke
+          re-flowed the field mid-word, which reads as the text jumping. */}
+      <View style={styles.clearSlot}>
+        {showClear ? <ClearButton onPress={() => onChangeText("")} /> : null}
+      </View>
     </View>
+  );
+}
+
+function ClearButton({ onPress }: { onPress: () => void }) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
+    rippleBorderless: true,
+    scale: mobileMotion.press.iconOnlyScale,
+  });
+
+  return (
+    <AnimatedPressable
+      accessibilityLabel="Clear search"
+      accessibilityRole="button"
+      android_ripple={androidRipple}
+      hitSlop={12}
+      onPress={onPress}
+      {...pressHandlers}
+      style={[styles.clearButton, animatedStyle]}
+    >
+      <Ionicons color={mobileColors.textSecondary} name="close" size={14} />
+    </AnimatedPressable>
   );
 }
 
@@ -82,14 +116,28 @@ const createStyles = (mobileColors: MobileColors) =>
     field: {
       minHeight: 46,
       alignItems: "center",
-      backgroundColor: mobileColors.surfaceSecondary,
+      // White, like every other enterable surface. `surfaceSecondary` made the
+      // field a *recessed* gray, which is the older iOS search idiom and reads
+      // as a filled control rather than something to type in — and against the
+      // slate page it had almost nothing to separate it (1.02:1), so the border
+      // was carrying the whole shape. Both screens that use this put it in page
+      // content, never in the white header bar, so the fill has the page to
+      // stand against. `surface`, not a literal, so dark mode gets its card
+      // color instead of a white slab.
+      backgroundColor: mobileColors.surface,
+      // Kept: at 1.12:1 the fill alone is a card-strength edge, and this is an
+      // interactive target that should read as crisper than a card.
       borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.control,
+      // Pill, to match the filter and add controls it sits beside.
+      borderRadius: mobileRadii.pill,
       borderWidth: 1,
       flexDirection: "row",
       flex: 1,
       gap: 9,
-      paddingHorizontal: 14,
+      // A pill needs more room at the ends than a 12pt-radius box before its
+      // contents stop looking crowded by the curve.
+      paddingLeft: 16,
+      paddingRight: 12,
     },
     input: {
       // Explicit regular weight — don't spread `mobileText.sectionTitle`,
@@ -103,15 +151,19 @@ const createStyles = (mobileColors: MobileColors) =>
       flex: 1,
       paddingVertical: 12,
     },
-    clearButton: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+    clearSlot: {
+      width: CLEAR_SIZE,
+      height: CLEAR_SIZE,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: mobileColors.surfaceSecondary,
     },
-    clearButtonPressed: {
-      transform: [{ scale: 0.96 }],
+    clearButton: {
+      width: CLEAR_SIZE,
+      height: CLEAR_SIZE,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: mobileColors.controlNeutralBg,
+      borderRadius: mobileRadii.pill,
+      overflow: "hidden",
     },
   });

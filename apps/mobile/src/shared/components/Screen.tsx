@@ -21,8 +21,43 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMobileColors } from "../providers/ThemeModeProvider";
-import { mobileRadii, mobileSpacing, mobileText, type MobileColors } from "../theme/tokens";
+import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
+import {
+  mobileElevation,
+  mobileRadii,
+  mobileSpace,
+  mobileSpacing,
+  mobileText,
+  type MobileColors,
+} from "../theme/tokens";
+
+/** Card header icon frame. Also the min height of the title and accessory
+ * columns beside it, so a one-line title centres against the icon. */
+export const CARD_ICON_FRAME_SIZE = 32;
+
+/**
+ * The card surface itself — fill, radius, padding, edge and shadow.
+ *
+ * Lives outside `createStyles` because the skeleton that stands in for a card
+ * has to be the *same* surface, not a copy of its numbers. A copy drifts the
+ * first time a padding changes and the placeholder silently stops matching
+ * what replaces it.
+ */
+export function getCardSurfaceStyle(mobileColors: MobileColors, isDark: boolean): ViewStyle {
+  return {
+    backgroundColor: mobileColors.surface,
+    borderRadius: mobileRadii.card,
+    padding: mobileSpace.xl,
+    gap: mobileSpace.md,
+    // Light mode carries depth with the shadow alone; a border on top of it
+    // reads as an outline sticker. Dark mode keeps the hairline, because a
+    // shadow against a near-black page is invisible and the edge is the only
+    // thing separating the card from the page.
+    borderWidth: isDark ? 1 : 0,
+    borderColor: mobileColors.borderSubtle,
+    ...mobileElevation("card", isDark),
+  };
+}
 
 export type CardIconTone = "brand" | "warning" | "danger" | "success";
 
@@ -55,6 +90,7 @@ function createCardIconTone(
 import {
   DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
   getScreenBottomPadding,
+  getScreenGutter,
   type ScreenBottomPaddingMode,
 } from "./screen-layout";
 
@@ -63,8 +99,6 @@ export type { ScreenBottomPaddingMode } from "./screen-layout";
 type ScreenScrollViewProps = ComponentProps<typeof ScrollView>;
 
 export function Screen({
-  title: _title,
-  subtitle: _subtitle,
   stickyHeader,
   stickyHeaderShellStyle,
   stickyHeaderTopPadding,
@@ -75,10 +109,14 @@ export function Screen({
   onRefresh,
   onScroll,
   scrollEventThrottle,
+  adjustsForKeyboard = true,
   bottomPaddingMode = DEFAULT_SCREEN_BOTTOM_PADDING_MODE,
 }: PropsWithChildren<{
-  title?: string;
-  subtitle?: string;
+  // No `title`/`subtitle` here on purpose. A page's title is the native header's
+  // (`createTopLevelStackOptions` / `createDetailStackOptions` on its route), or
+  // it belongs to a `stickyHeader` the screen builds itself. These props used to
+  // exist and were silently discarded, so a screen could pass `title="People"`,
+  // render nothing, and give no hint about where the real title comes from.
   stickyHeader?: ReactNode;
   stickyHeaderShellStyle?: StyleProp<ViewStyle>;
   stickyHeaderTopPadding?: number;
@@ -88,10 +126,18 @@ export function Screen({
   onRefresh?: () => void;
   onScroll?: ScreenScrollViewProps["onScroll"];
   scrollEventThrottle?: number;
+  /**
+   * Set false on a screen whose only input sits at the *top* — a search field
+   * above a list. Keyboard insetting exists to lift fields off the keyboard,
+   * and a field at the top never needed lifting, so all it does there is cost:
+   * see the note on `automaticallyAdjustKeyboardInsets` below.
+   */
+  adjustsForKeyboard?: boolean;
   bottomPaddingMode?: ScreenBottomPaddingMode;
 }>) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const insets = useSafeAreaInsets();
   const internalScrollViewRef = useRef<ScrollView>(null);
   // Mirrors stickyHeaderHeight so the translating scroll handle below can
@@ -152,6 +198,18 @@ export function Screen({
     <ScrollView
       ref={internalScrollViewRef}
       automaticallyAdjustContentInsets={useNativeContentInsets}
+      // iOS does not inset a ScrollView for the software keyboard on its own,
+      // so form fields and submit buttons near the bottom of a screen sat
+      // behind it. Android resizes the window instead (`adjustResize`), where
+      // this prop is ignored.
+      //
+      // It is opt-out because it is not free on a `headerLargeTitle` screen:
+      // the inset (and the offset RN writes alongside it) makes UIKit
+      // re-evaluate the large title, which collapses, and the whole page
+      // visibly jumps the instant the keyboard opens. UIScrollView does no
+      // first-responder scrolling of its own, so a screen that turns this off
+      // simply does not move on focus.
+      automaticallyAdjustKeyboardInsets={adjustsForKeyboard}
       automaticallyAdjustsScrollIndicatorInsets={useNativeContentInsets}
       contentContainerStyle={{
         paddingTop: stickyHeader ? (isIosStickyHeader ? 0 : stickyHeaderHeight) : 0,
@@ -254,7 +312,8 @@ export function Card({
   iconTone?: CardIconTone;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const cardIconTone = useMemo(() => createCardIconTone(mobileColors), [mobileColors]);
   const tone = cardIconTone[iconTone];
 
@@ -282,7 +341,7 @@ export function Card({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     root: {
       flex: 1,
@@ -293,7 +352,7 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.background,
     },
     content: {
-      paddingHorizontal: mobileSpacing.screenX,
+      paddingHorizontal: getScreenGutter(),
       gap: mobileSpacing.sectionGap,
     },
     contentDefault: {
@@ -308,12 +367,33 @@ const createStyles = (mobileColors: MobileColors) =>
       left: 0,
       right: 0,
       zIndex: 10,
-      backgroundColor: mobileColors.background,
-      paddingHorizontal: mobileSpacing.screenX,
-      paddingTop: 4,
-      paddingBottom: 14,
+      // The fill has to stay opaque: content scrolls under this shell and must
+      // not show through. `overflow: hidden` clips whatever the header draws to
+      // the shell's own bounds.
+      overflow: "hidden",
+      // `surface`, not `background` — this is the app bar on the only two
+      // screens that have one (the dashboard and both schedule scopes; every
+      // other screen takes the native header instead). White chrome over the
+      // slate page reads as a bar sitting above the content rather than as more
+      // page, and it matches the tab bar at the other end of the screen, which
+      // is already `surface`. It also puts the status-bar strip on white, since
+      // both of those routes run `headerShown: false` and this shell is what
+      // reaches under the notch.
+      backgroundColor: mobileColors.surface,
+      paddingHorizontal: getScreenGutter(),
+      paddingTop: mobileSpace.sm,
+      paddingBottom: mobileSpace.lg,
       borderBottomWidth: 1,
       borderBottomColor: mobileColors.borderSubtle,
+      // The level named for exactly this ("hairline lift: sticky headers once
+      // the content scrolls under them"). The fill and the hairline do the
+      // separating; the shadow only keeps the bar from looking pasted on.
+      ...mobileElevation("raised", isDark),
+      // ...but not its `elevation: 1`. On Android that number is also the draw
+      // order, and the cards scrolling underneath sit at the `card` level's 2 —
+      // at 1 the header would render *behind* them. This shell is an earlier
+      // sibling than the scroll view, so it loses ties too, and has to clear
+      // both outright.
       elevation: 4,
     },
     overlayLayer: {
@@ -321,38 +401,32 @@ const createStyles = (mobileColors: MobileColors) =>
       zIndex: 20,
       elevation: 20,
     },
-    card: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      padding: 18,
-      gap: 10,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      shadowColor: mobileColors.shadowStrong,
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 20,
-      elevation: 2,
-    },
+    card: getCardSurfaceStyle(mobileColors, isDark),
     cardHeader: {
       flexDirection: "row",
+      // Stays flex-start so a title that wraps to two lines grows downward from
+      // the icon's top rather than straddling it. Single-line titles are centred
+      // by the minHeight below instead.
       alignItems: "flex-start",
       justifyContent: "space-between",
-      gap: 12,
+      gap: mobileSpace.md,
     },
     cardHeaderCopy: {
       flex: 1,
       minWidth: 0,
+      // Matches the icon frame, so a one-line title sits optically centred
+      // against the icon instead of pinned to its top edge. A 22pt line inside a
+      // 32pt frame was reading as a 5pt upward offset.
+      minHeight: CARD_ICON_FRAME_SIZE,
+      justifyContent: "center",
     },
     cardHeaderAccessory: {
-      alignSelf: "flex-start",
+      minHeight: CARD_ICON_FRAME_SIZE,
+      justifyContent: "center",
     },
     cardIconFrame: {
-      width: 32,
-      height: 32,
+      width: CARD_ICON_FRAME_SIZE,
+      height: CARD_ICON_FRAME_SIZE,
       borderRadius: 10,
       borderWidth: 1,
       alignItems: "center",

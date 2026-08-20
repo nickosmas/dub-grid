@@ -11,7 +11,11 @@
 #
 # Required repo secrets:
 #   CRON_SECRET           — must match the deployment's CRON_SECRET env var
-#   NEXT_PUBLIC_SITE_URL  — production origin, e.g. https://app.dubgrid.com
+#   NEXT_PUBLIC_SITE_URL  — canonical production origin that serves the app
+#                           directly (https://www.dubgrid.com). It must not be a
+#                           host that redirects: the apex dubgrid.com 307s to www,
+#                           and curl drops the Authorization header across a host
+#                           hop, so a redirecting origin can never authenticate.
 
 name: Cron — Expire Requests
 
@@ -19,6 +23,9 @@ on:
   schedule:
     - cron: "0 * * * *" # top of every hour (UTC)
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: cron-expire-requests
@@ -43,12 +50,22 @@ jobs:
           url="${SITE_URL%/}/api/cron/expire-requests"
           echo "Calling $url"
           # Capture body + status; fail the job on any non-2xx so a broken cron is visible.
-          status=$(curl -sS -o /tmp/cron-body.txt -w '%{http_code}' \
+          # Deliberately no -L: curl strips the Authorization header on a
+          # cross-host redirect, so following one just turns a 307 into a 401.
+          # Report the redirect instead, with the target, so the cause is obvious.
+          status=$(curl -sS -o /tmp/cron-body.txt -D /tmp/cron-headers.txt -w '%{http_code}' \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "$url")
           echo "HTTP $status"
           cat /tmp/cron-body.txt
           echo
+          if [ "$status" -ge 300 ] && [ "$status" -lt 400 ]; then
+            # `|| true` — under `set -euo pipefail` a Location-less 3xx would
+            # otherwise abort the script before it could report anything.
+            location=$(grep -i '^location:' /tmp/cron-headers.txt | tail -1 | tr -d '\r' | cut -d' ' -f2- || true)
+            echo "::error::$url redirected (HTTP $status) to ${location:-an unknown location}. NEXT_PUBLIC_SITE_URL must be the origin that serves the app directly, not one that redirects to it."
+            exit 1
+          fi
           if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
             echo "::error::expire-requests returned HTTP $status"
             exit 1

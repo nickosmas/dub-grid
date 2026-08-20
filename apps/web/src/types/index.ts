@@ -43,8 +43,12 @@ export interface NamedItem {
   /** When true, jobs may use this role for eligibility gating. */
   isScheduleRole?: boolean;
   sortOrder: number;
-  /** FK to departments.id. Null = org-wide (not scoped to any department). */
-  departmentId?: number | null;
+  /**
+   * Scheduled departments this item belongs to. Empty = org-wide (not scoped to
+   * any department). An array because a credential or role can legitimately
+   * span departments, e.g. an RN covering both Nursing and Emergency.
+   */
+  departmentIds?: number[];
   /** Non-null when the item has been archived (soft-deleted). */
   archivedAt?: string | null;
 }

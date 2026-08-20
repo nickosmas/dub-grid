@@ -4,13 +4,15 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
+import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { getValidPort } from "@/lib/subdomain";
+import { withThemeParam } from "@/lib/theme-preference";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { markAuthTransition } from "@/lib/auth-transition";
-import { setUserViewActive } from "@/hooks";
+import { clearPermsCache, setUserViewActive } from "@/hooks";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { EmailPasswordForm } from "@/components/auth/EmailPasswordForm";
@@ -82,9 +84,22 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     }
     // Fresh login = previous session ended. Wipe any sandbox left over from
     // that session (involuntary logout / browser close that never ran the
-    // explicit exit) so stale sandbox data is never resumed. Fire-and-forget:
-    // never block or fail sign-in.
-    void exitSandbox().catch(() => {});
+    // explicit exit) so stale sandbox data is never resumed.
+    //
+    // Awaited, not fire-and-forget: the caller hard-navigates immediately after
+    // this returns, which aborted the in-flight request often enough that the
+    // sandbox routinely survived the switch — and a surviving sandbox cookie
+    // pins every later request to a clone of the org the user just left, at an
+    // elevated role. Failure is still non-fatal, because the switch route now
+    // clears the cookie server-side; this call is what deletes the org row.
+    try {
+      await exitSandbox();
+    } catch {
+      // Non-fatal: never block sign-in on sandbox teardown.
+    }
+    // The prior org's permissions are cached in a module-level singleton keyed
+    // by user id, which a same-user org switch does not invalidate on its own.
+    clearPermsCache();
     return true;
   }
 
@@ -334,8 +349,17 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     setLoading(false);
   }
 
+  const { theme } = useTheme();
   const { parsed, protocol } = useClientHost();
   const baseDomain = parsed?.rootDomain ?? "localhost";
+
+  // The apex is a separate origin with its own localStorage, so carry the theme
+  // over rather than letting the landing page resolve its own. Gated on
+  // `parsed` for the same reason `useClientHost` exists: it stays null through
+  // SSR *and* the first hydration pass, so the rendered href matches on both
+  // and only picks up the param once the client-only effect has run.
+  const apexOrigin = `${protocol}//${baseDomain}${parsed?.port ?? ""}`;
+  const apexHref = parsed ? withThemeParam(`${apexOrigin}/`, theme) : `${apexOrigin}/`;
 
   if (mfaRequired) {
     return (
@@ -353,11 +377,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
       <PageShell signInDisclaimer={!orgNotFound}>
         <Card>
           {/* Logo — links to apex landing page */}
-          <a
-            href={`${protocol}//${baseDomain}${parsed?.port ?? ""}/`}
-            className="dg-auth-logo-block"
-            style={{ marginBottom: "32px" }}
-          >
+          <a href={apexHref} className="dg-auth-logo-block" style={{ marginBottom: "32px" }}>
             <DubGridLogo size={52} />
             <DubGridWordmark />
           </a>
@@ -401,6 +421,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 loading={loading}
                 onSubmit={handleSubmit}
                 submitLabel="Sign In"
+                submitPendingLabel="Signing In"
                 forgotPasswordHref="/forgot-password"
               />
             </>
@@ -421,7 +442,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
                 const { protocol, port } = window.location;
                 const portStr = getValidPort(port);
                 const target = `${protocol}//${baseDomain}${portStr}/login`;
-                window.location.href = target;
+                window.location.href = withThemeParam(target, theme);
               }}
               className="dg-auth-link"
             >

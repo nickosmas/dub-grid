@@ -16,7 +16,10 @@ type AuthSessionContextValue = {
 };
 
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
-const SESSION_RESTORE_TIMEOUT_MS = 4000;
+// Matches the web AuthProvider's 12s budget. A shorter deadline turns a merely
+// slow token refresh (common on cellular cold starts) into a silent logout —
+// see AUTH_EDGE_CASES.md item A3, where web raised this for the same reason.
+export const SESSION_RESTORE_TIMEOUT_MS = 12_000;
 let activeSessionWriter: ((session: Session | null) => void) | null = null;
 
 export function replaceAuthSession(session: Session | null) {

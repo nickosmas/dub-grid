@@ -1,6 +1,6 @@
 import { readFileSync } from "fs";
 import { createInterface } from "node:readline/promises";
-import { Client } from "pg";
+import { connectSqlClient } from "./lib/db-client";
 
 /**
  * Require the operator to type the project ref back before we DROP its schema
@@ -53,8 +53,7 @@ async function main() {
   await confirmDestructiveReset(ref);
   console.log(`Connecting to REMOTE Supabase (${ref})...\n`);
 
-  const db = new Client({ connectionString, ssl: { rejectUnauthorized: false } });
-  await db.connect();
+  const db = await connectSqlClient({ connectionString, projectRef: ref });
 
   // Drop and recreate public schema
   console.log("Dropping public schema...");

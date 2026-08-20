@@ -10,7 +10,7 @@ describe("mobileApiRequest", () => {
   beforeEach(() => {
     createEphemeralSupabaseClient.mockReset();
     vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://example-project.supabase.co");
-    vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "anon-key");
     vi.stubEnv("EXPO_PUBLIC_API_BASE_URL", "https://app.dubgrid.com");
   });
 

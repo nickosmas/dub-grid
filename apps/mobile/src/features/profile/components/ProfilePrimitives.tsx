@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMemo, type ComponentProps, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ComponentProps, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -11,8 +11,16 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import { Chip } from "../../../shared/components/Chip";
+import { PressableRow } from "../../../shared/components/PressableRow";
+import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -43,22 +51,53 @@ export function formatProfileStatus(value: string | null | undefined) {
     .join(" ");
 }
 
+/**
+ * How the hero arranges its identity block.
+ *
+ * `row` is the compact heading a settings-style page wants: avatar left, name
+ * and subtitle beside it. `center` stacks them under a larger avatar, which is
+ * the shape a page whose whole subject *is* a person wants — the profile and
+ * both person detail screens. Held in context rather than passed down so
+ * `ProfileHeroMeta` can follow the alignment without every caller repeating it.
+ */
+export type ProfileHeroAlign = "row" | "center";
+
+const ProfileHeroAlignContext = createContext<ProfileHeroAlign>("row");
+
+/** The dot on the avatar's corner. Omit it where there is no status to show. */
+export type ProfileHeroStatusTone = "success" | "muted";
+
 export function ProfileHero({
+  align = "row",
   initials,
   title,
   subtitle,
   badge,
   badgeTone = "brand",
+  statusTone,
   avatarStyle,
   avatarTextStyle,
   style,
   children,
 }: {
-  initials: string;
-  title: string;
-  subtitle: string;
+  align?: ProfileHeroAlign;
+  /** Omit along with the rest of the identity block to leave only the meta grid. */
+  initials?: string;
+  /**
+   * Omit where the route's native header already carries it. A `row` hero on a
+   * large-title route does, since iOS renders that title as the page's own
+   * heading; a `center` hero is the heading, so its route takes a plain, static
+   * title instead and the name is printed here once.
+   */
+  title?: string;
+  subtitle?: string;
   badge?: string;
   badgeTone?: "brand" | "contrast" | "warning";
+  /**
+   * Paints a dot on the avatar's corner, ringed in the page background so it
+   * reads as cut out of the avatar rather than sitting on it.
+   */
+  statusTone?: ProfileHeroStatusTone;
   avatarStyle?: StyleProp<ViewStyle>;
   avatarTextStyle?: StyleProp<TextStyle>;
   style?: StyleProp<ViewStyle>;
@@ -66,56 +105,117 @@ export function ProfileHero({
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isCentered = align === "center";
+
+  // A screen whose native header already names it may want none of the
+  // identity block at all, leaving the meta grid as the whole hero. Rendering
+  // the row anyway would leave its gap above the grid.
+  const hasIdentity = Boolean(initials || title || badge || subtitle);
+
+  const badgeNode = badge ? (
+    <View
+      style={[
+        styles.heroBadge,
+        // `heroBadge` pins itself with `alignSelf: "flex-start"`, which beats a
+        // centered parent's `alignItems` and would hang the pill off the left
+        // edge of an otherwise centered block.
+        isCentered && styles.heroBadgeCentered,
+        badgeTone === "contrast" && styles.heroBadgeContrast,
+        badgeTone === "warning" && styles.heroBadgeWarning,
+      ]}
+    >
+      <Text
+        style={[
+          styles.heroBadgeText,
+          badgeTone === "contrast" && styles.heroBadgeTextContrast,
+          badgeTone === "warning" && styles.heroBadgeTextWarning,
+        ]}
+      >
+        {badge}
+      </Text>
+    </View>
+  ) : null;
 
   return (
-    <View style={[styles.hero, style]}>
-      <View style={styles.heroTop}>
-        <View style={[styles.avatar, avatarStyle]}>
-          <Text style={[styles.avatarText, avatarTextStyle]}>{initials}</Text>
-        </View>
-        <View style={styles.heroCopy}>
-          <View style={styles.heroTitleRow}>
-            <Text numberOfLines={2} style={styles.heroTitle}>
-              {title}
-            </Text>
-            {badge ? (
-              <View
-                style={[
-                  styles.heroBadge,
-                  badgeTone === "contrast" && styles.heroBadgeContrast,
-                  badgeTone === "warning" && styles.heroBadgeWarning,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.heroBadgeText,
-                    badgeTone === "contrast" && styles.heroBadgeTextContrast,
-                    badgeTone === "warning" && styles.heroBadgeTextWarning,
-                  ]}
-                >
-                  {badge}
-                </Text>
+    <ProfileHeroAlignContext.Provider value={align}>
+      <View style={[styles.hero, style]}>
+        {hasIdentity ? (
+          <View style={[styles.heroTop, isCentered && styles.heroTopCentered]}>
+            {initials ? (
+              <View style={styles.avatarFrame}>
+                <View style={[styles.avatar, isCentered && styles.avatarLarge, avatarStyle]}>
+                  <Text
+                    style={[
+                      styles.avatarText,
+                      isCentered && styles.avatarTextLarge,
+                      avatarTextStyle,
+                    ]}
+                  >
+                    {initials}
+                  </Text>
+                </View>
+                {statusTone ? (
+                  <View
+                    style={[
+                      styles.avatarStatusDot,
+                      isCentered && styles.avatarStatusDotLarge,
+                      statusTone === "success"
+                        ? styles.avatarStatusDotSuccess
+                        : styles.avatarStatusDotMuted,
+                    ]}
+                  />
+                ) : null}
               </View>
             ) : null}
+            <View style={[styles.heroCopy, isCentered && styles.heroCopyCentered]}>
+              {title || badgeNode ? (
+                <View style={[styles.heroTitleRow, isCentered && styles.heroTitleRowCentered]}>
+                  {title ? (
+                    <Text
+                      numberOfLines={2}
+                      style={[styles.heroTitle, isCentered && styles.heroTitleCentered]}
+                    >
+                      {title}
+                    </Text>
+                  ) : null}
+                  {/* Centered, the badge goes under the name instead of beside
+                      it: a pill tucked against a 26pt title pulls the whole
+                      block off center, and the eye reads the pair as one
+                      lopsided line rather than a name with a label. */}
+                  {isCentered ? null : badgeNode}
+                </View>
+              ) : null}
+              {subtitle ? (
+                <Text
+                  numberOfLines={1}
+                  style={[styles.heroSubtitle, isCentered && styles.heroSubtitleCentered]}
+                >
+                  {subtitle}
+                </Text>
+              ) : null}
+              {isCentered ? badgeNode : null}
+            </View>
           </View>
-          <Text numberOfLines={1} style={styles.heroSubtitle}>
-            {subtitle}
-          </Text>
-        </View>
+        ) : null}
+        {children ? (
+          <View style={[styles.heroDetail, isCentered && styles.heroDetailCentered]}>
+            {children}
+          </View>
+        ) : null}
       </View>
-      {children ? <View style={styles.heroDetail}>{children}</View> : null}
-    </View>
+    </ProfileHeroAlignContext.Provider>
   );
 }
 
 export function ProfileHeroMeta({ label, value }: { label: string; value: string }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isCentered = useContext(ProfileHeroAlignContext) === "center";
 
   return (
-    <View style={styles.heroMetaItem}>
-      <Text style={styles.heroMetaLabel}>{label}</Text>
-      <Text style={styles.heroMetaValue}>{value}</Text>
+    <View style={[styles.heroMetaItem, isCentered && styles.heroMetaItemCentered]}>
+      <Text style={[styles.heroMetaLabel, isCentered && styles.heroMetaTextCentered]}>{label}</Text>
+      <Text style={[styles.heroMetaValue, isCentered && styles.heroMetaTextCentered]}>{value}</Text>
     </View>
   );
 }
@@ -220,16 +320,9 @@ export function ProfileNavRow({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
+    <PressableRow
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.row,
-        styles.navRow,
-        !isLast && styles.rowDivider,
-        pressed && styles.rowPressed,
-      ]}
+      style={[styles.row, styles.navRow, !isLast && styles.rowDivider]}
     >
       <ProfileIcon name={iconName} />
       <View style={styles.rowCopy}>
@@ -241,7 +334,7 @@ export function ProfileNavRow({
         ) : null}
       </View>
       <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
-    </Pressable>
+    </PressableRow>
   );
 }
 
@@ -264,6 +357,7 @@ export function ProfileTextInput({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { style: textInputStyle, ...resolvedInputProps } = inputProps;
+  const { inputAccessoryViewID, keyboardDoneAccessory } = useKeyboardDoneAccessory(inputProps);
 
   return (
     <View style={[styles.field, containerStyle]}>
@@ -273,7 +367,11 @@ export function ProfileTextInput({
           style={[styles.inputShell, focused && styles.inputFocused, error && styles.inputError]}
         >
           <TextInput
+            // The visible <Text> label isn't associated with the input on
+            // native, so without this the field is announced unlabeled.
+            accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
             {...resolvedInputProps}
+            inputAccessoryViewID={inputAccessoryViewID}
             placeholderTextColor={mobileColors.textSubtle}
             style={[
               styles.input,
@@ -287,7 +385,9 @@ export function ProfileTextInput({
         </View>
       ) : (
         <TextInput
+          accessibilityLabel={resolvedInputProps.accessibilityLabel ?? label}
           {...resolvedInputProps}
+          inputAccessoryViewID={inputAccessoryViewID}
           placeholderTextColor={mobileColors.textSubtle}
           style={[
             styles.input,
@@ -299,6 +399,7 @@ export function ProfileTextInput({
           ]}
         />
       )}
+      {keyboardDoneAccessory}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
@@ -324,27 +425,14 @@ export function ProfileChoiceGroup<TId extends string | number>({
     <View style={styles.chipGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <View style={styles.chipRow}>
-        {items.map((item) => {
-          const selected = selectedIds.includes(item.id);
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
-              key={item.id}
-              onPress={() => onToggle(item.id)}
-              style={({ pressed }) => [
-                styles.chip,
-                selected && styles.chipSelected,
-                pressed && styles.chipPressed,
-              ]}
-            >
-              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                {item.abbr || item.name}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {items.map((item) => (
+          <Chip
+            key={item.id}
+            label={item.abbr || item.name}
+            onPress={() => onToggle(item.id)}
+            selected={selectedIds.includes(item.id)}
+          />
+        ))}
       </View>
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
@@ -353,13 +441,26 @@ export function ProfileChoiceGroup<TId extends string | number>({
 
 export function ProfileIcon({
   name,
-  tone = "neutral",
+  tone,
 }: {
   name: IconName;
+  /**
+   * Semantic override, for the rare row whose meaning is the colour. Left off,
+   * the icon is monochrome like every other row.
+   */
   tone?: "neutral" | "brand" | "danger" | "success";
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
+  const semanticColor =
+    tone === "brand"
+      ? mobileColors.brand
+      : tone === "danger"
+        ? mobileColors.dangerText
+        : tone === "success"
+          ? mobileColors.successText
+          : null;
 
   return (
     <View
@@ -371,20 +472,91 @@ export function ProfileIcon({
       ]}
     >
       <Ionicons
-        color={
-          tone === "brand"
-            ? mobileColors.brand
-            : tone === "danger"
-              ? mobileColors.dangerText
-              : tone === "success"
-                ? mobileColors.successText
-                : mobileColors.textSecondary
-        }
+        // Monochrome: a settings list is a list of labels, and a hue per row
+        // competes with them for attention while meaning nothing. `textPrimary`
+        // rather than a literal black, so the glyph inverts with the theme.
+        color={semanticColor ?? mobileColors.textPrimary}
+        // The outline glyph, as passed. An outline at full-strength ink weighs
+        // the same as a gray solid but keeps its detail, which is what tells
+        // one row's icon from the next.
         name={name}
         size={18}
       />
     </View>
   );
+}
+
+/**
+ * The layout shapes a person page is built from, shared by the staff profile
+ * and the management profile so the two read as the same page.
+ *
+ * Layout only, with no colour in it, so one module-scope sheet serves every
+ * render rather than a themed `createStyles` pass per screen.
+ */
+const personLayoutStyles = StyleSheet.create({
+  heroFacts: {
+    gap: 8,
+    // Full width, so every line centers on the page's axis rather than on
+    // whichever of them happens to be widest. `heroDetail` is a row, where
+    // `alignSelf: "stretch"` would stretch this vertically instead.
+    width: "100%",
+  },
+  heroFactsRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    justifyContent: "center",
+  },
+  quickActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    justifyContent: "center",
+    paddingBottom: 16,
+  },
+  actionStack: {
+    gap: 10,
+    paddingTop: 12,
+  },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+});
+
+/** The stack of fact lines under a centered hero's name. */
+export function ProfileHeroFacts({ children }: { children: ReactNode }) {
+  return <View style={personLayoutStyles.heroFacts}>{children}</View>;
+}
+
+/**
+ * One fact line. Its own row because a `Chip` pins itself with
+ * `alignSelf: "flex-start"`: left to a column it would sit against the left
+ * edge under a centered name, and only `justifyContent` on a row centers it.
+ */
+export function ProfileHeroFactsRow({ children }: { children: ReactNode }) {
+  return <View style={personLayoutStyles.heroFactsRow}>{children}</View>;
+}
+
+/**
+ * The row of plain pills directly under the hero. The colour lives in each
+ * button's icon, so the set reads as one group of actions on the person rather
+ * than as competing fills.
+ */
+export function ProfileQuickActions({ children }: { children: ReactNode }) {
+  return <View style={personLayoutStyles.quickActions}>{children}</View>;
+}
+
+/** The column of management actions at the foot of a person page. */
+export function ProfileActionStack({ children }: { children: ReactNode }) {
+  return <View style={personLayoutStyles.actionStack}>{children}</View>;
+}
+
+/** Two actions sharing a line inside a `ProfileActionStack`. */
+export function ProfileActionRow({ children }: { children: ReactNode }) {
+  return <View style={personLayoutStyles.actionRow}>{children}</View>;
 }
 
 const createProfilePrimitiveStyles = (mobileColors: MobileColors) =>
@@ -418,6 +590,15 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       gap: 14,
     },
+    heroTopCentered: {
+      flexDirection: "column",
+      gap: 14,
+      paddingTop: 8,
+    },
+    /** Relative only so the status dot can hang off the avatar's corner. */
+    avatarFrame: {
+      position: "relative",
+    },
     avatar: {
       alignItems: "center",
       backgroundColor: mobileColors.brand,
@@ -426,14 +607,58 @@ const createStyles = (mobileColors: MobileColors) =>
       justifyContent: "center",
       width: 64,
     },
+    avatarLarge: {
+      borderRadius: 48,
+      height: 96,
+      width: 96,
+    },
     avatarText: {
       ...mobileText.heroMetric,
       color: mobileColors.textInverse,
+    },
+    // Size only: the weight rides on `heroMetric`'s family, and naming a
+    // fontWeight next to it would send Android hunting for a bold face this
+    // single-weight family hasn't got.
+    avatarTextLarge: {
+      fontSize: 32,
+      lineHeight: 40,
+    },
+    avatarStatusDot: {
+      borderColor: mobileColors.background,
+      borderRadius: 9,
+      borderWidth: 3,
+      bottom: 0,
+      height: 18,
+      position: "absolute",
+      right: 0,
+      width: 18,
+    },
+    avatarStatusDotLarge: {
+      borderRadius: 11,
+      bottom: 4,
+      height: 22,
+      right: 4,
+      width: 22,
+    },
+    avatarStatusDotSuccess: {
+      backgroundColor: mobileColors.success,
+    },
+    avatarStatusDotMuted: {
+      backgroundColor: mobileColors.textSubtle,
     },
     heroCopy: {
       flex: 1,
       gap: 3,
       minWidth: 0,
+    },
+    // Stretched rather than flexed: in a column `flex: 1` would stretch the
+    // copy down the cross axis instead of sizing it to its text.
+    heroCopyCentered: {
+      alignItems: "center",
+      alignSelf: "stretch",
+      flexBasis: "auto",
+      flexGrow: 0,
+      gap: 6,
     },
     heroTitleRow: {
       alignItems: "center",
@@ -441,15 +666,26 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 8,
       minWidth: 0,
     },
+    heroTitleRowCentered: {
+      justifyContent: "center",
+    },
     heroTitle: {
       ...mobileText.screenTitle,
       color: mobileColors.textPrimary,
       flexShrink: 1,
       minWidth: 0,
     },
+    heroTitleCentered: {
+      fontSize: 26,
+      lineHeight: 32,
+      textAlign: "center",
+    },
     heroSubtitle: {
       ...mobileText.body,
       color: mobileColors.textMuted,
+    },
+    heroSubtitleCentered: {
+      textAlign: "center",
     },
     heroBadge: {
       alignItems: "center",
@@ -463,10 +699,12 @@ const createStyles = (mobileColors: MobileColors) =>
       paddingHorizontal: 10,
       paddingVertical: 5,
     },
+    heroBadgeCentered: {
+      alignSelf: "center",
+    },
     heroBadgeText: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "semibold"),
       color: mobileColors.brand,
-      fontWeight: "600",
     },
     heroBadgeContrast: {
       backgroundColor: mobileColors.textPrimary,
@@ -487,27 +725,39 @@ const createStyles = (mobileColors: MobileColors) =>
       flexWrap: "wrap",
       gap: 10,
     },
+    heroDetailCentered: {
+      alignItems: "center",
+      justifyContent: "center",
+    },
     heroMetaItem: {
       flex: 1,
       gap: 3,
       minWidth: 120,
+    },
+    heroMetaItemCentered: {
+      alignItems: "center",
+      // The 120pt floor above wraps three cells to 2 + 1 at phone widths, and a
+      // stranded last cell is the one arrangement a centered hero cannot
+      // balance. Flexed evenly they stay one symmetric strip.
+      minWidth: 0,
+    },
+    heroMetaTextCentered: {
+      textAlign: "center",
     },
     heroMetaLabel: {
       ...mobileText.caption,
       color: mobileColors.textSubtle,
     },
     heroMetaValue: {
-      ...mobileText.rowTitle,
+      ...mobileTextWeighted("rowTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     section: {
       gap: 10,
     },
     sectionTitle: {
-      ...mobileText.label,
+      ...mobileTextWeighted("label", "medium"),
       color: mobileColors.textSubtle,
-      fontWeight: "500",
       letterSpacing: 0.4,
       textTransform: "uppercase",
     },
@@ -518,7 +768,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     panel: {
       backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       gap: 14,
@@ -526,7 +776,7 @@ const createStyles = (mobileColors: MobileColors) =>
     },
     list: {
       backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
       overflow: "hidden",
@@ -545,9 +795,6 @@ const createStyles = (mobileColors: MobileColors) =>
     navRow: {
       minHeight: 70,
     },
-    rowPressed: {
-      opacity: 0.64,
-    },
     rowDivider: {
       borderBottomColor: mobileColors.borderSubtle,
       borderBottomWidth: StyleSheet.hairlineWidth,
@@ -562,26 +809,23 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textSubtle,
     },
     rowValue: {
-      ...mobileText.rowTitle,
+      ...mobileTextWeighted("rowTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     rowDetail: {
       ...mobileText.body,
       color: mobileColors.textMuted,
     },
     navLabel: {
-      ...mobileText.cardTitle,
+      ...mobileTextWeighted("cardTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     field: {
       gap: 7,
     },
     fieldLabel: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "medium"),
       color: mobileColors.textSubtle,
-      fontWeight: "500",
     },
     input: {
       // Explicit regular weight — don't spread a `mobileText.*` token that
@@ -644,35 +888,15 @@ const createStyles = (mobileColors: MobileColors) =>
       flexWrap: "wrap",
       gap: 8,
     },
-    chip: {
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderColor: mobileColors.borderSubtle,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-    },
-    chipSelected: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brand,
-    },
-    chipPressed: {
-      opacity: 0.64,
-    },
-    chipText: {
-      ...mobileText.caption,
-      color: mobileColors.textSecondary,
-      fontWeight: "500",
-    },
-    chipTextSelected: {
-      color: mobileColors.brand,
-      fontWeight: "600",
-    },
     iconBadge: {
       alignItems: "center",
-      backgroundColor: mobileColors.surfaceSecondary,
+      // White rather than a gray tint: the tile is a frame for the glyph, not a
+      // second surface, and a gray fill under a black glyph flattens both.
+      backgroundColor: mobileColors.surface,
       borderColor: mobileColors.borderSubtle,
-      borderRadius: 16,
+      // A rounded square, not a circle: 16 on a 32px box is a full circle, and
+      // the squircle reads as a tile the icon sits in rather than a bubble.
+      borderRadius: 10,
       borderWidth: 1,
       height: 32,
       justifyContent: "center",

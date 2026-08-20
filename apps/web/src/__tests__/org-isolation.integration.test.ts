@@ -256,13 +256,20 @@ async function resetJwt(): Promise<void> {
 }
 
 describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
-  it("falls back to profiles.org_id when the JWT carries no org_id claim", async () => {
-    const { userId, profileOrgId } = await pickSqlFixture();
+  // This test used to assert the opposite — that a claim-less JWT falls back to
+  // profiles.org_id — and that fallback was a cross-tenant read leak, not a
+  // feature. The access-token hook strips org_id precisely when the membership
+  // is invalid (archived membership, archived or suspended org, deactivated
+  // user), and "remove from organization" is a soft archive that leaves
+  // profiles.org_id pointing at the org. So a removed member's own token fell
+  // through to the org they had just been removed from and kept full SELECT
+  // over every table whose policy reads caller_org_id() — permanently, as a
+  // non-member. Resolving to NULL is what makes those policies match no rows.
+  it("resolves to no organization when the JWT carries no org_id claim", async () => {
+    const { userId } = await pickSqlFixture();
     await sqlDb.query("BEGIN");
     try {
-      // Legacy/SSR-shape JWT: authenticated, no org_id, no org_role. This is
-      // the exact claim shape an old token issued before the hook started
-      // writing org_id would have.
+      // The claim shape of a token the hook has refused org context to.
       await setJwtClaims({ sub: userId, role: "authenticated" });
 
       const { rows } = await sqlDb.query<{
@@ -272,12 +279,44 @@ describe.runIf(dbReachable)("caller_org_id / caller_org_role SQL layer", () => {
         `SELECT public.caller_org_id()::text AS cid,
                 public.caller_org_role()::text AS crole`,
       );
-      expect(rows[0].cid).toBe(profileOrgId);
-      // Membership exists for (userId, profileOrgId) per pickSqlFixture's
-      // join, so caller_org_role resolves the real role, not the bare 'user'
-      // fallback. We don't pin to a specific role here — any non-null value
-      // proves the membership lookup ran through the fallback org.
-      expect(rows[0].crole).not.toBeNull();
+      expect(rows[0].cid).toBeNull();
+      // And the role degrades with it: caller_org_role joins memberships on
+      // caller_org_id(), so a NULL org can only produce the 'user' floor.
+      expect(rows[0].crole).toBe("user");
+    } finally {
+      await sqlDb.query("ROLLBACK");
+      await resetJwt();
+    }
+  });
+
+  // The end-to-end shape of the leak, against a real database: a member whose
+  // membership is archived (what removal actually does) can no longer reach the
+  // org's rows through the policies that trust caller_org_id().
+  it("stops resolving an org for a member whose membership was archived", async () => {
+    const { userId, profileOrgId } = await pickSqlFixture();
+    await sqlDb.query("BEGIN");
+    try {
+      await sqlDb.query(
+        `UPDATE public.organization_memberships
+            SET archived_at = NOW()
+          WHERE user_id = $1 AND org_id = $2`,
+        [userId, profileOrgId],
+      );
+
+      // The trigger clears the profile default, so even a fresh sign-in has no
+      // org to inherit.
+      const { rows: profileRows } = await sqlDb.query<{ org_id: string | null }>(
+        `SELECT org_id::text AS org_id FROM public.profiles WHERE id = $1`,
+        [userId],
+      );
+      expect(profileRows[0].org_id).toBeNull();
+
+      // And an outstanding token with no claim resolves to nothing.
+      await setJwtClaims({ sub: userId, role: "authenticated" });
+      const { rows } = await sqlDb.query<{ cid: string | null }>(
+        `SELECT public.caller_org_id()::text AS cid`,
+      );
+      expect(rows[0].cid).toBeNull();
     } finally {
       await sqlDb.query("ROLLBACK");
       await resetJwt();

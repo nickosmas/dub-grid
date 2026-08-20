@@ -4,7 +4,7 @@ import { getMobileRealtimeInvalidationKeys } from "../lib/mobile-realtime-invali
 describe("getMobileRealtimeInvalidationKeys", () => {
   it("refreshes bootstrap, profile, schedule, requests, and the dashboard for org settings changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "organizations")).toEqual([
-      ["mobile", "bootstrap", "token-1"],
+      ["mobile", "bootstrap"],
       ["mobile", "profile", "token-1"],
       ["mobile", "schedule"],
       ["mobile", "requests"],
@@ -15,7 +15,7 @@ describe("getMobileRealtimeInvalidationKeys", () => {
 
   it("refreshes people-facing caches and the dashboard for employee changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "employees")).toEqual([
-      ["mobile", "bootstrap", "token-1"],
+      ["mobile", "bootstrap"],
       ["mobile", "profile", "token-1"],
       ["mobile", "people", "token-1"],
       ["mobile", "person", "token-1"],
@@ -28,7 +28,7 @@ describe("getMobileRealtimeInvalidationKeys", () => {
 
   it("refreshes people-facing caches for people directory relationship changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "organization_memberships")).toEqual([
-      ["mobile", "bootstrap", "token-1"],
+      ["mobile", "bootstrap"],
       ["mobile", "profile", "token-1"],
       ["mobile", "people", "token-1"],
       ["mobile", "person", "token-1"],
@@ -36,7 +36,7 @@ describe("getMobileRealtimeInvalidationKeys", () => {
     // invitations also feeds the dashboard's activity feed (accepted
     // invitations show up as "user_signup" activity items).
     expect(getMobileRealtimeInvalidationKeys("token-1", "invitations")).toEqual([
-      ["mobile", "bootstrap", "token-1"],
+      ["mobile", "bootstrap"],
       ["mobile", "profile", "token-1"],
       ["mobile", "people", "token-1"],
       ["mobile", "person", "token-1"],
@@ -46,7 +46,7 @@ describe("getMobileRealtimeInvalidationKeys", () => {
 
   it("refreshes bootstrap-owned data when subscription access changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "subscriptions")).toEqual([
-      ["mobile", "bootstrap", "token-1"],
+      ["mobile", "bootstrap"],
       ["mobile", "profile", "token-1"],
       ["mobile", "people", "token-1"],
       ["mobile", "person", "token-1"],
@@ -72,7 +72,7 @@ describe("getMobileRealtimeInvalidationKeys", () => {
   it("refreshes the notifications inbox, bootstrap, and facets when a notification row changes", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "notifications")).toEqual([
       ["mobile", "notifications-infinite"],
-      ["mobile", "bootstrap", "token-1"],
+      ["mobile", "bootstrap"],
       ["mobile", "notification-facets", "token-1"],
     ]);
   });
@@ -95,11 +95,11 @@ describe("getMobileRealtimeInvalidationKeys", () => {
 
   it("refreshes bootstrap + profile for audit-log and impersonation events", () => {
     expect(getMobileRealtimeInvalidationKeys("token-1", "audit_log")).toEqual([
-      ["mobile", "bootstrap", "token-1"],
+      ["mobile", "bootstrap"],
       ["mobile", "profile", "token-1"],
     ]);
     expect(getMobileRealtimeInvalidationKeys("token-1", "impersonation_sessions")).toEqual([
-      ["mobile", "bootstrap", "token-1"],
+      ["mobile", "bootstrap"],
       ["mobile", "profile", "token-1"],
     ]);
   });

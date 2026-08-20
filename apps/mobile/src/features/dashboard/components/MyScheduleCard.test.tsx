@@ -113,12 +113,17 @@ describe("MyScheduleCard", () => {
     expect(screen.getByText("You're not scheduled this week")).toBeInTheDocument();
   });
 
-  it("renders nothing while loading", () => {
+  // The card used to return null while its query loaded, which meant it
+  // appeared after the dashboard's skeleton had already cleared and pushed
+  // every card below it down. The screens that render it now fold this query
+  // into their own gate, so the card just draws whatever it has.
+  it("renders its card frame even before the query resolves", () => {
     useQuery.mockReturnValue({ isLoading: true, data: undefined });
 
     const { container } = render(<MyScheduleCard accessToken="token" />);
 
-    expect(container).toBeEmptyDOMElement();
+    expect(container).not.toBeEmptyDOMElement();
+    expect(screen.getByText("Your schedule")).toBeInTheDocument();
   });
 
   it("shows an expand button when onExpand is provided, and calls it on press", () => {

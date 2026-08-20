@@ -718,7 +718,11 @@ export function ManagementStaffPanel({
                     disabled={saving || !hasChanges}
                     className="dg-btn dg-btn-primary"
                   >
-                    <ButtonLoading loading={saving} spinnerSize={16}>
+                    <ButtonLoading
+                      loading={saving}
+                      loadingLabel={EDITOR_ACTION_LABELS.saving}
+                      spinnerSize={16}
+                    >
                       {EDITOR_ACTION_LABELS.save}
                     </ButtonLoading>
                   </button>
@@ -924,7 +928,11 @@ export function ManagementStaffPanel({
                     }
                     className="dg-btn dg-btn-primary"
                   >
-                    <ButtonLoading loading={saving} spinnerSize={16}>
+                    <ButtonLoading
+                      loading={saving}
+                      loadingLabel={EDITOR_ACTION_LABELS.saving}
+                      spinnerSize={16}
+                    >
                       {EDITOR_ACTION_LABELS.save}
                     </ButtonLoading>
                   </button>
@@ -1229,7 +1237,7 @@ export function ManagementStaffPanel({
                   className="dg-btn dg-btn-secondary"
                   style={{ width: "100%" }}
                 >
-                  <ButtonLoading loading={resending} spinnerSize={14}>
+                  <ButtonLoading loading={resending} loadingLabel="Sending" spinnerSize={14}>
                     Resend Invitation
                   </ButtonLoading>
                 </button>
@@ -1280,7 +1288,7 @@ export function ManagementStaffPanel({
                           color: "var(--color-text-inverse)",
                         }}
                       >
-                        <ButtonLoading loading={revoking} spinnerSize={14}>
+                        <ButtonLoading loading={revoking} loadingLabel="Revoking" spinnerSize={14}>
                           Confirm
                         </ButtonLoading>
                       </button>

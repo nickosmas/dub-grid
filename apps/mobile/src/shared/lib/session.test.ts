@@ -13,11 +13,9 @@ vi.mock("expo-secure-store", () => ({
 }));
 
 import {
-  loadLastOrgSlug,
-  loadSession,
+  loadLastOrg,
   loadStoredPushDevice,
-  saveLastOrgSlug,
-  saveSession,
+  saveLastOrg,
   saveStoredPushDevice,
   secureStoreAdapter,
 } from "./session";
@@ -37,28 +35,36 @@ describe("session storage", () => {
     await expect(secureStoreAdapter.getItem("token")).resolves.toBeNull();
   });
 
-  it("removes invalid stored sessions on web", async () => {
-    window.localStorage.setItem("dubgrid-mobile-session", "{invalid");
+  it("persists the last organization across logouts", async () => {
+    await saveLastOrg({ slug: "DubGrid-Health", name: "DubGrid Health" });
 
-    await expect(loadSession()).resolves.toBeNull();
-    expect(window.localStorage.getItem("dubgrid-mobile-session")).toBeNull();
+    await expect(loadLastOrg()).resolves.toEqual({
+      slug: "dubgrid-health",
+      name: "DubGrid Health",
+    });
   });
 
-  it("persists serialized sessions on web", async () => {
-    const session = {
-      access_token: "token-123",
-      refresh_token: "refresh-123",
-    };
+  // Login shows the cached name immediately; without one it can only name the
+  // organization by subdomain until a lookup answers.
+  it("stores a null name when none is known yet", async () => {
+    await saveLastOrg({ slug: "dubgrid-health" });
 
-    await saveSession(session as never);
-
-    expect(window.localStorage.getItem("dubgrid-mobile-session")).toContain("token-123");
+    await expect(loadLastOrg()).resolves.toEqual({ slug: "dubgrid-health", name: null });
   });
 
-  it("persists the last organization slug across logouts", async () => {
-    await saveLastOrgSlug("DubGrid-Health");
+  // Installs that last wrote this key before names were cached hold a bare
+  // slug; dropping it would forget the remembered organization on upgrade.
+  it("reads a legacy bare-slug record", async () => {
+    window.localStorage.setItem("dubgrid-mobile-last-org", "dubgrid-health");
 
-    await expect(loadLastOrgSlug()).resolves.toBe("dubgrid-health");
+    await expect(loadLastOrg()).resolves.toEqual({ slug: "dubgrid-health", name: null });
+  });
+
+  it("forgets the organization when the slug is cleared", async () => {
+    await saveLastOrg({ slug: "dubgrid-health", name: "DubGrid Health" });
+    await saveLastOrg({ slug: null });
+
+    await expect(loadLastOrg()).resolves.toBeNull();
   });
 
   it("persists the active push device on web", async () => {
@@ -71,5 +77,12 @@ describe("session storage", () => {
       expoPushToken: "ExponentPushToken[test-token]",
       platform: "ios",
     });
+  });
+
+  it("discards a corrupt stored value instead of throwing", async () => {
+    window.localStorage.setItem("dubgrid-mobile-push-device", "{invalid");
+
+    await expect(loadStoredPushDevice()).resolves.toBeNull();
+    expect(window.localStorage.getItem("dubgrid-mobile-push-device")).toBeNull();
   });
 });

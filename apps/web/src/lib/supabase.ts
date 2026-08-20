@@ -8,12 +8,12 @@ export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, 
     if (!browserClient) {
       if (!clientEnv) {
         throw new Error(
-          "Missing Supabase credentials. Keep your values in the repo-root .env.local (copy from .env.example if needed) and fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+          "Missing Supabase credentials. Keep your values in the repo-root .env.local (copy from .env.example if needed) and fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
         );
       }
       browserClient = createBrowserClient(
         clientEnv.NEXT_PUBLIC_SUPABASE_URL,
-        clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        clientEnv.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
       );
     }
     const value = (browserClient as unknown as Record<string, unknown>)[prop as string];

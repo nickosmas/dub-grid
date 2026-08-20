@@ -12,7 +12,8 @@ import {
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import {
   getCodeError,
@@ -25,6 +26,7 @@ import { SectionCard } from "./shared";
 import { EmptyState } from "@/components/EmptyState";
 import { useSmoothReorder } from "./useSmoothReorder";
 import type { DependencyInfo } from "@/features/settings/client";
+import { useNavigationGuard } from "@/components/NavigationGuardProvider";
 import { useRegisterWizardEditor, useWizardMode } from "@/components/onboarding/WizardModeContext";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -401,13 +403,18 @@ function DepartmentSection({
     Boolean(duplicateDepartmentName) ||
     Boolean(duplicateFocusAreaName);
 
+  // Only meaningful while editing. Outside edit mode there is no draft to
+  // compare: `localDepts`/`localFAs` stay empty until `handleEnterEdit` seeds
+  // them from props, so an ungated comparison reports every populated page as
+  // dirty and the navigation guard prompts on a page nobody has touched.
   const isDirty = useMemo(() => {
+    if (!isEditing) return false;
     const deptsDirty = JSON.stringify(nonEmpty(localDepts)) !== JSON.stringify(depts);
     if (type === "management") return deptsDirty;
     const faDirty =
       JSON.stringify(localFAs.filter((fa) => fa.name.trim())) !== JSON.stringify(propFAs);
     return deptsDirty || faDirty;
-  }, [localDepts, depts, localFAs, propFAs, nonEmpty, type]);
+  }, [isEditing, localDepts, depts, localFAs, propFAs, nonEmpty, type]);
 
   const displayList = isEditing ? localDepts : depts;
 
@@ -796,6 +803,8 @@ function DepartmentSection({
   };
 
   // Register with wizard so Continue can save this section.
+  useNavigationGuard(`departments:${type}`, { isDirty: () => isDirty });
+
   useRegisterWizardEditor(
     `departments:${type}`,
     {
@@ -826,7 +835,9 @@ function DepartmentSection({
           disabled={saving || !isDirty || hasValidationErrors}
           className="dg-btn dg-btn-primary dg-btn-sm"
         >
-          {getEditorSaveLabel(saving)}
+          <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
+            {EDITOR_ACTION_LABELS.save}
+          </ButtonLoading>
         </button>
       }
       style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}

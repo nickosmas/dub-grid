@@ -16,7 +16,11 @@ import {
   updatePendingInvitation,
 } from "@/features/organization/client";
 import { updateEmployeeIdentity } from "@/features/employees/client";
-import { isSelfAction } from "@dubgrid/domain";
+import {
+  countStaffByCertification,
+  isSelfAction,
+  summarizeStaffByCredential,
+} from "@dubgrid/domain";
 import { getAvatarTone } from "@dubgrid/design-tokens";
 import { useAuth } from "@/components/AuthProvider";
 import * as Sentry from "@/lib/sentry";
@@ -52,6 +56,7 @@ import {
   TableRow as UITableRow,
 } from "@/components/ui/table";
 import { BulkImportModal } from "./BulkImportModal";
+import { DirectoryCertificationCards } from "./DirectoryCertificationCards";
 import { DirectorySummaryCards } from "./DirectorySummaryCards";
 import { EmployeeManagementAccessModal } from "./EmployeeManagementAccessModal";
 import { ManagementStaffPanel } from "./ManagementStaffPanel";
@@ -69,6 +74,7 @@ import { StaffReorderListRow, StaffTableRow } from "./StaffTableRow";
 import { useStaffFilters, type EmployeeTab } from "./useStaffFilters";
 import { useStaffReorder } from "./useStaffReorder";
 import { useStaffSelection } from "./useStaffSelection";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 const REORDER_SETTLE_MS = 220;
 
@@ -809,6 +815,14 @@ export function MembersSection({
     [employees],
   );
 
+  // Same basis as the other summary cards (active, on-schedule), so the four
+  // numbers reconcile rather than reflecting the filtered table.
+  const credentialSummary = useMemo(() => summarizeStaffByCredential(employees), [employees]);
+  const certificationCounts = useMemo(
+    () => countStaffByCertification(employees, certifications),
+    [employees, certifications],
+  );
+
   const tabs: {
     key: EmployeeTab;
     label: string;
@@ -911,7 +925,7 @@ export function MembersSection({
 
   return (
     <>
-      <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+      <div className="px-[var(--dg-page-gutter)] py-4 md:py-6 lg:py-10">
         <div className="space-y-8">
           <div>
             <h1 className="text-[length:var(--dg-fs-page-title)] font-bold tracking-tight text-[var(--color-text-primary)]">
@@ -938,7 +952,9 @@ export function MembersSection({
                 onClick={loadMoreDirectory}
                 disabled={directoryLoadingMore}
               >
-                {directoryLoadingMore ? "Loading…" : "Load more"}
+                <ButtonLoading loading={directoryLoadingMore} loadingLabel="Loading">
+                  Load more
+                </ButtonLoading>
               </button>
             </div>
           )}
@@ -948,6 +964,18 @@ export function MembersSection({
             fullTimeCount={employmentSummary.fullTime}
             partTimeCount={employmentSummary.partTime}
           />
+
+          {!showManagement && (
+            <DirectoryCertificationCards
+              counts={certificationCounts}
+              certifications={certifications}
+              certificationLabel={certificationLabel}
+              certifiedCount={credentialSummary.certified}
+              uncertifiedCount={credentialSummary.uncertified}
+              selectedCertification={filterCertification}
+              onSelectCertification={setFilterCertification}
+            />
+          )}
 
           <div className="flex items-center gap-3 overflow-x-auto">
             <div className="flex min-w-0 items-center gap-2">

@@ -1,7 +1,7 @@
 "use client";
 
 import type { DraftBreakdown } from "@/lib/draft-utils";
-import ButtonSpinner from "@/components/ButtonSpinner";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 import ChangeLegend from "@/components/ChangeLegend";
 import { Eye, EyeOff } from "lucide-react";
 import { Hint } from "@/components/ui/hint";
@@ -122,14 +122,13 @@ export default function DraftBanner({
             className="dg-btn dg-btn-secondary dg-btn-sm"
             style={{ color: "var(--color-danger-dark)" }}
           >
-            {isCanceling ? (
-              <>
-                <ButtonSpinner size={12} />
-                Discarding…
-              </>
-            ) : (
-              "Discard"
-            )}
+            <ButtonLoading
+              loading={Boolean(isCanceling)}
+              loadingLabel="Discarding"
+              spinnerSize={12}
+            >
+              Discard
+            </ButtonLoading>
           </button>
         </Hint>
         <Hint content={hint(publishHint)} side="bottom">
@@ -139,14 +138,13 @@ export default function DraftBanner({
             disabled={isDisabled || !canPublish}
             className="dg-btn dg-btn-primary dg-btn-sm"
           >
-            {isPublishing ? (
-              <>
-                <ButtonSpinner size={12} />
-                Publishing…
-              </>
-            ) : (
-              "Publish"
-            )}
+            <ButtonLoading
+              loading={Boolean(isPublishing)}
+              loadingLabel="Publishing"
+              spinnerSize={12}
+            >
+              Publish
+            </ButtonLoading>
           </button>
         </Hint>
         {onDismiss && (

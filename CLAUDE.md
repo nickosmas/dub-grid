@@ -78,6 +78,13 @@
   (+ its `WorkspaceKind`/`workspaceKind` TS mapping — the real-vs-sandbox flavor; renaming
   needs a migration) and the marketing landing line. The generic word for a UI area
   (e.g. "the People section") is not the tenant — reword, don't call it "organization".
+- **No decorative "AI" iconography** anywhere in either app. The four-point sparkle
+  (Ionicons `sparkles*`, lucide `Sparkle`/`Sparkles`/`Wand*`, the ✨ and 🪄 emoji)
+  reads as "AI feature" and makes the product look generated rather than designed.
+  Nothing here is AI-powered, so an icon must name what it stands for. Enforced by
+  `design/no-decorative-ai-icons` (`eslint-rules/no-decorative-ai-icons.mjs`).
+  Stars and the word "magic" are fine — a star is a real favorite affordance, and
+  `MagicLinkEmail` is the standard Supabase term for passwordless sign-in
 - **Testing**: Run `npm test` (vitest) after changes. Tests use jsdom + Testing Library
 - **Cookie consent version**: When adding/removing cookies, changing analytics providers,
   or updating the cookie/privacy policy, bump `CONSENT_VERSION` in
@@ -85,7 +92,10 @@
 
 ---
 
-## 8. Design-System Conventions
+## 8. Design-System Conventions (Web)
+
+> Mobile has its own system — see **Section 9** below. The `dg-*` classes here
+> are web-only and have no mobile equivalent.
 
 Buttons are unified on **`dg-btn-*`** everywhere — the authenticated app, the
 public auth flows (login, forgot-password, reset-password, accept-invite,
@@ -114,6 +124,13 @@ Shared primitives to reach for before inventing a layout:
   centered max-width). Skip it for pages that own their full viewport (the
   schedule grid) or that intentionally go full-width (reports tables).
 - `<Switch>` — replaces hand-rolled 44×24 toggle buttons.
+- `<ButtonLoading>` (`components/ButtonSpinner.tsx`) — the only loading-button
+  treatment. A busy button shows **a spinner and its label**, with the label in
+  the progressive form of its own verb and no ellipsis (`[spinner] Saving`, not
+  `Saving…` and not a spinner with the label hidden), so it still says which
+  action is running. `loadingLabel` is required for that reason; a button with a
+  leading icon passes it as `icon={...}` and the spinner takes its place.
+  `<ConfirmDialog>` takes the same wording as `confirmPendingLabel`.
 - `<EditorActionRow>` — dirty-state save/discard footer used by every
   settings panel; the primary button always sits on the right.
 - `<SectionCard>` (`components/settings/shared.tsx`) — bordered/padded card
@@ -128,6 +145,107 @@ Shared primitives to reach for before inventing a layout:
 - `<ErrorBoundary>` and `<NotFoundBoundary>` (`components/RouteBoundary.tsx`)
   — every segment `error.tsx` and `not-found.tsx` should delegate to these
   rather than re-render the chrome.
+- **Unsaved input is never discarded silently**, by one of two guards. A modal
+  wires `useUnsavedChangesPrompt`'s `requestClose` into `<Modal onRequestClose>`
+  (the single veto for Escape, backdrop and X). A page-level editor calls
+  `useNavigationGuard(id, { isDirty })`, which asks before an in-app link click
+  and before tab close. Never hand-roll a `beforeunload` — `NavigationGuardProvider`
+  owns it, and a second one prompts twice. Full detail in `apps/web/AGENTS.md`.
+
+---
+
+## 9. Design-System Conventions (Mobile)
+
+Tokens live in `packages/design-tokens` with a `mobile*` prefix and reach screens
+through `apps/mobile/src/shared/theme/tokens.ts`. That adapter is the only import
+path. **The package is shared with the web app** — add `mobile*` groups, never
+change existing tokens.
+
+Reach for the shared primitive before inventing one:
+
+- **`<AppText variant tone>`** — all text. Carries a theme-correct color, so no
+  screen re-specifies it.
+- **`<Button>`** — all buttons. Solid fill, zero border, pill, sizes
+  `sm`/`md`/`lg`, plus `iconOnly`. Every tone is solid; do not add borders back.
+  `loading` renders a spinner **beside** the label, never over it, and swaps the
+  label to `loadingLabel` — the same verb in progress ("Saving", not "Save"), no
+  ellipsis. `<ConfirmationModal>` takes it as `confirmPendingLabel`. A
+  `disabled` that repeats the loading condition is redundant; `loading` already
+  disables.
+- **`<PressableRow>`** for pressable list rows, **`usePressAnimation()`** for
+  anything else pressable. iOS scales on press, Android gets a ripple and **no**
+  scale — its ripple is already the state layer.
+- **`<Chip>`**, **`<SegmentedControl>`**, **`<ScrollableTabStrip>`**,
+  **`<GradientBackdrop>`**, **`<AnimatedListItem>`**, **`<Collapsible>`**,
+  **`<BottomSheetModal>`** (its `header` slot renders in the drag region).
+- **`<BottomSheetModal>` is the only modal design** — there is no full-screen
+  modal, no centred alert card and no ✕ close button. Titles go in the `header`
+  slot via **`<SheetHeader>`**; stacked actions go in **`<SheetActions>`**,
+  primary first; confirmations use **`<ConfirmationModal>`**. A sheet holding
+  unsaved input routes `onDismiss` into a discard confirmation rather than
+  closing. Every sheet keeps its grabber and moves when dragged, blocking ones
+  included: they resist and settle back instead of refusing to move, and an
+  upward drag resists on every sheet. Never size anything inside a `<Modal>`
+  from window metrics.
+- **`useUnsavedChangesGuard()`** is that discard confirmation, and the only
+  implementation of it — never hand-roll a `hasUnsavedChanges` +
+  `showDiscardConfirmation` + `close()` triad. A sheet points both `onDismiss`
+  and its Cancel button at `guard.requestClose`; a screen with an inline editor
+  adds **`useNavigationDiscardGuard(guard)`** so header back, Android back and
+  the iOS back swipe ask through that same one confirmation. Keep `isDirty`
+  tight (`editing && hasChanges`), compute dirtiness once at module scope, and
+  never route a Cancel that navigates through `onClose` — it re-enters the guard
+  and asks twice.
+- **`<AuthShell>` / `<AuthField>`** — every public auth screen.
+- **`<EmptyStateCard>`** for every empty state. Always **centred**, and the icon
+  badge is always a **circle** — the rounded square stays the card _header's_
+  shape (`cardIconFrame`). A full-page empty gets a 60pt `brandSoft`/`brandBorder`
+  badge with a brand glyph; inside a card it is a 48pt badge in the card's own
+  `surface`, lifted with `mobileElevation("raised")` and carrying a muted glyph.
+  `iconName` is **required** — it used to default to `sparkles-outline`, which is
+  how the AI sparkle reached every screen that forgot one. `compact` renders
+  inside a card or `ProfileSection` and wraps itself in a `surfaceSecondary`
+  panel; that panel is load-bearing, since centred copy loose under a card's
+  left-aligned header reads as misaligned. Full-page variants own the viewport and
+  take no panel. `actionVariant="link"` gives the action a trailing arrow instead
+  of a filled pill, for an empty state pointing at a fuller view of the same thing.
+- **`shared/components/skeleton`** primitives (`SkeletonBlock`, `SkeletonLine`,
+  `SkeletonCardSurface`, `SkeletonGroup`) for loading placeholders. Skeletons
+  are per screen and colocated with it, and they **reuse that screen's own
+  style objects** rather than restating its numbers. One skeleton per screen,
+  shown once: fold every query the first paint needs into that screen's single
+  `useMobileContentState` and render on `showSkeleton`. Whatever appears in
+  `isLoading` must appear in `hasData` too, or the gate clears with that
+  query's data still missing and the screen paints a wrong terminal state
+  ("Person not found") for a frame. Never branch on a raw `isLoading`, never
+  nest a skeleton inside a section (a second wave after the first clears), and
+  never let a render branch depend on state synced in an effect.
+- **`mobileElevation(level, isDark)`** for shadows; there is no other shadow
+  vocabulary. Cards are borderless in light mode and keep the hairline in dark.
+- **`useMotionPreference()`** for every duration, spring and easing. Its `d()`
+  returns 0 under OS reduce-motion, which is what makes that setting apply
+  app-wide from one place. Never hardcode a duration.
+
+Two rules that are easy to get wrong and silent when you do:
+
+- **Weight is carried by `fontFamily`, never by `fontWeight`.** DM Sans loads as
+  four single-weight files registered one family name each, so a style that
+  names both (`DMSans_700Bold` + `fontWeight: "700"`) makes Android hunt for a
+  bold face that family hasn't got and fall back to Roboto, while iOS renders it
+  correctly — and a bare `fontWeight` with no family is Roboto everywhere. Use a
+  `mobileText` token, `mobileTextWeighted(variant, weight)`, or
+  `mobileTypography.fontFamily.*`. `<TextInput>` is the one exception.
+- **`expo-blur` is iOS-only**, and Android `elevation` needs an opaque
+  background and reorders sibling z order.
+- **Never put `flex: 1` on a child of an auto-width row.** Yoga collapses it to
+  zero width and the control renders empty; measure with `onLayout` instead.
+- **Soft control fills use `controlNeutralBg`/`controlSecondaryBg`**, not the
+  shared `surfaceSecondary`/`brandSoft`, which are invisible against the page.
+
+Password strength and match rules are shared with web via
+`@dubgrid/domain` — never re-derive them per app.
+
+Full detail, including the test-harness traps, lives in `apps/mobile/AGENTS.md`.
 
 ---
 

@@ -8,6 +8,7 @@ import {
 } from "@/features/organization/client/api";
 import { queryKeys } from "@/lib/query-keys";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 export default function SandboxBanner() {
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
@@ -125,7 +126,9 @@ export default function SandboxBanner() {
             fontSize: "var(--dg-fs-caption)",
           }}
         >
-          {pendingAction === "reset" ? "Resetting…" : "Reset sandbox"}
+          <ButtonLoading loading={pendingAction === "reset"} loadingLabel="Resetting">
+            Reset sandbox
+          </ButtonLoading>
         </button>
         <button
           type="button"
@@ -138,7 +141,9 @@ export default function SandboxBanner() {
             fontSize: "var(--dg-fs-caption)",
           }}
         >
-          {pendingAction === "exit" ? "Exiting…" : "Exit sandbox"}
+          <ButtonLoading loading={pendingAction === "exit"} loadingLabel="Exiting">
+            Exit sandbox
+          </ButtonLoading>
         </button>
       </div>
     </div>

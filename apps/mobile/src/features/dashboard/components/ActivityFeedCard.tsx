@@ -80,7 +80,7 @@ export function ActivityFeedCard({
             renderItem={(item) => <ActivityRow item={item} />}
           />
         ) : (
-          <EmptyStateCard compact iconName="sparkles-outline" title="No recent activity" />
+          <EmptyStateCard compact iconName="time-outline" title="No recent activity" />
         )
       }
     />

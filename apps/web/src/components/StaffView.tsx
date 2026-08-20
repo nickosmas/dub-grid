@@ -262,12 +262,12 @@ export default function StaffView({
                         }
                         isActive={activeSection === link.id}
                         tooltip={link.label}
-                        className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)]"
+                        className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)]"
                       >
                         <span
                           className={
                             activeSection === link.id
-                              ? "flex shrink-0 items-center justify-center text-[var(--color-brand)] transition-colors"
+                              ? "flex shrink-0 items-center justify-center text-[var(--color-text-primary)] transition-colors"
                               : "flex shrink-0 items-center justify-center text-[var(--color-text-faint)] transition-colors"
                           }
                         >
@@ -347,7 +347,7 @@ export default function StaffView({
         )}
 
         {activeSection !== "directory" && (
-          <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+          <div className="px-[var(--dg-page-gutter)] py-4 md:py-6 lg:py-10">
             {activeSection === "requests" && canAccessPeopleAdminSurfaces && orgId && (
               <ProfileChangeRequestQueue
                 orgId={orgId}

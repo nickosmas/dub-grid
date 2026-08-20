@@ -74,7 +74,8 @@ import {
   hasShiftRequestStarted,
   subtractBreakMinutes,
   getSegmentScheduledMinutes,
-  formatHoursValue,
+  formatHoursLabel,
+  toHoursValue,
   getEntrySegmentSortTime,
 } from "./schedule-time";
 export * from "./team-schedule";
@@ -356,7 +357,7 @@ export function buildWeeklyHoursSummary(
     );
   }, 0);
 
-  const scheduledHours = formatHoursValue(scheduledMinutes);
+  const scheduledHours = toHoursValue(scheduledMinutes);
   const progress = targetHours > 0 ? Math.min(scheduledHours / targetHours, 1) : 0;
   const statusLabel =
     progress >= 0.8 ? "On track" : progress >= 0.5 ? "In progress" : "Needs attention";

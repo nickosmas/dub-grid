@@ -4,41 +4,40 @@ import { ApiResponseError } from "@dubgrid/api-client";
 import type { MobileAuthLoginResponse } from "@dubgrid/contracts";
 import { ACCOUNT_DISABLED_CODE, ACCOUNT_DISABLED_MESSAGE } from "@dubgrid/domain";
 import { Redirect, router } from "expo-router";
-import {
-  KeyboardAvoidingView,
-  Image,
-  Linking,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { AppSplashScreen } from "../../../shared/components/AppSplashScreen";
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Button } from "../../../shared/components/Button";
-import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
-import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
+import { useKeyboardDoneAccessory } from "../../../shared/components/KeyboardDoneAccessory";
+import { AuthShell } from "../components/AuthShell";
 import {
+  useIsConsentDecisionPending,
+  useRecheckConsentDecision,
+} from "../../consent/components/ConsentGate";
+import { clearStoredConsent } from "../../consent/lib/consent";
+import {
+  getBootstrap,
   loginToOrganization,
   lookupOrganization,
   registerMobileSessionPresence,
   verifyMobileTotpFactor,
 } from "../../../shared/lib/api";
+import { buildBootstrapQueryKey } from "../hooks/useBootstrap";
+import { queryClient } from "../../../shared/lib/query-client";
 import { getInlineErrorMessageOrToast } from "../../../shared/lib/errors";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
-import {
-  loadLastOrgSlug,
-  saveHasSeenOnboarding,
-  saveLastOrgSlug,
-} from "../../../shared/lib/session";
+import { loadLastOrg, saveLastOrg } from "../../../shared/lib/session";
+import { markHasSeenOnboarding } from "../hooks/useHasSeenOnboarding";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
 import { useSessionState } from "../../../shared/providers/AuthSessionProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  mobileTextWeighted,
+  mobileTypography,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
 type Stage = "organization" | "credentials" | "mfa";
 
@@ -48,7 +47,6 @@ type PendingMfaLogin = MobileAuthLoginResponse & {
 };
 
 const SESSION_HANDOFF_TIMEOUT_MS = 15_000;
-const MAX_COLUMN_WIDTH = 380;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isValidEmail(value: string): boolean {
@@ -106,12 +104,22 @@ export default function LoginScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { accessToken, isLoading } = useSessionState();
-  const insets = useSafeAreaInsets();
+  const isConsentDecisionPending = useIsConsentDecisionPending();
+  const recheckConsentDecision = useRecheckConsentDecision();
   const emailInputRef = useRef<TextInput>(null);
   const passwordInputRef = useRef<TextInput>(null);
   const mfaInputRef = useRef<TextInput>(null);
+  // One bar serves every stage's field: the keyboard covers the stage's submit
+  // button here, so each field gets a visible way out even when its own return
+  // key could also dismiss it.
+  const { inputAccessoryViewID, keyboardDoneAccessory } = useKeyboardDoneAccessory({
+    always: true,
+  });
   const [orgSlug, setOrgSlug] = useState("");
   const [orgName, setOrgName] = useState<string | null>(null);
+  // True only while a remembered organization's name is still being fetched,
+  // which is the one window where we don't yet know what to call it.
+  const [isResolvingOrgName, setIsResolvingOrgName] = useState(false);
   const [stage, setStage] = useState<Stage>("organization");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -130,38 +138,56 @@ export default function LoginScreen() {
   const orgSuffix = getOrgSuffixLabel(apiBaseUrl);
 
   useEffect(() => {
+    // Both this and the consent gate's own storage read start at mount, and
+    // this one usually wins — which raised the keyboard a moment before the
+    // consent sheet slid up over it. Wait for the decision instead of racing
+    // it: this effect re-runs once consent resolves, and the focus below then
+    // lands on a screen the user can actually act on.
+    if (isConsentDecisionPending) {
+      return;
+    }
+
     let active = true;
 
     void (async () => {
-      const storedSlug = await loadLastOrgSlug();
-      if (!active || !storedSlug) {
+      const storedOrg = await loadLastOrg();
+      if (!active || !storedOrg) {
         return;
       }
 
-      // Take the user straight to the credentials step — the saved slug is
-      // enough to attempt sign-in. The lookup below is purely cosmetic
-      // (friendly organization name in the subtitle); if it fails we leave the
-      // user on the credentials step with the slug as the label.
-      setOrgSlug(storedSlug);
+      // Take the user straight to the credentials step: the saved slug is
+      // enough to attempt sign-in. The cached name renders the subtitle right
+      // away, so a returning user sees their organization named in full even
+      // before (or without) the network lookup below, which only refreshes a
+      // name that may have changed server-side.
+      setOrgSlug(storedOrg.slug);
+      setOrgName(storedOrg.name);
       setStage("credentials");
+      setIsResolvingOrgName(!storedOrg.name);
       setTimeout(() => emailInputRef.current?.focus(), 0);
       try {
-        const result = await lookupOrganization(storedSlug);
+        const result = await lookupOrganization(storedOrg.slug);
         if (!active) return;
         setOrgName(result.organization.name);
         setOrgSlug(result.organization.slug);
+        await saveLastOrg(result.organization);
       } catch {
-        // Ignore — fall back to displaying the slug.
+        // Ignore: the cached name (or the subdomain) still names the target.
+      } finally {
+        if (active) setIsResolvingOrgName(false);
       }
     })();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [isConsentDecisionPending]);
 
+  // No splash here: the only time the session is still restoring is launch, and
+  // `StartupSplashGate` is already covering the screen with the app's one
+  // splash instance. Rendering another would restart the brand animation.
   if (isLoading) {
-    return <AppSplashScreen />;
+    return null;
   }
 
   if (accessToken) {
@@ -169,7 +195,7 @@ export default function LoginScreen() {
   }
 
   async function finishLogin(response: MobileAuthLoginResponse, session = response.session) {
-    await saveLastOrgSlug(response.organization.slug);
+    await saveLastOrg(response.organization);
 
     const { error: sessionError } = await withSessionHandoffTimeout(
       getSupabaseClient().auth.setSession({
@@ -188,6 +214,18 @@ export default function LoginScreen() {
     }
 
     registerMobileSessionPresence(session.accessToken).catch(() => {});
+
+    // Warm bootstrap before handing off. The tab tree can't draw its tab bar or
+    // pick the Home screen without it, and the launch splash is long spent by
+    // now, so arriving without it would blank the screen. The submit button
+    // stays in its pending state for this, which is the honest place to show
+    // the wait. `prefetchQuery` never rejects: a failed bootstrap should still
+    // let the user through to the tab gate's locked/error handling.
+    await queryClient.prefetchQuery({
+      queryKey: buildBootstrapQueryKey(session.accessToken),
+      queryFn: () => getBootstrap(session.accessToken),
+    });
+
     router.replace("/(tabs)/home");
   }
 
@@ -205,7 +243,7 @@ export default function LoginScreen() {
 
     try {
       const result = await lookupOrganization(normalizedSlug);
-      await saveLastOrgSlug(result.organization.slug);
+      await saveLastOrg(result.organization);
       setOrgSlug(result.organization.slug);
       setOrgName(result.organization.name);
       setStage("credentials");
@@ -310,349 +348,311 @@ export default function LoginScreen() {
     setOrgName(null);
   }
 
-  const orgLabel = orgName ?? orgSlug;
+  // "Continue to" always names the organization in full. The subdomain form is
+  // a last resort for when no name is coming, and must never flash ahead of a
+  // name that is still on its way, so the line stays blank while we're still
+  // finding out. `styles.subtitle` reserves its height so nothing shifts.
+  const orgSubtitle = orgName ? (
+    <>
+      Continue to <Text style={styles.subtitleStrong}>{orgName}</Text>.
+    </>
+  ) : isResolvingOrgName ? null : (
+    <>
+      Signing in at{" "}
+      <Text style={styles.subtitleStrong}>
+        {orgSlug}
+        {orgSuffix}
+      </Text>
+      .
+    </>
+  );
 
   // `__DEV__` is a Metro/RN global that isn't defined outside the app
   // runtime (e.g. under vitest), so guard the lookup rather than reference
   // it directly.
   const isDevBuild = typeof __DEV__ !== "undefined" && __DEV__;
 
-  // Dev-only: long-press the wordmark to re-show onboarding after a local
-  // `db:reset`, since `hasSeenOnboarding` lives in device storage and a DB
-  // reset has no way to reach it.
-  async function handleDevResetOnboarding() {
+  // Dev-only: long-press the wordmark to replay first run after a local
+  // `db:reset`. Both the onboarding flag and the consent choice live in device
+  // storage, which a DB reset has no way to reach, so a fresh database
+  // otherwise lands on a device that has already seen and decided everything.
+  async function handleDevResetFirstRun() {
     if (!isDevBuild) return;
-    await saveHasSeenOnboarding(false);
-    pushToast({ title: "Onboarding reset", message: "Showing onboarding again.", tone: "info" });
+    await Promise.all([markHasSeenOnboarding(false), clearStoredConsent()]);
+    recheckConsentDecision();
+    pushToast({
+      title: "First run reset",
+      message: "Showing onboarding and the privacy prompt again.",
+      tone: "info",
+    });
     router.replace("/(auth)/onboarding");
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Pressable
-        style={styles.brandHeader}
-        onLongPress={isDevBuild ? () => void handleDevResetOnboarding() : undefined}
-      >
-        <Image
-          accessibilityIgnoresInvertColors
-          accessibilityLabel="DubGrid logo"
-          source={require("../../../../assets/images/logo-blue.png")}
-          style={styles.brandMark}
-        />
-        <DubGridWordmark fontSize={20} color={mobileColors.textPrimary} />
-      </Pressable>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.keyboardArea}
-      >
-        <ScrollView
-          contentContainerStyle={[
-            styles.scrollContent,
-            {
-              paddingBottom: getScreenBottomPadding("stack", insets.bottom),
-            },
-          ]}
-          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.column}>
-            {stage === "organization" ? (
-              <View style={styles.stage}>
-                <View style={styles.header}>
-                  <Text style={styles.title}>Sign in</Text>
-                  <Text style={styles.subtitle}>Enter the subdomain for your team.</Text>
-                </View>
-
-                <View style={styles.fields}>
-                  <View
-                    style={[
-                      styles.inputRow,
-                      focusedField === "organization" && styles.inputRowFocused,
-                      error ? styles.inputRowError : null,
-                    ]}
-                  >
-                    <TextInput
-                      accessibilityLabel="Organization"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      placeholder="yourorg"
-                      placeholderTextColor={mobileColors.placeholderText}
-                      returnKeyType="go"
-                      style={[styles.input, styles.inputFlex]}
-                      value={orgSlug}
-                      onBlur={() => setFocusedField(null)}
-                      onChangeText={(value) => {
-                        setOrgSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
-                        setError(null);
-                      }}
-                      onSubmitEditing={() => {
-                        void handleOrganizationContinue();
-                      }}
-                      onFocus={() => setFocusedField("organization")}
-                    />
-                    <View style={styles.suffix}>
-                      <Text style={styles.suffixText}>{orgSuffix}</Text>
-                    </View>
-                  </View>
-
-                  {error ? <InlineError message={error} /> : null}
-                </View>
-
-                <View style={styles.actions}>
-                  <Button
-                    disabled={orgLoading || !orgSlug.trim()}
-                    label="Continue"
-                    loading={orgLoading}
-                    onPress={() => {
-                      void handleOrganizationContinue();
-                    }}
-                  />
-
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: showOrgHelp }}
-                    android_ripple={{ color: mobileColors.rippleNeutral }}
-                    style={styles.link}
-                    onPress={() => setShowOrgHelp((current) => !current)}
-                  >
-                    <Text style={styles.linkText}>Need help with your subdomain?</Text>
-                  </Pressable>
-
-                  {showOrgHelp ? (
-                    <Text style={styles.helperText}>
-                      Your subdomain is the first part of your organization URL - for example, the{" "}
-                      <Text style={styles.helperStrong}>yourorg</Text> in{" "}
-                      <Text style={styles.helperStrong}>yourorg{orgSuffix}</Text>.
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            ) : stage === "credentials" ? (
-              <View style={styles.stage}>
-                <View style={styles.header}>
-                  <Text style={styles.title}>Welcome back!</Text>
-                  <Text style={styles.subtitle}>
-                    Continue to <Text style={styles.subtitleStrong}>{orgLabel}</Text>.
-                  </Text>
-                </View>
-
-                <View style={styles.fields}>
-                  <View
-                    style={[
-                      styles.inputRow,
-                      focusedField === "email" && styles.inputRowFocused,
-                      error ? styles.inputRowError : null,
-                    ]}
-                  >
-                    <TextInput
-                      accessibilityLabel="Email"
-                      ref={emailInputRef}
-                      autoCapitalize="none"
-                      autoComplete="email"
-                      autoCorrect={false}
-                      blurOnSubmit={false}
-                      keyboardType="email-address"
-                      placeholder="Email"
-                      placeholderTextColor={mobileColors.placeholderText}
-                      returnKeyType="next"
-                      style={[styles.input, styles.inputFlex]}
-                      textContentType="emailAddress"
-                      value={email}
-                      onBlur={() => setFocusedField(null)}
-                      onChangeText={setEmail}
-                      onFocus={() => setFocusedField("email")}
-                      onSubmitEditing={() => passwordInputRef.current?.focus()}
-                    />
-                  </View>
-
-                  <View
-                    style={[
-                      styles.inputRow,
-                      focusedField === "password" && styles.inputRowFocused,
-                      error ? styles.inputRowError : null,
-                    ]}
-                  >
-                    <TextInput
-                      accessibilityLabel="Password"
-                      ref={passwordInputRef}
-                      autoCapitalize="none"
-                      autoComplete="password"
-                      autoCorrect={false}
-                      placeholder="Password"
-                      placeholderTextColor={mobileColors.placeholderText}
-                      returnKeyType="done"
-                      secureTextEntry={!showPassword}
-                      style={[styles.input, styles.inputFlex]}
-                      textContentType="password"
-                      value={password}
-                      onBlur={() => setFocusedField(null)}
-                      onChangeText={setPassword}
-                      onFocus={() => setFocusedField("password")}
-                      onSubmitEditing={() => {
-                        void handleLogin();
-                      }}
-                    />
-                    <Pressable
-                      accessibilityLabel={showPassword ? "Hide password" : "Show password"}
-                      accessibilityRole="button"
-                      hitSlop={10}
-                      style={styles.eyeButton}
-                      onPress={() => setShowPassword((current) => !current)}
-                    >
-                      <Ionicons
-                        color={mobileColors.textMuted}
-                        name={showPassword ? "eye-off-outline" : "eye-outline"}
-                        size={20}
-                      />
-                    </Pressable>
-                  </View>
-
-                  {error ? <InlineError message={error} /> : null}
-                </View>
-
-                <View style={styles.actions}>
-                  <Button
-                    disabled={submitting || !isValidEmail(email) || !password}
-                    label="Sign In"
-                    loading={submitting}
-                    onPress={() => {
-                      void handleLogin();
-                    }}
-                  />
-
-                  <View style={styles.linkRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      android_ripple={{ color: mobileColors.rippleNeutral }}
-                      style={styles.link}
-                      onPress={switchOrganization}
-                    >
-                      <Text style={styles.linkText}>Switch organization</Text>
-                    </Pressable>
-                    <Text style={styles.linkSeparator}>·</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      android_ripple={{ color: mobileColors.rippleNeutral }}
-                      style={styles.link}
-                      onPress={() => {
-                        void Linking.openURL(`${apiBaseUrl}/forgot-password`);
-                      }}
-                    >
-                      <Text style={styles.linkText}>Forgot password?</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.stage}>
-                <View style={styles.header}>
-                  <Text style={styles.title}>Two-factor authentication</Text>
-                  <Text style={styles.subtitle}>
-                    Enter the 6-digit code from your authenticator app.
-                  </Text>
-                </View>
-
-                <View style={styles.fields}>
-                  <View
-                    style={[styles.inputRow, styles.codeRow, error ? styles.inputRowError : null]}
-                  >
-                    <TextInput
-                      ref={mfaInputRef}
-                      accessibilityLabel="Verification code"
-                      autoComplete="one-time-code"
-                      inputMode="numeric"
-                      keyboardType="number-pad"
-                      maxLength={6}
-                      onChangeText={(value) => {
-                        setMfaCode(value.replace(/\D/g, "").slice(0, 6));
-                        setError(null);
-                      }}
-                      placeholder="000000"
-                      placeholderTextColor={mobileColors.placeholderText}
-                      returnKeyType="done"
-                      style={[styles.input, styles.codeInput]}
-                      textContentType="oneTimeCode"
-                      value={mfaCode}
-                      onSubmitEditing={() => {
-                        void handleMfaVerify();
-                      }}
-                    />
-                  </View>
-
-                  {error ? <InlineError message={error} /> : null}
-                </View>
-
-                <View style={styles.actions}>
-                  <Button
-                    disabled={submitting || mfaCode.length !== 6}
-                    label="Verify and Sign In"
-                    loading={submitting}
-                    onPress={() => {
-                      void handleMfaVerify();
-                    }}
-                  />
-
-                  <Pressable
-                    accessibilityRole="button"
-                    android_ripple={{ color: mobileColors.rippleNeutral }}
-                    style={styles.link}
-                    onPress={() => {
-                      setStage("credentials");
-                      setPendingMfaLogin(null);
-                      setMfaCode("");
-                      setError(null);
-                    }}
-                  >
-                    <Text style={styles.linkText}>Back to sign in</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
+    <AuthShell
+      footer={keyboardDoneAccessory}
+      onBrandLongPress={isDevBuild ? () => void handleDevResetFirstRun() : undefined}
+    >
+      {stage === "organization" ? (
+        <View style={styles.stage}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Sign in</Text>
+            <Text style={styles.subtitle}>Enter the subdomain for your team.</Text>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+
+          <View style={styles.fields}>
+            <View
+              style={[
+                styles.inputRow,
+                focusedField === "organization" && styles.inputRowFocused,
+                error ? styles.inputRowError : null,
+              ]}
+            >
+              <TextInput
+                accessibilityLabel="Organization"
+                autoCapitalize="none"
+                autoCorrect={false}
+                inputAccessoryViewID={inputAccessoryViewID}
+                placeholder="yourorg"
+                placeholderTextColor={mobileColors.placeholderText}
+                returnKeyType="go"
+                style={[styles.input, styles.inputFlex]}
+                value={orgSlug}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={(value) => {
+                  setOrgSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                  setError(null);
+                }}
+                onSubmitEditing={() => {
+                  void handleOrganizationContinue();
+                }}
+                onFocus={() => setFocusedField("organization")}
+              />
+              <View style={styles.suffix}>
+                <Text style={styles.suffixText}>{orgSuffix}</Text>
+              </View>
+            </View>
+
+            {error ? <InlineError message={error} /> : null}
+          </View>
+
+          <View style={styles.actions}>
+            <Button
+              disabled={orgLoading || !orgSlug.trim()}
+              label="Continue"
+              loading={orgLoading}
+              loadingLabel="Checking"
+              onPress={() => {
+                void handleOrganizationContinue();
+              }}
+            />
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showOrgHelp }}
+              android_ripple={{ color: mobileColors.rippleNeutral }}
+              style={styles.link}
+              onPress={() => setShowOrgHelp((current) => !current)}
+            >
+              <Text style={styles.linkText}>Need help with your subdomain?</Text>
+            </Pressable>
+
+            {showOrgHelp ? (
+              <Text style={styles.helperText}>
+                Your subdomain is the first part of your organization URL - for example, the{" "}
+                <Text style={styles.helperStrong}>yourorg</Text> in{" "}
+                <Text style={styles.helperStrong}>yourorg{orgSuffix}</Text>.
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ) : stage === "credentials" ? (
+        <View style={styles.stage}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Welcome back!</Text>
+            <Text style={styles.subtitle}>{orgSubtitle}</Text>
+          </View>
+
+          <View style={styles.fields}>
+            <View
+              style={[
+                styles.inputRow,
+                focusedField === "email" && styles.inputRowFocused,
+                error ? styles.inputRowError : null,
+              ]}
+            >
+              <TextInput
+                accessibilityLabel="Email"
+                ref={emailInputRef}
+                autoCapitalize="none"
+                autoComplete="email"
+                autoCorrect={false}
+                blurOnSubmit={false}
+                inputAccessoryViewID={inputAccessoryViewID}
+                keyboardType="email-address"
+                placeholder="Email"
+                placeholderTextColor={mobileColors.placeholderText}
+                returnKeyType="next"
+                style={[styles.input, styles.inputFlex]}
+                textContentType="emailAddress"
+                value={email}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={setEmail}
+                onFocus={() => setFocusedField("email")}
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
+              />
+            </View>
+
+            <View
+              style={[
+                styles.inputRow,
+                focusedField === "password" && styles.inputRowFocused,
+                error ? styles.inputRowError : null,
+              ]}
+            >
+              <TextInput
+                accessibilityLabel="Password"
+                ref={passwordInputRef}
+                autoCapitalize="none"
+                autoComplete="password"
+                autoCorrect={false}
+                inputAccessoryViewID={inputAccessoryViewID}
+                placeholder="Password"
+                placeholderTextColor={mobileColors.placeholderText}
+                returnKeyType="done"
+                secureTextEntry={!showPassword}
+                style={[styles.input, styles.inputFlex]}
+                textContentType="password"
+                value={password}
+                onBlur={() => setFocusedField(null)}
+                onChangeText={setPassword}
+                onFocus={() => setFocusedField("password")}
+                onSubmitEditing={() => {
+                  void handleLogin();
+                }}
+              />
+              <View style={styles.eyeButton}>
+                <Button
+                  accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                  icon={showPassword ? "eye-off-outline" : "eye-outline"}
+                  iconOnly
+                  onPress={() => setShowPassword((current) => !current)}
+                  tone="ghost"
+                />
+              </View>
+            </View>
+
+            {error ? <InlineError message={error} /> : null}
+          </View>
+
+          <View style={styles.actions}>
+            <Button
+              disabled={submitting || !isValidEmail(email) || !password}
+              label="Sign In"
+              loading={submitting}
+              loadingLabel="Signing In"
+              onPress={() => {
+                void handleLogin();
+              }}
+            />
+
+            <View style={styles.linkRow}>
+              <Pressable
+                accessibilityRole="button"
+                android_ripple={{ color: mobileColors.rippleNeutral }}
+                style={styles.link}
+                onPress={switchOrganization}
+              >
+                <Text style={styles.linkText}>Switch organization</Text>
+              </Pressable>
+              <Text style={styles.linkSeparator}>·</Text>
+              <Pressable
+                accessibilityRole="button"
+                android_ripple={{ color: mobileColors.rippleNeutral }}
+                style={styles.link}
+                onPress={() => {
+                  // Native now, rather than handing the user off to the
+                  // web app in a browser sheet mid sign-in.
+                  router.push({
+                    pathname: "/(auth)/forgot-password",
+                    params: { email },
+                  });
+                }}
+              >
+                <Text style={styles.linkText}>Forgot password?</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.stage}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Two-factor authentication</Text>
+            <Text style={styles.subtitle}>Enter the 6-digit code from your authenticator app.</Text>
+          </View>
+
+          <View style={styles.fields}>
+            <View style={[styles.inputRow, styles.codeRow, error ? styles.inputRowError : null]}>
+              <TextInput
+                ref={mfaInputRef}
+                accessibilityLabel="Verification code"
+                autoComplete="one-time-code"
+                inputAccessoryViewID={inputAccessoryViewID}
+                inputMode="numeric"
+                keyboardType="number-pad"
+                maxLength={6}
+                onChangeText={(value) => {
+                  setMfaCode(value.replace(/\D/g, "").slice(0, 6));
+                  setError(null);
+                }}
+                placeholder="000000"
+                placeholderTextColor={mobileColors.placeholderText}
+                returnKeyType="done"
+                style={[styles.input, styles.codeInput]}
+                textContentType="oneTimeCode"
+                value={mfaCode}
+                onSubmitEditing={() => {
+                  void handleMfaVerify();
+                }}
+              />
+            </View>
+
+            {error ? <InlineError message={error} /> : null}
+          </View>
+
+          <View style={styles.actions}>
+            <Button
+              disabled={submitting || mfaCode.length !== 6}
+              label="Verify and Sign In"
+              loading={submitting}
+              loadingLabel="Verifying"
+              onPress={() => {
+                void handleMfaVerify();
+              }}
+            />
+
+            <Pressable
+              accessibilityRole="button"
+              android_ripple={{ color: mobileColors.rippleNeutral }}
+              style={styles.link}
+              onPress={() => {
+                setStage("credentials");
+                setPendingMfaLogin(null);
+                setMfaCode("");
+                setError(null);
+              }}
+            >
+              <Text style={styles.linkText}>Back to sign in</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </AuthShell>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: mobileColors.background,
-    },
-    keyboardArea: {
-      flex: 1,
-    },
-    scrollContent: {
-      // `justifyContent: "center"` causes the centered column to re-center
-      // as the keyboard opens — the available height shrinks and content
-      // jumps upward. Pin to the top with a generous offset so the layout
-      // is stable on focus.
-      flexGrow: 1,
-      justifyContent: "flex-start",
-      alignItems: "center",
-      paddingHorizontal: 24,
-      paddingTop: 72,
-    },
-    column: {
-      width: "100%",
-      maxWidth: MAX_COLUMN_WIDTH,
-      gap: 36,
-    },
-    brandHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      paddingHorizontal: 24,
-      paddingTop: 8,
-      paddingBottom: 4,
-    },
-    brandMark: {
-      width: 28,
-      height: 28,
-    },
     stage: {
       gap: 24,
     },
@@ -668,10 +668,13 @@ const createStyles = (mobileColors: MobileColors) =>
     subtitle: {
       ...mobileText.body,
       color: mobileColors.textMuted,
+      // Holds one line's height while the organization's name is still being
+      // resolved, so the header doesn't jump when the copy lands.
+      minHeight: mobileText.body.lineHeight,
     },
     subtitleStrong: {
       color: mobileColors.textPrimary,
-      fontWeight: "700",
+      fontFamily: mobileTypography.fontFamily.bold,
     },
     fields: {
       gap: 12,
@@ -726,11 +729,13 @@ const createStyles = (mobileColors: MobileColors) =>
       ...mobileText.bodyStrong,
       color: mobileColors.textMuted,
     },
+    // Centres the round toggle inside the field's trailing edge. The button
+    // brings its own 44pt target, so this only handles the inset.
     eyeButton: {
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: 14,
-      alignSelf: "stretch",
+      paddingRight: mobileSpace.xs,
+      alignSelf: "center",
     },
     actions: {
       gap: 16,
@@ -762,8 +767,7 @@ const createStyles = (mobileColors: MobileColors) =>
       textAlign: "center",
     },
     helperStrong: {
-      ...mobileText.meta,
-      fontWeight: "700",
+      ...mobileTextWeighted("meta", "bold"),
       color: mobileColors.textPrimary,
     },
     errorRow: {

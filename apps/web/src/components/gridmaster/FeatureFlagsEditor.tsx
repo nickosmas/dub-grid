@@ -6,7 +6,8 @@ import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
 } from "@/features/organization/client";
-import { getEditorSaveLabel, EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import type { Organization } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -159,7 +160,9 @@ export default function FeatureFlagsEditor({
             }}
             disabled={saving || !hasChanges}
           >
-            {getEditorSaveLabel(saving)}
+            <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
+              {EDITOR_ACTION_LABELS.save}
+            </ButtonLoading>
           </button>
         }
       />
@@ -169,6 +172,7 @@ export default function FeatureFlagsEditor({
           title="Save Runtime Control Changes"
           message="This change can affect live organization behavior. Review carefully before saving."
           confirmLabel="Save Changes"
+          confirmPendingLabel={EDITOR_ACTION_LABELS.saving}
           variant="warning"
           isLoading={saving}
           onConfirm={() => {

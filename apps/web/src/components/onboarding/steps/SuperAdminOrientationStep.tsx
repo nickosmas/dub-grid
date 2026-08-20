@@ -1,7 +1,13 @@
 "use client";
 
 import StepLayout from "../StepLayout";
-import { LayoutDashboard, CalendarDays, Users, Settings, Shield } from "lucide-react";
+import {
+  DashboardIcon,
+  ScheduleIcon,
+  PeopleIcon,
+  SettingsIcon,
+  ShieldIcon,
+} from "@/components/icons/NavIcons";
 
 interface SuperAdminOrientationStepProps {
   onNext: () => void;
@@ -10,27 +16,27 @@ interface SuperAdminOrientationStepProps {
 
 const sections = [
   {
-    icon: <LayoutDashboard size={22} />,
+    icon: <DashboardIcon size={22} />,
     name: "Dashboard & Insights",
     desc: "Real-time coverage metrics, staffing overview, and quick actions all in one place.",
   },
   {
-    icon: <CalendarDays size={22} />,
+    icon: <ScheduleIcon size={22} />,
     name: "Schedule",
     desc: "Build, publish, and manage schedules with conflict prevention and recurring templates.",
   },
   {
-    icon: <Users size={22} />,
+    icon: <PeopleIcon size={22} />,
     name: "People",
     desc: "Manage employees, send invitations, assign roles, and track certifications.",
   },
   {
-    icon: <Settings size={22} />,
+    icon: <SettingsIcon size={22} />,
     name: "Settings",
     desc: "Review and configure departments, shifts, jobs, roles, and all organization options.",
   },
   {
-    icon: <Shield size={22} />,
+    icon: <ShieldIcon size={22} />,
     name: "Admin Management",
     desc: "Invite admins, configure granular permissions, and delegate access across your organization.",
   },

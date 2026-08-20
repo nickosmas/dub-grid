@@ -2,8 +2,14 @@ import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, View } from "react-native";
 import type { MobileDashboardResponse } from "@dubgrid/contracts";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import {
+  mobileElevation,
+  mobileRadii,
+  mobileSpace,
+  mobileText,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import type { CardIconTone } from "../../../shared/components/Screen";
 import type { DashboardPeriodMode } from "../../../shared/lib/dates";
 import { PeriodToggle } from "./PeriodToggle";
@@ -49,7 +55,8 @@ function MetricTile({
   tone: CardIconTone;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const toneStyle = useMemo(() => createToneStyles(mobileColors), [mobileColors])[tone];
 
   return (
@@ -92,7 +99,8 @@ export function DashboardHeroCard({
   isFetching?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const tone = STATUS_TONE[summary.statusLabel] ?? "brand";
   const toneStyle = useMemo(() => createToneStyles(mobileColors), [mobileColors])[tone];
 
@@ -141,20 +149,17 @@ export function DashboardHeroCard({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     card: {
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
+      // Borderless in light mode, hairline in dark: matches the shared Card.
+      borderWidth: isDark ? 1 : 0,
       borderColor: mobileColors.borderSubtle,
-      padding: 18,
-      gap: 16,
-      shadowColor: mobileColors.shadowStrong,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 1,
-      shadowRadius: 20,
-      elevation: 2,
+      padding: mobileSpace.xl,
+      gap: mobileSpace.lg,
+      ...mobileElevation("card", isDark),
     },
     headerRow: {
       flexDirection: "row",

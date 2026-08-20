@@ -115,8 +115,9 @@ function ForgotPasswordContent() {
               >
                 <ButtonLoading
                   loading={loading}
+                  loadingLabel="Sending Reset Link"
                   spinnerColor="var(--color-text-inverse)"
-                  spinnerSize={28}
+                  spinnerSize={20}
                 >
                   Send Reset Link
                 </ButtonLoading>

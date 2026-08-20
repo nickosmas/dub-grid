@@ -11,9 +11,10 @@ import {
   getIsoDateInTimeZone,
   hasShiftRequestStarted,
   hasShiftStartedAtTimeRanges,
+  formatHoursLabel,
 } from "@dubgrid/schedule-core";
 import type { OpenShiftVisibility } from "@dubgrid/domain";
-import { getAvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTone, getHeroGradientCss, heroGradientTokens } from "@dubgrid/design-tokens";
 import { isEmployeeEligibleForOpenShift } from "@/app/schedule/_lib/open-shifts";
 import type {
   AbsenceType,
@@ -127,15 +128,13 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // ME_HERO_CARD_GRADIENT_LIGHT/_DARK): dark mode keeps the same dark-navy
 // start but ends in the app's vivid dark-mode brand blue instead of a pale
 // periwinkle, which would read as a washed-out pastel blob on a near-black page.
-const DASHBOARD_HERO_BG_LIGHT =
-  "linear-gradient(to top right, #142579 0%, #2C49CC 55%, #6E90FF 100%)";
-const DASHBOARD_HERO_BG_DARK =
-  "linear-gradient(to top right, #0A1442 0%, #1D3AA0 55%, #2075FF 100%)";
+const DASHBOARD_HERO_BG_LIGHT = getHeroGradientCss(false);
+const DASHBOARD_HERO_BG_DARK = getHeroGradientCss(true);
 // Matches the mobile hero card's "Working with" pill (ScheduleScreen.tsx
 // ME_HERO_COLLABORATOR_BACKGROUND_LIGHT/_DARK) — a solid navy fill, not a
 // translucent white overlay, so the pill reads as a distinct block on the gradient.
-const DASHBOARD_HERO_COLLABORATOR_BG_LIGHT = "#3A55CB";
-const DASHBOARD_HERO_COLLABORATOR_BG_DARK = "#1E2F66";
+const DASHBOARD_HERO_COLLABORATOR_BG_LIGHT = heroGradientTokens.collaboratorLight;
+const DASHBOARD_HERO_COLLABORATOR_BG_DARK = heroGradientTokens.collaboratorDark;
 const DASHBOARD_HERO_AVATAR_OVERLAP = -10;
 
 export default function UserDashboard(props: DashboardContentProps) {
@@ -2402,7 +2401,7 @@ function MyWeekSection({
 }) {
   const groups = groupScheduleItemsByDate(items);
   const periodLabel = isTwoWeekView ? "these 2 weeks" : "this week";
-  const hoursLabel = weeklyHours > 0 ? `${formatHoursValue(weeklyHours)}h ${periodLabel}` : null;
+  const hoursLabel = weeklyHours > 0 ? `${formatHoursLabel(weeklyHours)}h ${periodLabel}` : null;
 
   if (groups.length === 0) {
     return null;
@@ -3090,9 +3089,12 @@ function formatRequestShiftLabel(
   const shift = shiftId != null ? (shiftById.get(shiftId) ?? null) : null;
 
   return expandShiftDisplayLabel({
+    // The abbreviation is what lets the raw label's job suffix expand to a
+    // name; only the resolved segments carry it.
+    jobAbbr: request.requesterSegments?.[0]?.jobAbbr ?? null,
     jobName: segment?.jobName ?? null,
     rawLabel: request.requesterShiftLabel,
-    shiftAbbr: shift?.abbr ?? null,
+    shiftAbbr: shift?.abbr ?? request.requesterSegments?.[0]?.shiftAbbr ?? null,
     shiftName: segment?.shiftName ?? shift?.name ?? null,
   });
 }
@@ -3166,8 +3168,4 @@ function getHeroStatusLabel(status: HeroStatus): string {
 
 function formatEmployeeName(employee: Employee): string {
   return `${employee.firstName} ${employee.lastName}`.trim() || "Staff";
-}
-
-function formatHoursValue(hours: number): string {
-  return Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
 }

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MembersSection, type MembersSectionProps } from "@/components/staff/MembersSection";
-import type { DirectoryPerson } from "@/types";
+import type { DirectoryPerson, Employee } from "@/types";
 
 let mockCurrentUser: { id: string } | null = { id: "viewer-1" };
 
@@ -280,5 +280,226 @@ describe("MembersSection — management-only view access", () => {
 
     expect(screen.getByText("Jamie Rivera")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^\+ Add$/ })).toBeInTheDocument();
+  });
+});
+
+function makeEmployee(overrides: Partial<Employee> & { id: string }): Employee {
+  return {
+    firstName: "Pat",
+    lastName: "Doe",
+    employmentType: "full_time",
+    status: "active",
+    statusChangedAt: null,
+    statusNote: "",
+    certificationId: null,
+    roleIds: [],
+    seniority: 1,
+    focusAreaIds: [1],
+    phone: "",
+    email: "",
+    contactNotes: "",
+    userId: null,
+    departmentIds: [],
+    deptAdminIds: [],
+    version: 1,
+    ...overrides,
+  };
+}
+
+const RN = { id: 10, orgId: "org-1", name: "Registered Nurse", abbr: "RN", sortOrder: 0 };
+
+describe("MembersSection — certified staff count", () => {
+  // Support staff hold no certification, which is the whole signal: a scheduler
+  // reading "Certified staff" is reading the number of nurses.
+  it("counts staff holding a certification, and support staff separately", () => {
+    mockDirectory = [];
+    renderMembersSection({
+      certifications: [RN],
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      employees: [
+        makeEmployee({ id: "e1", firstName: "Casey", certificationId: RN.id }),
+        makeEmployee({ id: "e2", firstName: "Drew", certificationId: RN.id }),
+        makeEmployee({ id: "e3", firstName: "Robin", certificationId: null }),
+      ],
+    });
+
+    expect(screen.getByRole("button", { name: "Certified staff count, 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Not certified count, 1" })).toBeInTheDocument();
+  });
+
+  it("reconciles with the on-schedule headcount beside it", () => {
+    mockDirectory = [];
+    renderMembersSection({
+      certifications: [RN],
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      employees: [
+        makeEmployee({ id: "e1", certificationId: RN.id }),
+        makeEmployee({ id: "e2", certificationId: null }),
+        makeEmployee({ id: "e3", certificationId: null }),
+      ],
+    });
+
+    expect(screen.getByLabelText("On schedule staff count")).toHaveTextContent("3");
+    expect(screen.getByRole("button", { name: "Certified staff count, 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Not certified count, 2" })).toBeInTheDocument();
+  });
+
+  it("narrows the table to support staff when that filter is picked", async () => {
+    const user = userEvent.setup();
+    mockDirectory = [];
+    renderMembersSection({
+      certifications: [RN],
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      employees: [
+        makeEmployee({ id: "e1", firstName: "Casey", certificationId: RN.id }),
+        makeEmployee({ id: "e2", firstName: "Robin", certificationId: null }),
+      ],
+    });
+
+    await user.click(screen.getByRole("button", { name: /filter/i }));
+    await user.click(screen.getByRole("button", { name: "Not certified" }));
+
+    expect(screen.getByText(/Robin/)).toBeInTheDocument();
+    expect(screen.queryByText(/Casey/)).not.toBeInTheDocument();
+  });
+
+  it("narrows the table to certified staff when that filter is picked", async () => {
+    const user = userEvent.setup();
+    mockDirectory = [];
+    renderMembersSection({
+      certifications: [RN],
+      canManageEmployees: true,
+      canViewEmployeeDetails: true,
+      employees: [
+        makeEmployee({ id: "e1", firstName: "Casey", certificationId: RN.id }),
+        makeEmployee({ id: "e2", firstName: "Robin", certificationId: null }),
+      ],
+    });
+
+    await user.click(screen.getByRole("button", { name: /filter/i }));
+    await user.click(screen.getByRole("button", { name: "Certified staff" }));
+
+    expect(screen.getByText(/Casey/)).toBeInTheDocument();
+    expect(screen.queryByText(/Robin/)).not.toBeInTheDocument();
+  });
+});
+
+const LPN = { id: 11, orgId: "org-1", name: "Licensed Practical Nurse", abbr: "LPN", sortOrder: 1 };
+
+function renderWithCertifications(employees: Employee[], certifications = [RN, LPN]) {
+  mockDirectory = [];
+  renderMembersSection({
+    certifications,
+    canManageEmployees: true,
+    canViewEmployeeDetails: true,
+    employees,
+  });
+}
+
+describe("MembersSection — per-certification cards", () => {
+  it("shows a card per certification with its holder count", () => {
+    renderWithCertifications([
+      makeEmployee({ id: "e1", certificationId: RN.id }),
+      makeEmployee({ id: "e2", certificationId: RN.id }),
+      makeEmployee({ id: "e3", certificationId: LPN.id }),
+    ]);
+
+    expect(screen.getByRole("button", { name: "RN, 2 staff" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "LPN, 1 staff" })).toBeInTheDocument();
+  });
+
+  // A credential nobody holds is a staffing gap worth seeing, not noise.
+  it("shows a zero for a certification nobody holds", () => {
+    renderWithCertifications([makeEmployee({ id: "e1", certificationId: RN.id })]);
+
+    expect(screen.getByRole("button", { name: "LPN, 0 staff" })).toBeInTheDocument();
+  });
+
+  it("card counts sum to the certified staff total", () => {
+    renderWithCertifications([
+      makeEmployee({ id: "e1", certificationId: RN.id }),
+      makeEmployee({ id: "e2", certificationId: LPN.id }),
+      makeEmployee({ id: "e3", certificationId: null }),
+    ]);
+
+    expect(screen.getByRole("button", { name: "Certified staff count, 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "RN, 1 staff" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "LPN, 1 staff" })).toBeInTheDocument();
+  });
+
+  it("narrows the table to the holders of a card that is clicked", async () => {
+    const user = userEvent.setup();
+    renderWithCertifications([
+      makeEmployee({ id: "e1", firstName: "Casey", certificationId: RN.id }),
+      makeEmployee({ id: "e2", firstName: "Robin", certificationId: LPN.id }),
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "RN, 1 staff" }));
+
+    expect(screen.getByText(/Casey/)).toBeInTheDocument();
+    expect(screen.queryByText(/Robin/)).not.toBeInTheDocument();
+  });
+
+  it("clears the filter when the selected card is clicked again", async () => {
+    const user = userEvent.setup();
+    renderWithCertifications([
+      makeEmployee({ id: "e1", firstName: "Casey", certificationId: RN.id }),
+      makeEmployee({ id: "e2", firstName: "Robin", certificationId: LPN.id }),
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "RN, 1 staff" }));
+    await user.click(screen.getByRole("button", { name: "RN, 1 staff" }));
+
+    expect(screen.getByText(/Casey/)).toBeInTheDocument();
+    expect(screen.getByText(/Robin/)).toBeInTheDocument();
+  });
+
+  it("keeps a holder of an archived certification visible in its own card", () => {
+    renderWithCertifications([
+      makeEmployee({ id: "e1", certificationId: RN.id }),
+      makeEmployee({ id: "e2", certificationId: 999 }),
+    ]);
+
+    expect(screen.getByRole("button", { name: "Archived, 1 staff" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Certified staff count, 2" })).toBeInTheDocument();
+  });
+
+  it("filters to certified staff when the leading total card is clicked", async () => {
+    const user = userEvent.setup();
+    renderWithCertifications([
+      makeEmployee({ id: "e1", firstName: "Casey", certificationId: RN.id }),
+      makeEmployee({ id: "e2", firstName: "Robin", certificationId: null }),
+    ]);
+
+    await user.click(screen.getByRole("button", { name: /^Certified staff count/ }));
+
+    expect(screen.getByText(/Casey/)).toBeInTheDocument();
+    expect(screen.queryByText(/Robin/)).not.toBeInTheDocument();
+  });
+
+  // Headcounts describe who is on staff now. The helper filters on status
+  // itself, so a non-active row reaching this list can never inflate a count.
+  it("counts active staff only", () => {
+    renderWithCertifications([
+      makeEmployee({ id: "e1", certificationId: RN.id }),
+      makeEmployee({ id: "e2", certificationId: RN.id, status: "inactive" }),
+      makeEmployee({ id: "e3", certificationId: LPN.id, status: "removed" }),
+      makeEmployee({ id: "e4", certificationId: null }),
+      makeEmployee({ id: "e5", certificationId: null, status: "inactive" }),
+    ]);
+
+    expect(screen.getByRole("button", { name: "Certified staff count, 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Not certified count, 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "RN, 1 staff" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "LPN, 0 staff" })).toBeInTheDocument();
+  });
+
+  it("renders no cards when the org has no certifications configured", () => {
+    renderWithCertifications([makeEmployee({ id: "e1", certificationId: null })], []);
+
+    expect(screen.queryByRole("button", { name: /staff$/ })).not.toBeInTheDocument();
   });
 });

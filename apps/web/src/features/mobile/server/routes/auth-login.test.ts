@@ -17,6 +17,38 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient,
 }));
 
+const DEFAULT_ORG_ID = "577a93d3-8f6a-4b45-a93d-b9731122ce11";
+/** Some other organization this user also belongs to. */
+const OTHER_ORG_ID = "6f1d0a52-6a9c-4a3a-9c2f-2f5a1f0b8e44";
+
+/**
+ * A structurally real access token carrying an org_id claim.
+ *
+ * The login flow decides whether a switch is still needed by reading the org
+ * out of the token it was just handed, so these fixtures have to be decodable
+ * JWTs rather than opaque strings. It used to read `is_active` off
+ * get_my_organizations instead — a value derived from the user's GLOBAL profile
+ * default, which any of their other devices can move.
+ */
+function tokenForOrg(orgId: string | null): string {
+  const encode = (value: object) =>
+    Buffer.from(JSON.stringify(value))
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+  return [
+    encode({ alg: "HS256", typ: "JWT" }),
+    encode(
+      orgId
+        ? { sub: "8af6f242-c060-4920-a7db-91b4cb66fd26", org_id: orgId }
+        : { sub: "8af6f242-c060-4920-a7db-91b4cb66fd26" },
+    ),
+    "signature",
+  ].join(".");
+}
+
 function createServiceClientMock(input?: {
   organization?: {
     id: string;
@@ -85,6 +117,11 @@ function createSessionClientMock(input?: {
     updated_at?: string;
   }>;
   signInError?: { message: string } | null;
+  /**
+   * The org the freshly signed-in token is pinned to. Defaults to the org being
+   * logged into, i.e. nothing to reconcile.
+   */
+  signedInOrgId?: string | null;
 }) {
   const rpc = vi.fn(async (fn: string) => {
     if (fn === "get_my_organizations") {
@@ -122,7 +159,9 @@ function createSessionClientMock(input?: {
             }
           : {
               session: {
-                access_token: "access-token",
+                access_token: tokenForOrg(
+                  input?.signedInOrgId === undefined ? DEFAULT_ORG_ID : input.signedInOrgId,
+                ),
                 refresh_token: "refresh-token",
                 expires_in: 3600,
                 token_type: "bearer",
@@ -159,7 +198,7 @@ describe("mobile auth login route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "anon-key");
   });
 
   it("returns 403 ACCOUNT_DISABLED when the JWT hook refuses a terminated employee", async () => {
@@ -298,16 +337,24 @@ describe("mobile auth login route", () => {
     });
   });
 
-  it("switches org context before returning the mobile session when the target organization is inactive", async () => {
+  // `is_active: true` here is the whole point: it is the value that used to
+  // short-circuit the switch, and it is derived from the user's global profile
+  // default, which another device moves whenever it switches orgs. The token
+  // this device was just handed still names a different org, so the switch is
+  // genuinely needed — skipping it returned a session pinned to OTHER_ORG_ID
+  // while the response named DubGrid Health, and every later request resolved
+  // the other org's roster and permissions from the claim.
+  it("switches org context when the issued token names a different org, whatever is_active says", async () => {
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     getServiceClient.mockReturnValue(createServiceClientMock());
     const sessionClient = createSessionClientMock({
+      signedInOrgId: OTHER_ORG_ID,
       memberships: [
         {
-          org_id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+          org_id: DEFAULT_ORG_ID,
           org_name: "DubGrid Health",
           org_slug: "dubgrid-health",
-          is_active: false,
+          is_active: true,
         },
       ],
     });
@@ -328,7 +375,7 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(200);
     expect(sessionClient.rpc).toHaveBeenCalledWith("switch_org", {
-      target_org_id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
+      target_org_id: DEFAULT_ORG_ID,
     });
     expect(payload).toMatchObject({
       session: {
@@ -376,7 +423,9 @@ describe("mobile auth login route", () => {
     expect(response.status).toBe(200);
     expect(payload).toMatchObject({
       session: {
-        accessToken: "access-token",
+        // The original token, untouched: it already names the org being logged
+        // into, so there is nothing to reconcile and no refresh to burn.
+        accessToken: tokenForOrg(DEFAULT_ORG_ID),
         refreshToken: "refresh-token",
       },
       mfaRequired: true,

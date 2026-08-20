@@ -33,6 +33,7 @@ import {
   type ShiftCatRow,
 } from "./organization-setup/types";
 import { WizardStepper } from "./organization-setup/WizardStepper";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
 
@@ -610,7 +611,9 @@ export default function OrganizationSetupWizard({
             disabled={saving || !name.trim()}
             onClick={handleDetailsNext}
           >
-            {saving ? "Validating…" : "Next"}
+            <ButtonLoading loading={saving} loadingLabel="Validating">
+              Next
+            </ButtonLoading>
           </button>
         </ActionBar>
       </>
@@ -828,7 +831,9 @@ export default function OrganizationSetupWizard({
             }
             onClick={() => setSetupConfirmAction("create-organization")}
           >
-            {saving ? "Creating…" : "Create Organization"}
+            <ButtonLoading loading={saving} loadingLabel="Creating Organization">
+              Create Organization
+            </ButtonLoading>
           </button>
         </ActionBar>
       </>
@@ -948,7 +953,9 @@ export default function OrganizationSetupWizard({
                 onClick={handleSendPendingEmail}
                 style={{ whiteSpace: "nowrap" }}
               >
-                {sendingEmail ? "Sending…" : "Send Email"}
+                <ButtonLoading loading={sendingEmail} loadingLabel="Sending Email">
+                  Send Email
+                </ButtonLoading>
               </button>
             </div>
           </div>
@@ -1769,7 +1776,9 @@ export default function OrganizationSetupWizard({
             disabled={saving}
             onClick={() => setSetupConfirmAction("save-configuration")}
           >
-            {saving ? "Saving…" : "Next"}
+            <ButtonLoading loading={saving} loadingLabel="Saving">
+              Next
+            </ButtonLoading>
           </button>
         </ActionBar>
       </>
@@ -1954,9 +1963,9 @@ export default function OrganizationSetupWizard({
             disabled={saving || readyEmployeeCount === 0}
             onClick={() => setSetupConfirmAction("create-employees")}
           >
-            {saving
-              ? "Creating…"
-              : `Create ${readyEmployeeCount} Employee${readyEmployeeCount !== 1 ? "s" : ""}`}
+            <ButtonLoading loading={saving} loadingLabel="Creating Employees">
+              {`Create ${readyEmployeeCount} Employee${readyEmployeeCount !== 1 ? "s" : ""}`}
+            </ButtonLoading>
           </button>
         </ActionBar>
       </>
@@ -2146,9 +2155,9 @@ export default function OrganizationSetupWizard({
             disabled={saving || selectedCount === 0}
             onClick={() => setSetupConfirmAction("send-invitations")}
           >
-            {saving
-              ? "Sending…"
-              : `Send ${selectedCount} Invitation${selectedCount !== 1 ? "s" : ""} & Finish`}
+            <ButtonLoading loading={saving} loadingLabel="Sending Invitations">
+              {`Send ${selectedCount} Invitation${selectedCount !== 1 ? "s" : ""} & Finish`}
+            </ButtonLoading>
           </button>
         </ActionBar>
       </>
@@ -2163,6 +2172,7 @@ export default function OrganizationSetupWizard({
           title: "Create Organization",
           message: `Create "${name.trim()}" and assign "${superAdminEmail.trim()}" as the initial super admin?`,
           confirmLabel: "Create Organization",
+          confirmPendingLabel: "Creating Organization",
           variant: "warning" as const,
         }
       : setupConfirmAction === "save-configuration"
@@ -2170,6 +2180,7 @@ export default function OrganizationSetupWizard({
             title: "Save Configuration",
             message: `Save configuration items for ${createdOrg?.name ?? "this organization"} and continue to employees?`,
             confirmLabel: "Save Configuration",
+            confirmPendingLabel: "Saving Configuration",
             variant: "warning" as const,
           }
         : setupConfirmAction === "create-employees"
@@ -2177,6 +2188,7 @@ export default function OrganizationSetupWizard({
               title: "Create Employees",
               message: `Create ${readyEmployeeCount} employee${readyEmployeeCount !== 1 ? "s" : ""} for ${createdOrg?.name ?? "this organization"}?`,
               confirmLabel: "Create Employees",
+              confirmPendingLabel: "Creating Employees",
               variant: "warning" as const,
             }
           : setupConfirmAction === "send-invitations"
@@ -2184,6 +2196,7 @@ export default function OrganizationSetupWizard({
                 title: "Send Invitations",
                 message: `Send ${selectedInvitationCount} invitation${selectedInvitationCount !== 1 ? "s" : ""} for ${createdOrg?.name ?? "this organization"}?`,
                 confirmLabel: "Send Invitations",
+                confirmPendingLabel: "Sending Invitations",
                 variant: "warning" as const,
               }
             : null;
@@ -2228,6 +2241,7 @@ export default function OrganizationSetupWizard({
           title={setupConfirmCopy.title}
           message={setupConfirmCopy.message}
           confirmLabel={setupConfirmCopy.confirmLabel}
+          confirmPendingLabel={setupConfirmCopy.confirmPendingLabel}
           variant={setupConfirmCopy.variant}
           isLoading={saving}
           onConfirm={handleConfirmSetupAction}

@@ -125,11 +125,11 @@ function main() {
 
   const env = parseEnvFile(rootEnvPath);
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  const supabaseAnonKey = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      `Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in ${rootEnvPath}. Run \`npm run use:local\` first.`,
+      `Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in ${rootEnvPath}. Run \`npm run use:local\` first.`,
     );
   }
 
@@ -143,7 +143,7 @@ function main() {
     "# If you want the hosted backend instead, run `npm run use:mobile:remote`.",
     "",
     `EXPO_PUBLIC_SUPABASE_URL=${mobileSupabaseUrl}`,
-    `EXPO_PUBLIC_SUPABASE_ANON_KEY=${supabaseAnonKey}`,
+    `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${supabaseAnonKey}`,
     `EXPO_PUBLIC_API_BASE_URL=${mobileApiBaseUrl}`,
     "",
   ].join("\n");

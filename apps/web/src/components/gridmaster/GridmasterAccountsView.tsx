@@ -20,6 +20,7 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import type { AssignableOrganizationRole, GridmasterAccount, Organization } from "@/types";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefined }) {
   if (!deactivatedAt) return null;
@@ -290,7 +291,9 @@ export default function GridmasterAccountsView({
           type="submit"
           disabled={promoteLoading || !promoteEmail.trim()}
         >
-          {promoteLoading ? "Promoting..." : "Promote"}
+          <ButtonLoading loading={promoteLoading} loadingLabel="Promoting">
+            Promote
+          </ButtonLoading>
         </button>
         <div style={{ flex: 1 }} />
         <span
@@ -498,6 +501,7 @@ export default function GridmasterAccountsView({
               : `Deactivate "${activationConfirm.email}"? They will be blocked from gridmaster access.`
           }
           confirmLabel={activationConfirm.deactivatedAt ? "Reactivate" : "Deactivate"}
+          confirmPendingLabel={activationConfirm.deactivatedAt ? "Reactivating" : "Deactivating"}
           variant={activationConfirm.deactivatedAt ? "info" : "danger"}
           isLoading={actionLoading === activationConfirm.id}
           onConfirm={() => handleActivation(activationConfirm)}
@@ -510,6 +514,7 @@ export default function GridmasterAccountsView({
           title="Force Logout"
           message={`Terminate all sessions for "${forceLogoutConfirm.email}"? They will need to log in again.`}
           confirmLabel="Force Logout"
+          confirmPendingLabel="Signing Out"
           variant="danger"
           isLoading={actionLoading === forceLogoutConfirm.id}
           onConfirm={() => handleForceLogout(forceLogoutConfirm)}
@@ -522,6 +527,7 @@ export default function GridmasterAccountsView({
           title="Send Password Reset"
           message={`Send a password reset email to "${resetConfirm.email}"?`}
           confirmLabel="Send Reset Email"
+          confirmPendingLabel="Sending"
           variant="info"
           isLoading={actionLoading === resetConfirm.id}
           onConfirm={() => handlePasswordReset(resetConfirm)}
@@ -534,6 +540,7 @@ export default function GridmasterAccountsView({
           title="Promote Gridmaster"
           message={`Promote "${promoteConfirmEmail}" to platform gridmaster? This grants access to gridmaster oversight tools.`}
           confirmLabel="Promote"
+          confirmPendingLabel="Promoting"
           variant="warning"
           isLoading={promoteLoading}
           onConfirm={handleConfirmPromote}
@@ -605,7 +612,9 @@ export default function GridmasterAccountsView({
               onClick={handleDemote}
               disabled={!demoteOrgId || actionLoading === demoteTarget.id}
             >
-              {actionLoading === demoteTarget.id ? "Demoting..." : "Demote"}
+              <ButtonLoading loading={actionLoading === demoteTarget.id} loadingLabel="Demoting">
+                Demote
+              </ButtonLoading>
             </button>
           </div>
         </Modal>

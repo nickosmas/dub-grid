@@ -1,9 +1,7 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
-import { BottomSheetModal } from "../../../shared/components/BottomSheetModal";
+import { Fragment, useState, type ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
+import { BottomSheetModal, SheetHeader } from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
-import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
 const DEFAULT_COLLAPSED_COUNT = 5;
 
@@ -28,8 +26,6 @@ export function ExpandableList<T>({
    */
   onSeeAll?: () => void;
 }) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const [expanded, setExpanded] = useState(false);
   const hasMore = items.length > collapsedCount;
   const visibleItems = items.slice(0, collapsedCount);
@@ -58,9 +54,11 @@ export function ExpandableList<T>({
           visible={expanded}
           onDismiss={() => setExpanded(false)}
           scrollable
-          footer={<Button label="Done" onPress={() => setExpanded(false)} />}
+          // In the drag region, not the scrolling body: the title used to
+          // scroll away with the list and take the drag target with it.
+          header={<SheetHeader title={title} />}
+          footer={<Button fullWidth label="Done" onPress={() => setExpanded(false)} />}
         >
-          <Text style={styles.sheetTitle}>{title}</Text>
           <View style={styles.list}>{renderRows(items)}</View>
         </BottomSheetModal>
       )}
@@ -68,13 +66,8 @@ export function ExpandableList<T>({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    list: {
-      gap: 10,
-    },
-    sheetTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
-    },
-  });
+const styles = StyleSheet.create({
+  list: {
+    gap: 10,
+  },
+});

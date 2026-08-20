@@ -18,6 +18,7 @@ function getConfirmDialogCopy(action: BillingConfirmAction) {
         title: "Sync Stripe",
         message: `Sync Stripe billing state for ${action.org.orgName}? This updates the local billing snapshot from Stripe.`,
         confirmLabel: "Sync Stripe",
+        confirmPendingLabel: "Syncing",
         variant: "warning" as const,
       };
     case "sync_seats":
@@ -25,6 +26,7 @@ function getConfirmDialogCopy(action: BillingConfirmAction) {
         title: "True Up Seats",
         message: `True up ${action.org.orgName} billing seats to ${action.org.appUsers} app users? Stripe may prorate the subscription.`,
         confirmLabel: "True Up Seats",
+        confirmPendingLabel: "Updating Seats",
         variant: "warning" as const,
       };
     case "cancel_at_period_end":
@@ -32,6 +34,7 @@ function getConfirmDialogCopy(action: BillingConfirmAction) {
         title: "End Billing Period",
         message: `Schedule ${action.org.orgName} to cancel at the end of the current billing period? Access remains active until the period ends.`,
         confirmLabel: "End Period",
+        confirmPendingLabel: "Ending Period",
         variant: "warning" as const,
       };
     case "cancel":
@@ -39,6 +42,7 @@ function getConfirmDialogCopy(action: BillingConfirmAction) {
         title: "Cancel Billing",
         message: `Cancel billing for ${action.org.orgName}? This immediately cancels the Stripe subscription when one exists.`,
         confirmLabel: "Cancel Billing",
+        confirmPendingLabel: "Cancelling",
         variant: "danger" as const,
       };
     case "override_status":
@@ -46,6 +50,7 @@ function getConfirmDialogCopy(action: BillingConfirmAction) {
         title: "Override Billing Status",
         message: `Override ${action.org.orgName} billing status to ${formatBillingStatusLabel(action.status)}?`,
         confirmLabel: "Override Status",
+        confirmPendingLabel: "Overriding",
         variant: "warning" as const,
       };
   }
@@ -71,6 +76,7 @@ export function BillingConfirmDialog({
       title={copy.title}
       message={copy.message}
       confirmLabel={copy.confirmLabel}
+      confirmPendingLabel={copy.confirmPendingLabel}
       variant={copy.variant}
       isLoading={isLoading}
       onConfirm={onConfirm}
@@ -114,6 +120,7 @@ export function ExtendTrialDialog({
         </div>
       }
       confirmLabel="Extend Trial"
+      confirmPendingLabel="Extending"
       variant="warning"
       isLoading={isLoading}
       confirmDisabled={!days.trim()}

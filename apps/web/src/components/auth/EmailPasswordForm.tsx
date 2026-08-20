@@ -17,6 +17,7 @@ export function EmailPasswordForm({
   loading,
   onSubmit,
   submitLabel,
+  submitPendingLabel,
   forgotPasswordHref,
 }: {
   email: string;
@@ -26,6 +27,8 @@ export function EmailPasswordForm({
   loading: boolean;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
   submitLabel: string;
+  /** The same action in progress, shown beside the spinner ("Signing In"). */
+  submitPendingLabel: string;
   forgotPasswordHref?: string;
 }) {
   const [showPassword, setShowPassword] = useState(false);
@@ -82,7 +85,12 @@ export function EmailPasswordForm({
         className="dg-btn dg-btn-primary dg-btn-lg"
         style={{ marginTop: "4px", width: "100%" }}
       >
-        <ButtonLoading loading={loading} spinnerColor="var(--color-text-inverse)" spinnerSize={28}>
+        <ButtonLoading
+          loading={loading}
+          loadingLabel={submitPendingLabel}
+          spinnerColor="var(--color-text-inverse)"
+          spinnerSize={20}
+        >
           {submitLabel}
         </ButtonLoading>
       </button>

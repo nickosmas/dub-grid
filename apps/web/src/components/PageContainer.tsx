@@ -16,7 +16,8 @@ interface PageContainerProps {
  * Canonical wrapper for authenticated in-app pages.
  *
  * Provides:
- * - Responsive padding (16 / 24 / 32-40)
+ * - The canonical horizontal gutter (--dg-page-gutter) plus responsive
+ *   vertical padding
  * - Centered content with consistent max-width
  * - Optional entry animation (dg-page-enter)
  *
@@ -34,7 +35,7 @@ export function PageContainer({
     <div
       style={{
         width: "100%",
-        padding: "clamp(16px, 3vw, 32px) clamp(16px, 3vw, 40px)",
+        padding: "clamp(16px, 3vw, 32px) var(--dg-page-gutter)",
         display: "flex",
         justifyContent: "center",
         ...style,

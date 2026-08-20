@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CURRENT_TERMS_VERSION } from "@dubgrid/domain";
 
 const requireMobileAuth = vi.fn();
 const fetchMobileAbsenceTypes = vi.fn();
@@ -8,6 +9,7 @@ const fetchMobileFocusAreas = vi.fn();
 const fetchMobileRoles = vi.fn();
 const fetchLinkedEmployeeForUser = vi.fn();
 const fetchMobileUnreadNotificationCount = vi.fn();
+const fetchMobileTermsAcceptedVersion = vi.fn();
 const mapOrganizationToMobileConfig = vi.fn();
 
 vi.mock("@/features/mobile/server", () => ({
@@ -19,6 +21,7 @@ vi.mock("@/features/mobile/server", () => ({
   requireMobileAuth,
   fetchLinkedEmployeeForUser,
   fetchMobileUnreadNotificationCount,
+  fetchMobileTermsAcceptedVersion,
   mapOrganizationToMobileConfig,
 }));
 
@@ -141,6 +144,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
       },
     ]);
     fetchMobileUnreadNotificationCount.mockResolvedValue(4);
+    fetchMobileTermsAcceptedVersion.mockResolvedValue(CURRENT_TERMS_VERSION);
     mapOrganizationToMobileConfig.mockReturnValue({
       id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",
       name: "DubGrid Health",
@@ -171,6 +175,7 @@ describe("GET /api/mobile/v1/bootstrap", () => {
       },
       effectiveRole: "admin",
       unreadNotificationCount: 4,
+      acceptedCurrentTerms: true,
       memberships: [
         {
           id: "577a93d3-8f6a-4b45-a93d-b9731122ce11",

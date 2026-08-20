@@ -104,7 +104,7 @@ export function SettingsShell<TId extends string = string>({
           return {
             id: item.id,
             label: item.label,
-            icon: <item.Icon active={isActive} />,
+            icon: <item.Icon />,
             href: hrefFor(item.id),
             active: isActive,
             group: group.label,
@@ -153,16 +153,16 @@ export function SettingsShell<TId extends string = string>({
                               render={<Link href={hrefFor(item.id)} replace />}
                               isActive={isActive}
                               tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
+                              className="h-9 data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)] transition-all ease-in-out duration-150"
                             >
                               <span
                                 className={
                                   isActive
-                                    ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors"
+                                    ? "text-[var(--color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
                                     : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                                 }
                               >
-                                <item.Icon active={isActive} />
+                                <item.Icon />
                               </span>
                               <span className="font-semibold">{item.label}</span>
                             </SidebarMenuButton>
@@ -190,16 +190,16 @@ export function SettingsShell<TId extends string = string>({
                               render={<Link href={hrefFor(item.id)} replace />}
                               isActive={isActive}
                               tooltip={item.label}
-                              className="h-9 data-[active=true]:bg-[var(--color-brand-bg)] data-[active=true]:text-[var(--color-brand)] data-[active=true]:ring-[var(--color-brand-border)] transition-all ease-in-out duration-150"
+                              className="h-9 data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)] transition-all ease-in-out duration-150"
                             >
                               <span
                                 className={
                                   isActive
-                                    ? "text-[var(--color-brand)] flex shrink-0 items-center justify-center transition-colors"
+                                    ? "text-[var(--color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
                                     : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                                 }
                               >
-                                <item.Icon active={isActive} />
+                                <item.Icon />
                               </span>
                               <span className="font-semibold">{item.label}</span>
                             </SidebarMenuButton>
@@ -251,7 +251,7 @@ export function SettingsShell<TId extends string = string>({
             minWidth: 0,
             height: "100%",
             overflowY: "auto",
-            padding: isMobile ? "16px" : isTablet ? "24px" : "32px 40px",
+            padding: `${isMobile ? 16 : isTablet ? 24 : 32}px var(--dg-page-gutter)`,
             display: "flex",
             flexDirection: "column" as const,
             alignItems: "center",

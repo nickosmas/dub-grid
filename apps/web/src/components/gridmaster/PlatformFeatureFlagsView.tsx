@@ -16,6 +16,7 @@ import { formatClientErrorMessage, formatClientLabel } from "@/lib/client-facing
 import { queryKeys } from "@/lib/query-keys";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
 import type { PlatformFeatureFlag } from "@/types";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 // Plain-language label + explanation for each flag, shown instead of the raw
 // database key/description (which are written for engineers debugging a
@@ -302,6 +303,7 @@ export default function PlatformFeatureFlagsView() {
               : `This restores it for every organization on the platform immediately. ${pendingInfo.description}`
           }
           confirmLabel={pendingFlag.enabled ? "Turn It Off" : "Turn It On"}
+          confirmPendingLabel="Updating"
           variant={pendingFlag.enabled ? "danger" : "warning"}
           isLoading={mutation.isPending}
           onConfirm={() => {
@@ -386,7 +388,9 @@ export default function PlatformFeatureFlagsView() {
                 createMutation.isPending || !newKey.trim() || !newDescription.trim() || !!keyError
               }
             >
-              {createMutation.isPending ? "Adding..." : "Add Feature Control"}
+              <ButtonLoading loading={createMutation.isPending} loadingLabel="Adding">
+                Add Feature Control
+              </ButtonLoading>
             </button>
           </div>
         </Modal>

@@ -221,6 +221,19 @@ class OptimisticLockConflictError extends Error {
   }
 }
 
+/**
+ * True for the `assert_non_overlapping_work_assignment_times` rejection raised by
+ * `write_schedule_cell_snapshot`. Only orgs with `enforce_conflict_prevention` on
+ * can hit it, so it is a scheduling rule the admin turned on, not a server fault.
+ */
+function isOverlapConflictError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const message = (error as { message?: unknown }).message;
+  return typeof message === "string" && message.includes("have overlapping time ranges");
+}
+
 type ScheduleServiceClient = Extract<
   Awaited<ReturnType<typeof requireOrgPermissions>>,
   { serviceClient: unknown }
@@ -1478,6 +1491,17 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (error) {
+    if (isOverlapConflictError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            "These shift times overlap. Adjust the times, or turn off conflict prevention in Settings under Schedule Rules.",
+          code: "SHIFT_OVERLAP",
+        },
+        { status: 409 },
+      );
+    }
+
     if (error instanceof OptimisticLockConflictError) {
       return NextResponse.json(
         {

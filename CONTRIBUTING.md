@@ -9,7 +9,70 @@ DubGrid is proprietary software. All contributions must be authorized.
 1. Follow the [Getting Started](README.md#getting-started) guide.
 2. Ensure the Supabase CLI is installed and `supabase start` runs cleanly.
 3. Run `npm run db:reset` to apply migrations and seed the local database.
-4. Run `npm test` to confirm everything passes before making changes.
+4. Run `npm run hooks:install` to enable the repo's git hooks (see below).
+5. Run `npm test` to confirm everything passes before making changes.
+
+### Git Hooks
+
+The hooks live in `.githooks/` and are version-controlled, but git only picks
+them up once `core.hooksPath` points at that directory. That setting is local to
+each clone, so **every clone has to run it once**:
+
+```bash
+npm run hooks:install
+```
+
+Without it nothing breaks, you just lose the safety net and land formatting and
+lint errors in CI instead.
+
+- **pre-commit** — Prettier and ESLint over the _staged files only_, so it stays
+  fast. Lint errors block; the repo's known warnings do not.
+- **pre-push** — `type-check` and the full `test` suite, both through Turborepo,
+  so unchanged workspaces replay from cache.
+
+Bypass with `--no-verify` on either command when you genuinely need to.
+
+We deliberately do not use husky: it installs itself through a `prepare` script,
+and install scripts are disabled repo-wide (see
+[Changing Dependencies](#changing-dependencies)). `.githooks/` needs no
+dependency at all.
+
+---
+
+## Changing Dependencies
+
+`package-lock.json` is a security boundary. Deleting it and reinstalling
+re-resolves all ~8,500 packages to whatever is newest on npm that minute, which
+is how a freshly published malicious version gets adopted. Never do this:
+
+```bash
+rm -rf node_modules package-lock.json && npm install   # ❌ never
+```
+
+Add, remove, or bump a dependency this way instead:
+
+```bash
+npm install --package-lock-only <pkg>@<version>   # resolve, execute nothing
+git diff package-lock.json                        # review what actually moved
+npm ci --ignore-scripts && npm run deps:rebuild   # install the reviewed tree
+npm run deps:scan && npm audit signatures         # verify before building
+```
+
+To see whether anything you just pulled in is brand new (and therefore hasn't
+had time to be caught if it is malicious):
+
+```bash
+npm run deps:scan -- --freshness --since=origin/main
+```
+
+Install scripts are disabled repo-wide in `.npmrc` (`ignore-scripts=true`) — a
+compromised package's `preinstall` runs before any of your code imports it.
+Packages that genuinely need a native build are allowlisted by name in the
+`deps:rebuild` script; if a new dependency needs one, add it there in the same
+PR and say why.
+
+Routine bumps should come from Dependabot, which holds new releases for 3–14
+days (`.github/dependabot.yml`) so bad publishes are caught upstream first.
 
 ---
 

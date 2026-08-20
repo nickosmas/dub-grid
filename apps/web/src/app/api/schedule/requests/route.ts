@@ -6,7 +6,7 @@ import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
-import { fetchAssignmentIdByPairMap } from "@/app/api/shared/schedule";
+import { fetchSegmentResolutionMaps } from "@/app/api/shared/schedule";
 import { dispatchNotificationEvent } from "@/features/notifications/server";
 import { rowToShiftRequest } from "@/lib/db/mappers";
 import { assertSafeFilterValue } from "@/lib/db/shared";
@@ -247,7 +247,10 @@ export async function POST(req: NextRequest) {
         }
 
         const assignmentLabelMap = new Map<number, string>(data.assignmentLabels);
-        const assignmentIdByPair = await fetchAssignmentIdByPairMap(auth.serviceClient, data.orgId);
+        const { assignmentIdByPair, segmentCompatibility } = await fetchSegmentResolutionMaps(
+          auth.serviceClient,
+          data.orgId,
+        );
 
         return NextResponse.json({
           requests: ((rows ?? []) as Record<string, unknown>[]).map((row) => {
@@ -284,7 +287,12 @@ export async function POST(req: NextRequest) {
               target_last_name: target?.last_name ?? null,
             };
 
-            return rowToShiftRequest(mapped, assignmentLabelMap, undefined, assignmentIdByPair);
+            return rowToShiftRequest(
+              mapped,
+              assignmentLabelMap,
+              segmentCompatibility,
+              assignmentIdByPair,
+            );
           }),
         });
       }

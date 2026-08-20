@@ -1,5 +1,9 @@
-# Weekly dependency audit + on pushes that change dependencies.
-# Catches known high/critical vulnerabilities in npm packages.
+# Supply-chain checks: known vulnerabilities, registry signatures, and the
+# indicators a compromised dependency or planted persistence file would leave.
+#
+# Runs weekly, on pushes to main that change dependencies, and on every PR that
+# touches a manifest or lockfile. That last trigger matters most: a dependency
+# change is exactly the diff that deserves this gate before it merges.
 
 name: Dependency Audit
 
@@ -9,20 +13,76 @@ on:
     paths:
       - package.json
       - package-lock.json
+  pull_request:
+    paths:
+      - "**/package.json"
+      - package-lock.json
+      - .npmrc
   schedule:
     # Every Monday at 09:00 UTC
     - cron: "0 9 * * 1"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   audit:
     name: npm audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: npm
-      - run: npm ci
-      - run: npm audit --audit-level=high
+      - run: npm ci --ignore-scripts
+
+      # Known advisories. Wrapped rather than bare `npm audit --audit-level=high`
+      # so a finding with no fix upstream can be allowlisted individually, with a
+      # reason and an expiry, instead of the whole gate being dropped to
+      # `critical` to get green. See scripts/audit-check.mjs.
+      - run: npm run deps:audit
+
+      # Registry signatures across the installed tree. Catches a tarball that
+      # doesn't match what the registry attests it published — the case
+      # `npm audit` is blind to, because no advisory exists yet.
+      - name: Verify registry signatures
+        run: npm audit signatures
+
+      # Known-bad versions, worm markers, planted persistence files.
+      - run: npm run deps:scan
+
+  freshness:
+    name: Dependency freshness
+    runs-on: ubuntu-latest
+    # Advisory only: a brand-new release is not evidence of compromise, it just
+    # hasn't had time to be caught. Surfaces in the log for the reviewer.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Flag versions published inside the cooldown window
+        run: node scripts/supply-chain-scan.mjs --freshness --days=7 --since=origin/main
+
+  lockfile-integrity:
+    name: Lockfile integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      # `npm ci` fails outright when package.json and package-lock.json
+      # disagree, and that failure is the point: it forces a manifest change to
+      # arrive with the reviewed lockfile that resolved it, instead of being
+      # re-resolved to whatever is newest at install time.
+      - name: package.json and package-lock.json must agree
+        run: npm ci --ignore-scripts --dry-run

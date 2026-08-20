@@ -6,6 +6,8 @@ type GestureHandler = (event: GestureEvent) => void;
 
 type ChainableGesture = {
   __handlers: Partial<Record<string, GestureHandler>>;
+  /** Args each config method was called with, for asserting a gesture's setup. */
+  __config: Partial<Record<string, unknown[]>>;
 } & Record<string, (...args: unknown[]) => ChainableGesture>;
 
 // Methods that register a callback vitest can invoke directly to drive a
@@ -15,14 +17,30 @@ const GESTURE_HANDLER_METHODS = ["onStart", "onUpdate", "onChange", "onEnd", "on
 
 // Pure config methods — no callback to capture, just chainable no-ops.
 const GESTURE_CONFIG_METHODS = [
-  "minDistance",
+  "activeCursor",
   "activeOffsetX",
   "activeOffsetY",
+  "averageTouches",
+  "blocksExternalGesture",
+  "cancelsTouchesInView",
+  "enabled",
   "failOffsetX",
   "failOffsetY",
-  "enabled",
-  "simultaneousWithExternalGesture",
+  "hitSlop",
+  "manualActivation",
+  "maxDuration",
+  "maxPointers",
+  "minDistance",
+  "minDuration",
+  "minPointers",
+  "minVelocity",
+  "numberOfTaps",
   "requireExternalGestureToFail",
+  "runOnJS",
+  "shouldCancelWhenOutside",
+  "simultaneousWithExternalGesture",
+  "withRef",
+  "withTestId",
 ];
 
 // Every Gesture.Pan() built during a test is pushed here so tests can grab
@@ -31,7 +49,7 @@ const GESTURE_CONFIG_METHODS = [
 export const capturedPanGestures: ChainableGesture[] = [];
 
 function createChainableGesture(): ChainableGesture {
-  const gesture = { __handlers: {} } as ChainableGesture;
+  const gesture = { __handlers: {}, __config: {} } as ChainableGesture;
 
   for (const method of GESTURE_HANDLER_METHODS) {
     gesture[method] = (handler: unknown) => {
@@ -41,7 +59,10 @@ function createChainableGesture(): ChainableGesture {
   }
 
   for (const method of GESTURE_CONFIG_METHODS) {
-    gesture[method] = () => gesture;
+    gesture[method] = (...args: unknown[]) => {
+      gesture.__config[method] = args;
+      return gesture;
+    };
   }
 
   return gesture;
@@ -53,13 +74,28 @@ function createPanGesture(): ChainableGesture {
   return gesture;
 }
 
+/**
+ * Composition returns the first composed gesture rather than a fresh one.
+ * Returning `createChainableGesture()` (as this used to) silently drops every
+ * child's `__handlers`, so a composed gesture looks wired up but can't be
+ * driven by a test at all.
+ */
+function composeGestures(...gestures: ChainableGesture[]): ChainableGesture {
+  return gestures[0] ?? createChainableGesture();
+}
+
 export const Gesture = {
   Pan: createPanGesture,
   Tap: createChainableGesture,
   LongPress: createChainableGesture,
-  Race: createChainableGesture,
-  Simultaneous: createChainableGesture,
-  Exclusive: createChainableGesture,
+  Native: createChainableGesture,
+  Fling: createChainableGesture,
+  Pinch: createChainableGesture,
+  Rotation: createChainableGesture,
+  Hover: createChainableGesture,
+  Race: composeGestures,
+  Simultaneous: composeGestures,
+  Exclusive: composeGestures,
 };
 
 export function GestureDetector({ children }: { children?: React.ReactNode }) {

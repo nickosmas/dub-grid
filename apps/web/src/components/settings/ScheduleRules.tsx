@@ -13,6 +13,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import CalendarDatePicker from "@/components/ui/calendar-date-picker";
 import { Switch } from "@/components/ui/switch";
 import { SectionCard } from "./shared";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 export default function ScheduleRules({
   organization,
@@ -316,7 +317,9 @@ export default function ScheduleRules({
             disabled={!isModified || saving}
             className="dg-btn dg-btn-primary"
           >
-            {saving ? "Saving…" : "Save"}
+            <ButtonLoading loading={saving} loadingLabel="Saving">
+              Save
+            </ButtonLoading>
           </button>
         </div>
 
@@ -325,6 +328,7 @@ export default function ScheduleRules({
             title="Save Schedule Rule"
             message="This change updates an organization-wide scheduling rule. Review carefully before saving."
             confirmLabel="Save Rule"
+            confirmPendingLabel="Saving"
             variant="warning"
             isLoading={saving}
             onConfirm={() => {

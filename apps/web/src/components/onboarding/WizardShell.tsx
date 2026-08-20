@@ -3,6 +3,7 @@
 import { DubGridLogo } from "@/components/Logo";
 import StepperBar from "./StepperBar";
 import type { StepConfig } from "./useOnboardingState";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 interface WizardShellProps {
   steps: StepConfig[];
@@ -84,7 +85,9 @@ export default function WizardShell({
               padding: "4px 8px",
             }}
           >
-            {skipLoading ? "Skipping…" : "Skip setup"}
+            <ButtonLoading loading={Boolean(skipLoading)} loadingLabel="Skipping">
+              Skip setup
+            </ButtonLoading>
           </button>
         )}
       </div>

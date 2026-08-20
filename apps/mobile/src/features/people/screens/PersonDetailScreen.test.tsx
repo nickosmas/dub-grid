@@ -9,6 +9,8 @@ const useQueryClient = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
 const useLocalSearchParams = vi.fn();
+// Every options object the screen hands the native header, in render order.
+const stackScreenOptions: { title?: string }[] = [];
 const pushToast = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
@@ -32,12 +34,32 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("expo-router", () => ({
   Stack: {
-    Screen: () => null,
+    Screen: (props: { options?: { title?: string } }) => {
+      stackScreenOptions.push(props.options ?? {});
+      return null;
+    },
   },
   useLocalSearchParams,
 }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
+
+// Recorded rather than only queried, so a state that renders for a single
+// frame and is then corrected still shows up: `screen` only ever sees the
+// final DOM, but every render that reached the commit phase lands here.
+const emptyStateTitles: string[] = [];
+
+vi.mock("../../../shared/components/EmptyStateCard", () => ({
+  EmptyStateCard: ({ title, body }: { title: string; body?: string }) => {
+    emptyStateTitles.push(title);
+    return (
+      <div>
+        {title}
+        {body}
+      </div>
+    );
+  },
+}));
 
 vi.mock("../../../shared/navigation/top-level-stack", () => ({
   createDetailStackOptions: () => ({}),
@@ -67,6 +89,16 @@ function confirmDialog(label: string) {
   fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: label }));
 }
 
+/**
+ * Every payload passed to any of the screen's mutations. The screen declares
+ * several `useMutation`s, and asserting against one by its position in that
+ * list broke the moment another was added — which one fired is what matters,
+ * and the payload already identifies it.
+ */
+function allMutatePayloads(calls: Array<{ mutate: ReturnType<typeof vi.fn> }>) {
+  return calls.flatMap((call) => call.mutate.mock.calls.map(([payload]) => payload));
+}
+
 describe("PersonDetailScreen", () => {
   beforeEach(() => {
     useMutation.mockReset();
@@ -76,6 +108,8 @@ describe("PersonDetailScreen", () => {
     useBootstrap.mockReset();
     useLocalSearchParams.mockReset();
     pushToast.mockReset();
+    emptyStateTitles.length = 0;
+    stackScreenOptions.length = 0;
 
     useAccessToken.mockReturnValue("token-123");
     useLocalSearchParams.mockReturnValue({
@@ -114,6 +148,275 @@ describe("PersonDetailScreen", () => {
     });
   });
 
+  function makePerson(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "emp-1",
+      employeeNumber: 12,
+      firstName: "Mina",
+      lastName: "Diaz",
+      orgRole: "super_admin",
+      employmentType: "full_time",
+      phone: "(415) 425-3334",
+      email: "mina@dubgrid.com",
+      status: "active",
+      certificationId: null,
+      roleIds: [3],
+      seniority: 2,
+      focusAreaIds: [2],
+      departmentIds: [4],
+      deptAdminIds: [],
+      managementDepartmentIds: [],
+      managementDeptAdminIds: [],
+      contactNotes: "Weekend availability",
+      statusChangedAt: null,
+      statusNote: "",
+      userId: "user-1",
+      version: 7,
+      membershipUpdatedAt: null,
+      pendingInvitation: null,
+      ...overrides,
+    };
+  }
+
+  // The tier used to hang off the status chip behind a "·", which read as a
+  // caption on that chip and left the account chip alone on the next line. It
+  // is the hero's badge now, and the chips share the one row under it.
+  it("badges the access tier and groups the hero chips on one line", () => {
+    useQuery.mockReturnValue({
+      data: { person: makePerson() },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    // A chip nests its label in its own wrapper, so the row is one level up.
+    const chipRow = screen.getByText("Active").parentElement?.parentElement;
+    const accountRow = screen.getByText("App access").parentElement?.parentElement;
+
+    expect(chipRow).toBe(accountRow);
+    // The tier reads as the same pill the profile tab and the People rows
+    // print, so it sits above those chips rather than among them.
+    const badge = screen.getByText("Super Admin");
+    expect(badge.parentElement?.parentElement).not.toBe(chipRow);
+    expect(screen.queryByText("Super Admin Access")).not.toBeInTheDocument();
+    expect(screen.queryByText("·")).not.toBeInTheDocument();
+  });
+
+  // The page said nothing about management access: the only trace of it was
+  // whether the button at the foot read "Add to Management" or "Edit
+  // Management Access", and the number an admin identifies someone by was
+  // missing entirely. The two kinds of department take a row each — where they
+  // are scheduled, and what they manage, are different facts.
+  it("names the departments a person manages, and their staff number", () => {
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ managementDepartmentIds: [4] }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    const scheduled = screen.getByText("Departments");
+    const managed = screen.getByText("Management Departments");
+
+    expect(scheduled).toBeInTheDocument();
+    expect(managed).toBeInTheDocument();
+    // Adjacent rows in Assignments rather than a section of their own, which
+    // read as a second Assignments block for anyone who had both.
+    expect(scheduled.parentElement?.parentElement?.parentElement).toBe(
+      managed.parentElement?.parentElement?.parentElement,
+    );
+    expect(screen.getByText("Employee ID")).toBeInTheDocument();
+    expect(screen.getByText("#12")).toBeInTheDocument();
+  });
+
+  // The management label is fixed, never composed from the org's own noun for
+  // the other kind: an org that calls its scheduled departments "Scheduled
+  // Departments" was reading "Management Scheduled Departments" here.
+  it("never builds the management label out of the org's department label", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: {
+          labels: {
+            focusArea: "Focus Areas",
+            role: "Roles",
+            certification: "Certification",
+            department: "Scheduled Departments",
+          },
+        },
+        focusAreas: [{ id: 2, name: "Skilled Nursing", departmentId: 4 }],
+        roles: [{ id: 3, name: "Charge Nurse" }],
+        certifications: [],
+        departments: [
+          { id: 4, name: "North Wing", abbr: "NW", type: "scheduled" },
+          { id: 9, name: "Operations", abbr: "OPS", type: "management" },
+        ],
+        permissions: { canManageEmployees: true },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ managementDepartmentIds: [9] }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.getByText("Scheduled Departments")).toBeInTheDocument();
+    expect(screen.getByText("Management Departments")).toBeInTheDocument();
+    expect(screen.queryByText("Management Scheduled Departments")).not.toBeInTheDocument();
+  });
+
+  // `hasManagementAccess` is true for a plain staff app invitation too, so
+  // gating the section on it printed an empty "Management Departments" row for
+  // anyone with an invite out.
+  it("leaves the management section off for a staff invitation", () => {
+    useQuery.mockReturnValue({
+      data: {
+        person: makePerson({
+          userId: null,
+          managementDepartmentIds: [],
+          pendingInvitation: {
+            id: "11111111-1111-4111-8111-111111111111",
+            email: "mina@dubgrid.com",
+            expiresAt: "2026-09-01T00:00:00.000Z",
+            updatedAt: null,
+            roleToAssign: "user",
+          },
+        }),
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(screen.queryByText("Management Departments")).not.toBeInTheDocument();
+  });
+
+  // The edit draft used to be synced from the person in an effect, and effects
+  // run after the paint — so the frame where the person first arrived still had
+  // a null draft and rendered the not-found card before correcting itself.
+  it("never paints the not-found card on the frame the person arrives", () => {
+    useQuery.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
+
+    const { rerender } = render(<PersonDetailScreen />);
+
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ pendingInvitation: null }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    rerender(<PersonDetailScreen />);
+
+    expect(emptyStateTitles).not.toContain("Person not found");
+    // The name lives in the native header, so the loaded page is proved by a
+    // field the body actually prints.
+    expect(screen.getByText("mina@dubgrid.com")).toBeInTheDocument();
+  });
+
+  // `person` is gated on canManageEmployees, which comes from bootstrap. With
+  // only the person query resolved, an inactive teammate reads as null and the
+  // screen declared them missing until bootstrap landed.
+  it("waits for bootstrap before deciding a person is missing", () => {
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ status: "inactive", pendingInvitation: null }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    expect(emptyStateTitles).not.toContain("Person not found");
+  });
+
+  // The layout's static "Person" is a placeholder for a title that is really
+  // the person's name, and leaving it up while the rest of the page is a
+  // skeleton reads as the page having loaded with that as the name.
+  // The route's title is static ("Staff Profile"), because the page's heading is
+  // the centered identity block it draws itself. Nothing here may feed the bar a
+  // title: doing so would print the name twice, once above the avatar and once
+  // on it.
+  it("leaves the header title to the route through every state", () => {
+    useQuery.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
+
+    const { rerender } = render(<PersonDetailScreen />);
+
+    expect(stackScreenOptions).toEqual([]);
+
+    useQuery.mockReturnValue({
+      data: { person: makePerson({ pendingInvitation: null }) },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    rerender(<PersonDetailScreen />);
+
+    expect(stackScreenOptions).toEqual([]);
+    expect(screen.getAllByText("Mina Diaz")).toHaveLength(1);
+  });
+
+  it("shows the not-found card when the load ends without a person", () => {
+    useQuery.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
+
+    const { rerender } = render(<PersonDetailScreen />);
+
+    useQuery.mockReturnValue({
+      data: { person: null },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    rerender(<PersonDetailScreen />);
+
+    expect(emptyStateTitles).toContain("Person not found");
+    expect(stackScreenOptions).toEqual([]);
+  });
+
   it("fetches the selected person directly and avoids duplicate active account copy", () => {
     useQuery.mockReturnValue({
       data: {
@@ -132,6 +435,8 @@ describe("PersonDetailScreen", () => {
           focusAreaIds: [2],
           departmentIds: [4],
           deptAdminIds: [],
+          managementDepartmentIds: [],
+          managementDeptAdminIds: [],
           contactNotes: "Weekend availability",
           statusChangedAt: null,
           statusNote: "",
@@ -155,10 +460,70 @@ describe("PersonDetailScreen", () => {
       "emp-1",
     ]);
     expect(screen.getByText("Super Admin")).toBeInTheDocument();
-    expect(screen.getAllByText("Active app account")).toHaveLength(1);
-    expect(screen.getAllByText("Charge Nurse").length).toBeGreaterThan(0);
+    // The account chip never repeats the status chip's word, so "Active"
+    // stays the answer to one question on this header.
+    expect(screen.getAllByText("App access")).toHaveLength(1);
+    expect(screen.queryByText("Active app account")).not.toBeInTheDocument();
+    // Each staffing fact is printed exactly once: the hero grid used to preview
+    // the sections below it, so the role, the focus areas and the employment
+    // type all appeared twice on the way down the page.
+    expect(screen.getAllByText("Charge Nurse")).toHaveLength(1);
+    expect(screen.getAllByText("Full-time")).toHaveLength(1);
+    expect(screen.getAllByText("Skilled Nursing")).toHaveLength(1);
     expect(screen.queryByText("Account access")).not.toBeInTheDocument();
     expect(screen.queryByText("Status updated")).not.toBeInTheDocument();
+  });
+
+  it("heads the page with one centered identity block", () => {
+    useQuery.mockReturnValue({
+      data: {
+        person: {
+          id: "emp-1",
+          firstName: "Mina",
+          lastName: "Diaz",
+          orgRole: "user",
+          employmentType: "full_time",
+          phone: "",
+          email: "mina@dubgrid.com",
+          status: "active",
+          certificationId: null,
+          roleIds: [],
+          seniority: 2,
+          focusAreaIds: [2],
+          departmentIds: [4],
+          deptAdminIds: [],
+          managementDepartmentIds: [],
+          managementDeptAdminIds: [],
+          contactNotes: "",
+          statusChangedAt: null,
+          statusNote: "",
+          userId: "user-1",
+          version: 7,
+          pendingInvitation: null,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PersonDetailScreen />);
+
+    // The identity block is the page's heading: initials, the name once, and
+    // the status and tier beside it. The email is not part of it — it keeps its
+    // own row in Contact, and printing it here too is what made the old block
+    // redundant.
+    expect(stackScreenOptions).toEqual([]);
+    expect(screen.getByText("MD")).toBeInTheDocument();
+    expect(screen.getAllByText("Mina Diaz")).toHaveLength(1);
+    expect(screen.getAllByText("mina@dubgrid.com")).toHaveLength(1);
+
+    // A plain user gets a badge here too. The People list only badges the
+    // tiers worth picking out of a list of names; a page about one person
+    // states the tier whatever it is.
+    expect(screen.getByText("User")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
   });
 
   it("omits the account access section even when the person still needs app access", () => {
@@ -178,6 +543,8 @@ describe("PersonDetailScreen", () => {
           focusAreaIds: [2],
           departmentIds: [4],
           deptAdminIds: [],
+          managementDepartmentIds: [],
+          managementDeptAdminIds: [],
           contactNotes: "",
           statusChangedAt: "2026-04-24T12:00:00.000Z",
           statusNote: "",
@@ -221,6 +588,8 @@ describe("PersonDetailScreen", () => {
           focusAreaIds: [2],
           departmentIds: [4],
           deptAdminIds: [],
+          managementDepartmentIds: [],
+          managementDeptAdminIds: [],
           contactNotes: "Weekend availability",
           statusChangedAt: null,
           statusNote: "",
@@ -315,6 +684,8 @@ describe("PersonDetailScreen", () => {
           focusAreaIds: [2],
           departmentIds: [4],
           deptAdminIds: [],
+          managementDepartmentIds: [],
+          managementDeptAdminIds: [],
           contactNotes: "",
           statusChangedAt: null,
           statusNote: "",
@@ -340,11 +711,10 @@ describe("PersonDetailScreen", () => {
     expect(screen.queryByText("Name mismatch found")).not.toBeInTheDocument();
     expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
 
-    const invitationMutation = mutationCalls.at(-1);
-    invitationMutation?.mutate.mockClear();
+    for (const call of mutationCalls) call.mutate.mockClear();
     fireEvent.click(screen.getByText("Link Existing Account"));
 
-    expect(invitationMutation?.mutate).toHaveBeenCalledWith({
+    expect(allMutatePayloads(mutationCalls)).toContainEqual({
       action: "create",
       linkExistingAccount: true,
       reconcileName: false,
@@ -355,11 +725,10 @@ describe("PersonDetailScreen", () => {
     });
     expect(screen.getByText(/Minnie Diaz[\s\S]*Link it and update Mina Diaz/)).toBeInTheDocument();
 
-    const nameMismatchInvitationMutation = mutationCalls.at(-1);
-    nameMismatchInvitationMutation?.mutate.mockClear();
+    for (const call of mutationCalls) call.mutate.mockClear();
     fireEvent.click(screen.getByText("Use Account Name"));
 
-    expect(nameMismatchInvitationMutation?.mutate).toHaveBeenCalledWith({
+    expect(allMutatePayloads(mutationCalls)).toContainEqual({
       action: "create",
       linkExistingAccount: true,
       reconcileName: true,
@@ -416,6 +785,8 @@ describe("PersonDetailScreen", () => {
           focusAreaIds: [2],
           departmentIds: [4],
           deptAdminIds: [],
+          managementDepartmentIds: [],
+          managementDeptAdminIds: [],
           contactNotes: "",
           statusChangedAt: null,
           statusNote: "",
@@ -440,14 +811,237 @@ describe("PersonDetailScreen", () => {
     expect(screen.getByText(/matches this staff profile[\s\S]*new invitation/)).toBeInTheDocument();
     expect(screen.queryByText("Send invitation?")).not.toBeInTheDocument();
 
-    const invitationMutation = mutationCalls.at(-1);
-    invitationMutation?.mutate.mockClear();
+    for (const call of mutationCalls) call.mutate.mockClear();
     fireEvent.click(screen.getByText("Link Existing Account"));
 
-    expect(invitationMutation?.mutate).toHaveBeenCalledWith({
+    expect(allMutatePayloads(mutationCalls)).toContainEqual({
       action: "create",
       linkExistingAccount: true,
       reconcileName: false,
+    });
+  });
+
+  describe("deactivating", () => {
+    // One shared spy across all three useMutation calls is enough: only the
+    // status confirm fires a mutate in these tests.
+    function renderWithStatusMutation(person: Record<string, unknown> = {}) {
+      const mutate = vi.fn();
+      useMutation.mockReturnValue({
+        error: null,
+        isPending: false,
+        mutate,
+      });
+      useQuery.mockReturnValue({
+        data: { person: makePerson(person) },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+
+      render(<PersonDetailScreen />);
+      return mutate;
+    }
+
+    it("spends one button on deactivating an active person, not two", () => {
+      renderWithStatusMutation();
+
+      expect(screen.getByRole("button", { name: "Deactivate" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Mark Inactive" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    });
+
+    it("marks inactive when the sheet's default outcome is confirmed", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+      expect(screen.getByText("Deactivate Mina Diaz?")).toBeInTheDocument();
+      confirmDialog("Mark Inactive");
+
+      expect(mutate).toHaveBeenCalledWith({
+        action: "deactivate",
+        expectedVersion: 7,
+        note: undefined,
+      });
+    });
+
+    it("removes from staff when that outcome is picked instead", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+      const sheet = within(screen.getByRole("alert"));
+      fireEvent.click(sheet.getByRole("button", { name: /Remove from staff/ }));
+
+      // The primary action's verb follows the outcome, so the confirm always
+      // says what it is about to do.
+      expect(sheet.queryByRole("button", { name: "Mark Inactive" })).not.toBeInTheDocument();
+      confirmDialog("Remove");
+
+      expect(mutate).toHaveBeenCalledWith({
+        action: "remove",
+        expectedVersion: 7,
+        note: undefined,
+      });
+    });
+
+    it("carries the reason through with the chosen outcome", () => {
+      const mutate = renderWithStatusMutation();
+
+      fireEvent.click(screen.getByRole("button", { name: "Deactivate" }));
+      fireEvent.change(screen.getByPlaceholderText(/Reason \(optional\)/), {
+        target: { value: "  On leave until June  " },
+      });
+      confirmDialog("Mark Inactive");
+
+      expect(mutate).toHaveBeenCalledWith({
+        action: "deactivate",
+        expectedVersion: 7,
+        note: "On leave until June",
+      });
+    });
+
+    it("keeps Remove reachable once someone is already inactive", () => {
+      renderWithStatusMutation({ status: "inactive" });
+
+      expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+    });
+
+    it("offers no way back out of removed but reactivating", () => {
+      renderWithStatusMutation({ status: "removed" });
+
+      expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Deactivate" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("management access", () => {
+    function renderWithManagementAccess(options: {
+      canManageManagementAccess?: boolean;
+      person?: Record<string, unknown>;
+    }) {
+      const mutationCalls: Array<{ mutate: ReturnType<typeof vi.fn> }> = [];
+      useMutation.mockImplementation(() => {
+        const mutate = vi.fn();
+        mutationCalls.push({ mutate });
+        return { error: null, isPending: false, mutate };
+      });
+      useBootstrap.mockReturnValue({
+        data: {
+          currentOrg: {
+            labels: {
+              focusArea: "Focus Areas",
+              role: "Roles",
+              certification: "Certification",
+              department: "Departments",
+            },
+          },
+          focusAreas: [{ id: 2, name: "Skilled Nursing", departmentId: 4 }],
+          roles: [{ id: 3, name: "Charge Nurse" }],
+          certifications: [],
+          departments: [
+            { id: 4, name: "North Wing", abbr: "NW", type: "scheduled" },
+            { id: 9, name: "Operations", abbr: "OPS", type: "management" },
+            { id: 10, name: "Facilities", abbr: "FAC", type: "management" },
+          ],
+          permissions: {
+            canManageEmployees: true,
+            canManageManagementAccess: options.canManageManagementAccess ?? true,
+          },
+        },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      } as never);
+      useQuery.mockReturnValue({
+        data: { person: makePerson({ userId: null, ...options.person }) },
+        error: null,
+        isFetching: false,
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+
+      render(<PersonDetailScreen />);
+      return mutationCalls;
+    }
+
+    it("keeps management access out of reach without the permission", () => {
+      renderWithManagementAccess({ canManageManagementAccess: false });
+
+      expect(screen.queryByRole("button", { name: "Add to Management" })).not.toBeInTheDocument();
+    });
+
+    it("names the action for whether they are already on the roster", () => {
+      renderWithManagementAccess({});
+      expect(screen.getByRole("button", { name: "Add to Management" })).toBeInTheDocument();
+
+      renderWithManagementAccess({ person: { managementDepartmentIds: [9] } });
+      expect(screen.getByRole("button", { name: "Edit Management Access" })).toBeInTheDocument();
+    });
+
+    it("offers only the org's management departments, never its scheduled ones", () => {
+      renderWithManagementAccess({});
+
+      fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
+
+      expect(screen.getByText("OPS")).toBeInTheDocument();
+      expect(screen.queryByText("NW")).not.toBeInTheDocument();
+    });
+
+    it("sends the picked departments, defaulting a fresh grant to User", () => {
+      const mutationCalls = renderWithManagementAccess({ person: { orgRole: null } });
+
+      fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
+      fireEvent.click(screen.getByText("OPS"));
+      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+
+      expect(allMutatePayloads(mutationCalls)).toContainEqual({
+        draft: { orgRole: "user", managementDepartmentIds: [9] },
+      });
+    });
+
+    it("opens on the role they already hold rather than resetting it", () => {
+      const mutationCalls = renderWithManagementAccess({
+        person: { orgRole: "admin", managementDepartmentIds: [9] },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
+      // Something has to change before Save will fire at all, so the role the
+      // sheet seeded with rides along on a department edit.
+      fireEvent.click(screen.getByText("FAC"));
+      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+
+      expect(allMutatePayloads(mutationCalls)).toContainEqual({
+        draft: { orgRole: "admin", managementDepartmentIds: [9, 10] },
+      });
+    });
+
+    // Save used to be live the moment the sheet opened, so the everyday
+    // "opened it to check, closed it again" ended in a no-op write.
+    it("holds Save until something actually changes", () => {
+      const mutationCalls = renderWithManagementAccess({
+        person: { orgRole: "admin", managementDepartmentIds: [9] },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Edit Management Access" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+      expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
+
+      fireEvent.click(screen.getByText("FAC"));
+      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+      expect(allMutatePayloads(mutationCalls)).toHaveLength(1);
+    });
+
+    it("refuses to submit with no department selected", () => {
+      const mutationCalls = renderWithManagementAccess({});
+
+      fireEvent.click(screen.getByRole("button", { name: "Add to Management" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save Access" }));
+
+      expect(allMutatePayloads(mutationCalls)).toHaveLength(0);
     });
   });
 });

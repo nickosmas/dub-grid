@@ -541,7 +541,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       <ProgressBar loading={isLoading} />
 
       {!isLoading && employee && org && (
-        <div className="p-4 md:p-6 lg:px-12 lg:py-10">
+        <div className="px-[var(--dg-page-gutter)] py-4 md:py-6 lg:py-10">
           <div className="space-y-8 pb-10 dg-page-enter">
             <Link
               href="/people"
@@ -832,6 +832,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           title="Revoke Invitation?"
           message={`Revoke the pending invitation for ${quickRevokeInviteConfirm.email}? The current invite link will stop working.`}
           confirmLabel="Revoke Invitation"
+          confirmPendingLabel="Revoking"
           variant="danger"
           isLoading={quickRevokingInvite}
           onConfirm={() => {

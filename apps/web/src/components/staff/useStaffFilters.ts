@@ -7,6 +7,11 @@ export type SortKey = "seniority" | "name";
 export type EmploymentTypeFilter = "all" | Employee["employmentType"];
 export type AccountLinkFilter = "all" | "linked" | "unlinked";
 export type ContactPresenceFilter = "all" | "present" | "missing";
+/**
+ * A specific certification id, or the two presence cases. "any" is the People
+ * page's certified-staff count; "none" is its support-staff complement.
+ */
+export type CertificationFilter = number | "any" | "none" | null;
 export interface SortConfig {
   key: SortKey;
   dir: "asc" | "desc";
@@ -34,7 +39,7 @@ export function useStaffFilters({
   const [filterDepartment, setFilterDepartment] = useState<number | null>(null);
   const [filterDepartmentAdminOnly, setFilterDepartmentAdminOnly] = useState(false);
   const [filterFocusArea, setFilterFocusArea] = useState<number | null>(null);
-  const [filterCertification, setFilterCertification] = useState<number | null>(null);
+  const [filterCertification, setFilterCertification] = useState<CertificationFilter>(null);
   const [filterRole, setFilterRole] = useState<number | null>(null);
   const [filterAccountLink, setFilterAccountLink] = useState<AccountLinkFilter>("all");
   const [filterEmailPresence, setFilterEmailPresence] = useState<ContactPresenceFilter>("all");
@@ -140,7 +145,12 @@ export function useStaffFilters({
           : emp.deptAdminIds.length > 0);
       const matchesFocusArea = !filterFocusArea || emp.focusAreaIds.includes(filterFocusArea);
       const matchesCertification =
-        !filterCertification || emp.certificationId === filterCertification;
+        filterCertification === null ||
+        (filterCertification === "any"
+          ? emp.certificationId != null
+          : filterCertification === "none"
+            ? emp.certificationId == null
+            : emp.certificationId === filterCertification);
       const matchesRole = !filterRole || emp.roleIds.includes(filterRole);
       const matchesAccountLink =
         filterAccountLink === "all" ||

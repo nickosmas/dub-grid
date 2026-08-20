@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import type {
   DbAbsenceType,
   DbCoverageRequirement,
@@ -132,7 +133,7 @@ export async function GET(req: NextRequest) {
     const params = Object.fromEntries(req.nextUrl.searchParams.entries());
     const parsed = readOnlyScheduleSchema.safeParse(params);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
     const serviceClient = getServiceClient();

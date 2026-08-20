@@ -25,4 +25,21 @@ describe("top-level stack options", () => {
       headerLargeTitleEnabled: expect.any(Boolean),
     });
   });
+
+  // This suite runs under the react-native-web shim, so `Platform.OS` is "web"
+  // and this is the non-large-title branch, where an opaque `headerStyle` is
+  // both safe and what keeps the header off the navigation theme's `card`
+  // (white) above a page sitting on `background`. The iOS branch deliberately
+  // does NOT paint `headerStyle` — an explicit background there makes an iOS 26
+  // large title invisible — and is covered in top-level-stack.ios.test.tsx.
+  // Don't "fix" that branch by pushing this background back onto it.
+  it("paints the header with the page's own background where there is no large title", () => {
+    const options = createTopLevelStackOptions(mobileColors, "Profile");
+
+    expect(options.headerLargeTitleEnabled).toBe(false);
+    expect(options.headerStyle).toMatchObject({
+      backgroundColor: mobileColors.background,
+    });
+    expect(mobileColors.background).not.toBe(mobileColors.surface);
+  });
 });

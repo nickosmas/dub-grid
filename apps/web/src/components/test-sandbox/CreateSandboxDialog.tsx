@@ -81,7 +81,8 @@ export default function CreateSandboxDialog({ orgName, onClose }: CreateSandboxD
     <ConfirmDialog
       title="Enter sandbox mode"
       message={message}
-      confirmLabel={isLoading ? "Entering…" : "Enter sandbox"}
+      confirmLabel="Enter sandbox"
+      confirmPendingLabel="Entering"
       cancelLabel="Cancel"
       variant="info"
       isLoading={isLoading}

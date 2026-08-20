@@ -3,7 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../../../test/native";
 
 const routerReplace = vi.fn();
-const saveHasSeenOnboarding = vi.fn(() => Promise.resolve());
+const markHasSeenOnboarding = vi.fn(() => Promise.resolve());
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -21,8 +21,11 @@ vi.mock("expo-router", () => ({
   },
 }));
 
-vi.mock("../../../shared/lib/session", () => ({
-  saveHasSeenOnboarding,
+// Goes through the hook, not straight to storage: it writes the new value
+// into the query cache too, so the launch gate and index route don't keep
+// reading a stale first-run flag for the rest of the session.
+vi.mock("../../auth/hooks/useHasSeenOnboarding", () => ({
+  markHasSeenOnboarding,
 }));
 
 let OnboardingScreen: (typeof import("./OnboardingScreen"))["default"];
@@ -34,7 +37,7 @@ beforeAll(async () => {
 describe("OnboardingScreen", () => {
   beforeEach(() => {
     routerReplace.mockReset();
-    saveHasSeenOnboarding.mockClear();
+    markHasSeenOnboarding.mockClear();
   });
 
   it("renders all three value-prop slides", () => {
@@ -51,8 +54,28 @@ describe("OnboardingScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
 
     await vi.waitFor(() => {
-      expect(saveHasSeenOnboarding).toHaveBeenCalledWith(true);
+      expect(markHasSeenOnboarding).toHaveBeenCalledWith(true);
     });
     expect(routerReplace).toHaveBeenCalledWith("/(auth)/login");
+  });
+
+  it("starts on the first slide with an advance action, not a finish action", () => {
+    render(<OnboardingScreen />);
+
+    expect(screen.getByRole("button", { name: "Continue" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Get Started" })).not.toBeInTheDocument();
+  });
+
+  // The primary button doubles as advance and finish. If it ever completed on
+  // the first slide, every new user would be dropped straight onto login and
+  // never see the value props — and the flag is device-local, so they would
+  // never be shown them again either.
+  it("Continue advances instead of completing onboarding", () => {
+    render(<OnboardingScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(markHasSeenOnboarding).not.toHaveBeenCalled();
+    expect(routerReplace).not.toHaveBeenCalled();
   });
 });

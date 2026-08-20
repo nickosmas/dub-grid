@@ -88,7 +88,7 @@ describe("POST /api/auth/login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-key";
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "anon-key";
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
     validateCsrfOrigin.mockReturnValue(null);
     fetchTermsAcceptanceStatus.mockResolvedValue({

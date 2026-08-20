@@ -1,0 +1,57 @@
+# Dependency updates arrive as reviewable PRs on a cooldown, rather than as
+# hand-edited `overrides` blocks followed by a full lockfile re-resolve.
+#
+# The cooldown is the security control. A malicious version published to npm is
+# typically caught and unpublished within hours to a couple of days, so waiting
+# before adopting a release lets the ecosystem do that detection for us. None of
+# this helps if someone deletes package-lock.json and reinstalls, which
+# re-resolves every package to whatever is newest — see CONTRIBUTING.md.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    cooldown:
+      default-days: 7
+      semver-patch-days: 3
+      semver-major-days: 14
+    open-pull-requests-limit: 5
+    groups:
+      # Grouped so the lockfile diff stays reviewable. A hundred separate bumps
+      # is how a bad version slips through unread.
+      dev-tooling:
+        patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier"
+          - "typescript"
+          - "vitest"
+          - "@vitest/*"
+          - "@testing-library/*"
+          - "@playwright/test"
+        update-types: ["minor", "patch"]
+      production-minor-patch:
+        exclude-patterns:
+          - "@types/*"
+          - "eslint*"
+          - "prettier"
+          - "typescript"
+          - "vitest"
+          - "@vitest/*"
+          - "@testing-library/*"
+          - "@playwright/test"
+        update-types: ["minor", "patch"]
+
+  # Actions are pinned to commit SHAs in .github/workflows; this moves those
+  # pins forward without anyone having to resolve a tag by hand.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 3

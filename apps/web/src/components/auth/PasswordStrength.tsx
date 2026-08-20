@@ -1,60 +1,20 @@
 "use client";
 
-const PASSWORD_STRENGTH_RULES = [
-  {
-    id: "length",
-    label: "At least 10 characters",
-    isMet: (password: string) => password.length >= 10,
-  },
-  {
-    id: "uppercase",
-    label: "Uppercase letter",
-    isMet: (password: string) => /[A-Z]/.test(password),
-  },
-  {
-    id: "number",
-    label: "Number",
-    isMet: (password: string) => /[0-9]/.test(password),
-  },
-  {
-    id: "symbol",
-    label: "Symbol",
-    isMet: (password: string) => /[^A-Za-z0-9]/.test(password),
-  },
-] as const;
+// Rules come from @dubgrid/domain so web and mobile enforce one bar. This file
+// used to carry a byte-level duplicate that had already drifted: web gated on
+// length alone while mobile required strength level 2.
+import {
+  PASSWORD_STRENGTH_LABELS,
+  getPasswordStrengthHints,
+  getPasswordStrengthLevel,
+} from "@dubgrid/domain";
 
-export function getPasswordStrengthHints(password: string) {
-  return PASSWORD_STRENGTH_RULES.map((rule) => ({
-    id: rule.id,
-    label: rule.label,
-    met: rule.isMet(password),
-  }));
-}
-
-function getPasswordStrengthLevel(password: string) {
-  const hints = getPasswordStrengthHints(password);
-  const metCount = hints.filter((hint) => hint.met).length;
-
-  if (!hints[0]?.met) {
-    return 0;
-  }
-
-  if (metCount === hints.length) {
-    return 3;
-  }
-
-  if (metCount >= 3) {
-    return 2;
-  }
-
-  return 1;
-}
+export { getPasswordStrengthHints };
 
 export function PasswordStrength({ password }: { password: string }) {
   const hints = getPasswordStrengthHints(password);
   const level = getPasswordStrengthLevel(password);
   const hasStartedTyping = password.length > 0;
-  const labels = ["Too short", "Weak", "Fair", "Strong"];
   const colors = [
     "var(--color-danger)",
     "var(--color-warning)",
@@ -96,7 +56,7 @@ export function PasswordStrength({ password }: { password: string }) {
           fontWeight: 500,
         }}
       >
-        {hasStartedTyping ? labels[level] : "Password requirements"}
+        {hasStartedTyping ? PASSWORD_STRENGTH_LABELS[level] : "Password requirements"}
       </span>
       <ul
         id="password-strength-hints"

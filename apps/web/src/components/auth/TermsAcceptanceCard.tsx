@@ -138,6 +138,7 @@ export default function TermsAcceptanceCard({
         >
           <ButtonLoading
             loading={loading}
+            loadingLabel="Accepting"
             spinnerColor="var(--color-text-inverse)"
             spinnerSize={18}
           >
