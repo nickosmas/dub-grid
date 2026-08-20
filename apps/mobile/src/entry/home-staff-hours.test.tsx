@@ -37,7 +37,7 @@ describe("StaffHoursExpandedScreen", () => {
     useExpandedDashboardQuery.mockReset();
   });
 
-  it("shows a loading state while the dashboard query is loading", () => {
+  it("shows a loading state while the dashboard query is loading", async () => {
     useExpandedDashboardQuery.mockReturnValue({
       dashboardQuery: { isLoading: true, isError: false, data: undefined },
       bootstrapQuery: { isLoading: true, data: undefined },
@@ -45,7 +45,11 @@ describe("StaffHoursExpandedScreen", () => {
 
     render(<StaffHoursExpandedScreen />);
 
-    expect(screen.getByText("Loading overtime watch")).toBeInTheDocument();
+    // Gated now, so nothing paints for the first beat and a warm cache
+    // never flashes a skeleton it immediately replaces.
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Loading overtime watch")).not.toBeInTheDocument();
   });
 
   it("shows a retry state when the dashboard query fails", () => {

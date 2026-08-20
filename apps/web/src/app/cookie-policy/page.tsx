@@ -160,6 +160,16 @@ export default function CookiePolicyPage() {
                 </tr>
                 <tr>
                   <td style={tableCell}>
+                    <code>dg-theme</code>
+                  </td>
+                  <td style={tableCell}>
+                    Remembers your appearance preference (light, dark, or follow your device) so it
+                    stays consistent across your organization&apos;s subdomain and the main site.
+                  </td>
+                  <td style={tableCell}>1 year</td>
+                </tr>
+                <tr>
+                  <td style={tableCell}>
                     <code>dubgrid-impersonation</code>
                   </td>
                   <td style={tableCell}>

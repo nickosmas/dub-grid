@@ -1,7 +1,4 @@
-export function isOnSchedule(focusAreaIds: number[]): boolean {
-  return focusAreaIds.length > 0;
-}
-
-export function isManagementOnly(focusAreaIds: number[], departmentIds: number[]): boolean {
-  return departmentIds.length > 0 && focusAreaIds.length === 0;
-}
+// Shared with web via `@dubgrid/domain` so the two platforms can't drift on
+// what counts as "on the schedule" vs "management only". Re-exported here to
+// keep the existing mobile import path.
+export { isManagementOnly, isManagementUser, isOnSchedule } from "@dubgrid/domain";

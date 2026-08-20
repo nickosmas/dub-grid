@@ -10,11 +10,12 @@ import {
 } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { NETWORK_ERROR_MESSAGE, NETWORK_ERROR_TITLE } from "@dubgrid/client-errors";
+import { toastToneTokens } from "@dubgrid/design-tokens";
 import { StyleSheet, Text, View, type GestureResponderEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNetworkStatus } from "./NetworkStateProvider";
 import { useMobileColors } from "./ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../theme/tokens";
+import { mobileRadii, mobileText, mobileTextWeighted, type MobileColors } from "../theme/tokens";
 
 export type ToastTone = "error" | "success" | "info" | "warning";
 
@@ -37,26 +38,26 @@ const TOAST_SWIPE_DISMISS_THRESHOLD = 32;
 const createToastTone = (mobileColors: MobileColors) =>
   ({
     error: {
-      backgroundColor: "#DC2626",
-      borderColor: "#B91C1C",
+      backgroundColor: toastToneTokens.error.background,
+      borderColor: toastToneTokens.error.border,
       iconColor: mobileColors.textInverse,
       iconName: "alert-circle" as const,
     },
     success: {
-      backgroundColor: "#16A34A",
-      borderColor: "#166534",
+      backgroundColor: toastToneTokens.success.background,
+      borderColor: toastToneTokens.success.border,
       iconColor: mobileColors.textInverse,
       iconName: "checkmark-circle" as const,
     },
     info: {
-      backgroundColor: "#1D4ED8",
-      borderColor: "#1E3A8A",
+      backgroundColor: toastToneTokens.info.background,
+      borderColor: toastToneTokens.info.border,
       iconColor: mobileColors.textInverse,
       iconName: "information-circle" as const,
     },
     warning: {
-      backgroundColor: "#D97706",
-      borderColor: "#92400E",
+      backgroundColor: toastToneTokens.warning.background,
+      borderColor: toastToneTokens.warning.border,
       iconColor: mobileColors.textInverse,
       iconName: "warning" as const,
     },
@@ -118,11 +119,17 @@ export function ToastProvider({ children }: PropsWithChildren) {
 
   const pushToast = useCallback(
     (toast: ToastInput) => {
-      setQueue((current) => {
-        if (isOffline) {
-          return current;
-        }
+      if (isOffline) {
+        // Anything failing right now is failing for one reason, and the banner
+        // already names it, so queueing these would only flood the user with
+        // stale errors on reconnect. Re-assert the banner instead: it
+        // auto-dismisses after a few seconds, and without this a mutation
+        // attempted later in an offline session produced no feedback at all.
+        setIsOfflineBannerDismissed(false);
+        return;
+      }
 
+      setQueue((current) => {
         if (
           toast.dedupeKey &&
           (activeToast?.dedupeKey === toast.dedupeKey ||
@@ -358,8 +365,7 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textInverse,
     },
     toastMessage: {
-      ...mobileText.meta,
+      ...mobileTextWeighted("meta", "medium"),
       color: TOAST_MESSAGE_COLOR,
-      fontWeight: "500",
     },
   });

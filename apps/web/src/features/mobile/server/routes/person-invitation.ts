@@ -6,7 +6,6 @@ import {
 } from "@dubgrid/contracts";
 import {
   createMobileEmployeeInvitationRow,
-  fetchMobileEmployeeRowById,
   fetchMobilePendingInvitationRowByEmployeeId,
   insertMobileAuditLogEntry,
   refreshMobileEmployeeInvitationRow,
@@ -14,22 +13,16 @@ import {
 } from "@dubgrid/data-access";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireMobileAuth } from "@/features/mobile/server";
+import {
+  createInvitationEmailUnavailableResponse,
+  getInvitationEmailConfig,
+  sendInvitationEmail,
+} from "@/features/mobile/server/invitation-email";
+import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-access";
 import { createNameMismatchResponseBody, hasCompleteName, namesMatch } from "@/lib/account-linking";
-import { createElement } from "react";
-import { render } from "@react-email/components";
-import { sanitizeHeaderValue, emailBaseUrl } from "@/lib/email";
-import { InviteEmail } from "@/emails/InviteEmail";
 import logger from "@/lib/logger";
-import { rowToEmployee } from "@/lib/db/mappers";
-import { sendResendEmail } from "@/lib/resend";
-import { mapEmployeeToMobilePerson } from "./people";
 
 export const dynamic = "force-dynamic";
-
-type InvitationEmailConfig = {
-  apiKey: string;
-  from: string;
-};
 
 function getRequestIp(req: NextRequest): string | null {
   const forwarded = req.headers?.get("x-forwarded-for") ?? null;
@@ -41,80 +34,11 @@ function getRequestIp(req: NextRequest): string | null {
 }
 
 async function loadMobilePerson(
-  serviceClient: Parameters<typeof fetchMobileEmployeeRowById>[0],
+  serviceClient: Parameters<typeof loadMobilePersonWithAccess>[0],
   orgId: string,
   employeeId: string,
 ) {
-  const row = await fetchMobileEmployeeRowById(serviceClient, orgId, employeeId);
-  if (!row) return null;
-
-  const pendingInvitation = await fetchMobilePendingInvitationRowByEmployeeId(
-    serviceClient,
-    orgId,
-    employeeId,
-  );
-
-  return mapEmployeeToMobilePerson({
-    ...rowToEmployee(row),
-    pendingInvitation: pendingInvitation
-      ? {
-          id: pendingInvitation.id,
-          email: pendingInvitation.email,
-          expiresAt: pendingInvitation.expires_at,
-          updatedAt: pendingInvitation.updated_at ?? null,
-        }
-      : null,
-  });
-}
-
-function getInvitationEmailConfig(): InvitationEmailConfig | null {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    return null;
-  }
-
-  const from = process.env.RESEND_FROM_EMAIL || "DubGrid <onboarding@resend.dev>";
-  if (!process.env.RESEND_FROM_EMAIL) {
-    logger.warn("RESEND_FROM_EMAIL not set - using test domain for mobile invite");
-  }
-
-  return { apiKey, from };
-}
-
-function createInvitationEmailUnavailableResponse() {
-  return NextResponse.json({ error: "Email service not configured" }, { status: 503 });
-}
-
-async function sendInvitationEmail(input: {
-  config: InvitationEmailConfig;
-  token: string | null | undefined;
-  email: string;
-  orgName: string;
-  inviterName?: string | null;
-}) {
-  if (!input.token) {
-    throw new Error("Invitation token unavailable");
-  }
-
-  const baseUrl = emailBaseUrl();
-  const acceptUrl = `${baseUrl}/accept-invite?token=${encodeURIComponent(input.token)}&email=${encodeURIComponent(input.email)}`;
-
-  const html = await render(
-    createElement(InviteEmail, {
-      orgName: input.orgName,
-      inviterName: input.inviterName,
-      acceptUrl,
-      logoUrl: baseUrl,
-    }),
-  );
-
-  await sendResendEmail({
-    apiKey: input.config.apiKey,
-    from: input.config.from,
-    to: input.email,
-    subject: sanitizeHeaderValue(`You're invited to join ${input.orgName} on DubGrid`),
-    html,
-  });
+  return (await loadMobilePersonWithAccess(serviceClient, orgId, employeeId))?.person ?? null;
 }
 
 async function findExistingOrganizationMemberByEmail(input: {

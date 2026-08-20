@@ -10,17 +10,12 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
 
 let StatusBanner: (typeof import("./StatusBanner"))["StatusBanner"];
 let EmptyStateCard: (typeof import("./EmptyStateCard"))["EmptyStateCard"];
-let HeroSkeleton: (typeof import("./Skeleton"))["HeroSkeleton"];
-let ListSkeleton: (typeof import("./Skeleton"))["ListSkeleton"];
-let DetailSkeleton: (typeof import("./Skeleton"))["DetailSkeleton"];
+let CardRowListSkeleton: (typeof import("./skeleton"))["CardRowListSkeleton"];
 
 beforeAll(async () => {
   StatusBanner = (await import("./StatusBanner")).StatusBanner;
   EmptyStateCard = (await import("./EmptyStateCard")).EmptyStateCard;
-  const skeletonModule = await import("./Skeleton");
-  HeroSkeleton = skeletonModule.HeroSkeleton;
-  ListSkeleton = skeletonModule.ListSkeleton;
-  DetailSkeleton = skeletonModule.DetailSkeleton;
+  CardRowListSkeleton = (await import("./skeleton")).CardRowListSkeleton;
 });
 
 describe("mobile shared state components", () => {
@@ -39,6 +34,7 @@ describe("mobile shared state components", () => {
         <EmptyStateCard
           actionLabel="Explore"
           body="Nothing has landed here yet."
+          iconName="cube-outline"
           onAction={onExplore}
           title="No items yet"
         />
@@ -61,17 +57,11 @@ describe("mobile shared state components", () => {
     expect(screen.getByText("No one in ICU yet")).toBeInTheDocument();
   });
 
-  it("renders the shared skeleton variants", () => {
-    render(
-      <>
-        <HeroSkeleton />
-        <ListSkeleton />
-        <DetailSkeleton />
-      </>,
-    );
+  it("renders a skeleton under the one testID every screen shares", () => {
+    render(<CardRowListSkeleton rows={2} />);
 
-    expect(screen.getByTestId("hero-skeleton")).toBeInTheDocument();
-    expect(screen.getByTestId("list-skeleton")).toBeInTheDocument();
-    expect(screen.getByTestId("detail-skeleton")).toBeInTheDocument();
+    // Every skeleton composition roots at `SkeletonGroup`, so screens assert
+    // that *a* placeholder is showing rather than which silhouette it is.
+    expect(screen.getByTestId("skeleton")).toBeInTheDocument();
   });
 });

@@ -100,8 +100,9 @@ function VerifyEmailContent() {
             >
               <ButtonLoading
                 loading={resending}
+                loadingLabel="Sending"
                 spinnerColor="var(--color-text-muted)"
-                spinnerSize={28}
+                spinnerSize={20}
               >
                 {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend verification email"}
               </ButtonLoading>

@@ -6,6 +6,7 @@ import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useIsInSandbox } from "@/hooks";
 import type {
   AccountLinkFilter,
+  CertificationFilter,
   ContactPresenceFilter,
   EmploymentTypeFilter,
 } from "./useStaffFilters";
@@ -16,7 +17,7 @@ interface StaffContextBarProps {
   filterDepartment: number | null;
   filterDepartmentAdminOnly: boolean;
   filterFocusArea: number | null;
-  filterCertification: number | null;
+  filterCertification: CertificationFilter;
   filterRole: number | null;
   filterAccountLink: AccountLinkFilter;
   filterEmailPresence: ContactPresenceFilter;
@@ -124,9 +125,15 @@ export function StaffContextBar({
   const focusAreaName = filterFocusArea
     ? focusAreas.find((fa) => fa.id === filterFocusArea)?.name
     : null;
-  const certificationName = filterCertification
-    ? certifications.find((certification) => certification.id === filterCertification)?.name
-    : null;
+  const certificationName =
+    filterCertification === null
+      ? null
+      : filterCertification === "any"
+        ? "Certified staff"
+        : filterCertification === "none"
+          ? "Not certified"
+          : (certifications.find((certification) => certification.id === filterCertification)
+              ?.name ?? null);
   const roleName = filterRole ? roles.find((r) => r.id === filterRole)?.name : null;
   const accountLinkLabel =
     filterAccountLink === "linked"
@@ -192,7 +199,11 @@ export function StaffContextBar({
           )}
           {certificationName && (
             <FilterPill
-              label={`${certificationLabel}: ${certificationName}`}
+              label={
+                filterCertification === "any" || filterCertification === "none"
+                  ? certificationName
+                  : `${certificationLabel}: ${certificationName}`
+              }
               onClear={onClearCertification}
             />
           )}

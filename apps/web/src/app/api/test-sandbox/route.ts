@@ -88,15 +88,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // The auth layer rewrites claims.org_id to the sandbox when a sandbox
-    // cookie is present, so we can't read the source org from there. Pull it
-    // from the auth user's profile instead.
     const { data: profile } = await serviceClient
       .from("profiles")
       .select("org_id, platform_role")
       .eq("id", auth.user.id)
       .maybeSingle();
-    const sourceOrgId = (profile?.org_id as string | undefined) ?? getClaimOrgId(auth.claims);
+
+    // Which org gets cloned. The claim comes first, because it is the only
+    // value scoped to THIS session: profiles.org_id is a per-user global that
+    // switch_org rewrites on every device, so sourcing from it cloned whichever
+    // org the user last switched to ANYWHERE. A user sitting on org A's
+    // subdomain could press Enter and get a full copy of org B's employees,
+    // schedules and PII, served under org A's slug.
+    //
+    // profiles.org_id stays as the fallback for exactly one case: `reset`,
+    // where a sandbox cookie already exists and the auth layer has rewritten
+    // claims.org_id to the sandbox itself, so the claim can no longer name the
+    // source. On `enter` there is no cookie yet and the claim is correct.
+    const hasSandboxCookie = Boolean(req.cookies.get(SANDBOX_COOKIE_NAME)?.value);
+    const sourceOrgId = hasSandboxCookie
+      ? ((profile?.org_id as string | undefined) ?? getClaimOrgId(auth.claims))
+      : (getClaimOrgId(auth.claims) ?? (profile?.org_id as string | undefined) ?? null);
     if (!sourceOrgId) {
       return NextResponse.json(
         { error: "Pick an organization before entering sandbox mode." },

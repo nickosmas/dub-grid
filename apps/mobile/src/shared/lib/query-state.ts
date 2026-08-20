@@ -12,10 +12,22 @@ export function getQueryErrorMessage(
   return getClientFriendlyErrorMessage(error, fallback);
 }
 
+/**
+ * `hasData` answers "is there anything to render from?" and drives the loading
+ * and error branches. `isEmpty` answers "did the result turn out to be empty?"
+ * and drives the empty branch.
+ *
+ * They are the same question for a screen whose only signal is a list length,
+ * which is why `isEmpty` defaults to `!hasData`. They come apart on any screen
+ * whose query key carries a search or filter: there, `hasData` has to mean "the
+ * query resolved" so a keystroke doesn't repaint the skeleton over content the
+ * user is reading, and `isEmpty` carries the list length separately.
+ */
 export function getMobileQueryContentState(input: {
   hasData: boolean;
   isLoading: boolean;
   error: unknown;
+  isEmpty?: boolean;
 }) {
   if (!input.hasData && onlineManager.isOnline() === false) {
     return {
@@ -41,7 +53,7 @@ export function getMobileQueryContentState(input: {
     } as const;
   }
 
-  if (!input.hasData) {
+  if (input.isEmpty ?? !input.hasData) {
     return { kind: "empty" } as const;
   }
 

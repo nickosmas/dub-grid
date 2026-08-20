@@ -288,6 +288,34 @@ describe("ToastProvider", () => {
     expect(screen.getAllByText("Network connection issue")).toHaveLength(1);
   });
 
+  it("brings the offline banner back when an action fails later in an offline session", () => {
+    useNetworkStatus.mockReturnValue({
+      hasResolvedState: true,
+      isOnline: false,
+      isOffline: true,
+    });
+
+    render(
+      <ToastProvider>
+        <ToastHarness />
+      </ToastProvider>,
+    );
+
+    // The banner has its say, then gets out of the way.
+    act(() => {
+      vi.advanceTimersByTime(4500);
+    });
+    expect(screen.queryByText("Network connection issue")).not.toBeInTheDocument();
+
+    // Some minutes later the user taps something that needs the network. That
+    // used to produce no feedback whatsoever.
+    fireEvent.click(screen.getByText("Queue network"));
+
+    expect(screen.getByText("Network connection issue")).toBeInTheDocument();
+    // Still exactly one: re-asserting the banner, not stacking a toast behind it.
+    expect(screen.getAllByText("Network connection issue")).toHaveLength(1);
+  });
+
   it("clears transient toasts when the app goes offline so they do not resurface later", () => {
     const { rerender } = render(
       <ToastProvider>

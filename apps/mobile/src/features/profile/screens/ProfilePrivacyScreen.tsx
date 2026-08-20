@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Linking, StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Switch, Text, View } from "react-native";
 import { Screen } from "../../../shared/components/Screen";
+import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
+import { useToast } from "../../../shared/providers/ToastProvider";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileText, type MobileColors } from "../../../shared/theme/tokens";
-import { getStoredConsent, LEGAL_URLS, setStoredConsent } from "../../consent/lib/consent";
+import { mobileText, mobileTextWeighted, type MobileColors } from "../../../shared/theme/tokens";
+import { getLegalUrls, getStoredConsent, setStoredConsent } from "../../consent/lib/consent";
 import {
   ProfileList,
   ProfileNavRow,
@@ -14,13 +17,16 @@ import {
 export default function ProfilePrivacyScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  const [analytics, setAnalytics] = useState(false);
+  const { pushToast } = useToast();
+  // null until the stored consent is read. Defaulting to `false` rendered the
+  // switch off and then visibly flipped it on for anyone who had opted in.
+  const [analytics, setAnalytics] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
     void getStoredConsent().then((consent) => {
-      if (active && consent) setAnalytics(consent.analytics);
+      if (active) setAnalytics(consent?.analytics ?? false);
     });
     return () => {
       active = false;
@@ -28,19 +34,33 @@ export default function ProfilePrivacyScreen() {
   }, []);
 
   async function handleToggle(next: boolean) {
+    const previous = analytics;
     setAnalytics(next);
     setSaving(true);
     try {
       await setStoredConsent(next);
+    } catch (error) {
+      // Roll the switch back rather than leaving it showing a choice we never
+      // persisted.
+      setAnalytics(previous);
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not save preference",
+        fallbackMessage: "We couldn't save that preference. Try again in a moment.",
+      });
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Screen bottomPaddingMode="tabbed" title="Privacy & data" subtitle="Privacy & data">
+    <Screen bottomPaddingMode="tabbed">
+      {/* "Analytics", not "Cookies & analytics": that title came over from the
+          web consent banner, and a native app sets no cookies. `analytics` is
+          the only user-controlled flag here (see consent.ts). The cookie policy
+          still has a home below, under Policies, because it documents the site. */}
       <ProfileSection
-        title="Cookies & analytics"
+        title="Analytics"
         description="Essential data keeps DubGrid working, including error monitoring, and can't be turned off. Analytics is optional and helps us improve the app."
       >
         <ProfilePanel>
@@ -53,12 +73,12 @@ export default function ProfilePrivacyScreen() {
             </View>
             <Switch
               accessibilityLabel="Analytics consent"
-              disabled={saving}
+              disabled={saving || analytics === null}
               ios_backgroundColor={mobileColors.border}
               onValueChange={(next) => void handleToggle(next)}
               thumbColor={mobileColors.surface}
               trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
-              value={analytics}
+              value={analytics ?? false}
             />
           </View>
         </ProfilePanel>
@@ -69,18 +89,18 @@ export default function ProfilePrivacyScreen() {
           <ProfileNavRow
             iconName="lock-closed-outline"
             label="Privacy policy"
-            onPress={() => void Linking.openURL(LEGAL_URLS.privacy)}
+            onPress={() => void openInAppBrowser(getLegalUrls().privacy, mobileColors)}
           />
           <ProfileNavRow
             iconName="document-text-outline"
             label="Terms of service"
-            onPress={() => void Linking.openURL(LEGAL_URLS.terms)}
+            onPress={() => void openInAppBrowser(getLegalUrls().terms, mobileColors)}
           />
           <ProfileNavRow
             iconName="information-circle-outline"
             isLast
             label="Cookie policy"
-            onPress={() => void Linking.openURL(LEGAL_URLS.cookies)}
+            onPress={() => void openInAppBrowser(getLegalUrls().cookies, mobileColors)}
           />
         </ProfileList>
       </ProfileSection>
@@ -102,9 +122,8 @@ const createStyles = (mobileColors: MobileColors) =>
       minWidth: 0,
     },
     toggleLabel: {
-      ...mobileText.cardTitle,
+      ...mobileTextWeighted("cardTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     toggleDescription: {
       ...mobileText.body,

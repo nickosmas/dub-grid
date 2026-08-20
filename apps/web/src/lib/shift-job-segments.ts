@@ -247,13 +247,17 @@ export function joinShiftJobSegmentLabels(segments: ShiftJobSegment[]): string {
  * Full-name sibling of {@link joinShiftJobSegmentLabels}. Spells out shift and
  * job names for roomy surfaces (request board, dashboard cards, staff detail)
  * instead of the space-constrained grid abbreviations.
+ *
+ * Returns "" when nothing in the segments is nameable, so a caller can fall
+ * back to the abbreviated label. It never emits a placeholder of its own: a
+ * bare "?" reads to the user as a broken shift rather than an unresolved one.
  */
 export function joinShiftJobSegmentNames(segments: ShiftJobSegment[]): string {
   return segments
     .map((segment) => {
       const shiftName = segment.shiftName?.trim() ?? "";
       const jobName = segment.jobName?.trim() ?? "";
-      if (!shiftName) return jobName || segment.label || "?"; // shiftless
+      if (!shiftName) return jobName || segment.label || ""; // shiftless
       if (segment.isShiftOnly || segment.showJobOnGrid === false || !jobName) {
         return shiftName; // shift-only
       }

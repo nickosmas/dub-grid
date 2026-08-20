@@ -35,6 +35,7 @@ interface ShiftRequestBoardProps {
 type Tab = "available" | "mine" | "approval";
 type PendingConfirmation = {
   confirmLabel: string;
+  confirmPendingLabel: string;
   key: string;
   message: ReactNode;
   onConfirm: () => void | Promise<unknown>;
@@ -242,12 +243,11 @@ export default function ShiftRequestBoard({
           isDarkTheme,
         )
       : null;
-    const requesterLabel = req.requesterSegments?.length
-      ? joinShiftJobSegmentNames(req.requesterSegments)
-      : req.requesterShiftLabel;
-    const targetLabel = req.targetSegments?.length
-      ? joinShiftJobSegmentNames(req.targetSegments)
-      : req.targetShiftLabel;
+    // Segments only carry names once the server resolved them; fall back to the
+    // abbreviated label whenever the join comes back empty.
+    const requesterLabel =
+      joinShiftJobSegmentNames(req.requesterSegments ?? []) || req.requesterShiftLabel;
+    const targetLabel = joinShiftJobSegmentNames(req.targetSegments ?? []) || req.targetShiftLabel;
 
     return (
       <div
@@ -311,7 +311,7 @@ export default function ShiftRequestBoard({
               color: "var(--color-text-secondary)",
             }}
           >
-            {requesterLabel} shift on {formatShiftDate(req.requesterShiftDate)}
+            {requesterLabel} on {formatShiftDate(req.requesterShiftDate)}
           </span>
 
           {isSwap && req.targetName && req.targetShiftLabel && req.targetShiftDate && (
@@ -383,7 +383,7 @@ export default function ShiftRequestBoard({
 
   function renderActions(req: ShiftRequest, isOwnRequest: boolean, isTarget: boolean) {
     const actions: React.ReactNode[] = [];
-    const requestLabel = `${req.requesterShiftLabel} shift on ${formatShiftDate(req.requesterShiftDate)}`;
+    const requestLabel = `${req.requesterShiftLabel} on ${formatShiftDate(req.requesterShiftDate)}`;
 
     // Claim button: open pickup that isn't mine
     if (
@@ -401,6 +401,7 @@ export default function ShiftRequestBoard({
           onClick={() =>
             setPendingConfirmation({
               confirmLabel: "Claim",
+              confirmPendingLabel: "Claiming",
               key: `claim:${req.id}`,
               message: (
                 <>
@@ -431,6 +432,7 @@ export default function ShiftRequestBoard({
           onClick={() =>
             setPendingConfirmation({
               confirmLabel: "Accept",
+              confirmPendingLabel: "Accepting",
               key: `accept:${req.id}`,
               message: (
                 <>
@@ -453,6 +455,7 @@ export default function ShiftRequestBoard({
           onClick={() =>
             setPendingConfirmation({
               confirmLabel: "Decline",
+              confirmPendingLabel: "Declining",
               key: `decline:${req.id}`,
               message: (
                 <>
@@ -511,6 +514,7 @@ export default function ShiftRequestBoard({
 
                   setPendingConfirmation({
                     confirmLabel: "Reject",
+                    confirmPendingLabel: "Rejecting",
                     key: `reject:${req.id}`,
                     message: (
                       <>
@@ -562,6 +566,7 @@ export default function ShiftRequestBoard({
             onClick={() =>
               setPendingConfirmation({
                 confirmLabel: "Approve",
+                confirmPendingLabel: "Approving",
                 key: `approve:${req.id}`,
                 message: (
                   <>
@@ -605,6 +610,7 @@ export default function ShiftRequestBoard({
           onClick={() =>
             setPendingConfirmation({
               confirmLabel: "Cancel request",
+              confirmPendingLabel: "Cancelling",
               key: `cancel:${req.id}`,
               message: (
                 <>
@@ -644,6 +650,7 @@ export default function ShiftRequestBoard({
       {pendingConfirmation && (
         <ConfirmDialog
           confirmLabel={pendingConfirmation.confirmLabel}
+          confirmPendingLabel={pendingConfirmation.confirmPendingLabel}
           isLoading={runningConfirmationKey === pendingConfirmation.key}
           message={pendingConfirmation.message}
           title={pendingConfirmation.title}

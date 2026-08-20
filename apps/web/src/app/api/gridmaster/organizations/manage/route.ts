@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import type { DbOrganization } from "@dubgrid/db-types";
 import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
@@ -90,12 +91,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
   }
 
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
   const requestClient = createRequestSupabaseClient(req);

@@ -21,6 +21,7 @@
     "dev:webpack": "turbo run dev:webpack --filter=@dubgrid/web",
     "build": "turbo run build --filter=@dubgrid/web",
     "start": "npm --workspace @dubgrid/web run start",
+    "hooks:install": "git config core.hooksPath .githooks && echo 'Git hooks enabled (.githooks)'",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -43,18 +44,24 @@
     "use:mobile:remote": "cp apps/mobile/.env.remote apps/mobile/.env.local && echo 'Switched mobile app to the remote backend in apps/mobile/.env.local'",
     "use:remote": "ln -sf .env.remote .env.local && echo 'Switched to remote Supabase'",
     "gen:types": "npx supabase gen types --lang=typescript --local > apps/web/src/lib/database.types.ts",
+    "deps:rebuild": "npm rebuild --ignore-scripts=false --foreground-scripts @prisma/engines @snaplet/seed @sentry/cli",
+    "deps:audit": "node scripts/audit-check.mjs",
+    "deps:scan": "node scripts/supply-chain-scan.mjs",
     "build:packages": "turbo run build --filter=@dubgrid/authz --filter=@dubgrid/domain --filter=@dubgrid/schedule-core --filter=@dubgrid/design-tokens --filter=@dubgrid/api-client --filter=@dubgrid/db-types --filter=@dubgrid/data-access --filter=@dubgrid/mobile-api-core --filter=@dubgrid/contracts --filter=@dubgrid/client-errors --filter=@dubgrid/realtime-core"
   },
   "overrides": {
-    "@hono/node-server": "1.19.14",
+    "@expo/plist": {
+      "@xmldom/xmldom": "0.8.13"
+    },
+    "@hono/node-server": "2.1.0",
     "@opentelemetry/otlp-transformer": {
       "protobufjs": "7.5.9"
     },
-    "ajv": {
-      "fast-uri": "^3.1.2"
+    "@react-email/ui": {
+      "next": "16.3.0"
     },
-    "@expo/plist": {
-      "@xmldom/xmldom": "0.8.13"
+    "@sentry/nextjs": {
+      "fast-uri": "^3.1.5"
     },
     "@snaplet/copycat": {
       "uuid": "^14.0.0"
@@ -63,18 +70,33 @@
       "uuid": "^14.0.0"
     },
     "@xmldom/xmldom": "0.8.13",
-    "axios": "1.17.0",
-    "dompurify": "3.4.11",
-    "fast-uri": "^3.1.2",
+    "ajv": {
+      "fast-uri": "^3.1.5"
+    },
+    "axios": "1.19.0",
+    "dompurify": "3.4.13",
+    "fast-uri": "^3.1.5",
     "follow-redirects": "1.16.0",
-    "hono": "4.12.25",
+    "hono": "4.13.0",
+    "ip-address": "^10.4.0",
+    "next": "16.3.0",
     "plist": {
       "@xmldom/xmldom": "0.8.13"
     },
-    "postcss": "8.5.12",
+    "postcss": "8.5.25",
+    "posthog-js": {
+      "dompurify": "3.4.13"
+    },
     "protobufjs": "7.5.9",
-    "tar": "^7.5.13",
+    "react-email": {
+      "socket.io-parser": "^4.2.7",
+      "fast-uri": "^3.1.5"
+    },
+    "sharp": "^0.35.3",
+    "socket.io-parser": "^4.2.7",
+    "tar": "^7.5.22",
     "tmp": ">=0.2.3",
+    "undici": "^7.29.0",
     "xcode": {
       "uuid": "^14.0.0"
     }
@@ -94,7 +116,7 @@
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^5.1.4",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/coverage-v8": "^3.2.7",
     "cli-spinners": "^3.4.0",
     "eslint": "^9",
     "eslint-config-next": "^16.2.1",
@@ -111,7 +133,7 @@
     "turbo": "^2.5.6",
     "typescript": "^5",
     "vite": "^7.3.2",
-    "vitest": "^3.2.4",
+    "vitest": "^3.2.7",
     "zod": "^3.24.4"
   }
 }

@@ -132,3 +132,9 @@ The middleware reads these via `jwtVerify` / `decodeJwt` at the top level.
 - Run `npm run gen:types` when schema changes affect generated types (`apps/web/src/lib/database.types.ts`).
 - Do not run `npm run db:reset:remote` unless the user explicitly requests it and
   confirms the destructive remote risk.
+- Both remote scripts connect through `scripts/lib/db-client.ts`. Networks that
+  filter database ports (5432/6543) fail the direct connection with ECONNRESET or
+  a connect timeout, and Supabase's direct host is IPv6-only, so the client falls
+  back to running the same SQL over HTTPS via the Supabase Management API when
+  `SUPABASE_ACCESS_TOKEN` (or a `supabase login` token) is available. Pin one
+  transport with `SUPABASE_DB_TRANSPORT=postgres|https`.

@@ -1,6 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createScreenModule } from "../../../test/native";
+import {
+  navigatedActions,
+  pressBack,
+  resetNavigationShim,
+} from "../../../test/shims/react-navigation-native";
 
 const useMutation = vi.fn();
 const useQueryClient = vi.fn();
@@ -62,6 +67,7 @@ beforeAll(async () => {
 
 describe("AddPersonScreen", () => {
   beforeEach(() => {
+    resetNavigationShim();
     useQueryClient.mockReset();
     useAccessToken.mockReset();
     useBootstrap.mockReset();
@@ -124,6 +130,22 @@ describe("AddPersonScreen", () => {
     expect(screen.getByRole("button", { name: "Add person" })).not.toBeDisabled();
   });
 
+  it("names the organization's focus-area label as a singular noun in the validation error", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { focusArea: "Wings", certification: "Certification" } },
+        focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+        certifications: [],
+      },
+    });
+    renderWithMutation();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+
+    expect(screen.getByText("Select at least one wing")).toBeInTheDocument();
+    expect(screen.queryByText("Select at least one Wings")).not.toBeInTheDocument();
+  });
+
   it("creates the person and navigates back on success, without inviting when no email is set", async () => {
     createMobilePerson.mockResolvedValue({
       success: true,
@@ -175,6 +197,34 @@ describe("AddPersonScreen", () => {
     });
   });
 
+  it("says so when the person was created but the invitation could not be sent", async () => {
+    createMobilePerson.mockResolvedValue({
+      success: true,
+      person: { id: "emp-1" },
+    });
+    createMobilePersonInvitation.mockRejectedValue(new Error("smtp down"));
+    renderWithMutation();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+    fireEvent.change(screen.getByLabelText("Last name"), { target: { value: "Torres" } });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "nia@dubgrid.com" },
+    });
+    fireEvent.click(screen.getByText("Skilled Nursing"));
+    fireEvent.click(screen.getByRole("button", { name: "Add person" }));
+
+    await waitFor(() => {
+      expect(pushToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tone: "warning",
+          title: "Person added, invitation not sent",
+        }),
+      );
+    });
+    // The person really was created, so this stays a success path.
+    expect(routerBack).toHaveBeenCalled();
+  });
+
   it("shows an error toast when creation fails", async () => {
     createMobilePerson.mockRejectedValue(new Error("boom"));
     renderWithMutation();
@@ -190,5 +240,53 @@ describe("AddPersonScreen", () => {
       );
     });
     expect(routerBack).not.toHaveBeenCalled();
+  });
+
+  it("leaves an untouched form without asking", () => {
+    renderWithMutation();
+
+    act(() => {
+      expect(pressBack()).toBe(false);
+    });
+    expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
+  });
+
+  it("asks before a back press throws away a part-filled form", () => {
+    renderWithMutation();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+
+    act(() => {
+      expect(pressBack()).toBe(true);
+    });
+    expect(navigatedActions).toHaveLength(0);
+    expect(screen.getByText("Discard this staff profile?")).toBeInTheDocument();
+  });
+
+  it("keeps the form when the back press is called off", () => {
+    renderWithMutation();
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+    act(() => {
+      pressBack();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Keep Editing" }));
+
+    expect(navigatedActions).toHaveLength(0);
+    expect(screen.getByLabelText("First name")).toHaveValue("Nia");
+  });
+
+  it("does not ask on the way out after the person was saved", () => {
+    // The success handler navigates away with the fields still filled in, so a
+    // guard that only watched the fields would meet a saved person with
+    // "discard your changes?".
+    renderWithMutation({ isSuccess: true });
+
+    fireEvent.change(screen.getByLabelText("First name"), { target: { value: "Nia" } });
+
+    act(() => {
+      expect(pressBack()).toBe(false);
+    });
+    expect(navigatedActions).toEqual([{ type: "GO_BACK" }]);
   });
 });

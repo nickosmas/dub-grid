@@ -1,11 +1,12 @@
 import { useMemo } from "react";
-import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../../shared/components/Button";
 import { getScreenBottomPadding } from "../../../shared/components/screen-layout";
 import { getOrgStatus } from "../../../shared/lib/api";
 import { getMobileEnvConfig } from "../../../shared/lib/env";
+import { openInAppBrowser } from "../../../shared/lib/inAppBrowser";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpacing, mobileText, type MobileColors } from "../../../shared/theme/tokens";
 
@@ -98,13 +99,20 @@ export function OrganizationLockedScreen({
         </View>
 
         <View style={styles.actions}>
-          <Button label="Try again" loading={isRetrying} onPress={onRetry} tone="primary" />
+          <Button
+            label="Try again"
+            loading={isRetrying}
+            loadingLabel="Retrying"
+            onPress={onRetry}
+            tone="primary"
+          />
           {isSuperAdmin ? (
             <Button
               label="Manage billing on web"
               onPress={() => {
-                void Linking.openURL(
+                void openInAppBrowser(
                   `${getMobileEnvConfig().apiBaseUrl}/settings?section=org-billing`,
+                  mobileColors,
                 );
               }}
               tone="secondary"

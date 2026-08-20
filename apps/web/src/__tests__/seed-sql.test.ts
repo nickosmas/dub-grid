@@ -28,6 +28,28 @@ describe("seed schedule definition contracts", () => {
     },
   );
 
+  // Both tenant SQL files write every shift as
+  // `<target anchor> + (dt - schedule_source_start)`, so the target anchor is the
+  // one absolute date in the file. It used to be a hardcoded '2026-08-02', which
+  // the seed's regex date-shifter then moved again, landing Calm Haven and Arden
+  // Wood four weeks past the current week, so "this week" was empty for every
+  // user in those two orgs.
+  it.each([
+    ["seed_arden_wood.sql", "schedule_start"],
+    ["seed_calm_haven.sql", "schedule_target_start"],
+  ])(
+    "derives the schedule anchor in %s from the current date, not a literal",
+    (fileName, anchor) => {
+      const sql = readFileSync(resolveSeedPath(fileName), "utf8");
+
+      const declaration = sql.match(new RegExp(`^\\s*${anchor}\\s+date\\s*:=.*$`, "m"))?.[0];
+
+      expect(declaration).toBeDefined();
+      expect(declaration).toContain("CURRENT_DATE");
+      expect(declaration).not.toMatch(/DATE\s*'\d{4}-\d{2}-\d{2}'/);
+    },
+  );
+
   it("uses standard seed colors for focus areas, shifts, and jobs", () => {
     const calmHavenSql = readFileSync(resolveSeedPath("seed_calm_haven.sql"), "utf8");
 

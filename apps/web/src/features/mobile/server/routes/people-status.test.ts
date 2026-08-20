@@ -170,6 +170,7 @@ describe("mobile people status route", () => {
         statusNote: "Coverage hold",
         userId: null,
         version: 8,
+        membershipUpdatedAt: null,
         pendingInvitation: null,
       },
     });

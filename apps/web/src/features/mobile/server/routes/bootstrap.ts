@@ -8,6 +8,7 @@ import {
   fetchMobileFocusAreas,
   fetchMobileRoles,
   fetchLinkedEmployeeForUser,
+  fetchMobileTermsAcceptedVersion,
   fetchMobileUnreadNotificationCount,
   mapOrganizationToMobileConfig,
   requireMobileAuth,
@@ -33,6 +34,7 @@ export async function GET(req: NextRequest) {
     fetchMobileRoles,
     fetchMobileCertifications,
     fetchMobileDepartments,
+    fetchTermsAcceptedVersion: fetchMobileTermsAcceptedVersion,
     mapOrganizationToMobileConfig,
   });
 

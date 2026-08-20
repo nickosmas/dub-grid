@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { subscribeOrgScopedRealtime } from "@dubgrid/realtime-core";
+import { BOOTSTRAP_QUERY_KEY_PREFIX } from "../../features/auth/hooks/useBootstrap";
 import {
   invalidateMobileRealtimeQueries,
   type MobileRealtimeTable,
@@ -72,7 +73,7 @@ export function useMobileRealtimeInvalidation({
       },
       onReconnectAfterError: () => {
         void queryClient.invalidateQueries({
-          queryKey: ["mobile", "bootstrap", accessToken],
+          queryKey: BOOTSTRAP_QUERY_KEY_PREFIX,
         });
       },
       onError: (error) => {

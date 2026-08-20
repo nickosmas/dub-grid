@@ -17,12 +17,51 @@ export {
 } from "./avatar-tone";
 
 export {
+  mobileIconToneTokens,
+  getMobileIconToneColor,
+  MOBILE_DECORATIVE_ICON_TONES,
+  type MobileIconTone,
+  type MobileIconToneName,
+} from "./icon-tone";
+
+export {
   getReadableTextColor,
   borderColor,
   toDarkPillColors,
   resolveShiftPillColors,
+  visiblePillBorder,
   type ShiftPillColors,
 } from "./pill-colors";
+
+export { getHeroGradientCss, heroGradientTokens, type HeroGradientStops } from "./hero-gradient";
+
+export {
+  getSoftGradientCss,
+  getSoftGradientStops,
+  softGradientTokens,
+  type SoftGradientKind,
+  type SoftGradientStops,
+} from "./soft-gradient";
+
+export {
+  darkMobileElevationTokens,
+  getMobileElevation,
+  mobileElevationTokens,
+  type MobileElevation,
+  type MobileElevationLevel,
+} from "./elevation";
+
+export {
+  getMobileEasingCurve,
+  mobileMotionTokens,
+  type MobileDurationName,
+  type MobileEasingCurve,
+  type MobileEasingName,
+  type MobileSpringConfig,
+  type MobileSpringName,
+} from "./motion";
+
+export { resolveJobChipTone, type JobChipTone, type JobChipToneContext } from "./job-chip-tone";
 
 export const lightColorTokens = {
   background: "#F8FAFC",
@@ -40,6 +79,13 @@ export const lightColorTokens = {
   brandLight: "#3B82F6",
   brandSoft: "#EFF6FF",
   brandBorder: "#BFDBFE",
+  // Active-item highlight for the navbar tabs and app sidebars: gray rather
+  // than `brandSoft`, paired with `textPrimary` instead of brand blue.
+  // Sits half a step between `surfaceSecondary` (slate-100, also the hover
+  // background — the active state has to stay distinguishable from it) and
+  // `borderSubtle` (slate-200), and carries the same slate tint as the rest
+  // of the light ramp rather than being a pure neutral.
+  navActiveBg: "#E7ECF2",
   success: "#16A34A",
   successText: "#166534",
   successSoft: "#F0FDF4",
@@ -102,6 +148,11 @@ export const darkColorTokens: ColorTokens = {
   brandLight: "#4A9BFF",
   brandSoft: darkBrandSoft,
   brandBorder: "#1E3A5F",
+  // Dark counterpart: lifted above `surface` rather than dropped below it,
+  // and on the same zinc ramp as `surfaceSecondary`/`borderSubtle`/`border`
+  // (all R=G with B a few points higher). The light value would be near-white
+  // here, and its near-black text unreadable.
+  navActiveBg: "#26262B",
   success: "#22C55E",
   successText: "#4ADE80",
   successSoft: "#122118",
@@ -138,16 +189,70 @@ export const darkColorTokens: ColorTokens = {
 /** @deprecated Use `lightColorTokens` (or the theme-aware helpers) directly — this alias exists only for back-compat with existing static imports. */
 export const colorTokens = lightColorTokens;
 
+/**
+ * Named layout slots for mobile. Kept as-is for existing call sites; new work
+ * should reach for `mobileSpacing` below unless one of these names genuinely
+ * describes the slot.
+ */
 export const spacingTokens = {
   screenX: 16,
-  sectionGap: 16,
+  /** Vertical rhythm between cards/sections on a mobile screen. */
+  sectionGap: 20,
+  /**
+   * @deprecated Disagrees with the real card gap. `Screen.tsx`'s Card uses
+   * `mobileSpacingTokens.md` (12); this 8 is only still read by
+   * OrganizationLockedScreen. Migrate that call site and remove.
+   */
   cardGap: 8,
+} as const;
+
+/**
+ * The mobile spacing ramp, in density-independent pixels.
+ *
+ * `webSpacingTokens` are `"px"` strings that React Native can't consume, so
+ * mobile had no scale to reach for and screens hand-rolled numbers instead
+ * (ScheduleScreen alone had ~190 raw values against 12 token references).
+ * Values match the web ramp one-for-one so the two platforms stay in step.
+ */
+export const mobileSpacingTokens = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  "2xl": 24,
+  "3xl": 32,
+  "4xl": 40,
+  "5xl": 48,
+} as const;
+
+/**
+ * Toast fills. Deliberately fixed across themes: a toast is a transient
+ * high-contrast overlay, not a themed surface, and it always pairs a saturated
+ * fill with `textInverse`. They live here rather than inline in the mobile
+ * provider so they're part of the design system like everything else.
+ */
+export const toastToneTokens = {
+  error: { background: "#DC2626", border: "#B91C1C" },
+  success: { background: "#16A34A", border: "#166534" },
+  info: { background: "#1D4ED8", border: "#1E3A8A" },
+  warning: { background: "#D97706", border: "#92400E" },
 } as const;
 
 export const radiusTokens = {
   card: 16,
   control: 12,
   pill: 999,
+} as const;
+
+/**
+ * Radius ramp for mobile surfaces smaller than a card — chips, inputs, inline
+ * badges. `radiusTokens` stays the vocabulary for the three named roles.
+ */
+export const mobileRadiusTokens = {
+  sm: 6,
+  md: 8,
+  lg: 10,
 } as const;
 
 export const webSpacingTokens = {
@@ -208,78 +313,84 @@ export const mobileTypographyTokens = {
     semibold: "600",
     bold: "700",
   },
+  /**
+   * Weight lives in `fontFamily` alone - these tokens deliberately carry no
+   * `fontWeight`, and adding one back silently breaks Android.
+   *
+   * DM Sans ships as four separate single-weight files, and `expo-font`
+   * registers each one under its own family name at style NORMAL only. Naming a
+   * numeric weight next to the family reads as harmless (`DMSans_700Bold` is
+   * already 700) but sends Android down a different path: it asks that
+   * one-face family for a BOLD face, finds none registered and no
+   * `DMSans_700Bold_bold` asset to load, and falls back to the *system* font.
+   * The text renders in Roboto, at roughly the right weight, which is why this
+   * hid for so long - only anything at 500 and up was affected, since 400
+   * resolves to the NORMAL face that is actually there. iOS resolves the family
+   * either way, so it looked correct there throughout.
+   *
+   * To render a token at a different weight, move the family:
+   * `mobileTextWeighted(variant, weight)`.
+   */
   text: {
     screenTitle: {
       fontFamily: "DMSans_700Bold",
       fontSize: 22,
       lineHeight: 28,
-      fontWeight: "700",
     },
     heroMetric: {
       fontFamily: "DMSans_700Bold",
       fontSize: 24,
       lineHeight: 30,
-      fontWeight: "700",
     },
     sectionTitle: {
       fontFamily: "DMSans_700Bold",
       fontSize: 16,
       lineHeight: 22,
-      fontWeight: "700",
     },
     cardTitle: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 16,
       lineHeight: 22,
-      fontWeight: "600",
     },
     rowTitle: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 15,
       lineHeight: 21,
-      fontWeight: "600",
     },
     body: {
       fontFamily: "DMSans_400Regular",
       fontSize: 14,
       lineHeight: 21,
-      fontWeight: "400",
     },
     bodyStrong: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 14,
       lineHeight: 21,
-      fontWeight: "600",
     },
     meta: {
       fontFamily: "DMSans_400Regular",
       fontSize: 13,
       lineHeight: 18,
-      fontWeight: "400",
     },
     label: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 12,
       lineHeight: 16,
-      fontWeight: "600",
     },
     caption: {
       fontFamily: "DMSans_400Regular",
       fontSize: 12,
       lineHeight: 16,
-      fontWeight: "400",
     },
     badge: {
       fontFamily: "DMSans_700Bold",
       fontSize: 11,
       lineHeight: 14,
-      fontWeight: "700",
     },
     micro: {
       fontFamily: "DMSans_600SemiBold",
       fontSize: 10,
       lineHeight: 12,
-      fontWeight: "600",
     },
   },
 } as const;
@@ -414,8 +525,8 @@ export const lightShadcnTokens = {
   sidebarForeground: "oklch(0.145 0 0)",
   sidebarPrimary: lightColorTokens.brand,
   sidebarPrimaryForeground: lightColorTokens.textInverse,
-  sidebarAccent: lightColorTokens.brandSoft,
-  sidebarAccentForeground: lightColorTokens.brand,
+  sidebarAccent: lightColorTokens.navActiveBg,
+  sidebarAccentForeground: lightColorTokens.textPrimary,
   sidebarBorder: "oklch(0.922 0 0)",
   sidebarRing: lightColorTokens.brandLight,
 } as const;
@@ -460,8 +571,8 @@ export const darkShadcnTokens: Record<keyof typeof lightShadcnTokens, string> = 
   sidebarForeground: "oklch(0.97 0 0)",
   sidebarPrimary: darkColorTokens.brand,
   sidebarPrimaryForeground: darkColorTokens.textInverse,
-  sidebarAccent: darkColorTokens.brandSoft,
-  sidebarAccentForeground: darkColorTokens.brandLight,
+  sidebarAccent: darkColorTokens.navActiveBg,
+  sidebarAccentForeground: darkColorTokens.textPrimary,
   sidebarBorder: "oklch(1 0 0 / 12%)",
   sidebarRing: darkColorTokens.brandLight,
 } as const;
@@ -490,6 +601,7 @@ export const webThemeTokens = {
     "--color-brand-light": "var(--dg-color-brand-light)",
     "--color-brand-bg": "var(--dg-color-brand-bg)",
     "--color-brand-border": "var(--dg-color-brand-border)",
+    "--color-nav-active-bg": "var(--dg-color-nav-active-bg)",
     "--color-primary": "var(--dg-color-primary)",
     "--color-link": "var(--dg-color-link)",
     "--color-accent-text": "var(--dg-color-accent-text)",
@@ -636,6 +748,7 @@ function themedWebCssVariables(theme: WebTheme): Record<string, string> {
     "--dg-color-brand-light": tokens.brandLight,
     "--dg-color-brand-bg": tokens.brandSoft,
     "--dg-color-brand-border": tokens.brandBorder,
+    "--dg-color-nav-active-bg": tokens.navActiveBg,
     "--dg-color-primary": tokens.brand,
     "--dg-color-link": tokens.brand,
     "--dg-color-accent-text": tokens.brand,

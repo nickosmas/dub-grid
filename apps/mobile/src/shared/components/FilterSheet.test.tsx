@@ -12,12 +12,14 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: () => null,
 }));
 
+let Text: (typeof import("react-native"))["Text"];
 let FilterButton: (typeof import("./FilterSheet"))["FilterButton"];
 let FilterSheet: (typeof import("./FilterSheet"))["FilterSheet"];
 let SelectionRow: (typeof import("./FilterSheet"))["SelectionRow"];
 let SelectionSection: (typeof import("./FilterSheet"))["SelectionSection"];
 
 beforeAll(async () => {
+  Text = (await import("react-native")).Text;
   const mod = await import("./FilterSheet");
   FilterButton = mod.FilterButton;
   FilterSheet = mod.FilterSheet;
@@ -67,6 +69,37 @@ describe("FilterSheet", () => {
 
     expect(screen.queryByRole("button", { name: "Clear all" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Done" })).toBeInTheDocument();
+  });
+});
+
+describe("SelectionSection", () => {
+  it("renders a literal first row alongside a mapped array of rows", () => {
+    // The real shape every filter section uses: an "All …" row written out,
+    // then a `.map()`. The section flattens both to decide which row is last
+    // and which sits next to the selected one, so this is the case its
+    // `Children.toArray` has to survive.
+    render(
+      <SelectionSection label="Focus area">
+        <SelectionRow label="All focus areas" onPress={() => {}} selected />
+        {["ICU", "ER"].map((name) => (
+          <SelectionRow key={name} label={name} onPress={() => {}} selected={false} />
+        ))}
+      </SelectionSection>,
+    );
+
+    expect(screen.getByText("All focus areas")).toBeInTheDocument();
+    expect(screen.getByText("ICU")).toBeInTheDocument();
+    expect(screen.getByText("ER")).toBeInTheDocument();
+  });
+
+  it("leaves a non-row child untouched", () => {
+    render(
+      <SelectionSection label="Status">
+        <Text>Nothing to filter yet</Text>
+      </SelectionSection>,
+    );
+
+    expect(screen.getByText("Nothing to filter yet")).toBeInTheDocument();
   });
 });
 

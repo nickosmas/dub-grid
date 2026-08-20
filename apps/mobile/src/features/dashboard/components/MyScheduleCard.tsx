@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { addDaysToIsoDate, getDaysBetweenIsoDates } from "@dubgrid/schedule-core";
 import type { MobileScheduleEntry, ResolvedSchedulePresentationSegment } from "@dubgrid/contracts";
@@ -7,9 +6,14 @@ import { resolveShiftPillColors, type ShiftPillColors } from "@dubgrid/design-to
 import { Card } from "../../../shared/components/Screen";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
 import { useIsDarkMode, useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { formatUsTime } from "../../../shared/lib/dates";
-import { getMySchedule } from "../../../shared/lib/api";
+import { useMyScheduleQuery } from "../hooks/useMyScheduleQuery";
 import { ExpandButton } from "./ExpandButton";
 
 // Kept as narrow as possible while still fitting a full time range like
@@ -141,15 +145,11 @@ export function MyScheduleCard({
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDarkTheme = useIsDarkMode();
-  const query = useQuery({
-    queryKey: ["mobile", "dashboard", "my-schedule", accessToken],
-    queryFn: () => getMySchedule(accessToken!),
-    enabled: Boolean(accessToken),
-  });
-
-  if (query.isLoading) {
-    return null;
-  }
+  // The screens that render this card fold the same query into their content
+  // state, so by the time the card mounts the data is there. No local loading
+  // branch: returning null here made the card appear after the page skeleton
+  // had cleared, shifting everything below it down.
+  const query = useMyScheduleQuery(accessToken);
 
   const range = query.data?.range;
   const entries = query.data?.entries ?? [];
@@ -247,8 +247,11 @@ export function MyScheduleCard({
           </ScrollView>
         ) : (
           <EmptyStateCard
+            actionLabel={onExpand ? "View full schedule" : undefined}
+            actionVariant="link"
             compact
-            iconName="calendar-outline"
+            iconName="calendar-clear-outline"
+            onAction={onExpand}
             title="You're not scheduled this week"
           />
         )
@@ -278,7 +281,7 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surfaceSecondary,
       borderRadius: mobileRadii.control,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       padding: 12,
     },
     dayHeader: {
@@ -308,10 +311,9 @@ const createStyles = (mobileColors: MobileColors) =>
       color: mobileColors.textPrimary,
     },
     shiftJobName: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "medium"),
       fontSize: 11,
       lineHeight: 14,
-      fontWeight: "500",
       color: mobileColors.textMuted,
       opacity: 0.85,
     },

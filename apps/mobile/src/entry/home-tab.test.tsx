@@ -55,12 +55,16 @@ describe("Home tab role branching", () => {
     useSessionState.mockReturnValue({ accessToken: "token-1" });
   });
 
-  it("renders the personal schedule screen while bootstrap is loading, deferring to its own skeleton", () => {
+  // Picking a screen before the role is known meant an admin got the personal
+  // schedule's skeleton, then the dashboard's — two waves, the first one the
+  // wrong shape for the page that followed it.
+  it("mounts neither home screen while bootstrap is loading", () => {
     useBootstrap.mockReturnValue({ isLoading: true, data: undefined });
 
     render(<HomeTabScreen />);
 
-    expect(screen.getByText("personal-schedule-screen")).toBeInTheDocument();
+    expect(screen.queryByText("personal-schedule-screen")).not.toBeInTheDocument();
+    expect(screen.queryByText("admin-home-screen")).not.toBeInTheDocument();
   });
 
   it("renders AdminHomeScreen for an admin", () => {

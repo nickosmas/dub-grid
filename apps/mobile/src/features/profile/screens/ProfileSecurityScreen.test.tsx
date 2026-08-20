@@ -6,8 +6,7 @@ const useMutation = vi.fn();
 const useQuery = vi.fn();
 const useAccessToken = vi.fn();
 const useBootstrap = vi.fn();
-const getSupabaseClient = vi.fn();
-const handleExpiredMobileSession = vi.fn();
+const routerPush = vi.fn();
 const pushToast = vi.fn();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
@@ -17,6 +16,12 @@ vi.mock("@expo/vector-icons/Ionicons", () => ({
 }));
 
 vi.mock("../../../shared/components/Screen", async () => createScreenModule(await import("react")));
+
+vi.mock("expo-router", () => ({
+  router: {
+    push: routerPush,
+  },
+}));
 
 vi.mock("@tanstack/react-query", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-query")>();
@@ -36,14 +41,10 @@ vi.mock("../../auth/hooks/useBootstrap", () => ({
   useBootstrap,
 }));
 
-const updateProfileMfaStatus = vi.fn();
-
 vi.mock("../../../shared/lib/api", () => ({
   createProfileChangeRequest: vi.fn(),
   getProfile: vi.fn(),
   getProfileSessions: vi.fn(),
-  revokeProfileSession: vi.fn(),
-  updateProfileMfaStatus: (...args: unknown[]) => updateProfileMfaStatus(...args),
 }));
 
 vi.mock("../../../shared/lib/env", () => ({
@@ -52,13 +53,20 @@ vi.mock("../../../shared/lib/env", () => ({
   }),
 }));
 
-vi.mock("../../../shared/lib/supabase", () => ({
-  getSupabaseClient,
-}));
+// The real `app-lock` store (its cache and listeners are plain module state, so
+// it works under jsdom) behind the same `useSyncExternalStore` read the lock
+// itself uses — importing AppLockProvider for real would drag the session
+// provider and the lock sheet into a test about a settings row.
+vi.mock("../../../shared/providers/AppLockProvider", async () => {
+  const { useSyncExternalStore } = await import("react");
+  const { getAppLockEnabledSnapshot, subscribeAppLockEnabled } =
+    await import("../../../shared/lib/app-lock");
 
-vi.mock("../../../shared/lib/auth-reset", () => ({
-  handleExpiredMobileSession,
-}));
+  return {
+    useAppLockEnabled: () =>
+      useSyncExternalStore(subscribeAppLockEnabled, getAppLockEnabledSnapshot, () => false),
+  };
+});
 
 vi.mock("../../../shared/providers/ToastProvider", () => ({
   useToast: () => ({
@@ -76,6 +84,7 @@ vi.mock("expo-local-authentication", () => ({
 }));
 
 let ProfileSecurityScreen: (typeof import("./ProfileSecurityScreen"))["default"];
+let setAppLockEnabled: (typeof import("../../../shared/lib/app-lock"))["setAppLockEnabled"];
 
 const profileData = {
   user: {
@@ -85,25 +94,33 @@ const profileData = {
   pendingAccountDeletionRequest: false,
 };
 
+const sessionsData = {
+  active: [
+    { id: "session-1", isCurrent: true },
+    { id: "session-2", isCurrent: false },
+  ],
+  stale: [],
+};
+
 beforeAll(async () => {
   ProfileSecurityScreen = (await import("./ProfileSecurityScreen")).default;
+  setAppLockEnabled = (await import("../../../shared/lib/app-lock")).setAppLockEnabled;
 });
 
 describe("ProfileSecurityScreen", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     useMutation.mockReset();
     useQuery.mockReset();
     useAccessToken.mockReset();
     useBootstrap.mockReset();
-    getSupabaseClient.mockReset();
-    handleExpiredMobileSession.mockReset();
+    routerPush.mockReset();
     pushToast.mockReset();
-    updateProfileMfaStatus.mockReset();
-    updateProfileMfaStatus.mockResolvedValue({ user: { mfaEnabled: true } });
     hasHardwareAsync.mockReset();
     isEnrolledAsync.mockReset();
     hasHardwareAsync.mockResolvedValue(true);
     isEnrolledAsync.mockResolvedValue(true);
+    // Module-level store, so it survives between tests unless reset.
+    await setAppLockEnabled(false);
 
     useAccessToken.mockReturnValue("token-123");
     useBootstrap.mockReturnValue({
@@ -120,7 +137,7 @@ describe("ProfileSecurityScreen", () => {
       const key = queryKey.join(":");
       if (key.includes("sessions")) {
         return {
-          data: { active: [], stale: [] },
+          data: sessionsData,
           error: null,
           isLoading: false,
           refetch: vi.fn(),
@@ -141,184 +158,49 @@ describe("ProfileSecurityScreen", () => {
     });
   });
 
-  it("changes the password from the security page and signs out all sessions", async () => {
-    const signInWithPassword = vi.fn().mockResolvedValue({ error: null });
-    const updateUser = vi.fn().mockResolvedValue({ error: null });
-    const signOut = vi.fn().mockResolvedValue({ error: null });
-    getSupabaseClient.mockReturnValue({
-      auth: {
-        signInWithPassword,
-        updateUser,
-        signOut,
-      },
-    } as never);
-    handleExpiredMobileSession.mockResolvedValue(undefined);
-
+  it("routes each security flow to its own screen instead of unfolding it inline", () => {
     render(<ProfileSecurityScreen />);
 
-    expect(screen.getByRole("button", { name: "Change password" })).toBeInTheDocument();
+    // The editors that used to open in place are gone from this page.
     expect(screen.queryByLabelText("Current password")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("New password")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Confirm new password")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("6-digit verification code")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign out all devices" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Password" }));
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/password");
 
-    expect(screen.getByLabelText("Current password")).toBeInTheDocument();
-    expect(screen.getByLabelText("New password")).toBeInTheDocument();
-    expect(screen.getByLabelText("Confirm new password")).toBeInTheDocument();
-    expect(screen.getByLabelText("Current password")).toHaveAttribute("type", "password");
-    expect(screen.getByLabelText("New password")).toHaveAttribute("type", "password");
-    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "password");
-    fireEvent.click(screen.getByRole("button", { name: "Show current password" }));
-    fireEvent.click(screen.getByRole("button", { name: "Show new password" }));
-    fireEvent.click(screen.getByRole("button", { name: "Show confirm password" }));
-    expect(screen.getByLabelText("Current password")).toHaveAttribute("type", "text");
-    expect(screen.getByLabelText("New password")).toHaveAttribute("type", "text");
-    expect(screen.getByLabelText("Confirm new password")).toHaveAttribute("type", "text");
-    expect(screen.getByRole("button", { name: "Hide current password" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hide new password" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Hide confirm password" })).toBeInTheDocument();
-    expect(screen.getByText("At least 10 characters")).toBeInTheDocument();
-    expect(screen.getByText("Uppercase letter")).toBeInTheDocument();
-    expect(screen.getByText("Number")).toBeInTheDocument();
-    expect(screen.getByText("Symbol")).toBeInTheDocument();
-    expect(screen.queryByText("Too short")).not.toBeInTheDocument();
+    // Regex, not an exact name: these rows carry a trailing value, so their
+    // accessible name is the label plus that value.
+    fireEvent.click(screen.getByRole("button", { name: /^Two-factor authentication/ }));
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/two-factor");
 
-    fireEvent.change(screen.getByLabelText("Current password"), {
-      target: { value: "old-password" },
-    });
-    fireEvent.change(screen.getByLabelText("New password"), {
-      target: { value: "New-password-123" },
-    });
-    fireEvent.change(screen.getByLabelText("Confirm new password"), {
-      target: { value: "New-password-123" },
-    });
-    expect(screen.getByText("Strong")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Update password" }));
-
-    expect(screen.getByText("Update password?")).toBeInTheDocument();
-    expect(
-      screen.getByText("You'll be signed out of every device after the password is updated."),
-    ).toBeInTheDocument();
-
-    await act(async () => {
-      fireEvent.click(
-        within(screen.getByRole("alert")).getByRole("button", {
-          name: "Update and sign out",
-        }),
-      );
-    });
-
-    await waitFor(() => {
-      expect(signInWithPassword).toHaveBeenCalledWith({
-        email: "mina@dubgrid.com",
-        password: "old-password",
-      });
-      expect(updateUser).toHaveBeenCalledWith({
-        password: "New-password-123",
-      });
-      expect(signOut).toHaveBeenCalledWith({ scope: "global" });
-      expect(handleExpiredMobileSession).toHaveBeenCalledWith({
-        skipSignOut: true,
-      });
-    });
+    fireEvent.click(screen.getByRole("button", { name: /^Signed-in devices/ }));
+    expect(routerPush).toHaveBeenCalledWith("/(tabs)/profile/sessions");
   });
 
-  it("enrolls in two-factor authentication with a manually-entered secret", async () => {
-    const listFactors = vi.fn().mockResolvedValue({
-      data: { all: [], totp: [] },
-      error: null,
-    });
-    const enroll = vi.fn().mockResolvedValue({
-      data: { id: "factor-1", totp: { secret: "SECRET123" } },
-      error: null,
-    });
-    const challengeAndVerify = vi.fn().mockResolvedValue({ data: {}, error: null });
-    getSupabaseClient.mockReturnValue({
-      auth: {
-        mfa: { listFactors, enroll, challengeAndVerify, unenroll: vi.fn() },
-      },
-    } as never);
-
+  it("summarises two-factor status and the signed-in device count on the rows", () => {
     render(<ProfileSecurityScreen />);
 
     expect(screen.getByText("Not enabled")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Enable 2FA" }));
-
-    await waitFor(() => {
-      expect(enroll).toHaveBeenCalledWith({
-        factorType: "totp",
-        friendlyName: "DubGrid Mobile Authenticator",
-      });
-    });
-
-    expect(await screen.findByText("SECRET123")).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("6-digit verification code"), {
-      target: { value: "123456" },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Verify & enable" }));
-
-    await waitFor(() => {
-      expect(challengeAndVerify).toHaveBeenCalledWith({ factorId: "factor-1", code: "123456" });
-      expect(updateProfileMfaStatus).toHaveBeenCalledWith("token-123", { enabled: true });
-    });
+    expect(screen.getByText("2 devices signed in")).toBeInTheDocument();
   });
 
-  it("disables two-factor authentication after confirming", async () => {
-    const unenroll = vi.fn().mockResolvedValue({ error: null });
-    const listFactors = vi.fn().mockResolvedValue({
-      data: {
-        all: [{ id: "factor-1", factor_type: "totp", status: "verified" }],
-        totp: [{ id: "factor-1", factor_type: "totp", status: "verified" }],
-      },
-      error: null,
-    });
-    getSupabaseClient.mockReturnValue({
-      auth: {
-        mfa: { listFactors, unenroll, enroll: vi.fn(), challengeAndVerify: vi.fn() },
-      },
-    } as never);
+  it("waits for the sessions query before painting, so there is no second loading wave", () => {
     useQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
       const key = queryKey.join(":");
       if (key.includes("sessions")) {
-        return {
-          data: { active: [], stale: [] },
-          error: null,
-          isLoading: false,
-          refetch: vi.fn(),
-        };
+        return { data: undefined, error: null, isLoading: true, refetch: vi.fn() };
       }
 
-      return {
-        data: {
-          user: { email: "mina@dubgrid.com", mfaEnabled: true },
-          pendingAccountDeletionRequest: false,
-        },
-        error: null,
-        isLoading: false,
-        refetch: vi.fn(),
-      };
+      return { data: profileData, error: null, isLoading: false, refetch: vi.fn() };
     });
 
     render(<ProfileSecurityScreen />);
 
-    expect(screen.getByText("Enabled")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Disable 2FA" }));
-
-    expect(screen.getByText("Disable two-factor authentication?")).toBeInTheDocument();
-
-    await act(async () => {
-      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Disable" }));
-    });
-
-    await waitFor(() => {
-      expect(unenroll).toHaveBeenCalledWith({ factorId: "factor-1" });
-      expect(updateProfileMfaStatus).toHaveBeenCalledWith("token-123", { enabled: false });
-    });
+    // The profile query has resolved, but the page must not paint its rows
+    // with a device count still missing.
+    expect(screen.queryByText("Not enabled")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Signed-in devices/ })).not.toBeInTheDocument();
   });
 
   it("turns on app lock when the device has biometrics enrolled", async () => {
@@ -355,5 +237,36 @@ describe("ProfileSecurityScreen", () => {
       );
       expect(appLockSwitch).not.toBeChecked();
     });
+  });
+
+  it("requests account deletion after confirming, for a user who can't edit their own record", async () => {
+    const mutate = vi.fn();
+    useMutation.mockReturnValue({ isPending: false, mutate, mutateAsync: vi.fn() });
+    useBootstrap.mockReturnValue({
+      data: { permissions: { canManageEmployees: false } },
+      error: null,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<ProfileSecurityScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Request account deletion" }));
+
+    expect(screen.getByText("Request account deletion?")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Request" }));
+    });
+
+    expect(mutate).toHaveBeenCalled();
+  });
+
+  it("hides account deletion from a user who can edit employee records", () => {
+    render(<ProfileSecurityScreen />);
+
+    expect(
+      screen.queryByRole("button", { name: "Request account deletion" }),
+    ).not.toBeInTheDocument();
   });
 });

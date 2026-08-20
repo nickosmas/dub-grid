@@ -37,6 +37,7 @@ import type {
   FullAuditLogEntry,
   OrganizationBillingSummary,
 } from "@/types";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 function formatDate(value: string | null): string {
   if (!value) return "--";
@@ -923,8 +924,14 @@ export default function BillingSettings({ organization }: { organization: { id: 
                         !featureFlags.stripe
                       }
                     >
-                      <ExternalLink size={15} aria-hidden="true" />
-                      {openingCheckout || openingPortal ? "Opening..." : primaryAction}
+                      <ButtonLoading
+                        loading={openingCheckout || openingPortal}
+                        loadingLabel="Opening"
+                        spinnerSize={15}
+                        icon={<ExternalLink size={15} aria-hidden="true" />}
+                      >
+                        {primaryAction}
+                      </ButtonLoading>
                     </button>
                   </MaybeHint>
                 </div>

@@ -1,33 +1,53 @@
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  ORG_ROLE_LABELS,
+  getHighlightedOrgRole,
+  getOrgRoleLabel,
+  type OrgRole,
+} from "@dubgrid/domain";
+import {
+  mobileRadii,
+  mobileText,
+  mobileTextWeighted,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 
-type MobileOrgRole = "super_admin" | "admin" | "user" | null;
-type OrgRole = NonNullable<MobileOrgRole>;
-type HighlightedOrgRole = Extract<OrgRole, "super_admin" | "admin">;
+type MobileOrgRole = OrgRole | null;
 
-export const MOBILE_ORG_ROLE_LABELS: Record<OrgRole, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  user: "User",
-};
+// The labels and the which-roles-get-badged rule are shared with web via
+// `@dubgrid/domain`; only the styling below is mobile-specific.
+export { ORG_ROLE_LABELS, getHighlightedOrgRole };
 
-export function getHighlightedMobileOrgRole(
-  role: MobileOrgRole | null | undefined,
-): HighlightedOrgRole | null {
-  return role === "super_admin" || role === "admin" ? role : null;
+/**
+ * Which access badge a hero prints, with no styling attached.
+ *
+ * `ProfileHero` owns the pill itself, so a hero only ever needed the label and
+ * the tone — the styled factory below is for the rows that draw their own pill
+ * (the People list). Unlike that one this never returns null: a hero badges
+ * every tier, User included, because on a page about one person the access
+ * level is a fact about them rather than a highlight on a list.
+ */
+export function getMobileOrgRoleHeroBadge(role: MobileOrgRole | null | undefined): {
+  label: string;
+  tone: "brand" | "warning";
+} {
+  return {
+    label: getOrgRoleLabel(role),
+    tone: getHighlightedOrgRole(role) === "super_admin" ? "warning" : "brand",
+  };
 }
 
 export function getMobileOrgRoleBadge(
   mobileColors: MobileColors,
   role: MobileOrgRole | null | undefined,
 ) {
-  const highlightedRole = getHighlightedMobileOrgRole(role);
+  const highlightedRole = getHighlightedOrgRole(role);
   if (!highlightedRole) {
     return null;
   }
 
   if (highlightedRole === "super_admin") {
     return {
-      label: MOBILE_ORG_ROLE_LABELS[highlightedRole],
+      label: ORG_ROLE_LABELS[highlightedRole],
       tone: "warning" as const,
       containerStyle: {
         alignItems: "center" as const,
@@ -40,15 +60,14 @@ export function getMobileOrgRoleBadge(
         paddingVertical: 4,
       },
       textStyle: {
-        ...mobileText.caption,
+        ...mobileTextWeighted("caption", "bold"),
         color: mobileColors.warningText,
-        fontWeight: "700" as const,
       },
     };
   }
 
   return {
-    label: MOBILE_ORG_ROLE_LABELS[highlightedRole],
+    label: ORG_ROLE_LABELS[highlightedRole],
     tone: "brand" as const,
     containerStyle: {
       alignItems: "center" as const,
@@ -61,9 +80,8 @@ export function getMobileOrgRoleBadge(
       paddingVertical: 4,
     },
     textStyle: {
-      ...mobileText.caption,
+      ...mobileTextWeighted("caption", "bold"),
       color: mobileColors.brand,
-      fontWeight: "700" as const,
     },
   };
 }

@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated from "react-native-reanimated";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MobileDepartment,
+  MobileManagementUser,
+  MobileManagementUserInviteBody,
   MobilePerson,
   MobileProfileChangeRequest,
 } from "@dubgrid/contracts";
@@ -18,26 +21,44 @@ import {
   SelectionSection,
 } from "../../../shared/components/FilterSheet";
 import { SearchBar } from "../../../shared/components/SearchBar";
-import { ListSkeleton } from "../../../shared/components/Skeleton";
+import { AnimatedListItem } from "../../../shared/motion/AnimatedListItem";
+import { usePressAnimation } from "../../../shared/motion/usePressAnimation";
+import { PressableRow } from "../../../shared/components/PressableRow";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
+import { SegmentedControl } from "../../../shared/components/SegmentedControl";
 import {
   getAdminProfileChangeRequests,
+  getManagementUsers,
   getPeople,
+  inviteMobileManagementUser,
   updateProfileChangeRequest,
 } from "../../../shared/lib/api";
 import { getAvatarTone } from "../../../shared/lib/avatar-tone";
+import { getDepartmentNames } from "../../../shared/lib/departments";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import {
+  mobileMotion,
+  mobileRadii,
+  mobileText,
+  type MobileColors,
+} from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
+import { ManagementUserActionsSheet } from "../components/ManagementUserActionsSheet";
+import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
+import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 type StatusFilter = "active" | "inactive";
+/** Which half of the directory the list is showing, mirroring web's toggle. */
+type RosterTab = "schedule" | "management";
 type SortMode = "seniority" | "alphabetical";
 type MobileOrgRole = "super_admin" | "admin" | "user" | null;
 type ProfileRequestConfirmation = {
@@ -67,13 +88,29 @@ export default function PeopleScreen() {
     "all",
   );
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+  const [rosterTab, setRosterTab] = useState<RosterTab>("schedule");
+  const [showInviteManagementUser, setShowInviteManagementUser] = useState(false);
+  /** The roster row whose actions sheet is open, for rows with no staff profile. */
+  const [managementUserActions, setManagementUserActions] = useState<MobileManagementUser | null>(
+    null,
+  );
   const [profileRequestConfirmation, setProfileRequestConfirmation] =
     useState<ProfileRequestConfirmation>(null);
   const canManageEmployees = Boolean(bootstrapQuery.data?.permissions.canManageEmployees);
+  const canManageManagementAccess = Boolean(
+    bootstrapQuery.data?.permissions.canManageManagementAccess,
+  );
   const peopleQuery = useQuery({
     queryKey: ["mobile", "people", accessToken],
     queryFn: () => getPeople(accessToken!),
     enabled: Boolean(accessToken),
+  });
+  // The roster is a different union from the staff directory: it includes
+  // people with no `employees` row at all, who the people endpoint can't see.
+  const managementUsersQuery = useQuery({
+    queryKey: ["mobile", "management-users", accessToken],
+    queryFn: () => getManagementUsers(accessToken!),
+    enabled: Boolean(accessToken) && (canManageManagementAccess || canManageEmployees),
   });
   const profileRequestsQuery = useQuery({
     queryKey: ["mobile", "profile-change-requests", "admin", accessToken],
@@ -99,8 +136,33 @@ export default function PeopleScreen() {
       });
     },
   });
+  const inviteManagementUserMutation = useMutation({
+    mutationFn: (body: MobileManagementUserInviteBody) =>
+      inviteMobileManagementUser(accessToken!, body),
+    onSuccess: async () => {
+      setShowInviteManagementUser(false);
+      await managementUsersQuery.refetch();
+      pushToast({
+        tone: "success",
+        title: "Management invitation sent",
+        message: "They'll join management once they accept.",
+      });
+    },
+    onError: (error) => {
+      pushClientFriendlyErrorToast(pushToast, {
+        error,
+        title: "Could not send invitation",
+        fallbackMessage: "We couldn't send that management invitation right now.",
+      });
+    },
+  });
   const manualRefresh = useManualRefresh(() =>
-    Promise.all([peopleQuery.refetch(), bootstrapQuery.refetch(), profileRequestsQuery.refetch()]),
+    Promise.all([
+      peopleQuery.refetch(),
+      bootstrapQuery.refetch(),
+      profileRequestsQuery.refetch(),
+      managementUsersQuery.refetch(),
+    ]),
   );
   function clearFilters() {
     setFocusFilterId("all");
@@ -136,6 +198,10 @@ export default function PeopleScreen() {
       ),
     [bootstrapQuery.data?.departments],
   );
+  // The toggle only appears where there is a second half to switch to: web
+  // hides it for orgs with no management departments for the same reason.
+  const canSeeManagementRoster =
+    (canManageManagementAccess || canManageEmployees) && managementDepartments.length > 0;
   const filteredPeople = useMemo(() => {
     const normalizedSearch = searchValue.trim().toLowerCase();
 
@@ -200,19 +266,51 @@ export default function PeopleScreen() {
     (canManageEmployees && statusFilter === "inactive" ? 1 : 0) +
     (sortMode === "alphabetical" ? 1 : 0);
   const peopleError = peopleQuery.error ?? bootstrapQuery.error;
+  const isManagementTab = rosterTab === "management" && canSeeManagementRoster;
+  const managementUsers = managementUsersQuery.data?.managementUsers ?? [];
+  const filteredManagementUsers = useMemo(() => {
+    const normalizedSearch = searchValue.trim().toLowerCase();
+    return managementUsers.filter((managementUser) => {
+      const fullName = `${managementUser.firstName} ${managementUser.lastName}`
+        .trim()
+        .toLowerCase();
+      const matchesSearch =
+        !normalizedSearch ||
+        fullName.includes(normalizedSearch) ||
+        managementUser.email.toLowerCase().includes(normalizedSearch) ||
+        managementUser.phone.toLowerCase().includes(normalizedSearch);
+      const matchesDepartment =
+        managementDepartmentFilterId === "all"
+          ? true
+          : managementUser.managementDepartmentIds.includes(managementDepartmentFilterId);
+      return matchesSearch && matchesDepartment;
+    });
+  }, [managementDepartmentFilterId, managementUsers, searchValue]);
   const currentUserId = bootstrapQuery.data?.user?.id ?? null;
   const currentEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
-  const contentState = getMobileQueryContentState({
-    hasData: peopleQuery.data !== undefined,
-    isLoading: peopleQuery.isLoading || bootstrapQuery.isLoading,
+  const contentState = useMobileContentState({
+    // Bootstrap is in both halves. `canManageEmployees` decides which people
+    // are visible at all, so clearing the skeleton on the people query alone
+    // shows a list that then rewrites itself when bootstrap lands.
+    //
+    // The roster is folded in the same way, but only once bootstrap says the
+    // viewer can see it — naming a disabled query here unconditionally would
+    // pin `hasData` false forever, since a disabled query never resolves.
+    hasData:
+      peopleQuery.data !== undefined &&
+      bootstrapQuery.data !== undefined &&
+      (!canSeeManagementRoster || managementUsersQuery.data !== undefined),
+    isLoading: peopleQuery.isLoading || bootstrapQuery.isLoading || managementUsersQuery.isLoading,
     error: peopleError,
   });
 
   return (
     <Screen
+      // The only field here is the search bar at the top, which the keyboard
+      // never covers. Insetting for it just collapses the large title and
+      // jumps the page open.
+      adjustsForKeyboard={false}
       bottomPaddingMode="tabbed"
-      title="People"
-      subtitle="People"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
@@ -291,11 +389,24 @@ export default function PeopleScreen() {
       </FilterSheet>
 
       <View style={styles.section}>
+        {canSeeManagementRoster ? (
+          <View style={styles.rosterTabs}>
+            <SegmentedControl
+              accessibilityLabel="Directory section"
+              onChange={setRosterTab}
+              options={[
+                { value: "schedule", label: "Schedule", count: visiblePeople.length },
+                { value: "management", label: "Management", count: managementUsers.length },
+              ]}
+              value={rosterTab}
+            />
+          </View>
+        ) : null}
         <View style={styles.searchBarRow}>
           <SearchBar
             accessibilityLabel="Search people"
             onChangeText={setSearchValue}
-            placeholder="Search people"
+            placeholder={isManagementTab ? "Search management" : "Search people"}
             value={searchValue}
           />
           <FilterButton
@@ -304,16 +415,18 @@ export default function PeopleScreen() {
             expanded={isFilterModalVisible}
             onPress={() => setIsFilterModalVisible(true)}
           />
-          {canManageEmployees ? (
-            <Pressable
+          {isManagementTab ? (
+            canManageManagementAccess ? (
+              <AddPersonButton
+                accessibilityLabel="Invite management user"
+                onPress={() => setShowInviteManagementUser(true)}
+              />
+            ) : null
+          ) : canManageEmployees ? (
+            <AddPersonButton
               accessibilityLabel="Add person"
-              accessibilityRole="button"
-              android_ripple={{ color: "rgba(15, 23, 42, 0.08)" }}
               onPress={() => router.push("/people/add")}
-              style={styles.addPersonButton}
-            >
-              <Ionicons color={mobileColors.textInverse} name="person-add-outline" size={18} />
-            </Pressable>
+            />
           ) : null}
         </View>
       </View>
@@ -365,10 +478,9 @@ export default function PeopleScreen() {
       ) : null}
 
       {contentState.kind === "loading" ? (
-        <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading directory</Text>
-          <ListSkeleton rows={4} showSectionHeader={false} />
-        </View>
+        contentState.showSkeleton ? (
+          <PersonListSkeleton rows={6} />
+        ) : null
       ) : contentState.kind === "error" && contentState.reason === "unauthorized" ? (
         <StatusBanner
           body="Your current role does not include mobile staff visibility for this organization."
@@ -388,6 +500,85 @@ export default function PeopleScreen() {
             void peopleQuery.refetch();
           }}
         />
+      ) : isManagementTab ? (
+        managementUsers.length === 0 ? (
+          <EmptyStateCard
+            fillScreen
+            body="Nobody has management access yet. Invite someone, or add a teammate to management from their staff profile."
+            iconName="briefcase-outline"
+            title="No management users yet"
+          />
+        ) : filteredManagementUsers.length === 0 ? (
+          <EmptyStateCard
+            fillScreen
+            body="Try a different name, email, or management department."
+            iconName="search-outline"
+            title="No matches"
+          />
+        ) : (
+          <View style={styles.section}>
+            <View>
+              {filteredManagementUsers.map((managementUser, index) => {
+                const isSelf = Boolean(
+                  currentUserId && managementUser.userId && managementUser.userId === currentUserId,
+                );
+                const departmentNames = getDepartmentNames(
+                  managementUser.managementDepartmentIds,
+                  managementDepartments,
+                );
+
+                return (
+                  <AnimatedListItem index={index} key={managementUser.id}>
+                    <PersonRow
+                      accessHint={
+                        managementUser.source === "pending_invite"
+                          ? "Invitation pending"
+                          : "App access"
+                      }
+                      id={managementUser.id}
+                      employmentType={null}
+                      isLast={index === filteredManagementUsers.length - 1}
+                      name={
+                        `${managementUser.firstName} ${managementUser.lastName}`.trim() ||
+                        managementUser.email ||
+                        "Unnamed person"
+                      }
+                      navigable
+                      orgRole={managementUser.orgRole}
+                      onPress={() => {
+                        // Every row opens the one profile page there is. Your
+                        // own goes to the profile tab, which owns the only page
+                        // that can edit you; everyone else's opens their staff
+                        // profile, which carries their management access along
+                        // with the rest of their record.
+                        if (isSelf) {
+                          router.push("/(tabs)/profile");
+                          return;
+                        }
+                        if (managementUser.employeeId) {
+                          router.push({
+                            pathname: "/(tabs)/people/[id]",
+                            params: { id: managementUser.employeeId },
+                          });
+                          return;
+                        }
+                        // No staff profile to open: a management-only
+                        // invitation has no `employees` row until it is
+                        // accepted. Its handful of actions come up here.
+                        setManagementUserActions(managementUser);
+                      }}
+                      showStatus={false}
+                      status="active"
+                      subtitle={
+                        departmentNames.join(", ") || managementUser.email || "No departments"
+                      }
+                    />
+                  </AnimatedListItem>
+                );
+              })}
+            </View>
+          </View>
+        )
       ) : visiblePeople.length === 0 ? (
         <EmptyStateCard
           fillScreen
@@ -404,7 +595,9 @@ export default function PeopleScreen() {
         />
       ) : (
         <View style={styles.section}>
-          <View style={styles.linkList}>
+          {/* The directory sits straight on the page background: no card
+              surface, rows aligned with the screen gutters. */}
+          <View>
             {filteredPeople.map((person, index) => {
               const focusAreasForPerson = person.focusAreaIds
                 .map((focusAreaId) => focusAreaMap.get(focusAreaId) ?? null)
@@ -429,34 +622,48 @@ export default function PeopleScreen() {
                 isSelf || canManageEmployees || !person.managementDepartmentIds?.length;
 
               return (
-                <PersonRow
-                  key={person.id}
-                  accessHint={canManageEmployees ? accessHint : null}
-                  id={person.id}
-                  employmentType={person.employmentType}
-                  isLast={index === filteredPeople.length - 1}
-                  name={getFullName(person)}
-                  navigable={navigable}
-                  orgRole={person.orgRole}
-                  onPress={() => {
-                    if (isSelf) {
-                      router.push("/(tabs)/profile");
-                      return;
-                    }
-                    router.push({
-                      pathname: "/(tabs)/people/[id]",
-                      params: { id: person.id },
-                    });
-                  }}
-                  showStatus={canManageEmployees}
-                  status={person.status}
-                  subtitle={subtitle}
-                />
+                <AnimatedListItem index={index} key={person.id}>
+                  <PersonRow
+                    accessHint={canManageEmployees ? accessHint : null}
+                    id={person.id}
+                    employmentType={person.employmentType}
+                    isLast={index === filteredPeople.length - 1}
+                    name={getFullName(person)}
+                    navigable={navigable}
+                    orgRole={person.orgRole}
+                    onPress={() => {
+                      if (isSelf) {
+                        router.push("/(tabs)/profile");
+                        return;
+                      }
+                      router.push({
+                        pathname: "/(tabs)/people/[id]",
+                        params: { id: person.id },
+                      });
+                    }}
+                    showStatus={canManageEmployees}
+                    status={person.status}
+                    subtitle={subtitle}
+                  />
+                </AnimatedListItem>
               );
             })}
           </View>
         </View>
       )}
+      <ManagementUserActionsSheet
+        managementDepartments={managementDepartments}
+        managementUser={managementUserActions}
+        onDismiss={() => setManagementUserActions(null)}
+      />
+
+      <ManagementUserInviteSheet
+        isPending={inviteManagementUserMutation.isPending}
+        managementDepartments={managementDepartments}
+        onDismiss={() => setShowInviteManagementUser(false)}
+        onSubmit={(body) => inviteManagementUserMutation.mutate(body)}
+        visible={showInviteManagementUser}
+      />
       <ConfirmationModal
         body={
           profileRequestConfirmation?.request.type === "account_deletion" &&
@@ -467,10 +674,13 @@ export default function PeopleScreen() {
               : "The teammate's profile will stay as it is."
         }
         confirmLabel={profileRequestConfirmation?.action === "approve" ? "Approve" : "Reject"}
+        confirmPendingLabel={
+          profileRequestConfirmation?.action === "approve" ? "Approving" : "Rejecting"
+        }
         confirmTone={
           profileRequestConfirmation?.request.type === "account_deletion" &&
           profileRequestConfirmation.action === "approve"
-            ? "dangerFilled"
+            ? "danger"
             : profileRequestConfirmation?.action === "reject"
               ? "danger"
               : "primary"
@@ -499,6 +709,39 @@ function countPeopleInManagementDepartment(
     .length;
 }
 
+/**
+ * A circle rather than the shared `<Button iconOnly>`, which caps at 44 and
+ * would sit two points shorter than the search field it lines up with.
+ */
+function AddPersonButton({
+  accessibilityLabel,
+  onPress,
+}: {
+  accessibilityLabel: string;
+  onPress: () => void;
+}) {
+  const mobileColors = useMobileColors();
+  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
+    rippleBorderless: true,
+    rippleColor: mobileColors.ripplePrimary,
+    scale: mobileMotion.press.iconOnlyScale,
+  });
+
+  return (
+    <AnimatedPressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      android_ripple={androidRipple}
+      onPress={onPress}
+      {...pressHandlers}
+      style={[styles.addPersonButton, animatedStyle]}
+    >
+      <Ionicons color={mobileColors.textInverse} name="person-add-outline" size={18} />
+    </AnimatedPressable>
+  );
+}
+
 function PersonRow({
   id,
   employmentType,
@@ -513,7 +756,8 @@ function PersonRow({
   onPress,
 }: {
   id: string;
-  employmentType: MobilePerson["employmentType"];
+  /** Null for a management-only user, who was never on the schedule. */
+  employmentType: MobilePerson["employmentType"] | null;
   name: string;
   navigable: boolean;
   orgRole: MobileOrgRole;
@@ -528,7 +772,7 @@ function PersonRow({
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { resolvedTheme } = useThemeMode();
   const secondaryDetail = [
-    employmentType === "part_time" ? "PT" : "FT",
+    employmentType === null ? null : employmentType === "part_time" ? "PT" : "FT",
     accessHint,
     showStatus ? formatStatusLabel(status) : null,
   ]
@@ -545,18 +789,11 @@ function PersonRow({
       .join("") || "?";
 
   return (
-    <Pressable
+    <PressableRow
       accessibilityLabel={name}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !navigable }}
-      android_ripple={navigable ? { color: "rgba(15, 23, 42, 0.08)" } : undefined}
       disabled={!navigable}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.personRow,
-        !isLast && styles.personRowDivider,
-        navigable && pressed && styles.personRowPressed,
-      ]}
+      style={[styles.personRow, !isLast && styles.personRowDivider]}
     >
       <View
         style={[
@@ -592,19 +829,12 @@ function PersonRow({
       {navigable ? (
         <Ionicons color={mobileColors.textSubtle} name="chevron-forward" size={22} />
       ) : null}
-    </Pressable>
+    </PressableRow>
   );
 }
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    loadingState: {
-      gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
-    },
     section: {
       gap: 10,
     },
@@ -618,10 +848,18 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       gap: 10,
     },
+    rosterTabs: {
+      // The control sizes to its own labels, so it needs a start-aligned row
+      // rather than stretching across the gutter.
+      alignItems: "flex-start",
+      marginBottom: 10,
+    },
     addPersonButton: {
       alignItems: "center",
       backgroundColor: mobileColors.brand,
-      borderRadius: mobileRadii.control,
+      // Circular: 46 square at the pill radius, matching the search field's
+      // height and the filter pill beside it.
+      borderRadius: mobileRadii.pill,
       height: 46,
       justifyContent: "center",
       width: 46,
@@ -630,7 +868,7 @@ const createStyles = (mobileColors: MobileColors) =>
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
       borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
+      borderColor: mobileColors.cardBorder,
       overflow: "hidden",
     },
     personRow: {
@@ -638,7 +876,6 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       gap: 12,
       minHeight: 76,
-      paddingHorizontal: 16,
       paddingVertical: 12,
     },
     personRowDivider: {
@@ -661,9 +898,6 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 8,
-    },
-    personRowPressed: {
-      opacity: 0.62,
     },
     personAvatar: {
       alignItems: "center",

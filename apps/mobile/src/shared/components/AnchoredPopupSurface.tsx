@@ -1,8 +1,8 @@
 import { useMemo, type PropsWithChildren } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { StyleSheet, View } from "react-native";
-import { mobileRadii, type MobileColors } from "../theme/tokens";
-import { useMobileColors } from "../providers/ThemeModeProvider";
+import { mobileElevation, mobileRadii, type MobileColors } from "../theme/tokens";
+import { useIsDarkMode, useMobileColors } from "../providers/ThemeModeProvider";
 
 export function AnchoredPopupSurface({
   children,
@@ -13,7 +13,8 @@ export function AnchoredPopupSurface({
   accessibilityLabel?: string;
 }>) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   return (
     <View
       accessibilityLabel={accessibilityLabel}
@@ -25,21 +26,14 @@ export function AnchoredPopupSurface({
   );
 }
 
-const createStyles = (mobileColors: MobileColors) =>
+const createStyles = (mobileColors: MobileColors, isDark: boolean) =>
   StyleSheet.create({
     surface: {
       position: "absolute",
       backgroundColor: mobileColors.surface,
       borderRadius: mobileRadii.card,
-      borderWidth: 1,
+      borderWidth: isDark ? 1 : 0,
       borderColor: mobileColors.borderSubtle,
-      shadowColor: mobileColors.shadowStrong,
-      shadowOffset: {
-        width: 0,
-        height: 10,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 20,
-      elevation: 6,
+      ...mobileElevation("float", isDark),
     },
   });

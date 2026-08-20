@@ -1,7 +1,28 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import type { ErrorBoundaryProps } from "expo-router";
 import { Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
 import { useTabsGate } from "../../src/features/auth/hooks/useTabsGate";
+import { RouteErrorScreen } from "../../src/shared/components/RouteErrorScreen";
 import { useMobileColors, useThemeMode } from "../../src/shared/providers/ThemeModeProvider";
+import { mobileTypography } from "../../src/shared/theme/tokens";
+
+/**
+ * Keeps a crash inside the authed tab tree from unmounting the whole app —
+ * the provider tree above stays alive, so "Try again" can actually recover.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <RouteErrorScreen
+      actionLabel="Try again"
+      body="Something went wrong loading this tab. Trying again usually clears it."
+      detail={error.message}
+      onAction={() => {
+        void retry();
+      }}
+      title="This tab ran into a problem"
+    />
+  );
+}
 
 export default function TabsLayout() {
   const gate = useTabsGate();
@@ -99,13 +120,13 @@ export default function TabsLayout() {
       labelStyle={{
         default: {
           color: mobileColors.textSubtle,
+          fontFamily: mobileTypography.fontFamily.semibold,
           fontSize: 11,
-          fontWeight: "600",
         },
         selected: {
           color: mobileColors.brand,
+          fontFamily: mobileTypography.fontFamily.bold,
           fontSize: 11,
-          fontWeight: "700",
         },
       }}
       minimizeBehavior="never"

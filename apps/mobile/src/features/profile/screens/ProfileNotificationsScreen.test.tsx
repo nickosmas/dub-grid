@@ -92,12 +92,13 @@ describe("ProfileNotificationsScreen", () => {
     useMutation.mockReturnValue({ isPending: false, mutate: vi.fn() });
   });
 
-  it("shows a loading skeleton while preferences are loading", () => {
+  it("shows a loading skeleton while preferences are loading", async () => {
     useQuery.mockReturnValue({ data: undefined, isLoading: true, error: null, refetch: vi.fn() });
 
     render(<ProfileNotificationsScreen />);
 
-    expect(screen.getByTestId("detail-skeleton")).toBeInTheDocument();
+    expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("skeleton")).toBeInTheDocument();
   });
 
   it("shows an error state with retry when preferences fail to load", () => {
@@ -116,7 +117,7 @@ describe("ProfileNotificationsScreen", () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it("renders category toggles reflecting the loaded preferences", () => {
+  it("summarises each category's channels on its row, with the switches behind it", () => {
     useQuery.mockReturnValue({
       data: {
         prefs: {
@@ -135,11 +136,16 @@ describe("ProfileNotificationsScreen", () => {
     expect(screen.getByText("Schedule updates")).toBeInTheDocument();
     expect(screen.getByText("Shift requests")).toBeInTheDocument();
     expect(screen.getByText("System & account")).toBeInTheDocument();
-    expect(screen.getAllByText("In-app")).toHaveLength(3);
-    expect(screen.getAllByText("Email")).toHaveLength(3);
+
+    // The row says what is on; six switches no longer sit open on the page.
+    expect(screen.getByText("In-app, Email")).toBeInTheDocument();
+    expect(screen.getByText("Off")).toBeInTheDocument();
+    expect(screen.getByText("In-app")).toBeInTheDocument();
+    expect(screen.queryByLabelText("In-app notifications")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Email notifications")).not.toBeInTheDocument();
   });
 
-  it("optimistically writes and saves a toggled category preference", () => {
+  it("optimistically writes and saves a preference toggled in the category sheet", () => {
     const mutate = vi.fn();
     useMutation.mockReturnValue({ isPending: false, mutate });
     useQuery.mockReturnValue({
@@ -157,8 +163,11 @@ describe("ProfileNotificationsScreen", () => {
 
     render(<ProfileNotificationsScreen />);
 
-    const [firstInAppToggle] = screen.getAllByText("In-app");
-    fireEvent.click(firstInAppToggle);
+    fireEvent.click(screen.getByRole("button", { name: /^Schedule updates/ }));
+
+    const inAppSwitch = screen.getByLabelText("In-app notifications");
+    expect(inAppSwitch).toBeChecked();
+    fireEvent.click(inAppSwitch);
 
     expect(setQueryData).toHaveBeenCalledWith(["mobile", "notification-preferences", "token-123"], {
       prefs: {

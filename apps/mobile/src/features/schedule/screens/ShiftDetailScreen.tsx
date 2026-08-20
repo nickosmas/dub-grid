@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState } from "react";
-import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -10,14 +10,18 @@ import {
   type MobileShiftRequest,
 } from "@dubgrid/contracts";
 import { indefiniteArticle } from "@dubgrid/domain";
-import { getAvatarTone, resolveShiftPillColors } from "@dubgrid/design-tokens";
+import { getAvatarTone } from "@dubgrid/design-tokens";
+import {
+  BottomSheetModal,
+  SheetActions,
+  SheetHeader,
+} from "../../../shared/components/BottomSheetModal";
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { ModalHeader } from "../../../shared/components/ModalHeader";
-import { DetailSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
 import { Card, Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { ShiftDetailSkeleton } from "../components/ShiftDetailSkeleton";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
@@ -29,7 +33,9 @@ import {
   getShiftSwapOptions,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import { getMobileQueryContentState, getQueryErrorMessage } from "../../../shared/lib/query-state";
+import { getQueryErrorMessage } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
 import {
   useIsDarkMode,
   useMobileColors,
@@ -38,8 +44,10 @@ import {
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
+  mobileDarkenTone,
   mobileRadii,
   mobileText,
+  mobileVisiblePillBorder,
   type MobileColors,
 } from "../../../shared/theme/tokens";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
@@ -100,22 +108,23 @@ import {
   type RequestMode,
   type ShiftmateSegmentGroup,
 } from "../lib/shiftDetailHelpers";
+import {
+  ACTION_SEGMENT_OPTION_RADIUS,
+  ACTION_SEGMENT_PANEL_PADDING,
+  ACTION_SEGMENT_PANEL_RADIUS,
+  createStyles,
+} from "./shiftDetailScreenStyles";
 
 type CoverageRequestType = "pickup" | "calloff" | null;
 type ShiftDetailConfirmation = {
   title: string;
   body: string;
   confirmLabel: string;
-  confirmTone?: "primary" | "dangerFilled";
+  confirmPendingLabel: string;
+  confirmTone?: "primary" | "danger";
   onConfirm: () => void;
 } | null;
 const SWAP_SCHEDULE_LOOKAHEAD_DAYS = MAX_MOBILE_SCHEDULE_RANGE_DAYS;
-const ACTION_SEGMENT_PANEL_RADIUS = mobileRadii.card;
-const ACTION_SEGMENT_PANEL_PADDING = 14;
-const ACTION_SEGMENT_OPTION_RADIUS = Math.min(
-  ACTION_SEGMENT_PANEL_RADIUS - 4,
-  Math.max(8, ACTION_SEGMENT_PANEL_RADIUS - ACTION_SEGMENT_PANEL_PADDING / 2),
-);
 const ACTIVE_SHIFT_REQUEST_STATUSES = new Set<MobileShiftRequest["status"]>([
   "open",
   "pending_approval",
@@ -136,39 +145,6 @@ type AbsenceColorSource = Pick<
   "shiftColor" | "shiftBorderColor" | "shiftTextColor"
 >;
 type EyebrowDisplay = "inside" | "outside";
-
-function getRequestModalPresentationStyle(mode: RequestMode) {
-  if (Platform.OS !== "ios") {
-    return "fullScreen" as const;
-  }
-
-  if (mode === "coverage") {
-    return "formSheet" as const;
-  }
-
-  return "pageSheet" as const;
-}
-
-// User-picked hex colors from the backend are tuned for a white page and
-// read as washed-out on a dark surface — remap through the shared HSV
-// darkener. Theme tokens (mobileColors.*) are already theme-correct and
-// must NOT be passed through this a second time.
-function darkenTone(
-  tone: { backgroundColor: string; borderColor: string; textColor: string },
-  isDark: boolean,
-): { backgroundColor: string; borderColor: string; textColor: string } {
-  if (!isDark) return tone;
-
-  const resolved = resolveShiftPillColors(
-    { color: tone.backgroundColor, text: tone.textColor, border: tone.borderColor },
-    true,
-  );
-  return {
-    backgroundColor: resolved.color,
-    borderColor: resolved.border,
-    textColor: resolved.text,
-  };
-}
 
 function buildDetailJobChip(
   mobileColors: MobileColors,
@@ -193,10 +169,13 @@ function buildDetailJobChip(
     return {
       kind: "job",
       label: trimmedLabel,
-      ...darkenTone(
+      ...mobileDarkenTone(
         {
           backgroundColor: jobColor,
-          borderColor: jobBorderColor ?? jobColor,
+          borderColor: mobileVisiblePillBorder(
+            jobBorderColor,
+            jobTextColor ?? mobileColors.textMuted,
+          ),
           textColor: jobTextColor ?? mobileColors.textMuted,
         },
         isDark,
@@ -256,10 +235,13 @@ function buildDetailAbsenceChip(
       kind: "absence",
       label: trimmedLabel,
       eyebrowLabel: "Absence",
-      ...darkenTone(
+      ...mobileDarkenTone(
         {
           backgroundColor: absenceColor,
-          borderColor: absenceBorderColor ?? absenceColor,
+          borderColor: mobileVisiblePillBorder(
+            absenceBorderColor,
+            absenceTextColor ?? mobileColors.textMuted,
+          ),
           textColor: absenceTextColor ?? mobileColors.textMuted,
         },
         isDark,
@@ -435,6 +417,13 @@ export default function ShiftDetailScreen() {
       Boolean(myScheduleRange.startDate) &&
       Boolean(myScheduleRange.endDate),
   });
+  // Named rather than inline so the content-state gate below can ask the same
+  // question: a query that is never enabled is also never "resolved".
+  const canLoadTeamSchedule =
+    Boolean(accessToken) &&
+    Boolean(teamScheduleRange.startDate) &&
+    Boolean(teamScheduleRange.endDate) &&
+    (canViewTeamSchedule || needsTeamScheduleForShift);
   const teamScheduleQuery = useQuery({
     queryKey: [
       "mobile",
@@ -445,11 +434,7 @@ export default function ShiftDetailScreen() {
       teamScheduleRange.endDate,
     ],
     queryFn: () => getOrgSchedule(accessToken!, teamScheduleRange),
-    enabled:
-      Boolean(accessToken) &&
-      Boolean(teamScheduleRange.startDate) &&
-      Boolean(teamScheduleRange.endDate) &&
-      (canViewTeamSchedule || needsTeamScheduleForShift),
+    enabled: canLoadTeamSchedule,
   });
   const swapOptionsQuery = useQuery({
     queryKey: [
@@ -818,12 +803,22 @@ export default function ShiftDetailScreen() {
   const canSubmitRequest = Boolean(
     linkedEmployeeId && shiftEntry && requestMode === "swap" && selectedTargetEntry,
   );
-  const contentState = getMobileQueryContentState({
-    hasData: Boolean(shiftEntry) && Boolean(bootstrapQuery.data),
-    isLoading:
-      bootstrapQuery.isLoading ||
-      myScheduleQuery.isLoading ||
-      (needsTeamScheduleForShift && teamScheduleQuery.isLoading),
+  // The team schedule counts even when it isn't strictly needed to resolve
+  // *this* shift: the "Working with" section reads from it, so leaving it out
+  // cleared the page skeleton and then painted a second one inside that
+  // section — on your own shift, every single time. Its error is "resolved"
+  // too, because that section renders its own banner for it.
+  // `!canLoadTeamSchedule` first: the query is disabled for a user viewing
+  // their own shift without team-schedule permission, and a disabled query
+  // never resolves, so `hasData` would stay false forever and hand the error
+  // and offline branches a page that had actually loaded fine.
+  const teamScheduleResolved =
+    !canLoadTeamSchedule ||
+    teamScheduleQuery.data !== undefined ||
+    Boolean(teamScheduleQuery.error);
+  const contentState = useMobileContentState({
+    hasData: Boolean(shiftEntry) && Boolean(bootstrapQuery.data) && teamScheduleResolved,
+    isLoading: bootstrapQuery.isLoading || myScheduleQuery.isLoading || teamScheduleQuery.isLoading,
     error:
       bootstrapQuery.error ??
       myScheduleQuery.error ??
@@ -880,12 +875,11 @@ export default function ShiftDetailScreen() {
     getScheduleEntryAbsenceTypeId(shiftEntry) == null &&
     !isGeneralDetailEntry(shiftEntry),
   );
+  // No `isLoading` term: the screen's own gate now waits on the team schedule,
+  // so by the time this renders the list is either populated or errored.
   const shouldRenderShiftmatesSection = Boolean(
     shouldShowShiftmates &&
-    (teamScheduleQuery.isLoading ||
-      teamScheduleQuery.error ||
-      shiftmates.length > 0 ||
-      hasGroupedShiftmates),
+    (teamScheduleQuery.error || shiftmates.length > 0 || hasGroupedShiftmates),
   );
   const manualRefresh = useManualRefresh(() =>
     Promise.all([
@@ -915,6 +909,31 @@ export default function ShiftDetailScreen() {
     setSelectedTargetedPickupEmployeeId(null);
     setSelectedCalloffAbsenceTypeId(null);
   }
+
+  /**
+   * Anything the user has chosen inside the request sheet that a dismissal
+   * would throw away. The segment index counts: on a split shift, picking the
+   * other half is a real decision, not a default.
+   */
+  const hasUnsavedRequestInput =
+    requestMode != null &&
+    (coverageRequestType != null ||
+      selectedTargetShift != null ||
+      selectedTargetedPickupEmployeeId != null ||
+      selectedCalloffAbsenceTypeId != null ||
+      selectedRequesterSegmentIndex !== firstRequestableRequesterSegmentIndex);
+
+  // Leaving the sheet open is what makes this a guard: a dragged sheet settles
+  // back into place while the confirmation sits on top of it. Resetting the
+  // mode is also what closes the sheet, so it is the discard and the close at
+  // once.
+  const requestGuard = useUnsavedChangesGuard({
+    isDirty: hasUnsavedRequestInput,
+    disabled: createRequestMutation.isPending,
+    title: "Discard this request?",
+    body: "Your selections won't be saved.",
+    onDiscard: () => resetRequestMode(null),
+  });
 
   function submitSwapRequest() {
     if (!linkedEmployeeId || !shiftEntry || requestMode !== "swap") {
@@ -981,7 +1000,8 @@ export default function ShiftDetailScreen() {
           ? `Your ${shiftLabel} shift on ${shiftDateLabel} will be offered to teammates for pickup.`
           : `${indefiniteArticle(options?.absenceTypeLabel ?? "selected") === "an" ? "An" : "A"} ${options?.absenceTypeLabel ?? "selected"} absence will be submitted for your ${shiftLabel} shift on ${shiftDateLabel}.`,
       confirmLabel: type === "pickup" ? "Offer Shift" : "Submit Call-off",
-      confirmTone: type === "calloff" ? "dangerFilled" : "primary",
+      confirmPendingLabel: type === "pickup" ? "Offering" : "Submitting",
+      confirmTone: type === "calloff" ? "danger" : "primary",
       onConfirm: () =>
         submitCoverageRequest(type, {
           absenceTypeId: options?.absenceTypeId,
@@ -1007,6 +1027,7 @@ export default function ShiftDetailScreen() {
       title: "Send a pickup request?",
       body: `${entry.employeeName} will be asked to pick up your ${shiftLabel} shift on ${shiftDateLabel} so you can use ${absenceTypeLabel}.`,
       confirmLabel: "Send Request",
+      confirmPendingLabel: "Sending",
       onConfirm: () =>
         submitCoverageRequest("pickup", {
           targetEmpId: entry.employeeId,
@@ -1031,6 +1052,7 @@ export default function ShiftDetailScreen() {
       title: "Send this swap request?",
       body: `You'll swap your ${requesterLabel} shift on ${formatShiftDate(shiftEntry.date)} for ${selectedTargetEntry.employeeName}'s ${targetLabel} shift on ${formatShiftDate(selectedTargetEntry.date)}.`,
       confirmLabel: "Send Swap",
+      confirmPendingLabel: "Sending",
       onConfirm: submitSwapRequest,
     });
   }
@@ -1053,17 +1075,13 @@ export default function ShiftDetailScreen() {
   return (
     <Screen
       bottomPaddingMode="stack"
-      title="Shift Detail"
-      subtitle="Shift Detail"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
       {contentState.kind === "loading" ? (
-        <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading shift</Text>
-          <Text style={styles.loadingBody}>Getting the latest shift details.</Text>
-          <DetailSkeleton sections={2} />
-        </View>
+        contentState.showSkeleton ? (
+          <ShiftDetailSkeleton />
+        ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try again"
@@ -1177,9 +1195,7 @@ export default function ShiftDetailScreen() {
           {shouldRenderShiftmatesSection ? (
             <View style={styles.sectionBlock}>
               <Text style={styles.sectionTitle}>Working with</Text>
-              {teamScheduleQuery.isLoading ? (
-                <ListSkeleton rows={2} showSectionHeader={false} />
-              ) : teamScheduleQuery.error ? (
+              {teamScheduleQuery.error ? (
                 <StatusBanner
                   body={getQueryErrorMessage(
                     teamScheduleQuery.error,
@@ -1245,412 +1261,400 @@ export default function ShiftDetailScreen() {
           ) : null}
         </>
       )}
-      <Modal
-        animationType="slide"
-        allowSwipeDismissal
-        onRequestClose={() => resetRequestMode(null)}
-        presentationStyle={getRequestModalPresentationStyle(requestMode)}
+      <BottomSheetModal
+        // A request in flight can't be dragged, tapped or backed away from —
+        // the same rule the old close button enforced on its own.
+        dismissDisabled={createRequestMutation.isPending}
+        header={<SheetHeader title={getRequestModeTitle(requestMode)} />}
+        scrollable
         visible={requestMode != null}
+        onDismiss={requestGuard.requestClose}
       >
-        <Screen
-          bottomPaddingMode="modal"
-          stickyHeader={
-            <ModalHeader
-              closeDisabled={createRequestMutation.isPending}
-              title={getRequestModeTitle(requestMode)}
-              onClose={() => resetRequestMode(null)}
+        <View style={styles.modalContent}>
+          {actionSegmentOptions.length > 1 && shiftEntry ? (
+            <ActionSegmentSelector
+              disabled={createRequestMutation.isPending}
+              entry={shiftEntry}
+              isOptionDisabled={(segmentIndex) =>
+                hasScheduleEntrySegmentStarted(shiftEntry, timeZone, segmentIndex)
+              }
+              options={actionSegmentOptions}
+              selectedIndex={selectedRequesterSegmentIndex}
+              onSelect={setSelectedRequesterSegmentIndex}
             />
-          }
-          stickyHeaderTopPadding={15}
-        >
-          <View style={styles.modalContent}>
-            {actionSegmentOptions.length > 1 && shiftEntry ? (
-              <ActionSegmentSelector
-                disabled={createRequestMutation.isPending}
-                entry={shiftEntry}
-                isOptionDisabled={(segmentIndex) =>
-                  hasScheduleEntrySegmentStarted(shiftEntry, timeZone, segmentIndex)
-                }
-                options={actionSegmentOptions}
-                selectedIndex={selectedRequesterSegmentIndex}
-                onSelect={setSelectedRequesterSegmentIndex}
-              />
-            ) : null}
-            {requestMode === "coverage" ? (
-              <View style={styles.subsection}>
-                <Text style={styles.subsectionBody}>Choose how you want to drop this shift.</Text>
-                <View style={styles.coverageOptionList}>
-                  <CoverageOptionCard
-                    active={coverageRequestType === "pickup"}
-                    body="Post the shift for teammates to claim. It stays yours unless someone claims it and approval completes."
-                    disabled={createRequestMutation.isPending}
-                    onPress={() => {
-                      setCoverageRequestType("pickup");
-                      setSelectedCalloffAbsenceTypeId(null);
-                    }}
-                    title="Offer for pickup"
-                    tone="neutral"
-                  />
-                  <CoverageOptionCard
-                    active={coverageRequestType === "calloff"}
-                    body="Use this when you cannot work the shift yourself. Approval records the absence and opens coverage automatically."
-                    disabled={createRequestMutation.isPending || activeAbsenceTypes.length === 0}
-                    onPress={() => {
-                      setCoverageRequestType("calloff");
-                      setSelectedTargetedPickupEmployeeId(null);
-                    }}
-                    title="Call off"
-                    tone="danger"
-                  />
-                </View>
-                {activeAbsenceTypes.length === 0 ? (
-                  <Text style={styles.coverageNotice}>
-                    Call off is unavailable until at least one active absence type is set up.
+          ) : null}
+          {requestMode === "coverage" ? (
+            <View style={styles.subsection}>
+              <Text style={styles.subsectionBody}>Choose how you want to drop this shift.</Text>
+              <View style={styles.coverageOptionList}>
+                <CoverageOptionCard
+                  active={coverageRequestType === "pickup"}
+                  body="Post the shift for teammates to claim. It stays yours unless someone claims it and approval completes."
+                  disabled={createRequestMutation.isPending}
+                  onPress={() => {
+                    setCoverageRequestType("pickup");
+                    setSelectedCalloffAbsenceTypeId(null);
+                  }}
+                  title="Offer for pickup"
+                  tone="neutral"
+                />
+                <CoverageOptionCard
+                  active={coverageRequestType === "calloff"}
+                  body="Use this when you cannot work the shift yourself. Approval records the absence and opens coverage automatically."
+                  disabled={createRequestMutation.isPending || activeAbsenceTypes.length === 0}
+                  onPress={() => {
+                    setCoverageRequestType("calloff");
+                    setSelectedTargetedPickupEmployeeId(null);
+                  }}
+                  title="Call off"
+                  tone="danger"
+                />
+              </View>
+              {activeAbsenceTypes.length === 0 ? (
+                <Text style={styles.coverageNotice}>
+                  Call off is unavailable until at least one active absence type is set up.
+                </Text>
+              ) : null}
+              {coverageRequestType === "pickup" ? (
+                <View style={styles.modalInlinePanel}>
+                  <Text style={styles.subsectionLabel}>Offer for pickup</Text>
+                  {selectedTargetedPickupEntry ? null : (
+                    <Button
+                      disabled={createRequestMutation.isPending}
+                      label="Offer to everyone"
+                      onPress={() => confirmCoverageRequest("pickup")}
+                    />
+                  )}
+                  <Text style={styles.subsectionLabel}>Request specific person</Text>
+                  <Text style={styles.subsectionBody}>
+                    {selectedTargetedPickupEntry
+                      ? "Review your request below, then submit."
+                      : "Only teammates with an absence on this date are shown."}
                   </Text>
-                ) : null}
-                {coverageRequestType === "pickup" ? (
-                  <View style={styles.modalInlinePanel}>
-                    <Text style={styles.subsectionLabel}>Offer for pickup</Text>
-                    {selectedTargetedPickupEntry ? null : (
-                      <Button
-                        disabled={createRequestMutation.isPending}
-                        label="Offer to everyone"
-                        onPress={() => confirmCoverageRequest("pickup")}
+                  <View style={styles.swapDateFilteredList}>
+                    {targetedPickupOptions.length === 0 ? (
+                      <EmptyStateCard
+                        compact
+                        iconName="person-remove-outline"
+                        title="No absent teammates on this date"
                       />
+                    ) : (
+                      <View style={styles.swapOptions}>
+                        {(selectedTargetedPickupEntry
+                          ? [selectedTargetedPickupEntry]
+                          : targetedPickupOptions
+                        ).map((entry) => (
+                          <SwapOptionCard
+                            key={`${entry.employeeId}-${entry.date}`}
+                            active={selectedTargetedPickupEmployeeId === entry.employeeId}
+                            disabled={createRequestMutation.isPending}
+                            detailLabel={getPickupTargetDetailLabel(activeAbsenceTypes, entry)}
+                            entry={entry}
+                            showSegments={false}
+                            onPress={() => {
+                              setSelectedTargetedPickupEmployeeId(
+                                selectedTargetedPickupEmployeeId === entry.employeeId
+                                  ? null
+                                  : entry.employeeId,
+                              );
+                            }}
+                          />
+                        ))}
+                      </View>
                     )}
-                    <Text style={styles.subsectionLabel}>Request specific person</Text>
+                  </View>
+                </View>
+              ) : null}
+              {coverageRequestType === "calloff" ? (
+                <View style={styles.modalInlinePanel}>
+                  <Text style={styles.subsectionLabel}>
+                    {selectedCalloffAbsenceType ? "Absence reason" : "Select absence reason"}
+                  </Text>
+                  {selectedCalloffAbsenceType ? (
                     <Text style={styles.subsectionBody}>
-                      {selectedTargetedPickupEntry
-                        ? "Review your request below, then submit."
-                        : "Only teammates with an absence on this date are shown."}
+                      Review your call-off below, then submit.
                     </Text>
-                    <View style={styles.swapDateFilteredList}>
-                      {targetedPickupOptions.length === 0 ? (
-                        <EmptyStateCard
-                          compact
-                          iconName="person-remove-outline"
-                          title="No absent teammates on this date"
-                        />
-                      ) : (
-                        <View style={styles.swapOptions}>
-                          {(selectedTargetedPickupEntry
-                            ? [selectedTargetedPickupEntry]
-                            : targetedPickupOptions
-                          ).map((entry) => (
-                            <SwapOptionCard
-                              key={`${entry.employeeId}-${entry.date}`}
-                              active={selectedTargetedPickupEmployeeId === entry.employeeId}
-                              disabled={createRequestMutation.isPending}
-                              detailLabel={getPickupTargetDetailLabel(activeAbsenceTypes, entry)}
-                              entry={entry}
-                              showSegments={false}
+                  ) : null}
+                  <View style={styles.selectorWrap}>
+                    {(selectedCalloffAbsenceType
+                      ? [selectedCalloffAbsenceType]
+                      : activeAbsenceTypes
+                    ).map((absenceType) => (
+                      <SelectorChip
+                        key={absenceType.id}
+                        active={selectedCalloffAbsenceTypeId === absenceType.id}
+                        disabled={createRequestMutation.isPending}
+                        label={getAbsenceTypeOptionLabel(absenceType)}
+                        onPress={() =>
+                          setSelectedCalloffAbsenceTypeId(
+                            selectedCalloffAbsenceTypeId === absenceType.id ? null : absenceType.id,
+                          )
+                        }
+                      />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {requestMode === "swap" ? (
+            <View style={styles.subsection}>
+              <Text style={styles.subsectionBody}>
+                {selectedTargetEntry
+                  ? "Review the trade below, then submit your swap request."
+                  : "Choose a teammate's published shift to trade dates or shift types. Same-code swaps are allowed when the date changes."}
+              </Text>
+              {shiftEntry ? (
+                <>
+                  <View style={styles.swapSummaryList}>
+                    <SwapSummaryCard
+                      entry={shiftEntry}
+                      label={selectedTargetEntry ? "You give" : "Your shift"}
+                      segmentIndex={selectedRequesterSegmentIndex}
+                    />
+                    {selectedTargetEntry ? (
+                      <SwapSummaryCard
+                        entry={selectedTargetEntry}
+                        label="You get"
+                        segmentIndex={selectedTargetShift?.segmentIndex ?? 0}
+                        summaryNote={`From ${selectedTargetEntry.employeeName}`}
+                      />
+                    ) : null}
+                  </View>
+                  <View style={styles.modalInlinePanel}>
+                    <Text style={styles.subsectionLabel}>Eligible teammates</Text>
+                    {swapOptionsQuery.isLoading ? (
+                      <Text style={styles.subsectionBody}>
+                        Loading teammate shifts for this range.
+                      </Text>
+                    ) : swapOptionsQuery.error ? (
+                      <Text style={styles.subsectionBody}>
+                        {getQueryErrorMessage(
+                          swapOptionsQuery.error,
+                          "We couldn't load teammate shifts.",
+                        )}
+                      </Text>
+                    ) : swapTargetOptions.length === 0 ? (
+                      <EmptyStateCard
+                        compact
+                        iconName="swap-horizontal-outline"
+                        title="No eligible shifts"
+                        body="Eligible teammate shifts will appear here once published."
+                      />
+                    ) : selectedTargetEntry ? (
+                      <View style={styles.swapSelectedPanel}>
+                        <Text style={styles.subsectionBody}>
+                          {selectedTargetEntry.employeeName} is selected for{" "}
+                          {formatShiftDate(selectedTargetEntry.date)}.
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={styles.swapDateFilteredList}>
+                        <View style={styles.swapWeekNav}>
+                          <Pressable
+                            accessibilityLabel="Go to previous week"
+                            accessibilityRole="button"
+                            accessibilityState={{
+                              disabled: previousEligibleSwapWeekStart == null,
+                            }}
+                            android_ripple={
+                              previousEligibleSwapWeekStart == null
+                                ? undefined
+                                : { color: "rgba(15, 23, 42, 0.08)" }
+                            }
+                            disabled={previousEligibleSwapWeekStart == null}
+                            onPress={() => handleSwapWeek(-1)}
+                            style={({ pressed }) => [
+                              styles.swapWeekNavButton,
+                              pressed &&
+                                previousEligibleSwapWeekStart != null &&
+                                styles.swapWeekNavButtonPressed,
+                              previousEligibleSwapWeekStart == null &&
+                                styles.swapWeekNavButtonDisabled,
+                            ]}
+                          >
+                            <Ionicons
+                              color={mobileColors.textSecondary}
+                              name="chevron-back"
+                              size={20}
+                            />
+                          </Pressable>
+                          <Text style={styles.swapWeekRangeLabel}>
+                            {activeSwapWeekStart ? formatWeekRangeLabel(activeSwapWeekStart) : ""}
+                          </Text>
+                          <Pressable
+                            accessibilityLabel="Go to next week"
+                            accessibilityRole="button"
+                            accessibilityState={{
+                              disabled: nextEligibleSwapWeekStart == null,
+                            }}
+                            android_ripple={
+                              nextEligibleSwapWeekStart == null
+                                ? undefined
+                                : { color: "rgba(15, 23, 42, 0.08)" }
+                            }
+                            disabled={nextEligibleSwapWeekStart == null}
+                            onPress={() => handleSwapWeek(1)}
+                            style={({ pressed }) => [
+                              styles.swapWeekNavButton,
+                              pressed &&
+                                nextEligibleSwapWeekStart != null &&
+                                styles.swapWeekNavButtonPressed,
+                              nextEligibleSwapWeekStart == null && styles.swapWeekNavButtonDisabled,
+                            ]}
+                          >
+                            <Ionicons
+                              color={mobileColors.textSecondary}
+                              name="chevron-forward"
+                              size={20}
+                            />
+                          </Pressable>
+                        </View>
+                        <View accessibilityLabel="Eligible swap dates" style={styles.swapDateGrid}>
+                          {swapWeekDates.map((date) => (
+                            <SwapDateChip
+                              key={date}
+                              active={date === activeSwapDate}
+                              count={swapSectionsByDate.get(date)?.entries.length ?? 0}
+                              date={date}
                               onPress={() => {
-                                setSelectedTargetedPickupEmployeeId(
-                                  selectedTargetedPickupEmployeeId === entry.employeeId
-                                    ? null
-                                    : entry.employeeId,
-                                );
+                                setSelectedSwapDate(date);
+                                setSelectedTargetShift(null);
                               }}
                             />
                           ))}
                         </View>
-                      )}
-                    </View>
-                  </View>
-                ) : null}
-                {coverageRequestType === "calloff" ? (
-                  <View style={styles.modalInlinePanel}>
-                    <Text style={styles.subsectionLabel}>
-                      {selectedCalloffAbsenceType ? "Absence reason" : "Select absence reason"}
-                    </Text>
-                    {selectedCalloffAbsenceType ? (
-                      <Text style={styles.subsectionBody}>
-                        Review your call-off below, then submit.
-                      </Text>
-                    ) : null}
-                    <View style={styles.selectorWrap}>
-                      {(selectedCalloffAbsenceType
-                        ? [selectedCalloffAbsenceType]
-                        : activeAbsenceTypes
-                      ).map((absenceType) => (
-                        <SelectorChip
-                          key={absenceType.id}
-                          active={selectedCalloffAbsenceTypeId === absenceType.id}
-                          disabled={createRequestMutation.isPending}
-                          label={getAbsenceTypeOptionLabel(absenceType)}
-                          onPress={() =>
-                            setSelectedCalloffAbsenceTypeId(
-                              selectedCalloffAbsenceTypeId === absenceType.id
-                                ? null
-                                : absenceType.id,
-                            )
-                          }
-                        />
-                      ))}
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
-
-            {requestMode === "swap" ? (
-              <View style={styles.subsection}>
-                <Text style={styles.subsectionBody}>
-                  {selectedTargetEntry
-                    ? "Review the trade below, then submit your swap request."
-                    : "Choose a teammate's published shift to trade dates or shift types. Same-code swaps are allowed when the date changes."}
-                </Text>
-                {shiftEntry ? (
-                  <>
-                    <View style={styles.swapSummaryList}>
-                      <SwapSummaryCard
-                        entry={shiftEntry}
-                        label={selectedTargetEntry ? "You give" : "Your shift"}
-                        segmentIndex={selectedRequesterSegmentIndex}
-                      />
-                      {selectedTargetEntry ? (
-                        <SwapSummaryCard
-                          entry={selectedTargetEntry}
-                          label="You get"
-                          segmentIndex={selectedTargetShift?.segmentIndex ?? 0}
-                          summaryNote={`From ${selectedTargetEntry.employeeName}`}
-                        />
-                      ) : null}
-                    </View>
-                    <View style={styles.modalInlinePanel}>
-                      <Text style={styles.subsectionLabel}>Eligible teammates</Text>
-                      {swapOptionsQuery.isLoading ? (
-                        <Text style={styles.subsectionBody}>
-                          Loading teammate shifts for this range.
-                        </Text>
-                      ) : swapOptionsQuery.error ? (
-                        <Text style={styles.subsectionBody}>
-                          {getQueryErrorMessage(
-                            swapOptionsQuery.error,
-                            "We couldn't load teammate shifts.",
-                          )}
-                        </Text>
-                      ) : swapTargetOptions.length === 0 ? (
-                        <EmptyStateCard
-                          compact
-                          iconName="swap-horizontal-outline"
-                          title="No eligible shifts"
-                          body="Eligible teammate shifts will appear here once published."
-                        />
-                      ) : selectedTargetEntry ? (
-                        <View style={styles.swapSelectedPanel}>
-                          <Text style={styles.subsectionBody}>
-                            {selectedTargetEntry.employeeName} is selected for{" "}
-                            {formatShiftDate(selectedTargetEntry.date)}.
-                          </Text>
-                        </View>
-                      ) : (
-                        <View style={styles.swapDateFilteredList}>
-                          <View style={styles.swapWeekNav}>
-                            <Pressable
-                              accessibilityLabel="Go to previous week"
-                              accessibilityRole="button"
-                              accessibilityState={{
-                                disabled: previousEligibleSwapWeekStart == null,
-                              }}
-                              android_ripple={
-                                previousEligibleSwapWeekStart == null
-                                  ? undefined
-                                  : { color: "rgba(15, 23, 42, 0.08)" }
-                              }
-                              disabled={previousEligibleSwapWeekStart == null}
-                              onPress={() => handleSwapWeek(-1)}
-                              style={({ pressed }) => [
-                                styles.swapWeekNavButton,
-                                pressed &&
-                                  previousEligibleSwapWeekStart != null &&
-                                  styles.swapWeekNavButtonPressed,
-                                previousEligibleSwapWeekStart == null &&
-                                  styles.swapWeekNavButtonDisabled,
-                              ]}
-                            >
-                              <Ionicons
-                                color={mobileColors.textSecondary}
-                                name="chevron-back"
-                                size={20}
-                              />
-                            </Pressable>
-                            <Text style={styles.swapWeekRangeLabel}>
-                              {activeSwapWeekStart ? formatWeekRangeLabel(activeSwapWeekStart) : ""}
-                            </Text>
-                            <Pressable
-                              accessibilityLabel="Go to next week"
-                              accessibilityRole="button"
-                              accessibilityState={{
-                                disabled: nextEligibleSwapWeekStart == null,
-                              }}
-                              android_ripple={
-                                nextEligibleSwapWeekStart == null
-                                  ? undefined
-                                  : { color: "rgba(15, 23, 42, 0.08)" }
-                              }
-                              disabled={nextEligibleSwapWeekStart == null}
-                              onPress={() => handleSwapWeek(1)}
-                              style={({ pressed }) => [
-                                styles.swapWeekNavButton,
-                                pressed &&
-                                  nextEligibleSwapWeekStart != null &&
-                                  styles.swapWeekNavButtonPressed,
-                                nextEligibleSwapWeekStart == null &&
-                                  styles.swapWeekNavButtonDisabled,
-                              ]}
-                            >
-                              <Ionicons
-                                color={mobileColors.textSecondary}
-                                name="chevron-forward"
-                                size={20}
-                              />
-                            </Pressable>
-                          </View>
-                          <View
-                            accessibilityLabel="Eligible swap dates"
-                            style={styles.swapDateGrid}
-                          >
-                            {swapWeekDates.map((date) => (
-                              <SwapDateChip
-                                key={date}
-                                active={date === activeSwapDate}
-                                count={swapSectionsByDate.get(date)?.entries.length ?? 0}
-                                date={date}
-                                onPress={() => {
-                                  setSelectedSwapDate(date);
-                                  setSelectedTargetShift(null);
-                                }}
-                              />
-                            ))}
-                          </View>
-                          {activeSwapSection ? (
-                            <View style={styles.swapOptions}>
-                              {visibleSwapTargetOptions.flatMap((entry) => {
-                                const options = getActionSegmentOptions(entry);
-                                const targetOptions =
-                                  options.length > 1
-                                    ? options.filter(
-                                        (option) =>
-                                          !hasScheduleEntrySegmentStarted(
-                                            entry,
-                                            timeZone,
-                                            option.segmentIndex,
-                                          ),
-                                      )
-                                    : options[0]
-                                      ? hasScheduleEntrySegmentStarted(
+                        {activeSwapSection ? (
+                          <View style={styles.swapOptions}>
+                            {visibleSwapTargetOptions.flatMap((entry) => {
+                              const options = getActionSegmentOptions(entry);
+                              const targetOptions =
+                                options.length > 1
+                                  ? options.filter(
+                                      (option) =>
+                                        !hasScheduleEntrySegmentStarted(
                                           entry,
                                           timeZone,
-                                          options[0].segmentIndex,
-                                        )
-                                        ? []
-                                        : [options[0]]
-                                      : [];
+                                          option.segmentIndex,
+                                        ),
+                                    )
+                                  : options[0]
+                                    ? hasScheduleEntrySegmentStarted(
+                                        entry,
+                                        timeZone,
+                                        options[0].segmentIndex,
+                                      )
+                                      ? []
+                                      : [options[0]]
+                                    : [];
 
-                                return targetOptions.map((option) => (
-                                  <SwapOptionCard
-                                    key={`${entry.employeeId}-${entry.date}-${option.segmentIndex}`}
-                                    active={
-                                      selectedTargetShift?.employeeId === entry.employeeId &&
-                                      selectedTargetShift?.date === entry.date &&
-                                      (selectedTargetShift.segmentIndex ?? 0) ===
-                                        option.segmentIndex
-                                    }
-                                    entry={entry}
-                                    segmentIndex={
-                                      options.length > 1 ? option.segmentIndex : undefined
-                                    }
-                                    onPress={() =>
-                                      setSelectedTargetShift({
-                                        employeeId: entry.employeeId,
-                                        date: entry.date,
-                                        segmentIndex:
-                                          options.length > 1 ? option.segmentIndex : undefined,
-                                      })
-                                    }
-                                  />
-                                ));
-                              })}
-                            </View>
-                          ) : null}
-                        </View>
-                      )}
-                    </View>
-                  </>
-                ) : (
-                  <Text style={styles.subsectionBody}>Refreshing shift details.</Text>
-                )}
-              </View>
-            ) : null}
+                              return targetOptions.map((option) => (
+                                <SwapOptionCard
+                                  key={`${entry.employeeId}-${entry.date}-${option.segmentIndex}`}
+                                  active={
+                                    selectedTargetShift?.employeeId === entry.employeeId &&
+                                    selectedTargetShift?.date === entry.date &&
+                                    (selectedTargetShift.segmentIndex ?? 0) === option.segmentIndex
+                                  }
+                                  entry={entry}
+                                  segmentIndex={
+                                    options.length > 1 ? option.segmentIndex : undefined
+                                  }
+                                  onPress={() =>
+                                    setSelectedTargetShift({
+                                      employeeId: entry.employeeId,
+                                      date: entry.date,
+                                      segmentIndex:
+                                        options.length > 1 ? option.segmentIndex : undefined,
+                                    })
+                                  }
+                                />
+                              ));
+                            })}
+                          </View>
+                        ) : null}
+                      </View>
+                    )}
+                  </View>
+                </>
+              ) : (
+                <Text style={styles.subsectionBody}>Refreshing shift details.</Text>
+              )}
+            </View>
+          ) : null}
 
-            {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
-              <View style={styles.modalActionButtons}>
-                <Button
-                  disabled={createRequestMutation.isPending}
-                  label="Back"
-                  onPress={() => {
-                    setSelectedSwapDate(selectedTargetEntry.date);
-                    setSelectedTargetShift(null);
-                  }}
-                  tone="neutral"
-                />
-                <Button
-                  disabled={!canSubmitRequest || createRequestMutation.isPending}
-                  label={createRequestMutation.isPending ? "Submitting..." : "Submit"}
-                  onPress={handleSubmitRequest}
-                />
-              </View>
-            ) : null}
+          {requestMode === "swap" && selectedTargetEntry && shiftEntry ? (
+            <SheetActions>
+              <Button
+                disabled={!canSubmitRequest || createRequestMutation.isPending}
+                label="Submit"
+                loading={createRequestMutation.isPending}
+                loadingLabel="Submitting"
+                onPress={handleSubmitRequest}
+              />
+              <Button
+                disabled={createRequestMutation.isPending}
+                label="Back"
+                onPress={() => {
+                  setSelectedSwapDate(selectedTargetEntry.date);
+                  setSelectedTargetShift(null);
+                }}
+                tone="neutral"
+              />
+            </SheetActions>
+          ) : null}
 
-            {requestMode === "coverage" &&
-            coverageRequestType === "pickup" &&
-            selectedTargetedPickupEntry &&
-            shiftEntry ? (
-              <View style={styles.modalActionButtons}>
-                <Button
-                  disabled={createRequestMutation.isPending}
-                  label="Back"
-                  onPress={() => setSelectedTargetedPickupEmployeeId(null)}
-                  tone="neutral"
-                />
-                <Button
-                  disabled={createRequestMutation.isPending}
-                  label={createRequestMutation.isPending ? "Submitting..." : "Submit"}
-                  onPress={() => confirmTargetedPickupRequest(selectedTargetedPickupEntry)}
-                />
-              </View>
-            ) : null}
+          {requestMode === "coverage" &&
+          coverageRequestType === "pickup" &&
+          selectedTargetedPickupEntry &&
+          shiftEntry ? (
+            <SheetActions>
+              <Button
+                label="Submit"
+                loading={createRequestMutation.isPending}
+                loadingLabel="Submitting"
+                onPress={() => confirmTargetedPickupRequest(selectedTargetedPickupEntry)}
+              />
+              <Button
+                disabled={createRequestMutation.isPending}
+                label="Back"
+                onPress={() => setSelectedTargetedPickupEmployeeId(null)}
+                tone="neutral"
+              />
+            </SheetActions>
+          ) : null}
 
-            {requestMode === "coverage" &&
-            coverageRequestType === "calloff" &&
-            selectedCalloffAbsenceType &&
-            shiftEntry ? (
-              <View style={styles.modalActionButtons}>
-                <Button
-                  disabled={createRequestMutation.isPending}
-                  label="Back"
-                  onPress={() => setSelectedCalloffAbsenceTypeId(null)}
-                  tone="neutral"
-                />
-                <Button
-                  disabled={createRequestMutation.isPending}
-                  label={createRequestMutation.isPending ? "Submitting..." : "Submit"}
-                  onPress={() =>
-                    confirmCoverageRequest("calloff", {
-                      absenceTypeId: selectedCalloffAbsenceType.id,
-                      absenceTypeLabel: getAbsenceTypeOptionLabel(selectedCalloffAbsenceType),
-                    })
-                  }
-                />
-              </View>
-            ) : null}
-          </View>
-        </Screen>
-      </Modal>
+          {requestMode === "coverage" &&
+          coverageRequestType === "calloff" &&
+          selectedCalloffAbsenceType &&
+          shiftEntry ? (
+            <SheetActions>
+              <Button
+                label="Submit"
+                loading={createRequestMutation.isPending}
+                loadingLabel="Submitting"
+                onPress={() =>
+                  confirmCoverageRequest("calloff", {
+                    absenceTypeId: selectedCalloffAbsenceType.id,
+                    absenceTypeLabel: getAbsenceTypeOptionLabel(selectedCalloffAbsenceType),
+                  })
+                }
+              />
+              <Button
+                disabled={createRequestMutation.isPending}
+                label="Back"
+                onPress={() => setSelectedCalloffAbsenceTypeId(null)}
+                tone="neutral"
+              />
+            </SheetActions>
+          ) : null}
+        </View>
+      </BottomSheetModal>
       <ConfirmationModal
         body={pendingConfirmation?.body}
         confirmLabel={pendingConfirmation?.confirmLabel ?? "Confirm"}
+        confirmPendingLabel={pendingConfirmation?.confirmPendingLabel ?? "Submitting"}
         confirmTone={pendingConfirmation?.confirmTone ?? "primary"}
         loading={createRequestMutation.isPending}
         onCancel={() => setPendingConfirmation(null)}
@@ -1662,6 +1666,10 @@ export default function ShiftDetailScreen() {
         title={pendingConfirmation?.title ?? "Confirm action?"}
         visible={pendingConfirmation != null}
       />
+      {/* Separate from the descriptor modal above, which routes the request
+          sheet's own buttons. The two are never visible together: this one is
+          only ever raised by a dismissal, which the buttons don't perform. */}
+      <ConfirmationModal {...requestGuard.confirmationProps} />
     </Screen>
   );
 }
@@ -2354,741 +2362,3 @@ function ShiftEntrySegmentList({
     />
   );
 }
-
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    loadingState: {
-      gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
-    },
-    loadingBody: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-    },
-    shiftDetailCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      marginTop: 12,
-      marginBottom: 8,
-      paddingHorizontal: 16,
-      paddingVertical: 16,
-      gap: 16,
-      shadowColor: mobileColors.shadowStrong,
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 12,
-      elevation: 2,
-    },
-    detailHeroHeader: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      gap: 14,
-    },
-    detailHeroCopy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 7,
-    },
-    detailHeroPillRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      flexWrap: "wrap",
-      gap: 10,
-    },
-    detailHeroTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
-    },
-    detailEmployeeName: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textSubtle,
-    },
-    detailHeaderJobPill: {
-      minHeight: 28,
-      borderRadius: 10,
-      borderWidth: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      flexShrink: 0,
-      gap: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-    },
-    detailHeaderJobPillText: {
-      ...mobileText.badge,
-      textTransform: "uppercase",
-    },
-    detailHeaderJobPillMentoredText: {
-      ...mobileText.badge,
-      textTransform: "none",
-    },
-    detailInfoStack: {
-      gap: 14,
-    },
-    detailSplitNotice: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textSecondary,
-    },
-    detailActionsRow: {
-      flexDirection: "row",
-      gap: 10,
-    },
-    detailActionButton: {
-      flex: 1,
-      minHeight: 56,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: mobileColors.dangerBorder,
-      backgroundColor: mobileColors.dangerSoft,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 12,
-      paddingVertical: 12,
-    },
-    detailActionButtonSecondary: {
-      borderColor: mobileColors.brandBorder,
-      backgroundColor: mobileColors.brandSoft,
-    },
-    detailActionButtonPressed: {
-      transform: [{ scale: 0.98 }],
-    },
-    detailActionButtonDisabled: {
-      opacity: 0.5,
-    },
-    detailActionButtonContent: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-    },
-    detailActionButtonText: {
-      ...mobileText.bodyStrong,
-    },
-    detailPublishedFooter: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 16,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 9,
-    },
-    detailPublishedText: {
-      flex: 1,
-      minWidth: 0,
-      ...mobileText.meta,
-      color: mobileColors.textSubtle,
-    },
-    detailPublishedName: {
-      fontWeight: "600",
-      color: mobileColors.textMuted,
-    },
-    detailInfoRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-    },
-    detailInfoIconBox: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    detailInfoCopy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 2,
-    },
-    detailInfoLabel: {
-      ...mobileText.label,
-      textTransform: "uppercase",
-      color: mobileColors.textSubtle,
-    },
-    detailInfoValue: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textSecondary,
-    },
-    detailGroup: {
-      gap: 10,
-      alignItems: "flex-start",
-    },
-    detailDateTile: {
-      width: 60,
-      minHeight: 68,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceMuted,
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 4,
-      paddingHorizontal: 6,
-      paddingVertical: 8,
-    },
-    detailDateWeekday: {
-      ...mobileText.badge,
-      color: mobileColors.textSubtle,
-      textTransform: "uppercase",
-    },
-    detailDateDay: {
-      ...mobileText.heroMetric,
-      color: mobileColors.textPrimary,
-    },
-    detailShiftTitle: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    detailSummaryText: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-      fontWeight: "500",
-    },
-    detailFocusAreaRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 7,
-    },
-    detailFocusAreaText: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textSecondary,
-    },
-    detailFootnote: {
-      ...mobileText.caption,
-      color: mobileColors.textSubtle,
-      paddingTop: 2,
-    },
-    detailJobChip: {
-      alignSelf: "flex-start",
-      borderRadius: 8,
-      borderWidth: 1,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-    },
-    detailJobPillRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    detailJobChipTextStack: {
-      gap: 2,
-    },
-    detailJobChipInlineTextRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-    },
-    detailJobChipEyebrowText: {
-      ...mobileText.micro,
-    },
-    detailJobChipText: {
-      ...mobileText.badge,
-      textTransform: "uppercase",
-    },
-    detailJobChipMentoredText: {
-      textTransform: "none",
-    },
-    detailJobChipValueText: {
-      ...mobileText.badge,
-      fontWeight: "600",
-    },
-    mentoredPill: {
-      alignSelf: "flex-start",
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceSecondary,
-      minHeight: 28,
-      justifyContent: "center",
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-    },
-    mentoredPillText: {
-      ...mobileText.badge,
-      color: mobileColors.textSecondary,
-    },
-    detailSegmentList: {
-      gap: 12,
-    },
-    detailSegmentBlock: {
-      gap: 5,
-    },
-    detailSegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 12,
-    },
-    detailSegmentTitle: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    detailSegmentMeta: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-      fontWeight: "500",
-    },
-    sectionBlock: {
-      gap: 12,
-    },
-    sectionBody: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-    },
-    shiftmatesList: {
-      gap: 0,
-    },
-    shiftmateSegmentGroups: {
-      gap: 24,
-    },
-    shiftmateSegmentGroup: {
-      gap: 6,
-    },
-    shiftmateSegmentHeader: {
-      paddingBottom: 2,
-    },
-    shiftmateSegmentHeaderCopy: {
-      gap: 2,
-      minWidth: 0,
-    },
-    shiftmateSegmentTitleRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    shiftmateSegmentTitleMeta: {
-      flex: 1,
-      minWidth: 0,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-    },
-    shiftmateSegmentTitle: {
-      flexShrink: 1,
-      minWidth: 0,
-      ...mobileText.sectionTitle,
-      color: mobileColors.textPrimary,
-    },
-    shiftmateSegmentTime: {
-      flexShrink: 0,
-      ...mobileText.meta,
-      color: mobileColors.textMuted,
-      fontWeight: "600",
-    },
-    shiftmateRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      paddingHorizontal: 0,
-      paddingVertical: 13,
-    },
-    shiftmateRowBorder: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-    },
-    shiftmateAvatar: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      borderWidth: 1,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    shiftmateAvatarText: {
-      ...mobileText.bodyStrong,
-    },
-    shiftmateContent: {
-      flex: 1,
-      gap: 5,
-      minWidth: 0,
-    },
-    shiftmateHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 10,
-    },
-    shiftmateName: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-      flex: 1,
-    },
-    shiftmateChipRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "flex-end",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    shiftmateMeta: {
-      ...mobileText.meta,
-      color: mobileColors.textMuted,
-      fontWeight: "500",
-    },
-    supportingSegmentList: {
-      gap: 8,
-    },
-    supportingSegmentBlock: {
-      gap: 4,
-    },
-    supportingSegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 8,
-    },
-    supportingSegmentTitle: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textSecondary,
-    },
-    supportingSegmentMeta: {
-      ...mobileText.meta,
-      color: mobileColors.textMuted,
-      fontWeight: "500",
-    },
-    sectionTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
-    },
-    modalContent: {
-      gap: 18,
-    },
-    modalActionButtons: {
-      gap: 10,
-      paddingTop: 2,
-    },
-    subsection: {
-      gap: 14,
-    },
-    subsectionLabel: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textPrimary,
-    },
-    subsectionBody: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-    },
-    modalInlinePanel: {
-      gap: 12,
-      padding: 16,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surface,
-    },
-    actionSegmentPanel: {
-      gap: 10,
-      padding: ACTION_SEGMENT_PANEL_PADDING,
-      borderRadius: ACTION_SEGMENT_PANEL_RADIUS,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
-      backgroundColor: mobileColors.brandSoft,
-    },
-    actionSegmentOptions: {
-      gap: 8,
-    },
-    swapSummaryList: {
-      gap: 10,
-    },
-    swapSummaryCard: {
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderRadius: mobileRadii.card,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      gap: 6,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-    },
-    swapSummaryLabel: {
-      ...mobileText.label,
-      color: mobileColors.textSubtle,
-      textTransform: "uppercase",
-    },
-    swapSummaryTitle: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    swapSummaryDate: {
-      ...mobileText.meta,
-      color: mobileColors.textMuted,
-      fontWeight: "500",
-    },
-    swapSummaryNote: {
-      ...mobileText.meta,
-      color: mobileColors.textMuted,
-      fontWeight: "500",
-    },
-    swapSummaryMeta: {
-      ...mobileText.meta,
-      color: mobileColors.textSecondary,
-      fontWeight: "500",
-    },
-    coverageOptionList: {
-      gap: 10,
-    },
-    coverageOptionCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      padding: 16,
-      gap: 8,
-      position: "relative",
-    },
-    coverageOptionCardDanger: {
-      borderColor: mobileColors.dangerBorder,
-      backgroundColor: mobileColors.dangerSoft,
-    },
-    coverageOptionCardActive: {
-      borderColor: mobileColors.brandBorder,
-      backgroundColor: mobileColors.brandSoft,
-    },
-    coverageOptionCardActiveDanger: {
-      borderColor: mobileColors.dangerText,
-    },
-    coverageOptionCardDisabled: {
-      opacity: 0.5,
-    },
-    coverageOptionTitle: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    coverageOptionTitleWithCheck: {
-      paddingRight: 28,
-    },
-    coverageOptionTitleDanger: {
-      color: mobileColors.dangerText,
-    },
-    coverageOptionBody: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-    },
-    coverageOptionCheckmark: {
-      position: "absolute",
-      top: 12,
-      right: 12,
-      width: 20,
-      height: 20,
-      borderRadius: 999,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.brand,
-    },
-    coverageOptionCheckmarkDanger: {
-      backgroundColor: mobileColors.dangerText,
-    },
-    coverageNotice: {
-      ...mobileText.body,
-      color: mobileColors.warningText,
-    },
-    selectorWrap: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    selectorChip: {
-      borderRadius: mobileRadii.pill,
-      minHeight: 44,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      backgroundColor: mobileColors.surfaceSecondary,
-    },
-    selectorSegment: {
-      minHeight: 56,
-      borderRadius: ACTION_SEGMENT_OPTION_RADIUS,
-      backgroundColor: mobileColors.surfaceSecondary,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
-      paddingHorizontal: 14,
-      paddingVertical: 13,
-      justifyContent: "center",
-    },
-    selectorChipDisabled: {
-      opacity: 0.5,
-    },
-    selectorSegmentDisabled: {
-      backgroundColor: mobileColors.surfaceMuted,
-      borderColor: mobileColors.borderSubtle,
-    },
-    selectorChipActive: {
-      backgroundColor: mobileColors.brandSoft,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
-    },
-    selectorSegmentActive: {
-      backgroundColor: mobileColors.surface,
-      borderColor: mobileColors.brand,
-      shadowColor: mobileColors.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 1,
-      shadowRadius: 10,
-      elevation: 2,
-    },
-    selectorSegmentContent: {
-      width: "100%",
-      minWidth: 0,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    selectorChipText: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textSecondary,
-    },
-    selectorSegmentText: {
-      flex: 1,
-      minWidth: 0,
-    },
-    selectorSegmentTextDisabled: {
-      color: mobileColors.textSubtle,
-    },
-    selectorChipTextActive: {
-      color: mobileColors.brand,
-    },
-    selectorSegmentCheckmark: {
-      width: 22,
-      height: 22,
-      borderRadius: 999,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.brand,
-    },
-    swapSelectedPanel: {
-      gap: 12,
-    },
-    swapDateFilteredList: {
-      gap: 12,
-    },
-    swapWeekNav: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-    },
-    swapWeekNavButton: {
-      width: 44,
-      height: 44,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceSecondary,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    swapWeekNavButtonPressed: {
-      transform: [{ scale: 0.98 }],
-    },
-    swapWeekNavButtonDisabled: {
-      opacity: 0.5,
-    },
-    swapWeekRangeLabel: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-      flex: 1,
-      textAlign: "center",
-      fontWeight: "800",
-    },
-    swapDateGrid: {
-      flexDirection: "row",
-      alignItems: "stretch",
-      gap: 6,
-    },
-    swapDateChip: {
-      flex: 1,
-      minWidth: 0,
-      minHeight: 68,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surface,
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 2,
-      paddingHorizontal: 4,
-      paddingVertical: 8,
-    },
-    swapDateChipActive: {
-      borderColor: mobileColors.brandBorder,
-      backgroundColor: mobileColors.brandSoft,
-    },
-    swapDateChipDisabled: {
-      opacity: 0.5,
-    },
-    swapDateChipWeekday: {
-      ...mobileText.micro,
-      color: mobileColors.textSubtle,
-      textTransform: "uppercase",
-    },
-    swapDateChipDay: {
-      fontSize: 20,
-      lineHeight: 24,
-      fontWeight: "800",
-      color: mobileColors.textPrimary,
-    },
-    swapDateChipTextActive: {
-      color: mobileColors.brand,
-    },
-    swapDateChipCount: {
-      minWidth: 0,
-      minHeight: 18,
-      borderRadius: 10,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 2,
-      paddingHorizontal: 5,
-      backgroundColor: mobileColors.surfaceSecondary,
-    },
-    swapDateChipCountActive: {
-      backgroundColor: mobileColors.surface,
-    },
-    swapDateChipCountText: {
-      ...mobileText.micro,
-      color: mobileColors.textMuted,
-    },
-    swapDateChipCountTextActive: {
-      color: mobileColors.brand,
-    },
-    swapOptions: {
-      gap: 8,
-    },
-    swapOptionCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      padding: 14,
-      gap: 8,
-    },
-    swapOptionCardActive: {
-      backgroundColor: mobileColors.brandSoft,
-      borderColor: mobileColors.brandBorder,
-    },
-    swapOptionCardDisabled: {
-      opacity: 0.5,
-    },
-    swapOptionHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 10,
-    },
-    swapOptionName: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textPrimary,
-      flex: 1,
-    },
-    swapOptionDetail: {
-      ...mobileText.meta,
-      color: mobileColors.textSecondary,
-      fontWeight: "600",
-    },
-  });

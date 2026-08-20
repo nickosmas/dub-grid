@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../../src/shared/components/Screen";
-import { ListSkeleton } from "../../../src/shared/components/Skeleton";
 import { StatusBanner } from "../../../src/shared/components/StatusBanner";
 import { EmptyStateCard } from "../../../src/shared/components/EmptyStateCard";
 import {
@@ -11,8 +10,9 @@ import {
   SelectionSection,
 } from "../../../src/shared/components/FilterSheet";
 import { CoverageSectionRow } from "../../../src/features/dashboard/components/CoverageBySectionCard";
+import { DashboardListSkeleton } from "../../../src/features/dashboard/components/DashboardSkeleton";
 import { useExpandedDashboardQuery } from "../../../src/features/dashboard/hooks/useExpandedDashboardQuery";
-import { getMobileQueryContentState } from "../../../src/shared/lib/query-state";
+import { useMobileContentState } from "../../../src/shared/hooks/useMobileContentState";
 import { useMobileColors } from "../../../src/shared/providers/ThemeModeProvider";
 import { mobileText, type MobileColors } from "../../../src/shared/theme/tokens";
 
@@ -23,7 +23,7 @@ export default function CoverageExpandedScreen() {
   const [focusAreaFilter, setFocusAreaFilter] = useState<number | "all">("all");
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
-  const contentState = getMobileQueryContentState({
+  const contentState = useMobileContentState({
     hasData: dashboardQuery.data !== undefined,
     isLoading: dashboardQuery.isLoading || bootstrapQuery.isLoading,
     error: dashboardQuery.error ?? bootstrapQuery.error,
@@ -31,18 +31,15 @@ export default function CoverageExpandedScreen() {
 
   if (contentState.kind === "loading") {
     return (
-      <Screen title="Coverage" bottomPaddingMode="tabbed">
-        <View style={styles.loadingState}>
-          <Text style={styles.loadingTitle}>Loading coverage</Text>
-          <ListSkeleton rows={4} showSectionHeader={false} />
-        </View>
+      <Screen bottomPaddingMode="tabbed">
+        {contentState.showSkeleton ? <DashboardListSkeleton rows={4} variant="meter" /> : null}
       </Screen>
     );
   }
 
   if (contentState.kind === "error") {
     return (
-      <Screen title="Coverage" bottomPaddingMode="tabbed">
+      <Screen bottomPaddingMode="tabbed">
         <StatusBanner
           actionLabel="Try again"
           body={contentState.message}
@@ -70,7 +67,7 @@ export default function CoverageExpandedScreen() {
   const activeFilterCount = focusAreaFilter === "all" ? 0 : 1;
 
   return (
-    <Screen title="Coverage" bottomPaddingMode="tabbed">
+    <Screen bottomPaddingMode="tabbed">
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
         title={`Filter by ${focusAreaLabel.toLowerCase()}`}
@@ -110,9 +107,9 @@ export default function CoverageExpandedScreen() {
 
       {filtered.length === 0 ? (
         <EmptyStateCard
+          body="Coverage appears here once staffing requirements are configured and the period is published."
           iconName="stats-chart-outline"
           title="No coverage to track yet"
-          body="Coverage appears here once staffing requirements are configured and the period is published."
         />
       ) : (
         <View style={styles.list}>
@@ -127,13 +124,6 @@ export default function CoverageExpandedScreen() {
 
 const createStyles = (mobileColors: MobileColors) =>
   StyleSheet.create({
-    loadingState: {
-      gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
-    },
     headerRow: {
       flexDirection: "row",
       alignItems: "center",

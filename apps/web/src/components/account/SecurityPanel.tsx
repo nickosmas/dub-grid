@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
 
 import { SectionCard } from "@/components/settings/shared";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -70,13 +71,19 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
     setShowPassword(false);
   }
 
+  // Derived so the warning appears as the user types the confirmation, matching
+  // the mobile in-app change screen.
+  const mismatchError = getPasswordMismatchError(newPassword, confirmPassword);
+  const canSubmitPassword =
+    Boolean(currentPassword) && isPasswordAcceptable(newPassword) && mismatchError === null;
+
   function requestPasswordChange(e: FormEvent) {
     e.preventDefault();
     if (saving) return;
     setError(null);
     if (!currentPassword) return setError("Enter your current password.");
-    if (newPassword !== confirmPassword) return setError("Passwords do not match.");
-    if (newPassword.length < 10) return setError("Password must be at least 10 characters.");
+    if (mismatchError) return setError(mismatchError);
+    if (!isPasswordAcceptable(newPassword)) return setError("Choose a stronger password.");
     setPendingConfirm(true);
   }
 
@@ -157,7 +164,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                 Password
               </div>
               <p className="mb-0 mt-1 text-[13px] text-[var(--color-text-muted)]">
-                Choose a strong password with at least 10 characters.
+                Choose a strong password: at least 10 characters, with a mix of uppercase letters,
+                numbers, and symbols.
               </p>
             </div>
             {!showPasswordForm && (
@@ -210,29 +218,26 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                   onChange={setConfirmPassword}
                   showPassword={showPassword}
                   onToggle={() => setShowPassword((v) => !v)}
+                  ariaDescribedBy={mismatchError ? "security-confirm-error" : undefined}
                   autoComplete="new-password"
                   className="dg-input"
                 />
+                {mismatchError && (
+                  <p className="dg-form-error" id="security-confirm-error">
+                    {mismatchError}
+                  </p>
+                )}
               </div>
-              {error && (
-                <p
-                  style={{
-                    color: "var(--color-danger-dark)",
-                    fontSize: "var(--dg-fs-body-sm)",
-                    margin: 0,
-                  }}
-                >
-                  {error}
-                </p>
-              )}
+              {error && <p className="dg-form-error">{error}</p>}
               <div className="flex flex-wrap gap-2">
                 <button
                   type="submit"
-                  disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+                  disabled={saving || !canSubmitPassword}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
                   <ButtonLoading
                     loading={saving}
+                    loadingLabel="Updating Password"
                     spinnerColor="var(--color-text-inverse)"
                     spinnerSize={16}
                   >
@@ -292,7 +297,11 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               disabled={signingOut !== null}
               className="dg-btn dg-btn-secondary"
             >
-              <ButtonLoading loading={signingOut === "others"} spinnerSize={14}>
+              <ButtonLoading
+                loading={signingOut === "others"}
+                loadingLabel="Signing Out"
+                spinnerSize={14}
+              >
                 Sign out other devices
               </ButtonLoading>
             </button>
@@ -302,7 +311,11 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               disabled={signingOut !== null}
               className="dg-btn dg-btn-danger"
             >
-              <ButtonLoading loading={signingOut === "global"} spinnerSize={14}>
+              <ButtonLoading
+                loading={signingOut === "global"}
+                loadingLabel="Signing Out"
+                spinnerSize={14}
+              >
                 Sign out everywhere
               </ButtonLoading>
             </button>
@@ -326,6 +339,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           title="Update password?"
           message="Confirm that you want to update your password. You will be signed out of every session."
           confirmLabel="Update and sign out"
+          confirmPendingLabel="Updating"
           variant="warning"
           isLoading={saving}
           onConfirm={() => void handlePasswordChange()}

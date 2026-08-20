@@ -2741,3 +2741,69 @@ describe("mobile schedule helpers", () => {
     expect(summary.scheduledHours).toBe(15);
   });
 });
+
+describe("buildTeamScheduleFocusAreaTabs badge counts", () => {
+  const focusAreas = [
+    { id: 1, name: "Emergency" },
+    { id: 2, name: "ICU" },
+  ];
+
+  function entry(employeeId: string, date: string, focusAreaId: number) {
+    return {
+      employeeId,
+      employeeName: `Employee ${employeeId}`,
+      date,
+      focusAreaId,
+      focusAreaName: focusAreaId === 1 ? "Emergency" : "ICU",
+    };
+  }
+
+  it("counts only the day passed as the count source, not the whole range", () => {
+    const range = [
+      entry("emp-1", "2026-04-16", 1),
+      entry("emp-2", "2026-04-16", 1),
+      // Same two people again the next day: counting the range would double
+      // every badge for each extra day loaded.
+      entry("emp-1", "2026-04-17", 1),
+      entry("emp-2", "2026-04-17", 1),
+    ];
+    const selectedDay = range.filter((item) => item.date === "2026-04-16");
+
+    const tabs = buildTeamScheduleFocusAreaTabs(focusAreas, range, selectedDay);
+
+    expect(tabs.find((tab) => tab.focusAreaId === 1)?.count).toBe(2);
+  });
+
+  it("counts a person once even when they have several entries that day", () => {
+    const selectedDay = [
+      // A split shift: two rows, one person.
+      entry("emp-1", "2026-04-16", 1),
+      entry("emp-1", "2026-04-16", 1),
+      entry("emp-2", "2026-04-16", 1),
+    ];
+
+    const tabs = buildTeamScheduleFocusAreaTabs(focusAreas, selectedDay, selectedDay);
+
+    expect(tabs.find((tab) => tab.focusAreaId === 1)?.count).toBe(2);
+  });
+
+  it("keeps a tab whose focus area has nobody on the selected day", () => {
+    const range = [entry("emp-1", "2026-04-16", 1), entry("emp-2", "2026-04-17", 2)];
+    const selectedDay = range.filter((item) => item.date === "2026-04-16");
+
+    const tabs = buildTeamScheduleFocusAreaTabs(focusAreas, range, selectedDay);
+
+    // The tab set comes from the range, so tabs don't pop in and out as the
+    // user moves between days; the badge just reads zero.
+    expect(tabs.map((tab) => tab.focusAreaId)).toEqual([1, 2]);
+    expect(tabs.find((tab) => tab.focusAreaId === 2)?.count).toBe(0);
+  });
+
+  it("defaults the count source to the tab source for existing callers", () => {
+    const entries = [entry("emp-1", "2026-04-16", 1), entry("emp-2", "2026-04-16", 1)];
+
+    expect(buildTeamScheduleFocusAreaTabs(focusAreas, entries)).toEqual(
+      buildTeamScheduleFocusAreaTabs(focusAreas, entries, entries),
+    );
+  });
+});

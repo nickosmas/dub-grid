@@ -401,8 +401,9 @@ export default function RequestDemoPage() {
             >
               <ButtonLoading
                 loading={loading}
+                loadingLabel="Submitting Request"
                 spinnerColor="var(--color-text-inverse)"
-                spinnerSize={28}
+                spinnerSize={20}
               >
                 Submit Request
               </ButtonLoading>

@@ -12,6 +12,7 @@ import type {
   MobileScheduleEntry,
   MobileScheduleRange,
 } from "@dubgrid/contracts";
+import { hasAcceptedCurrentTerms } from "@dubgrid/domain";
 import type { Organization, PlatformRole } from "@dubgrid/domain";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -41,13 +42,21 @@ type MobileMembershipLike = {
   platformRole: PlatformRole;
 };
 
-type MobilePermissionsLike = MobileBootstrapResponse["permissions"] & {
+// `canManageManagementAccess` is omitted deliberately: it is not an admin
+// permission the auth context carries, it is derived from `canManageUsers` when
+// the payload is built below.
+type MobilePermissionsLike = Omit<
+  MobileBootstrapResponse["permissions"],
+  "canManageManagementAccess"
+> & {
   role: string;
   level: number;
   canEditShifts: boolean;
   canApproveShiftRequests: boolean;
   canManageEmployees: boolean;
   canViewStaff: boolean;
+  /** authz derives this as super_admin-or-gridmaster, which is the same gate. */
+  canManageUsers: boolean;
 };
 
 type MobileServiceContext = {
@@ -118,6 +127,8 @@ type FetchLinkedEmployeeForUser = (
 ) => Promise<MobileLinkedEmployee | null>;
 
 type FetchMobileUnreadNotificationCount = (userClient: SupabaseClient) => Promise<number>;
+
+type FetchTermsAcceptedVersion = (userId: string) => Promise<string | null>;
 
 type FetchMobileAbsenceTypes = (
   serviceClient: SupabaseClient,
@@ -226,6 +237,7 @@ export async function loadMobileBootstrapPayload(
     fetchMobileRoles: FetchMobileNamedItems;
     fetchMobileCertifications: FetchMobileNamedItems;
     fetchMobileDepartments: FetchMobileDepartments;
+    fetchTermsAcceptedVersion: FetchTermsAcceptedVersion;
     mapOrganizationToMobileConfig: MapOrganizationToMobileConfig;
   },
 ): Promise<MobileBootstrapResponse> {
@@ -237,6 +249,7 @@ export async function loadMobileBootstrapPayload(
     roles,
     certifications,
     departments,
+    termsAcceptedVersion,
   ] = await Promise.all([
     deps.fetchLinkedEmployeeForUser(auth.serviceClient, auth.currentOrg.id, auth.user.id),
     deps.fetchMobileUnreadNotificationCount(auth.userClient),
@@ -245,6 +258,7 @@ export async function loadMobileBootstrapPayload(
     deps.fetchMobileRoles(auth.serviceClient, auth.currentOrg.id),
     deps.fetchMobileCertifications(auth.serviceClient, auth.currentOrg.id),
     deps.fetchMobileDepartments(auth.serviceClient, auth.currentOrg.id),
+    deps.fetchTermsAcceptedVersion(auth.user.id),
   ]);
 
   return {
@@ -264,7 +278,14 @@ export async function loadMobileBootstrapPayload(
       isCurrent: membership.orgId === auth.currentOrg.id,
     })),
     effectiveRole: getEffectiveMobileRole(auth.permissions.role),
-    permissions: auth.permissions,
+    permissions: {
+      ...auth.permissions,
+      // Not an admin permission on either platform: granting management access
+      // and setting org roles is super_admin-or-gridmaster, which authz already
+      // derives as canManageUsers. Spelled out here because the response schema
+      // strips keys it doesn't name, so it would otherwise fall to its default.
+      canManageManagementAccess: auth.permissions.canManageUsers,
+    },
     linkedEmployee: linkedEmployee
       ? {
           id: linkedEmployee.id,
@@ -281,6 +302,7 @@ export async function loadMobileBootstrapPayload(
     certifications,
     departments,
     unreadNotificationCount,
+    acceptedCurrentTerms: hasAcceptedCurrentTerms(termsAcceptedVersion),
   };
 }
 

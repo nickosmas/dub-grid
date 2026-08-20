@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# The checks that need the whole repo. These are the ones that catch what a
+# per-file lint cannot: a shared token whose new value breaks a contrast
+# assertion, a type that stopped lining up across a workspace boundary.
+#
+# Both run through Turborepo, so an unchanged workspace replays from cache and
+# the hook usually costs far less than a cold run.
+#
+# Bypass with `git push --no-verify` when you need to.
+
+set -e
+
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
+
+echo "pre-push: type-check"
+if ! npm run type-check --silent; then
+  echo
+  echo "  Type-check failed. Push blocked."
+  exit 1
+fi
+
+echo "pre-push: tests"
+if ! npm test --silent; then
+  echo
+  echo "  Tests failed. Push blocked."
+  echo "  Re-run a suspect file in isolation before trusting a full-suite total:"
+  echo "    npx vitest run <path> --root apps/mobile"
+  exit 1
+fi
+
+exit 0

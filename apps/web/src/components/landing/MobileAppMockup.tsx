@@ -90,7 +90,10 @@ const ME_HERO_GRADIENT_DARK =
 const ME_HERO_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
 const ME_HERO_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
-/* ── mobileTypographyTokens.text — { fontSize, lineHeight, fontWeight } ── */
+/* ── mobileTypographyTokens.text, restated as CSS ── the token itself carries
+   { fontSize, lineHeight, fontFamily }, since DM Sans is four single-weight
+   files on mobile. Here it's one webfont, so the family's weight becomes a
+   plain numeric `fontWeight`. ── */
 const heroMetric = { fontSize: 24, lineHeight: "30px", fontWeight: 700 };
 const sectionTitle = { fontSize: 16, lineHeight: "22px", fontWeight: 700 };
 const rowTitle = { fontSize: 15, lineHeight: "21px", fontWeight: 600 };

@@ -150,6 +150,7 @@ describe("mobile people route", () => {
         statusNote: "",
         userId: null,
         version: 7,
+        membershipUpdatedAt: null,
         pendingInvitation: null,
       },
     ]);
@@ -186,6 +187,7 @@ describe("mobile people route", () => {
         statusNote: "",
         userId: null,
         version: 7,
+        membershipUpdatedAt: null,
         pendingInvitation: null,
       },
     ]);

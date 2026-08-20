@@ -193,11 +193,11 @@ function HeaderBillingNotice({ orgId, compact = false }: { orgId: string; compac
   );
 }
 
-const renderDrawerIcon = (id: string, active: boolean): React.ReactNode => {
+const renderDrawerIcon = (id: string): React.ReactNode => {
   const item = NAV_ITEMS.find((i) => i.id === id);
   if (!item) return <span />;
   const Icon = item.Icon;
-  return <Icon size={22} active={active} />;
+  return <Icon size={22} />;
 };
 
 /* ── Hamburger Icon ──────────────────────────────────────── */
@@ -273,22 +273,6 @@ export default function Header({ orgName }: HeaderProps) {
           : pathname.startsWith("/settings")
             ? "settings"
             : "";
-
-  // Schedule owns the full viewport for grid space and always uses a flat
-  // 16px, not the wider clamp. Dashboard matches Schedule's padding rather
-  // than the wider Reports/Alerts clamp so the two calendar-style pages
-  // (and their in-page toolbars) share the same horizontal rhythm.
-  const isFlatPaddingRoute = pathname.startsWith("/schedule") || pathname.startsWith("/dashboard");
-
-  // Routes with their own collapsible sidebar (People/Settings/Profile all
-  // share the same `SettingsShell` or sidebar chrome) keep the logo centered
-  // over the collapsed icon rail (9px). Everywhere else, the logo aligns with
-  // that page's own content edge instead — see PageContainer's padding.
-  const hasSidebarChrome =
-    pathname.startsWith("/people") ||
-    pathname.startsWith("/settings") ||
-    pathname.startsWith("/profile") ||
-    pathname.startsWith("/account");
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.id === "dashboard") return !isManagementOnlyUser;
@@ -404,7 +388,8 @@ export default function Header({ orgName }: HeaderProps) {
     <ConfirmDialog
       title="Exit sandbox to sign out"
       message="You're in sandbox mode. Signing out will permanently discard your sandbox and all its changes."
-      confirmLabel={exitingForLogout ? "Signing out…" : "Exit & sign out"}
+      confirmLabel="Exit & sign out"
+      confirmPendingLabel="Signing out"
       cancelLabel="Cancel"
       variant="danger"
       isLoading={exitingForLogout}
@@ -425,7 +410,7 @@ export default function Header({ orgName }: HeaderProps) {
         <div
           style={{
             background: "var(--color-surface)",
-            padding: "0 12px",
+            padding: "0 var(--dg-page-gutter)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -500,7 +485,7 @@ export default function Header({ orgName }: HeaderProps) {
             id: item.id,
             href: item.href,
             label: item.label,
-            icon: renderDrawerIcon(item.id, activeTab === item.id),
+            icon: renderDrawerIcon(item.id),
           }))}
           activeTab={activeTab}
           isGridmaster={isGridmaster}
@@ -528,15 +513,11 @@ export default function Header({ orgName }: HeaderProps) {
       <div
         style={{
           background: "var(--color-surface)",
-          // On pages with a collapsible sidebar (People/Settings/Profile),
-          // 9px centers the logo over the collapsed (icon-only) rail
-          // (--sidebar-width-icon is 3rem in components/ui/sidebar.tsx), so
-          // it stays aligned with it when the sidebar collapses. Schedule and
-          // Dashboard stay flat 16px to match their own toolbar padding.
-          // Everywhere else, the logo aligns with that page's own content
-          // edge, which uses the same clamp(16px, 3vw, 40px) as PageContainer.
-          paddingLeft: hasSidebarChrome ? 9 : isFlatPaddingRoute ? 16 : "clamp(16px, 3vw, 40px)",
-          paddingRight: 16,
+          // The logo sits on the canonical page gutter on every route, with no
+          // per-route exceptions — every page's left content edge uses the same
+          // token, so the logo never shifts as you navigate.
+          paddingLeft: "var(--dg-page-gutter)",
+          paddingRight: "var(--dg-page-gutter)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -598,7 +579,7 @@ export default function Header({ orgName }: HeaderProps) {
                 href={item.href}
                 className={`dg-nav-tab${active ? " active" : ""}`}
               >
-                <Icon size={16} active={active} />
+                <Icon size={16} />
                 {item.label}
               </Link>
             );

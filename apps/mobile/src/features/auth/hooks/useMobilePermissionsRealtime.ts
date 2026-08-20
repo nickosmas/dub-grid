@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { createRealtimeChannelName, subscribeToPostgresChanges } from "@dubgrid/realtime-core";
 import { getSupabaseClient } from "../../../shared/lib/supabase";
+import { BOOTSTRAP_QUERY_KEY_PREFIX } from "./useBootstrap";
 
 // Realtime: re-resolve the bootstrap-derived permission cache on membership
 // changes. When another session (e.g. super_admin) updates the current
@@ -41,7 +42,9 @@ export function useMobilePermissionsRealtime({
 
     const reResolve = () => {
       void queryClient.refetchQueries({
-        queryKey: ["mobile", "bootstrap", accessToken],
+        // Prefix match: the entry is keyed by user id, which this hook has no
+        // reason to restate. Only one account is signed in at a time anyway.
+        queryKey: BOOTSTRAP_QUERY_KEY_PREFIX,
         type: "active",
       });
     };

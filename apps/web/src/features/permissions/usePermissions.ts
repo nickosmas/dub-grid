@@ -46,12 +46,18 @@ const NO_PERMS: WebPermissions = {
 let permsCache: WebPermissions | null = null;
 let permsCacheTimestamp = 0;
 let permsCacheUserId: string | null = null;
+// Part of the cache identity, not just of its contents: one user can be an
+// admin in one organization and a plain member of another, so a user-only key
+// served the previous org's role, orgId and admin_permissions for up to the 10s
+// window after a same-user org change.
+let permsCacheOrgId: string | null = null;
 
-/** Clear the permission cache (call on logout). Does NOT affect user view state. */
+/** Clear the permission cache (call on logout, and on org switch). Does NOT affect user view state. */
 export function clearPermsCache(): void {
   permsCache = null;
   permsCacheTimestamp = 0;
   permsCacheUserId = null;
+  permsCacheOrgId = null;
 }
 
 // ── User View toggle ───────────────────────────────────────────────────────
@@ -131,22 +137,28 @@ export function usePermissions(): WebPermissions {
       return;
     }
 
-    // Different user than what's cached: invalidate so we don't flash the
-    // previous user's resolved permissions while the new ones load.
-    if (permsCache && permsCacheUserId && permsCacheUserId !== userId) {
+    // Resolved before the cache checks below, because the org is half of the
+    // cache's identity. Both claims come straight off the token — no network.
+    const { effectiveRole, orgId } = extractJwtClaims(accessToken);
+
+    // Different user OR different organization than what's cached: invalidate
+    // so we don't flash the previous context's resolved permissions while the
+    // new ones load.
+    if (
+      permsCache &&
+      ((permsCacheUserId && permsCacheUserId !== userId) || permsCacheOrgId !== orgId)
+    ) {
       clearPermsCache();
       setPerms({ ...LOADING_PERMS });
     }
 
-    // Fresh same-user cache: just surface it (every hook instance reads the
-    // same module-level cache).
-    const sameUser = permsCacheUserId === userId;
-    if (permsCache && sameUser && Date.now() - permsCacheTimestamp < 10_000) {
+    // Fresh cache for this exact user + org: just surface it (every hook
+    // instance reads the same module-level cache).
+    const sameContext = permsCacheUserId === userId && permsCacheOrgId === orgId;
+    if (permsCache && sameContext && Date.now() - permsCacheTimestamp < 10_000) {
       setPerms(permsCache);
       return;
     }
-
-    const { effectiveRole, orgId } = extractJwtClaims(accessToken);
 
     // Surface the JWT-derived orgId immediately, while permissions are still
     // loading. orgId is a JWT claim (no network needed), so orgId-gated queries
@@ -177,6 +189,7 @@ export function usePermissions(): WebPermissions {
         permsCache = merged;
         permsCacheTimestamp = Date.now();
         permsCacheUserId = userId;
+        permsCacheOrgId = orgId;
         setPerms(merged);
       } catch {
         if (!mounted) return;
@@ -189,6 +202,7 @@ export function usePermissions(): WebPermissions {
         permsCache = fallback;
         permsCacheTimestamp = Date.now();
         permsCacheUserId = userId;
+        permsCacheOrgId = orgId;
         setPerms(fallback);
       }
     })();

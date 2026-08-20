@@ -5,6 +5,24 @@ type ReactModule = typeof ReactType;
 
 export const screenScrollToMock = vi.fn();
 export const alertMock = vi.fn();
+export const keyboardDismissMock = vi.fn();
+export const announceForAccessibilityMock = vi.fn();
+
+/**
+ * Live `Keyboard.addListener` subscriptions, so a test can drive the keyboard.
+ * The real events come from the platform, and a hook that answers them has no
+ * other way to be exercised.
+ */
+const keyboardListeners = new Map<string, Set<(event: unknown) => void>>();
+
+/** Names the component under test is currently subscribed to, in order. */
+export function subscribedKeyboardEvents(): string[] {
+  return [...keyboardListeners].filter(([, handlers]) => handlers.size > 0).map(([name]) => name);
+}
+
+export function emitKeyboardEvent(name: string, event: unknown = {}): void {
+  for (const handler of [...(keyboardListeners.get(name) ?? [])]) handler(event);
+}
 
 function pickDomProps(input: Record<string, any>) {
   const output: Record<string, any> = {};
@@ -27,8 +45,10 @@ function pickDomProps(input: Record<string, any>) {
       key === "style" ||
       key === "hitSlop" ||
       key === "animationType" ||
-      key === "allowSwipeDismissal" ||
       key === "presentationStyle" ||
+      key === "navigationBarTranslucent" ||
+      key === "statusBarTranslucent" ||
+      key === "bounces" ||
       key === "transparent" ||
       key === "visible" ||
       key === "onRequestClose" ||
@@ -38,6 +58,7 @@ function pickDomProps(input: Record<string, any>) {
       key === "contentInsetAdjustmentBehavior" ||
       key === "automaticallyAdjustContentInsets" ||
       key === "automaticallyAdjustsScrollIndicatorInsets" ||
+      key === "scrollEventThrottle" ||
       key === "stickyHeaderIndices" ||
       key === "onStartShouldSetResponder" ||
       key === "onLayout" ||
@@ -67,10 +88,14 @@ function pickDomProps(input: Record<string, any>) {
         continue;
       }
       const state = value as {
+        busy?: boolean;
         disabled?: boolean;
         expanded?: boolean;
         selected?: boolean;
       };
+      if (state.busy !== undefined) {
+        output["aria-busy"] = String(state.busy);
+      }
       if (state.disabled !== undefined) {
         output["aria-disabled"] = String(state.disabled);
       }
@@ -88,37 +113,76 @@ function pickDomProps(input: Record<string, any>) {
       continue;
     }
 
+    // Kept (rather than dropped) so tests can assert which accessory view a
+    // field is wired to, but renamed so React doesn't warn about the casing.
+    if (key === "inputAccessoryViewID") {
+      if (value != null) {
+        output["data-input-accessory-view-id"] = value;
+      }
+      continue;
+    }
+
     output[key] = value;
   }
 
   return output;
 }
 
-export function createReactNativeModule(React: ReactModule) {
+export function createReactNativeModule(
+  React: ReactModule,
+  options: { platformOS?: "ios" | "android" } = {},
+) {
+  const platformOS = options.platformOS ?? "ios";
   let layoutOffset = 0;
-  const View = ({ children, onLayout, ...props }: Record<string, any>) => {
-    const layoutYRef = React.useRef<number | null>(null);
+  const View = React.forwardRef<unknown, Record<string, any>>(
+    ({ children, onLayout, ...props }, ref) => {
+      const layoutYRef = React.useRef<number | null>(null);
 
-    if (layoutYRef.current == null) {
-      layoutYRef.current = layoutOffset;
-      layoutOffset += 120;
-    }
+      if (layoutYRef.current == null) {
+        layoutYRef.current = layoutOffset;
+        layoutOffset += 120;
+      }
 
-    React.useEffect(() => {
-      onLayout?.({
-        nativeEvent: {
-          layout: {
-            x: 0,
-            y: layoutYRef.current ?? 0,
-            width: 0,
-            height: 100,
+      // Native measurement, stubbed. Without this a ref'd View resolves to the
+      // underlying DOM node, which has no `measureInWindow`, and anything that
+      // measures itself (the skeleton shimmer reads its own window x) throws
+      // during the layout effect.
+      React.useImperativeHandle(
+        ref,
+        () => ({
+          measureInWindow: (
+            callback: (x: number, y: number, width: number, height: number) => void,
+          ) => callback(0, layoutYRef.current ?? 0, 0, 100),
+          measure: (
+            callback: (
+              x: number,
+              y: number,
+              width: number,
+              height: number,
+              pageX: number,
+              pageY: number,
+            ) => void,
+          ) => callback(0, 0, 0, 100, 0, layoutYRef.current ?? 0),
+        }),
+        [],
+      );
+
+      React.useEffect(() => {
+        onLayout?.({
+          nativeEvent: {
+            layout: {
+              x: 0,
+              y: layoutYRef.current ?? 0,
+              width: 0,
+              height: 100,
+            },
           },
-        },
-      });
-    }, [onLayout]);
+        });
+      }, [onLayout]);
 
-    return React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
-  };
+      return React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
+    },
+  );
   const Text = ({ children, ...props }: Record<string, any>) =>
     React.createElement("span", pickDomProps(props), children as ReactType.ReactNode);
   const ScrollView = React.forwardRef<{ scrollTo: typeof screenScrollToMock }, Record<string, any>>(
@@ -143,6 +207,19 @@ export function createReactNativeModule(React: ReactModule) {
   );
   const KeyboardAvoidingView = ({ children, ...props }: Record<string, any>) =>
     React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
+  // The real view renders above the keyboard rather than inline, but keeping
+  // its children in the tree lets tests assert the Done affordance exists.
+  const InputAccessoryView = ({
+    children,
+    nativeID,
+    backgroundColor: _backgroundColor,
+    ...props
+  }: Record<string, any>) =>
+    React.createElement(
+      "div",
+      { ...pickDomProps(props), "data-native-id": nativeID },
+      children as ReactType.ReactNode,
+    );
   const Image = ({ source, ...props }: Record<string, any>) =>
     React.createElement("img", {
       alt: props.accessibilityLabel ?? "",
@@ -150,17 +227,28 @@ export function createReactNativeModule(React: ReactModule) {
     });
   const SafeAreaView = ({ children, ...props }: Record<string, any>) =>
     React.createElement("div", pickDomProps(props), children as ReactType.ReactNode);
-  const Pressable = ({ children, onPress, disabled, ...props }: Record<string, any>) =>
-    React.createElement(
+  // forwardRef so `Animated.createAnimatedComponent(Pressable)` can hand it a
+  // ref without React warning about a function component receiving one.
+  const Pressable = React.forwardRef<HTMLButtonElement, Record<string, any>>(function Pressable(
+    { children, onPress, onPressIn, onPressOut, disabled, ...props },
+    ref,
+  ) {
+    return React.createElement(
       "button",
       {
+        ref,
         type: "button",
         disabled,
         onClick: onPress as (() => void) | undefined,
+        // Mapped to mouse down/up so press *feedback* is testable: the press
+        // animation and its haptic both fire on press-in, not on press.
+        onMouseDown: disabled ? undefined : (onPressIn as (() => void) | undefined),
+        onMouseUp: disabled ? undefined : (onPressOut as (() => void) | undefined),
         ...pickDomProps(props),
       },
       children as ReactType.ReactNode,
     );
+  });
   const TextInput = React.forwardRef<
     HTMLInputElement,
     Record<string, any> & {
@@ -247,6 +335,7 @@ export function createReactNativeModule(React: ReactModule) {
           return undefined;
         },
       }),
+      announceForAccessibility: announceForAccessibilityMock,
       isReduceMotionEnabled: () => Promise.resolve(false),
     },
     ActivityIndicator: (props: Record<string, any>) =>
@@ -285,6 +374,21 @@ export function createReactNativeModule(React: ReactModule) {
       get: () => null,
       getEnforcing: () => new Proxy({}, { get: () => () => undefined }),
     },
+    InputAccessoryView,
+    Keyboard: {
+      dismiss: keyboardDismissMock,
+      addListener: (name: string, handler: (event: unknown) => void) => {
+        const handlers = keyboardListeners.get(name) ?? new Set<(event: unknown) => void>();
+        handlers.add(handler);
+        keyboardListeners.set(name, handlers);
+
+        return {
+          remove() {
+            handlers.delete(handler);
+          },
+        };
+      },
+    },
     KeyboardAvoidingView,
     Image,
     LayoutAnimation: {
@@ -303,8 +407,8 @@ export function createReactNativeModule(React: ReactModule) {
     },
     Modal,
     Platform: {
-      OS: "ios",
-      select: (value: Record<string, any>) => value.ios ?? value.default ?? null,
+      OS: platformOS,
+      select: (value: Record<string, any>) => value[platformOS] ?? value.default ?? null,
     },
     Pressable,
     RefreshControl: () => null,
@@ -419,5 +523,10 @@ export function createScreenModule(React: ReactModule) {
         children,
       );
     },
+    // Skeletons import these from the real Screen module so their placeholder
+    // card is literally the card's own surface. The harness drops `style`
+    // anyway, so the shape only has to exist, not carry values.
+    CARD_ICON_FRAME_SIZE: 32,
+    getCardSurfaceStyle: () => ({}),
   };
 }

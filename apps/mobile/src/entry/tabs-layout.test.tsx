@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { createReactNativeModule } from "../test/native";
 
 const useSessionState = vi.fn();
 const useBootstrap = vi.fn();
@@ -8,19 +9,11 @@ const triggerIconMock = vi.fn();
 const stackScreenMock = vi.fn();
 const handleExpiredMobileSession = vi.fn();
 
-vi.mock("react-native", async () => {
-  const React = await import("react");
-
-  return {
-    AppState: {
-      addEventListener: vi.fn(() => ({ remove: vi.fn() })),
-    },
-    Platform: {
-      OS: "ios",
-    },
-    View: ({ children }: { children: React.ReactNode }) => React.createElement("div", {}, children),
-  };
-});
+// The shared emulation rather than a three-export hand-roll: the tab layout
+// pulls in Button, which pulls in Reanimated, which needs most of the module.
+vi.mock("react-native", async () =>
+  createReactNativeModule(await import("react"), { platformOS: "ios" }),
+);
 
 vi.mock("@expo/vector-icons/Ionicons", () => ({
   default: {
@@ -169,12 +162,36 @@ describe("TabsLayout", () => {
     });
   });
 
-  it("shows the app splash screen instead of a spinner while the session is restoring", () => {
+  // StartupSplashGate, above the router, owns the app's one splash and is still
+  // covering the screen whenever this is reached on a cold launch. Rendering a
+  // second instance here restarted the brand animation mid-handoff, which is
+  // what read as the splash showing twice.
+  it("renders nothing rather than a second splash while the session is restoring", () => {
     useSessionState.mockReturnValue({ accessToken: undefined, isLoading: true });
 
-    render(<TabsLayout />);
+    const { container } = render(<TabsLayout />);
 
-    expect(screen.getByText("app-splash-screen")).toBeInTheDocument();
+    expect(screen.queryByText("app-splash-screen")).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  // Holding here is what keeps the Home tab from picking a screen (and a
+  // skeleton shape) before it knows whether this is an admin. Every
+  // `canView*` permission is also false until bootstrap lands, so releasing
+  // early made the tab bar itself pop tabs in afterwards.
+  it("keeps blocking until bootstrap resolves, not just the session", () => {
+    useBootstrap.mockReturnValue({
+      data: undefined,
+      error: null,
+      isFetching: true,
+      isLoading: true,
+      refetch: vi.fn(),
+    });
+
+    const { container } = render(<TabsLayout />);
+
+    expect(container).toBeEmptyDOMElement();
+    expect(stackScreenMock).not.toHaveBeenCalled();
   });
 
   it("uses SF symbols on iOS and Android vector icon sources for the native tabs", () => {
@@ -197,21 +214,32 @@ describe("TabsLayout", () => {
     }
   });
 
+  // The large-title screens carry no header background at all: an explicit one
+  // makes an iOS 26 large title invisible, and painting it via
+  // `headerBackground` makes the header translucent and stops it collapsing.
+  // The page's own `background` shows through instead. Detail screens keep the
+  // plain opaque header — they have no large title to lose.
   it("uses native stack headers for request, people, and profile tab pages", () => {
     render(<RequestsLayout />);
     render(<PeopleLayout />);
     render(<ProfileLayout />);
 
-    expect(stackScreenMock).toHaveBeenCalledTimes(11);
+    // Profile contributes nine: index, account, work, security, and the three
+    // security flows split out of it (password, two-factor, sessions), plus
+    // notifications and privacy. People contributes three now that the
+    // management profile is retired: index, add, and the one person page.
+    expect(stackScreenMock).toHaveBeenCalledTimes(13);
     const requestsOptions = stackScreenMock.mock.calls[0]?.[0].options;
     const peopleOptions = stackScreenMock.mock.calls[1]?.[0].options;
-    const profileOptions = stackScreenMock.mock.calls[4]?.[0].options;
+    const profileOptions = stackScreenMock.mock.calls[5]?.[0].options;
 
     expect(stackScreenMock.mock.calls[0]?.[0]).toMatchObject({
       name: "index",
       options: {
         headerLargeTitle: true,
         headerLargeTitleEnabled: true,
+        // No background of any kind: an explicit one makes an iOS 26 large
+        // title invisible, and `headerBackground` costs it the collapse.
         headerStyle: undefined,
         title: "Requests",
       },
@@ -222,40 +250,43 @@ describe("TabsLayout", () => {
       options: {
         headerLargeTitle: true,
         headerLargeTitleEnabled: true,
+        // No background of any kind: an explicit one makes an iOS 26 large
+        // title invisible, and `headerBackground` costs it the collapse.
         headerStyle: undefined,
         title: "People",
       },
     });
     expect(peopleOptions).not.toHaveProperty("headerLargeStyle");
+    // The People and Profile sections take large titles at every level, so
+    // their pushed screens opt in too, and follow the same no-background rule.
     expect(stackScreenMock.mock.calls[2]?.[0]).toMatchObject({
       name: "add",
       options: {
-        headerLargeTitle: false,
-        headerLargeTitleEnabled: false,
-        headerStyle: {
-          backgroundColor: expect.any(String),
-        },
+        headerLargeTitle: true,
+        headerLargeTitleEnabled: true,
+        headerStyle: undefined,
         title: "Add Person",
       },
     });
-    const peopleDetailOptions = stackScreenMock.mock.calls[3]?.[0].options;
+    // The person page is the section's exception: its heading is the centered
+    // identity block the screen draws, so it takes a plain static title. A
+    // large title here would be the person's name printed a second time, in a
+    // bar the page has already named under the avatar.
     expect(stackScreenMock.mock.calls[3]?.[0]).toMatchObject({
       name: "[id]",
       options: {
         headerLargeTitle: false,
         headerLargeTitleEnabled: false,
-        headerStyle: {
-          backgroundColor: expect.any(String),
-        },
-        title: "Person",
+        title: "Staff Profile",
       },
     });
-    expect(peopleDetailOptions).not.toHaveProperty("headerLargeStyle");
     expect(stackScreenMock.mock.calls[4]?.[0]).toMatchObject({
       name: "index",
       options: {
         headerLargeTitle: true,
         headerLargeTitleEnabled: true,
+        // No background of any kind: an explicit one makes an iOS 26 large
+        // title invisible, and `headerBackground` costs it the collapse.
         headerStyle: undefined,
         title: "Profile",
       },
@@ -266,9 +297,13 @@ describe("TabsLayout", () => {
       "account",
       "work",
       "security",
+      // The three flows lifted out of the security page, registered next to it
+      // so the section reads in the order it is navigated.
+      "password",
+      "two-factor",
+      "sessions",
       "notifications",
       "privacy",
-      "appearance",
     ]);
   });
 

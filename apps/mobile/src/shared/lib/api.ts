@@ -18,6 +18,9 @@ import {
   mobileNotificationFacetsSchema,
   mobileNotificationReadResponseSchema,
   mobileNotificationsResponseSchema,
+  mobileManagementAccessResponseSchema,
+  mobileManagementUserResponseSchema,
+  mobileManagementUsersResponseSchema,
   mobileOrgScheduleResponseSchema,
   mobilePersonResponseSchema,
   mobilePersonCreateResponseSchema,
@@ -31,11 +34,19 @@ import {
   mobileUpdateShiftRequestResponseSchema,
   mobileOrganizationLookupResponseSchema,
   mobileOrgStatusResponseSchema,
+  mobileTermsAcceptanceResponseSchema,
   type MobileAuthSession,
   type MobileAuthLoginResponse,
   type MobileCreateShiftRequestBody,
   type MobileBootstrapResponse,
   type MobileOrgStatusResponse,
+  type MobileTermsAcceptanceResponse,
+  type MobileManagementAccessBody,
+  type MobileManagementAccessRemoveBody,
+  type MobileManagementUserInvitationActionBody,
+  type MobileManagementUserInviteBody,
+  type MobileManagementUserRemoveBody,
+  type MobileManagementUserUpdateBody,
   type MobilePersonInvitationActionBody,
   type MobilePersonCreateBody,
   type MobilePersonInvitationCreateBody,
@@ -291,6 +302,15 @@ export function parseMobileNameMismatchError(error: unknown): MobileNameMismatch
 export function getBootstrap(accessToken: string): Promise<MobileBootstrapResponse> {
   return mobileApiRequest("/api/mobile/v1/bootstrap", accessToken, { method: "GET" }, (value) =>
     mobileBootstrapResponseSchema.parse(value),
+  );
+}
+
+export function acceptCurrentTerms(accessToken: string): Promise<MobileTermsAcceptanceResponse> {
+  return mobileApiRequest(
+    "/api/mobile/v1/profile/terms",
+    accessToken,
+    { method: "POST", body: JSON.stringify({}) },
+    (value) => mobileTermsAcceptanceResponseSchema.parse(value),
   );
 }
 
@@ -817,6 +837,107 @@ export function revokeMobilePersonInvitation(
       body: JSON.stringify(body),
     },
     (value) => mobilePersonInvitationResponseSchema.parse(value),
+  );
+}
+
+export function updateMobilePersonManagementAccess(
+  accessToken: string,
+  personId: string,
+  body: MobileManagementAccessBody,
+) {
+  return mobileApiRequest(
+    `/api/mobile/v1/people/${personId}/management-access`,
+    accessToken,
+    {
+      method: "PUT",
+      body: JSON.stringify(body),
+    },
+    (value) => mobileManagementAccessResponseSchema.parse(value),
+  );
+}
+
+export function removeMobilePersonManagementAccess(
+  accessToken: string,
+  personId: string,
+  body: MobileManagementAccessRemoveBody,
+) {
+  return mobileApiRequest(
+    `/api/mobile/v1/people/${personId}/management-access`,
+    accessToken,
+    {
+      method: "DELETE",
+      body: JSON.stringify(body),
+    },
+    (value) => mobileManagementAccessResponseSchema.parse(value),
+  );
+}
+
+export function getManagementUsers(accessToken: string) {
+  return mobileApiRequest("/api/mobile/v1/management-users", accessToken, {}, (value) =>
+    mobileManagementUsersResponseSchema.parse(value),
+  );
+}
+
+export function inviteMobileManagementUser(
+  accessToken: string,
+  body: MobileManagementUserInviteBody,
+) {
+  return mobileApiRequest(
+    "/api/mobile/v1/management-users",
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    (value) => mobileManagementUserResponseSchema.parse(value),
+  );
+}
+
+export function updateMobileManagementUser(
+  accessToken: string,
+  personId: string,
+  body: MobileManagementUserUpdateBody,
+) {
+  return mobileApiRequest(
+    `/api/mobile/v1/management-users/${encodeURIComponent(personId)}`,
+    accessToken,
+    {
+      method: "PUT",
+      body: JSON.stringify(body),
+    },
+    (value) => mobileManagementUserResponseSchema.parse(value),
+  );
+}
+
+export function removeMobileManagementUser(
+  accessToken: string,
+  personId: string,
+  body: MobileManagementUserRemoveBody,
+) {
+  return mobileApiRequest(
+    `/api/mobile/v1/management-users/${encodeURIComponent(personId)}`,
+    accessToken,
+    {
+      method: "DELETE",
+      body: JSON.stringify(body),
+    },
+    (value) => mobileManagementUserResponseSchema.parse(value),
+  );
+}
+
+export function updateMobileManagementUserInvitation(
+  accessToken: string,
+  personId: string,
+  body: MobileManagementUserInvitationActionBody,
+) {
+  return mobileApiRequest(
+    `/api/mobile/v1/management-users/${encodeURIComponent(personId)}/invitation`,
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+    },
+    (value) => mobileManagementUserResponseSchema.parse(value),
   );
 }
 

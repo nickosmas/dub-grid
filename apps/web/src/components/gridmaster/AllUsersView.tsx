@@ -592,6 +592,7 @@ export default function AllUsersView({
               : `Deactivate "${deactivateConfirm.email}"? They will be blocked from logging in across all orgs.`
           }
           confirmLabel={!!deactivateConfirm.deactivatedAt ? "Reactivate" : "Deactivate"}
+          confirmPendingLabel={!!deactivateConfirm.deactivatedAt ? "Reactivating" : "Deactivating"}
           variant={!!deactivateConfirm.deactivatedAt ? "info" : "danger"}
           isLoading={actionLoading === deactivateConfirm.id}
           onConfirm={() => handleDeactivate(deactivateConfirm)}
@@ -605,6 +606,7 @@ export default function AllUsersView({
           title="Force Logout"
           message={`Terminate all sessions for "${forceLogoutConfirm.email}"? They will need to log in again.`}
           confirmLabel="Force Logout"
+          confirmPendingLabel="Signing Out"
           variant="danger"
           isLoading={actionLoading === forceLogoutConfirm.id}
           onConfirm={() => handleForceLogout(forceLogoutConfirm)}
@@ -618,6 +620,7 @@ export default function AllUsersView({
           title="Send Password Reset"
           message={`Send a password reset email to "${resetConfirm.email}"?`}
           confirmLabel="Send Reset Email"
+          confirmPendingLabel="Sending"
           variant="info"
           isLoading={actionLoading === resetConfirm.id}
           onConfirm={() => handlePasswordReset(resetConfirm)}

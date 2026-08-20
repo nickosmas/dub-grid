@@ -5,6 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 import { DubGridLogo } from "@/components/Logo";
 import { fetchAccountIdentity } from "@/features/account/client";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 export default function OnboardingPage() {
   const { user, signOut, isLoading: isAuthLoading } = useAuth();
@@ -151,7 +152,9 @@ export default function OnboardingPage() {
               boxShadow: "0 4px 12px rgba(37, 99, 235, 0.2)",
             }}
           >
-            {checking ? "Checking..." : "I've been invited — refresh"}
+            <ButtonLoading loading={checking} loadingLabel="Checking">
+              I've been invited — refresh
+            </ButtonLoading>
           </button>
 
           {pollTimedOut && (

@@ -12,6 +12,7 @@ import {
   markAllNotificationsRead,
 } from "@/features/notifications/client";
 import { useAuth } from "@/components/AuthProvider";
+import { usePermissions } from "@/hooks";
 import { useNotificationsRealtime } from "@/hooks/useNotificationsRealtime";
 import { useAccountRealtimeInvalidation } from "@/hooks/useAccountRealtimeInvalidation";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -210,6 +211,9 @@ export default function NotificationBell({
 } = {}) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  // Alerts are org-filtered server-side, so the org is part of this cache's
+  // identity, not just of the request.
+  const { orgId } = usePermissions();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [confirmingMarkAllRead, setConfirmingMarkAllRead] = useState(false);
@@ -218,7 +222,7 @@ export default function NotificationBell({
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: userId
-      ? queryKeys.notifications.unreadCount(userId)
+      ? queryKeys.notifications.unreadCount(userId, orgId)
       : ["notifications", "anon", "unreadCount"],
     queryFn: fetchUnreadNotificationCount,
     enabled: !!userId,
@@ -227,7 +231,9 @@ export default function NotificationBell({
   });
 
   const { data: notifications = [], isFetching: loading } = useQuery<Notification[]>({
-    queryKey: userId ? queryKeys.notifications.recent(userId) : ["notifications", "anon", "recent"],
+    queryKey: userId
+      ? queryKeys.notifications.recent(userId, orgId)
+      : ["notifications", "anon", "recent"],
     queryFn: () => fetchNotifications({ limit: 20 }),
     enabled: open && !!userId,
   });
@@ -595,6 +601,7 @@ export default function NotificationBell({
               : `This marks all ${unreadCount} unread alerts as read.`
           }
           confirmLabel="Mark all read"
+          confirmPendingLabel="Marking read"
           variant="info"
           onConfirm={handleConfirmMarkAllRead}
           onCancel={() => setConfirmingMarkAllRead(false)}

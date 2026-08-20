@@ -128,6 +128,33 @@ Shared primitives — use before creating alternatives:
 
 Font: DM Sans only (`var(--font-dm-sans)`). Never Geist.
 
+## Unsaved Changes
+
+Nothing holding user input may be thrown away silently. Two guards, by surface —
+they compose, and a modal that wants both is fine:
+
+- **A modal guards its own dismissal.** `useUnsavedChangesPrompt` returns
+  `{ requestClose, unsavedChangesDialog }`; wire `requestClose` into
+  `<Modal onRequestClose>`, which is the single veto point for Escape, the
+  backdrop and the X button. Render `unsavedChangesDialog` as a sibling.
+- **A page-level editor guards navigation.** `useNavigationGuard(id, { isDirty })`
+  registers with `NavigationGuardProvider` (mounted around `<AppShell>` in
+  `app/layout.tsx`), which asks before an in-app link click and before tab
+  close/refresh. Never add a bare `beforeunload` — the provider owns it, and a
+  second one prompts twice.
+
+The provider intercepts with one capture-phase click listener on `document`
+rather than per-`Link` `onNavigate`, so links added later are covered by
+default. That listener's skip-list (modifier clicks, `target`, `download`,
+cross-origin, `mailto:`, in-page hashes) is the whole risk surface — a missed
+case breaks cmd-click app-wide, so every branch has a test in
+`__tests__/NavigationGuardProvider.test.tsx`. It resumes a confirmed navigation
+by **replaying the original click**, not by calling `router.push`, so a
+`<Link replace>` stays a replace.
+
+Deliberately not covered, and documented as such: browser Back/Forward, and
+programmatic `router.push`.
+
 ## Mobile API Contract Safety
 
 - `apps/web/src/app/api/mobile/v1/` serves the mobile app.
@@ -138,7 +165,7 @@ Font: DM Sans only (`var(--font-dm-sans)`). Never Geist.
 
 - Variable names from `.env.example` or `apps/web/.env.example` only.
 - `NEXT_PUBLIC_*` is browser-visible.
-- `SUPABASE_SERVICE_ROLE_KEY`, Stripe, Resend, Upstash, Sentry tokens are server-only.
+- `SUPABASE_SECRET_KEY`, Stripe, Resend, Upstash, Sentry tokens are server-only.
 
 ## Verification
 
@@ -146,3 +173,13 @@ Font: DM Sans only (`var(--font-dm-sans)`). Never Geist.
 - Route handler / auth / tenant / DB / Stripe changes: typecheck + targeted tests;
   `npm --workspace @dubgrid/web run build` when build/runtime boundaries are affected.
 - Mobile API contract changes: also run `npm run test:mobile`.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

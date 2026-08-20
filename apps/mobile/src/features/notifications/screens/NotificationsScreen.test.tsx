@@ -17,6 +17,7 @@ vi.mock("react-native", async () => createReactNativeModule(await import("react"
 
 vi.mock("@tanstack/react-query", () => ({
   QueryClient: class QueryClient {},
+  keepPreviousData: Symbol("keepPreviousData"),
   onlineManager: {
     isOnline: () => true,
   },
@@ -149,6 +150,48 @@ describe("NotificationsScreen", () => {
     render(<NotificationsScreen />);
 
     expect(screen.getByText("No alerts yet")).toBeInTheDocument();
+  });
+
+  // The filter row was a third hand-rolled chip strip, so selecting a filter
+  // that sat off the right edge left it scrolled out of view. It now rides on
+  // ScrollableTabStrip, which is what scrolls the active tab back in.
+  it("renders the filters as a scrollable tab strip", () => {
+    useInfiniteQuery.mockReturnValue(buildInfiniteQueryResult());
+
+    render(<NotificationsScreen />);
+
+    expect(screen.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "true");
+    for (const label of ["Unread", "Schedule", "Requests", "System", "Archived"]) {
+      expect(screen.getByRole("tab", { name: label })).toHaveAttribute("aria-selected", "false");
+    }
+
+    fireEvent.click(screen.getByRole("tab", { name: "Archived" }));
+    expect(screen.getByRole("tab", { name: "Archived" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  // Search and filter are both in the query key, so a keystroke starts a new
+  // query. `hasData` used to be derived from the rendered list's length, which
+  // meant the skeleton repainted over alerts the user was mid-read.
+  it("does not repaint a skeleton over alerts that are already on screen", async () => {
+    useInfiniteQuery.mockReturnValue(
+      buildInfiniteQueryResult({ notifications: [SAMPLE_NOTIFICATION], unreadCount: 1 }),
+    );
+
+    render(<NotificationsScreen />);
+    expect(screen.getByText("Pickup available")).toBeInTheDocument();
+
+    // A new key resolving: still fetching, and the derived list is momentarily
+    // empty, but the query itself has previous data to show.
+    useInfiniteQuery.mockReturnValue({
+      ...buildInfiniteQueryResult({ notifications: [], isLoading: true }),
+      data: { pages: [{ notifications: [], unreadCount: 0, nextCursor: null }] },
+    });
+
+    fireEvent.click(screen.getByText("Unread"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("skeleton")).not.toBeInTheDocument();
+    });
   });
 
   it("opens the detail screen when an alert is tapped and marks it read first", async () => {

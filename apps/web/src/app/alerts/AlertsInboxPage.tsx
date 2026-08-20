@@ -51,6 +51,7 @@ import type {
   NotificationType,
 } from "@/types";
 import { formatClientErrorMessage } from "@/lib/client-facing";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 const PAGE_SIZE = 25;
 
@@ -631,7 +632,9 @@ export function InboxView() {
                 onClick={handleLoadMore}
                 disabled={loadingMore}
               >
-                {loadingMore ? "Loading…" : "Load more"}
+                <ButtonLoading loading={loadingMore} loadingLabel="Loading">
+                  Load more
+                </ButtonLoading>
               </button>
             </div>
           )}
@@ -654,6 +657,7 @@ export function InboxView() {
               : `This marks all ${facets?.totalUnread ?? 0} unread alerts as read.`
           }
           confirmLabel="Mark all read"
+          confirmPendingLabel="Marking read"
           variant="info"
           onConfirm={handleMarkAllRead}
           onCancel={() => setConfirmingMarkAllRead(false)}
@@ -850,7 +854,7 @@ function FilterChip({
       data-active={active ? "true" : undefined}
       className={
         active
-          ? "bg-[var(--color-brand-bg)] text-[var(--color-brand)] ring-1 ring-[var(--color-brand-border)] ring-inset"
+          ? "bg-[var(--color-nav-active-bg)] text-[var(--color-text-primary)]"
           : "hover:bg-[var(--color-bg-secondary)]"
       }
       style={{

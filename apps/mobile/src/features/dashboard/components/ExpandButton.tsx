@@ -1,12 +1,20 @@
-import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable } from "react-native";
+import Animated from "react-native-reanimated";
+import { usePressAnimation } from "../../../shared/motion/usePressAnimation";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
-import type { MobileColors } from "../../../shared/theme/tokens";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 // Mirrors web's ExpandButton (apps/web/src/components/dashboard/ExpandButton.tsx):
-// a small icon-only button in a dashboard card's header that opens a full,
-// expanded view of that card's content.
+// the affordance in a dashboard card's header that opens a full, expanded view
+// of that card's content.
+//
+// A bare glyph rather than an icon-only `<Button>`: this sits in a card header
+// beside the title, where a 36pt tappable box with its own tone competes with
+// the title for weight. The muted glyph reads as a quiet affordance and lets
+// the header stay one line of hierarchy. `hitSlop` keeps the touch target at
+// the 44pt minimum even though the glyph is 20.
 export function ExpandButton({
   accessibilityLabel,
   onPress,
@@ -15,32 +23,22 @@ export function ExpandButton({
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
+    rippleColor: mobileColors.rippleNeutral,
+    rippleBorderless: true,
+  });
 
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
-      android_ripple={{ color: mobileColors.rippleNeutral, borderless: true }}
-      hitSlop={8}
+      android_ripple={androidRipple}
+      hitSlop={12}
       onPress={onPress}
-      style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
+      style={animatedStyle}
+      {...pressHandlers}
     >
-      <Ionicons color={mobileColors.textSecondary} name="expand-outline" size={16} />
-    </Pressable>
+      <Ionicons color={mobileColors.textMuted} name="expand-outline" size={20} />
+    </AnimatedPressable>
   );
 }
-
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    button: {
-      width: 28,
-      height: 28,
-      borderRadius: 999,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    buttonPressed: {
-      backgroundColor: mobileColors.brandSoft,
-    },
-  });

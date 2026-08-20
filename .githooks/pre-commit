@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Fast checks against the staged snapshot only. Anything that needs the whole
+# repo (type-check, tests) belongs in pre-push, so committing stays quick.
+#
+# Bypass with `git commit --no-verify` when you need to.
+
+set -e
+
+ROOT=$(git rev-parse --show-toplevel)
+cd "$ROOT"
+
+# Only what this commit actually touches, and only files that still exist:
+# `d` drops deletions, which have nothing left to check.
+STAGED=$(git diff --cached --name-only --diff-filter=d)
+
+[ -z "$STAGED" ] && exit 0
+
+# Prettier owns formatting for far more than code (json, md, yml, css), so it
+# gets the full staged list and decides for itself what it can parse.
+PRETTIER_FILES=$(printf '%s\n' "$STAGED" | grep -Ei '\.(js|jsx|mjs|cjs|ts|tsx|json|md|mdx|css|ya?ml|html)$' || true)
+
+if [ -n "$PRETTIER_FILES" ]; then
+  echo "pre-commit: checking formatting"
+  # `--no-error-on-unmatched-pattern` keeps a staged file that Prettier has been
+  # told to ignore from failing the whole hook.
+  if ! printf '%s\n' "$PRETTIER_FILES" | xargs npx prettier --check --no-error-on-unmatched-pattern; then
+    echo
+    echo "  Formatting check failed. Fix with:"
+    echo "    npm run format"
+    exit 1
+  fi
+fi
+
+LINT_FILES=$(printf '%s\n' "$STAGED" | grep -Ei '\.(js|jsx|mjs|cjs|ts|tsx)$' || true)
+
+if [ -n "$LINT_FILES" ]; then
+  echo "pre-commit: linting"
+  # Errors block; warnings do not. The repo carries ~148 known warnings, so
+  # failing on them would make every commit unpassable rather than catch
+  # anything new.
+  if ! printf '%s\n' "$LINT_FILES" | xargs npx eslint --no-warn-ignored; then
+    echo
+    echo "  Lint failed. Fix the errors above, or run:"
+    echo "    npx eslint --fix <file>"
+    exit 1
+  fi
+fi
+
+exit 0

@@ -1,24 +1,33 @@
-import { useMemo } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useMemo, useState, type ComponentProps } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Switch, Text, View } from "react-native";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
-import { DetailSkeleton } from "../../../shared/components/Skeleton";
 import { useManualRefresh } from "../../../shared/hooks/useManualRefresh";
 import {
   getProfileNotificationPreferences,
   saveProfileNotificationPreferences,
 } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
-import { mobileRadii, mobileText, type MobileColors } from "../../../shared/theme/tokens";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
+import { mobileText, mobileTextWeighted, type MobileColors } from "../../../shared/theme/tokens";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { useToast } from "../../../shared/providers/ToastProvider";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { usePushRegistration } from "../../notifications/hooks/usePushRegistration";
-import { ProfilePanel, ProfileSection } from "../components/ProfilePrimitives";
+import {
+  ProfileList,
+  ProfileNavRow,
+  ProfilePanel,
+  ProfileSection,
+} from "../components/ProfilePrimitives";
+import { ProfileSkeleton } from "../components/ProfileSkeleton";
+import {
+  NotificationCategorySheet,
+  formatChannelSummary,
+} from "../components/NotificationCategorySheet";
 
 const CATEGORIES = [
   {
@@ -39,6 +48,13 @@ const CATEGORIES = [
 ] as const;
 
 type CategoryKey = (typeof CATEGORIES)[number]["key"];
+
+/** One glyph per category, so the rows are told apart by shape as well as text. */
+const CATEGORY_ICONS: Record<CategoryKey, ComponentProps<typeof Ionicons>["name"]> = {
+  schedule: "calendar-outline",
+  shift_requests: "swap-horizontal-outline",
+  system: "settings-outline",
+};
 
 type Channel = "in_app" | "email";
 
@@ -78,6 +94,8 @@ export default function ProfileNotificationsScreen() {
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
   const bootstrap = useBootstrap(accessToken);
+  const [openCategoryKey, setOpenCategoryKey] = useState<CategoryKey | null>(null);
+  const openCategory = CATEGORIES.find((cat) => cat.key === openCategoryKey) ?? null;
   const currentOrgId = bootstrap.data?.currentOrg?.id ?? null;
   const push = usePushRegistration(accessToken, currentOrgId, {
     autoRegister: false,
@@ -149,7 +167,7 @@ export default function ProfileNotificationsScreen() {
     }
   };
 
-  const contentState = getMobileQueryContentState({
+  const contentState = useMobileContentState({
     hasData: Boolean(prefsQuery.data),
     isLoading: prefsQuery.isLoading,
     error: prefsQuery.error,
@@ -162,14 +180,14 @@ export default function ProfileNotificationsScreen() {
 
   return (
     <Screen
-      bottomPaddingMode="stack"
-      title="Notifications"
-      subtitle="Notifications"
+      bottomPaddingMode="tabbed"
       refreshing={manualRefresh.isRefreshing}
       onRefresh={manualRefresh.refresh}
     >
       {contentState.kind === "loading" ? (
-        <DetailSkeleton />
+        contentState.showSkeleton ? (
+          <ProfileSkeleton rowVariant="toggle" rowsPerSection={3} sections={2} showHero={false} />
+        ) : null
       ) : contentState.kind === "error" ? (
         <StatusBanner
           actionLabel="Try again"
@@ -197,6 +215,9 @@ export default function ProfileNotificationsScreen() {
                 <Switch
                   accessibilityLabel="Push notifications"
                   disabled={!pushSwitchEnabled || push.permissionState === "denied"}
+                  ios_backgroundColor={mobileColors.border}
+                  thumbColor={mobileColors.surface}
+                  trackColor={{ false: mobileColors.border, true: mobileColors.brand }}
                   value={push.permissionState === "granted"}
                   onValueChange={() => {
                     void togglePush();
@@ -206,65 +227,40 @@ export default function ProfileNotificationsScreen() {
             </ProfilePanel>
           </ProfileSection>
 
-          <ProfileSection title="Categories">
-            <ProfilePanel>
-              {CATEGORIES.map((cat, idx) => (
-                <View
+          <ProfileSection
+            title="Categories"
+            description="Choose how each kind of update reaches you."
+          >
+            <ProfileList>
+              {CATEGORIES.map((cat, index) => (
+                <ProfileNavRow
                   key={cat.key}
-                  style={[
-                    styles.categoryBlock,
-                    idx < CATEGORIES.length - 1 && styles.categoryDivider,
-                  ]}
-                >
-                  <Text style={styles.rowTitle}>{cat.label}</Text>
-                  <Text style={styles.rowDescription}>{cat.description}</Text>
-                  <View style={styles.channelRow}>
-                    <ChannelToggle
-                      icon="phone-portrait-outline"
-                      label="In-app"
-                      value={localPrefs[cat.key].in_app}
-                      onValueChange={() => togglePref(cat.key, "in_app")}
-                    />
-                    <ChannelToggle
-                      icon="mail-outline"
-                      label="Email"
-                      value={localPrefs[cat.key].email}
-                      onValueChange={() => togglePref(cat.key, "email")}
-                    />
-                  </View>
-                </View>
+                  iconName={CATEGORY_ICONS[cat.key]}
+                  isLast={index === CATEGORIES.length - 1}
+                  label={cat.label}
+                  value={formatChannelSummary(localPrefs[cat.key])}
+                  onPress={() => setOpenCategoryKey(cat.key)}
+                />
               ))}
-            </ProfilePanel>
+            </ProfileList>
           </ProfileSection>
-
-          {saveMutation.isPending ? <Text style={styles.savingNote}>Saving…</Text> : null}
         </View>
       )}
+      <NotificationCategorySheet
+        category={
+          openCategory
+            ? {
+                key: openCategory.key,
+                label: openCategory.label,
+                description: openCategory.description,
+                channels: localPrefs[openCategory.key],
+              }
+            : null
+        }
+        onDismiss={() => setOpenCategoryKey(null)}
+        onToggle={(categoryKey, channel) => togglePref(categoryKey as CategoryKey, channel)}
+      />
     </Screen>
-  );
-}
-
-interface ChannelToggleProps {
-  icon: React.ComponentProps<typeof Ionicons>["name"];
-  label: string;
-  value: boolean;
-  onValueChange: () => void;
-}
-
-function ChannelToggle({ icon, label, value, onValueChange }: ChannelToggleProps) {
-  const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
-  return (
-    <Pressable
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      onPress={onValueChange}
-      style={styles.channelChip}
-    >
-      <Ionicons name={icon} size={16} color={mobileColors.textPrimary} />
-      <Text style={styles.channelLabel}>{label}</Text>
-      <Switch value={value} onValueChange={onValueChange} />
-    </Pressable>
   );
 }
 
@@ -285,48 +281,11 @@ const createStyles = (mobileColors: MobileColors) =>
       gap: 4,
     },
     rowTitle: {
-      ...mobileText.cardTitle,
+      ...mobileTextWeighted("cardTitle", "medium"),
       color: mobileColors.textPrimary,
-      fontWeight: "500",
     },
     rowDescription: {
       ...mobileText.caption,
       color: mobileColors.textMuted,
-    },
-    categoryBlock: {
-      padding: 16,
-      gap: 8,
-    },
-    categoryDivider: {
-      borderBottomWidth: 1,
-      borderBottomColor: mobileColors.borderSubtle,
-    },
-    channelRow: {
-      flexDirection: "row",
-      gap: 10,
-      flexWrap: "wrap",
-      marginTop: 6,
-    },
-    channelChip: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.control,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-    },
-    channelLabel: {
-      ...mobileText.label,
-      color: mobileColors.textPrimary,
-      fontWeight: "500",
-    },
-    savingNote: {
-      ...mobileText.caption,
-      color: mobileColors.textMuted,
-      textAlign: "center",
-      paddingVertical: 4,
     },
   });

@@ -66,6 +66,7 @@ export default defineConfig(async () => {
           "font",
           "asset",
           "local-authentication",
+          "web-browser",
         ].map((m) => ({
           find: new RegExp(`^expo-${m}$`),
           replacement: path.resolve(__dirname, `./src/test/shims/expo-${m}.ts`),
@@ -89,6 +90,24 @@ export default defineConfig(async () => {
         {
           find: /^expo-linear-gradient$/,
           replacement: path.resolve(__dirname, "./src/test/shims/expo-linear-gradient.tsx"),
+        },
+        // react-native-safe-area-context re-exports untranspiled react-native
+        // Flow syntax, so any screen reaching it transitively failed to
+        // collect. Zero insets under jsdom; tests needing real values still
+        // vi.mock it directly.
+        {
+          find: /^react-native-safe-area-context$/,
+          replacement: path.resolve(__dirname, "./src/test/shims/safe-area-context.tsx"),
+        },
+        // @react-navigation/native's hooks (useNavigation, useRoute,
+        // usePreventRemoveContext) all throw outside a NavigationContainer, so
+        // any screen using usePreventRemove would fail to render in every one
+        // of its tests. The shim registers guards for real and exposes
+        // `pressBack()`, so the guard stays testable rather than being silently
+        // disabled by a no-op mock.
+        {
+          find: /^@react-navigation\/native$/,
+          replacement: path.resolve(__dirname, "./src/test/shims/react-navigation-native.ts"),
         },
       ],
     },

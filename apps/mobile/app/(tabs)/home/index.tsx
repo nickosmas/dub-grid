@@ -10,10 +10,16 @@ export default function HomeTabScreen() {
   const { accessToken } = useSessionState();
   const bootstrapQuery = useBootstrap(accessToken);
 
-  // While bootstrap is loading, effectiveRole is undefined and isAdminHomeRole
-  // returns false — AdminHomeScreen never mounts before we know the role.
-  // HomeScheduleScreen already folds bootstrapQuery.isLoading into its own
-  // skeleton-based contentState, so it's a safe interim render either way.
+  // Neither screen until the role is known. `useTabsGate` already holds the
+  // whole tab layout on bootstrap, so this is belt and braces for anything
+  // that reaches this route outside it — but it is the load-bearing rule:
+  // falling through to HomeScheduleScreen as an "interim" render gave an admin
+  // the personal-schedule skeleton, then the dashboard skeleton, then content.
+  // Only one of the two home screens is ever mounted.
+  if (bootstrapQuery.isLoading) {
+    return null;
+  }
+
   if (isAdminHomeRole(bootstrapQuery.data?.effectiveRole)) {
     return <AdminHomeScreen />;
   }

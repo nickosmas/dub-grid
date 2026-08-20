@@ -73,7 +73,7 @@ export function rowToNamedItem(row: DbNamedItem): NamedItem {
     name: row.name,
     abbr: row.abbr,
     isScheduleRole: row.is_schedule_role ?? true,
-    departmentId: row.department_id ?? null,
+    departmentIds: row.department_ids ?? [],
     sortOrder: row.sort_order,
     archivedAt: row.archived_at ?? null,
   };

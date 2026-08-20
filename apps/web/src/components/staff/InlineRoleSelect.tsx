@@ -75,6 +75,7 @@ export function InlineRoleSelect({
           title="Change role"
           message={`Change this person's role to ${ORG_ROLE_LABELS[pending]}? Their access updates immediately.`}
           confirmLabel="Change role"
+          confirmPendingLabel="Changing role"
           variant="warning"
           isLoading={saving}
           onCancel={() => {

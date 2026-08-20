@@ -4,7 +4,7 @@ import { getMobileAccountRealtimeInvalidationKeys } from "../lib/mobile-account-
 describe("getMobileAccountRealtimeInvalidationKeys", () => {
   it("refreshes bootstrap and the entire profile namespace on profile row changes", () => {
     expect(getMobileAccountRealtimeInvalidationKeys("token-1", "profiles")).toEqual([
-      ["mobile", "bootstrap", "token-1"],
+      ["mobile", "bootstrap"],
       ["mobile", "profile", "token-1"],
       ["mobile", "profile"],
     ]);
@@ -28,7 +28,7 @@ describe("getMobileAccountRealtimeInvalidationKeys", () => {
   it("refreshes the notifications inbox, bootstrap, facets, and the deep-link detail fallback on a per-user notification event", () => {
     expect(getMobileAccountRealtimeInvalidationKeys("token-1", "notifications")).toEqual([
       ["mobile", "notifications-infinite"],
-      ["mobile", "bootstrap", "token-1"],
+      ["mobile", "bootstrap"],
       ["mobile", "notification-facets", "token-1"],
       ["mobile", "notification-detail"],
     ]);

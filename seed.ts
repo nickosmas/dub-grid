@@ -1,7 +1,27 @@
 import { copycat } from "@snaplet/copycat";
 import { readFileSync } from "fs";
-import { Client } from "pg";
+import { connectSqlClient, type SqlClient } from "./scripts/lib/db-client";
 import { getPresetByBg, normalizePresetBg } from "./apps/web/src/lib/colors";
+
+// ── Schedule date anchoring ──────────────────────────────────────────────────
+// Every seeded shift/absence — both the programmatic tenants below and the
+// dates baked into the tenant SQL files — is authored around this reference
+// Sunday. On each reseed we shift them all by whole weeks so the reference
+// lands on the current week's Sunday, keeping the seeded schedule in the
+// current pay period instead of drifting into the past. The offset is always a
+// multiple of 7, so weekday/weekend patterns (and 14-day pay-period alignment)
+// are preserved.
+const SEED_SCHEDULE_REFERENCE_SUNDAY = "2026-07-05";
+
+function currentWeekSundayIso(now = new Date()): string {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+  return d.toISOString().slice(0, 10);
+}
+
+const SEED_SCHEDULE_SHIFT_DAYS = Math.round(
+  (Date.parse(currentWeekSundayIso()) - Date.parse(SEED_SCHEDULE_REFERENCE_SUNDAY)) / 86_400_000,
+);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 5-Tenant Seed: Realistic healthcare scheduling data
@@ -158,18 +178,17 @@ const TENANTS = [
       { name: "Respite Care" },
     ],
     certifications: [
-      { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
-      { name: "Licensed Practical Nurse", abbr: "LPN", deptIndex: 0 },
-      { name: "Certified Nursing Assistant", abbr: "CNA", deptIndex: 0 },
-      { name: "Home Health Aide", abbr: "HHA", deptIndex: 1 },
-      { name: "Medication Aide", abbr: "MA", deptIndex: null },
-      { name: "Other", abbr: "Other", deptIndex: null },
+      { name: "Registered Nurse", abbr: "RN", deptIndexes: [0] },
+      { name: "Licensed Practical Nurse", abbr: "LPN", deptIndexes: [0] },
+      { name: "Certified Nursing Assistant", abbr: "CNA", deptIndexes: [0] },
+      { name: "Home Health Aide", abbr: "HHA", deptIndexes: [1] },
+      { name: "Medication Aide", abbr: "MA", deptIndexes: [] },
     ],
     orgRoles: [
-      { name: "Charge Nurse", abbr: "CN", deptIndex: 0 },
-      { name: "Supervisor", abbr: "SUP", deptIndex: null },
-      { name: "Activities Director", abbr: "AD", deptIndex: 1 },
-      { name: "Med Tech", abbr: "MT", deptIndex: 0 },
+      { name: "Charge Nurse", abbr: "CN", deptIndexes: [0] },
+      { name: "Supervisor", abbr: "SUP", deptIndexes: [] },
+      { name: "Activities Director", abbr: "AD", deptIndexes: [1] },
+      { name: "Med Tech", abbr: "MT", deptIndexes: [0] },
     ],
     departments: [
       // Scheduled departments — focus areas linked to these
@@ -444,18 +463,17 @@ const TENANTS = [
       { name: "Outpatient" },
     ],
     certifications: [
-      { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
-      { name: "Licensed Vocational Nurse", abbr: "LVN", deptIndex: 0 },
-      { name: "Certified Nursing Assistant", abbr: "CNA", deptIndex: 0 },
-      { name: "Physical Therapist", abbr: "PT", deptIndex: 1 },
-      { name: "Occupational Therapist", abbr: "OT", deptIndex: 1 },
-      { name: "Other", abbr: "Other", deptIndex: null },
+      { name: "Registered Nurse", abbr: "RN", deptIndexes: [0] },
+      { name: "Licensed Vocational Nurse", abbr: "LVN", deptIndexes: [0] },
+      { name: "Certified Nursing Assistant", abbr: "CNA", deptIndexes: [0] },
+      { name: "Physical Therapist", abbr: "PT", deptIndexes: [1] },
+      { name: "Occupational Therapist", abbr: "OT", deptIndexes: [1] },
     ],
     orgRoles: [
-      { name: "Charge Nurse", abbr: "CN", deptIndex: 0 },
-      { name: "Floor Lead", abbr: "FL", deptIndex: 0 },
-      { name: "Rehab Tech", abbr: "RT", deptIndex: 1 },
-      { name: "Case Manager", abbr: "CM", deptIndex: 2 },
+      { name: "Charge Nurse", abbr: "CN", deptIndexes: [0] },
+      { name: "Floor Lead", abbr: "FL", deptIndexes: [0] },
+      { name: "Rehab Tech", abbr: "RT", deptIndexes: [1] },
+      { name: "Case Manager", abbr: "CM", deptIndexes: [2] },
     ],
     departments: [
       { name: "Nursing", type: "scheduled" as const },
@@ -671,16 +689,14 @@ const TENANTS = [
       { name: "North Wing" },
     ],
     certifications: [
-      { name: "Caregiver", abbr: "CG", deptIndex: 0 },
-      { name: "Medication Technician", abbr: "MT", deptIndex: 0 },
-      { name: "Activity Director", abbr: "AD", deptIndex: 1 },
-      { name: "Senior Caregiver", abbr: "SC", deptIndex: 0 },
-      { name: "Other", abbr: "Other", deptIndex: null },
+      { name: "Caregiver", abbr: "CG", deptIndexes: [0] },
+      { name: "Medication Technician", abbr: "MT", deptIndexes: [0] },
+      { name: "Senior Caregiver", abbr: "SC", deptIndexes: [0] },
     ],
     orgRoles: [
-      { name: "Lead Caregiver", abbr: "LC", deptIndex: 0 },
-      { name: "Medication Aide", abbr: "MA", deptIndex: 0 },
-      { name: "Shift Supervisor", abbr: "SS", deptIndex: null },
+      { name: "Lead Caregiver", abbr: "LC", deptIndexes: [0] },
+      { name: "Medication Aide", abbr: "MA", deptIndexes: [0] },
+      { name: "Shift Supervisor", abbr: "SS", deptIndexes: [] },
     ],
     departments: [
       { name: "Caregiving", type: "scheduled" as const },
@@ -922,20 +938,22 @@ const TENANTS = [
       { name: "Behavioral Health" },
     ],
     certifications: [
-      { name: "Doctor of Medicine", abbr: "MD", deptIndex: null },
-      { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
-      { name: "Physician Assistant", abbr: "PA", deptIndex: null },
-      { name: "Medical Assistant", abbr: "MA", deptIndex: null },
-      { name: "Respiratory Therapist", abbr: "RT", deptIndex: 0 },
-      { name: "Social Worker", abbr: "SW", deptIndex: null },
-      { name: "Other", abbr: "Other", deptIndex: null },
+      { name: "Doctor of Medicine", abbr: "MD", deptIndexes: [] },
+      // Spans Nursing and Emergency Medicine but not Outpatient. This org has
+      // three scheduled departments, so the selection stays a genuine subset
+      // rather than collapsing to org-wide the way "all departments" would.
+      { name: "Registered Nurse", abbr: "RN", deptIndexes: [0, 2] },
+      { name: "Physician Assistant", abbr: "PA", deptIndexes: [] },
+      { name: "Medical Assistant", abbr: "MA", deptIndexes: [] },
+      { name: "Respiratory Therapist", abbr: "RT", deptIndexes: [0] },
+      { name: "Social Worker", abbr: "SW", deptIndexes: [] },
     ],
     orgRoles: [
-      { name: "Attending", abbr: "ATT", deptIndex: null },
-      { name: "Charge Nurse", abbr: "CN", deptIndex: 0 },
-      { name: "Nurse Manager", abbr: "NM", deptIndex: 0 },
-      { name: "Technician", abbr: "Tech", deptIndex: null },
-      { name: "Social Worker", abbr: "SW", deptIndex: null },
+      { name: "Attending", abbr: "ATT", deptIndexes: [] },
+      { name: "Charge Nurse", abbr: "CN", deptIndexes: [0] },
+      { name: "Nurse Manager", abbr: "NM", deptIndexes: [0] },
+      { name: "Technician", abbr: "Tech", deptIndexes: [] },
+      { name: "Social Worker", abbr: "SW", deptIndexes: [] },
     ],
     departments: [
       { name: "Nursing", type: "scheduled" as const },
@@ -1162,17 +1180,15 @@ const TENANTS = [
     role_label: "Disciplines",
     focusAreas: [{ name: "Inpatient Hospice" }, { name: "Home Care" }, { name: "Bereavement" }],
     certifications: [
-      { name: "Registered Nurse", abbr: "RN", deptIndex: 0 },
-      { name: "Licensed Practical Nurse", abbr: "LPN", deptIndex: 0 },
-      { name: "Social Worker", abbr: "SW", deptIndex: null },
-      { name: "Chaplain", abbr: "CH", deptIndex: null },
-      { name: "Volunteer", abbr: "VOL", deptIndex: 3 },
-      { name: "Other", abbr: "Other", deptIndex: null },
+      { name: "Registered Nurse", abbr: "RN", deptIndexes: [0] },
+      { name: "Licensed Practical Nurse", abbr: "LPN", deptIndexes: [0] },
+      { name: "Social Worker", abbr: "SW", deptIndexes: [] },
+      { name: "Chaplain", abbr: "CH", deptIndexes: [] },
     ],
     orgRoles: [
-      { name: "Case Manager", abbr: "CM", deptIndex: 0 },
-      { name: "Team Lead", abbr: "TL", deptIndex: null },
-      { name: "On-Call", abbr: "OC", deptIndex: 0 },
+      { name: "Case Manager", abbr: "CM", deptIndexes: [0] },
+      { name: "Team Lead", abbr: "TL", deptIndexes: [] },
+      { name: "On-Call", abbr: "OC", deptIndexes: [0] },
     ],
     departments: [
       { name: "Clinical Services", type: "scheduled" as const },
@@ -1755,7 +1771,7 @@ function selectBaseAssignment(
 }
 
 async function writePublishedWorkScheduleCellsBatch(
-  db: Client,
+  db: SqlClient,
   orgId: string,
   cells: Array<{
     empId: string;
@@ -1790,7 +1806,7 @@ async function writePublishedWorkScheduleCellsBatch(
 }
 
 async function writePublishedAbsenceScheduleCellsBatch(
-  db: Client,
+  db: SqlClient,
   orgId: string,
   cells: Array<{ empId: string; date: string; absenceTypeId: number }>,
 ): Promise<void> {
@@ -1837,7 +1853,7 @@ function splitSqlBeforeFinalScheduleBlock(sql: string): {
 }
 
 async function seedTenantSqlBeforeSchedule(
-  db: Client,
+  db: SqlClient,
   sqlPath: string,
   orgId: string,
 ): Promise<{
@@ -1845,6 +1861,12 @@ async function seedTenantSqlBeforeSchedule(
   scheduledJobCount: number;
   shiftlessJobCount: number;
 }> {
+  // Read verbatim. These files rebase themselves onto the current week: every
+  // shift is written as `<target anchor> + (dt - schedule_source_start)`, with
+  // the target anchor computed from CURRENT_DATE. A regex here used to shift
+  // every '2026-MM-DD' literal by SEED_SCHEDULE_SHIFT_DAYS, which moved that
+  // absolute anchor as well and left both tenants' schedules a month past the
+  // current week, so their "this week" was empty for every user.
   const tenantSql = readFileSync(sqlPath, "utf8");
   const { prefixSql, scheduleSql } = splitSqlBeforeFinalScheduleBlock(tenantSql);
 
@@ -1876,7 +1898,7 @@ async function seedTenantSqlBeforeSchedule(
 }
 
 async function seedJobsForOrg(
-  db: Client,
+  db: SqlClient,
   orgId: string,
   assignmentDefinitions: SeedAssignmentRow[],
 ): Promise<{
@@ -2293,6 +2315,8 @@ async function seedJobsForOrg(
 
 async function main() {
   let connectionString: string;
+  // Only a remote project can fall back to the HTTPS transport.
+  let projectRef: string | null = null;
 
   if (process.env.FORCE_LOCAL_DB === "1") {
     // Explicitly forced local (from npm run db:reset)
@@ -2300,6 +2324,11 @@ async function main() {
     console.log("Connecting to LOCAL Supabase...\n");
   } else if (process.env.DATABASE_URL) {
     connectionString = process.env.DATABASE_URL;
+    const projectUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    // The fallback only applies when this URL really is the remote project.
+    if (connectionString.includes("supabase.com") && projectUrl?.includes("supabase.co")) {
+      projectRef = new URL(projectUrl).hostname.split(".")[0];
+    }
   } else if (process.env.NEXT_PUBLIC_SUPABASE_URL?.includes("supabase.co")) {
     // Remote Supabase — derive pooler connection string from project ref
     const ref = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname.split(".")[0];
@@ -2312,15 +2341,14 @@ async function main() {
       process.exit(1);
     }
     connectionString = `postgresql://postgres:${encodeURIComponent(password)}@db.${ref}.supabase.co:5432/postgres`;
+    projectRef = ref;
     console.log(`Connecting to REMOTE Supabase (${ref})...\n`);
   } else {
     connectionString = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
     console.log("Connecting to LOCAL Supabase...\n");
   }
 
-  const ssl = connectionString.includes("supabase") ? { rejectUnauthorized: false } : undefined;
-  const db = new Client({ connectionString, ssl });
-  await db.connect();
+  const db = await connectSqlClient({ connectionString, projectRef });
 
   // ── Cleanup ────────────────────────────────────────────────────────────
   console.log("Clearing existing seed data...");
@@ -2460,17 +2488,17 @@ async function main() {
     const certIds: number[] = [];
     if (tenant.certifications.length > 0) {
       const certSeeds = tenant.certifications.map((c, i) => ({
-        department_id: c.deptIndex != null ? deptIds[c.deptIndex] : null,
+        department_ids: c.deptIndexes.map((idx) => deptIds[idx]),
         name: c.name,
         abbr: c.abbr,
         sort_order: i,
       }));
       const { rows } = await db.query(
         `WITH inserted AS (
-           INSERT INTO public.certifications (org_id, department_id, name, abbr, sort_order)
-           SELECT $1, department_id, name, abbr, sort_order
+           INSERT INTO public.certifications (org_id, department_ids, name, abbr, sort_order)
+           SELECT $1, department_ids, name, abbr, sort_order
            FROM jsonb_to_recordset($2::jsonb) AS x(
-             department_id bigint, name text, abbr text, sort_order int
+             department_ids bigint[], name text, abbr text, sort_order int
            )
            RETURNING id, sort_order
          )
@@ -2484,7 +2512,7 @@ async function main() {
     const roleIds: number[] = [];
     if (tenant.orgRoles.length > 0) {
       const roleSeeds = tenant.orgRoles.map((r, i) => ({
-        department_id: r.deptIndex != null ? deptIds[r.deptIndex] : null,
+        department_ids: r.deptIndexes.map((idx) => deptIds[idx]),
         name: r.name,
         abbr: r.abbr,
         is_schedule_role: (r as { isScheduleRole?: boolean }).isScheduleRole ?? true,
@@ -2492,10 +2520,10 @@ async function main() {
       }));
       const { rows } = await db.query(
         `WITH inserted AS (
-           INSERT INTO public.organization_roles (org_id, department_id, name, abbr, is_schedule_role, sort_order)
-           SELECT $1, department_id, name, abbr, is_schedule_role, sort_order
+           INSERT INTO public.organization_roles (org_id, department_ids, name, abbr, is_schedule_role, sort_order)
+           SELECT $1, department_ids, name, abbr, is_schedule_role, sort_order
            FROM jsonb_to_recordset($2::jsonb) AS x(
-             department_id bigint, name text, abbr text, is_schedule_role boolean, sort_order int
+             department_ids bigint[], name text, abbr text, is_schedule_role boolean, sort_order int
            )
            RETURNING id, sort_order
          )
@@ -2647,17 +2675,23 @@ async function main() {
       seniority: number;
       phone: string;
       email: string;
-      certification_id: number;
+      certification_id: number | null;
       role_ids: number[];
       focus_area_ids: number[];
       status: string;
     }
+    // Holding a certification is what makes someone certified staff, so roughly
+    // one in five is left with none to stand in for support staff (activity
+    // coordinators and the like). They get no catch-all credential — a catch-all
+    // is exactly what used to make support staff look certified.
+    const SUPPORT_STAFF_EVERY = 5;
     const empSeeds: EmpSeed[] = empNames.map((fullName, i) => {
       const nameParts = fullName.split(" ");
       const lastName = nameParts.pop()!;
       const firstName = nameParts.join(" ") || lastName;
-      const certId = certIds[i % certIds.length];
       const primaryFaIdx = i % focusAreaIds.length;
+      const isSupportStaff = i % SUPPORT_STAFF_EVERY === SUPPORT_STAFF_EVERY - 1;
+      const certId = isSupportStaff || certIds.length === 0 ? null : certIds[i % certIds.length];
       const empFaIds = [focusAreaIds[primaryFaIdx]];
       if (i % 3 === 0 && focusAreaIds.length > 1) {
         empFaIds.push(focusAreaIds[(primaryFaIdx + 1) % focusAreaIds.length]);
@@ -2775,7 +2809,8 @@ async function main() {
       );
       if (empWorkAssignments.length === 0) continue;
 
-      const shiftStart = new Date(2026, 6, 5); // July 5, 2026
+      const shiftStart = new Date(2026, 6, 5); // reference Sunday (July 5, 2026)
+      shiftStart.setDate(shiftStart.getDate() + SEED_SCHEDULE_SHIFT_DAYS); // → current pay period
       for (let i = 0; i < 14; i++) {
         const d = new Date(shiftStart);
         d.setDate(d.getDate() + i);
@@ -3137,6 +3172,94 @@ async function main() {
   `);
   console.log(`    ✓ Backfilled employees rows for management members`);
 
+  // ── Put the login accounts on the schedule ─────────────────────────────
+  // The per-org loop above generates schedule cells only for the anonymous
+  // roster it just inserted; the employees rows for real login accounts do
+  // not exist yet at that point (auth users are created afterwards). Left
+  // alone, every account you can actually sign in as has focus_area_ids = '{}'
+  // and zero cells, so "my schedule" on mobile and the personal schedule on
+  // web are empty for all of them while the grid looks fully populated.
+  //
+  // Give each login-linked employee a real week by mirroring one seeded
+  // co-worker: copy that donor's focus areas (an employee with no focus area
+  // is off-schedule entirely and never renders in the grid) and replay their
+  // published cells. Cloning rather than generating keeps this valid for all
+  // seven tenants, including Calm Haven and Arden Wood whose shifts come from
+  // SQL files with no assignment data left in scope here. Donors are paired
+  // round-robin per org so the accounts get visibly different schedules.
+  // Runs before the publish_history backfill below so the recorded range
+  // covers these cells too.
+  console.log("\n  Putting login accounts on the schedule...");
+  const linkedEmployeeDonorCte = `
+    WITH linked AS (
+      SELECT e.id, e.org_id,
+             row_number() OVER (PARTITION BY e.org_id ORDER BY e.id) - 1 AS idx
+      FROM public.employees e
+      WHERE e.user_id IS NOT NULL
+        AND e.archived_at IS NULL
+    ),
+    donors AS (
+      SELECT e.id, e.org_id, e.focus_area_ids,
+             row_number() OVER (PARTITION BY e.org_id ORDER BY e.seniority DESC, e.id) - 1 AS idx,
+             count(*) OVER (PARTITION BY e.org_id) AS n
+      FROM public.employees e
+      WHERE e.user_id IS NULL
+        AND e.archived_at IS NULL
+        AND e.status = 'active'
+        AND e.focus_area_ids <> '{}'
+        AND EXISTS (SELECT 1 FROM public.schedule_cells c WHERE c.emp_id = e.id)
+    ),
+    pairs AS (
+      SELECT l.id AS linked_id, l.org_id, d.id AS donor_id, d.focus_area_ids
+      FROM linked l
+      JOIN donors d
+        ON d.org_id = l.org_id
+       AND d.idx = l.idx % d.n
+    )`;
+
+  // An employee with no focus area is treated as off-schedule, so the focus
+  // areas have to land before the cells mean anything.
+  await db.query(`
+    ${linkedEmployeeDonorCte}
+    UPDATE public.employees e
+    SET focus_area_ids = p.focus_area_ids
+    FROM pairs p
+    WHERE e.id = p.linked_id
+      AND e.focus_area_ids = '{}'
+  `);
+
+  const { rowCount: linkedCellCount } = await db.query(`
+    ${linkedEmployeeDonorCte}
+    SELECT public.write_schedule_cell_snapshot_internal(
+      p.org_id, p.linked_id, c.date, 'published', s.state_kind,
+      COALESCE(seg.shift_ids, '{}'::bigint[]),
+      COALESCE(seg.job_ids, '{}'::bigint[]),
+      s.absence_type_id, s.custom_start_time, s.custom_end_time,
+      NULL, false, c.focus_area_id, NULL, NULL,
+      COALESCE(seg.mentored, '{}'::boolean[])
+    )
+    FROM pairs p
+    JOIN public.schedule_cells c
+      ON c.emp_id = p.donor_id
+    JOIN public.schedule_cell_snapshots s
+      ON s.cell_id = c.id
+     AND s.snapshot_kind = 'published'
+    LEFT JOIN LATERAL (
+      SELECT array_agg(g.shift_id  ORDER BY g.position) AS shift_ids,
+             array_agg(g.job_id    ORDER BY g.position) AS job_ids,
+             array_agg(g.is_mentored ORDER BY g.position) AS mentored
+      FROM public.schedule_cell_segments g
+      WHERE g.snapshot_id = s.id
+    ) seg ON true
+    WHERE s.state_kind <> 'deleted'
+      AND NOT EXISTS (
+        SELECT 1 FROM public.schedule_cells existing
+        WHERE existing.emp_id = p.linked_id
+          AND existing.date = c.date
+      )
+  `);
+  console.log(`    ✓ ${linkedCellCount} cells cloned onto login-linked employees`);
+
   // ── Publish history ────────────────────────────────────────────────────
   // The seed writes published cell snapshots directly via
   // write_schedule_cell_snapshot_internal, which (unlike the publish_schedule
@@ -3171,7 +3294,8 @@ async function main() {
                   ELSE 2
                 END
        LIMIT 1
-     ) publisher ON true`,
+     ) publisher ON true
+     RETURNING id`,
   );
   console.log(`    ✓ ${publishHistoryCount} organizations marked as published`);
 

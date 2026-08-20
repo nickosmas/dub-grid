@@ -13,6 +13,7 @@ import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
 import { resolveJobColorsForShift } from "@/lib/job-placement";
 import { useTheme } from "next-themes";
 import { borderColor, resolveShiftPillColors } from "@/lib/colors";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 const PREVIEW_DAYS = [
   { shortLabel: "Mon", dateNumber: "21" },
@@ -550,7 +551,9 @@ export default function DisplayMode({
             disabled={!isModified || saving}
             className="dg-btn dg-btn-primary"
           >
-            {saving ? "Saving…" : "Save"}
+            <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
+              {EDITOR_ACTION_LABELS.save}
+            </ButtonLoading>
           </button>
         </div>
       </div>

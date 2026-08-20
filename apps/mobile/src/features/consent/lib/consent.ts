@@ -10,7 +10,7 @@ const CONSENT_KEY = "dubgrid-cookie-consent";
 
 // Mirror the web banner's version (apps/web/src/components/CookieConsent.tsx).
 // Bump in lockstep with web so a policy change re-prompts on both platforms.
-export const CONSENT_VERSION = "1.1";
+export const CONSENT_VERSION = "1.2";
 
 export type ConsentPreferences = {
   essential: true;
@@ -18,12 +18,32 @@ export type ConsentPreferences = {
   version: string;
 };
 
-/** Public legal pages live on the web app; mobile links out to them. */
-export const LEGAL_URLS = {
-  privacy: "https://app.dubgrid.com/privacy",
-  terms: "https://app.dubgrid.com/terms",
-  cookies: "https://app.dubgrid.com/cookie-policy",
-} as const;
+/** Last-resort host, used only when the env config can't be read at all. */
+const FALLBACK_WEB_ORIGIN = "https://app.dubgrid.com";
+
+/**
+ * Public legal pages live on the web app; mobile links out to them. Derived
+ * from `EXPO_PUBLIC_API_BASE_URL` rather than hardcoded, so a staging or local
+ * build links to its own web app instead of production.
+ */
+export function getLegalUrls(): {
+  privacy: string;
+  terms: string;
+  cookies: string;
+} {
+  let origin = FALLBACK_WEB_ORIGIN;
+  try {
+    origin = getMobileEnvConfig().apiBaseUrl.replace(/\/+$/, "");
+  } catch {
+    // Fall through to the production host.
+  }
+
+  return {
+    privacy: `${origin}/privacy`,
+    terms: `${origin}/terms`,
+    cookies: `${origin}/cookie-policy`,
+  };
+}
 
 /** Read the stored consent record, or null if the user hasn't chosen yet. */
 export async function getStoredConsent(): Promise<ConsentPreferences | null> {
@@ -35,6 +55,17 @@ export async function getStoredConsent(): Promise<ConsentPreferences | null> {
     await secureStoreAdapter.removeItem(CONSENT_KEY);
     return null;
   }
+}
+
+/**
+ * Forget the stored choice so the gate prompts again.
+ *
+ * Consent lives in device storage, which `npm run db:reset` can't reach from
+ * the host machine, so a reset DB otherwise leaves a decided device behind.
+ * Dev-only reset paths use this to restore the real first-run experience.
+ */
+export async function clearStoredConsent(): Promise<void> {
+  await secureStoreAdapter.removeItem(CONSENT_KEY);
 }
 
 /** True when there is no stored choice, or it predates the current version. */

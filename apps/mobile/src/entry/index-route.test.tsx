@@ -1,8 +1,6 @@
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule, createSafeAreaContextModule } from "../test/native";
-
-vi.useFakeTimers();
 
 vi.mock("react-native", async () => createReactNativeModule(await import("react")));
 
@@ -13,7 +11,7 @@ vi.mock("react-native-safe-area-context", async () =>
 const routerReplace = vi.fn();
 const useSessionState = vi.fn();
 const getSupabaseClient = vi.fn();
-const loadHasSeenOnboarding = vi.fn();
+const useHasSeenOnboarding = vi.fn();
 
 vi.mock("expo-router", () => ({
   router: {
@@ -29,8 +27,8 @@ vi.mock("../shared/lib/supabase", () => ({
   getSupabaseClient,
 }));
 
-vi.mock("../shared/lib/session", () => ({
-  loadHasSeenOnboarding,
+vi.mock("../features/auth/hooks/useHasSeenOnboarding", () => ({
+  useHasSeenOnboarding,
 }));
 
 vi.mock("../features/auth/screens/LoginScreen", async () => {
@@ -59,83 +57,66 @@ describe("IndexScreen", () => {
     routerReplace.mockReset();
     useSessionState.mockReset();
     getSupabaseClient.mockReset();
-    loadHasSeenOnboarding.mockReset();
-    loadHasSeenOnboarding.mockResolvedValue(true);
+    useHasSeenOnboarding.mockReset();
+    useHasSeenOnboarding.mockReturnValue({ data: true, isLoading: false });
   });
 
-  it("shows the splash screen while startup is still loading", () => {
-    useSessionState.mockReturnValue({
-      accessToken: null,
-      isLoading: true,
-    });
+  // The splash is owned by StartupSplashGate, above the router. A second
+  // instance rendered from a route restarts the whole brand animation on the
+  // handoff, which is what read as the splash showing twice.
+  it("never renders a splash of its own", () => {
+    useSessionState.mockReturnValue({ accessToken: null, isLoading: true });
 
     render(<IndexScreen />);
 
-    expect(screen.getByLabelText("DubGrid logo")).toBeInTheDocument();
+    expect(screen.queryByLabelText("DubGrid logo")).not.toBeInTheDocument();
+  });
+
+  it("paints nothing until it knows where the user is going", () => {
+    useSessionState.mockReturnValue({ accessToken: null, isLoading: true });
+
+    const { container } = render(<IndexScreen />);
+
+    expect(container).toBeEmptyDOMElement();
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
-  it("keeps the splash visible briefly, then shows the login screen for returning users", async () => {
-    useSessionState.mockReturnValue({
-      accessToken: null,
-      isLoading: false,
-    });
+  it("shows the login screen once startup resolves signed out", () => {
+    useSessionState.mockReturnValue({ accessToken: null, isLoading: false });
 
     render(<IndexScreen />);
-
-    expect(screen.getByLabelText("DubGrid logo")).toBeInTheDocument();
-    expect(routerReplace).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(899);
-    });
-
-    expect(screen.getByLabelText("DubGrid logo")).toBeInTheDocument();
-    expect(routerReplace).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1);
-    });
 
     expect(screen.getByText("Enter your subdomain")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", {
-        name: "Continue",
-      }),
-    ).toBeInTheDocument();
     expect(routerReplace).not.toHaveBeenCalled();
   });
 
-  it("routes first-run users to the onboarding screen", async () => {
-    useSessionState.mockReturnValue({
-      accessToken: null,
-      isLoading: false,
-    });
-    loadHasSeenOnboarding.mockResolvedValue(false);
+  it("routes first-run users to the onboarding screen", () => {
+    useSessionState.mockReturnValue({ accessToken: null, isLoading: false });
+    useHasSeenOnboarding.mockReturnValue({ data: false, isLoading: false });
 
     render(<IndexScreen />);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(900);
-    });
 
     expect(routerReplace).toHaveBeenCalledWith("/(auth)/onboarding");
+    // Never the login screen first: that would flash behind the splash and
+    // then jump to onboarding.
+    expect(screen.queryByText("Enter your subdomain")).not.toBeInTheDocument();
   });
 
-  it("routes signed-in users to the Home tab after the splash delay", async () => {
-    useSessionState.mockReturnValue({
-      accessToken: "token",
-      isLoading: false,
-    });
+  it("routes signed-in users to the Home tab", () => {
+    useSessionState.mockReturnValue({ accessToken: "token", isLoading: false });
 
     render(<IndexScreen />);
 
-    expect(screen.getByLabelText("DubGrid logo")).toBeInTheDocument();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(900);
-    });
-
     expect(routerReplace).toHaveBeenCalledWith("/(tabs)/home");
+  });
+
+  it("waits for the first-run flag before picking a destination", () => {
+    useSessionState.mockReturnValue({ accessToken: null, isLoading: false });
+    useHasSeenOnboarding.mockReturnValue({ data: undefined, isLoading: true });
+
+    render(<IndexScreen />);
+
+    expect(routerReplace).not.toHaveBeenCalled();
+    expect(screen.queryByText("Enter your subdomain")).not.toBeInTheDocument();
   });
 });

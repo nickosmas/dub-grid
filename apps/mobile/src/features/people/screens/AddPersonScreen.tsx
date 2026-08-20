@@ -9,11 +9,17 @@ import {
   normalizeStaffName,
 } from "@dubgrid/contracts";
 import { Button } from "../../../shared/components/Button";
+import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { Screen } from "../../../shared/components/Screen";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
 import { createMobilePerson, createMobilePersonInvitation } from "../../../shared/lib/api";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
+import { singularLabelNoun } from "../../../shared/lib/labels";
 import { useToast } from "../../../shared/providers/ToastProvider";
+import { useNavigationDiscardGuard } from "../../../shared/hooks/useNavigationDiscardGuard";
+import { useSkeletonGate } from "../../../shared/hooks/useSkeletonGate";
+import { useUnsavedChangesGuard } from "../../../shared/hooks/useUnsavedChangesGuard";
+import { PersonFormSkeleton } from "../components/PersonFormSkeleton";
 import { useAccessToken } from "../../auth/hooks/useAccessToken";
 import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import {
@@ -28,6 +34,10 @@ export default function AddPersonScreen() {
   const { pushToast } = useToast();
   const queryClient = useQueryClient();
   const bootstrapQuery = useBootstrap(accessToken);
+  // Bootstrap is usually warm here — the tab that got you to this form already
+  // read it — so the placeholder only paints if the wait is long enough to be
+  // worth acknowledging.
+  const showSkeleton = useSkeletonGate(bootstrapQuery.isLoading);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -36,6 +46,16 @@ export default function AddPersonScreen() {
   const [certificationId, setCertificationId] = useState<number | null>(null);
   const [focusAreaIds, setFocusAreaIds] = useState<number[]>([]);
   const [focusedField, setFocusedField] = useState<"firstName" | "lastName" | "email" | null>(null);
+
+  // Anything typed or picked counts: this form starts empty, so any departure
+  // from that is work the user did.
+  const hasUnsavedChanges =
+    firstName.trim() !== "" ||
+    lastName.trim() !== "" ||
+    email.trim() !== "" ||
+    employmentType !== "full_time" ||
+    certificationId !== null ||
+    focusAreaIds.length > 0;
 
   const focusAreaLabel = bootstrapQuery.data?.currentOrg.labels.focusArea ?? "Focus Areas";
   const certificationLabel =
@@ -49,7 +69,7 @@ export default function AddPersonScreen() {
     email: email.trim().length > 0 ? getOptionalStaffEmailError(email) : null,
     focusAreaIds:
       focusAreaIds.length === 0 && (firstName.trim().length > 0 || lastName.trim().length > 0)
-        ? `Select at least one ${focusAreaLabel}`
+        ? `Select at least one ${singularLabelNoun(focusAreaLabel)}`
         : null,
   };
   const canSubmit =
@@ -72,26 +92,38 @@ export default function AddPersonScreen() {
         email: normalizedEmail,
       });
 
+      let invitationSent = true;
+
       if (normalizedEmail) {
         try {
           await createMobilePersonInvitation(accessToken!, result.person.id, {
             email: normalizedEmail,
           });
         } catch {
-          // The person was created; a failed invite send isn't fatal here —
-          // an admin can resend it from the person's detail screen.
+          // The person was created, so this isn't fatal and must not roll the
+          // create back. It does have to be said out loud, though: silently
+          // swallowing it leaves an admin believing an invite is on its way.
+          invitationSent = false;
         }
       }
 
-      return result;
+      return { ...result, invitationSent };
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ["mobile", "people"] });
-      pushToast({
-        tone: "success",
-        title: "Person added",
-        message: `${firstName} ${lastName} was added to your roster.`,
-      });
+      pushToast(
+        result.invitationSent
+          ? {
+              tone: "success",
+              title: "Person added",
+              message: `${firstName} ${lastName} was added to your roster.`,
+            }
+          : {
+              tone: "warning",
+              title: "Person added, invitation not sent",
+              message: `${firstName} ${lastName} is on your roster. Resend the invitation from their profile.`,
+            },
+      );
       router.back();
     },
     onError: (error) => {
@@ -103,14 +135,41 @@ export default function AddPersonScreen() {
     },
   });
 
+  // Header back, Android hardware back, the iOS back swipe and the Cancel
+  // button all reach the guard the same way: through the stack removal they
+  // each dispatch. Cancel deliberately keeps its plain `router.back()` rather
+  // than closing through the guard, which would ask, navigate, and be asked
+  // again by this same hook.
+  //
+  // `isSuccess` disarms it, because the success handler navigates away with the
+  // fields still filled in — without it a saved person would be met with
+  // "discard your changes?" on the way out.
+  const guard = useUnsavedChangesGuard({
+    isDirty: hasUnsavedChanges,
+    disabled: createMutation.isPending || createMutation.isSuccess,
+    title: "Discard this staff profile?",
+    body: "The details you filled in won't be saved.",
+  });
+  useNavigationDiscardGuard(guard);
+
   function toggleFocusArea(id: number) {
     setFocusAreaIds((current) =>
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     );
   }
 
+  // Focus areas and certifications come from bootstrap. Rendering the form
+  // before it resolves shows an empty Assignments picker next to a live
+  // "Select at least one <focus area>" error, which reads as broken rather
+  // than loading.
+  if (bootstrapQuery.isLoading) {
+    return (
+      <Screen bottomPaddingMode="tabbed">{showSkeleton ? <PersonFormSkeleton /> : null}</Screen>
+    );
+  }
+
   return (
-    <Screen>
+    <Screen bottomPaddingMode="tabbed">
       <ProfileSection title="Basic info">
         <ProfilePanel>
           <ProfileTextInput
@@ -204,7 +263,9 @@ export default function AddPersonScreen() {
       <View style={{ flexDirection: "row", gap: 10 }}>
         <Button
           disabled={!canSubmit || createMutation.isPending}
-          label={createMutation.isPending ? "Adding..." : "Add person"}
+          label="Add person"
+          loading={createMutation.isPending}
+          loadingLabel="Adding"
           onPress={() => createMutation.mutate()}
         />
         <Button
@@ -214,6 +275,8 @@ export default function AddPersonScreen() {
           tone="neutral"
         />
       </View>
+
+      <ConfirmationModal {...guard.confirmationProps} />
     </Screen>
   );
 }

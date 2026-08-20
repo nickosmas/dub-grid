@@ -9,7 +9,6 @@ export type MobileRequestActionFeedback = {
   confirmStyle?: "default" | "destructive";
   key: string;
   message: string;
-  pendingLabel: string;
   title: string;
 };
 
@@ -52,7 +51,6 @@ export function getMobileRequestActionFeedback({
         confirmLabel: "Volunteer",
         key,
         message: "Volunteer for this open shift? This will be sent to your admin for approval.",
-        pendingLabel: "Volunteering...",
         title: "Volunteer for open shift?",
       };
     case "claim":
@@ -60,7 +58,6 @@ export function getMobileRequestActionFeedback({
         confirmLabel: "Claim shift",
         key,
         message: "Claim this open shift? This will be sent to your admin for approval.",
-        pendingLabel: "Claiming...",
         title: "Claim this shift?",
       };
     case "accept":
@@ -69,7 +66,6 @@ export function getMobileRequestActionFeedback({
         key,
         message:
           "Accept this coverage request? The request will move forward for manager review if approval is required.",
-        pendingLabel: "Accepting...",
         title: "Accept request?",
       };
     case "decline":
@@ -79,7 +75,6 @@ export function getMobileRequestActionFeedback({
         key,
         message:
           "Decline this coverage request? The requester will keep their current shift unless another response is submitted.",
-        pendingLabel: "Declining...",
         title: "Decline request?",
       };
     case "approve":
@@ -87,7 +82,6 @@ export function getMobileRequestActionFeedback({
         confirmLabel: "Approve",
         key,
         message: "Approve this request? This will finalize the staffing change.",
-        pendingLabel: "Approving...",
         title: "Approve request?",
       };
     case "reject":
@@ -96,7 +90,6 @@ export function getMobileRequestActionFeedback({
         confirmStyle: "destructive",
         key,
         message: "Reject this request? The original schedule will stay in place.",
-        pendingLabel: "Rejecting...",
         title: "Reject request?",
       };
     case "cancel":
@@ -105,7 +98,6 @@ export function getMobileRequestActionFeedback({
         confirmStyle: "destructive",
         key,
         message: "Cancel this request? It will no longer be available for review.",
-        pendingLabel: "Canceling...",
         title: "Cancel request?",
       };
     default:
@@ -113,7 +105,6 @@ export function getMobileRequestActionFeedback({
         confirmLabel: "Confirm",
         key,
         message: "Confirm this request action?",
-        pendingLabel: "Submitting...",
         title: "Confirm action?",
       };
   }

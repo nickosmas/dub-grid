@@ -23,7 +23,7 @@ import {
   type AppStateStatus,
   type GestureResponderEvent,
 } from "react-native";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,9 +41,13 @@ import Reanimated, {
 import { Button } from "../../../shared/components/Button";
 import { ConfirmationModal } from "../../../shared/components/ConfirmationModal";
 import { EmptyStateCard } from "../../../shared/components/EmptyStateCard";
-import { HeroSkeleton, ListSkeleton } from "../../../shared/components/Skeleton";
 import { Card, Screen, type ScreenScrollHandle } from "../../../shared/components/Screen";
+import {
+  ScrollableTabStrip,
+  ScrollableTabStripSkeleton,
+} from "../../../shared/components/ScrollableTabStrip";
 import { StatusBanner } from "../../../shared/components/StatusBanner";
+import { ScheduleMeSkeleton, ScheduleTeamSkeleton } from "../components/ScheduleSkeleton";
 import { SplitShiftBadge, SplitShiftSegmentList } from "../components/SplitShift";
 import {
   getMySchedule,
@@ -51,10 +55,10 @@ import {
   getShiftRequests,
   updateShiftRequest,
 } from "../../../shared/lib/api";
-import { getAvatarTone, resolveShiftPillColors, type AvatarTone } from "@dubgrid/design-tokens";
+import { getAvatarTone, type AvatarTone } from "@dubgrid/design-tokens";
 import { pushClientFriendlyErrorToast } from "../../../shared/lib/errors";
 import { hapticSelection } from "../../../shared/lib/haptics";
-import { getMobileQueryContentState } from "../../../shared/lib/query-state";
+import { useMobileContentState } from "../../../shared/hooks/useMobileContentState";
 import {
   useIsDarkMode,
   useMobileColors,
@@ -63,6 +67,7 @@ import {
 import { useToast } from "../../../shared/providers/ToastProvider";
 import {
   mobileBorderColorFromText,
+  mobileMotion,
   mobileRadii,
   mobileSpacing,
   mobileText,
@@ -162,23 +167,28 @@ import type {
   MobileScheduleEntrySegment,
   MobileShiftRequest,
 } from "@dubgrid/contracts";
+import {
+  DATE_HIGHLIGHT_SIZE,
+  MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS,
+  ME_HERO_AVATAR_FRAME_OVERLAP,
+  MONTH_EXPAND_SECTION_GAP,
+  MONTH_GRID_ROW_GAP,
+  OPEN_SHIFT_CARD_MIN_HEIGHT,
+  OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
+  WEEK_STRIP_ROW_HEIGHT,
+  createStyles,
+} from "./scheduleScreenStyles";
+import {
+  getOpenShiftAbsenceTypeId,
+  getOpenShiftFocusAreaName,
+  getOpenShiftPrimarySegment,
+  getOpenShiftTimeRange,
+} from "../lib/openShiftPresentation";
 
-const MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS = 4;
-const OPEN_SHIFT_CARD_MIN_HEIGHT = 180;
-const OPEN_SHIFT_CARD_SHADOW_ALLOWANCE = 18;
-const ME_HERO_AVATAR_FRAME_OVERLAP = -10;
 const OPEN_SHIFT_STACK_PEEK_HEIGHT = 10;
 const OPEN_SHIFT_STACK_SIDE_INSET = 6;
 const UPCOMING_SHIFT_DIVIDER_DASHES = Array.from({ length: 18 });
 const MONTH_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-// Fallback single-row height, used until the real row is measured. Matches
-// monthCalendarDaySlot's minHeight in styles below.
-const WEEK_STRIP_ROW_HEIGHT = 44;
-// Fixed size for the circular date highlight, shared by every week/month row.
-const DATE_HIGHLIGHT_SIZE = 36;
-// Matches monthCalendarWeek/monthCalendarWeeks gap in styles below.
-const MONTH_GRID_ROW_GAP = 6;
-const MONTH_EXPAND_SECTION_GAP = 14;
 const MONTH_EXPAND_TIMING = {
   duration: 240,
   easing: Easing.out(Easing.cubic),
@@ -196,6 +206,18 @@ const ME_HERO_CARD_GRADIENT_DARK = ["#0A1442", "#1D3AA0", "#2075FF"] as const;
 const ME_HERO_CARD_GRADIENT_LOCATIONS = [0, 0.55, 1] as const;
 const ME_HERO_CARD_GRADIENT_START = { x: 0, y: 1 } as const;
 const ME_HERO_CARD_GRADIENT_END = { x: 1, y: 0 } as const;
+/**
+ * Week/month swipe springs, named so the two feels are legible and so the
+ * schedule shares the app's motion vocabulary.
+ *
+ * These stay on the legacy `Animated` API rather than Reanimated: they already
+ * run with `useNativeDriver: true`, so the transform is on the UI thread either
+ * way, and the gesture is driven by raw touch handlers whose behaviour is
+ * covered by tests.
+ */
+const SWIPE_CANCEL_SPRING = mobileMotion.spring.gentle;
+const SWIPE_SETTLE_SPRING = mobileMotion.spring.snappy;
+
 const ME_HERO_CARD_SHADOW_LIGHT = "rgba(37, 99, 235, 0.3)";
 const ME_HERO_CARD_SHADOW_DARK = "rgba(32, 117, 255, 0.28)";
 
@@ -219,7 +241,6 @@ type RequestActionBody =
   | { action: "respond"; empId: string; accept: boolean };
 type PendingRequestAction = {
   key: string;
-  label: string;
 } | null;
 type RequestActionConfirmation = {
   requestId: string;
@@ -581,17 +602,9 @@ function getRequestTimeRange(
   );
 }
 
-function getOpenShiftPrimarySegment(openShift: MobileOpenShift) {
-  return openShift.presentation.segments[0] ?? null;
-}
-
 function getOpenShiftShiftName(openShift: MobileOpenShift): string {
   const primarySegment = getOpenShiftPrimarySegment(openShift);
   return primarySegment?.shiftName ?? openShift.presentation.label ?? "Open Shift";
-}
-
-function getOpenShiftAbsenceTypeId(openShift: MobileOpenShift): number | null {
-  return openShift.state.kind === "absence" ? (openShift.state.absenceTypeId ?? null) : null;
 }
 
 function getOpenShiftJobChip(
@@ -626,32 +639,10 @@ function formatOpenShiftCardCountLabel(count: number): string {
   return `${count} open shift card${count === 1 ? "" : "s"}`;
 }
 
-function getOpenShiftFocusAreaName(openShift: MobileOpenShift): string | null {
-  return (
-    openShift.presentation.segments.find((segment) => segment.displayFocusAreaName)
-      ?.displayFocusAreaName ??
-    openShift.presentation.displayFocusAreaName ??
-    openShift.focusAreaName
-  );
-}
-
-function getOpenShiftTimeRange(openShift: MobileOpenShift): string | null {
-  const primarySegment = openShift.presentation.segments.find(
-    (segment) => segment.startTime && segment.endTime,
-  );
-
-  if (primarySegment?.startTime && primarySegment.endTime) {
-    return formatScheduleTimeRange(primarySegment.startTime, primarySegment.endTime);
-  }
-
-  return openShift.presentation.startTime && openShift.presentation.endTime
-    ? formatScheduleTimeRange(openShift.presentation.startTime, openShift.presentation.endTime)
-    : null;
-}
-
 export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const accessToken = useAccessToken();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -695,21 +686,27 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
   const canLoadSchedule = Boolean(accessToken) && (!isTeamScope || canViewTeamSchedule);
   const canLoadRequests = Boolean(accessToken) && !isTeamScope;
   const canLoadMeTeamSchedule = Boolean(accessToken) && !isTeamScope && canViewTeamSchedule;
+  // These three are keyed by the visible date range. Without `keepPreviousData`,
+  // paging to the next week drops each of them to `isLoading` and flashes a
+  // skeleton over a schedule the user was already reading.
   const scheduleQuery = useQuery({
     queryKey: ["mobile", "schedule", scope, accessToken, range.startDate, range.endDate],
     queryFn: () =>
       isTeamScope ? getOrgSchedule(accessToken!, range) : getMySchedule(accessToken!, range),
     enabled: canLoadSchedule,
+    placeholderData: keepPreviousData,
   });
   const meTeamScheduleQuery = useQuery({
     queryKey: ["mobile", "schedule", "team", accessToken, range.startDate, range.endDate],
     queryFn: () => getOrgSchedule(accessToken!, range),
     enabled: canLoadMeTeamSchedule,
+    placeholderData: keepPreviousData,
   });
   const requestsQuery = useQuery({
     queryKey: ["mobile", "requests", accessToken, range.startDate, range.endDate],
     queryFn: () => getShiftRequests(accessToken!, range),
     enabled: canLoadRequests,
+    placeholderData: keepPreviousData,
   });
   const refetchBootstrap = bootstrapQuery.refetch;
   const refetchSchedule = scheduleQuery.refetch;
@@ -791,10 +788,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
     const { requestId, body, feedback } = requestActionConfirmation;
     setRequestActionConfirmation(null);
-    setPendingAction({
-      key: feedback.key,
-      label: feedback.pendingLabel,
-    });
+    setPendingAction({ key: feedback.key });
     requestActionMutation.mutate(
       { requestId, body },
       {
@@ -895,8 +889,14 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       return [];
     }
 
-    return buildTeamScheduleFocusAreaTabs(bootstrapQuery.data?.focusAreas ?? [], scheduleEntries);
-  }, [bootstrapQuery.data?.focusAreas, isBlockedTeamView, scheduleEntries]);
+    // Tabs come from the whole range so they don't appear and vanish as the
+    // user moves between days; the badges count only the selected day.
+    return buildTeamScheduleFocusAreaTabs(
+      bootstrapQuery.data?.focusAreas ?? [],
+      scheduleEntries,
+      selectedDayTeamEntries,
+    );
+  }, [bootstrapQuery.data?.focusAreas, isBlockedTeamView, scheduleEntries, selectedDayTeamEntries]);
   const defaultTeamFocusAreaKey = useMemo(() => {
     const homeFocusAreaId = linkedEmployee?.focusAreaIds[0] ?? null;
     if (homeFocusAreaId != null) {
@@ -1011,9 +1011,20 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     () => buildTeamScheduleShiftGroupsForView(selectedEntries),
     [selectedEntries],
   );
-  const contentState = getMobileQueryContentState({
-    hasData: Boolean(activeData) && Boolean(bootstrapQuery.data),
-    isLoading: scheduleQuery.isLoading || bootstrapQuery.isLoading,
+  // Requests are folded in because the personal view renders cover requests and
+  // open shifts inline. Left out, they cleared the page skeleton and then
+  // painted two more of their own underneath it. "Resolved" rather than
+  // "succeeded": those sections show their own error banner, so a failed
+  // request fetch must not take the whole schedule to an error screen.
+  // A disabled query never resolves: in team scope `canLoadRequests` is false,
+  // so without the short-circuit `hasData` stayed false forever and every error
+  // or offline moment repainted the whole tab over a schedule already on
+  // screen. Same shape as AdminHomeScreen's `managementOnly ||`.
+  const requestsResolved =
+    !canLoadRequests || requestsQuery.data !== undefined || Boolean(requestsQuery.error);
+  const contentState = useMobileContentState({
+    hasData: Boolean(activeData) && Boolean(bootstrapQuery.data) && requestsResolved,
+    isLoading: scheduleQuery.isLoading || bootstrapQuery.isLoading || requestsQuery.isLoading,
     error: scheduleQuery.error ?? bootstrapQuery.error,
   });
   const emptyStateTitle = "Nothing to show yet";
@@ -1127,9 +1138,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     weekTransitionRef.current?.stop();
     const resetAnimation = Animated.spring(weekStripTranslateX, {
       toValue: 0,
-      damping: 18,
-      stiffness: 220,
-      mass: 0.7,
+      ...SWIPE_CANCEL_SPRING,
       useNativeDriver: true,
     });
 
@@ -1152,9 +1161,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
     const settleAnimation = Animated.spring(weekStripTranslateX, {
       toValue: 0,
-      damping: 22,
-      stiffness: 260,
-      mass: 0.8,
+      ...SWIPE_SETTLE_SPRING,
       useNativeDriver: true,
     });
 
@@ -1245,9 +1252,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
     monthTransitionRef.current?.stop();
     const resetAnimation = Animated.spring(monthSwipeTranslateX, {
       toValue: 0,
-      damping: 18,
-      stiffness: 220,
-      mass: 0.7,
+      ...SWIPE_CANCEL_SPRING,
       useNativeDriver: true,
     });
 
@@ -1275,9 +1280,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
 
     const settleAnimation = Animated.spring(monthSwipeTranslateX, {
       toValue: 0,
-      damping: 22,
-      stiffness: 260,
-      mass: 0.8,
+      ...SWIPE_SETTLE_SPRING,
       useNativeDriver: true,
     });
 
@@ -1523,6 +1526,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                           getScheduleMonthStartDate(day.date) === visibleCalendarMonth,
                       }}
                       accessible={row.key === "current"}
+                      dateLabel={formatScheduleDayLabel(day.date, now, timeZone)}
                       onPress={() => handleSelectDate(day.date)}
                     />
                   ))}
@@ -1540,6 +1544,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
               key={day.date}
               day={day}
               accessible={isCenterMonth}
+              dateLabel={formatScheduleDayLabel(day.date, now, timeZone)}
               onPress={() => handleSelectDate(day.date)}
             />
           ))}
@@ -1650,56 +1655,30 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
       stickyHeaderShellStyle={styles.scheduleCalendarStickyHeaderShell}
     >
       <View>
-        {isTeamScope && teamFocusAreaTabs.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.focusAreaPillListContent}
-            style={styles.focusAreaPillList}
-          >
-            {teamFocusAreaTabs.map((tab) => {
-              const isActive = tab.key === activeTeamFocusAreaKey;
-
-              return (
-                <Pressable
-                  key={tab.key}
-                  accessibilityLabel={`Select ${tab.label}`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isActive }}
-                  onPress={() => {
-                    handleSelectFocusArea(tab.key);
-                  }}
-                  style={({ pressed }) => [
-                    styles.focusAreaPill,
-                    isActive && styles.focusAreaPillActive,
-                    pressed && styles.focusAreaPillPressed,
-                  ]}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.focusAreaPillText, isActive && styles.focusAreaPillTextActive]}
-                  >
-                    {tab.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+        {/* The focus-area pills carry per-day counts, so they can't paint before
+            the schedule resolves without every badge popping in behind them.
+            While loading there is no tab list yet either — it comes from
+            bootstrap — so the skeleton stands in at a fixed width. */}
+        {isTeamScope && contentState.kind === "loading" ? (
+          contentState.showSkeleton ? (
+            <ScrollableTabStripSkeleton tabs={4} />
+          ) : null
+        ) : isTeamScope && teamFocusAreaTabs.length > 0 ? (
+          <ScrollableTabStrip
+            accessibilityLabel="Focus areas"
+            activeKey={activeTeamFocusAreaKey}
+            onSelect={handleSelectFocusArea}
+            tabs={teamFocusAreaTabs}
+          />
         ) : null}
         {contentState.kind === "loading" ? (
-          <View style={styles.loadingState}>
-            <Text style={styles.loadingTitle}>Loading schedule</Text>
-            <Text style={styles.loadingBody}>Getting the latest published schedule.</Text>
-            {!isTeamScope ? (
-              <>
-                <HeroSkeleton />
-                <ListSkeleton rows={2} />
-                <ListSkeleton rows={2} />
-              </>
+          contentState.showSkeleton ? (
+            isTeamScope ? (
+              <ScheduleTeamSkeleton />
             ) : (
-              <ListSkeleton rows={4} showSectionHeader={false} />
-            )}
-          </View>
+              <ScheduleMeSkeleton />
+            )
+          ) : null
         ) : contentState.kind === "error" ? (
           <StatusBanner
             actionLabel="Try again"
@@ -1750,7 +1729,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
             {isMeScheduleEmpty ? null : (
               <>
                 <ShiftCoverRequestsSection
-                  isLoading={requestsQuery.isLoading}
                   linkedEmployeeId={linkedEmployee?.id ?? null}
                   pendingAction={pendingAction}
                   onRespond={(requestId, accept) => {
@@ -1768,7 +1746,6 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
                   requestsError={requestsQuery.error}
                 />
                 <OpenShiftsSection
-                  isLoading={requestsQuery.isLoading}
                   linkedEmployeeId={linkedEmployee?.id ?? null}
                   pendingAction={pendingAction}
                   now={now}
@@ -1857,7 +1834,7 @@ export function ScheduleScreen({ scope }: { scope: ScheduleScope }) {
           confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
           confirmTone={
             requestActionConfirmation?.feedback.confirmStyle === "destructive"
-              ? "dangerFilled"
+              ? "danger"
               : "primary"
           }
           onCancel={() => setRequestActionConfirmation(null)}
@@ -1882,10 +1859,13 @@ type MonthDayCellDay = {
 // highlight is always the same circle, in the same place, at the same size.
 function MonthDayCell({
   day,
+  dateLabel,
   onPress,
   accessible = true,
 }: {
   day: MonthDayCellDay;
+  /** Human-readable date, e.g. "Today, Apr 16" — see the label below. */
+  dateLabel: string;
   onPress: () => void;
   // The week-swipe strip always keeps the previous/next week mounted
   // off-screen (clipped horizontally) so a swipe can start instantly. Those
@@ -1894,11 +1874,14 @@ function MonthDayCell({
   accessible?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <Pressable
-      accessibilityLabel={accessible ? `Select date ${day.date}` : undefined}
+      // `day.date` is a raw ISO string; screen readers announce it digit by
+      // digit ("Select date 2026-08-03"). Speak it the way the UI reads it.
+      accessibilityLabel={accessible ? `Select ${dateLabel}` : undefined}
       accessibilityRole={accessible ? "button" : undefined}
       accessibilityState={accessible ? { selected: day.isSelected } : undefined}
       android_ripple={{ color: "rgba(15, 23, 42, 0.08)", borderless: true }}
@@ -1942,7 +1925,8 @@ function IconControlButton({
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <Pressable
@@ -1963,7 +1947,8 @@ function IconControlButton({
 
 function AlertsChromeButton({ unreadCount }: { unreadCount: number }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <Pressable
@@ -2032,7 +2017,8 @@ function getRequestJobChip(
 
 function MentoredPill() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View accessibilityLabel="Mentored assignment" style={styles.mentoredPill}>
@@ -2051,7 +2037,8 @@ function MeSectionHeader({
   onAction?: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View style={styles.meSectionHeader}>
@@ -2079,7 +2066,8 @@ function JobPill({
   isMentored?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
@@ -2169,7 +2157,8 @@ function MeTypePill({
   isMentored?: boolean;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (!chip) {
     return isMentored ? <MentoredPill /> : null;
@@ -2197,8 +2186,9 @@ function MeTypePill({
 
 function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { resolvedTheme } = useThemeMode();
+  const isDark = resolvedTheme === "dark";
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (entries.length === 0) {
     return null;
@@ -2206,7 +2196,6 @@ function MeHeroShiftmates({ entries }: { entries: MobileScheduleEntry[] }) {
 
   const visibleEntries = entries.slice(0, 3);
   const overflowCount = entries.length - visibleEntries.length;
-  const isDark = resolvedTheme === "dark";
   const collaboratorBackground = {
     backgroundColor: isDark
       ? ME_HERO_COLLABORATOR_BACKGROUND_DARK
@@ -2286,8 +2275,8 @@ function MeHeroCard({
   onPress?: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (!featuredItem) {
     return (
@@ -2487,8 +2476,8 @@ function UpcomingShiftsSection({
   todayDate: string;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   if (items.length === 0) {
     return null;
@@ -2648,7 +2637,8 @@ function UpcomingShiftsSection({
 
 function UpcomingShiftDashedDivider() {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
 
   return (
     <View
@@ -2668,7 +2658,6 @@ function OpenShiftsSection({
   openShifts,
   scheduleEntries,
   linkedEmployeeId,
-  isLoading,
   pendingAction,
   now,
   requestsError,
@@ -2682,7 +2671,6 @@ function OpenShiftsSection({
   openShifts: MobileOpenShift[];
   scheduleEntries: MobileScheduleEntry[];
   linkedEmployeeId: string | null;
-  isLoading: boolean;
   pendingAction: PendingRequestAction;
   now: Date;
   requestsError: unknown;
@@ -2696,8 +2684,8 @@ function OpenShiftsSection({
   onSeeAll: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [stackCardHeights, setStackCardHeights] = useState<Record<string, number>>({});
   const availableOpenShiftFeed = useMemo(
@@ -2846,11 +2834,12 @@ function OpenShiftsSection({
             disabled={
               Boolean(pendingAction) || !linkedEmployeeId || item.openShift.canVolunteer === false
             }
-            label={isVolunteerLoading ? pendingAction.label : "Volunteer"}
+            label="Volunteer"
             leadingAccessory={
               <Ionicons color={mobileColors.brand} name="add-circle-outline" size={18} />
             }
             loading={isVolunteerLoading}
+            loadingLabel="Volunteering"
             onPress={() => {
               if (item.openShift.canVolunteer === false) {
                 return;
@@ -2935,13 +2924,7 @@ function OpenShiftsSection({
         {cardSurface}
         <Button
           disabled={isPendingVolunteerRequest || Boolean(pendingAction) || !linkedEmployeeId}
-          label={
-            isPendingVolunteerRequest
-              ? "Pending approval"
-              : isClaimLoading
-                ? pendingAction.label
-                : "Claim Shift"
-          }
+          label={isPendingVolunteerRequest ? "Pending approval" : "Claim Shift"}
           leadingAccessory={
             <Ionicons
               color={mobileColors.brand}
@@ -2950,6 +2933,7 @@ function OpenShiftsSection({
             />
           }
           loading={isClaimLoading}
+          loadingLabel="Claiming"
           onPress={() => onClaim(item.request.id)}
           tone="secondary"
         />
@@ -2957,7 +2941,7 @@ function OpenShiftsSection({
     );
   };
 
-  if (!isLoading && !requestsError && availableOpenShiftFeed.totalCount === 0) {
+  if (!requestsError && availableOpenShiftFeed.totalCount === 0) {
     return null;
   }
 
@@ -2965,9 +2949,7 @@ function OpenShiftsSection({
     <View style={styles.meSectionBlock}>
       <MeSectionHeader actionLabel="See all" onAction={onSeeAll} title="Open Shifts" />
 
-      {isLoading ? (
-        <ListSkeleton rows={2} showSectionHeader={false} />
-      ) : requestsError ? (
+      {requestsError ? (
         <StatusBanner
           body="We couldn't load open shifts right now."
           title="Could not load open shifts"
@@ -3080,23 +3062,22 @@ function OpenShiftsSection({
 function ShiftCoverRequestsSection({
   requests,
   linkedEmployeeId,
-  isLoading,
   pendingAction,
   requestsError,
   onRespond,
 }: {
   requests: MobileShiftRequest[];
   linkedEmployeeId: string | null;
-  isLoading: boolean;
   pendingAction: PendingRequestAction;
   requestsError: unknown;
   onRespond: (requestId: string, accept: boolean) => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { resolvedTheme } = useThemeMode();
 
-  if (!isLoading && !requestsError && requests.length === 0) {
+  if (!requestsError && requests.length === 0) {
     return null;
   }
 
@@ -3104,9 +3085,7 @@ function ShiftCoverRequestsSection({
     <View style={styles.meSectionBlock}>
       <MeSectionHeader title="Needs Your Response" />
 
-      {isLoading ? (
-        <ListSkeleton rows={2} showSectionHeader={false} />
-      ) : requestsError ? (
+      {requestsError ? (
         <StatusBanner
           body="We couldn't load cover requests right now."
           title="Could not load requests"
@@ -3185,14 +3164,16 @@ function ShiftCoverRequestsSection({
                 <View style={styles.requestActions}>
                   <Button
                     disabled={Boolean(pendingAction) || !linkedEmployeeId}
-                    label={isAcceptLoading ? pendingAction.label : "Accept"}
+                    label="Accept"
                     loading={isAcceptLoading}
+                    loadingLabel="Accepting"
                     onPress={() => onRespond(request.id, true)}
                   />
                   <Button
                     disabled={Boolean(pendingAction) || !linkedEmployeeId}
-                    label={isDeclineLoading ? pendingAction.label : "Decline"}
+                    label="Decline"
                     loading={isDeclineLoading}
+                    loadingLabel="Declining"
                     onPress={() => onRespond(request.id, false)}
                     tone="neutral"
                   />
@@ -3220,7 +3201,8 @@ function TeamShiftMemberRow({
   onPress: () => void;
 }) {
   const mobileColors = useMobileColors();
-  const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+  const isDark = useIsDarkMode();
+  const styles = useMemo(() => createStyles(mobileColors, isDark), [mobileColors, isDark]);
   const { resolvedTheme } = useThemeMode();
   const { entry, segment } = row;
   const avatarTone = getAvatarTone(entry.employeeId, resolvedTheme === "dark");
@@ -3317,1498 +3299,3 @@ function getInitials(name: string): string {
 
   return `${first}${last}` || "?";
 }
-
-const createStyles = (mobileColors: MobileColors) =>
-  StyleSheet.create({
-    loadingState: {
-      gap: 14,
-    },
-    loadingTitle: {
-      ...mobileText.screenTitle,
-      color: mobileColors.textPrimary,
-    },
-    loadingBody: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-    },
-    stickyControlsSection: {
-      gap: 16,
-    },
-    scheduleCalendarStickyHeaderShell: {
-      backgroundColor: mobileColors.borderSubtle,
-      borderBottomWidth: 0.5,
-      borderBottomColor: mobileColors.border,
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 8,
-      elevation: 2,
-    },
-    mePage: {
-      gap: 22,
-      paddingTop: 8,
-    },
-    mePageEmpty: {
-      justifyContent: "center",
-      paddingTop: 0,
-    },
-    meTopStack: {
-      gap: 18,
-    },
-    meWelcomeRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 16,
-    },
-    meWelcomeCopy: {
-      flex: 1,
-      gap: 4,
-    },
-    meWelcomeDate: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textSubtle,
-    },
-    meWelcomeTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 20,
-      lineHeight: 25,
-      color: mobileColors.textPrimary,
-    },
-    meWeekNavigator: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 14,
-      paddingVertical: 2,
-    },
-    meWeekNavigatorCopy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 4,
-    },
-    meWeekNavigatorTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 26,
-      lineHeight: 32,
-      fontWeight: "800",
-      color: mobileColors.textPrimary,
-    },
-    meWeekNavigatorRangeLabel: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textSecondary,
-    },
-    meWeekNavigatorActions: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      flexShrink: 0,
-    },
-    meWeekRangeControlGroup: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexShrink: 0,
-      gap: 8,
-    },
-    meTodayButton: {
-      minHeight: 44,
-      borderRadius: 22,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
-      backgroundColor: mobileColors.brandSoft,
-      justifyContent: "center",
-      paddingHorizontal: 14,
-    },
-    meTodayButtonPressed: {
-      opacity: 0.82,
-    },
-    meTodayButtonText: {
-      ...mobileText.meta,
-      color: mobileColors.brand,
-      fontFamily: "DMSans_700Bold",
-      fontWeight: "700",
-    },
-    meHeroCard: {
-      position: "relative",
-      overflow: "hidden",
-      borderRadius: 24,
-      paddingHorizontal: 18,
-      paddingVertical: 18,
-      shadowOffset: {
-        width: 0,
-        height: 14,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 28,
-      elevation: 5,
-    },
-    meHeroCardMuted: {
-      backgroundColor: "#E2E8F0",
-      shadowColor: mobileColors.shadow,
-    },
-    meHeroCardPressed: {
-      opacity: 0.94,
-    },
-    meHeroGlow: {
-      position: "absolute",
-      borderRadius: 999,
-      backgroundColor: "rgba(255, 255, 255, 0.12)",
-    },
-    meHeroGlowLarge: {
-      width: 180,
-      height: 180,
-      top: -72,
-      right: -58,
-    },
-    meHeroGlowSmall: {
-      width: 140,
-      height: 140,
-      bottom: -64,
-      left: -24,
-      backgroundColor: "rgba(15, 23, 42, 0.08)",
-    },
-    meHeroGlowMuted: {
-      backgroundColor: "rgba(255, 255, 255, 0.22)",
-    },
-    meHeroContent: {
-      gap: 11,
-    },
-    meHeroHeader: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    meHeroHeaderCopy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 10,
-    },
-    meHeroBadge: {
-      alignSelf: "flex-start",
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-    },
-    meHeroBadgeMuted: {
-      backgroundColor: "rgba(255, 255, 255, 0.55)",
-    },
-    meHeroBadgeDot: {
-      width: 9,
-      height: 9,
-      borderRadius: 4.5,
-    },
-    meHeroBadgeDotActive: {
-      backgroundColor: "#86EFAC",
-    },
-    meHeroBadgeDotScheduled: {
-      backgroundColor: "#BFDBFE",
-    },
-    meHeroBadgeDotMuted: {
-      backgroundColor: mobileColors.textMuted,
-    },
-    meHeroBadgeText: {
-      ...mobileText.label,
-      color: mobileColors.textInverse,
-      textTransform: "uppercase",
-    },
-    meHeroBadgeTextMuted: {
-      color: mobileColors.textPrimary,
-    },
-    meHeroDateTile: {
-      minWidth: 58,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.22)",
-      backgroundColor: "rgba(255, 255, 255, 0.14)",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-    },
-    meHeroDateWeekday: {
-      ...mobileText.label,
-      color: "rgba(255, 255, 255, 0.72)",
-    },
-    meHeroDateDay: {
-      ...mobileText.heroMetric,
-      color: mobileColors.textInverse,
-    },
-    meHeroDateText: {
-      ...mobileText.meta,
-      alignSelf: "flex-start",
-      color: "rgba(255, 255, 255, 0.86)",
-      fontWeight: "600",
-    },
-    meHeroTitle: {
-      flexShrink: 1,
-      minWidth: 0,
-      ...mobileText.heroMetric,
-      color: mobileColors.textInverse,
-    },
-    meHeroTitleRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    meHeroHeading: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textInverse,
-    },
-    meHeroHeadingMuted: {
-      color: mobileColors.textSecondary,
-    },
-    meHeroTitleMuted: {
-      color: mobileColors.textPrimary,
-    },
-    meHeroSupportingText: {
-      ...mobileText.body,
-      color: "rgba(255, 255, 255, 0.84)",
-      fontWeight: "500",
-    },
-    meHeroSupportingTextMuted: {
-      color: mobileColors.textMuted,
-    },
-    meHeroAreaLabel: {
-      ...mobileText.rowTitle,
-      color: "rgba(255, 255, 255, 0.86)",
-    },
-    meHeroAreaLabelMuted: {
-      color: mobileColors.textSecondary,
-    },
-    meHeroMetaRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    meHeroAreaRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      marginTop: 2,
-    },
-    meHeroRoleRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 10,
-    },
-    meTypePillStack: {
-      alignSelf: "flex-start",
-      gap: 4,
-    },
-    meTypePillLabel: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textMuted,
-    },
-    meTypePillLabelRow: {
-      fontSize: 17,
-      lineHeight: 22,
-    },
-    meTypePillLabelHero: {
-      fontSize: 24,
-      lineHeight: 30,
-    },
-    meTypePillLabelInverse: {
-      color: "rgba(255, 255, 255, 0.82)",
-    },
-    meHeroScheduleRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      flexWrap: "wrap",
-      gap: 10,
-      marginTop: 6,
-    },
-    meHeroTimeRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      flex: 1,
-      gap: 9,
-      minWidth: 0,
-    },
-    meHeroTimeText: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textInverse,
-      flexShrink: 1,
-    },
-    meHeroTimePill: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      alignSelf: "flex-start",
-      backgroundColor: "rgba(29, 78, 216, 0.22)",
-      borderRadius: mobileRadii.control,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-    },
-    meHeroTimePillMuted: {
-      backgroundColor: "rgba(255, 255, 255, 0.58)",
-    },
-    meHeroTimePillText: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textInverse,
-    },
-    meHeroTimePillTextMuted: {
-      color: mobileColors.textSecondary,
-    },
-    meHeroActionIcon: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "rgba(255, 255, 255, 0.18)",
-    },
-    meHeroActionIconMuted: {
-      backgroundColor: "rgba(255, 255, 255, 0.55)",
-    },
-    meHeroEmptyText: {
-      ...mobileText.body,
-      color: "rgba(255, 255, 255, 0.84)",
-      fontWeight: "500",
-    },
-    meHeroEmptyBlock: {
-      gap: 10,
-    },
-    meHeroEmptyTextMuted: {
-      color: mobileColors.textSecondary,
-    },
-    meHeroDetails: {
-      gap: 8,
-    },
-    meHeroDetailText: {
-      color: "rgba(255, 255, 255, 0.88)",
-      fontSize: 14,
-      fontWeight: "600",
-      lineHeight: 20,
-    },
-    meHeroDetailTextMuted: {
-      color: mobileColors.textSecondary,
-    },
-    meHeroProgressBlock: {
-      gap: 10,
-      marginTop: 4,
-    },
-    meHeroProgressRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    meHeroProgressLabel: {
-      ...mobileText.rowTitle,
-      color: "rgba(255, 255, 255, 0.86)",
-      flexShrink: 0,
-    },
-    meHeroProgressTrack: {
-      height: 7,
-      borderRadius: 999,
-      backgroundColor: "rgba(15, 23, 42, 0.24)",
-      overflow: "hidden",
-    },
-    meHeroProgressFill: {
-      height: "100%",
-      borderRadius: 999,
-      backgroundColor: "#42E878",
-    },
-    meHeroCollaborators: {
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: "rgba(255, 255, 255, 0.14)",
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 10,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      marginTop: 6,
-      marginBottom: 6,
-    },
-    meHeroCollaboratorLabelRow: {
-      flex: 1,
-      minWidth: 0,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 9,
-    },
-    meHeroCollaboratorLabel: {
-      ...mobileText.rowTitle,
-      color: "rgba(255, 255, 255, 0.84)",
-      flexShrink: 1,
-    },
-    meHeroAvatarStack: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexShrink: 0,
-    },
-    meHeroCollaboratorAvatarFrame: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      padding: 2,
-    },
-    meHeroCollaboratorAvatarFrameOverlap: {
-      marginLeft: ME_HERO_AVATAR_FRAME_OVERLAP,
-    },
-    meHeroCollaboratorAvatar: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      borderWidth: 1,
-      borderColor: "#2946C7",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    meHeroCollaboratorAvatarText: {
-      ...mobileText.meta,
-      fontWeight: "600",
-    },
-    meHeroCollaboratorOverflow: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      borderWidth: 1,
-      borderColor: "#93C5FD",
-      backgroundColor: "#DBEAFE",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    meHeroCollaboratorOverflowText: {
-      ...mobileText.bodyStrong,
-      color: "#1D4ED8",
-    },
-    meSectionBlock: {
-      gap: 12,
-    },
-    upcomingSectionBlock: {
-      gap: 18,
-    },
-    upcomingSectionHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 14,
-    },
-    upcomingSectionTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 18,
-      lineHeight: 24,
-      flex: 1,
-      color: mobileColors.textPrimary,
-    },
-    upcomingHoursBadge: {
-      borderRadius: 12,
-      backgroundColor: mobileColors.brandSoft,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-    },
-    upcomingHoursBadgeText: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.brand,
-    },
-    upcomingShiftsCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: 28,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      paddingHorizontal: 20,
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 12,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 24,
-      elevation: 3,
-    },
-    upcomingDateGroup: {
-      flexDirection: "row",
-      alignItems: "stretch",
-      gap: 18,
-      marginHorizontal: -20,
-      paddingHorizontal: 20,
-    },
-    upcomingDateColumn: {
-      width: 60,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingVertical: 18,
-    },
-    upcomingDateShiftStack: {
-      flex: 1,
-      minWidth: 0,
-    },
-    upcomingShiftRow: {
-      minHeight: 132,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 18,
-      paddingVertical: 18,
-    },
-    upcomingShiftRowBorder: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-    },
-    upcomingShiftDashedDivider: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-    },
-    upcomingShiftDashedDividerSegment: {
-      flex: 1,
-      height: 1,
-      borderRadius: 999,
-      backgroundColor: mobileColors.border,
-    },
-    upcomingShiftRowToday: {
-      backgroundColor: mobileColors.brandSoft,
-    },
-    upcomingShiftRowTodayFirst: {
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
-    },
-    upcomingShiftRowTodayLast: {
-      borderBottomLeftRadius: 28,
-      borderBottomRightRadius: 28,
-    },
-    upcomingDateTile: {
-      width: 60,
-      height: 68,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceMuted,
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 6,
-    },
-    upcomingDateWeekday: {
-      ...mobileText.micro,
-      color: mobileColors.textSubtle,
-      fontSize: 11,
-    },
-    upcomingDateDay: {
-      ...mobileText.sectionTitle,
-      fontSize: 20,
-      lineHeight: 24,
-      color: mobileColors.textSecondary,
-    },
-    upcomingDateTodayDot: {
-      width: 5,
-      height: 5,
-      borderRadius: 999,
-      backgroundColor: mobileColors.danger,
-      marginTop: 1,
-    },
-    upcomingShiftCopy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 9,
-    },
-    upcomingShiftTitleRow: {
-      // flex-start (not center) so the time stays pinned to the title's first
-      // line instead of drifting to the vertical middle when a long shift name
-      // wraps to two lines.
-      alignItems: "flex-start",
-      flexDirection: "row",
-      justifyContent: "space-between",
-      gap: 8,
-    },
-    upcomingShiftTitleMeta: {
-      flex: 1,
-      minWidth: 0,
-      alignItems: "center",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    upcomingShiftTitle: {
-      flexShrink: 1,
-      minWidth: 0,
-      ...mobileText.sectionTitle,
-      fontSize: 17,
-      color: mobileColors.textPrimary,
-    },
-    upcomingShiftArea: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textSecondary,
-    },
-    upcomingShiftTime: {
-      flexShrink: 0,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      // upcomingShiftTitle's line-height (sectionTitle preset) adds leading
-      // space above its glyphs that this shorter icon+text row doesn't have —
-      // nudge down so it lines up with the title's actual text, not its box top.
-      paddingTop: 3,
-    },
-    // Smaller and lighter than upcomingShiftTitle (17px) — the time is
-    // secondary to the shift name, not competing with it for attention.
-    upcomingShiftTimeText: {
-      ...mobileText.caption,
-      fontSize: 13,
-      color: mobileColors.textSubtle,
-    },
-    upcomingShiftAction: {
-      width: 24,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    meSectionHeader: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    meSectionHeaderCopy: {
-      flex: 1,
-      gap: 4,
-    },
-    meSectionTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 18,
-      color: mobileColors.textPrimary,
-    },
-    meSectionLink: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.brand,
-    },
-    meSurfaceCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      padding: 18,
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 18,
-      elevation: 2,
-    },
-    meSectionBody: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-      fontWeight: "500",
-    },
-    scheduleListRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 16,
-      paddingVertical: 16,
-    },
-    scheduleListRowBorder: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-    },
-    scheduleListCopy: {
-      flex: 1,
-      gap: 8,
-    },
-    scheduleRowDate: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textMuted,
-    },
-    scheduleRowTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 17,
-      color: mobileColors.textPrimary,
-    },
-    scheduleRowTitleWithBadge: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    scheduleRowMeta: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textSecondary,
-    },
-    scheduleRowContext: {
-      flexDirection: "row",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    scheduleRowContextStack: {
-      gap: 8,
-    },
-    scheduleRowTime: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-    },
-    scheduleRowTimeText: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textMuted,
-      fontWeight: "500",
-    },
-    scheduleRowArrow: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceSecondary,
-    },
-    openShiftCarousel: {
-      marginHorizontal: -OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
-    },
-    openShiftCarouselContent: {
-      gap: 14,
-      paddingHorizontal: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
-      paddingTop: 4,
-      paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
-      paddingRight: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE + 4,
-    },
-    openShiftDateCard: {
-      width: 320,
-      gap: 12,
-    },
-    openShiftDateHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    openShiftDateCardItems: {
-      gap: 14,
-      paddingBottom: OPEN_SHIFT_CARD_SHADOW_ALLOWANCE,
-    },
-    openShiftDateCardItemsStacked: {
-      gap: 0,
-      minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
-      position: "relative",
-    },
-    openShiftCountBadge: {
-      minWidth: 28,
-      paddingHorizontal: 9,
-      paddingVertical: 5,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
-      backgroundColor: mobileColors.brandSoft,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    openShiftCountBadgeText: {
-      ...mobileText.badge,
-      color: mobileColors.brand,
-    },
-    openShiftCard: {
-      minHeight: OPEN_SHIFT_CARD_MIN_HEIGHT,
-      gap: 12,
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      padding: 18,
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 18,
-      elevation: 2,
-    },
-    openShiftCardSurface: {
-      gap: 12,
-    },
-    openShiftSplitPanel: {
-      gap: 10,
-    },
-    openShiftCardLead: {
-      zIndex: MAX_VISIBLE_OPEN_SHIFT_STACK_CARDS + 1,
-    },
-    openShiftCardStacked: {
-      position: "absolute",
-      shadowRadius: 14,
-    },
-    requestList: {
-      gap: 14,
-    },
-    requestCard: {
-      gap: 14,
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      padding: 18,
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 18,
-      elevation: 2,
-    },
-    requestHeaderRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    requestHeaderCopy: {
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-    },
-    requestAvatar: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      borderWidth: 1,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    requestAvatarText: {
-      ...mobileText.bodyStrong,
-    },
-    requestHeaderText: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    requestHeaderTextStack: {
-      flex: 1,
-      gap: 2,
-    },
-    requestHeaderSubtext: {
-      ...mobileText.meta,
-      color: mobileColors.textSecondary,
-      fontWeight: "600",
-    },
-    requestDateText: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textMuted,
-    },
-    requestActions: {
-      flexDirection: "row",
-      gap: 12,
-    },
-    jobPill: {
-      alignSelf: "flex-start",
-      borderRadius: 8,
-      borderWidth: 1,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
-    },
-    jobPillCompact: {
-      borderRadius: 8,
-      paddingHorizontal: 9,
-      paddingVertical: 5,
-    },
-    jobPillTextStack: {
-      gap: 2,
-    },
-    jobPillInlineTextRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-    },
-    jobPillEyebrowText: {
-      ...mobileText.micro,
-    },
-    jobPillEyebrowTextCompact: {
-      fontSize: 9,
-    },
-    jobPillText: {
-      ...mobileText.badge,
-      textTransform: "uppercase",
-    },
-    jobPillMentoredText: {
-      textTransform: "none",
-    },
-    jobPillTextCompact: {
-      fontSize: 12,
-    },
-    jobPillValueText: {
-      ...mobileText.meta,
-      fontWeight: "600",
-    },
-    jobPillValueTextCompact: {
-      fontSize: 12,
-    },
-    mentoredPill: {
-      alignSelf: "flex-start",
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surfaceSecondary,
-      minHeight: 28,
-      justifyContent: "center",
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-    },
-    mentoredPillText: {
-      ...mobileText.badge,
-      color: mobileColors.textSecondary,
-    },
-    meCollaboratorList: {
-      gap: 0,
-    },
-    meCollaboratorRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 12,
-      paddingVertical: 12,
-    },
-    meCollaboratorRowBorder: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-    },
-    meCollaboratorAvatar: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: mobileColors.brandSoft,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    meCollaboratorAvatarText: {
-      ...mobileText.meta,
-      color: mobileColors.brand,
-      fontWeight: "600",
-    },
-    meCollaboratorCopy: {
-      flex: 1,
-      gap: 8,
-    },
-    meCollaboratorName: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textPrimary,
-    },
-    timelineList: {
-      gap: 18,
-    },
-    timelineSection: {
-      gap: 12,
-      paddingLeft: 18,
-      marginLeft: 4,
-      borderLeftWidth: 2,
-      borderLeftColor: mobileColors.borderSubtle,
-    },
-    timelineSectionHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      marginLeft: -25,
-    },
-    timelineDot: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      borderWidth: 3,
-      borderColor: mobileColors.background,
-      backgroundColor: mobileColors.brand,
-    },
-    timelineSectionTitle: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    timelineSectionEntries: {
-      gap: 10,
-    },
-    timelineEntryCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: 22,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      padding: 16,
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 6,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 14,
-      elevation: 2,
-    },
-    timelineEntryCardPressed: {
-      opacity: 0.92,
-    },
-    meHeaderRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    meHeaderActions: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-    },
-    teamHeaderUtilityRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 14,
-      justifyContent: "space-between",
-    },
-    teamHeaderActions: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      marginLeft: "auto",
-      flexShrink: 0,
-      overflow: "visible",
-    },
-    teamHeaderTitleArea: {
-      flex: 1,
-      minWidth: 0,
-    },
-    meSelectedDateTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 26,
-      lineHeight: 32,
-      fontWeight: "800",
-      flex: 1,
-      color: mobileColors.textPrimary,
-      textAlign: "left",
-    },
-    teamHeaderTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 26,
-      lineHeight: 32,
-      fontWeight: "800",
-      color: mobileColors.textPrimary,
-      textAlign: "left",
-      flexShrink: 1,
-      minWidth: 0,
-    },
-    focusAreaPillList: {
-      marginHorizontal: -mobileSpacing.screenX,
-    },
-    focusAreaPillListContent: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingHorizontal: mobileSpacing.screenX,
-      paddingVertical: 2,
-    },
-    focusAreaPill: {
-      minHeight: 36,
-      maxWidth: 180,
-      borderRadius: mobileRadii.pill,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surface,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-    },
-    focusAreaPillActive: {
-      borderColor: mobileColors.brand,
-      backgroundColor: mobileColors.brand,
-    },
-    focusAreaPillPressed: {
-      opacity: 0.62,
-    },
-    focusAreaPillText: {
-      color: mobileColors.textSecondary,
-      fontSize: 14,
-      fontWeight: "700",
-    },
-    focusAreaPillTextActive: {
-      color: mobileColors.textInverse,
-    },
-    iconControlButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      backgroundColor: mobileColors.surface,
-      alignItems: "center",
-      justifyContent: "center",
-      shadowColor: mobileColors.shadow,
-      shadowOffset: {
-        width: 0,
-        height: 6,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 14,
-      elevation: 2,
-    },
-    iconControlButtonPressed: {
-      opacity: 0.82,
-    },
-    calendarBlock: {
-      gap: MONTH_EXPAND_SECTION_GAP,
-    },
-    weekStripFrame: {
-      overflow: "hidden",
-    },
-    calendarDragHandleRow: {
-      alignItems: "center",
-      justifyContent: "center",
-      paddingVertical: 2,
-    },
-    calendarDragHandleBar: {
-      width: 36,
-      height: 5,
-      borderRadius: mobileRadii.pill,
-      backgroundColor: mobileColors.textSubtle,
-    },
-    weekSwipeRowClip: {
-      overflow: "hidden",
-    },
-    weekStripTrack: {
-      flexDirection: "row",
-    },
-    monthCalendarWeekdays: {
-      flexDirection: "row",
-      gap: 6,
-    },
-    monthCalendarWeekdayLabel: {
-      flex: 1,
-      color: mobileColors.textSubtle,
-      fontSize: 12,
-      fontWeight: "700",
-      textAlign: "center",
-    },
-    monthCalendarWeeks: {
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-    },
-    monthSwipeTrack: {
-      flexDirection: "row",
-    },
-    monthGridColumn: {
-      gap: MONTH_GRID_ROW_GAP,
-    },
-    monthCalendarWeek: {
-      flexDirection: "row",
-      gap: 6,
-    },
-    monthCalendarDaySlot: {
-      flex: 1,
-      minHeight: WEEK_STRIP_ROW_HEIGHT,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    dateHighlightCircle: {
-      width: DATE_HIGHLIGHT_SIZE,
-      height: DATE_HIGHLIGHT_SIZE,
-      borderRadius: DATE_HIGHLIGHT_SIZE / 2,
-      borderWidth: 1,
-      borderColor: "transparent",
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "transparent",
-    },
-    dateHighlightSelected: {
-      backgroundColor: mobileColors.brand,
-      borderColor: mobileColors.brand,
-    },
-    dateHighlightTodaySelected: {
-      backgroundColor: mobileColors.danger,
-      borderColor: mobileColors.danger,
-    },
-    dateHighlightToday: {
-      backgroundColor: mobileColors.dangerSoft,
-      borderColor: mobileColors.dangerBorder,
-    },
-    dateHighlightOutsideMonth: {
-      opacity: 0.4,
-    },
-    dateHighlightText: {
-      color: mobileColors.textPrimary,
-      fontSize: 15,
-      fontWeight: "700",
-    },
-    dateHighlightTextSelected: {
-      color: mobileColors.textInverse,
-    },
-    dateHighlightTextToday: {
-      color: mobileColors.danger,
-    },
-    dateHighlightTextTodaySelected: {
-      color: mobileColors.textInverse,
-    },
-    alertBadge: {
-      position: "absolute",
-      top: 3,
-      right: -2,
-      minWidth: 16,
-      height: 16,
-      borderRadius: 999,
-      paddingHorizontal: 4,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: mobileColors.danger,
-    },
-    alertBadgeText: {
-      color: mobileColors.textInverse,
-      fontSize: 10,
-      fontWeight: "700",
-    },
-    groupsList: {
-      gap: mobileSpacing.sectionGap,
-    },
-    shiftGroupsList: {
-      gap: 28,
-      paddingTop: 24,
-    },
-    shiftGroupBlock: {
-      gap: 12,
-    },
-    shiftGroupDivider: {
-      height: 1,
-      backgroundColor: mobileColors.borderSubtle,
-    },
-    shiftGroupHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 12,
-      paddingHorizontal: 8,
-    },
-    shiftGroupTitle: {
-      flex: 1,
-      minWidth: 0,
-      ...mobileText.sectionTitle,
-      fontSize: 18,
-      lineHeight: 23,
-      color: mobileColors.textPrimary,
-    },
-    shiftGroupTime: {
-      flexShrink: 0,
-      ...mobileText.bodyStrong,
-      color: mobileColors.textSubtle,
-      textAlign: "right",
-    },
-    weekDaySection: {
-      gap: 12,
-    },
-    weekDayHeader: {
-      gap: 4,
-    },
-    weekDayTitle: {
-      ...mobileText.sectionTitle,
-      fontSize: 17,
-      color: mobileColors.textPrimary,
-    },
-    weekDayEmptyState: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-    },
-    weekDayEmptyText: {
-      ...mobileText.body,
-      color: mobileColors.textMuted,
-      fontWeight: "600",
-    },
-    groupEntries: {
-      gap: 10,
-    },
-    teamGroupCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: 28,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-      shadowColor: mobileColors.shadowStrong,
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity: 1,
-      shadowRadius: 20,
-      elevation: 2,
-    },
-    teamGroupMembers: {
-      marginTop: 0,
-    },
-    teamMemberRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 16,
-      minHeight: 72,
-      paddingVertical: 16,
-    },
-    teamMemberRowBorder: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-    },
-    teamMemberAvatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: mobileColors.brandSoft,
-      borderWidth: 1,
-      borderColor: mobileColors.brandBorder,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    teamMemberAvatarText: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.brand,
-    },
-    teamMemberMain: {
-      flex: 1,
-      minWidth: 0,
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-    },
-    teamMemberCopy: {
-      flex: 1,
-      minWidth: 0,
-      gap: 5,
-    },
-    teamMemberNameRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    teamMemberName: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textPrimary,
-    },
-    teamMemberTime: {
-      ...mobileText.bodyStrong,
-      color: mobileColors.textSubtle,
-    },
-    teamMemberSplitBadgeRow: {
-      alignItems: "flex-start",
-    },
-    teamMemberRoleRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "flex-end",
-      flexWrap: "wrap",
-      gap: 8,
-    },
-    teamMemberRoleChip: {
-      borderWidth: 1,
-      borderRadius: 7,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
-    },
-    teamMemberRoleChipTextStack: {
-      gap: 2,
-    },
-    teamMemberRoleChipEyebrowText: {
-      ...mobileText.micro,
-    },
-    teamMemberRoleChipText: {
-      ...mobileText.badge,
-      textTransform: "uppercase",
-    },
-    teamMemberRoleChipValueText: {
-      ...mobileText.caption,
-      fontWeight: "600",
-    },
-    compactSegmentList: {
-      gap: 8,
-    },
-    compactSegmentBlock: {
-      gap: 3,
-    },
-    compactSegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 8,
-    },
-    compactSegmentTitle: {
-      color: mobileColors.textSecondary,
-      fontSize: 13,
-      fontWeight: "700",
-    },
-    compactSegmentMeta: {
-      color: mobileColors.textMuted,
-      fontSize: 13,
-      fontWeight: "600",
-    },
-    heroSegmentList: {
-      gap: 12,
-    },
-    heroSegmentBlock: {
-      gap: 6,
-    },
-    heroSegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: "rgba(255, 255, 255, 0.18)",
-      paddingTop: 12,
-    },
-    heroSegmentTitle: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textInverse,
-    },
-    heroSegmentMeta: {
-      ...mobileText.body,
-      color: "rgba(255, 255, 255, 0.84)",
-      fontWeight: "500",
-    },
-    timelineSegmentList: {
-      gap: 12,
-    },
-    timelineSegmentBlock: {
-      gap: 4,
-    },
-    timelineSegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 12,
-    },
-    timelineSegmentTitle: {
-      ...mobileText.rowTitle,
-      color: mobileColors.textPrimary,
-    },
-    timelineSegmentMeta: {
-      ...mobileText.meta,
-      color: mobileColors.textMuted,
-      fontWeight: "500",
-    },
-    entryCard: {
-      backgroundColor: mobileColors.surface,
-      borderRadius: mobileRadii.card,
-      borderWidth: 1,
-      borderColor: mobileColors.borderSubtle,
-      padding: 16,
-      gap: 12,
-    },
-    entrySegmentList: {
-      gap: 12,
-    },
-    entrySegmentBlock: {
-      gap: 6,
-    },
-    entrySegmentDivider: {
-      borderTopWidth: 1,
-      borderTopColor: mobileColors.borderSubtle,
-      paddingTop: 12,
-    },
-    entryTitle: {
-      ...mobileText.sectionTitle,
-      color: mobileColors.textPrimary,
-    },
-    entryMetaText: {
-      ...mobileText.meta,
-      color: mobileColors.textMuted,
-      fontWeight: "500",
-    },
-  });

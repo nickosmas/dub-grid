@@ -4,22 +4,15 @@ import {
   mobilePersonUpdateBodySchema,
   mobilePersonUpdateResponseSchema,
 } from "@dubgrid/contracts";
-import {
-  fetchMobileEmployeeRowById,
-  fetchMobileManagementMembershipRowsByUserIds,
-  fetchMobilePendingInvitationRowByEmployeeId,
-  insertMobileAuditLogEntry,
-  updateMobileEmployeeDetailsRow,
-} from "@dubgrid/data-access";
+import { insertMobileAuditLogEntry, updateMobileEmployeeDetailsRow } from "@dubgrid/data-access";
 import { requireMobileAuth } from "@/features/mobile/server";
-import { rowToEmployee } from "@/lib/db/mappers";
+import { loadMobilePersonWithAccess } from "@/features/mobile/server/person-access";
 import { getEmployeeContactConflict } from "@/lib/employee-contact-conflicts";
 import {
   buildStaffValidationErrorResponse,
   getStaffFieldErrorsFromZod,
   validateStaffOrgReferences,
 } from "@/lib/staff-validation";
-import { mapEmployeeToMobilePerson } from "./people";
 
 export const dynamic = "force-dynamic";
 
@@ -33,45 +26,11 @@ function getRequestIp(req: NextRequest): string | null {
 }
 
 async function loadMobilePerson(
-  serviceClient: Parameters<typeof fetchMobileEmployeeRowById>[0],
+  serviceClient: Parameters<typeof loadMobilePersonWithAccess>[0],
   orgId: string,
   employeeId: string,
 ) {
-  const row = await fetchMobileEmployeeRowById(serviceClient, orgId, employeeId);
-  if (!row) {
-    return null;
-  }
-
-  const pendingInvitation = await fetchMobilePendingInvitationRowByEmployeeId(
-    serviceClient,
-    orgId,
-    employeeId,
-  );
-  const managementMemberships = row.user_id
-    ? await fetchMobileManagementMembershipRowsByUserIds(serviceClient, orgId, [row.user_id])
-    : [];
-  const managementMembership = row.user_id
-    ? (managementMemberships.find((membership) => membership.user_id === row.user_id) ?? null)
-    : null;
-  return mapEmployeeToMobilePerson({
-    ...rowToEmployee(row),
-    managementDepartmentIds:
-      managementMembership?.department_ids ?? pendingInvitation?.department_ids ?? [],
-    managementDeptAdminIds:
-      managementMembership?.dept_admin_ids ?? pendingInvitation?.dept_admin_ids ?? [],
-    orgRole: (() => {
-      const role = managementMembership?.org_role;
-      return role === "super_admin" || role === "admin" || role === "user" ? role : null;
-    })(),
-    pendingInvitation: pendingInvitation
-      ? {
-          id: pendingInvitation.id,
-          email: pendingInvitation.email,
-          expiresAt: pendingInvitation.expires_at,
-          updatedAt: pendingInvitation.updated_at ?? null,
-        }
-      : null,
-  });
+  return (await loadMobilePersonWithAccess(serviceClient, orgId, employeeId))?.person ?? null;
 }
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {

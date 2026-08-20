@@ -39,6 +39,8 @@ const SOURCE_ORG = "11111111-1111-1111-1111-111111111111";
 function buildServiceClient(opts: {
   role: "user" | "admin" | "super_admin" | null;
   gridmaster?: boolean;
+  /** profiles.org_id — the user's GLOBAL default, which any device can move. */
+  profileOrgId?: string;
 }) {
   return {
     from: (table: string) => {
@@ -47,7 +49,10 @@ function buildServiceClient(opts: {
           select: () => ({
             eq: () => ({
               maybeSingle: async () => ({
-                data: { org_id: SOURCE_ORG, platform_role: opts.gridmaster ? "gridmaster" : null },
+                data: {
+                  org_id: opts.profileOrgId ?? SOURCE_ORG,
+                  platform_role: opts.gridmaster ? "gridmaster" : null,
+                },
                 error: null,
               }),
             }),
@@ -75,10 +80,11 @@ function buildServiceClient(opts: {
   };
 }
 
-function makeRequest(action: string): NextRequest {
+function makeRequest(action: string, opts?: { sandboxCookie?: boolean }): NextRequest {
   return new NextRequest("https://app.test/api/test-sandbox", {
     method: "POST",
     body: JSON.stringify({ action }),
+    headers: opts?.sandboxCookie ? { cookie: "dubgrid-sandbox=already-in-one" } : undefined,
   });
 }
 
@@ -117,6 +123,46 @@ describe("POST /api/test-sandbox", () => {
       expect.objectContaining({ sourceOrgId: SOURCE_ORG }),
     );
     expect(res.cookies.get("dubgrid-sandbox")?.value).toBeTruthy();
+  });
+
+  // profiles.org_id is a per-user global that switch_org rewrites on EVERY
+  // device. Sourcing the clone from it meant a user sitting on org A's
+  // subdomain could press Enter and get a full copy of org B's employees, PII
+  // and schedules — because some other device of theirs had switched to B.
+  // The session's own claim is the only value scoped to this browser.
+  it("clones the session's org, not whichever org another device last switched to", async () => {
+    const OTHER_ORG = "22222222-2222-2222-2222-222222222222";
+    getServiceClient.mockReturnValue(
+      buildServiceClient({ role: "admin", profileOrgId: OTHER_ORG }),
+    );
+
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest("enter"));
+
+    expect(res.status).toBe(200);
+    expect(createSandboxForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceOrgId: SOURCE_ORG }),
+    );
+  });
+
+  // The one case where the profile default is still the right source: on reset
+  // a sandbox cookie already exists, so the auth layer has rewritten
+  // claims.org_id to the sandbox itself and it can no longer name the source.
+  it("falls back to the profile default on reset, where the claim names the sandbox", async () => {
+    const REAL_ORG = "33333333-3333-3333-3333-333333333333";
+    requireAuthenticatedUserWithClaims.mockResolvedValue({
+      user: { id: USER_ID },
+      claims: { org_id: "sandbox-1", org_role: "super_admin", in_sandbox: true },
+    });
+    getServiceClient.mockReturnValue(buildServiceClient({ role: "admin", profileOrgId: REAL_ORG }));
+
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest("reset", { sandboxCookie: true }));
+
+    expect(res.status).toBe(200);
+    expect(createSandboxForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceOrgId: REAL_ORG }),
+    );
   });
 
   it("refuses a plain user-role member (sandbox is admin+ only)", async () => {

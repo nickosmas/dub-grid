@@ -64,6 +64,7 @@ import {
   getReadableTextOnSurface,
   resolveShiftPillColors,
   toDarkPillColors,
+  visiblePillBorder,
 } from "@/lib/colors";
 import { useTheme } from "next-themes";
 import { lightColorTokens, darkColorTokens } from "@dubgrid/design-tokens";
@@ -1829,9 +1830,12 @@ const SectionBlock = memo(function SectionBlock({
                                           effectiveText,
                                           themeSurface,
                                         );
-                                    // Compute effective border: draft indicators use dashed border
+                                    // Compute effective border: draft indicators use dashed border.
+                                    // Absence pills derive theirs from the resolved text like every
+                                    // other pill — their stored border is the "transparent"
+                                    // sentinel, which would render as no border at all in light mode.
                                     const absenceBorder = isAbsence
-                                      ? `1px solid ${isDarkTheme ? borderColor(effectiveText) : cellAbsenceType!.border}`
+                                      ? `1px solid ${isDarkTheme ? borderColor(effectiveText) : visiblePillBorder(cellAbsenceType!.border, singleForegroundColor)}`
                                       : `1px solid ${borderColor(singleForegroundColor)}`;
                                     const effectiveBorder = singleDraftBorderKind
                                       ? getDraftBorder(singleDraftBorderKind, absenceBorder)
@@ -1868,6 +1872,16 @@ const SectionBlock = memo(function SectionBlock({
                                       text: effectiveText,
                                     });
                                     const showSingleSecondaryLine = !!displayParts.secondaryLabel;
+                                    // Name mode spells shift and job out, so each item earns its
+                                    // own row; when a custom time joins them the stack steps down
+                                    // a size to fit three rows in the 52px cell. Code mode's
+                                    // labels are a character or two, so a row each would waste
+                                    // the pill: shift and job always share a line there,
+                                    // separated by a middot, at their full size.
+                                    const singleIsThreeRow =
+                                      showSingleSecondaryLine && !!customTimes && isNameMode;
+                                    const singleInlinesSecondary =
+                                      showSingleSecondaryLine && !isNameMode;
                                     const singleDisplayLabel = displayParts.primaryLabel;
                                     const singleIsMentored =
                                       !isAbsence && (cellSegments[0]?.isMentored ?? false);
@@ -1966,11 +1980,25 @@ const SectionBlock = memo(function SectionBlock({
                                           <div
                                             style={{
                                               display: "flex",
-                                              flexDirection: "column",
-                                              alignItems: "center",
-                                              gap: showSingleSecondaryLine ? 1 : 0,
+                                              flexDirection: singleInlinesSecondary
+                                                ? "row"
+                                                : "column",
+                                              // Inline, the job code sits on the shift code's
+                                              // baseline rather than floating at its optical
+                                              // centre, which reads as one label instead of two.
+                                              alignItems: singleInlinesSecondary
+                                                ? "baseline"
+                                                : "center",
+                                              justifyContent: "center",
+                                              flexWrap: "nowrap",
+                                              gap: singleInlinesSecondary
+                                                ? 2
+                                                : showSingleSecondaryLine
+                                                  ? 1
+                                                  : 0,
                                               maxWidth: "100%",
                                               minWidth: 0,
+                                              overflow: "hidden",
                                             }}
                                           >
                                             <span
@@ -1979,7 +2007,7 @@ const SectionBlock = memo(function SectionBlock({
                                                   ? {
                                                       fontSize: "var(--dg-fs-caption)",
                                                       fontWeight: 800,
-                                                      lineHeight: 1.2,
+                                                      lineHeight: singleIsThreeRow ? 1.15 : 1.2,
                                                       textAlign: "center" as const,
                                                       maxWidth: "100%",
                                                       overflowWrap: "break-word" as const,
@@ -2000,6 +2028,7 @@ const SectionBlock = memo(function SectionBlock({
                                                       overflow: "hidden",
                                                       textOverflow: "ellipsis",
                                                       maxWidth: "100%",
+                                                      minWidth: 0,
                                                     }
                                               }
                                             >
@@ -2017,17 +2046,34 @@ const SectionBlock = memo(function SectionBlock({
                                                 </sup>
                                               )}
                                             </span>
-                                            {showSingleSecondaryLine ? (
+                                            {singleInlinesSecondary && (
                                               <span
+                                                aria-hidden="true"
                                                 style={{
                                                   fontSize: "var(--dg-fs-footnote)",
                                                   fontWeight: 700,
                                                   lineHeight: 1.3,
+                                                  opacity: 0.5,
+                                                  flexShrink: 0,
+                                                }}
+                                              >
+                                                ·
+                                              </span>
+                                            )}
+                                            {showSingleSecondaryLine ? (
+                                              <span
+                                                style={{
+                                                  fontSize: singleIsThreeRow
+                                                    ? "var(--dg-fs-micro)"
+                                                    : "var(--dg-fs-footnote)",
+                                                  fontWeight: 700,
+                                                  lineHeight: singleIsThreeRow ? 1.2 : 1.3,
                                                   opacity: 0.78,
                                                   whiteSpace: "nowrap",
                                                   overflow: "hidden",
                                                   textOverflow: "ellipsis",
                                                   maxWidth: "100%",
+                                                  minWidth: 0,
                                                 }}
                                               >
                                                 {displayParts.secondaryLabel}
@@ -2037,10 +2083,12 @@ const SectionBlock = memo(function SectionBlock({
                                           {customTimes && (
                                             <span
                                               style={{
-                                                fontSize: "var(--dg-fs-footnote)",
+                                                fontSize: singleIsThreeRow
+                                                  ? "var(--dg-fs-micro)"
+                                                  : "var(--dg-fs-footnote)",
                                                 fontWeight: 500,
                                                 lineHeight: 1,
-                                                marginTop: 4,
+                                                marginTop: singleIsThreeRow ? 2 : 4,
                                                 opacity: 0.7,
                                                 letterSpacing: "0.02em",
                                               }}
@@ -2267,6 +2315,12 @@ const SectionBlock = memo(function SectionBlock({
                                               });
                                             const showMultiSecondaryLine =
                                               !!displayParts.secondaryLabel;
+                                            // Same split as the single pill: a row per item in
+                                            // name mode, shift · job on one line in code mode.
+                                            const multiIsThreeRow =
+                                              showMultiSecondaryLine && !!hasTime && isNameMode;
+                                            const multiInlinesSecondary =
+                                              showMultiSecondaryLine && !isNameMode;
                                             const multiDisplayLabel = displayParts.primaryLabel;
                                             const isMentoredPill =
                                               cellSegments[li]?.isMentored ?? false;
@@ -2356,11 +2410,22 @@ const SectionBlock = memo(function SectionBlock({
                                                 <div
                                                   style={{
                                                     display: "flex",
-                                                    flexDirection: "column",
-                                                    alignItems: "center",
-                                                    gap: showMultiSecondaryLine ? 1 : 0,
+                                                    flexDirection: multiInlinesSecondary
+                                                      ? "row"
+                                                      : "column",
+                                                    alignItems: multiInlinesSecondary
+                                                      ? "baseline"
+                                                      : "center",
+                                                    justifyContent: "center",
+                                                    flexWrap: "nowrap",
+                                                    gap: multiInlinesSecondary
+                                                      ? 2
+                                                      : showMultiSecondaryLine
+                                                        ? 1
+                                                        : 0,
                                                     maxWidth: "100%",
                                                     minWidth: 0,
+                                                    overflow: "hidden",
                                                   }}
                                                 >
                                                   <span
@@ -2385,6 +2450,7 @@ const SectionBlock = memo(function SectionBlock({
                                                             overflow: "hidden",
                                                             textOverflow: "ellipsis",
                                                             maxWidth: "100%",
+                                                            minWidth: 0,
                                                           }
                                                     }
                                                   >
@@ -2402,13 +2468,30 @@ const SectionBlock = memo(function SectionBlock({
                                                       </sup>
                                                     )}
                                                   </span>
+                                                  {multiInlinesSecondary && (
+                                                    <span
+                                                      aria-hidden="true"
+                                                      style={{
+                                                        fontSize: "var(--dg-fs-micro)",
+                                                        fontWeight: 700,
+                                                        opacity: 0.5,
+                                                        lineHeight: 1.3,
+                                                        flexShrink: 0,
+                                                      }}
+                                                    >
+                                                      ·
+                                                    </span>
+                                                  )}
                                                   {showMultiSecondaryLine ? (
                                                     <span
                                                       style={{
                                                         fontSize: "var(--dg-fs-micro)",
                                                         fontWeight: 700,
                                                         opacity: 0.78,
-                                                        lineHeight: 1.3,
+                                                        // A split shift is half the width but the
+                                                        // full cell height, so three rows fit on
+                                                        // the same budget as the single pill.
+                                                        lineHeight: multiIsThreeRow ? 1.2 : 1.3,
                                                         whiteSpace: "nowrap",
                                                         overflow: "hidden",
                                                         textOverflow: "ellipsis",

@@ -7,7 +7,9 @@ export function getMobileAccountRealtimeInvalidationKeys(
   accessToken: string,
   table: MobileAccountRealtimeTable,
 ): readonly (readonly unknown[])[] {
-  const bootstrap = ["mobile", "bootstrap", accessToken] as const;
+  // Prefix-only key — the bootstrap entry is keyed by user id, which is stable
+  // across token refreshes and which this module has no reason to restate.
+  const bootstrap = ["mobile", "bootstrap"] as const;
   const profile = ["mobile", "profile", accessToken] as const;
   // Prefix-only key — matches every variant of the profile namespace
   // (sessions, notification-preferences, etc.).

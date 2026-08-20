@@ -1,14 +1,11 @@
 export const EDITOR_ACTION_LABELS = {
   save: "Save",
-  saving: "Saving…",
+  /** What the save button says while the save is in flight, beside its spinner. */
+  saving: "Saving",
   cancel: "Cancel",
   discard: "Discard",
   close: "Close",
 } as const;
-
-export function getEditorSaveLabel(isSaving: boolean): string {
-  return isSaving ? EDITOR_ACTION_LABELS.saving : EDITOR_ACTION_LABELS.save;
-}
 
 export function getEditorDismissLabel({
   hasUnsavedChanges,

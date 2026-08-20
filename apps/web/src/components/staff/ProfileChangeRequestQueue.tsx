@@ -15,6 +15,7 @@ import ProgressBar from "@/components/ProgressBar";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { queryKeys } from "@/lib/query-keys";
 import { Inbox } from "lucide-react";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 interface ReferenceItem {
   id: number;
@@ -375,7 +376,9 @@ export function ProfileChangeRequestQueue({
                   className="dg-btn dg-btn-primary dg-btn-sm"
                   onClick={() => setPendingResolution({ request, action: "approve" })}
                 >
-                  {resolvingId === request.id ? "Working..." : "Approve"}
+                  <ButtonLoading loading={resolvingId === request.id} loadingLabel="Approving">
+                    Approve
+                  </ButtonLoading>
                 </button>
                 <button
                   type="button"
@@ -406,6 +409,7 @@ export function ProfileChangeRequestQueue({
                 : "Reject this request? The requester will not receive the requested changes."
           }
           confirmLabel={pendingResolution.action === "approve" ? "Approve" : "Reject"}
+          confirmPendingLabel={pendingResolution.action === "approve" ? "Approving" : "Rejecting"}
           variant={
             pendingResolution.request.type === "account_deletion" &&
             pendingResolution.action === "approve"

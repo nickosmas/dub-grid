@@ -11,6 +11,7 @@ import {
 import { endGridmasterImpersonation } from "@/features/gridmaster/client";
 import { clearPermsCache } from "@/features/permissions/client";
 import { MaybeHint } from "@/components/ui/hint";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 
 const BANNER_HEIGHT = 40;
 
@@ -172,7 +173,9 @@ export default function ImpersonationBanner() {
           fontFamily: "inherit",
         }}
       >
-        {ending ? "Ending..." : "End Session"}
+        <ButtonLoading loading={ending} loadingLabel="Ending Session">
+          End Session
+        </ButtonLoading>
       </button>
     </div>
   );

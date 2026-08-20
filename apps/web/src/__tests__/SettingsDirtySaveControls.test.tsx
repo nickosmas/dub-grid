@@ -951,7 +951,7 @@ describe("settings dirty save controls", () => {
         abbr: "SUPV",
         isScheduleRole: true,
         sortOrder: 0,
-        departmentId: null,
+        departmentIds: [],
       },
       {
         id: 9,
@@ -960,7 +960,7 @@ describe("settings dirty save controls", () => {
         abbr: "MEN",
         isScheduleRole: true,
         sortOrder: 2,
-        departmentId: null,
+        departmentIds: [],
       },
     ];
     const jobs: JobDefinition[] = [
@@ -1095,7 +1095,7 @@ describe("settings dirty save controls", () => {
         name: "Charge",
         abbr: "CH",
         sortOrder: 0,
-        departmentId: null,
+        departmentIds: [],
       },
     ];
 
@@ -1143,7 +1143,7 @@ describe("settings dirty save controls", () => {
         name: "Charge Nurse",
         abbr: "CN",
         sortOrder: 0,
-        departmentId: null,
+        departmentIds: [],
       },
     ];
 
@@ -1899,7 +1899,7 @@ describe("settings dirty save controls", () => {
         abbr: "SUP",
         isScheduleRole: true,
         sortOrder: 0,
-        departmentId: null,
+        departmentIds: [],
       },
       {
         id: 9,
@@ -1908,7 +1908,7 @@ describe("settings dirty save controls", () => {
         abbr: "MEN",
         isScheduleRole: true,
         sortOrder: 2,
-        departmentId: null,
+        departmentIds: [],
       },
     ];
     const certifications: NamedItem[] = [
@@ -1918,7 +1918,7 @@ describe("settings dirty save controls", () => {
         name: "CN III",
         abbr: "CN3",
         sortOrder: 0,
-        departmentId: null,
+        departmentIds: [],
       },
     ];
     const jobs: JobDefinition[] = [

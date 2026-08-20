@@ -69,9 +69,9 @@ export function PendingRequestsCard({
               <View style={styles.rowAction}>
                 <Button
                   compact
-                  disabled={isCancelling}
-                  label={isCancelling ? "Cancelling..." : "Cancel request"}
+                  label="Cancel request"
                   loading={isCancelling}
+                  loadingLabel="Cancelling"
                   onPress={() => onCancel(request)}
                   tone="secondary"
                 />

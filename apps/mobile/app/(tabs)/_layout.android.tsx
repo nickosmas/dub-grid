@@ -13,14 +13,10 @@ export default function TabsLayoutAndroid() {
 
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: "transparent",
-          borderTopWidth: 0,
-          elevation: 0,
-        },
-      }}
+      // No `tabBarStyle`: a custom `tabBar` replaces react-navigation's own bar
+      // outright, so those styles were never rendered. `FloatingTabBar` owns its
+      // fill, and floats by positioning itself over the screen container.
+      screenOptions={{ headerShown: false }}
       tabBar={(props) => <FloatingTabBar {...props} />}
     >
       <Tabs.Screen

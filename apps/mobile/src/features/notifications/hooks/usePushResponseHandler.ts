@@ -33,6 +33,16 @@ function installForegroundHandler(notifications: typeof Notifications) {
   });
 }
 
+// A cold start delivers the tapped notification through
+// `getLastNotificationResponseAsync()`, and a warm app can deliver the *same*
+// tap through the response listener. Remember what we've already routed so the
+// two paths can't double-navigate.
+//
+// Module-scoped on purpose: `getLastNotificationResponseAsync()` keeps
+// returning the launching response for the whole process lifetime, so an
+// effect-scoped guard would re-navigate every time this hook remounted.
+let lastHandledResponseId: string | null = null;
+
 function navigateForPayload(data: Record<string, unknown> | null | undefined) {
   if (!data) {
     router.push("/alerts");
@@ -79,6 +89,18 @@ export function usePushResponseHandler(enabled: boolean) {
     let cancelled = false;
     let cleanup: (() => void) | null = null;
 
+    function handleResponse(response: Notifications.NotificationResponse) {
+      const responseId = response.notification.request.identifier;
+      if (responseId && responseId === lastHandledResponseId) {
+        return;
+      }
+      lastHandledResponseId = responseId ?? null;
+
+      const data = response.notification.request.content.data as
+        Record<string, unknown> | undefined;
+      navigateForPayload(data ?? null);
+    }
+
     void (async () => {
       const notifications = await loadNotifications();
       if (!notifications || cancelled) return;
@@ -95,10 +117,16 @@ export function usePushResponseHandler(enabled: boolean) {
       });
 
       const responseSub = notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data as
-          Record<string, unknown> | undefined;
-        navigateForPayload(data ?? null);
+        handleResponse(response);
       });
+
+      // The listener above only fires while the app is running. When the app was
+      // killed and is launched *by* a notification tap, the tap is replayed here
+      // instead — without this, a cold-start tap silently lands on Home.
+      const initialResponse = await notifications.getLastNotificationResponseAsync();
+      if (!cancelled && initialResponse) {
+        handleResponse(initialResponse);
+      }
 
       cleanup = () => {
         receivedSub.remove();

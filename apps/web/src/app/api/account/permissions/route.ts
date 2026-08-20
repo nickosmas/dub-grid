@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isManagementUser, isOnSchedule } from "@dubgrid/domain";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import { buildPerms } from "@/features/permissions/shared";
 import { getImpersonationFromCookie } from "@/lib/impersonation";
@@ -60,8 +61,8 @@ async function getSelfEmploymentFlags(
   const focusAreaIds = (data?.focus_area_ids as number[] | null) ?? [];
   const departmentIds = (data?.department_ids as number[] | null) ?? [];
   return {
-    isOnSchedule: focusAreaIds.length > 0,
-    isManagementUser: departmentIds.length > 0,
+    isOnSchedule: isOnSchedule(focusAreaIds),
+    isManagementUser: isManagementUser(departmentIds),
   };
 }
 

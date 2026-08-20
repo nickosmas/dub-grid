@@ -205,7 +205,6 @@ DECLARE
   cert_csn4   bigint;
   cert_csn3   bigint;
   cert_csn2   bigint;
-  cert_other  bigint;
   -- Role IDs
   role_dcsn   bigint;
   role_dvcsn  bigint;
@@ -233,38 +232,36 @@ BEGIN
   SELECT id INTO dept_visiting FROM public.departments WHERE org_id = org AND name = 'Visiting';
 
   -- ── Certifications ──────────────────────────────────────────────────────────
-  INSERT INTO public.certifications (org_id, department_id, name, abbr, sort_order)
+  INSERT INTO public.certifications (org_id, department_ids, name, abbr, sort_order)
   VALUES
-    (org, dept_nursing,  'Journal Listed Christian Science Nurse', 'JLCSN',  0),
-    (org, dept_nursing,  'Nurse',                                'Nurse',  1),
-    (org, dept_nursing,  'Christian Science Nurse IV',            'CSN IV', 2),
-    (org, dept_nursing,  'Christian Science Nurse III',           'CSN III',3),
-    (org, dept_nursing,  'Christian Science Nurse II',            'CSN II', 4),
-    (org, dept_nursing,  'Christian Science Nurse I',             'CSN I',  5),
-    (org, NULL,          'Other',                                 'Other',  6)
-  ON CONFLICT (org_id, name, COALESCE(department_id, -1)) WHERE archived_at IS NULL DO NOTHING;
+    (org, ARRAY[dept_nursing],  'Journal Listed Christian Science Nurse', 'JLCSN',  0),
+    (org, ARRAY[dept_nursing],  'Nurse',                                'Nurse',  1),
+    (org, ARRAY[dept_nursing],  'Christian Science Nurse IV',            'CSN IV', 2),
+    (org, ARRAY[dept_nursing],  'Christian Science Nurse III',           'CSN III',3),
+    (org, ARRAY[dept_nursing],  'Christian Science Nurse II',            'CSN II', 4),
+    (org, ARRAY[dept_nursing],  'Christian Science Nurse I',             'CSN I',  5)
+  ON CONFLICT (org_id, name) WHERE archived_at IS NULL DO NOTHING;
 
   SELECT id INTO cert_jlcsn FROM public.certifications WHERE org_id = org AND name = 'Journal Listed Christian Science Nurse';
   SELECT id INTO cert_csn4  FROM public.certifications WHERE org_id = org AND name = 'Christian Science Nurse IV';
   SELECT id INTO cert_csn3  FROM public.certifications WHERE org_id = org AND name = 'Christian Science Nurse III';
   SELECT id INTO cert_csn2  FROM public.certifications WHERE org_id = org AND name = 'Christian Science Nurse II';
   SELECT id INTO cert_staff FROM public.certifications WHERE org_id = org AND name = 'Nurse';
-  SELECT id INTO cert_other FROM public.certifications WHERE org_id = org AND name = 'Other';
 
   -- ── Organization Roles ────────────────────────────────────────────────────────
-  INSERT INTO public.organization_roles (org_id, department_id, name, abbr, sort_order)
+  INSERT INTO public.organization_roles (org_id, department_ids, name, abbr, sort_order)
   VALUES
-    (org, dept_nursing,  'Director of Christian Science Nursing',           'DCSN',       0),
-    (org, dept_visiting, 'Director of Visiting Christian Science Nursing', 'DVCSN',      1),
-    (org, dept_nursing,  'Director of Christian Science Nursing Training', 'DCSNT',      2),
-    (org, dept_nursing,  'Assistant Director of Christian Science Nursing','ADCSN',      3),
-    (org, NULL,          'Supervisor',                                     'Supv',       4),
-    (org, NULL,          'Mentor',                                         'Mentor',     5),
-    (org, NULL,          'Nurse',                                          'Nurse',      6),
-    (org, dept_nursing,  'Sheltered Care Manager',                         'SC Mgr',     7),
-    (org, dept_nursing,  'Activity Coordinator',                           'Act Cor',    8),
-    (org, dept_nursing,  'SC/Asst/Act/Cor',                                'SC/Act. Cor',9)
-  ON CONFLICT (org_id, name, COALESCE(department_id, -1)) WHERE archived_at IS NULL DO NOTHING;
+    (org, ARRAY[dept_nursing],  'Director of Christian Science Nursing',           'DCSN',       0),
+    (org, ARRAY[dept_visiting], 'Director of Visiting Christian Science Nursing', 'DVCSN',      1),
+    (org, ARRAY[dept_nursing],  'Director of Christian Science Nursing Training', 'DCSNT',      2),
+    (org, ARRAY[dept_nursing],  'Assistant Director of Christian Science Nursing','ADCSN',      3),
+    (org, ARRAY[]::bigint[],          'Supervisor',                                     'Supv',       4),
+    (org, ARRAY[]::bigint[],          'Mentor',                                         'Mentor',     5),
+    (org, ARRAY[]::bigint[],          'Nurse',                                          'Nurse',      6),
+    (org, ARRAY[dept_nursing],  'Sheltered Care Manager',                         'SC Mgr',     7),
+    (org, ARRAY[dept_nursing],  'Activity Coordinator',                           'Act Cor',    8),
+    (org, ARRAY[dept_nursing],  'SC/Asst/Act/Cor',                                'SC/Act. Cor',9)
+  ON CONFLICT (org_id, name) WHERE archived_at IS NULL DO NOTHING;
 
   SELECT id INTO role_dcsn   FROM public.organization_roles WHERE org_id = org AND abbr = 'DCSN';
   SELECT id INTO role_dvcsn  FROM public.organization_roles WHERE org_id = org AND abbr = 'DVCSN';
@@ -394,8 +391,8 @@ BEGIN
     (org, 'Patricia',       'Langford',   cert_csn2,  ARRAY[]::bigint[],                    21, ARRAY[fa_snw, fa_sc],           'active'),
     (org, 'Christine',      'Prescott',   cert_csn2,  ARRAY[]::bigint[],                    22, ARRAY[fa_snw, fa_sc],           'active'),
     (org, 'Evelyn',         'Hartwell',   cert_jlcsn, ARRAY[role_scmgr],                    23, ARRAY[fa_snw, fa_sc],           'active'),
-    (org, 'Gloria',         'Jennings',   cert_other, ARRAY[role_actcor],                   24, ARRAY[fa_snw, fa_sc],           'active'),
-    (org, 'Donna',          'Fowler',     cert_other, ARRAY[role_scasst],                   25, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Gloria',         'Jennings',   NULL,       ARRAY[role_actcor],                   24, ARRAY[fa_snw, fa_sc],           'active'),
+    (org, 'Donna',          'Fowler',     NULL,       ARRAY[role_scasst],                   25, ARRAY[fa_snw, fa_sc],           'active'),
     -- Night Shift ─────────────────────────────────────────────────────────────
     (org, 'Hannah',         'Stratton',   cert_jlcsn, ARRAY[role_supv],                     26, ARRAY[fa_ns],                   'active'),
     (org, 'Vincent',        'Gallagher',  cert_jlcsn, ARRAY[role_supv],                     27, ARRAY[fa_ns],                   'active'),
@@ -432,7 +429,13 @@ DO $$
 DECLARE
   org  uuid := 'b7c335a0-6218-4f4e-9a82-1d5f7c8e2b90';
   schedule_source_start date := DATE '2026-03-22';
-  schedule_target_start date := DATE '2026-07-05';
+  -- Land the roster on the current week so "this week" is never empty. Must be
+  -- computed, not a literal: every shift below is written as
+  -- schedule_target_start + (dt - schedule_source_start), so this is the one
+  -- absolute anchor in the file and a hardcoded date silently rots (it also used
+  -- to get double-shifted by the seed's date rewriter, pushing Calm Haven's
+  -- whole schedule a month into the future). DOW is 0 for Sunday.
+  schedule_target_start date := CURRENT_DATE - EXTRACT(DOW FROM CURRENT_DATE)::int;
   -- Focus area IDs
   snw  bigint;
   sc   bigint;

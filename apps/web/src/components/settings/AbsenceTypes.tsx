@@ -15,7 +15,8 @@ import { useMediaQuery, MOBILE } from "@/hooks";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
-import { getEditorDismissLabel, getEditorSaveLabel } from "@/components/ui/editor-action-labels";
+import { EDITOR_ACTION_LABELS, getEditorDismissLabel } from "@/components/ui/editor-action-labels";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
 import {
   getCodeError,
@@ -433,7 +434,9 @@ function AbsenceTypeRow({
                 disabled={saving || !canSave || !canEdit}
                 className="dg-btn dg-btn-primary dg-btn-sm"
               >
-                {getEditorSaveLabel(saving)}
+                <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
+                  {EDITOR_ACTION_LABELS.save}
+                </ButtonLoading>
               </button>
             }
           />

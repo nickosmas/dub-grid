@@ -86,8 +86,9 @@ export default function AuthVerifyPage() {
             >
               <ButtonLoading
                 loading={loading}
+                loadingLabel="Verifying"
                 spinnerColor="var(--color-text-inverse)"
-                spinnerSize={28}
+                spinnerSize={20}
               >
                 Continue
               </ButtonLoading>

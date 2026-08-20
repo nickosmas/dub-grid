@@ -2902,35 +2902,6 @@ function SchedulerContent() {
     [computeEditSessionDirty],
   );
 
-  const handleCustomTimeChange = useCallback(
-    (start: string | null, end: string | null) => {
-      updateEditSessionDraft((prev) => {
-        if (!prev.draftShift) {
-          return {
-            draftShift: prev.draftShift,
-            draftNotes: prev.draftNotes,
-          };
-        }
-
-        const updated = {
-          ...prev.draftShift,
-          customStartTime: start,
-          customEndTime: end,
-        };
-        const draftKind = computeScheduleEntryDraftKind(updated);
-        return {
-          draftShift: {
-            ...updated,
-            isDraft: draftKind !== null,
-            draftKind,
-          },
-          draftNotes: prev.draftNotes,
-        };
-      });
-    },
-    [updateEditSessionDraft],
-  );
-
   const buildShiftDeleteUpdate = useCallback(
     (empId: string, dateKey: string): ShiftDeleteUpdate | null => {
       const key = `${empId}_${dateKey}`;
@@ -3376,6 +3347,43 @@ function SchedulerContent() {
       }));
     },
     [buildDraftShiftFromInput, updateEditSessionDraft],
+  );
+
+  // Rebuilt through buildDraftShiftFromInput rather than by setting the entry's
+  // top-level customStartTime/customEndTime: those are derived from the entry's
+  // effective snapshot, and buildEntryPayload reads the snapshot back out when
+  // it builds an upsert. Patching only the derived fields left the snapshot
+  // without the time, so saving a shift whose assignment also changed (every
+  // brand-new shift) posted customStartTime: null.
+  const handleCustomTimeChange = useCallback(
+    (start: string | null, end: string | null) => {
+      updateEditSessionDraft((prev) => {
+        if (!prev.draftShift) {
+          return {
+            draftShift: prev.draftShift,
+            draftNotes: prev.draftNotes,
+          };
+        }
+
+        const input = buildEntryPayload(prev.draftShift);
+        if (input.kind !== "worked") {
+          return {
+            draftShift: prev.draftShift,
+            draftNotes: prev.draftNotes,
+          };
+        }
+
+        return {
+          draftShift: buildDraftShiftFromInput(prev.draftShift, {
+            ...input,
+            customStartTime: start,
+            customEndTime: end,
+          }),
+          draftNotes: prev.draftNotes,
+        };
+      });
+    },
+    [buildDraftShiftFromInput, buildEntryPayload, updateEditSessionDraft],
   );
 
   const handleConfirmEditPanel = useCallback(
@@ -5546,12 +5554,9 @@ function SchedulerContent() {
             <div
               data-tour="schedule-toolbar"
               style={{
-                // Flat 16px on both sides — the schedule grid owns the full
-                // viewport and needs the room, so it doesn't grow with the
-                // wider clamp(16px, 3vw, 40px) used elsewhere. The header
-                // logo matches this flat 16px specifically on /schedule
-                // (see Header.tsx) to stay aligned.
-                padding: "12px 16px 0",
+                // Horizontally on the canonical page gutter, shared with the
+                // header logo and every other page (see globals.css).
+                padding: "12px var(--dg-page-gutter) 0",
                 borderBottom: "1px solid var(--color-border)",
               }}
             >
@@ -5896,6 +5901,7 @@ function SchedulerContent() {
             {pendingCoverageGapVolunteer && currentEmpId && (
               <ConfirmDialog
                 confirmLabel="Volunteer"
+                confirmPendingLabel="Volunteering"
                 isLoading={isCoverageGapVolunteerPending}
                 message={
                   <>
@@ -6417,6 +6423,7 @@ function SchedulerContent() {
                   : `Publish ${draftBreakdown.totalChanges} unpublished change${draftBreakdown.totalChanges === 1 ? "" : "s"} for ${currentPublishWindow.label}? ${publishSummary}.`
               }
               confirmLabel="Publish"
+              confirmPendingLabel="Publishing"
               variant={allCoverageGaps.length > 0 ? "warning" : "info"}
               isLoading={isPublishing}
               onConfirm={() => {
@@ -6432,6 +6439,7 @@ function SchedulerContent() {
               title="Auto Fill Shifts?"
               message={`This will fill ${autoFillPreview.count} empty schedule slot${autoFillPreview.count === 1 ? "" : "s"} for ${autoFillPreview.dateRange} using recurring templates. Existing visible shifts will not be overwritten.`}
               confirmLabel="Fill Shifts"
+              confirmPendingLabel="Filling"
               variant="info"
               isLoading={isApplyingRecurring}
               onConfirm={handleApplyRecurring}
@@ -6476,6 +6484,7 @@ function SchedulerContent() {
                 return `${copyLine} ${breakdown.totalSkipped} will be skipped: ${description}.`;
               })()}
               confirmLabel="Import Shifts"
+              confirmPendingLabel="Importing"
               variant="info"
               isLoading={isImportingPrevious}
               onConfirm={handleImportPrevious}
