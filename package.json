@@ -35,6 +35,8 @@
     "db:reset": "supabase db reset && FORCE_LOCAL_DB=1 npm run seed",
     "db:reset:mobile": "npm run db:reset && node scripts/reset-mobile-android-storage.mjs",
     "db:reset:remote": "npx tsx --env-file=.env.remote scripts/reset-remote-db.ts && npx tsx --env-file=.env.remote seed.ts",
+    "auth:templates:check": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts",
+    "auth:templates:push": "npx tsx --env-file=.env.remote scripts/push-auth-templates.ts --apply",
     "test:load": "k6 run load-tests/schedule-load.js",
     "test:load:auth": "k6 run load-tests/auth-flow.js",
     "test:load:stress": "SCENARIO=stress k6 run load-tests/schedule-load.js",
