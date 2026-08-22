@@ -33,13 +33,23 @@ export default function PostHogProvider({
       return;
     }
 
-    enablePostHog();
+    // enablePostHog now downloads the SDK before it can opt in, so the identify
+    // has to wait for it — called eagerly it would run against a null client
+    // and be dropped.
+    let cancelled = false;
+    void (async () => {
+      await enablePostHog();
+      if (cancelled) return;
+      if (user) {
+        identifyUser(user.id, { email: user.email });
+      } else {
+        resetPostHog();
+      }
+    })();
 
-    if (user) {
-      identifyUser(user.id, { email: user.email });
-    } else {
-      resetPostHog();
-    }
+    return () => {
+      cancelled = true;
+    };
   }, [enabled, hasConsent, user]);
 
   return <>{children}</>;
