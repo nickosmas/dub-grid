@@ -6,6 +6,7 @@ import type { AdminPermissions, OrganizationRole } from "@/types";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
 import { getSandboxFromCookie, SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
+import { cacheGet, cacheSet, CacheKey, TTL } from "@/lib/cache";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 // True when the caller's employees row in the effective org has status='inactive'.
@@ -39,6 +40,18 @@ interface OrgPermissionOptions {
    * endpoint, which must show the source organization's real Stripe state.
    */
   ignoreSandbox?: boolean;
+  /**
+   * An already-verified caller, to skip re-verifying the same token.
+   *
+   * `getUser()` is a network round trip to Supabase Auth on every call — it
+   * never reads from the cookie. A route that ran requireAuthenticatedUser /
+   * requireAuthenticatedUserWithClaims and then calls this helper pays that
+   * round trip twice for one request. Pass the user from the first call.
+   *
+   * Only ever pass a `User` that came out of one of those helpers in *this*
+   * request. Anything else skips authentication entirely.
+   */
+  actor?: User;
 }
 
 export interface AuthorizedOrgRequest {
@@ -72,6 +85,42 @@ function lockedOrganizationResponse() {
     },
     { status: 403 },
   );
+}
+
+/**
+ * isOrganizationSetupComplete, but it stops re-running once an org has passed.
+ *
+ * The raw check is seven full table scans, and requireOrgPermissions runs it on
+ * all but a handful of its call sites — including /api/billing, which loads on
+ * every page. For a live org that is seven queries per request forever, to
+ * re-confirm something that became true during onboarding and stays true.
+ *
+ * Only `true` is ever written. That asymmetry is the whole design:
+ *
+ * - incomplete -> complete is the transition a user is actively waiting on
+ *   ("I finished setup, why is it still locked?"). Never caching `false` means
+ *   the very next request after the last setup step sees the change, with no
+ *   invalidation to wire up at ~25 config write sites and no way for one of
+ *   them to be missed later.
+ * - complete -> incomplete (an admin archives the last focus area) is bounded
+ *   by the TTL instead. That direction is a UX gate rather than a security
+ *   boundary, and re-locking a working org a few minutes late is the harmless
+ *   half of the trade.
+ */
+async function isOrganizationSetupCompleteCached(
+  serviceClient: ReturnType<typeof getServiceClient>,
+  orgId: string,
+): Promise<boolean> {
+  const key = CacheKey.orgSetupComplete(orgId);
+  if (await cacheGet<boolean>(key)) {
+    return true;
+  }
+
+  const complete = await isOrganizationSetupComplete(serviceClient, orgId);
+  if (complete) {
+    await cacheSet(key, true, TTL.STABLE);
+  }
+  return complete;
 }
 
 async function isOrganizationSetupComplete(
@@ -255,7 +304,7 @@ export async function requireOrgPermissions(
   isAllowed: (permissions: PermissionContext) => boolean,
   options?: OrgPermissionOptions,
 ): Promise<AuthorizedOrgRequest | { response: NextResponse }> {
-  const auth = await requireAuthenticatedUser(req);
+  const auth = options?.actor ? { user: options.actor } : await requireAuthenticatedUser(req);
   if ("response" in auth) {
     return { response: auth.response };
   }
@@ -368,7 +417,7 @@ export async function requireOrgPermissions(
   }
 
   if (!options?.allowDuringSetup && !permissions.isGridmaster) {
-    const setupComplete = await isOrganizationSetupComplete(serviceClient, orgId);
+    const setupComplete = await isOrganizationSetupCompleteCached(serviceClient, orgId);
     if (!setupComplete) {
       return { response: lockedOrganizationResponse() };
     }

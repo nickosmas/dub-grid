@@ -54,18 +54,15 @@ async function requestOrganizationJson<T>(input: string, init?: RequestInit): Pr
   return body as T;
 }
 
-export function fetchOrganizationBootstrap(options?: {
-  includeAssignments?: boolean;
-}): Promise<OrganizationBootstrap> {
-  const params = new URLSearchParams();
-  if (options?.includeAssignments === false) {
-    params.set("includeAssignments", "0");
-  }
-
-  const suffix = params.toString();
-  return requestOrganizationJson<OrganizationBootstrap>(
-    `/api/organization/bootstrap${suffix ? `?${suffix}` : ""}`,
-  );
+/**
+ * There is no `includeAssignments` option any more. It only ever gated
+ * buildScheduleAssignmentOptions, a pure derivation over focus areas, shifts
+ * and jobs the response already carries — it saved no queries, only bytes, and
+ * in exchange it split the cache so the same payload was fetched twice per page
+ * under two keys. The server now always includes them.
+ */
+export function fetchOrganizationBootstrap(): Promise<OrganizationBootstrap> {
+  return requestOrganizationJson<OrganizationBootstrap>("/api/organization/bootstrap");
 }
 
 export function fetchOrganizationDirectory(

@@ -12,7 +12,7 @@ import { getValidPort } from "@/lib/subdomain";
 import { withThemeParam } from "@/lib/theme-preference";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { markAuthTransition } from "@/lib/auth-transition";
-import { clearPermsCache, setUserViewActive } from "@/hooks";
+import { setUserViewActive } from "@/hooks";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { EmailPasswordForm } from "@/components/auth/EmailPasswordForm";
@@ -99,7 +99,6 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     }
     // The prior org's permissions are cached in a module-level singleton keyed
     // by user id, which a same-user org switch does not invalidate on its own.
-    clearPermsCache();
     return true;
   }
 

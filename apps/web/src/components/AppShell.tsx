@@ -93,8 +93,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // local state. Without this, stale sandbox values linger in form
   // inputs after exit (and vice versa on enter) until manual refresh.
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
-    queryKey: queryKeys.org.bootstrap(null, false),
-    queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
+    queryKey: queryKeys.org.bootstrap(),
+    queryFn: () => fetchOrganizationBootstrap(),
     staleTime: 60_000,
     enabled: !isGridmaster && Boolean(orgId),
   });

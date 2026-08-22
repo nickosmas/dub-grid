@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type { DbRecurringShift } from "@dubgrid/db-types";
 import { scheduleCellStateSchema } from "@dubgrid/contracts";
 import { requireOrgPermissions, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
@@ -90,6 +90,26 @@ const requestSchema = z.discriminatedUnion("action", [
     employeeId: z.string().uuid(),
     dayOfWeek: z.number().int().min(0).max(6),
   }),
+  // Bulk form of the two actions above. The recurring-schedule editor saves a
+  // whole grid at once; one request per cell meant an employees x days fan-out
+  // of sequential HTTP calls, each paying its own requireOrgPermissions
+  // (a getUser round trip plus four queries). This authorises once.
+  z.object({
+    action: z.literal("saveRecurringShifts"),
+    orgId: z.string().uuid(),
+    effectiveFrom: z.string().date(),
+    changes: z
+      .array(
+        z.object({
+          employeeId: z.string().uuid(),
+          dayOfWeek: z.number().int().min(0).max(6),
+          // null = clear this day for this employee
+          input: scheduleCellStateSchema.nullable(),
+        }),
+      )
+      .min(1)
+      .max(500),
+  }),
 ]);
 
 function canReadRecurring(
@@ -130,9 +150,14 @@ export async function POST(req: NextRequest) {
   const data = parsed.data;
 
   // Sandbox redirect.
+  // Captured so the switch arms below authorize against the caller this block
+  // already verified. requireOrgPermissions otherwise re-runs getUser(), which
+  // is a network round trip to Supabase Auth, not a cookie read.
+  let actor: User | undefined;
   {
     const auth = await requireAuthenticatedUser(req);
     if (!("response" in auth)) {
+      actor = auth.user;
       const effective = await resolveEffectiveOrgId(req, auth.user.id, data.orgId);
       if (effective !== data.orgId) {
         (data as { orgId: string }).orgId = effective;
@@ -143,7 +168,7 @@ export async function POST(req: NextRequest) {
   try {
     switch (data.action) {
       case "fetchRecurringShifts": {
-        const auth = await requireOrgPermissions(req, data.orgId, canReadRecurring);
+        const auth = await requireOrgPermissions(req, data.orgId, canReadRecurring, { actor });
         if ("response" in auth) {
           return auth.response;
         }
@@ -184,7 +209,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "getRecurringDraft": {
-        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
         if ("response" in auth) {
           return auth.response;
         }
@@ -213,7 +238,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "saveRecurringDraft": {
-        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
         if ("response" in auth) {
           return auth.response;
         }
@@ -258,7 +283,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "deleteRecurringDraft": {
-        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
         if ("response" in auth) {
           return auth.response;
         }
@@ -276,7 +301,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "upsertRecurringShift": {
-        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
         if ("response" in auth) {
           return auth.response;
         }
@@ -316,7 +341,7 @@ export async function POST(req: NextRequest) {
       }
 
       case "deleteRecurringShift": {
-        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring);
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
         if ("response" in auth) {
           return auth.response;
         }
@@ -343,6 +368,68 @@ export async function POST(req: NextRequest) {
         });
 
         return NextResponse.json({ success: true });
+      }
+
+      case "saveRecurringShifts": {
+        const auth = await requireOrgPermissions(req, data.orgId, canManageRecurring, { actor });
+        if ("response" in auth) {
+          return auth.response;
+        }
+
+        const invalid = data.changes.find(
+          (change) => change.input?.kind === "worked" && (change.input.segments?.length ?? 0) === 0,
+        );
+        if (invalid) {
+          return NextResponse.json(
+            { error: "Recurring schedules require at least one worked segment" },
+            { status: 400 },
+          );
+        }
+
+        // Parallel: each change targets a distinct (employee, day) row, so there
+        // is no ordering dependency. A partial failure leaves the successful
+        // rows applied, which matches how the per-cell loop this replaced
+        // behaved when it threw partway through.
+        await Promise.all(
+          data.changes.map(async (change) => {
+            if (change.input) {
+              const { error } = await auth.userClient.rpc("upsert_recurring_shift", {
+                p_emp_id: change.employeeId,
+                p_org_id: data.orgId,
+                p_day_of_week: change.dayOfWeek,
+                p_state: change.input,
+                p_effective_from: data.effectiveFrom,
+              });
+              if (error) throw error;
+            } else {
+              const { error } = await auth.serviceClient
+                .from("recurring_shifts")
+                .update({ archived_at: new Date().toISOString() })
+                .eq("org_id", data.orgId)
+                .eq("emp_id", change.employeeId)
+                .eq("day_of_week", change.dayOfWeek)
+                .is("archived_at", null);
+              if (error) throw error;
+            }
+          }),
+        );
+
+        // One audit entry for the save, not one per cell — the per-cell actions
+        // each wrote their own, which turned a grid save into dozens of rows.
+        logScheduleAudit(auth.serviceClient, {
+          orgId: data.orgId,
+          actorId: auth.actor.id,
+          actorEmail: auth.actor.email ?? null,
+          action: "recurring_shift.upserted",
+          resourceType: "recurring_shift",
+          resourceId: null,
+          details: {
+            changed: data.changes.length,
+            cleared: data.changes.filter((change) => !change.input).length,
+          },
+        });
+
+        return NextResponse.json({ success: true, count: data.changes.length });
       }
     }
   } catch (error) {

@@ -232,7 +232,7 @@ export async function PUT(req: NextRequest) {
       bodyOrgId,
       (permissions) =>
         permissions.isGridmaster || permissions.isSuperAdmin || permissions.canManageOrgSettings,
-      { allowDuringSetup: true },
+      { allowDuringSetup: true, actor: user },
     );
     if ("response" in orgAuth) {
       return orgAuth.response;

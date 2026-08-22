@@ -3497,6 +3497,10 @@ function SchedulerContent() {
           ...Object.keys(session.draftNotes).map(Number),
         ]);
 
+        // Collect first, then fire together. Each note write is its own HTTP
+        // round trip and they target distinct (indicator, focus area) rows on
+        // one cell, so awaiting them one at a time only serialised them.
+        const noteWrites: Array<() => Promise<unknown>> = [];
         for (const focusAreaId of focusAreaIds) {
           const baseEntries = session.baseNotes[focusAreaId] ?? [];
           const draftEntries = session.draftNotes[focusAreaId] ?? [];
@@ -3515,26 +3519,31 @@ function SchedulerContent() {
             if (baseStatus === draftStatus) continue;
 
             if (draftStatus && draftStatus !== "draft_deleted") {
-              await upsertScheduleNote(
-                orgId,
-                panel.empId,
-                formatDateKey(panel.date),
-                indicatorTypeId,
-                focusAreaId,
-                baseStatus,
+              noteWrites.push(() =>
+                upsertScheduleNote(
+                  orgId,
+                  panel.empId,
+                  formatDateKey(panel.date),
+                  indicatorTypeId,
+                  focusAreaId,
+                  baseStatus,
+                ),
               );
             } else if (baseStatus) {
-              await deleteScheduleNote(
-                orgId,
-                panel.empId,
-                formatDateKey(panel.date),
-                indicatorTypeId,
-                focusAreaId,
-                baseStatus,
+              noteWrites.push(() =>
+                deleteScheduleNote(
+                  orgId,
+                  panel.empId,
+                  formatDateKey(panel.date),
+                  indicatorTypeId,
+                  focusAreaId,
+                  baseStatus,
+                ),
               );
             }
           }
         }
+        await Promise.all(noteWrites.map((write) => write()));
 
         const refreshed = await refetchScheduleDataRef.current();
         const realtimeDiff = refreshed

@@ -329,6 +329,31 @@ export function deleteRecurringShift(
   }).then(() => undefined);
 }
 
+export interface RecurringShiftChange {
+  employeeId: string;
+  dayOfWeek: number;
+  /** null clears that day for that employee. */
+  input: ScheduleCellInput | null;
+}
+
+/**
+ * Saves a whole recurring grid in one request. Prefer this over looping
+ * upsertRecurringShift/deleteRecurringShift per cell: those are one HTTP round
+ * trip each, and each re-runs requireOrgPermissions server-side.
+ */
+export function saveRecurringShifts(
+  orgId: string,
+  changes: RecurringShiftChange[],
+  effectiveFrom: string,
+): Promise<void> {
+  return requestRecurringAction<{ success: true; count: number }>({
+    action: "saveRecurringShifts",
+    orgId,
+    effectiveFrom,
+    changes,
+  }).then(() => undefined);
+}
+
 function requestScheduleManage<T>(body: Record<string, unknown>): Promise<T> {
   return requestScheduleJson("/api/schedule/manage", {
     method: "POST",

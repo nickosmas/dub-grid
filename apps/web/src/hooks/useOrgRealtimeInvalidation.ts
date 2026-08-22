@@ -65,7 +65,7 @@ export function getOrgRealtimeInvalidationKeys(
   orgId: string,
   table: OrgRealtimeTable,
 ): readonly unknown[][] {
-  const bootstrap = queryKeys.org.bootstrapAll();
+  const bootstrap = queryKeys.org.bootstrap();
   const detail = queryKeys.org.detail(orgId);
 
   switch (table) {
@@ -184,19 +184,28 @@ export function invalidateOrgRealtimeQueries(
   }
 }
 
-export function useOrgRealtimeInvalidation({
-  orgId,
-  disabled = false,
-  queryClient,
-}: {
-  orgId: string | null;
-  disabled?: boolean;
-  queryClient: QueryClient;
-}) {
-  useEffect(() => {
-    if (!orgId || disabled) return;
+/**
+ * One shared subscription per org, reference-counted.
+ *
+ * useOrgRealtimeInvalidation is called from useOrganizationData and
+ * useEmployees, which between them have 21 call sites and several mount
+ * simultaneously on one page. Each instance used to open its own channel over
+ * all 23 tables, so a single CDC event ran the full invalidation set — and its
+ * cross-tab broadcast — once per mounted instance. Debouncing did not help:
+ * it is per subscription, so it coalesced within a channel, never across them.
+ *
+ * A caller that is `disabled` simply does not acquire, which preserves the
+ * previous per-caller semantics rather than letting whoever mounted first
+ * decide for everyone.
+ */
+const orgSubscriptions = new Map<string, { count: number; unsubscribe: () => void }>();
 
-    return subscribeOrgScopedRealtime<OrgRealtimeTable>({
+function acquireOrgSubscription(orgId: string, queryClient: QueryClient): () => void {
+  const existing = orgSubscriptions.get(orgId);
+  if (existing) {
+    existing.count += 1;
+  } else {
+    const unsubscribe = subscribeOrgScopedRealtime<OrgRealtimeTable>({
       client: getBrowserSupabaseClient(),
       orgId,
       tables: ORG_FILTER_TABLES,
@@ -216,12 +225,43 @@ export function useOrgRealtimeInvalidation({
       },
       onReconnectAfterError: () => {
         void queryClient.invalidateQueries({
-          queryKey: queryKeys.org.bootstrapAll(),
+          queryKey: queryKeys.org.bootstrap(),
         });
       },
       onError: (error) => {
         Sentry.captureException(error);
       },
     });
+    orgSubscriptions.set(orgId, { count: 1, unsubscribe });
+  }
+
+  let released = false;
+  return () => {
+    // Guard against a double release: React can run a cleanup more than once,
+    // and decrementing twice would tear down a channel other consumers hold.
+    if (released) return;
+    released = true;
+    const entry = orgSubscriptions.get(orgId);
+    if (!entry) return;
+    entry.count -= 1;
+    if (entry.count <= 0) {
+      orgSubscriptions.delete(orgId);
+      entry.unsubscribe();
+    }
+  };
+}
+
+export function useOrgRealtimeInvalidation({
+  orgId,
+  disabled = false,
+  queryClient,
+}: {
+  orgId: string | null;
+  disabled?: boolean;
+  queryClient: QueryClient;
+}) {
+  useEffect(() => {
+    if (!orgId || disabled) return;
+    return acquireOrgSubscription(orgId, queryClient);
   }, [disabled, orgId, queryClient]);
 }

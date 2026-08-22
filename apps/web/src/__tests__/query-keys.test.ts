@@ -138,10 +138,11 @@ describe("queryKeys factory", () => {
       expect(queryKeys.org.focusAreas("org-1")).toEqual(["org", "org-1", "focusAreas"]);
     });
 
-    it("org.bootstrap produces correct keys", () => {
-      expect(queryKeys.org.bootstrapAll()).toEqual(["org", "bootstrap"]);
-      expect(queryKeys.org.bootstrap("org-1", true)).toEqual(["org", "bootstrap", "org-1", true]);
-      expect(queryKeys.org.bootstrap(null, false)).toEqual(["org", "bootstrap", "auto", false]);
+    // One key with no dimensions is the point: the org id and the
+    // includeAssignments flag used to split this into three cache entries for
+    // one identical request, so a single page load fetched it up to three times.
+    it("org.bootstrap is a single argument-free key", () => {
+      expect(queryKeys.org.bootstrap()).toEqual(["org", "bootstrap"]);
     });
 
     it("org.assignments produces correct key", () => {
@@ -198,7 +199,6 @@ describe("queryKeys factory", () => {
       // Collect all keys that take an orgId
       const allKeys = [
         queryKeys.org.all(orgId),
-        queryKeys.org.bootstrap(orgId, true),
         queryKeys.org.detail(orgId),
         queryKeys.org.focusAreas(orgId),
         queryKeys.org.assignments(orgId),

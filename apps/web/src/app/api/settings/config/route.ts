@@ -30,6 +30,7 @@ import {
   NAMED_ITEM_COLS,
   ORG_ROLE_COLS,
   SHIFT_CATEGORY_COLS,
+  upsertNamedEntities,
 } from "@/lib/db/shared";
 import {
   rowToAbsenceType,
@@ -1477,16 +1478,20 @@ export async function POST(req: NextRequest) {
         const hardDeleteHint = new Set(data.hardDeleteIds ?? []);
         const toHardDelete: number[] = [];
         const toArchive: number[] = [];
-        for (const item of toDelete) {
-          if (hardDeleteHint.has(item.id)) {
-            const hasAny = await certificationHasAnyReferencesForOrg(item.id, data.orgId);
-            if (!hasAny) {
-              toHardDelete.push(item.id);
-              continue;
-            }
-          }
-          toArchive.push(item.id);
-        }
+        // Reference checks run in parallel: each is a pair of count queries, and
+        // awaiting them one item at a time made a multi-row delete N sequential
+        // waves. Order of toHardDelete/toArchive is preserved by mapping first.
+        const certRefs = await Promise.all(
+          toDelete.map(async (item) =>
+            hardDeleteHint.has(item.id)
+              ? !(await certificationHasAnyReferencesForOrg(item.id, data.orgId))
+              : false,
+          ),
+        );
+        toDelete.forEach((item, i) => {
+          if (certRefs[i]) toHardDelete.push(item.id);
+          else toArchive.push(item.id);
+        });
 
         await hardDeleteSettingsRowsByIds(
           serviceClient,
@@ -1496,59 +1501,19 @@ export async function POST(req: NextRequest) {
         );
         await archiveSettingsRowsByIds(serviceClient, "certifications", data.orgId, toArchive);
 
-        const toUpdate = validatedItems.items
-          .map((item, index) => ({ item, sortOrder: index }))
-          .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
-        const toInsert = validatedItems.items
-          .map((item, index) => ({ item, sortOrder: index }))
-          .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
-
-        for (const { item, sortOrder } of toUpdate) {
-          const { error } = await serviceClient
-            .from("certifications")
-            .update({
-              name: item.name,
-              abbr: item.abbr,
-              department_ids: item.departmentIds ?? [],
-              sort_order: sortOrder,
-            })
-            .eq("org_id", data.orgId)
-            .eq("id", item.id);
-          if (error) throw error;
-        }
-
-        for (const { item, sortOrder } of toInsert) {
-          const { data: archived } = await serviceClient
-            .from("certifications")
-            .select("id")
-            .eq("org_id", data.orgId)
-            .eq("name", item.name)
-            .not("archived_at", "is", null)
-            .maybeSingle();
-
-          if (archived) {
-            const { error } = await serviceClient
-              .from("certifications")
-              .update({
-                name: item.name,
-                abbr: item.abbr,
-                department_ids: item.departmentIds ?? [],
-                sort_order: sortOrder,
-                archived_at: null,
-              })
-              .eq("id", archived.id);
-            if (error) throw error;
-          } else {
-            const { error } = await serviceClient.from("certifications").insert({
-              org_id: data.orgId,
-              name: item.name,
-              abbr: item.abbr,
-              department_ids: item.departmentIds ?? [],
-              sort_order: sortOrder,
-            });
-            if (error) throw error;
-          }
-        }
+        const { created, updated } = await upsertNamedEntities({
+          client: serviceClient,
+          table: "certifications",
+          orgId: data.orgId,
+          items: validatedItems.items,
+          existingIds,
+          toRow: (item, sortOrder) => ({
+            name: item.name,
+            abbr: item.abbr,
+            department_ids: item.departmentIds ?? [],
+            sort_order: sortOrder,
+          }),
+        });
 
         await cacheDel(CacheKey.certifications(data.orgId));
         await writeAudit({
@@ -1557,8 +1522,8 @@ export async function POST(req: NextRequest) {
           resourceType: "certification",
           resourceId: null,
           details: {
-            created: toInsert.length,
-            updated: toUpdate.length,
+            created,
+            updated,
             archived: toArchive.length,
             deleted: toHardDelete.length,
           },
@@ -1609,16 +1574,20 @@ export async function POST(req: NextRequest) {
         const hardDeleteHint = new Set(data.hardDeleteIds ?? []);
         const toHardDelete: number[] = [];
         const toArchive: number[] = [];
-        for (const item of toDelete) {
-          if (hardDeleteHint.has(item.id)) {
-            const hasAny = await roleHasAnyReferencesForOrg(item.id, data.orgId);
-            if (!hasAny) {
-              toHardDelete.push(item.id);
-              continue;
-            }
-          }
-          toArchive.push(item.id);
-        }
+        // Reference checks run in parallel: each is a pair of count queries, and
+        // awaiting them one item at a time made a multi-row delete N sequential
+        // waves. Order of toHardDelete/toArchive is preserved by mapping first.
+        const roleRefs = await Promise.all(
+          toDelete.map(async (item) =>
+            hardDeleteHint.has(item.id)
+              ? !(await roleHasAnyReferencesForOrg(item.id, data.orgId))
+              : false,
+          ),
+        );
+        toDelete.forEach((item, i) => {
+          if (roleRefs[i]) toHardDelete.push(item.id);
+          else toArchive.push(item.id);
+        });
 
         await hardDeleteSettingsRowsByIds(
           serviceClient,
@@ -1628,62 +1597,20 @@ export async function POST(req: NextRequest) {
         );
         await archiveSettingsRowsByIds(serviceClient, "organization_roles", data.orgId, toArchive);
 
-        const toUpdate = validatedItems.items
-          .map((item, index) => ({ item, sortOrder: index }))
-          .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
-        const toInsert = validatedItems.items
-          .map((item, index) => ({ item, sortOrder: index }))
-          .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
-
-        for (const { item, sortOrder } of toUpdate) {
-          const { error } = await serviceClient
-            .from("organization_roles")
-            .update({
-              name: item.name,
-              abbr: item.abbr,
-              is_schedule_role: item.isScheduleRole ?? true,
-              department_ids: item.departmentIds ?? [],
-              sort_order: sortOrder,
-            })
-            .eq("org_id", data.orgId)
-            .eq("id", item.id);
-          if (error) throw error;
-        }
-
-        for (const { item, sortOrder } of toInsert) {
-          const { data: archived } = await serviceClient
-            .from("organization_roles")
-            .select("id")
-            .eq("org_id", data.orgId)
-            .eq("name", item.name)
-            .not("archived_at", "is", null)
-            .maybeSingle();
-
-          if (archived) {
-            const { error } = await serviceClient
-              .from("organization_roles")
-              .update({
-                name: item.name,
-                abbr: item.abbr,
-                is_schedule_role: item.isScheduleRole ?? true,
-                department_ids: item.departmentIds ?? [],
-                sort_order: sortOrder,
-                archived_at: null,
-              })
-              .eq("id", archived.id);
-            if (error) throw error;
-          } else {
-            const { error } = await serviceClient.from("organization_roles").insert({
-              org_id: data.orgId,
-              name: item.name,
-              abbr: item.abbr,
-              is_schedule_role: item.isScheduleRole ?? true,
-              department_ids: item.departmentIds ?? [],
-              sort_order: sortOrder,
-            });
-            if (error) throw error;
-          }
-        }
+        const { created, updated } = await upsertNamedEntities({
+          client: serviceClient,
+          table: "organization_roles",
+          orgId: data.orgId,
+          items: validatedItems.items,
+          existingIds,
+          toRow: (item, sortOrder) => ({
+            name: item.name,
+            abbr: item.abbr,
+            is_schedule_role: item.isScheduleRole ?? true,
+            department_ids: item.departmentIds ?? [],
+            sort_order: sortOrder,
+          }),
+        });
 
         await cacheDel(CacheKey.orgRoles(data.orgId));
         await writeAudit({
@@ -1692,8 +1619,8 @@ export async function POST(req: NextRequest) {
           resourceType: "org_role",
           resourceId: null,
           details: {
-            created: toInsert.length,
-            updated: toUpdate.length,
+            created,
+            updated,
             archived: toArchive.length,
             deleted: toHardDelete.length,
           },
@@ -1741,17 +1668,25 @@ export async function POST(req: NextRequest) {
         const toHardDelete: number[] = [];
         const toArchive: number[] = [];
         const cascadeFocusAreaIds: number[] = [];
-        for (const item of toDelete) {
-          if (hardDeleteHint.has(item.id)) {
-            const refCheck = await departmentRefCheckForOrg(item.id, data.orgId);
-            if (!refCheck.hasAnyReferences) {
-              toHardDelete.push(item.id);
-              cascadeFocusAreaIds.push(...refCheck.cascadeFocusAreaIds);
-              continue;
-            }
+        // Reference checks run in parallel: each is a pair of count queries, and
+        // awaiting them one item at a time made a multi-row delete N sequential
+        // waves. Order of toHardDelete/toArchive is preserved by mapping first.
+        const deptRefs = await Promise.all(
+          toDelete.map(async (item) =>
+            hardDeleteHint.has(item.id)
+              ? await departmentRefCheckForOrg(item.id, data.orgId)
+              : null,
+          ),
+        );
+        toDelete.forEach((item, i) => {
+          const refCheck = deptRefs[i];
+          if (refCheck && !refCheck.hasAnyReferences) {
+            toHardDelete.push(item.id);
+            cascadeFocusAreaIds.push(...refCheck.cascadeFocusAreaIds);
+          } else {
+            toArchive.push(item.id);
           }
-          toArchive.push(item.id);
-        }
+        });
 
         if (cascadeFocusAreaIds.length > 0) {
           for (const batch of chunkNumberIds(cascadeFocusAreaIds)) {
@@ -1766,62 +1701,20 @@ export async function POST(req: NextRequest) {
         await hardDeleteSettingsRowsByIds(serviceClient, "departments", data.orgId, toHardDelete);
         await archiveSettingsRowsByIds(serviceClient, "departments", data.orgId, toArchive);
 
-        const toUpdate = validatedItems.items
-          .map((item, index) => ({ item, sortOrder: index }))
-          .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
-        const toInsert = validatedItems.items
-          .map((item, index) => ({ item, sortOrder: index }))
-          .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
-
-        for (const { item, sortOrder } of toUpdate) {
-          const { error } = await serviceClient
-            .from("departments")
-            .update({
-              name: item.name,
-              abbr: item.abbr || "",
-              type: item.type,
-              sort_order: sortOrder,
-              permissions: item.permissions ?? null,
-            })
-            .eq("org_id", data.orgId)
-            .eq("id", item.id);
-          if (error) throw error;
-        }
-
-        for (const { item, sortOrder } of toInsert) {
-          const { data: archived } = await serviceClient
-            .from("departments")
-            .select("id")
-            .eq("org_id", data.orgId)
-            .eq("name", item.name)
-            .not("archived_at", "is", null)
-            .maybeSingle();
-
-          if (archived) {
-            const { error } = await serviceClient
-              .from("departments")
-              .update({
-                name: item.name,
-                abbr: item.abbr || "",
-                type: item.type,
-                sort_order: sortOrder,
-                archived_at: null,
-                permissions: item.permissions ?? null,
-              })
-              .eq("id", archived.id);
-            if (error) throw error;
-          } else {
-            const { error } = await serviceClient.from("departments").insert({
-              org_id: data.orgId,
-              name: item.name,
-              abbr: item.abbr || "",
-              type: item.type,
-              sort_order: sortOrder,
-              permissions: item.permissions ?? null,
-            });
-            if (error) throw error;
-          }
-        }
+        const { created, updated } = await upsertNamedEntities({
+          client: serviceClient,
+          table: "departments",
+          orgId: data.orgId,
+          items: validatedItems.items,
+          existingIds,
+          toRow: (item, sortOrder) => ({
+            name: item.name,
+            abbr: item.abbr || "",
+            type: item.type,
+            sort_order: sortOrder,
+            permissions: item.permissions ?? null,
+          }),
+        });
 
         await cacheDel(
           CacheKey.departments(data.orgId),
@@ -1834,8 +1727,8 @@ export async function POST(req: NextRequest) {
           resourceType: "department",
           resourceId: null,
           details: {
-            created: toInsert.length,
-            updated: toUpdate.length,
+            created,
+            updated,
             archived: toArchive.length,
             deleted: toHardDelete.length,
             cascadedFocusAreas: cascadeFocusAreaIds.length,

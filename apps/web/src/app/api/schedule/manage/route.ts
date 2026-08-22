@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type {
   DbRecurringShift,
   DbScheduleCell,
@@ -510,9 +510,14 @@ export async function POST(req: NextRequest) {
   // Redirect body.orgId to the sandbox if the caller is in sandbox
   // mode, so every downstream `.eq("org_id", data.orgId)` targets the
   // sandbox rather than the unrefreshed-JWT-derived real org.
+  // Captured so the switch arms below authorize against the caller this block
+  // already verified. requireOrgPermissions otherwise re-runs getUser(), which
+  // is a network round trip to Supabase Auth, not a cookie read.
+  let actor: User | undefined;
   {
     const auth = await requireAuthenticatedUser(req);
     if (!("response" in auth)) {
+      actor = auth.user;
       const effective = await resolveEffectiveOrgId(req, auth.user.id, data.orgId);
       if (effective !== data.orgId) {
         (data as { orgId: string }).orgId = effective;
@@ -528,6 +533,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -583,6 +589,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -630,6 +637,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -722,6 +730,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -743,6 +752,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canViewSchedule,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -763,6 +773,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -793,6 +804,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -838,6 +850,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -867,28 +880,42 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
         }
 
-        for (const shift of data.shifts) {
-          await deleteShiftSnapshot(auth.userClient, {
-            orgId: data.orgId,
-            employeeId: shift.employeeId,
-            date: shift.date,
-            expectedVersion: shift.expectedVersion,
-          });
-          logScheduleAudit(auth.serviceClient, {
-            orgId: data.orgId,
-            actorId: auth.actor.id,
-            actorEmail: auth.actor.email ?? null,
-            action: "shift.deleted",
-            resourceType: "shift",
-            resourceId: `${shift.employeeId}:${shift.date}`,
-            details: {},
-          });
-        }
+        // Parallel, not sequential. Each delete is its own RPC round trip against
+        // a distinct (employee, date) cell, so there is no ordering dependency
+        // between them; awaiting one at a time made a bulk delete N serial round
+        // trips. A single batched RPC would be better still, but that needs a new
+        // database function and the schema is fixed at migrations 001-004.
+        //
+        // Error semantics do shift slightly: the loop stopped at the first
+        // failure, leaving later cells untouched, whereas every delete is now
+        // attempted and the first rejection is what surfaces. For a bulk delete
+        // that is the friendlier half of the trade, and either way the client
+        // sees an optimistic-conflict error and refetches.
+        await Promise.all(
+          data.shifts.map(async (shift) => {
+            await deleteShiftSnapshot(auth.userClient, {
+              orgId: data.orgId,
+              employeeId: shift.employeeId,
+              date: shift.date,
+              expectedVersion: shift.expectedVersion,
+            });
+            logScheduleAudit(auth.serviceClient, {
+              orgId: data.orgId,
+              actorId: auth.actor.id,
+              actorEmail: auth.actor.email ?? null,
+              action: "shift.deleted",
+              resourceType: "shift",
+              resourceId: `${shift.employeeId}:${shift.date}`,
+              details: {},
+            });
+          }),
+        );
         return NextResponse.json({ success: true, count: data.shifts.length });
       }
 
@@ -898,6 +925,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -978,6 +1006,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditShifts,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1038,6 +1067,7 @@ export async function POST(req: NextRequest) {
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
             permissions.canManageShiftSeries,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1129,6 +1159,7 @@ export async function POST(req: NextRequest) {
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
             permissions.canManageShiftSeries,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1174,6 +1205,7 @@ export async function POST(req: NextRequest) {
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
             permissions.canManageShiftSeries,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1209,6 +1241,7 @@ export async function POST(req: NextRequest) {
             permissions.isGridmaster ||
             permissions.isSuperAdmin ||
             permissions.canApplyRecurringSchedule,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1380,6 +1413,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
@@ -1432,6 +1466,7 @@ export async function POST(req: NextRequest) {
           data.orgId,
           (permissions) =>
             permissions.isGridmaster || permissions.isSuperAdmin || permissions.canEditNotes,
+          { actor },
         );
         if ("response" in auth) {
           return auth.response;
