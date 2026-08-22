@@ -18,14 +18,15 @@ The mobile API (`/api/mobile/v1/*`) uses a Bearer token in the `Authorization` h
 
 ### Public
 
-| Method | Path                      | Purpose                                             | Rate Limit                             |
-| ------ | ------------------------- | --------------------------------------------------- | -------------------------------------- |
-| GET    | `/api/health`             | Health check                                        | None                                   |
-| GET    | `/api/validate-domain`    | Check whether an org subdomain slug exists          | IP-based (`apiLimiter`)                |
-| POST   | `/api/request-demo`       | Demo request form submission (landing page)         | `demoLimiter` (3/hr per IP)            |
-| POST   | `/api/auth/login`         | Email/password login with brute-force protection    | `loginLimiter` (15/15m per email hash) |
-| POST   | `/api/consent`            | Record cookie consent preference                    | None                                   |
-| GET    | `/api/invitations/lookup` | Look up an invitation by token (accept-invite page) | None                                   |
+| Method | Path                        | Purpose                                                                   | Rate Limit                                             |
+| ------ | --------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------ |
+| GET    | `/api/health`               | Health check                                                              | None                                                   |
+| GET    | `/api/validate-domain`      | Check whether an org subdomain slug exists                                | IP-based (`apiLimiter`)                                |
+| POST   | `/api/request-demo`         | Demo request form submission (landing page)                               | `demoLimiter` (3/hr per IP)                            |
+| POST   | `/api/auth/login`           | Email/password login with brute-force protection                          | `loginLimiter` (15/15m per email hash)                 |
+| POST   | `/api/consent`              | Record cookie consent preference                                          | None                                                   |
+| GET    | `/api/invitations/lookup`   | Look up an invitation by token (accept-invite page)                       | None                                                   |
+| POST   | `/api/invitations/register` | Create the invitee's pre-confirmed auth account (token is the credential) | `apiLimiter` per IP + `emailTargetLimiter` per address |
 
 ---
 

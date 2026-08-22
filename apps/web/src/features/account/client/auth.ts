@@ -32,10 +32,6 @@ export async function updateBrowserUserPassword(password: string): Promise<void>
   }
 }
 
-export async function signUpBrowserUser(input: { email: string; password: string }) {
-  return supabase.auth.signUp(input);
-}
-
 export async function signInBrowserWithPassword(input: { email: string; password: string }) {
   return supabase.auth.signInWithPassword(input);
 }

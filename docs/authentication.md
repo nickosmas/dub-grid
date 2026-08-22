@@ -133,15 +133,15 @@ ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
 
 ### 2.3 Invitation Flow
 
-| Step | Actor       | Action                                                                   |
-| ---- | ----------- | ------------------------------------------------------------------------ |
-| 1    | Super Admin | Fills "Invite User" form: selects employee, enters email + role          |
-| 2    | Server      | Inserts `invitations` row with `employee_id` FK, returns token           |
-| 3    | API Route   | `/api/send-invite-email` sends invitation via Resend                     |
-| 4    | Invitee     | Clicks link → arrives at `/accept-invite?token=<uuid>`                   |
-| 5    | Accept Flow | Validates token, creates Supabase auth user, sets `employees.user_id`    |
-| 6    | Auth Hook   | JWT issued with `platform_role`, `org_role`, `org_id`, `org_slug` claims |
-| 7    | Invitee     | Redirected to their org dashboard, fully authenticated                   |
+| Step | Actor       | Action                                                                                                                           |
+| ---- | ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Super Admin | Fills "Invite User" form: selects employee, enters email + role                                                                  |
+| 2    | Server      | Inserts `invitations` row with `employee_id` FK, returns token                                                                   |
+| 3    | API Route   | `/api/send-invite-email` sends invitation via Resend                                                                             |
+| 4    | Invitee     | Clicks link → arrives at `/accept-invite?token=<uuid>`                                                                           |
+| 5    | Accept Flow | `/api/invitations/register` validates token, creates a **pre-confirmed** auth user; `accept_invitation` sets `employees.user_id` |
+| 6    | Auth Hook   | JWT issued with `platform_role`, `org_role`, `org_id`, `org_slug` claims                                                         |
+| 7    | Invitee     | Redirected to their org dashboard, fully authenticated                                                                           |
 
 ### 2.4 Invitation Edge Cases
 
@@ -212,7 +212,7 @@ sequenceDiagram
 
     Note over User,VerifyPage: === EMAIL VERIFICATION FLOW ===
 
-    User->>VerifyPage: Redirected after invitation acceptance
+    User->>VerifyPage: Login with an account whose email was never confirmed
     VerifyPage-->>User: "Verify your email" message
     VerifyPage->>SupaAuth: Listen for SIGNED_IN event
 
@@ -230,12 +230,30 @@ sequenceDiagram
 
 ## 4. Email Verification
 
-New accounts created via invitation acceptance go through email verification:
+**Invited accounts are never asked to confirm their email.** The invitation link was
+mailed to that address, so clicking it already proves the address; `/api/invitations/register`
+creates the auth user with `email_confirm: true` and no confirmation email is sent.
+The invitee sets a password and lands on their org's login, and nothing in between
+depends on them opening a second email.
+
+This replaced a browser-side `supabase.auth.signUp()`. With "Confirm email" enabled on
+the production Supabase project, that call mailed a redundant "Confirm your email" and
+returned a user with **no session**, so the invitation could not be accepted until the
+invitee found and clicked that mail. The route handler is now the only account-creation
+path, and the flow behaves the same whether or not confirmations are enabled.
+
+`/verify-email` remains for accounts that are genuinely unconfirmed — anyone stranded by
+the old flow, reached by logging in:
 
 - **Verify Email** (`/verify-email`) — Displays verification status with optional `?email=` param
 - Resend button with 60-second cooldown to prevent abuse
 - Listens for `SIGNED_IN` auth event to auto-redirect when verified
 - Email enumeration protection (same UI regardless of email validity)
+
+Re-clicking a live invitation also repairs such an account: an unconfirmed user that
+belongs to no organization is an abandoned signup, so the register route confirms it and
+sets the password just chosen. A **confirmed** account's password is never touched — that
+person signs in with the one they already have.
 
 ---
 

@@ -110,6 +110,14 @@ export interface InvitationLookup {
   orgSlug: string | null;
 }
 
+/**
+ * `created` — a fresh, already-confirmed account was made for the invitee.
+ * `existing` — the address already has an account; sign in with its password.
+ */
+export interface InvitationRegistration {
+  status: "created" | "existing";
+}
+
 async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
   const response = await fetch(input, init);
   const contentType = response.headers.get("content-type") ?? "";
@@ -327,4 +335,22 @@ export function exitSandbox(): Promise<{ success: true }> {
 export function fetchInvitationLookup(token: string): Promise<InvitationLookup> {
   const params = new URLSearchParams({ token });
   return requestJson(`/api/invitations/lookup?${params}`);
+}
+
+/**
+ * Creates the invitee's auth account, pre-confirmed, using the invitation token
+ * as proof of the address. Replaces `supabase.auth.signUp()` here: that mailed
+ * a redundant "Confirm your email" and returned no session, which stalled the
+ * invite until the invitee clicked it.
+ */
+export function registerInvitedUser(input: {
+  token: string;
+  email: string;
+  password: string;
+}): Promise<InvitationRegistration> {
+  return requestJson("/api/invitations/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }
