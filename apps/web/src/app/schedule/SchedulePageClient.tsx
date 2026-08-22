@@ -170,6 +170,7 @@ import {
   widenFetchWindow,
   type ScheduleOperation,
 } from "./_lib/operations";
+import { buildScheduleNoteMap } from "./_lib/schedule-window";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
   Employee,
@@ -863,24 +864,7 @@ function SchedulerContent() {
         ),
         fetchScheduleNotes(org.id, start, end),
       ]);
-      const noteMap: Record<
-        string,
-        {
-          indicatorTypeId: number;
-          status: "published" | "draft" | "draft_deleted";
-        }[]
-      > = {};
-      for (const note of noteRows) {
-        const key =
-          note.focusAreaId != null
-            ? `${note.empId}_${note.date}_${note.focusAreaId}`
-            : `${note.empId}_${note.date}`;
-        if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push({
-          indicatorTypeId: note.indicatorTypeId,
-          status: note.status,
-        });
-      }
+      const noteMap = buildScheduleNoteMap(noteRows);
       setShifts(shiftData);
       setNotes(noteMap);
       setLoadedShiftWindow({ start, end });
@@ -1011,24 +995,7 @@ function SchedulerContent() {
           () => [] as PublishHistoryEntry[],
         );
 
-        const noteMap: Record<
-          string,
-          {
-            indicatorTypeId: number;
-            status: "published" | "draft" | "draft_deleted";
-          }[]
-        > = {};
-        for (const note of noteRows) {
-          const key =
-            note.focusAreaId != null
-              ? `${note.empId}_${note.date}_${note.focusAreaId}`
-              : `${note.empId}_${note.date}`;
-          if (!noteMap[key]) noteMap[key] = [];
-          noteMap[key].push({
-            indicatorTypeId: note.indicatorTypeId,
-            status: note.status,
-          });
-        }
+        const noteMap = buildScheduleNoteMap(noteRows);
         setShifts(shiftData);
         setNotes(noteMap);
         setRecurringShifts(recShifts);
