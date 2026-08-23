@@ -1195,45 +1195,60 @@ function parseRgbaPng(buffer: Buffer, tintColor?: [number, number, number]): Pdf
   };
 }
 
-function getReportLogo(): PdfPngImage | null {
-  if (cachedReportLogo !== undefined) return cachedReportLogo;
-
-  const candidates = [
-    join(process.cwd(), "public", "logo.png"),
-    join(process.cwd(), "apps", "web", "public", "logo.png"),
-  ];
-
-  for (const candidate of candidates) {
+/**
+ * Reads one of the app's own brand PNGs for the PDF export.
+ *
+ * Each readFileSync takes a fully literal path, and the two locations are
+ * spelled out rather than looped over, because Turbopack resolves that argument
+ * statically to decide what to trace. Handing it a loop variable made it give
+ * up and trace the *whole project* into the server output — every source file
+ * and the entire public folder, on every serverless function — which is dead
+ * weight on each cold start.
+ *
+ * Two locations because cwd differs depending on whether the app was started
+ * from the monorepo root or from apps/web. A miss returns null rather than
+ * throwing, so a PDF still renders (without the artwork) in an environment that
+ * does not expose public assets.
+ */
+function readBrandAsset(name: "logo" | "wordmark-white"): Buffer | null {
+  if (name === "logo") {
     try {
-      cachedReportLogo = parseRgbaPng(readFileSync(candidate));
-      return cachedReportLogo;
+      return readFileSync(join(process.cwd(), "public", "logo.png"));
     } catch {
-      // Keep PDF export available if an environment does not expose public assets.
+      /* fall through to the monorepo-root location */
+    }
+    try {
+      return readFileSync(join(process.cwd(), "apps", "web", "public", "logo.png"));
+    } catch {
+      return null;
     }
   }
 
-  cachedReportLogo = null;
+  try {
+    return readFileSync(join(process.cwd(), "public", "wordmark-white.png"));
+  } catch {
+    /* fall through to the monorepo-root location */
+  }
+  try {
+    return readFileSync(join(process.cwd(), "apps", "web", "public", "wordmark-white.png"));
+  } catch {
+    return null;
+  }
+}
+
+function getReportLogo(): PdfPngImage | null {
+  if (cachedReportLogo !== undefined) return cachedReportLogo;
+
+  const bytes = readBrandAsset("logo");
+  cachedReportLogo = bytes ? parseRgbaPng(bytes) : null;
   return cachedReportLogo;
 }
 
 function getReportWordmark(): PdfPngImage | null {
   if (cachedReportWordmark !== undefined) return cachedReportWordmark;
 
-  const candidates = [
-    join(process.cwd(), "public", "wordmark-white.png"),
-    join(process.cwd(), "apps", "web", "public", "wordmark-white.png"),
-  ];
-
-  for (const candidate of candidates) {
-    try {
-      cachedReportWordmark = parseRgbaPng(readFileSync(candidate), [0.059, 0.09, 0.141]);
-      return cachedReportWordmark;
-    } catch {
-      // Keep PDF export available if an environment does not expose public assets.
-    }
-  }
-
-  cachedReportWordmark = null;
+  const bytes = readBrandAsset("wordmark-white");
+  cachedReportWordmark = bytes ? parseRgbaPng(bytes, [0.059, 0.09, 0.141]) : null;
   return cachedReportWordmark;
 }
 
