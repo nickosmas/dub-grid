@@ -5,13 +5,7 @@
 // for everyone. Session Replay records user sessions, so it is gated behind
 // analytics consent and only attached once the user opts in (here at boot if
 // already granted, or live via the consent-changed event).
-import {
-  init,
-  replayIntegration,
-  addIntegration,
-  getClient,
-  captureRouterTransitionStart,
-} from "@/lib/sentry";
+import { init, addIntegration, getClient, captureRouterTransitionStart } from "@/lib/sentry";
 import { getAnalyticsConsentSnapshot, subscribeToConsentChanges } from "@/components/CookieConsent";
 
 function beforeSend(event: Record<string, unknown>) {
@@ -29,13 +23,29 @@ function beforeSend(event: Record<string, unknown>) {
 
 const analyticsConsented = getAnalyticsConsentSnapshot();
 
+/**
+ * Loads Session Replay on demand and attaches it.
+ *
+ * Replay is the heaviest part of the browser SDK by a wide margin, and it is
+ * useless without analytics consent — so it is imported here rather than at
+ * module scope. Statically imported it shipped to every visitor of every page,
+ * consent or not: the gate stopped it *recording*, never downloading, which is
+ * the same mistake the PostHog provider used to make.
+ */
+async function attachSessionReplay(): Promise<void> {
+  if (!getClient()) return;
+  const { replayIntegration } = await import("@sentry/nextjs");
+  if (!getClient()) return;
+  addIntegration(replayIntegration());
+}
+
 init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  // Replay only loads up-front when analytics consent already exists.
-  // Otherwise it is attached later via addIntegration on opt-in.
-  integrations: analyticsConsented ? [replayIntegration()] : [],
+  // Never at boot. Error monitoring is what has to be up immediately; replay
+  // is attached afterwards, and only for a consenting visitor.
+  integrations: [],
 
   tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
   enableLogs: true,
@@ -52,12 +62,24 @@ init({
 
 // Attach Session Replay the moment the user grants analytics consent, without
 // requiring a page reload. Guard against double-attach.
-let replayAttached = analyticsConsented;
-subscribeToConsentChanges(() => {
-  if (replayAttached || !getAnalyticsConsentSnapshot()) return;
-  if (!getClient()) return;
-  addIntegration(replayIntegration());
+let replayAttached = false;
+
+function attachReplayOnce(): void {
+  if (replayAttached) return;
   replayAttached = true;
+  void attachSessionReplay().catch(() => {
+    // A failed replay download must never take error monitoring with it.
+    replayAttached = false;
+  });
+}
+
+// Already consented on this load: attach after boot rather than during it, so
+// the download never sits in front of first paint.
+if (analyticsConsented) attachReplayOnce();
+
+subscribeToConsentChanges(() => {
+  if (!getAnalyticsConsentSnapshot()) return;
+  attachReplayOnce();
 });
 
 export const onRouterTransitionStart = captureRouterTransitionStart;

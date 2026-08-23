@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/AuthProvider";
@@ -44,11 +44,31 @@ function isBillingRecoveryRoute(pathname: string, section: string | null): boole
   return pathname === "/settings" && section === "org-billing";
 }
 
+/**
+ * Reads the one search param the onboarding decision needs.
+ *
+ * Split out, and given its own Suspense boundary below, because
+ * useSearchParams() opts its nearest boundary out of static prerendering: Next
+ * emits that boundary's *fallback* into the HTML. This gate wraps every page,
+ * so calling the hook here put `null` in the static HTML of every prerendered
+ * route — the marketing page shipped with no content in it at all and could not
+ * paint until the whole bundle had downloaded and hydrated.
+ *
+ * Nothing above this component reads search params, so public routes now
+ * prerender their real markup, and only the authenticated path — the one that
+ * actually reaches OnboardingCheck — pays the boundary.
+ */
+function OnboardingCheckWithSection(
+  props: Omit<React.ComponentProps<typeof OnboardingCheck>, "section">,
+) {
+  const searchParams = useSearchParams();
+  return <OnboardingCheck {...props} section={searchParams.get("section")} />;
+}
+
 export default function OnboardingGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
   const perms = usePermissions();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const authTransitionPending = useAuthTransitionPending();
 
   // Pass through for: loading, unauthenticated, public routes,
@@ -69,17 +89,18 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
 
   // User is authenticated with an org — check onboarding status
   return (
-    <OnboardingCheck
-      userId={user.id}
-      orgId={perms.orgId}
-      role={perms.role}
-      isSuperAdmin={perms.isSuperAdmin}
-      canManageOrg={perms.canManageOrg}
-      pathname={pathname}
-      section={searchParams.get("section")}
-    >
-      {children}
-    </OnboardingCheck>
+    <Suspense fallback={<AuthSplash />}>
+      <OnboardingCheckWithSection
+        userId={user.id}
+        orgId={perms.orgId}
+        role={perms.role}
+        isSuperAdmin={perms.isSuperAdmin}
+        canManageOrg={perms.canManageOrg}
+        pathname={pathname}
+      >
+        {children}
+      </OnboardingCheckWithSection>
+    </Suspense>
   );
 }
 
