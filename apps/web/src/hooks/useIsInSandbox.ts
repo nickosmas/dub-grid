@@ -20,8 +20,8 @@ import { queryKeys } from "@/lib/query-keys";
  */
 export function useIsInSandbox(): boolean {
   const { data } = useQuery<OrganizationBootstrap>({
-    queryKey: queryKeys.org.bootstrap(null, false),
-    queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
+    queryKey: queryKeys.org.bootstrap(),
+    queryFn: () => fetchOrganizationBootstrap(),
     staleTime: 60_000,
   });
   return data?.org?.workspaceKind === "sandbox";
@@ -35,8 +35,8 @@ export function useIsInSandbox(): boolean {
  */
 export function useSandboxSourceOrgId(): string | null {
   const { data } = useQuery<OrganizationBootstrap>({
-    queryKey: queryKeys.org.bootstrap(null, false),
-    queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
+    queryKey: queryKeys.org.bootstrap(),
+    queryFn: () => fetchOrganizationBootstrap(),
     staleTime: 60_000,
   });
   const org = data?.org;

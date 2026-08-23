@@ -300,8 +300,8 @@ export default function Header({ orgName }: HeaderProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const sandboxBootstrapQuery = useQuery<OrganizationBootstrap>({
-    queryKey: queryKeys.org.bootstrap(null, false),
-    queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
+    queryKey: queryKeys.org.bootstrap(),
+    queryFn: () => fetchOrganizationBootstrap(),
     staleTime: 60_000,
     enabled: Boolean(authUser),
   });

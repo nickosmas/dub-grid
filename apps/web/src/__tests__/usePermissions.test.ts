@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createElement, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { Session, User } from "@supabase/supabase-js";
 
@@ -50,7 +52,7 @@ import {
   applyViewImplications,
   READ_ONLY_PERMS,
 } from "@/features/permissions";
-import { clearPermsCache, usePermissions } from "@/features/permissions/client";
+import { usePermissions } from "@/features/permissions/client";
 import { ALL_FALSE_PERMS } from "./factories";
 
 type TestJwtClaims = {
@@ -94,12 +96,27 @@ function signOut() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  clearPermsCache();
   currentAuth = { user: null, session: null, isLoading: false };
   mockFetchAccountPermissions.mockImplementation(async () => ({
     permissions: getPermissionsFromSession(currentAuth.session),
   }));
 });
+
+/**
+ * usePermissions reads through React Query, so it needs a provider. A fresh
+ * client per test keeps one test's resolved permissions out of the next one's
+ * cache, and retry:false makes the error-fallback path resolve immediately
+ * instead of waiting out a retry.
+ */
+function renderPermissions() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return renderHook(() => usePermissions(), {
+    wrapper: ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children),
+  });
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Part A: ROLE_LEVEL constant
@@ -268,13 +285,13 @@ describe("permission derivation", () => {
 describe("usePermissions hook", () => {
   it("starts with loading state when auth is still resolving", () => {
     setAuth({ user: null, session: null, isLoading: true });
-    const { result } = renderHook(() => usePermissions());
+    const { result } = renderPermissions();
     expect(result.current.isLoading).toBe(true);
   });
 
   it("returns NO_PERMS when auth resolves with no session", async () => {
     setAuth({ user: null, session: null, isLoading: false });
-    const { result } = renderHook(() => usePermissions());
+    const { result } = renderPermissions();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("user");
     expect(result.current.orgId).toBeNull();
@@ -290,7 +307,7 @@ describe("usePermissions hook", () => {
       "gm-1",
     );
 
-    const { result } = renderHook(() => usePermissions());
+    const { result } = renderPermissions();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("gridmaster");
     expect(result.current.isGridmaster).toBe(true);
@@ -333,7 +350,7 @@ describe("usePermissions hook", () => {
       }),
     });
 
-    const { result } = renderHook(() => usePermissions());
+    const { result } = renderPermissions();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("admin");
     expect(result.current.canEditShifts).toBe(true);
@@ -348,7 +365,7 @@ describe("usePermissions hook", () => {
       org_id: "org-1",
     });
 
-    const { result, rerender } = renderHook(() => usePermissions());
+    const { result, rerender } = renderPermissions();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("super_admin");
 
@@ -365,7 +382,7 @@ describe("usePermissions hook", () => {
       org_id: "org-1",
     });
 
-    const { result, rerender } = renderHook(() => usePermissions());
+    const { result, rerender } = renderPermissions();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("super_admin");
 
@@ -392,7 +409,7 @@ describe("usePermissions hook", () => {
       "u-1",
     );
 
-    const { result, rerender } = renderHook(() => usePermissions());
+    const { result, rerender } = renderPermissions();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("super_admin");
 
@@ -422,7 +439,7 @@ describe("usePermissions hook", () => {
       permissions: buildPerms("user", "org-1", false),
     });
 
-    const { result } = renderHook(() => usePermissions());
+    const { result } = renderPermissions();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.role).toBe("user");
     expect(result.current.canEditShifts).toBe(false);
@@ -592,7 +609,7 @@ describe("canAccessSettings", () => {
       org_slug: "acme",
     });
 
-    const { result } = renderHook(() => usePermissions());
+    const { result } = renderPermissions();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.canAccessSettings).toBe(true);
   });
@@ -614,7 +631,7 @@ describe("canAccessSettings", () => {
       }),
     });
 
-    const { result } = renderHook(() => usePermissions());
+    const { result } = renderPermissions();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.canAccessSettings).toBe(true);
     expect(result.current.canManageOrg).toBe(false);
@@ -634,7 +651,7 @@ describe("canAccessSettings", () => {
       permissions: buildPerms("user", "org-1", false),
     });
 
-    const { result } = renderHook(() => usePermissions());
+    const { result } = renderPermissions();
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.canAccessSettings).toBe(false);
   });

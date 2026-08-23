@@ -5,7 +5,7 @@ import { queryKeys } from "@/lib/query-keys";
 describe("getOrgRealtimeInvalidationKeys", () => {
   it("invalidates bootstrap and organization detail for org changes", () => {
     expect(getOrgRealtimeInvalidationKeys("org-1", "organizations")).toEqual([
-      queryKeys.org.bootstrapAll(),
+      queryKeys.org.bootstrap(),
       queryKeys.org.detail("org-1"),
       queryKeys.org.billing("org-1"),
     ]);
@@ -14,14 +14,14 @@ describe("getOrgRealtimeInvalidationKeys", () => {
   it("invalidates billing and org shell caches for subscription changes", () => {
     expect(getOrgRealtimeInvalidationKeys("org-1", "subscriptions")).toEqual([
       queryKeys.org.billing("org-1"),
-      queryKeys.org.bootstrapAll(),
+      queryKeys.org.bootstrap(),
       queryKeys.org.detail("org-1"),
     ]);
   });
 
   it("invalidates settings and derived assignment data for job changes", () => {
     expect(getOrgRealtimeInvalidationKeys("org-1", "jobs")).toEqual([
-      queryKeys.org.bootstrapAll(),
+      queryKeys.org.bootstrap(),
       queryKeys.org.jobs("org-1"),
       queryKeys.org.assignments("org-1"),
       queryKeys.org.coverageRequirements("org-1"),

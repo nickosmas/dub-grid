@@ -9,7 +9,6 @@ import {
   type ImpersonationData,
 } from "@/lib/impersonation";
 import { endGridmasterImpersonation } from "@/features/gridmaster/client";
-import { clearPermsCache } from "@/features/permissions/client";
 import { MaybeHint } from "@/components/ui/hint";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 
@@ -48,7 +47,6 @@ export default function ImpersonationBanner() {
       if (diff <= 0) {
         setCountdown(null);
         clearImpersonationCookie();
-        clearPermsCache();
         queryClient.clear();
         setImp(null);
         window.location.replace("/dashboard");
@@ -87,7 +85,6 @@ export default function ImpersonationBanner() {
       // Best-effort — cookie clear + redirect is what matters
     }
     clearImpersonationCookie();
-    clearPermsCache();
     queryClient.clear();
     toast.success("Impersonation ended");
     window.location.replace("/dashboard");

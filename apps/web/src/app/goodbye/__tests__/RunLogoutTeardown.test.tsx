@@ -6,7 +6,6 @@ import { RunLogoutTeardown } from "../RunLogoutTeardown";
 const mockSignOutFromBrowser = vi.fn();
 const mockClearLogoutCleanup = vi.fn();
 const mockClearImpersonationCookie = vi.fn();
-const mockClearPermsCache = vi.fn();
 const mockGetChannels = vi.fn();
 const mockUntrackChannel = vi.fn();
 const mockRemoveChannel = vi.fn();
@@ -33,9 +32,7 @@ vi.mock("@/lib/impersonation", () => ({
   clearImpersonationCookie: () => mockClearImpersonationCookie(),
 }));
 
-vi.mock("@/features/permissions/client", () => ({
-  clearPermsCache: () => mockClearPermsCache(),
-}));
+vi.mock("@/features/permissions/client", () => ({}));
 
 vi.mock("@/lib/sentry", () => ({
   captureException: vi.fn(),
@@ -98,9 +95,9 @@ describe("RunLogoutTeardown", () => {
       mockSignOutFromBrowser.mock.invocationCallOrder[0],
     );
 
-    // Cache + perms + impersonation cookie all cleared exactly once.
+    // Cache + impersonation cookie both cleared exactly once. Permissions live
+    // in the query cache now, so queryClient.clear() is what drops them.
     expect(queryClientClear).toHaveBeenCalledTimes(1);
-    expect(mockClearPermsCache).toHaveBeenCalledTimes(1);
     expect(mockClearImpersonationCookie).toHaveBeenCalledTimes(1);
 
     await waitFor(() => {
@@ -144,7 +141,6 @@ describe("RunLogoutTeardown", () => {
     expect(mockSignOutFromBrowser).not.toHaveBeenCalled();
     expect(mockClearLogoutCleanup).not.toHaveBeenCalled();
     expect(mockClearImpersonationCookie).not.toHaveBeenCalled();
-    expect(mockClearPermsCache).not.toHaveBeenCalled();
     expect(mockHistoryReplaceState).not.toHaveBeenCalled();
   });
 

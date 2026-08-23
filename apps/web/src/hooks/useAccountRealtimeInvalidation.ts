@@ -19,7 +19,7 @@ export function getAccountRealtimeInvalidationKeys(
   const accountAll = ["account", userId] as const;
   switch (table) {
     case "profiles":
-      return [accountAll, queryKeys.org.bootstrapAll()];
+      return [accountAll, queryKeys.org.bootstrap()];
     case "user_sessions":
       return [queryKeys.account.sessions(userId)];
     case "notification_preferences":

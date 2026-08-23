@@ -1,14 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { getServiceClient } from "@/lib/supabase-service";
-import { invalidatePlatformFlagsCache } from "@/lib/feature-flags";
+import { invalidatePlatformFlagsCache, PLATFORM_FLAGS_TAG } from "@/lib/feature-flags";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+
+/**
+ * Drops both caching layers behind isFeatureEnabled: Redis (shared across
+ * instances) and Next's Data Cache (per deployment region, and what the
+ * prerendered pages read through). Missing the second one would leave a
+ * flipped kill switch invisible for up to its TTL.
+ */
+async function dropFlagCaches(): Promise<void> {
+  await invalidatePlatformFlagsCache();
+  // `{ expire: 0 }` purges rather than merely marking stale — a gridmaster
+  // flipping a kill switch mid-incident should not be served the old value
+  // once more while the new one revalidates. (`updateTag` would be the more
+  // direct spelling, but it is Server-Action-only and this codebase has no
+  // Server Actions.)
+  revalidateTag(PLATFORM_FLAGS_TAG, { expire: 0 });
+}
 
 const updateSchema = z.object({
   key: z.string().min(1),
@@ -124,7 +141,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await invalidatePlatformFlagsCache();
+    await dropFlagCaches();
 
     // Best-effort audit — the flag update itself already succeeded and must not
     // be reported as failed to the gridmaster just because the audit write hiccuped.
@@ -212,7 +229,7 @@ export async function PUT(req: NextRequest) {
       throw error;
     }
 
-    await invalidatePlatformFlagsCache();
+    await dropFlagCaches();
 
     // Best-effort audit — the create already succeeded and must not be reported as
     // failed to the gridmaster just because the audit write hiccuped.

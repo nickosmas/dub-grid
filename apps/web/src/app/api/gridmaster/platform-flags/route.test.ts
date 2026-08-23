@@ -6,6 +6,7 @@ const requireGridmasterSession = vi.fn();
 const checkRateLimit = vi.fn();
 const serviceFrom = vi.fn();
 const invalidatePlatformFlagsCache = vi.fn();
+const revalidateTag = vi.fn();
 const writeGridmasterAuditLog = vi.fn();
 
 vi.mock("@/lib/csrf", () => ({
@@ -27,6 +28,11 @@ vi.mock("@/lib/supabase-service", () => ({
 
 vi.mock("@/lib/feature-flags", () => ({
   invalidatePlatformFlagsCache: (...args: unknown[]) => invalidatePlatformFlagsCache(...args),
+  PLATFORM_FLAGS_TAG: "platform-feature-flags",
+}));
+
+vi.mock("next/cache", () => ({
+  revalidateTag: (...args: unknown[]) => revalidateTag(...args),
 }));
 
 vi.mock("@/app/api/gridmaster/_lib/audit", () => ({
@@ -135,6 +141,7 @@ describe("/api/gridmaster/platform-flags", () => {
 
       expect(response.status).toBe(409);
       expect(invalidatePlatformFlagsCache).not.toHaveBeenCalled();
+      expect(revalidateTag).not.toHaveBeenCalled();
       expect(writeGridmasterAuditLog).not.toHaveBeenCalled();
     });
 
@@ -167,6 +174,9 @@ describe("/api/gridmaster/platform-flags", () => {
         },
       });
       expect(invalidatePlatformFlagsCache).toHaveBeenCalledTimes(1);
+      // Both layers: Redis above, and Next's Data Cache, which is what the
+      // prerendered pages read the flags through.
+      expect(revalidateTag).toHaveBeenCalledWith("platform-feature-flags", { expire: 0 });
       expect(writeGridmasterAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
           actor: GRIDMASTER,
@@ -216,6 +226,7 @@ describe("/api/gridmaster/platform-flags", () => {
 
       expect(response.status).toBe(409);
       expect(invalidatePlatformFlagsCache).not.toHaveBeenCalled();
+      expect(revalidateTag).not.toHaveBeenCalled();
     });
 
     it("creates the flag, invalidates the cache, and writes an audit log", async () => {
@@ -257,6 +268,9 @@ describe("/api/gridmaster/platform-flags", () => {
         },
       });
       expect(invalidatePlatformFlagsCache).toHaveBeenCalledTimes(1);
+      // Both layers: Redis above, and Next's Data Cache, which is what the
+      // prerendered pages read the flags through.
+      expect(revalidateTag).toHaveBeenCalledWith("platform-feature-flags", { expire: 0 });
       expect(writeGridmasterAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
           actor: GRIDMASTER,

@@ -118,7 +118,7 @@ function renderHeader(ui: React.ReactElement, opts?: { inSandbox?: boolean }) {
 
   if (opts?.inSandbox !== undefined) {
     // Seed the bootstrap cache so Header's isInSandbox is set synchronously.
-    queryClient.setQueryData(queryKeys.org.bootstrap(null, false), {
+    queryClient.setQueryData(queryKeys.org.bootstrap(), {
       org: { workspaceKind: opts.inSandbox ? "sandbox" : "real" },
     });
   }

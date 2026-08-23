@@ -1,6 +1,5 @@
 // src/hooks/index.ts
 export {
-  clearPermsCache,
   getUserViewActive,
   setUserViewActive,
   usePermissions,

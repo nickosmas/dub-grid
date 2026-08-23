@@ -571,9 +571,11 @@ function DepartmentSection({
             !localFaIds.has(fa.id) &&
             !(fa.departmentId != null && pendingHardDeleteDeptIds.has(fa.departmentId)),
         );
-        for (const fa of deletedFAs) {
-          await deleteFocusArea(fa.id, orgId, pendingHardDeleteFaIds.has(fa.id));
-        }
+        // Parallel: distinct rows, one HTTP round trip each, no ordering between
+        // them. Deleting a handful of focus areas was a handful of serial calls.
+        await Promise.all(
+          deletedFAs.map((fa) => deleteFocusArea(fa.id, orgId, pendingHardDeleteFaIds.has(fa.id))),
+        );
 
         // Upsert new and modified FAs
         const savedFAsList: FocusArea[] = [];

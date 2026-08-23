@@ -31,7 +31,35 @@ vi.mock("@/lib/cache", () => ({
   TTL: { MIDDLEWARE: 30 },
 }));
 
-import { isFeatureEnabled, invalidatePlatformFlagsCache } from "./feature-flags";
+// unstable_cache needs Next's incrementalCache, which only exists inside a real
+// request/prerender, so the callback passes straight through here. That keeps
+// these tests on the Redis layer's semantics, which is what they are about;
+// that the wrapper is present at all is asserted in the last test.
+//
+// The recorder is a plain object rather than a vi.fn because the wrapper is
+// applied once at module load: clearAllMocks would wipe a spy's call record
+// before any test could read it, and vi.hoisted is needed because that load
+// happens above this file's own const initializers.
+const { unstableCacheCall } = vi.hoisted(() => ({
+  unstableCacheCall: {} as { keys?: string[]; options?: { revalidate?: number; tags?: string[] } },
+}));
+vi.mock("next/cache", () => ({
+  unstable_cache: (
+    fn: (...args: unknown[]) => unknown,
+    keys?: string[],
+    options?: { revalidate?: number; tags?: string[] },
+  ) => {
+    unstableCacheCall.keys = keys;
+    unstableCacheCall.options = options;
+    return fn;
+  },
+}));
+
+import {
+  isFeatureEnabled,
+  invalidatePlatformFlagsCache,
+  PLATFORM_FLAGS_TAG,
+} from "./feature-flags";
 
 describe("feature-flags", () => {
   beforeEach(() => {
@@ -88,5 +116,17 @@ describe("feature-flags", () => {
     await isFeatureEnabled("stripe");
 
     expect(from).toHaveBeenCalledTimes(2);
+  });
+
+  // Guards the whole reason this app prerenders. @upstash/redis fetches with
+  // `cache: "no-store"`, and the root layout reads a flag, so an unwrapped read
+  // opts every route out of the Full Route Cache and Vercel serves the entire
+  // app `no-store`. Drop the wrapper and production silently stops caching.
+  it("reads the flags through Next's Data Cache, tagged for invalidation", () => {
+    expect(unstableCacheCall.keys).toEqual([PLATFORM_FLAGS_TAG]);
+    expect(unstableCacheCall.options).toEqual({
+      revalidate: 30,
+      tags: [PLATFORM_FLAGS_TAG],
+    });
   });
 });

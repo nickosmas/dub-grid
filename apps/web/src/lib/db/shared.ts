@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { cacheThrough, cacheDel, CacheKey, TTL } from "@/lib/cache";
 import { logAudit } from "@/lib/audit";
@@ -67,6 +68,97 @@ export interface SaveNamedEntitiesResult {
   archived: number;
 }
 
+/**
+ * The write half of saveNamedEntities: updates kept rows, revives archived rows
+ * whose name is coming back, and bulk-inserts the rest.
+ *
+ * Split out so callers that own a different *deletion* policy can still share
+ * the batched upsert. /api/settings/config is the one that needs this — it
+ * decides per row whether a removal is a hard delete or an archive (based on
+ * whether anything still references it), which saveNamedEntities has no notion
+ * of. Before this existed it hand-rolled the whole upsert as sequential
+ * per-item loops, which is exactly the ~2N round trips the comment above
+ * describes getting rid of.
+ */
+export async function upsertNamedEntities<T extends { id: number; name: string }>(opts: {
+  /**
+   * Explicit, because the two callers do not share one. This module's own
+   * `supabase` is the browser anon-key client (RLS applies); the settings route
+   * writes with a service-role client. Defaulting to the module client would
+   * silently run the route's writes under the wrong identity.
+   */
+  client: Pick<SupabaseClient, "from">;
+  table: string;
+  orgId: string;
+  items: T[];
+  existingIds: Set<number>;
+  toRow: (item: T, sortOrder: number) => Record<string, unknown>;
+}): Promise<{ created: number; updated: number }> {
+  const { client, table, orgId, items, existingIds, toRow } = opts;
+
+  const toUpdate = items
+    .map((item, i) => ({ item, sortOrder: i }))
+    .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
+  const toInsert = items
+    .map((item, i) => ({ item, sortOrder: i }))
+    .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
+
+  // Updates — parallel single-row writes
+  await Promise.all(
+    toUpdate.map(async ({ item, sortOrder }) => {
+      const { error } = await client
+        .from(table)
+        .update(toRow(item, sortOrder))
+        .eq("org_id", orgId)
+        .eq("id", item.id);
+      if (error) throw error;
+    }),
+  );
+
+  // One batched lookup for archived rows matching incoming names
+  const archivedByName = new Map<string, number>();
+  if (toInsert.length > 0) {
+    const names = [...new Set(toInsert.map(({ item }) => item.name))];
+    const { data, error } = await client
+      .from(table)
+      .select("id, name")
+      .eq("org_id", orgId)
+      .in("name", names)
+      .not("archived_at", "is", null);
+    if (error) throw error;
+    for (const row of (data ?? []) as { id: number; name: string }[]) {
+      if (!archivedByName.has(row.name)) archivedByName.set(row.name, row.id);
+    }
+  }
+
+  // Split inserts into restores (reuse one archived row per name) vs fresh
+  const usedArchivedIds = new Set<number>();
+  const restores: { id: number; row: Record<string, unknown> }[] = [];
+  const fresh: Record<string, unknown>[] = [];
+  for (const { item, sortOrder } of toInsert) {
+    const archivedId = archivedByName.get(item.name);
+    if (archivedId !== undefined && !usedArchivedIds.has(archivedId)) {
+      usedArchivedIds.add(archivedId);
+      restores.push({ id: archivedId, row: { ...toRow(item, sortOrder), archived_at: null } });
+    } else {
+      fresh.push({ org_id: orgId, ...toRow(item, sortOrder) });
+    }
+  }
+
+  await Promise.all(
+    restores.map(async ({ id, row }) => {
+      const { error } = await client.from(table).update(row).eq("org_id", orgId).eq("id", id);
+      if (error) throw error;
+    }),
+  );
+  if (fresh.length > 0) {
+    const { error } = await client.from(table).insert(fresh);
+    if (error) throw error;
+  }
+
+  return { created: toInsert.length, updated: toUpdate.length };
+}
+
 export async function saveNamedEntities<T extends { id: number; name: string }>(opts: {
   table: string;
   orgId: string;
@@ -93,67 +185,16 @@ export async function saveNamedEntities<T extends { id: number; name: string }>(
     if (error) throw error;
   }
 
-  const toUpdate = items
-    .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id > 0 && existingIds.has(item.id));
-  const toInsert = items
-    .map((item, i) => ({ item, sortOrder: i }))
-    .filter(({ item }) => item.id <= 0 || !existingIds.has(item.id));
+  const { created, updated } = await upsertNamedEntities({
+    client: supabase,
+    table,
+    orgId,
+    items,
+    existingIds,
+    toRow,
+  });
 
-  // 2. Updates — parallel single-row writes
-  await Promise.all(
-    toUpdate.map(async ({ item, sortOrder }) => {
-      const { error } = await supabase
-        .from(table)
-        .update(toRow(item, sortOrder))
-        .eq("org_id", orgId)
-        .eq("id", item.id);
-      if (error) throw error;
-    }),
-  );
-
-  // 3. One batched lookup for archived rows matching incoming names
-  const archivedByName = new Map<string, number>();
-  if (toInsert.length > 0) {
-    const names = [...new Set(toInsert.map(({ item }) => item.name))];
-    const { data, error } = await supabase
-      .from(table)
-      .select("id, name")
-      .eq("org_id", orgId)
-      .in("name", names)
-      .not("archived_at", "is", null);
-    if (error) throw error;
-    for (const row of (data ?? []) as { id: number; name: string }[]) {
-      if (!archivedByName.has(row.name)) archivedByName.set(row.name, row.id);
-    }
-  }
-
-  // 4. Split inserts into restores (reuse one archived row per name) vs fresh
-  const usedArchivedIds = new Set<number>();
-  const restores: { id: number; row: Record<string, unknown> }[] = [];
-  const fresh: Record<string, unknown>[] = [];
-  for (const { item, sortOrder } of toInsert) {
-    const archivedId = archivedByName.get(item.name);
-    if (archivedId !== undefined && !usedArchivedIds.has(archivedId)) {
-      usedArchivedIds.add(archivedId);
-      restores.push({ id: archivedId, row: { ...toRow(item, sortOrder), archived_at: null } });
-    } else {
-      fresh.push({ org_id: orgId, ...toRow(item, sortOrder) });
-    }
-  }
-
-  await Promise.all(
-    restores.map(async ({ id, row }) => {
-      const { error } = await supabase.from(table).update(row).eq("org_id", orgId).eq("id", id);
-      if (error) throw error;
-    }),
-  );
-  if (fresh.length > 0) {
-    const { error } = await supabase.from(table).insert(fresh);
-    if (error) throw error;
-  }
-
-  return { created: toInsert.length, updated: toUpdate.length, archived: toDelete.length };
+  return { created, updated, archived: toDelete.length };
 }
 
 // ── Auto-paginating row fetch ────────────────────────────────────────────────

@@ -12,8 +12,8 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 
 export default function SandboxBanner() {
   const bootstrapQuery = useQuery<OrganizationBootstrap>({
-    queryKey: queryKeys.org.bootstrap(null, false),
-    queryFn: () => fetchOrganizationBootstrap({ includeAssignments: false }),
+    queryKey: queryKeys.org.bootstrap(),
+    queryFn: () => fetchOrganizationBootstrap(),
     staleTime: 60_000,
   });
   const [pendingAction, setPendingAction] = useState<"exit" | "reset" | null>(null);

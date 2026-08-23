@@ -7,7 +7,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import * as Sentry from "@/lib/sentry";
 import { clearImpersonationCookie } from "@/lib/impersonation";
-import { clearPermsCache } from "@/features/permissions/client";
 import {
   clearLogoutCleanup,
   getBrowserRealtimeChannels,
@@ -78,7 +77,6 @@ export function RunLogoutTeardown({ scope, reason = null }: RunLogoutTeardownPro
     void (async () => {
       try {
         queryClient.clear();
-        clearPermsCache();
         clearImpersonationCookie();
         // Auth-required cleanup MUST run before signOut clears the session.
         await clearLogoutCleanup().catch(() => {

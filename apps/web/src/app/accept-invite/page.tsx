@@ -14,9 +14,9 @@ import * as Sentry from "@/lib/sentry";
 import {
   fetchInvitationLookup,
   recordCurrentTermsAcceptance,
+  registerInvitedUser,
   signInBrowserWithPassword,
   signOutFromBrowser,
-  signUpBrowserUser,
 } from "@/features/account/client";
 import { acceptInvitation } from "@/features/organization/client";
 
@@ -94,33 +94,26 @@ function AcceptInviteContent() {
     setState("processing");
 
     try {
-      // 1. Sign up — create the Supabase auth account
-      const { data, error: signUpError } = await signUpBrowserUser({
+      // 1. Create the auth account server-side, already confirmed. The invite
+      //    link was mailed to this address, so the address is already proven —
+      //    a second "confirm your email" round trip would only stall the invite.
+      const { status } = await registerInvitedUser({ token: token!, email, password });
+
+      // 2. Sign in. A new account takes the password just chosen; an address
+      //    that already has one needs that account's existing password.
+      const { error: signInError } = await signInBrowserWithPassword({
         email,
         password,
       });
-
-      if (signUpError) {
-        throw new Error("Unable to create your account. Please try again or contact support.");
+      if (signInError) {
+        throw new Error(
+          status === "existing"
+            ? "This email already has a DubGrid account. Enter that account's password to accept the invitation."
+            : "Unable to sign in. Please try again or contact support.",
+        );
       }
 
-      // If no session (email confirmation required or user already exists),
-      // try signing in directly
-      if (data.user && !data.session) {
-        const { error: signInError } = await signInBrowserWithPassword({
-          email,
-          password,
-        });
-        if (signInError) {
-          throw new Error(
-            signInError.message.toLowerCase().includes("email not confirmed")
-              ? "Please check your email to confirm your account, then try again."
-              : "Unable to sign in. Please try again or contact support.",
-          );
-        }
-      }
-
-      // 2. Accept the invitation (now authenticated)
+      // 3. Accept the invitation (now authenticated)
       let slug: string | null = null;
       try {
         const result = await acceptInvitation(token!);
@@ -149,7 +142,7 @@ function AcceptInviteContent() {
         }
       }
 
-      // 2b. Record terms acceptance (best-effort — user is already authenticated)
+      // 3b. Record terms acceptance (best-effort — user is already authenticated)
       try {
         await recordCurrentTermsAcceptance();
       } catch {
@@ -157,7 +150,7 @@ function AcceptInviteContent() {
         // this didn't persist for any reason.
       }
 
-      // 3. Sign out so user re-authenticates with fresh JWT claims.
+      // 4. Sign out so user re-authenticates with fresh JWT claims.
       // Use global scope to revoke the server-side refresh token too,
       // otherwise the login page will find a stale token in cookies.
       await signOutFromBrowser("global");

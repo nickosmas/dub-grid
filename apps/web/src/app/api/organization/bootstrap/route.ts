@@ -43,10 +43,6 @@ import {
 } from "@/lib/db/shared";
 import logger from "@/lib/logger";
 
-function parseIncludeAssignments(req: NextRequest): boolean {
-  return req.nextUrl.searchParams.get("includeAssignments") !== "0";
-}
-
 async function resolveOrganizationId(
   req: NextRequest,
   claims: Record<string, unknown>,
@@ -140,7 +136,6 @@ export async function GET(req: NextRequest) {
       return auth.response;
     }
 
-    const includeAssignments = parseIncludeAssignments(req);
     const { orgId, isGridmaster } = await resolveOrganizationId(
       req,
       auth.claims,
@@ -171,6 +166,9 @@ export async function GET(req: NextRequest) {
     const orgAuth = await requireOrgPermissions(req, orgId, () => true, {
       allowLockedOrganization: true,
       allowDuringSetup: true,
+      // Already verified at the top of this handler; without this the same
+      // token costs two /auth/v1/user round trips on a route every page loads.
+      actor: auth.user,
     });
     if ("response" in orgAuth) {
       return orgAuth.response;
@@ -266,15 +264,16 @@ export async function GET(req: NextRequest) {
     const allAbsenceTypes = ((absenceTypeResult.data ?? []) as DbAbsenceType[]).map(
       rowToAbsenceType,
     );
-    const allAssignmentDefinitions = includeAssignments
-      ? buildScheduleAssignmentOptions({
-          orgId,
-          focusAreas,
-          shiftCategories,
-          jobs,
-          includeArchived: true,
-        })
-      : [];
+    // Always built. It is a pure derivation over focusAreas/shiftCategories/jobs
+    // that this handler already has in hand, so the old `includeAssignments=0`
+    // opt-out saved no queries — it only split the client cache in two.
+    const allAssignmentDefinitions = buildScheduleAssignmentOptions({
+      orgId,
+      focusAreas,
+      shiftCategories,
+      jobs,
+      includeArchived: true,
+    });
 
     return NextResponse.json({
       org,

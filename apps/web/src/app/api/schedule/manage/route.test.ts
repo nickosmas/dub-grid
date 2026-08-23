@@ -179,6 +179,9 @@ describe("POST /api/schedule/manage", () => {
       expect.anything(),
       sandboxOrgId,
       expect.any(Function),
+      // The caller verified once at the top of the handler is handed down, so
+      // requireOrgPermissions does not re-run getUser() over the network.
+      expect.objectContaining({ actor: expect.objectContaining({ id: "actor-user" }) }),
     );
     expect(userRpc).toHaveBeenCalledWith(
       "write_schedule_cell_snapshot",

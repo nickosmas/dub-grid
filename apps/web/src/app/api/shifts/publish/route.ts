@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       orgId,
       (permissions) =>
         permissions.isGridmaster || permissions.isSuperAdmin || permissions.canPublishSchedule,
+      { actor: user },
     );
     if ("response" in orgAuth) {
       return orgAuth.response;
