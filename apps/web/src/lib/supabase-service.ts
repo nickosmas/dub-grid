@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { getSupabaseSecretKey } from "@/lib/supabase-keys";
+import { getSupabaseSecretKey, getSupabaseUrl } from "@/lib/supabase-keys";
 
 /**
  * Supabase client authenticated with the service role key, for Route Handlers
@@ -15,7 +15,7 @@ let cached: SupabaseClient | null = null;
 
 export function getServiceClient(): SupabaseClient {
   if (cached) return cached;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = getSupabaseUrl();
   const key = getSupabaseSecretKey();
   if (!url || !key) throw new Error("Supabase env vars not configured");
   cached = createClient(url, key, {

@@ -4,9 +4,19 @@
  */
 export const queryKeys = {
   org: {
-    bootstrapAll: () => ["org", "bootstrap"] as const,
-    bootstrap: (orgId: string | null, includeAssignments: boolean) =>
-      ["org", "bootstrap", orgId ?? "auto", includeAssignments] as const,
+    /**
+     * The one org-bootstrap key. Deliberately takes no arguments.
+     *
+     * It used to be keyed by (orgId, includeAssignments), which meant a single
+     * page load could fire the same request under three different keys: the
+     * shell's `(null, false)`, the header's `(uuid, false)` and the page's
+     * `(uuid, true)`. Nothing about the request varies by org — the server
+     * resolves it from the caller's claims and sandbox cookie, not from an
+     * argument — and every transition that changes the active org either
+     * hard-reloads (sandbox enter/exit/reset) or clears the cache
+     * (impersonation, org switch, logout). One key, one fetch.
+     */
+    bootstrap: () => ["org", "bootstrap"] as const,
     all: (orgId: string) => ["org", orgId] as const,
     detail: (orgId: string) => ["org", orgId, "detail"] as const,
     bySubdomain: () => ["org", "bySubdomain"] as const,
@@ -55,6 +65,20 @@ export const queryKeys = {
     operationsAll: (orgId: string) => ["reports", "operations", orgId] as const,
   },
   account: {
+    /**
+     * The caller's org id + gridmaster flag. Deliberately not keyed by user or
+     * org: it is what *resolves* those, and every transition that could change
+     * it either hard-reloads the page (sandbox enter/exit/reset) or clears the
+     * whole cache (impersonation, org switch, logout).
+     */
+    orgContext: () => ["account", "orgContext"] as const,
+    /**
+     * Keyed by org as well as user: one person can be an admin in one
+     * organization and a plain member in another, so a user-only key served the
+     * previous org's role and admin_permissions across a same-user org switch.
+     */
+    permissions: (userId: string | null, orgId: string | null) =>
+      ["account", userId ?? "anon", orgId ?? "no-org", "permissions"] as const,
     self: (userId: string, orgId: string | null) =>
       ["account", userId, orgId ?? "no-org", "self"] as const,
     sessions: (userId: string) => ["account", userId, "sessions"] as const,

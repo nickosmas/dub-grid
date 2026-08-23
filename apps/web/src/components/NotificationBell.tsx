@@ -226,7 +226,14 @@ export default function NotificationBell({
       : ["notifications", "anon", "unreadCount"],
     queryFn: fetchUnreadNotificationCount,
     enabled: !!userId,
-    refetchInterval: 60_000,
+    // No refetchInterval. useNotificationsRealtime (mounted just below)
+    // invalidates the ["notifications", userId] prefix on every CDC event for
+    // this user, which covers this key, and re-invalidates after a channel
+    // error resolves — so a 60s poll on every route was re-asking a question
+    // realtime had already answered.
+    //
+    // Focus refetch stays as the backstop realtime cannot give: a socket that
+    // died quietly across a laptop sleep never raises CHANNEL_ERROR.
     refetchOnWindowFocus: true,
   });
 

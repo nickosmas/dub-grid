@@ -12,6 +12,11 @@
  * member access.
  */
 
+/** Project API URL. Public by design — it is in the browser bundle already. */
+export function getSupabaseUrl(): string | undefined {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL;
+}
+
 /** Client-safe key, published in the browser bundle and the mobile binary. */
 export function getSupabasePublishableKey(): string | undefined {
   return process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;

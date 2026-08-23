@@ -8,7 +8,7 @@ describe("getAccountRealtimeInvalidationKeys", () => {
   it("invalidates every account.* variant and bootstrap on profile changes", () => {
     expect(getAccountRealtimeInvalidationKeys(USER, "profiles")).toEqual([
       ["account", USER],
-      [...queryKeys.org.bootstrapAll()],
+      [...queryKeys.org.bootstrap()],
     ]);
   });
 

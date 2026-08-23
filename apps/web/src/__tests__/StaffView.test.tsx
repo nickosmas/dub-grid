@@ -5,7 +5,7 @@ import * as fc from "fast-check";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import StaffView from "@/components/StaffView";
 import { Department, Employee, FocusArea, NamedItem, ScheduleCellSegmentInput } from "@/types";
-import { upsertRecurringShift } from "@/features/schedule/client";
+import { saveRecurringShifts } from "@/features/schedule/client";
 
 const { mockToastSuccess, mockToastError } = vi.hoisted(() => ({
   mockToastSuccess: vi.fn(),
@@ -128,6 +128,7 @@ vi.mock("@/features/schedule/client", () => ({
   getRecurringDraft: vi.fn().mockResolvedValue(null),
   upsertRecurringShift: vi.fn(),
   deleteRecurringShift: vi.fn(),
+  saveRecurringShifts: vi.fn(),
   saveRecurringDraft: vi.fn(),
   deleteRecurringDraft: vi.fn(),
 }));
@@ -698,7 +699,7 @@ describe("StaffView", () => {
     it("saves recurring shift changes through the recurring upsert helper", async () => {
       mockSearchParams = new URLSearchParams("section=recurring-schedule");
       const user = userEvent.setup();
-      const mockedUpsertRecurringShift = vi.mocked(upsertRecurringShift);
+      const mockedSaveRecurringShifts = vi.mocked(saveRecurringShifts);
 
       renderWithProviders(
         <StaffView
@@ -739,26 +740,31 @@ describe("StaffView", () => {
       });
       await user.click(within(confirmDialog).getByRole("button", { name: "Save Changes" }));
 
-      expect(mockedUpsertRecurringShift).toHaveBeenCalledTimes(1);
-      expect(mockedUpsertRecurringShift).toHaveBeenCalledWith(
-        "emp-2",
+      // One bulk request for the whole grid, not one call per (employee, day).
+      expect(mockedSaveRecurringShifts).toHaveBeenCalledTimes(1);
+      expect(mockedSaveRecurringShifts).toHaveBeenCalledWith(
         "org-1",
-        0,
-        {
-          kind: "worked",
-          segments: [
-            {
-              shiftId: null,
-              jobId: 101,
-              position: 0,
+        [
+          {
+            employeeId: "emp-2",
+            dayOfWeek: 0,
+            input: {
+              kind: "worked",
+              segments: [
+                {
+                  shiftId: null,
+                  jobId: 101,
+                  position: 0,
+                },
+              ],
+              absenceTypeId: null,
+              customStartTime: null,
+              customEndTime: null,
+              seriesId: null,
+              fromRecurring: true,
             },
-          ],
-          absenceTypeId: null,
-          customStartTime: null,
-          customEndTime: null,
-          seriesId: null,
-          fromRecurring: true,
-        },
+          },
+        ],
         expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       );
       expect(mockToastSuccess).toHaveBeenCalledWith("Recurring schedules saved");

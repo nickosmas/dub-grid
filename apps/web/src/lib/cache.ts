@@ -69,6 +69,13 @@ export const CacheKey = {
 
   // Platform-wide kill switches (see lib/feature-flags.ts)
   platformFlags: () => `dg:platform:featureFlags`,
+
+  /**
+   * Whether an org has finished setup (see requireOrgPermissions). Only ever
+   * holds `true` — see the note at its one write site for why caching the
+   * `false` is the one thing this must not do.
+   */
+  orgSetupComplete: (orgId: string) => `dg:org:${orgId}:setupComplete`,
 } as const;
 
 // ── Typed Cache Operations ──────────────────────────────────────────────

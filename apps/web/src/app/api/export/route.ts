@@ -227,6 +227,7 @@ export async function GET(req: NextRequest) {
         permissions.isSuperAdmin ||
         (type === "staff" && permissions.canManageEmployees) ||
         (type === "schedule" && permissions.canEditShifts),
+      { actor: user },
     );
     if ("response" in orgAuth) {
       return orgAuth.response;

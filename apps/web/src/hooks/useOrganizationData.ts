@@ -157,61 +157,66 @@ const INITIAL_CTX: OrgContext = {
   resolved: false,
 };
 
+/**
+ * Resolves which org this browser is acting as.
+ *
+ * This is a React Query query rather than a bare effect because
+ * useOrganizationData has 19 call sites and several mount at once on a single
+ * page (AppShell, AppHeader, OnboardingGate, the page itself). As a raw
+ * useEffect + fetch it had no cache and no in-flight dedupe, so each of those
+ * fired its own /api/account/org-context request on every mount and every
+ * navigation. One query key means one request, reused.
+ *
+ * The request cannot be replaced by reading the JWT client-side, tempting as
+ * that looks: /api/account/org-context goes through
+ * requireAuthenticatedUserWithClaims, which rewrites org_id to the sandbox org
+ * when a valid sandbox cookie is present. That cookie is httpOnly by design, so
+ * the browser cannot derive the sandbox org on its own, and a JWT-only answer
+ * would silently point a sandboxed user at their real organization.
+ *
+ * Impersonation is different — its cookie *is* client-readable, so that case
+ * short-circuits with no request at all, exactly as before.
+ */
 function useOrgContext(): OrgContext {
-  const [ctx, setCtx] = useState<OrgContext>(INITIAL_CTX);
+  // Read once on mount, like the effect this replaced. Entering or leaving
+  // impersonation clears the whole query cache and re-renders from scratch.
+  const [impersonation] = useState(() =>
+    typeof document === "undefined" ? null : getImpersonationFromCookie(document.cookie),
+  );
 
-  useEffect(() => {
-    let cancelled = false;
+  const query = useQuery({
+    queryKey: queryKeys.account.orgContext(),
+    queryFn: fetchAccountOrgContext,
+    enabled: !impersonation,
+    // Only a sandbox enter/exit, an impersonation change or an org switch moves
+    // this, and each of those hard-reloads or clears the cache. Nothing is
+    // gained by re-asking during a session.
+    staleTime: Infinity,
+    retry: 1,
+  });
 
-    async function resolve() {
-      let earlyOrgId: string | null = null;
-      let isImpersonating = false;
-
-      if (typeof document !== "undefined") {
-        const impersonation = getImpersonationFromCookie(document.cookie);
-        if (impersonation) {
-          earlyOrgId = impersonation.targetOrgId;
-          isImpersonating = true;
-        }
-      }
-
-      if (!earlyOrgId) {
-        try {
-          const orgContext = await fetchAccountOrgContext();
-          if (orgContext.isGridmaster) {
-            if (!cancelled) {
-              setCtx({
-                orgId: null,
-                isImpersonating: false,
-                isGridmaster: true,
-                resolved: true,
-              });
-            }
-            return;
-          }
-          earlyOrgId = orgContext.orgId;
-        } catch {
-          // Proceed without a server-side hint.
-        }
-      }
-
-      if (!cancelled) {
-        setCtx({
-          orgId: earlyOrgId,
-          isImpersonating,
-          isGridmaster: false,
-          resolved: true,
-        });
-      }
+  return useMemo(() => {
+    if (impersonation) {
+      return {
+        orgId: impersonation.targetOrgId,
+        isImpersonating: true,
+        isGridmaster: false,
+        resolved: true,
+      };
     }
 
-    resolve();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    // A failed lookup still resolves: the original effect swallowed the error
+    // and carried on without a server-side hint, and bootstrap resolves the org
+    // server-side anyway. Staying unresolved would wedge every dependent query.
+    if (query.isPending) return INITIAL_CTX;
 
-  return ctx;
+    return {
+      orgId: query.data?.isGridmaster ? null : (query.data?.orgId ?? null),
+      isImpersonating: false,
+      isGridmaster: query.data?.isGridmaster ?? false,
+      resolved: true,
+    };
+  }, [impersonation, query.isPending, query.data]);
 }
 
 export function useOrganizationData(options?: UseOrganizationDataOptions): OrganizationData {
@@ -220,18 +225,17 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
   const includeAssignmentDefinitionCompatibility =
     options?.includeAssignmentDefinitionCompatibility ?? true;
   const enabled = options?.enabled ?? true;
-  const bootstrapQueryKey = queryKeys.org.bootstrap(
-    ctx.orgId,
-    includeAssignmentDefinitionCompatibility,
-  );
+  const bootstrapQueryKey = queryKeys.org.bootstrap();
 
+  // Deliberately not gated on ctx.resolved. The request carries no org id —
+  // the server resolves the org from the caller's claims and sandbox cookie —
+  // so waiting for the org-context round trip only serialised two requests that
+  // can run at once. ctx is still used below for the *identity* of the result
+  // (effectiveOrgId), which is a different question from whether to ask.
   const bootstrapQuery = useQuery({
     queryKey: bootstrapQueryKey,
-    queryFn: () =>
-      fetchOrganizationBootstrap({
-        includeAssignments: includeAssignmentDefinitionCompatibility,
-      }),
-    enabled: enabled && ctx.resolved,
+    queryFn: fetchOrganizationBootstrap,
+    enabled,
     staleTime: 5 * 60_000,
   });
 
@@ -248,7 +252,7 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     (updater: (current: OrganizationBootstrap) => OrganizationBootstrap) => {
       if (!effectiveOrgId) return;
       queryClient.setQueriesData<OrganizationBootstrap>(
-        { queryKey: queryKeys.org.bootstrapAll() },
+        { queryKey: queryKeys.org.bootstrap() },
         (current) => {
           if (!current?.org || current.org.id !== effectiveOrgId) {
             return current;
@@ -266,9 +270,9 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
       // deliver to the sending tab, so we also invalidate locally below to
       // force same-tab consumers (e.g. settings panels rendering the just-
       // saved data in a sibling component) to refetch immediately.
-      broadcastInvalidation(queryKeys.org.bootstrapAll());
+      broadcastInvalidation(queryKeys.org.bootstrap());
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.org.bootstrapAll(),
+        queryKey: queryKeys.org.bootstrap(),
       });
       for (const key of queryKeysToBroadcast) {
         broadcastInvalidation(key);

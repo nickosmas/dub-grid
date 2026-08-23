@@ -43,7 +43,7 @@ describe("billing realtime invalidation", () => {
   it("targets billing and shell queries for billing changes", () => {
     expect(getBillingRealtimeInvalidationKeys("org-1")).toEqual([
       queryKeys.org.billing("org-1"),
-      queryKeys.org.bootstrapAll(),
+      queryKeys.org.bootstrap(),
       queryKeys.org.detail("org-1"),
     ]);
   });

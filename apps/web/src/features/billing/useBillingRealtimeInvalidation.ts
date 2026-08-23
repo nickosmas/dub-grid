@@ -13,7 +13,7 @@ import {
 export function getBillingRealtimeInvalidationKeys(orgId: string): readonly unknown[][] {
   return [
     [...queryKeys.org.billing(orgId)],
-    [...queryKeys.org.bootstrapAll()],
+    [...queryKeys.org.bootstrap()],
     [...queryKeys.org.detail(orgId)],
   ];
 }

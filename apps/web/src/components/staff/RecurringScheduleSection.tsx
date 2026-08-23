@@ -22,11 +22,11 @@ import {
 } from "@/lib/colors";
 import {
   deleteRecurringDraft,
-  deleteRecurringShift,
   fetchRecurringShifts,
   getRecurringDraft,
   saveRecurringDraft,
-  upsertRecurringShift,
+  saveRecurringShifts,
+  type RecurringShiftChange,
 } from "@/features/schedule/client";
 import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -785,16 +785,19 @@ export function RecurringScheduleSection({
     const savedKeys = new Set<string>();
 
     try {
+      // One request for the whole grid. This used to be a nested loop issuing an
+      // HTTP call per (employee, day) cell, sequentially — an 10x7 grid meant 70
+      // round trips, each re-authorising server-side.
+      const changes: RecurringShiftChange[] = [];
       for (const [employeeId, employeeDirty] of Object.entries(snapshot)) {
         for (const [dayKey, newValue] of Object.entries(employeeDirty)) {
-          const day = Number(dayKey);
-          if (newValue) {
-            await upsertRecurringShift(employeeId, orgId, day, newValue, todayKey);
-          } else {
-            await deleteRecurringShift(employeeId, day, orgId);
-          }
+          changes.push({ employeeId, dayOfWeek: Number(dayKey), input: newValue ?? null });
           savedKeys.add(`${employeeId}:${dayKey}`);
         }
+      }
+
+      if (changes.length > 0) {
+        await saveRecurringShifts(orgId, changes, todayKey);
       }
 
       await queryClient.invalidateQueries({

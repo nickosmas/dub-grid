@@ -202,7 +202,9 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-# NOTE: Set to true in production (Supabase dashboard). Kept false for local dev (no SMTP).
+# NOTE: The invite flow no longer depends on this either way — /api/invitations/register
+# creates invited accounts with email_confirm: true, since the invitation link was mailed
+# to that address. Kept false for local dev (no SMTP).
 enable_confirmations = false
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = true

@@ -9,7 +9,6 @@ import {
   startGridmasterImpersonation,
 } from "@/features/gridmaster/client";
 import { setImpersonationCookie, clearImpersonationCookie } from "@/lib/impersonation";
-import { clearPermsCache } from "@/features/permissions/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
 import type { Organization, OrganizationUser } from "@/types";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle } from "@/lib/styles";
@@ -144,7 +143,6 @@ export default function EnhancedImpersonation({
         justification: trimmedJustification,
         expiresAt: result.expiresAt,
       });
-      clearPermsCache();
       queryClient.clear();
       fetch("/api/notify-impersonation", {
         method: "POST",
@@ -188,7 +186,6 @@ export default function EnhancedImpersonation({
       // Best-effort — clearing cookie is what matters
     }
     clearImpersonationCookie();
-    clearPermsCache();
     queryClient.clear();
     setSessionId(null);
     setExpiresAt(null);

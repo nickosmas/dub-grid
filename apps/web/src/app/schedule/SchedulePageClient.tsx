@@ -170,6 +170,9 @@ import {
   widenFetchWindow,
   type ScheduleOperation,
 } from "./_lib/operations";
+import { useQueryClient } from "@tanstack/react-query";
+import { buildScheduleNoteMap } from "./_lib/schedule-window";
+import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
   Employee,
@@ -313,6 +316,9 @@ function SchedulerContent() {
   // "sync loaded window to current view" effect further down).
   const defaultShiftFetchStart = useMemo(() => formatDateKey(addDays(today, -90)), [today]);
   const defaultShiftFetchEnd = useMemo(() => formatDateKey(addDays(today, 90)), [today]);
+
+  // Holds the schedule window snapshot across navigations — see _lib/schedule-cache.
+  const queryClient = useQueryClient();
 
   // The currently-loaded shift/notes window. Starts at the ±90-day default,
   // then widens (or recenters, for a far jump) to follow wherever the user
@@ -863,27 +869,16 @@ function SchedulerContent() {
         ),
         fetchScheduleNotes(org.id, start, end),
       ]);
-      const noteMap: Record<
-        string,
-        {
-          indicatorTypeId: number;
-          status: "published" | "draft" | "draft_deleted";
-        }[]
-      > = {};
-      for (const note of noteRows) {
-        const key =
-          note.focusAreaId != null
-            ? `${note.empId}_${note.date}_${note.focusAreaId}`
-            : `${note.empId}_${note.date}`;
-        if (!noteMap[key]) noteMap[key] = [];
-        noteMap[key].push({
-          indicatorTypeId: note.indicatorTypeId,
-          status: note.status,
-        });
-      }
+      const noteMap = buildScheduleNoteMap(noteRows);
       setShifts(shiftData);
       setNotes(noteMap);
       setLoadedShiftWindow({ start, end });
+      writeScheduleWindow(queryClient, org.id, {
+        window: { start, end },
+        shifts: shiftData,
+        notes: noteMap,
+        canEditShifts: canEditShiftsRef.current,
+      });
       lastRefetchAtRef.current = Date.now();
       return { shiftData, noteMap };
     },
@@ -929,6 +924,18 @@ function SchedulerContent() {
     scheduleLoadStarted.current = true;
     initialLoadUsedEditPerms.current = canEditShifts;
     const orgId = org.id;
+
+    // Paint the previous visit's grid immediately while the fetch below
+    // refreshes it. Coming back to /schedule otherwise blocked on refetching
+    // the whole default window before anything rendered. readScheduleWindow
+    // returns null unless the snapshot is this org's and was taken under the
+    // same edit permission, so a stale or wrong-shaped grid never shows.
+    const cachedWindow = readScheduleWindow(queryClient, orgId, canEditShifts);
+    if (cachedWindow) {
+      setShifts(cachedWindow.shifts);
+      setNotes(cachedWindow.notes);
+      setLoadedShiftWindow(cachedWindow.window);
+    }
 
     async function fetchCurrentUser(): Promise<{
       id: string;
@@ -1011,26 +1018,15 @@ function SchedulerContent() {
           () => [] as PublishHistoryEntry[],
         );
 
-        const noteMap: Record<
-          string,
-          {
-            indicatorTypeId: number;
-            status: "published" | "draft" | "draft_deleted";
-          }[]
-        > = {};
-        for (const note of noteRows) {
-          const key =
-            note.focusAreaId != null
-              ? `${note.empId}_${note.date}_${note.focusAreaId}`
-              : `${note.empId}_${note.date}`;
-          if (!noteMap[key]) noteMap[key] = [];
-          noteMap[key].push({
-            indicatorTypeId: note.indicatorTypeId,
-            status: note.status,
-          });
-        }
+        const noteMap = buildScheduleNoteMap(noteRows);
         setShifts(shiftData);
         setNotes(noteMap);
+        writeScheduleWindow(queryClient, orgId, {
+          window: { start: defaultShiftFetchStart, end: defaultShiftFetchEnd },
+          shifts: shiftData,
+          notes: noteMap,
+          canEditShifts,
+        });
         setRecurringShifts(recShifts);
         setCalloffOpenShifts(initialCalloffOpenShifts);
         setPublishedDateRanges(initialPublishedDateRanges);
@@ -3497,6 +3493,10 @@ function SchedulerContent() {
           ...Object.keys(session.draftNotes).map(Number),
         ]);
 
+        // Collect first, then fire together. Each note write is its own HTTP
+        // round trip and they target distinct (indicator, focus area) rows on
+        // one cell, so awaiting them one at a time only serialised them.
+        const noteWrites: Array<() => Promise<unknown>> = [];
         for (const focusAreaId of focusAreaIds) {
           const baseEntries = session.baseNotes[focusAreaId] ?? [];
           const draftEntries = session.draftNotes[focusAreaId] ?? [];
@@ -3515,26 +3515,31 @@ function SchedulerContent() {
             if (baseStatus === draftStatus) continue;
 
             if (draftStatus && draftStatus !== "draft_deleted") {
-              await upsertScheduleNote(
-                orgId,
-                panel.empId,
-                formatDateKey(panel.date),
-                indicatorTypeId,
-                focusAreaId,
-                baseStatus,
+              noteWrites.push(() =>
+                upsertScheduleNote(
+                  orgId,
+                  panel.empId,
+                  formatDateKey(panel.date),
+                  indicatorTypeId,
+                  focusAreaId,
+                  baseStatus,
+                ),
               );
             } else if (baseStatus) {
-              await deleteScheduleNote(
-                orgId,
-                panel.empId,
-                formatDateKey(panel.date),
-                indicatorTypeId,
-                focusAreaId,
-                baseStatus,
+              noteWrites.push(() =>
+                deleteScheduleNote(
+                  orgId,
+                  panel.empId,
+                  formatDateKey(panel.date),
+                  indicatorTypeId,
+                  focusAreaId,
+                  baseStatus,
+                ),
               );
             }
           }
         }
+        await Promise.all(noteWrites.map((write) => write()));
 
         const refreshed = await refetchScheduleDataRef.current();
         const realtimeDiff = refreshed
