@@ -170,7 +170,9 @@ import {
   widenFetchWindow,
   type ScheduleOperation,
 } from "./_lib/operations";
+import { useQueryClient } from "@tanstack/react-query";
 import { buildScheduleNoteMap } from "./_lib/schedule-window";
+import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
   Employee,
@@ -314,6 +316,9 @@ function SchedulerContent() {
   // "sync loaded window to current view" effect further down).
   const defaultShiftFetchStart = useMemo(() => formatDateKey(addDays(today, -90)), [today]);
   const defaultShiftFetchEnd = useMemo(() => formatDateKey(addDays(today, 90)), [today]);
+
+  // Holds the schedule window snapshot across navigations — see _lib/schedule-cache.
+  const queryClient = useQueryClient();
 
   // The currently-loaded shift/notes window. Starts at the ±90-day default,
   // then widens (or recenters, for a far jump) to follow wherever the user
@@ -868,6 +873,12 @@ function SchedulerContent() {
       setShifts(shiftData);
       setNotes(noteMap);
       setLoadedShiftWindow({ start, end });
+      writeScheduleWindow(queryClient, org.id, {
+        window: { start, end },
+        shifts: shiftData,
+        notes: noteMap,
+        canEditShifts: canEditShiftsRef.current,
+      });
       lastRefetchAtRef.current = Date.now();
       return { shiftData, noteMap };
     },
@@ -913,6 +924,18 @@ function SchedulerContent() {
     scheduleLoadStarted.current = true;
     initialLoadUsedEditPerms.current = canEditShifts;
     const orgId = org.id;
+
+    // Paint the previous visit's grid immediately while the fetch below
+    // refreshes it. Coming back to /schedule otherwise blocked on refetching
+    // the whole default window before anything rendered. readScheduleWindow
+    // returns null unless the snapshot is this org's and was taken under the
+    // same edit permission, so a stale or wrong-shaped grid never shows.
+    const cachedWindow = readScheduleWindow(queryClient, orgId, canEditShifts);
+    if (cachedWindow) {
+      setShifts(cachedWindow.shifts);
+      setNotes(cachedWindow.notes);
+      setLoadedShiftWindow(cachedWindow.window);
+    }
 
     async function fetchCurrentUser(): Promise<{
       id: string;
@@ -998,6 +1021,12 @@ function SchedulerContent() {
         const noteMap = buildScheduleNoteMap(noteRows);
         setShifts(shiftData);
         setNotes(noteMap);
+        writeScheduleWindow(queryClient, orgId, {
+          window: { start: defaultShiftFetchStart, end: defaultShiftFetchEnd },
+          shifts: shiftData,
+          notes: noteMap,
+          canEditShifts,
+        });
         setRecurringShifts(recShifts);
         setCalloffOpenShifts(initialCalloffOpenShifts);
         setPublishedDateRanges(initialPublishedDateRanges);
