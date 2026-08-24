@@ -213,7 +213,7 @@ function BillingRowActions({
       >
         End period
       </Button>
-      <button
+      <Button
         type="button"
         className="dg-btn dg-btn-danger dg-btn-xs"
         // No Stripe subscription = nothing to cancel; use Override to change a
@@ -222,7 +222,7 @@ function BillingRowActions({
         onClick={() => onCancel(org)}
       >
         Cancel
-      </button>
+      </Button>
       <CustomSelect
         ariaLabel={`Billing status for ${org.orgName}`}
         value={status}

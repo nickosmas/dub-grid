@@ -472,6 +472,7 @@ export default function NotificationBell({
                     onClick={() => {
                       if (isUnread) return handleMarkRead(n.id);
                     }}
+                    spinner={false}
                     aria-label={`${n.title}: ${n.message}${isUnread ? " (unread, click to mark as read)" : ""}`}
                     style={{
                       display: "flex",
