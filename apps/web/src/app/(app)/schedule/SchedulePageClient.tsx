@@ -15,7 +15,7 @@ import MonthView from "@/components/MonthView";
 import { EmptyState } from "@/components/EmptyState";
 import PrintLegend from "@/components/PrintLegend";
 import type { PrintConfig } from "@/components/PrintOptionsModal";
-import ChangeLegend from "@/components/ChangeLegend";
+import ChangeCountChips from "@/components/ChangeCountChips";
 import DraftBanner from "@/components/DraftBanner";
 import DraftReviewSummary from "@/components/DraftReviewSummary";
 import PublishHistoryPanel from "@/components/PublishHistoryPanel";
@@ -407,7 +407,6 @@ function SchedulerContent() {
     count: number;
     dateRange: string;
   } | null>(null);
-  const [showDiffOverlay, setShowDiffOverlay] = useState(false);
   const [pendingSeriesDelete, setPendingSeriesDelete] = useState<{
     seriesId: string;
     shiftCount: number;
@@ -566,13 +565,6 @@ function SchedulerContent() {
   );
 
   const hasUnpublishedChanges = draftBreakdown.totalChanges > 0;
-
-  // Adapts the diff-toggle label between "Show Changes" (when modified/
-  // deleted drafts have a hidden baseline worth revealing) and
-  // "Highlight New" (when every draft is brand-new — the overlay only
-  // outlines what's already drawn).
-  const hasRevealableDraftChanges =
-    draftBreakdown.modifiedShifts > 0 || draftBreakdown.deletedShifts > 0;
 
   const publishSummary = useMemo(
     () => formatDraftBreakdownSummary(draftBreakdown),
@@ -1293,26 +1285,23 @@ function SchedulerContent() {
     return map;
   }, [inWindowPublishHistory]);
 
-  // Same logic as drafts: only "modified" / "deleted" entries reveal hidden
-  // state when the publish-diff overlay is on. An all-"new" publish history
-  // would just ring every cell green.
-  const publishHasRevealableChanges = useMemo(() => {
-    if (!publishChangesMap) return false;
+  // What the "Highlight Changes" toggle puts on the grid, counted by kind so
+  // the banner can name and key each one. A publish can carry any mix of new,
+  // edited and deleted cells.
+  const publishChangeCounts = useMemo(() => {
+    const counts = { newShifts: 0, modifiedShifts: 0, deletedShifts: 0 };
+    if (!publishChangesMap) return counts;
     for (const change of publishChangesMap.values()) {
-      if (change.kind !== "new") return true;
+      if (change.kind === "new") counts.newShifts += 1;
+      else if (change.kind === "deleted") counts.deletedShifts += 1;
+      else counts.modifiedShifts += 1;
     }
-    return false;
+    return counts;
   }, [publishChangesMap]);
 
   // Defensive bookkeeping: when the banner that hosts the toggle unmounts,
   // clear the overlay state so it doesn't come back on stuck-true the next
-  // time drafts/publishes appear.
-  useEffect(() => {
-    if (!hasUnpublishedChanges && showDiffOverlay) {
-      setShowDiffOverlay(false);
-    }
-  }, [hasUnpublishedChanges, showDiffOverlay]);
-
+  // time a publish appears.
   useEffect(() => {
     if (inWindowPublishHistory.length === 0 && showPublishDiff) {
       setShowPublishDiff(false);
@@ -2594,11 +2583,18 @@ function SchedulerContent() {
 
   const draftKindForKey = useCallback(
     (empId: string, date: Date): DraftKind => {
-      if (!draftCheckComplete) return null;
+      // `paintedFromSnapshot` counts as draft data being here: the snapshot is
+      // only read back when it was taken under this same `canEditShifts`, so
+      // its entries already carry their draft kinds. Waiting on
+      // `draftCheckComplete` alone drew every draft pill with a published
+      // (solid) border for the length of the initial fetch — while DraftBanner,
+      // reading the same `shifts`, was already counting those drafts — and then
+      // snapped them to dashed once the fetch landed.
+      if (!draftCheckComplete && !paintedFromSnapshot) return null;
       if (!canEditShifts) return null;
       return shifts[`${empId}_${formatDateKey(date)}`]?.draftKind ?? null;
     },
-    [shifts, draftCheckComplete, canEditShifts],
+    [shifts, draftCheckComplete, paintedFromSnapshot, canEditShifts],
   );
 
   const fromRecurringForKey = useCallback(
@@ -4522,7 +4518,6 @@ function SchedulerContent() {
 
       setShowPublishDiff(false);
       closeEditPanel();
-      setShowDiffOverlay(false);
       toast.success("Schedule published");
 
       // Notify affected employees about the published schedule
@@ -4596,7 +4591,6 @@ function SchedulerContent() {
         // view, not a failed discard.
         setShowDiscardConfirm(false);
         closeEditPanel();
-        setShowDiffOverlay(false);
         toast.success(discardAll ? "All changes discarded" : "Your changes discarded");
 
         if (discardAll) {
@@ -4864,7 +4858,6 @@ function SchedulerContent() {
         isCellInteractive: canEditShifts || canEditNotes || !!currentEmpId,
         canDragShifts: canEditShifts,
         shiftDisplayMode: org?.shiftDisplayMode ?? "code",
-        showDiffOverlay,
         showPublishDiffOverlay: showPublishDiff,
         showAudit,
         accessors: {
@@ -4914,7 +4907,6 @@ function SchedulerContent() {
       canEditNotes,
       currentEmpId,
       org?.shiftDisplayMode,
-      showDiffOverlay,
       showPublishDiff,
       showAudit,
       shiftForKey,
@@ -5130,7 +5122,7 @@ function SchedulerContent() {
   // can't be taken away. Modals stop the event before it reaches us, and the
   // state guards below keep us off any overlay that owns its own Escape.
   const canExitModeWithEscape =
-    (showPublishDiff || showDiffOverlay || isBulkDeleteMode) &&
+    (showPublishDiff || isBulkDeleteMode) &&
     !editPanel &&
     !contextMenu &&
     !pendingClearShift &&
@@ -5148,7 +5140,6 @@ function SchedulerContent() {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       setShowPublishDiff(false);
-      setShowDiffOverlay(false);
       handleCancelBulkDeleteMode();
     };
     document.addEventListener("keydown", handleEscape);
@@ -5499,9 +5490,6 @@ function SchedulerContent() {
                 isPublishing={isPublishing}
                 isCanceling={cancelingMode !== null}
                 breakdown={draftBreakdown}
-                showDiff={showDiffOverlay}
-                onToggleDiff={() => setShowDiffOverlay((v) => !v)}
-                diffMode={hasRevealableDraftChanges ? "changes" : "highlight"}
                 canPublish={canPublishSchedule}
               />
             )}
@@ -5673,10 +5661,6 @@ function SchedulerContent() {
               !publishBannerDismissed &&
               (() => {
                 const latest = inWindowPublishHistory[0];
-                const totalChanges = inWindowPublishHistory.reduce(
-                  (sum, e) => sum + e.changeCount,
-                  0,
-                );
                 return (
                   <div
                     className="dg-draft-banner no-print"
@@ -5703,13 +5687,15 @@ function SchedulerContent() {
                         return `${days} day${days !== 1 ? "s" : ""} ago`;
                       })()}
                     </span>
-                    <span style={{ opacity: 0.7, marginLeft: 4 }}>
-                      {totalChanges} change{totalChanges !== 1 ? "s" : ""}
-                      {inWindowPublishHistory.length > 1
-                        ? ` across ${inWindowPublishHistory.length} publishes`
-                        : ""}
-                    </span>
-                    {!isMobile && showPublishDiff && <ChangeLegend />}
+                    {/* The counts are the key: each kind is named, counted
+                        and colored once, and only the kinds this publish
+                        actually contains appear at all. */}
+                    <ChangeCountChips counts={publishChangeCounts} />
+                    {inWindowPublishHistory.length > 1 && (
+                      <span style={{ opacity: 0.7, marginLeft: 4 }}>
+                        across {inWindowPublishHistory.length} publishes
+                      </span>
+                    )}
                     <div className="dg-draft-banner-actions">
                       {isMobile ? (
                         // Publish History's "Show on Grid" reaches the overlay
@@ -5726,7 +5712,7 @@ function SchedulerContent() {
                               color: "var(--color-accent-text)",
                             }}
                           >
-                            {publishHasRevealableChanges ? "Hide Changes" : "Hide Highlights"}
+                            Hide Changes
                           </Button>
                         ) : (
                           <span
@@ -5742,11 +5728,7 @@ function SchedulerContent() {
                       ) : (
                         <>
                           <Hint
-                            content={hint(
-                              publishHasRevealableChanges
-                                ? "Highlight differences from the published schedule"
-                                : "Outline the newly published shifts",
-                            )}
+                            content={hint("Highlight this publish's changes on the grid")}
                             side="bottom"
                           >
                             <Button
@@ -5759,13 +5741,7 @@ function SchedulerContent() {
                                 color: showPublishDiff ? "var(--color-accent-text)" : undefined,
                               }}
                             >
-                              {publishHasRevealableChanges
-                                ? showPublishDiff
-                                  ? "Hide Changes"
-                                  : "Show What Changed"
-                                : showPublishDiff
-                                  ? "Hide Highlights"
-                                  : "Highlight New"}
+                              {showPublishDiff ? "Hide Changes" : "Highlight Changes"}
                             </Button>
                           </Hint>
                           <Button
@@ -6784,9 +6760,11 @@ function SchedulerContent() {
                 resetPublishBanner();
               }}
               assignments={assignments}
-              assignmentLabelMap={assignmentLabelMap}
+              shiftCategories={shiftCategories}
+              jobs={jobs}
+              focusAreas={focusAreas}
               employees={employees}
-              absenceTypeMap={absenceTypeMap}
+              absenceTypes={allAbsenceTypes}
             />
           )}
           {activeOperation && (

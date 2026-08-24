@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { PublicRoute } from "@/components/RouteGuards";
+import { Form } from "@/components/Form";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
@@ -251,7 +252,7 @@ function AcceptInviteContent() {
               )}
             </p>
 
-            <form
+            <Form
               onSubmit={handleSubmit}
               style={{ display: "flex", flexDirection: "column", gap: 16 }}
             >
@@ -414,7 +415,7 @@ function AcceptInviteContent() {
                   {existingAccount ? "Sign In & Accept" : "Set Password & Accept"}
                 </ButtonLoading>
               </button>
-            </form>
+            </Form>
           </>
         )}
       </Card>

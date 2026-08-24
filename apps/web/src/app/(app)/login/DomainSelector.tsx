@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
+import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import { getValidPort, buildSubdomainHost, RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
@@ -139,7 +140,7 @@ export default function DomainSelector() {
             Enter your organization&apos;s subdomain to sign in.
           </p>
 
-          <form onSubmit={handleContinue}>
+          <Form onSubmit={handleContinue}>
             <SubdomainField
               value={slug}
               onChange={(v) => {
@@ -182,7 +183,7 @@ export default function DomainSelector() {
                 Need help finding your subdomain?
               </Button>
             </div>
-          </form>
+          </Form>
         </Card>
 
         {showHelp && (

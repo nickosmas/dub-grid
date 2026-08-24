@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
-import { Suspense } from "react";
 import { DM_Sans, DM_Mono } from "next/font/google";
 import { createStaticWebCssVariables, createThemedCssText } from "@dubgrid/design-tokens";
 import { createThemeSeedScript } from "@/lib/theme-preference";
@@ -35,31 +34,19 @@ export const metadata: Metadata = {
   },
 };
 
-import AuthProvider from "@/components/AuthProvider";
-import QueryProvider from "@/components/QueryProvider";
-import AppShell from "@/components/AppShell";
-import { MobileSubNavProvider } from "@/components/MobileSubNavContext";
-import { NavigationGuardProvider } from "@/components/NavigationGuardProvider";
 import ConsentGatedAnalytics from "@/components/ConsentGatedAnalytics";
 import { cn } from "@/lib/utils";
-import { TooltipProvider } from "@/components/ui/hint";
-import { TOOLTIP_DELAY_MS } from "@/lib/constants";
 import CookieConsent from "@/components/CookieConsent";
-import OnboardingGate from "@/components/onboarding/OnboardingGate";
 
-import PostHogProvider from "@/components/PostHogProvider";
 import AppToaster from "@/components/AppToaster";
 import WebVitals from "@/components/WebVitals";
 import ThemeProvider from "@/components/ThemeProvider";
-import { isFeatureEnabled } from "@/lib/feature-flags";
 
 const staticWebCssVariables = createStaticWebCssVariables() as CSSProperties;
 const themedCssText = createThemedCssText();
 const themeSeedScript = createThemeSeedScript();
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const posthogEnabled = await isFeatureEnabled("posthog");
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
@@ -81,32 +68,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body suppressHydrationWarning>
         <ThemeProvider>
-          <AuthProvider>
-            <PostHogProvider enabled={posthogEnabled}>
-              <QueryProvider>
-                {/* No Suspense boundary here on purpose. It used to wrap this
-                    whole subtree — every page — to satisfy OnboardingGate's
-                    useSearchParams(). Next renders a boundary's fallback into
-                    the static HTML when something inside reads search params,
-                    so `fallback={null}` meant every prerendered route shipped
-                    HTML with no page content in it, and nothing could paint
-                    until the bundle had downloaded and hydrated. The gate now
-                    owns a tight boundary around only the part that reads
-                    them. */}
-                <OnboardingGate>
-                  <MobileSubNavProvider>
-                    <TooltipProvider delay={TOOLTIP_DELAY_MS}>
-                      {/* Wraps the whole shell so it sees every nav link,
-                          not just the ones inside a given page. */}
-                      <NavigationGuardProvider>
-                        <AppShell>{children}</AppShell>
-                      </NavigationGuardProvider>
-                    </TooltipProvider>
-                  </MobileSubNavProvider>
-                </OnboardingGate>
-              </QueryProvider>
-            </PostHogProvider>
-          </AuthProvider>
+          {/* Only what every page needs. The auth, query and nav-shell
+              providers moved to (app)/layout.tsx so the marketing pages stop
+              paying for a session they do not have — see the note there. */}
+          {children}
           <AppToaster />
           <CookieConsent />
           <ConsentGatedAnalytics />

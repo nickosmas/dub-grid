@@ -2091,9 +2091,11 @@ html[data-dragging] .dg-grid-cell[data-locked="true"] {
   background: var(--color-success-bg);
   color: var(--color-success-text);
 }
+/* Amber, not brand: this chip keys the grid's own "edited" tone, and a
+   brand-tinted chip next to an amber cell reads as a different thing. */
 .dg-draft-chip--modified {
-  background: var(--color-brand-bg);
-  color: var(--color-brand);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
 }
 .dg-draft-chip--deleted {
   background: var(--color-danger-bg);

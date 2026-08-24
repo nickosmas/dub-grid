@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import CustomSelect from "@/components/CustomSelect";
+import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { openConsentPreferences } from "@/components/CookieConsent";
@@ -277,7 +278,7 @@ export default function RequestDemoPage() {
             Tell us about your organization and we&apos;ll be in touch.
           </p>
 
-          <form onSubmit={handleSubmit}>
+          <Form onSubmit={handleSubmit}>
             <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
               {/* Contact Name */}
               <div>
@@ -409,7 +410,7 @@ export default function RequestDemoPage() {
                 Submit Request
               </ButtonLoading>
             </button>
-          </form>
+          </Form>
         </div>
       )}
 

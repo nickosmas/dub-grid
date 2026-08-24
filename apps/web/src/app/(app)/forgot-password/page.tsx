@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PublicRoute } from "@/components/RouteGuards";
+import { Form } from "@/components/Form";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
@@ -78,7 +79,7 @@ function ForgotPasswordContent() {
               Enter your email address and we&apos;ll send you a link to reset your password.
             </p>
 
-            <form
+            <Form
               onSubmit={handleSubmit}
               style={{
                 display: "flex",
@@ -122,7 +123,7 @@ function ForgotPasswordContent() {
                   Send Reset Link
                 </ButtonLoading>
               </button>
-            </form>
+            </Form>
 
             <div
               style={{

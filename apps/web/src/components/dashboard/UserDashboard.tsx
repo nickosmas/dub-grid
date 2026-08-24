@@ -16,7 +16,7 @@ import {
 } from "@dubgrid/schedule-core";
 import type { OpenShiftVisibility } from "@dubgrid/domain";
 import { getAvatarTone, getHeroGradientCss, heroGradientTokens } from "@dubgrid/design-tokens";
-import { isEmployeeEligibleForOpenShift } from "@/app/schedule/_lib/open-shifts";
+import { isEmployeeEligibleForOpenShift } from "@/app/(app)/schedule/_lib/open-shifts";
 import type {
   AbsenceType,
   AssignmentDefinition,
