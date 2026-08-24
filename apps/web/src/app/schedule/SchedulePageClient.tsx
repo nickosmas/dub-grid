@@ -1585,6 +1585,18 @@ function SchedulerContent() {
           segmentCompatibility,
         );
         setShifts(draftShifts);
+        // Restamp the snapshot under the permission it was actually fetched
+        // with. Without this the entry keeps the canEditShifts=false written by
+        // the initial load, which ran before permissions resolved — and every
+        // later visit, arriving with permissions already cached and true, would
+        // mismatch and refetch the whole window. That is a guaranteed miss for
+        // exactly the schedulers and admins who use this page most.
+        writeScheduleWindow(queryClient, org.id, {
+          window: { start: shiftFetchStart, end: shiftFetchEnd },
+          shifts: draftShifts,
+          notes: notesRef.current,
+          canEditShifts: true,
+        });
       } catch (err) {
         Sentry.captureException(err);
       } finally {

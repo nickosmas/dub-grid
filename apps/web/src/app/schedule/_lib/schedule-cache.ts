@@ -31,6 +31,14 @@ export function writeScheduleWindow(
   orgId: string,
   value: CachedScheduleWindow,
 ): void {
+  // Nothing calls useQuery on this key — it is written and read imperatively —
+  // so the entry has no observer, and React Query garbage-collects unobserved
+  // entries once gcTime elapses. On this client that default is 5 minutes,
+  // which quietly capped the snapshot's usefulness at "came back within five
+  // minutes". It is dropped by queryClient.clear() on org switch,
+  // impersonation and logout, and a sandbox change hard-reloads the page, so
+  // nothing depends on the timer to expire it.
+  queryClient.setQueryDefaults(scheduleWindowKey(orgId), { gcTime: Infinity });
   queryClient.setQueryData(scheduleWindowKey(orgId), value);
 }
 
