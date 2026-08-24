@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/Button";
 import { fetchAccountIdentity } from "@/features/account/client";
+import dynamic from "next/dynamic";
 import { DubGridLogo } from "@/components/Logo";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getAvatarInitials } from "@/lib/utils";
@@ -28,9 +29,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import GridmasterDashboard from "@/components/gridmaster/GridmasterDashboard";
-import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
-import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
 import {
   DashboardIcon,
   PeopleIcon,
@@ -47,15 +45,51 @@ import {
   type NavIconProps,
 } from "@/components/icons/NavIcons";
 
-import AllUsersView from "@/components/gridmaster/AllUsersView";
-import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
-import GridmasterBillingView from "@/components/gridmaster/GridmasterBillingView";
-import GridmasterComplianceView from "@/components/gridmaster/GridmasterComplianceView";
-import GridmasterSecurityView from "@/components/gridmaster/GridmasterSecurityView";
-import PlatformFeatureFlagsView from "@/components/gridmaster/PlatformFeatureFlagsView";
-import AuditLogView from "@/components/gridmaster/AuditLogView";
-import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation";
-import ImpersonationHistory from "@/components/gridmaster/ImpersonationHistory";
+// Each view is fetched when its tab is opened. The portal renders exactly one
+// at a time — the body below is a chain of `view === "..."` guards — but
+// importing them statically pulled all twelve, ~9,500 lines, for whichever
+// single one a gridmaster actually opened. OrganizationSetupWizard alone is
+// 2,258 of those and is reached from one button.
+const GridmasterDashboard = dynamic(() => import("@/components/gridmaster/GridmasterDashboard"), {
+  ssr: false,
+});
+const OrganizationDetail = dynamic(() => import("@/components/gridmaster/OrganizationDetail"), {
+  ssr: false,
+});
+const OrganizationSetupWizard = dynamic(
+  () => import("@/components/gridmaster/OrganizationSetupWizard"),
+  { ssr: false },
+);
+const AllUsersView = dynamic(() => import("@/components/gridmaster/AllUsersView"), { ssr: false });
+const GridmasterAccountsView = dynamic(
+  () => import("@/components/gridmaster/GridmasterAccountsView"),
+  { ssr: false },
+);
+const GridmasterBillingView = dynamic(
+  () => import("@/components/gridmaster/GridmasterBillingView"),
+  { ssr: false },
+);
+const GridmasterComplianceView = dynamic(
+  () => import("@/components/gridmaster/GridmasterComplianceView"),
+  { ssr: false },
+);
+const GridmasterSecurityView = dynamic(
+  () => import("@/components/gridmaster/GridmasterSecurityView"),
+  { ssr: false },
+);
+const PlatformFeatureFlagsView = dynamic(
+  () => import("@/components/gridmaster/PlatformFeatureFlagsView"),
+  { ssr: false },
+);
+const AuditLogView = dynamic(() => import("@/components/gridmaster/AuditLogView"), { ssr: false });
+const EnhancedImpersonation = dynamic(
+  () => import("@/components/gridmaster/EnhancedImpersonation"),
+  { ssr: false },
+);
+const ImpersonationHistory = dynamic(() => import("@/components/gridmaster/ImpersonationHistory"), {
+  ssr: false,
+});
+
 import NotificationBell from "@/components/NotificationBell";
 import ProgressBar from "@/components/ProgressBar";
 import { InboxView as AlertsInboxView } from "@/app/alerts/AlertsInboxPage";
