@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
       extra: { context: "organizations/invitations:get", orgId: effectiveOrgId },
     });
     logger.error({ error: err, orgId: effectiveOrgId }, "Invitation fetch failed");
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }
 
@@ -200,7 +200,7 @@ export async function PATCH(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -325,7 +325,7 @@ export async function PATCH(req: NextRequest) {
       extra: { context: "organizations/invitations", orgId, invitationId },
     });
     logger.error({ error: err, orgId, invitationId }, "Invitation update failed");
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }
 
@@ -341,7 +341,7 @@ export async function DELETE(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -422,7 +422,7 @@ export async function DELETE(req: NextRequest) {
       extra: { context: "organizations/invitations", orgId, invitationId },
     });
     logger.error({ error: err, orgId, invitationId }, "Invitation revocation failed");
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }
 
@@ -438,7 +438,7 @@ export async function POST(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -542,6 +542,6 @@ export async function POST(req: NextRequest) {
       extra: { context: "organizations/invitations", orgId, invitationId },
     });
     logger.error({ error: err, orgId, invitationId }, "Invitation resend failed");
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }

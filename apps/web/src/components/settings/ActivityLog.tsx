@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
+import { Button } from "@/components/Button";
 import type { FullAuditLogEntry } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { CloseButton } from "@/components/ui/CloseButton";
@@ -18,6 +19,7 @@ import {
   groupByDate,
   getAuditActorLabel,
   getAuditActorSecondaryLabel,
+  getAuditCategoryLabel,
   getAuditTargetLabel,
 } from "@/lib/activity-log-utils";
 import type { DetailItem } from "@/lib/activity-log-utils";
@@ -116,7 +118,7 @@ function Toolbar({
         </span>
         <input
           type="text"
-          placeholder="Search activity..."
+          placeholder="Search activity"
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           style={{
@@ -173,11 +175,7 @@ function DateGroupRow({ label, colSpan }: { label: string; colSpan: number }) {
 }
 
 function ActionBadge({ action }: { action: string }) {
-  const severity = getActionSeverity(action);
-  const colors = severityColor(severity);
-  const category = ACTIVITY_CATEGORIES.find(
-    (c) => c.prefixes.length > 0 && c.prefixes.some((p) => action.startsWith(p)),
-  );
+  const colors = severityColor(getActionSeverity(action));
   return (
     <span
       style={{
@@ -191,7 +189,7 @@ function ActionBadge({ action }: { action: string }) {
         whiteSpace: "nowrap",
       }}
     >
-      {category?.label ?? "Other"}
+      {getAuditCategoryLabel(action)}
     </span>
   );
 }
@@ -277,22 +275,22 @@ function Pagination({
         Showing {start}–{end}
       </span>
       <div style={{ display: "flex", gap: 8 }}>
-        <button
+        <Button
           className="dg-btn dg-btn-secondary dg-btn-sm"
           onClick={() => onPageChange(page - 1)}
           disabled={!hasPrev}
           style={{ opacity: hasPrev ? 1 : 0.4 }}
         >
           Previous
-        </button>
-        <button
+        </Button>
+        <Button
           className="dg-btn dg-btn-secondary dg-btn-sm"
           onClick={() => onPageChange(page + 1)}
           disabled={!hasNext}
           style={{ opacity: hasNext ? 1 : 0.4 }}
         >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -336,12 +334,11 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Single-prefix categories can be server-filtered
-  const serverPrefix = useMemo(() => {
-    const cat = ACTIVITY_CATEGORIES.find((c) => c.value === categoryFilter);
-    if (!cat || cat.prefixes.length !== 1) return undefined;
-    return cat.prefixes[0];
-  }, [categoryFilter]);
+  // Every category filters server-side, so the page counts stay honest.
+  const serverPrefixes = useMemo(
+    () => ACTIVITY_CATEGORIES.find((c) => c.value === categoryFilter)?.prefixes ?? [],
+    [categoryFilter],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -351,7 +348,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
       orgId,
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
-      actionPrefix: serverPrefix,
+      actionPrefixes: serverPrefixes.length > 0 ? serverPrefixes : undefined,
     })
       .then((data) => {
         if (!cancelled) setEntries(data);
@@ -367,7 +364,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [orgId, page, serverPrefix]);
+  }, [orgId, page, serverPrefixes]);
 
   const handleCategoryChange = (value: string) => {
     setCategoryFilter(value);
@@ -391,10 +388,10 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
   const filteredEntries = useMemo(() => {
     return entries.filter((e) => {
-      if (!serverPrefix && !matchesCategory(e.action, categoryFilter)) return false;
+      if (!matchesCategory(e.action, categoryFilter)) return false;
       return matchesSearch(e, searchQuery, descriptions.get(e.id) ?? "");
     });
-  }, [entries, categoryFilter, searchQuery, serverPrefix, descriptions]);
+  }, [entries, categoryFilter, searchQuery, descriptions]);
 
   const groups = useMemo(() => groupByDate(filteredEntries), [filteredEntries]);
 
@@ -430,7 +427,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
           }
           action={
             searchQuery || categoryFilter !== "all" ? (
-              <button
+              <Button
                 className="dg-btn dg-btn-secondary dg-btn-sm"
                 onClick={() => {
                   setSearchQuery("");
@@ -438,7 +435,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
                 }}
               >
                 Clear filters
-              </button>
+              </Button>
             ) : undefined
           }
         />

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -47,5 +47,55 @@ describe("ConfirmDialog", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalledOnce();
+  });
+
+  it("runs an async confirm once when it is double-clicked", async () => {
+    let settle!: () => void;
+    const onConfirm = vi.fn(() => new Promise<void>((resolve) => (settle = resolve)));
+
+    render(
+      <ConfirmDialog
+        title="Delete shift?"
+        message="This cannot be undone."
+        confirmLabel="Delete"
+        confirmPendingLabel="Deleting"
+        onConfirm={onConfirm}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    // Both clicks in one tick, with no await between them: `userEvent.click`
+    // flushes React in between, which would hide the very race this guards.
+    const confirmButton = screen.getByRole("button", { name: "Delete" });
+    act(() => {
+      fireEvent.click(confirmButton);
+      fireEvent.click(confirmButton);
+    });
+
+    expect(onConfirm).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: /Deleting/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+
+    await act(async () => {
+      settle();
+    });
+  });
+
+  it("lets a caller's own isLoading override the dialog's busy state", () => {
+    render(
+      <ConfirmDialog
+        title="Remove member?"
+        message="They lose access immediately."
+        confirmLabel="Remove"
+        confirmPendingLabel="Removing"
+        // The pending flag lives outside this dialog, keyed by row, so the
+        // dialog must defer to it rather than to its own idle latch.
+        isLoading
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: /Removing/ })).toBeDisabled();
   });
 });

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
+import { Button } from "@/components/Button";
 import { fetchTermsAcceptanceStatus } from "@/features/account/client";
 import { parseHost, type ParsedHost } from "@/lib/subdomain";
 
@@ -78,7 +79,7 @@ export function useSessionInvalidToast() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("error");
     if (code === "session_invalid") {
-      toast.error("Your session could not be verified. Please sign in again.");
+      toast.error("We couldn't verify your session. Sign in again.");
       // Clean the URL so a refresh doesn't re-show the toast
       window.history.replaceState({}, "", window.location.pathname);
     }
@@ -102,17 +103,17 @@ export function AccountDisabledModal({ onClose }: { onClose: () => void }) {
           color: "var(--color-text-secondary)",
         }}
       >
-        This account has been disabled by your organization. Please contact your administrator if
-        you believe this is a mistake.
+        Your organization disabled this account. Contact your administrator if you think that's a
+        mistake.
       </p>
-      <button
+      <Button
         type="button"
         onClick={onClose}
         className="dg-btn dg-btn-primary"
         style={{ width: "100%" }}
       >
         OK
-      </button>
+      </Button>
     </Modal>
   );
 }

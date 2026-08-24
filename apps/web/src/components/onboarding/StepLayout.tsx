@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Button } from "@/components/Button";
 
 interface StepLayoutProps {
   title: string;
@@ -82,7 +83,7 @@ export default function StepLayout({
         }}
       >
         {showBack && onBack && (
-          <button
+          <Button
             onClick={onBack}
             type="button"
             style={{
@@ -102,10 +103,10 @@ export default function StepLayout({
           >
             <ChevronLeft size={16} />
             {backLabel}
-          </button>
+          </Button>
         )}
         {onNext && (
-          <button
+          <Button
             onClick={onNext}
             disabled={nextDisabled || nextLoading}
             type="button"
@@ -134,7 +135,7 @@ export default function StepLayout({
               {nextLabel}
               <ChevronRight size={16} />
             </ButtonLoading>
-          </button>
+          </Button>
         )}
       </div>
     </div>

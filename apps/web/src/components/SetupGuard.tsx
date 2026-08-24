@@ -1,6 +1,7 @@
 "use client";
 
 import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
+import { Button } from "@/components/Button";
 import { useLogout } from "@/hooks";
 
 /**
@@ -101,7 +102,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
           </p>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
-          <button
+          <Button
             onClick={() => window.location.reload()}
             style={{
               padding: "10px 24px",
@@ -115,8 +116,8 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
             }}
           >
             Refresh
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => signOut()}
             style={{
               padding: "10px 24px",
@@ -130,7 +131,7 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
             }}
           >
             Sign Out
-          </button>
+          </Button>
         </div>
       </div>
     );

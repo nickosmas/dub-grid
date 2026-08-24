@@ -1,7 +1,9 @@
 "use client";
 
 import Modal from "@/components/Modal";
+import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 interface ConfirmDialogProps {
   title: string;
@@ -15,12 +17,17 @@ interface ConfirmDialogProps {
   confirmPendingLabel?: string;
   cancelLabel?: string;
   variant?: "danger" | "warning" | "info";
+  /**
+   * Overrides the busy state the dialog works out for itself. Only needed when
+   * the pending flag lives outside this confirm (a shared `actionLoading` keyed
+   * by row, say); an async `onConfirm` already spins on its own.
+   */
   isLoading?: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<unknown>;
   onCancel: () => void;
   secondaryConfirmLabel?: string;
   secondaryConfirmPendingLabel?: string;
-  onSecondaryConfirm?: () => void;
+  onSecondaryConfirm?: () => void | Promise<unknown>;
   isSecondaryLoading?: boolean;
   maxWidth?: number;
   wrapActions?: boolean;
@@ -35,18 +42,30 @@ export default function ConfirmDialog({
   confirmPendingLabel,
   cancelLabel = "Cancel",
   variant = "danger",
-  isLoading = false,
+  isLoading,
   onConfirm,
   onCancel,
   secondaryConfirmLabel,
   secondaryConfirmPendingLabel,
   onSecondaryConfirm,
-  isSecondaryLoading = false,
+  isSecondaryLoading,
   maxWidth = 420,
   wrapActions = false,
   confirmDisabled = false,
   secondaryConfirmDisabled = false,
 }: ConfirmDialogProps) {
+  // Confirming is the press most worth double-clicking: the dialog has just
+  // told the user something irreversible is about to happen, and a slow
+  // request leaves the button sitting there looking unpressed. The latch is
+  // synchronous, so the second click is dropped before React can re-render;
+  // `isRunning` only drives the spinner. A caller passing its own `isLoading`
+  // still wins, and a synchronous `onConfirm` never spins at all.
+  const confirm = useAsyncAction(onConfirm);
+  const secondaryConfirm = useAsyncAction(onSecondaryConfirm ?? (() => {}));
+
+  const confirmBusy = isLoading ?? confirm.isRunning;
+  const secondaryBusy = isSecondaryLoading ?? secondaryConfirm.isRunning;
+
   const confirmClass =
     variant === "danger" ? "dg-btn dg-btn-danger-filled" : "dg-btn dg-btn-primary";
 
@@ -54,7 +73,7 @@ export default function ConfirmDialog({
     variant === "warning" ? { background: "var(--color-warning)", border: "none" } : undefined;
 
   const descId = "confirm-dialog-desc";
-  const actionDisabled = isLoading || isSecondaryLoading;
+  const actionDisabled = confirmBusy || secondaryBusy;
   const cancelButtonStyle = wrapActions ? { marginRight: "auto", minWidth: 120 } : undefined;
   const confirmButtonStyle = wrapActions
     ? {
@@ -85,43 +104,43 @@ export default function ConfirmDialog({
           alignItems: "stretch",
         }}
       >
-        <button
+        <Button
           className="dg-btn dg-btn-secondary"
           onClick={onCancel}
           disabled={actionDisabled}
           style={cancelButtonStyle}
         >
           {cancelLabel}
-        </button>
-        <button
+        </Button>
+        <Button
           className={confirmClass}
           style={confirmButtonStyle}
-          onClick={onConfirm}
+          onClick={confirm.run}
           disabled={actionDisabled || confirmDisabled}
         >
           <ButtonLoading
-            loading={isLoading}
+            loading={confirmBusy}
             loadingLabel={confirmPendingLabel ?? confirmLabel}
             spinnerSize={16}
           >
             {confirmLabel}
           </ButtonLoading>
-        </button>
+        </Button>
         {secondaryConfirmLabel && onSecondaryConfirm && (
-          <button
+          <Button
             className={confirmClass}
             style={confirmButtonStyle}
-            onClick={onSecondaryConfirm}
+            onClick={secondaryConfirm.run}
             disabled={actionDisabled || secondaryConfirmDisabled}
           >
             <ButtonLoading
-              loading={isSecondaryLoading}
+              loading={secondaryBusy}
               loadingLabel={secondaryConfirmPendingLabel ?? secondaryConfirmLabel}
               spinnerSize={16}
             >
               {secondaryConfirmLabel}
             </ButtonLoading>
-          </button>
+          </Button>
         )}
       </div>
     </Modal>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { clientEnv } from "@/lib/env";
 
 /**
@@ -33,7 +34,7 @@ export function validateCsrfOrigin(req: NextRequest): NextResponse | null {
 
   if (!origin || !siteUrl) {
     if (process.env.NODE_ENV === "production") {
-      return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
     }
     return null;
   }
@@ -44,7 +45,7 @@ export function validateCsrfOrigin(req: NextRequest): NextResponse | null {
   const originRoot = getRootDomain(new URL(origin).hostname);
 
   if (originRoot !== allowedRoot) {
-    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ success: false, error: API_ERRORS.FORBIDDEN }, { status: 403 });
   }
 
   return null;

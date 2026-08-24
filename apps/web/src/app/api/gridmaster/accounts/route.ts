@@ -91,7 +91,10 @@ export async function GET(req: NextRequest) {
       { err: error, path: "/api/gridmaster/accounts" },
       "gridmaster accounts GET failed",
     );
-    return NextResponse.json({ error: "Failed to load gridmaster accounts" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the gridmaster accounts. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -127,7 +130,11 @@ export async function POST(req: NextRequest) {
         p_email: parsed.data.email,
       });
       if (result.error) {
-        return apiErrorResponse(result.error, "Failed to promote gridmaster account", 400);
+        return apiErrorResponse(
+          result.error,
+          "We couldn't promote gridmaster account. Try again.",
+          400,
+        );
       }
       const payload = getRpcPayload(result.data);
       const userId = (payload.user_id as string | undefined) ?? null;
@@ -150,7 +157,11 @@ export async function POST(req: NextRequest) {
         p_org_role: parsed.data.orgRole,
       });
       if (result.error) {
-        return apiErrorResponse(result.error, "Failed to demote gridmaster account", 400);
+        return apiErrorResponse(
+          result.error,
+          "We couldn't demote gridmaster account. Try again.",
+          400,
+        );
       }
       await writeGridmasterAuditLog({
         serviceClient,
@@ -174,7 +185,11 @@ export async function POST(req: NextRequest) {
       p_deactivate: parsed.data.deactivate,
     });
     if (result.error) {
-      return apiErrorResponse(result.error, "Failed to update gridmaster account", 400);
+      return apiErrorResponse(
+        result.error,
+        "We couldn't update gridmaster account. Try again.",
+        400,
+      );
     }
     await writeGridmasterAuditLog({
       serviceClient,
@@ -196,6 +211,9 @@ export async function POST(req: NextRequest) {
       { err: error, path: "/api/gridmaster/accounts" },
       "gridmaster accounts POST failed",
     );
-    return NextResponse.json({ error: "Failed to update gridmaster account" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't update that gridmaster account. Try again." },
+      { status: 500 },
+    );
   }
 }

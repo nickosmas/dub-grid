@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, actor.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -108,7 +108,10 @@ export async function POST(req: NextRequest) {
       extra: { orgId: effectiveOrgId, context: "org-deletion" },
     });
     logger.error({ error: archiveError, orgId: effectiveOrgId }, "Failed to archive organization");
-    return NextResponse.json({ error: "Failed to delete organization" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't delete that organization. Try again." },
+      { status: 500 },
+    );
   }
 
   // The public subdomain lookup caches {id, name} by slug with a long TTL —

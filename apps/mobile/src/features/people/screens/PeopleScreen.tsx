@@ -52,7 +52,7 @@ import { useBootstrap } from "../../auth/hooks/useBootstrap";
 import { ManagementUserActionsSheet } from "../components/ManagementUserActionsSheet";
 import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
-import { getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
+import { ORG_ROLE_LABELS, getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -61,6 +61,66 @@ type StatusFilter = "active" | "inactive";
 type RosterTab = "schedule" | "management";
 type SortMode = "seniority" | "alphabetical";
 type MobileOrgRole = "super_admin" | "admin" | "user" | null;
+/** The three access states a staff row's hint prints, as a filter value. */
+type PersonAppAccess = "has_access" | "invited" | "none";
+type ManagementSortMode = "alphabetical" | "access";
+
+/**
+ * The two halves of the directory are different populations, so each carries
+ * its own filters. Staff rows have focus areas, a certification, an employment
+ * type and an active/inactive status; management rows have management
+ * departments, an access level and an invitation that may still be pending.
+ * Neither set says anything about the other list, so the sheet swaps with the
+ * tab rather than offering filters the visible roster can't answer.
+ */
+type StaffFilters = {
+  focusAreaId: number | "all";
+  certificationId: number | "all";
+  employmentType: "all" | MobilePerson["employmentType"];
+  appAccess: "all" | PersonAppAccess;
+  status: StatusFilter;
+  sort: SortMode;
+};
+
+type ManagementFilters = {
+  departmentId: number | "all";
+  orgRole: "all" | NonNullable<MobileOrgRole>;
+  invitation: "all" | MobileManagementUser["source"];
+  sort: ManagementSortMode;
+};
+
+const STAFF_FILTER_DEFAULTS: StaffFilters = {
+  focusAreaId: "all",
+  certificationId: "all",
+  employmentType: "all",
+  appAccess: "all",
+  status: "active",
+  sort: "seniority",
+};
+
+const MANAGEMENT_FILTER_DEFAULTS: ManagementFilters = {
+  departmentId: "all",
+  orgRole: "all",
+  invitation: "all",
+  sort: "alphabetical",
+};
+
+/** Super admins first, then admins, then everyone else. */
+const MANAGEMENT_ROLE_RANK: Record<NonNullable<MobileOrgRole>, number> = {
+  super_admin: 0,
+  admin: 1,
+  user: 2,
+};
+
+/** Offered in the same order the sort ranks them. */
+const MANAGEMENT_ROLE_FILTERS: NonNullable<MobileOrgRole>[] = ["super_admin", "admin", "user"];
+
+/** How many of a tab's filters sit away from their default, for the badge. */
+function countActiveFilters<Filters extends object>(filters: Filters, defaults: Filters): number {
+  return (Object.keys(defaults) as (keyof Filters)[]).filter(
+    (key) => filters[key] !== defaults[key],
+  ).length;
+}
 type ProfileRequestConfirmation = {
   request: MobileProfileChangeRequest;
   action: "approve" | "reject";
@@ -74,6 +134,31 @@ function formatStatusLabel(status: MobilePerson["status"]): string {
   return status === "active" ? "Active" : "Inactive";
 }
 
+function getManagementUserName(managementUser: MobileManagementUser): string {
+  return (
+    `${managementUser.firstName} ${managementUser.lastName}`.trim() ||
+    managementUser.email ||
+    "Unnamed person"
+  );
+}
+
+/** The same three states a staff row's access hint prints. */
+function getPersonAppAccess(person: MobilePerson): PersonAppAccess {
+  if (person.pendingInvitation) return "invited";
+  return person.userId ? "has_access" : "none";
+}
+
+function countManagementUsersWithRole(
+  managementUsers: MobileManagementUser[],
+  role: NonNullable<MobileOrgRole>,
+): number {
+  return managementUsers.filter((managementUser) => managementUser.orgRole === role).length;
+}
+
+function getManagementRoleRank(role: MobileOrgRole): number {
+  return role ? MANAGEMENT_ROLE_RANK[role] : MANAGEMENT_ROLE_RANK.user + 1;
+}
+
 export default function PeopleScreen() {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -81,11 +166,9 @@ export default function PeopleScreen() {
   const { pushToast } = useToast();
   const bootstrapQuery = useBootstrap(accessToken);
   const [searchValue, setSearchValue] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
-  const [sortMode, setSortMode] = useState<SortMode>("seniority");
-  const [focusFilterId, setFocusFilterId] = useState<number | "all">("all");
-  const [managementDepartmentFilterId, setManagementDepartmentFilterId] = useState<number | "all">(
-    "all",
+  const [staffFilters, setStaffFilters] = useState<StaffFilters>(STAFF_FILTER_DEFAULTS);
+  const [managementFilters, setManagementFilters] = useState<ManagementFilters>(
+    MANAGEMENT_FILTER_DEFAULTS,
   );
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [rosterTab, setRosterTab] = useState<RosterTab>("schedule");
@@ -164,11 +247,24 @@ export default function PeopleScreen() {
       managementUsersQuery.refetch(),
     ]),
   );
+  /** Clears the half you're looking at; the other keeps its own filters. */
   function clearFilters() {
-    setFocusFilterId("all");
-    setManagementDepartmentFilterId("all");
-    setStatusFilter("active");
-    setSortMode("seniority");
+    if (isManagementTab) {
+      setManagementFilters(MANAGEMENT_FILTER_DEFAULTS);
+      return;
+    }
+    setStaffFilters(STAFF_FILTER_DEFAULTS);
+  }
+
+  function setStaffFilter<Key extends keyof StaffFilters>(key: Key, value: StaffFilters[Key]) {
+    setStaffFilters((current) => ({ ...current, [key]: value }));
+  }
+
+  function setManagementFilter<Key extends keyof ManagementFilters>(
+    key: Key,
+    value: ManagementFilters[Key],
+  ) {
+    setManagementFilters((current) => ({ ...current, [key]: value }));
   }
 
   function confirmProfileRequestAction() {
@@ -191,6 +287,7 @@ export default function PeopleScreen() {
   const people = peopleQuery.data?.people ?? [];
   const profileRequests = profileRequestsQuery.data?.requests ?? [];
   const focusAreas = bootstrapQuery.data?.focusAreas ?? [];
+  const certifications = bootstrapQuery.data?.certifications ?? [];
   const managementDepartments = useMemo(
     () =>
       (bootstrapQuery.data?.departments ?? []).filter(
@@ -202,6 +299,8 @@ export default function PeopleScreen() {
   // hides it for orgs with no management departments for the same reason.
   const canSeeManagementRoster =
     (canManageManagementAccess || canManageEmployees) && managementDepartments.length > 0;
+  const managementUsers = managementUsersQuery.data?.managementUsers ?? [];
+  const isManagementTab = rosterTab === "management" && canSeeManagementRoster;
   const filteredPeople = useMemo(() => {
     const normalizedSearch = searchValue.trim().toLowerCase();
 
@@ -220,21 +319,40 @@ export default function PeopleScreen() {
 
         const matchesStatus = !canManageEmployees
           ? true
-          : statusFilter === "active"
+          : staffFilters.status === "active"
             ? person.status === "active"
             : person.status !== "active";
 
         const matchesFocus =
-          focusFilterId === "all" ? true : person.focusAreaIds.includes(focusFilterId);
-        const matchesManagementDepartment =
-          managementDepartmentFilterId === "all"
+          staffFilters.focusAreaId === "all"
             ? true
-            : getPersonManagementDepartmentIds(person).includes(managementDepartmentFilterId);
+            : person.focusAreaIds.includes(staffFilters.focusAreaId);
+        const matchesCertification =
+          staffFilters.certificationId === "all"
+            ? true
+            : person.certificationId === staffFilters.certificationId;
+        const matchesEmploymentType =
+          staffFilters.employmentType === "all"
+            ? true
+            : person.employmentType === staffFilters.employmentType;
+        // App access is an admin-only column on the row, and an admin-only
+        // filter with it: nobody else is shown the hint it filters on.
+        const matchesAppAccess =
+          !canManageEmployees || staffFilters.appAccess === "all"
+            ? true
+            : getPersonAppAccess(person) === staffFilters.appAccess;
 
-        return matchesSearch && matchesStatus && matchesFocus && matchesManagementDepartment;
+        return (
+          matchesSearch &&
+          matchesStatus &&
+          matchesFocus &&
+          matchesCertification &&
+          matchesEmploymentType &&
+          matchesAppAccess
+        );
       })
       .sort((left, right) => {
-        if (sortMode === "alphabetical") {
+        if (staffFilters.sort === "alphabetical") {
           return getFullName(left).localeCompare(getFullName(right));
         }
 
@@ -245,47 +363,55 @@ export default function PeopleScreen() {
 
         return getFullName(left).localeCompare(getFullName(right));
       });
-  }, [
-    canManageEmployees,
-    focusFilterId,
-    managementDepartmentFilterId,
-    people,
-    searchValue,
-    sortMode,
-    statusFilter,
-  ]);
+  }, [canManageEmployees, people, searchValue, staffFilters]);
   const visiblePeople = useMemo(
     () => (canManageEmployees ? people : people.filter((person) => person.status === "active")),
     [canManageEmployees, people],
   );
   const activeCount = visiblePeople.filter((person) => person.status === "active").length;
   const inactiveCount = visiblePeople.length - activeCount;
-  const activeFilterCount =
-    (focusFilterId === "all" ? 0 : 1) +
-    (managementDepartmentFilterId === "all" ? 0 : 1) +
-    (canManageEmployees && statusFilter === "inactive" ? 1 : 0) +
-    (sortMode === "alphabetical" ? 1 : 0);
   const peopleError = peopleQuery.error ?? bootstrapQuery.error;
-  const isManagementTab = rosterTab === "management" && canSeeManagementRoster;
-  const managementUsers = managementUsersQuery.data?.managementUsers ?? [];
   const filteredManagementUsers = useMemo(() => {
     const normalizedSearch = searchValue.trim().toLowerCase();
-    return managementUsers.filter((managementUser) => {
-      const fullName = `${managementUser.firstName} ${managementUser.lastName}`
-        .trim()
-        .toLowerCase();
-      const matchesSearch =
-        !normalizedSearch ||
-        fullName.includes(normalizedSearch) ||
-        managementUser.email.toLowerCase().includes(normalizedSearch) ||
-        managementUser.phone.toLowerCase().includes(normalizedSearch);
-      const matchesDepartment =
-        managementDepartmentFilterId === "all"
-          ? true
-          : managementUser.managementDepartmentIds.includes(managementDepartmentFilterId);
-      return matchesSearch && matchesDepartment;
-    });
-  }, [managementDepartmentFilterId, managementUsers, searchValue]);
+    return managementUsers
+      .filter((managementUser) => {
+        const fullName = getManagementUserName(managementUser).toLowerCase();
+        const matchesSearch =
+          !normalizedSearch ||
+          fullName.includes(normalizedSearch) ||
+          managementUser.email.toLowerCase().includes(normalizedSearch) ||
+          managementUser.phone.toLowerCase().includes(normalizedSearch);
+        const matchesDepartment =
+          managementFilters.departmentId === "all"
+            ? true
+            : managementUser.managementDepartmentIds.includes(managementFilters.departmentId);
+        const matchesOrgRole =
+          managementFilters.orgRole === "all"
+            ? true
+            : managementUser.orgRole === managementFilters.orgRole;
+        const matchesInvitation =
+          managementFilters.invitation === "all"
+            ? true
+            : managementUser.source === managementFilters.invitation;
+        return matchesSearch && matchesDepartment && matchesOrgRole && matchesInvitation;
+      })
+      .sort((left, right) => {
+        if (managementFilters.sort === "access") {
+          const rankComparison =
+            getManagementRoleRank(left.orgRole) - getManagementRoleRank(right.orgRole);
+          if (rankComparison !== 0) {
+            return rankComparison;
+          }
+        }
+
+        return getManagementUserName(left).localeCompare(getManagementUserName(right));
+      });
+  }, [managementFilters, managementUsers, searchValue]);
+  // The badge counts the filters the sheet is currently showing, so it never
+  // reports a count against a list those filters aren't touching.
+  const activeFilterCount = isManagementTab
+    ? countActiveFilters(managementFilters, MANAGEMENT_FILTER_DEFAULTS)
+    : countActiveFilters(staffFilters, STAFF_FILTER_DEFAULTS);
   const currentUserId = bootstrapQuery.data?.user?.id ?? null;
   const currentEmployeeId = bootstrapQuery.data?.linkedEmployee?.id ?? null;
   const contentState = useMobileContentState({
@@ -316,76 +442,189 @@ export default function PeopleScreen() {
     >
       <FilterSheet
         clearDisabled={activeFilterCount === 0}
-        title="Filter directory"
+        title={isManagementTab ? "Filter management" : "Filter staff"}
         onClearAll={clearFilters}
         onDismiss={() => setIsFilterModalVisible(false)}
         onDone={() => setIsFilterModalVisible(false)}
         visible={isFilterModalVisible}
       >
-        <SelectionSection label="Focus area">
-          <SelectionRow
-            label="All focus areas"
-            onPress={() => setFocusFilterId("all")}
-            selected={focusFilterId === "all"}
-          />
-          {focusAreas.map((focusArea) => (
-            <SelectionRow
-              key={focusArea.id}
-              label={focusArea.name}
-              onPress={() => setFocusFilterId(focusArea.id)}
-              selected={focusFilterId === focusArea.id}
-            />
-          ))}
-        </SelectionSection>
-
-        {canManageEmployees && managementDepartments.length > 0 ? (
-          <SelectionSection label="Management departments">
-            <SelectionRow
-              label="All management departments"
-              onPress={() => setManagementDepartmentFilterId("all")}
-              selected={managementDepartmentFilterId === "all"}
-            />
-            {managementDepartments.map((department) => (
+        {isManagementTab ? (
+          <>
+            <SelectionSection label="Management department">
               <SelectionRow
-                key={department.id}
-                detail={`${countPeopleInManagementDepartment(visiblePeople, department.id)} people`}
-                label={department.name}
-                onPress={() => setManagementDepartmentFilterId(department.id)}
-                selected={managementDepartmentFilterId === department.id}
+                label="All management departments"
+                onPress={() => setManagementFilter("departmentId", "all")}
+                selected={managementFilters.departmentId === "all"}
               />
-            ))}
-          </SelectionSection>
-        ) : null}
+              {managementDepartments.map((department) => (
+                <SelectionRow
+                  key={department.id}
+                  detail={`${countManagementUsersInDepartment(managementUsers, department.id)} people`}
+                  label={department.name}
+                  onPress={() => setManagementFilter("departmentId", department.id)}
+                  selected={managementFilters.departmentId === department.id}
+                />
+              ))}
+            </SelectionSection>
 
-        {canManageEmployees ? (
-          <SelectionSection label="Status">
-            <SelectionRow
-              detail={`${activeCount} people`}
-              label="Active staff"
-              onPress={() => setStatusFilter("active")}
-              selected={statusFilter === "active"}
-            />
-            <SelectionRow
-              detail={`${inactiveCount} people`}
-              label="Inactive staff"
-              onPress={() => setStatusFilter("inactive")}
-              selected={statusFilter === "inactive"}
-            />
-          </SelectionSection>
-        ) : null}
+            <SelectionSection label="Access level">
+              <SelectionRow
+                label="All access levels"
+                onPress={() => setManagementFilter("orgRole", "all")}
+                selected={managementFilters.orgRole === "all"}
+              />
+              {MANAGEMENT_ROLE_FILTERS.map((role) => (
+                <SelectionRow
+                  key={role}
+                  detail={`${countManagementUsersWithRole(managementUsers, role)} people`}
+                  label={ORG_ROLE_LABELS[role]}
+                  onPress={() => setManagementFilter("orgRole", role)}
+                  selected={managementFilters.orgRole === role}
+                />
+              ))}
+            </SelectionSection>
 
-        <SelectionSection label="Sort by">
-          <SelectionRow
-            label="Seniority"
-            onPress={() => setSortMode("seniority")}
-            selected={sortMode === "seniority"}
-          />
-          <SelectionRow
-            label="Alphabetical"
-            onPress={() => setSortMode("alphabetical")}
-            selected={sortMode === "alphabetical"}
-          />
-        </SelectionSection>
+            <SelectionSection label="Invitation">
+              <SelectionRow
+                label="Everyone"
+                onPress={() => setManagementFilter("invitation", "all")}
+                selected={managementFilters.invitation === "all"}
+              />
+              <SelectionRow
+                label="Has access"
+                onPress={() => setManagementFilter("invitation", "member")}
+                selected={managementFilters.invitation === "member"}
+              />
+              <SelectionRow
+                label="Invitation pending"
+                onPress={() => setManagementFilter("invitation", "pending_invite")}
+                selected={managementFilters.invitation === "pending_invite"}
+              />
+            </SelectionSection>
+
+            <SelectionSection label="Sort by">
+              <SelectionRow
+                label="Alphabetical"
+                onPress={() => setManagementFilter("sort", "alphabetical")}
+                selected={managementFilters.sort === "alphabetical"}
+              />
+              <SelectionRow
+                label="Access level"
+                onPress={() => setManagementFilter("sort", "access")}
+                selected={managementFilters.sort === "access"}
+              />
+            </SelectionSection>
+          </>
+        ) : (
+          <>
+            <SelectionSection label="Focus area">
+              <SelectionRow
+                label="All focus areas"
+                onPress={() => setStaffFilter("focusAreaId", "all")}
+                selected={staffFilters.focusAreaId === "all"}
+              />
+              {focusAreas.map((focusArea) => (
+                <SelectionRow
+                  key={focusArea.id}
+                  label={focusArea.name}
+                  onPress={() => setStaffFilter("focusAreaId", focusArea.id)}
+                  selected={staffFilters.focusAreaId === focusArea.id}
+                />
+              ))}
+            </SelectionSection>
+
+            {certifications.length > 0 ? (
+              <SelectionSection label="Certification">
+                <SelectionRow
+                  label="All certifications"
+                  onPress={() => setStaffFilter("certificationId", "all")}
+                  selected={staffFilters.certificationId === "all"}
+                />
+                {certifications.map((certification) => (
+                  <SelectionRow
+                    key={certification.id}
+                    label={certification.name}
+                    onPress={() => setStaffFilter("certificationId", certification.id)}
+                    selected={staffFilters.certificationId === certification.id}
+                  />
+                ))}
+              </SelectionSection>
+            ) : null}
+
+            <SelectionSection label="Employment type">
+              <SelectionRow
+                label="All employment types"
+                onPress={() => setStaffFilter("employmentType", "all")}
+                selected={staffFilters.employmentType === "all"}
+              />
+              <SelectionRow
+                label="Full-time"
+                onPress={() => setStaffFilter("employmentType", "full_time")}
+                selected={staffFilters.employmentType === "full_time"}
+              />
+              <SelectionRow
+                label="Part-time"
+                onPress={() => setStaffFilter("employmentType", "part_time")}
+                selected={staffFilters.employmentType === "part_time"}
+              />
+            </SelectionSection>
+
+            {canManageEmployees ? (
+              <SelectionSection label="App access">
+                <SelectionRow
+                  label="All access"
+                  onPress={() => setStaffFilter("appAccess", "all")}
+                  selected={staffFilters.appAccess === "all"}
+                />
+                <SelectionRow
+                  label="Has app access"
+                  onPress={() => setStaffFilter("appAccess", "has_access")}
+                  selected={staffFilters.appAccess === "has_access"}
+                />
+                <SelectionRow
+                  label="Invitation pending"
+                  onPress={() => setStaffFilter("appAccess", "invited")}
+                  selected={staffFilters.appAccess === "invited"}
+                />
+                <SelectionRow
+                  label="No app access"
+                  onPress={() => setStaffFilter("appAccess", "none")}
+                  selected={staffFilters.appAccess === "none"}
+                />
+              </SelectionSection>
+            ) : null}
+
+            {canManageEmployees ? (
+              <SelectionSection label="Status">
+                <SelectionRow
+                  detail={`${activeCount} people`}
+                  label="Active staff"
+                  onPress={() => setStaffFilter("status", "active")}
+                  selected={staffFilters.status === "active"}
+                />
+                <SelectionRow
+                  detail={`${inactiveCount} people`}
+                  label="Inactive staff"
+                  onPress={() => setStaffFilter("status", "inactive")}
+                  selected={staffFilters.status === "inactive"}
+                />
+              </SelectionSection>
+            ) : null}
+
+            <SelectionSection label="Sort by">
+              <SelectionRow
+                label="Seniority"
+                onPress={() => setStaffFilter("sort", "seniority")}
+                selected={staffFilters.sort === "seniority"}
+              />
+              <SelectionRow
+                label="Alphabetical"
+                onPress={() => setStaffFilter("sort", "alphabetical")}
+                selected={staffFilters.sort === "alphabetical"}
+              />
+            </SelectionSection>
+          </>
+        )}
       </FilterSheet>
 
       <View style={styles.section}>
@@ -511,7 +750,7 @@ export default function PeopleScreen() {
         ) : filteredManagementUsers.length === 0 ? (
           <EmptyStateCard
             fillScreen
-            body="Try a different name, email, or management department."
+            body="Try a different name, email, department, or access level."
             iconName="search-outline"
             title="No matches"
           />
@@ -538,11 +777,7 @@ export default function PeopleScreen() {
                       id={managementUser.id}
                       employmentType={null}
                       isLast={index === filteredManagementUsers.length - 1}
-                      name={
-                        `${managementUser.firstName} ${managementUser.lastName}`.trim() ||
-                        managementUser.email ||
-                        "Unnamed person"
-                      }
+                      name={getManagementUserName(managementUser)}
                       navigable
                       orgRole={managementUser.orgRole}
                       onPress={() => {
@@ -589,7 +824,7 @@ export default function PeopleScreen() {
       ) : filteredPeople.length === 0 ? (
         <EmptyStateCard
           fillScreen
-          body="Try a different name, email, phone, or focus area."
+          body="Try a different name, email, phone, focus area, or certification."
           iconName="search-outline"
           title="No matches"
         />
@@ -697,16 +932,13 @@ export default function PeopleScreen() {
   );
 }
 
-function getPersonManagementDepartmentIds(person: MobilePerson): number[] {
-  return person.managementDepartmentIds ?? [];
-}
-
-function countPeopleInManagementDepartment(
-  people: MobilePerson[],
+function countManagementUsersInDepartment(
+  managementUsers: MobileManagementUser[],
   departmentId: MobileDepartment["id"],
 ): number {
-  return people.filter((person) => getPersonManagementDepartmentIds(person).includes(departmentId))
-    .length;
+  return managementUsers.filter((managementUser) =>
+    managementUser.managementDepartmentIds.includes(departmentId),
+  ).length;
 }
 
 /**

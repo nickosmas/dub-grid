@@ -9,6 +9,7 @@ import {
   PredefinedColor,
 } from "@/lib/colors";
 import { sectionStyle, labelStyle as sharedLabelStyle } from "@/lib/styles";
+import { Button } from "@/components/Button";
 import { parseTo12h, to24h } from "@/lib/utils";
 import CustomSelect from "@/components/CustomSelect";
 import { MaybeHint } from "@/components/ui/hint";
@@ -91,10 +92,12 @@ export function PresetColorPicker({
     <>
       <div style={{ display: "inline-flex", flexDirection: "column", gap: 8 }}>
         <MaybeHint content={active.name} side="top">
-          <button
+          <Button
             ref={triggerRef}
             type="button"
-            onClick={() => !disabled && setOpen((prev) => !prev)}
+            onClick={() => {
+              if (!disabled) setOpen((prev) => !prev);
+            }}
             disabled={disabled}
             title={active.name}
             aria-haspopup="dialog"
@@ -124,7 +127,7 @@ export function PresetColorPicker({
                 boxShadow: open ? `inset 0 0 0 1px ${activeDisplay.text}` : undefined,
               }}
             />
-          </button>
+          </Button>
         </MaybeHint>
       </div>
 
@@ -228,7 +231,7 @@ export function PresetColorPicker({
                       const colorDisplay = toDisplay(color);
                       return (
                         <MaybeHint key={color.id} content={color.name} side="top">
-                          <button
+                          <Button
                             type="button"
                             onClick={() => {
                               if (disabled) return;
@@ -268,7 +271,7 @@ export function PresetColorPicker({
                                 }}
                               />
                             )}
-                          </button>
+                          </Button>
                         </MaybeHint>
                       );
                     })}

@@ -224,7 +224,7 @@ describe("dispatchNotificationEvent", () => {
       "org-1",
       "schedule_note_published",
       "Schedule note added",
-      "Schedule note added for 2026-05-20.",
+      "An administrator added a note to your shift on May 20, 2026.",
       { empId: "emp-1", date: "2026-05-20", mode: "upsert" },
     );
   });
@@ -647,6 +647,63 @@ describe("dispatchNotificationEvent", () => {
       "Your trial has ended",
       expect.any(String),
       { trialEndsAt: "2026-06-08T00:00:00Z" },
+    );
+  });
+  it("names who joined, and the role they joined as, on invitation_accepted", async () => {
+    fromMock.mockImplementation((table: string) => {
+      if (table === "organizations") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({ data: { name: "Calm Haven" } }),
+            })),
+          })),
+        };
+      }
+      if (table === "invitations") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: {
+                  invited_by: null,
+                  email: "sarah@example.com",
+                  org_id: "org-1",
+                  role_to_assign: "admin",
+                },
+              }),
+            })),
+          })),
+        };
+      }
+      if (table === "profiles") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi
+                .fn()
+                .mockResolvedValue({ data: { first_name: "Sarah", last_name: "Chen" } }),
+            })),
+          })),
+        };
+      }
+      return makeMembershipBuilder({ superAdmins: [{ user_id: "sa-1" }] });
+    });
+
+    await dispatchNotificationEvent("actor", {
+      action: "invitation_accepted",
+      orgId: "org-1",
+      acceptedUserId: "new-user",
+      invitationId: "inv-1",
+    });
+
+    expect(sendNotification).toHaveBeenCalledWith(
+      "sa-1",
+      "org-1",
+      "invitation_accepted",
+      "Invitation accepted",
+      "Sarah Chen accepted their invitation and joined Calm Haven as Admin.",
+      { acceptedUserId: "new-user", invitationId: "inv-1" },
     );
   });
 });

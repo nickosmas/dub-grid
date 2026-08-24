@@ -14,6 +14,7 @@ import {
   NamedItem,
 } from "@/types";
 import { buildAssignableShiftOptions } from "@/lib/assignable-shifts";
+import { Button } from "@/components/Button";
 import { borderColor, toDarkPillColors } from "@/lib/colors";
 import { buildShiftJobPairKey } from "@/lib/shift-job-segments";
 import ScrollableTabs from "@/components/ScrollableTabs";
@@ -284,7 +285,7 @@ export default function ShiftPicker({
     };
 
     return (
-      <button
+      <Button
         key={option.id}
         onClick={handleToggle}
         aria-pressed={isActive}
@@ -363,7 +364,7 @@ export default function ShiftPicker({
             </div>
           </MaybeHint>
         ) : null}
-      </button>
+      </Button>
     );
   }
 
@@ -468,13 +469,13 @@ export default function ShiftPicker({
                     }}
                   />
                 )}
-                <button
+                <Button
                   onClick={() => setPickerTab(fa.id)}
                   className={`dg-span-tab${isActive ? " active" : ""}`}
                   style={{ flex: "1 0 auto", textAlign: "center", whiteSpace: "nowrap" }}
                 >
                   {fa.name}
-                </button>
+                </Button>
               </Fragment>
             );
           })}
@@ -538,7 +539,7 @@ export default function ShiftPicker({
                 const atColor = darkAt?.bg ?? at.color;
                 const atText = darkAt?.text ?? at.text;
                 return (
-                  <button
+                  <Button
                     key={at.id}
                     onClick={() => {
                       onAbsenceSelect?.(at);
@@ -595,7 +596,7 @@ export default function ShiftPicker({
                         {at.name || at.label}
                       </div>
                     </MaybeHint>
-                  </button>
+                  </Button>
                 );
               })}
             </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePermissions } from "@/hooks";
+import { Button } from "@/components/Button";
 
 const BANNER_HEIGHT = 36;
 const DISMISS_KEY = "dg_mfa_nag_dismissed";
@@ -62,7 +63,7 @@ export default function MfaNagBanner() {
       >
         Set it up
       </Link>
-      <button
+      <Button
         onClick={dismiss}
         aria-label="Dismiss"
         style={{
@@ -78,7 +79,7 @@ export default function MfaNagBanner() {
         }}
       >
         Dismiss
-      </button>
+      </Button>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import { JobDefinition, Organization, ShiftCategory, ShiftDisplayMode } from "@/types";
+import { Button } from "@/components/Button";
 import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
@@ -394,7 +395,7 @@ export default function DisplayMode({
         toast.error("Display mode changed elsewhere. Review the latest value and try again.");
       } else {
         Sentry.captureException(err);
-        toast.error("Failed to update display mode");
+        toast.error("We couldn't save that display setting. Try again.");
       }
     } finally {
       setSaving(false);
@@ -452,7 +453,7 @@ export default function DisplayMode({
             {modes.map((mode) => {
               const isActive = selected === mode.id;
               return (
-                <button
+                <Button
                   key={mode.id}
                   type="button"
                   onClick={() => setSelected(mode.id)}
@@ -519,7 +520,7 @@ export default function DisplayMode({
 
                   {/* Sample grid */}
                   <DisplayModeSample mode={mode.id} shiftCategories={shiftCategories} jobs={jobs} />
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -536,16 +537,16 @@ export default function DisplayMode({
           }}
         >
           {isModified ? (
-            <button
+            <Button
               type="button"
               onClick={handleCancel}
               disabled={saving}
               className="dg-btn dg-btn-secondary"
             >
               {EDITOR_ACTION_LABELS.cancel}
-            </button>
+            </Button>
           ) : null}
-          <button
+          <Button
             type="button"
             onClick={handleSave}
             disabled={!isModified || saving}
@@ -554,7 +555,7 @@ export default function DisplayMode({
             <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
               {EDITOR_ACTION_LABELS.save}
             </ButtonLoading>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

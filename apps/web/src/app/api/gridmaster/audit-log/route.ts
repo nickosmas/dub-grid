@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
 import logger from "@/lib/logger";
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
       offset: req.nextUrl.searchParams.get("offset") ?? undefined,
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
     }
 
     const { data, error } = await createRequestSupabaseClient(req).rpc("get_audit_log", {
@@ -54,6 +55,9 @@ export async function GET(req: NextRequest) {
       { err: error, path: "/api/gridmaster/audit-log" },
       "gridmaster audit-log GET failed",
     );
-    return NextResponse.json({ error: "Failed to load audit log" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the activity log. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

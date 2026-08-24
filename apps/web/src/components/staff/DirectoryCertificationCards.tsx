@@ -2,6 +2,7 @@
 
 import type { StaffCertificationCount } from "@dubgrid/domain";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import type { NamedItem } from "@/types";
 import type { CertificationFilter } from "./useStaffFilters";
@@ -76,7 +77,7 @@ export function DirectoryCertificationCards({
       {/* "Certified staff" describes the person, not the credential, so this
           copy holds however an org renames its certification label — someone
           holding a "License" or a "Skill Level" is still certified. */}
-      <button
+      <Button
         type="button"
         aria-label={`Certified staff count, ${certifiedCount}`}
         aria-pressed={certifiedSelected}
@@ -84,7 +85,7 @@ export function DirectoryCertificationCards({
         className="text-left"
       >
         <CountTile label="Certified staff" count={certifiedCount} selected={certifiedSelected} />
-      </button>
+      </Button>
 
       {counts.map(({ certificationId, count }) => {
         const certification =
@@ -100,19 +101,20 @@ export function DirectoryCertificationCards({
 
         return (
           <MaybeHint key={String(certificationId)} content={fullName}>
-            <button
+            <Button
               type="button"
               aria-label={`${label}, ${count} staff`}
               aria-pressed={isSelected}
               disabled={isArchived}
-              onClick={() =>
-                !isArchived &&
-                onSelectCertification(isSelected ? null : (certificationId as number))
-              }
+              onClick={() => {
+                if (!isArchived) {
+                  onSelectCertification(isSelected ? null : (certificationId as number));
+                }
+              }}
               className="text-left disabled:cursor-default"
             >
               <CountTile label={label} count={count} selected={isSelected} />
-            </button>
+            </Button>
           </MaybeHint>
         );
       })}
@@ -120,7 +122,7 @@ export function DirectoryCertificationCards({
       {/* Last, and named for what it means rather than what the people do:
           these are the staff who hold no certification at all. */}
       <MaybeHint content={`Staff holding no ${certificationLabel.toLowerCase()}`}>
-        <button
+        <Button
           type="button"
           aria-label={`Not certified count, ${uncertifiedCount}`}
           aria-pressed={uncertifiedSelected}
@@ -132,7 +134,7 @@ export function DirectoryCertificationCards({
             count={uncertifiedCount}
             selected={uncertifiedSelected}
           />
-        </button>
+        </Button>
       </MaybeHint>
     </div>
   );

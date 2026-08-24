@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "account notification preferences GET failed");
-    return NextResponse.json({ error: "Failed to load notification preferences" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your notification settings. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -52,6 +55,9 @@ export async function PUT(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "account notification preferences PUT failed");
-    return NextResponse.json({ error: "Failed to save notification preferences" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't save your notification settings. Try again." },
+      { status: 500 },
+    );
   }
 }

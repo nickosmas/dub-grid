@@ -202,7 +202,7 @@ describe("ShiftRequestBoard", () => {
     await user.click(screen.getByRole("button", { name: "Approve" }));
     await confirmDialogAction(user, "Approve");
     await user.click(screen.getByRole("button", { name: "Reject" }));
-    await user.type(screen.getByPlaceholderText("Optional note..."), "Need more coverage");
+    await user.type(screen.getByPlaceholderText("Add a note (optional)"), "Need more coverage");
     await user.click(screen.getByRole("button", { name: "Confirm Reject" }));
     await confirmDialogAction(user, "Reject");
 

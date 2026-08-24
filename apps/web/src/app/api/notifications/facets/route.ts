@@ -16,6 +16,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(result.data as NotificationFacets);
   } catch (error) {
     logger.error({ error }, "notifications facets failed");
-    return NextResponse.json({ error: "Failed to load notification facets" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the alert filters. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

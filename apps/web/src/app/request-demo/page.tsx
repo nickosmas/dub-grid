@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import CustomSelect from "@/components/CustomSelect";
+import { Button } from "@/components/Button";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { openConsentPreferences } from "@/components/CookieConsent";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
@@ -130,12 +131,12 @@ export default function RequestDemoPage() {
       if (res.ok) {
         setSubmitted(true);
       } else if (res.status === 429) {
-        toast.error("Too many requests. Please try again later.");
+        toast.error("Too many requests. Wait a few minutes and try again.");
       } else {
-        toast.error("Something went wrong. Please try again.");
+        toast.error("Something went wrong. Try again.");
       }
     } catch {
-      toast.error("Something went wrong. Please try again.");
+      toast.error("Something went wrong. Try again.");
     } finally {
       setLoading(false);
     }
@@ -441,7 +442,7 @@ export default function RequestDemoPage() {
           Terms of Service
         </Link>
         <span style={{ margin: "0 4px" }}>·</span>
-        <button
+        <Button
           type="button"
           onClick={openConsentPreferences}
           style={{
@@ -455,7 +456,7 @@ export default function RequestDemoPage() {
           }}
         >
           Cookie preferences
-        </button>
+        </Button>
       </footer>
     </div>
   );

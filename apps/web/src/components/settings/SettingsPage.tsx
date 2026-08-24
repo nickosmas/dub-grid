@@ -29,21 +29,33 @@ import {
   getMaxWidth,
   type NavPermissions,
 } from "./nav-config";
+import dynamic from "next/dynamic";
 import { SettingsShell } from "./SettingsShell";
-import OrganizationGeneral from "./OrganizationGeneral";
-import OrganizationLabels from "./OrganizationLabels";
-import BillingSettings from "./BillingSettings";
-import DisplayMode from "./DisplayMode";
-import ScheduleRules from "./ScheduleRules";
-import ShiftCategories from "./ShiftCategories";
-import Jobs from "./Jobs";
-import AbsenceTypes from "./AbsenceTypes";
-import Coverage from "./Coverage";
-import StringListSettings from "./StringListSettings";
-import DepartmentsSettings from "./DepartmentsSettings";
-import Indicators from "./Indicators";
-import OrgActivityLog from "./ActivityLog";
-import DangerZone from "./DangerZone";
+
+// Each section is loaded when its tab is opened, not when Settings mounts.
+//
+// Exactly one of these renders at a time — the JSX below is a chain of
+// `activeSection === "..."` guards — but importing them statically meant
+// opening any single section downloaded all fourteen, over 11k lines, most of
+// which the reader never looks at in that visit.
+//
+// ssr: false matches the treatment ShiftEditPanel and the print views already
+// get: these are authenticated, force-dynamic screens, so nothing is gained by
+// rendering them on the server first.
+const OrganizationGeneral = dynamic(() => import("./OrganizationGeneral"), { ssr: false });
+const OrganizationLabels = dynamic(() => import("./OrganizationLabels"), { ssr: false });
+const BillingSettings = dynamic(() => import("./BillingSettings"), { ssr: false });
+const DisplayMode = dynamic(() => import("./DisplayMode"), { ssr: false });
+const ScheduleRules = dynamic(() => import("./ScheduleRules"), { ssr: false });
+const ShiftCategories = dynamic(() => import("./ShiftCategories"), { ssr: false });
+const Jobs = dynamic(() => import("./Jobs"), { ssr: false });
+const AbsenceTypes = dynamic(() => import("./AbsenceTypes"), { ssr: false });
+const Coverage = dynamic(() => import("./Coverage"), { ssr: false });
+const StringListSettings = dynamic(() => import("./StringListSettings"), { ssr: false });
+const DepartmentsSettings = dynamic(() => import("./DepartmentsSettings"), { ssr: false });
+const Indicators = dynamic(() => import("./Indicators"), { ssr: false });
+const OrgActivityLog = dynamic(() => import("./ActivityLog"), { ssr: false });
+const DangerZone = dynamic(() => import("./DangerZone"), { ssr: false });
 
 // ── Props ────────────────────────────────────────────────────────────────────
 export interface SettingsPageProps {
@@ -352,7 +364,7 @@ export default function SettingsPage({
               onCertificationsChange(saved);
               toast.success("Certifications saved");
             } catch (err) {
-              toast.error("Failed to save certifications");
+              toast.error("We couldn't save the certifications. Try again.");
               throw err;
             }
           }}
@@ -381,7 +393,7 @@ export default function SettingsPage({
               onOrgRolesChange(saved);
               toast.success("Roles saved");
             } catch (err) {
-              toast.error("Failed to save roles");
+              toast.error("We couldn't save the roles. Try again.");
               throw err;
             }
           }}

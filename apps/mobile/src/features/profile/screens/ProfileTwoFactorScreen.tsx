@@ -252,9 +252,7 @@ export default function ProfileTwoFactorScreen() {
           actionLabel="Try Again"
           body={contentState.message}
           title="Could not load two-factor status"
-          onAction={() => {
-            void profileQuery.refetch();
-          }}
+          onAction={() => profileQuery.refetch()}
         />
       ) : isEnrolling ? (
         <ProfileSection
@@ -337,7 +335,7 @@ export default function ProfileTwoFactorScreen() {
         onCancel={() => setIsConfirmingDisable(false)}
         onConfirm={() => {
           setIsConfirmingDisable(false);
-          void disableMfa();
+          return disableMfa();
         }}
         title="Disable two-factor authentication?"
         visible={isConfirmingDisable}

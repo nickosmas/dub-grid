@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { fetchAccountIdentity, getVerifiedBrowserAuthUser } from "@/features/account/client";
+// @/features/account/client is imported dynamically inside the session effect —
+// see the comment there. A static import here pulls the Supabase auth SDK into
+// the landing page's initial bundle for visitors who are not signed in.
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { Button } from "@/components/Button";
 import { openConsentPreferences } from "@/components/CookieConsent";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
@@ -143,10 +146,30 @@ function RevealSection({
 
 export default function RootPage() {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
+  // Starts true so the prerendered HTML carries the actual marketing page.
+  // Initialising it false put a spinner in the static output, which meant the
+  // largest paint could not happen until the bundle had downloaded, parsed and
+  // hydrated — throwing away the whole benefit of prerendering this route. Only
+  // a visitor we can already tell is signed in is switched to the spinner, and
+  // only to cover the redirect.
+  const [ready, setReady] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  /* Session redirect — preserved exactly */
+  /* Session redirect.
+   *
+   * Only a visitor who actually carries a Supabase auth cookie waits for this.
+   * Everyone else — every first-time visitor, and every crawler and speed test
+   * — renders immediately, because the cookie check is synchronous and local.
+   *
+   * It used to gate the whole page on `getVerifiedBrowserAuthUser()`, which
+   * meant nothing painted until the bundle had parsed *and* a round trip to
+   * Supabase Auth came back, with a 5s blank-screen fallback behind it. The
+   * marketing page is prerendered; holding it behind a network call threw that
+   * away for the overwhelming majority of visitors, who are signed out.
+   *
+   * The SDK import is dynamic for the same reason: statically imported it put
+   * the whole auth client in the landing page's initial bundle.
+   */
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const wantsSignIn = params.get("signin") === "1";
@@ -155,9 +178,22 @@ export default function RootPage() {
       return;
     }
 
+    // Matches the plain and the chunked cookie names @supabase/ssr writes.
+    // No cookie means no session to redirect to, so nothing further runs: no
+    // SDK download, no network call, and the page stays as rendered.
+    if (!/(^|;\s*)sb-[^=;]*auth-token(\.\d+)?=/.test(document.cookie)) return;
+
+    // Signed in (probably): cover the redirect rather than flashing marketing
+    // copy at someone who already has an account.
+    setReady(false);
+
+    let cancelled = false;
     const checkSession = async () => {
       try {
+        const { getVerifiedBrowserAuthUser, fetchAccountIdentity } =
+          await import("@/features/account/client");
         const user = await getVerifiedBrowserAuthUser();
+        if (cancelled) return;
         if (user) {
           const parsed = parseHost(window.location.host);
           if (isApexHost(parsed)) {
@@ -174,12 +210,17 @@ export default function RootPage() {
           setReady(true);
         }
       } catch {
-        setReady(true);
+        if (!cancelled) setReady(true);
       }
     };
 
+    // A stale cookie must not strand a visitor on the spinner.
     const timeout = setTimeout(() => setReady(true), 5000);
     checkSession().finally(() => clearTimeout(timeout));
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [router]);
 
   /* Loading state */
@@ -224,13 +265,13 @@ export default function RootPage() {
               Sign In
             </Link>
             {/* Mobile hamburger */}
-            <button
+            <Button
               onClick={() => setMobileMenuOpen(true)}
               className="md:hidden p-2 -mr-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
               aria-label="Open menu"
             >
               <Menu size={22} />
-            </button>
+            </Button>
           </div>
         </div>
       </nav>
@@ -507,13 +548,13 @@ export default function RootPage() {
             >
               Terms of Service
             </Link>
-            <button
+            <Button
               type="button"
               onClick={openConsentPreferences}
               className="text-xs text-[var(--color-text-faint)] hover:text-[var(--color-text-muted)] transition-colors"
             >
               Cookie preferences
-            </button>
+            </Button>
           </div>
         </div>
       </footer>

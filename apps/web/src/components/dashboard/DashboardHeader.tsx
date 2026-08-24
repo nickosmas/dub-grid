@@ -1,6 +1,7 @@
 import { Fragment, type CSSProperties } from "react";
 import type { ViewMode } from "./DashboardView";
 import { useMediaQuery, MOBILE } from "@/hooks";
+import { Button } from "@/components/Button";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 
@@ -90,7 +91,7 @@ export default function DashboardHeader({
         {/* Row 1: Period navigation */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <Hint content={hint("Go to previous period")} side="bottom">
-            <button
+            <Button
               onClick={onPrev}
               className="dg-btn dg-btn-secondary"
               style={{
@@ -117,7 +118,7 @@ export default function DashboardHeader({
               >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-            </button>
+            </Button>
           </Hint>
           <div style={{ flex: 1, textAlign: "center", userSelect: "none" }}>
             <span
@@ -132,7 +133,7 @@ export default function DashboardHeader({
             </span>
           </div>
           <Hint content={hint("Go to next period")} side="bottom">
-            <button
+            <Button
               onClick={onNext}
               className="dg-btn dg-btn-secondary"
               style={{
@@ -159,9 +160,9 @@ export default function DashboardHeader({
               >
                 <polyline points="9 18 15 12 9 6" />
               </svg>
-            </button>
+            </Button>
           </Hint>
-          <button
+          <Button
             onClick={onToday}
             className="dg-btn dg-btn-secondary"
             style={{
@@ -174,7 +175,7 @@ export default function DashboardHeader({
             }}
           >
             {todayLabel}
-          </button>
+          </Button>
         </div>
 
         {showViewModeTabs ? (
@@ -208,7 +209,7 @@ export default function DashboardHeader({
       >
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <Hint content={hint("Go to previous period")} side="bottom">
-            <button
+            <Button
               onClick={onPrev}
               className="dg-btn dg-btn-secondary"
               style={{
@@ -235,7 +236,7 @@ export default function DashboardHeader({
               >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-            </button>
+            </Button>
           </Hint>
           <div
             style={{
@@ -256,7 +257,7 @@ export default function DashboardHeader({
             </span>
           </div>
           <Hint content={hint("Go to next period")} side="bottom">
-            <button
+            <Button
               onClick={onNext}
               className="dg-btn dg-btn-secondary"
               style={{
@@ -283,12 +284,12 @@ export default function DashboardHeader({
               >
                 <polyline points="9 18 15 12 9 6" />
               </svg>
-            </button>
+            </Button>
           </Hint>
         </div>
 
         {/* Today button */}
-        <button
+        <Button
           onClick={onToday}
           className="dg-btn dg-btn-secondary"
           style={{
@@ -300,7 +301,7 @@ export default function DashboardHeader({
           }}
         >
           {todayLabel}
-        </button>
+        </Button>
 
         {showViewModeTabs ? (
           <ViewModeTabs
@@ -344,12 +345,12 @@ function ViewModeTabs({
                 }}
               />
             )}
-            <button
+            <Button
               onClick={() => onViewModeChange(m.value)}
               className={`dg-span-tab${isActive ? " active" : ""}`}
             >
               {m.label}
-            </button>
+            </Button>
           </Fragment>
         );
       })}

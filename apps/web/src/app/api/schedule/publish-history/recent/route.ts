@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { toPublishChanges, type ScheduleChangeRow } from "@/lib/db/publish-history";
+import logger from "@/lib/logger";
 
 const querySchema = z.object({
   orgId: z.string().uuid(),
@@ -13,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const parsed = querySchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
 
   const auth = await requireOrgPermissions(
@@ -74,8 +76,13 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load recent publish history";
-    return NextResponse.json({ error: message }, { status: 500 });
+    logger.error(
+      { err: error, route: "schedule/publish-history/recent" },
+      "Publish history load failed",
+    );
+    return NextResponse.json(
+      { error: "We couldn't load the recent publish history. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

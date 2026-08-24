@@ -136,7 +136,7 @@ export function useScheduleImport({
     const expected = importPreview.breakdown.imported;
     startScheduleOperation({
       kind: "import_previous",
-      title: "Importing previous schedule...",
+      title: "Importing previous schedule",
       detail: `Copying ${expected} shift${expected === 1 ? "" : "s"} from ${importPreview.sourceRange} into ${importPreview.targetRange}.`,
       progress: 25,
     });

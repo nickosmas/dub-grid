@@ -16,6 +16,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import CustomSelect, { type SelectOption } from "@/components/CustomSelect";
+import { Button } from "@/components/Button";
 import ProgressBar from "@/components/ProgressBar";
 import { ProtectedRoute } from "@/components/RouteGuards";
 import SetupGuard from "@/components/SetupGuard";
@@ -306,7 +307,7 @@ function CalendarGrid({
   return (
     <div style={calendarShellStyle}>
       <div style={calendarHeaderStyle}>
-        <button
+        <Button
           aria-label="Previous month"
           className="dg-btn dg-btn-secondary"
           onClick={() => setVisibleMonth((current) => addMonths(current, -1))}
@@ -314,9 +315,9 @@ function CalendarGrid({
           type="button"
         >
           <ChevronLeft size={15} />
-        </button>
+        </Button>
         <div style={calendarMonthLabelStyle}>{formatMonthLabel(visibleMonth)}</div>
-        <button
+        <Button
           aria-label="Next month"
           className="dg-btn dg-btn-secondary"
           onClick={() => setVisibleMonth((current) => addMonths(current, 1))}
@@ -324,7 +325,7 @@ function CalendarGrid({
           type="button"
         >
           <ChevronRight size={15} />
-        </button>
+        </Button>
       </div>
       <div style={calendarWeekdayGridStyle} aria-hidden="true">
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
@@ -346,7 +347,7 @@ function CalendarGrid({
           const isSelected = value === date || selectedDateSet.has(date) || isRangeEndpoint;
           const dayNumber = parseIsoDate(date)?.getUTCDate() ?? date.slice(-2);
           return (
-            <button
+            <Button
               key={date}
               aria-label={formatDateLabel(date)}
               aria-pressed={isSelected}
@@ -362,7 +363,7 @@ function CalendarGrid({
               type="button"
             >
               {dayNumber}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -407,7 +408,7 @@ function ReportRangePicker({
   return (
     <label style={controlLabelStyle}>
       {label}
-      <button
+      <Button
         ref={anchorRef}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -419,7 +420,7 @@ function ReportRangePicker({
       >
         <span style={datePickerLabelStyle}>{rangeLabel}</span>
         <CalendarDays size={16} style={{ flexShrink: 0 }} />
-      </button>
+      </Button>
       <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverContent
           anchor={anchorRef}
@@ -469,7 +470,7 @@ function TargetDropdown({
   return (
     <div style={controlLabelStyle}>
       {title}
-      <button
+      <Button
         ref={anchorRef}
         aria-label={title}
         aria-expanded={open}
@@ -490,7 +491,7 @@ function TargetDropdown({
             transition: "transform 150ms ease",
           }}
         />
-      </button>
+      </Button>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverContent
           anchor={anchorRef}
@@ -505,7 +506,7 @@ function TargetDropdown({
           {onClear ? (
             <div style={targetDropdownHeaderStyle}>
               <div style={targetDropdownTitleStyle}>{title}</div>
-              <button
+              <Button
                 className="dg-btn dg-btn-secondary"
                 disabled={clearDisabled}
                 onClick={onClear}
@@ -513,7 +514,7 @@ function TargetDropdown({
                 type="button"
               >
                 Clear
-              </button>
+              </Button>
             </div>
           ) : null}
           {children}
@@ -572,7 +573,7 @@ function ReportsContent() {
       toast.info("Reports are available to admins and super admins.");
       router.replace("/dashboard");
     } else if (!featureFlags.reports) {
-      toast.info("Reports are temporarily unavailable. Please try again shortly.");
+      toast.info("Reports are unavailable right now. Try again in a moment.");
       router.replace("/dashboard");
     }
   }, [hasReportsPermission, featureFlags.reports, permissions.isLoading, router]);
@@ -779,7 +780,7 @@ function ReportsContent() {
               justifyContent: "flex-end",
             }}
           >
-            <button
+            <Button
               className="dg-btn dg-btn-secondary"
               disabled={
                 !appliedRequest ||
@@ -787,13 +788,13 @@ function ReportsContent() {
                 !hasExportableRows ||
                 exportingFormat != null
               }
-              onClick={() => void handleExport("pdf")}
+              onClick={() => handleExport("pdf")}
               type="button"
             >
               <FileUp size={16} />
               {exportingFormat === "pdf" ? "Exporting" : "Export PDF"}
-            </button>
-            <button
+            </Button>
+            <Button
               className="dg-btn dg-btn-primary"
               disabled={
                 !appliedRequest ||
@@ -801,12 +802,12 @@ function ReportsContent() {
                 !hasExportableRows ||
                 exportingFormat != null
               }
-              onClick={() => void handleExport("csv")}
+              onClick={() => handleExport("csv")}
               type="button"
             >
               <Upload size={16} />
               {exportingFormat === "csv" ? "Exporting" : "Export CSV"}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -920,16 +921,16 @@ function ReportsContent() {
             </TargetDropdown>
           ) : null}
           <div data-testid="reports-run-actions" style={reportsRunActionsStyle}>
-            <button
+            <Button
               className="dg-btn dg-btn-secondary"
               disabled={!appliedRequest}
-              onClick={() => void reportsQuery.refetch()}
+              onClick={() => reportsQuery.refetch()}
               type="button"
             >
               <RefreshCw size={16} />
               Refresh
-            </button>
-            <button
+            </Button>
+            <Button
               className="dg-btn dg-btn-secondary"
               disabled={!appliedRequest}
               onClick={resetAppliedReport}
@@ -937,10 +938,10 @@ function ReportsContent() {
             >
               <X size={16} />
               Close
-            </button>
-            <button className="dg-btn dg-btn-primary" onClick={handleGenerateReport} type="button">
+            </Button>
+            <Button className="dg-btn dg-btn-primary" onClick={handleGenerateReport} type="button">
               Generate report
-            </button>
+            </Button>
           </div>
         </section>
 

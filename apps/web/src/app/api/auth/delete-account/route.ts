@@ -35,7 +35,7 @@ export async function DELETE(req: NextRequest) {
     // Rate-limit: this is a destructive, irreversible endpoint.
     const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
     if (misconfigured) {
-      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -174,7 +174,10 @@ export async function DELETE(req: NextRequest) {
         { error: cleanupError, userId },
         "Account deletion cleanup failed; auth user preserved",
       );
-      return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
+      return NextResponse.json(
+        { error: "We couldn't delete that account. Try again." },
+        { status: 500 },
+      );
     }
 
     const { error: deleteError } = await serviceClient.auth.admin.deleteUser(userId);
@@ -186,7 +189,10 @@ export async function DELETE(req: NextRequest) {
         { error: deleteError, userId },
         "Auth delete failed after successful cleanup; user has no profile",
       );
-      return NextResponse.json({ error: "Failed to delete account" }, { status: 500 });
+      return NextResponse.json(
+        { error: "We couldn't delete that account. Try again." },
+        { status: 500 },
+      );
     }
 
     try {

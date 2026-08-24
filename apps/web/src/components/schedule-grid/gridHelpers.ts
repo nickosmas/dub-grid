@@ -51,6 +51,18 @@ export function getPublishDiffBoxShadow(kind: string, fallback: string): string 
   return `0 0 0 1px var(--color-surface), 0 0 0 2.5px ${color}`;
 }
 
+/**
+ * Publish-diff ring for pills that share a cell. An outward ring spreads
+ * outside the border box without reserving layout space, so two side-by-side
+ * pills separated by a hairline gap end up drawing their rings on top of each
+ * other and over the neighbour's body. Drawing it inward keeps each ring
+ * inside its own pill.
+ */
+export function getPublishDiffInsetRing(kind: string, fallback: string): string {
+  const color = DRAFT_BORDER_COLORS[kind] ?? fallback;
+  return `inset 0 0 0 2px ${color}`;
+}
+
 export function joinBoxShadows(...values: Array<string | undefined>): string | undefined {
   const shadows = values.filter((value): value is string => !!value);
   return shadows.length > 0 ? shadows.join(", ") : undefined;

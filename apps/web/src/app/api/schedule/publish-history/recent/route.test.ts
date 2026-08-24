@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireOrgPermissions = vi.fn();
@@ -152,7 +153,7 @@ describe("GET /api/schedule/publish-history/recent", () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: "Invalid query" });
+    expect(body).toEqual({ error: API_ERRORS.INVALID_REQUEST });
     expect(requireOrgPermissions).not.toHaveBeenCalled();
   });
 

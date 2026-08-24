@@ -145,7 +145,9 @@ describe("POST /api/stripe/billing-portal", () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "Invalid return URL" });
+    await expect(response.json()).resolves.toEqual({
+      error: "That link looks wrong. Start again from your billing settings.",
+    });
     expect(requireOrgPermissions).not.toHaveBeenCalled();
     expect(createBillingPortalSession).not.toHaveBeenCalled();
   });

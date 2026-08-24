@@ -80,6 +80,35 @@ describe("schedule window cache", () => {
     expect(cached?.notes).toEqual({});
   });
 
+  // The initial load can run before permissions resolve, write the snapshot as
+  // a viewer, and only then have the scheduler re-fetch land. If that re-fetch
+  // does not restamp the entry, every later visit arrives with permissions
+  // already cached and true, mismatches, and refetches the whole window — a
+  // permanent miss for exactly the people who use the page most.
+  it("serves an editor once the late scheduler re-fetch restamps the snapshot", () => {
+    const qc = new QueryClient();
+
+    // Initial load, permissions not resolved yet.
+    writeScheduleWindow(qc, "org-1", snapshot({ canEditShifts: false }));
+    expect(readScheduleWindow(qc, "org-1", true)).toBeNull();
+
+    // Permissions resolve; the scheduler re-fetch restamps it.
+    writeScheduleWindow(qc, "org-1", snapshot({ canEditShifts: true }));
+
+    expect(readScheduleWindow(qc, "org-1", true)).not.toBeNull();
+  });
+
+  // The entry has no observer, so it is subject to garbage collection. The
+  // client's default gcTime is 5 minutes, which would silently cap this at
+  // "returned within five minutes".
+  it("is not garbage-collected while unobserved", () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { gcTime: 0 } } });
+    writeScheduleWindow(qc, "org-1", snapshot());
+
+    const entry = qc.getQueryCache().find({ queryKey: scheduleWindowKey("org-1") });
+    expect(entry?.gcTime).toBe(Infinity);
+  });
+
   // queryClient.clear() is what the org switch, impersonation and logout paths
   // already call; the snapshot must not survive it.
   it("is dropped by queryClient.clear()", () => {

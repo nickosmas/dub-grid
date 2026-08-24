@@ -2,6 +2,7 @@
 
 import { useState, useEffect, type CSSProperties } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { toast } from "sonner";
 import { Bell, Mail } from "lucide-react";
@@ -132,7 +133,7 @@ export function NotificationPreferences({
         if (!cancelled) {
           setLoaded(true);
         }
-        toast.error("Failed to load notification preferences.");
+        toast.error("We couldn't load your notification settings. Refresh and try again.");
       }
     }
     void load();
@@ -150,7 +151,7 @@ export function NotificationPreferences({
       setSavedPrefs(normalizedPrefs);
       toast.success("Notification preferences saved.");
     } catch {
-      toast.error("Failed to save preferences.");
+      toast.error("We couldn't save your notification settings. Try again.");
     } finally {
       setSaving(false);
     }
@@ -289,13 +290,13 @@ export function NotificationPreferences({
       <EditorActionRow
         secondaryAction={
           hasChanges ? (
-            <button onClick={discard} disabled={saving} className="dg-btn dg-btn-secondary">
+            <Button onClick={discard} disabled={saving} className="dg-btn dg-btn-secondary">
               {EDITOR_ACTION_LABELS.discard}
-            </button>
+            </Button>
           ) : null
         }
         primaryAction={
-          <button onClick={save} disabled={!hasChanges || saving} className="dg-btn dg-btn-primary">
+          <Button onClick={save} disabled={!hasChanges || saving} className="dg-btn dg-btn-primary">
             <ButtonLoading
               loading={saving}
               loadingLabel="Saving"
@@ -304,7 +305,7 @@ export function NotificationPreferences({
             >
               Save Preferences
             </ButtonLoading>
-          </button>
+          </Button>
         }
       />
     </div>

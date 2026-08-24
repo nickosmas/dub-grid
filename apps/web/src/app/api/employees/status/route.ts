@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
   // ── Rate limit by user ID ─────────────────────────────────────────
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -315,6 +315,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "employees/status", empId, orgId, action } });
     logger.error({ error: err, empId, orgId, action }, "Employee status change failed");
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }

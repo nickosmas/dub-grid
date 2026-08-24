@@ -59,7 +59,7 @@ describe("handleApiError", () => {
   it("handles jwt expired by showing toast, signing out, and redirecting", async () => {
     await handleApiError(new Error("jwt expired"));
     expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringContaining("session has expired"),
+      expect.stringContaining("session expired"),
       expect.any(Object),
     );
     expect(mockSignOut).toHaveBeenCalledWith("local");
@@ -69,7 +69,7 @@ describe("handleApiError", () => {
   it("handles Refresh Token Not Found the same way", async () => {
     await handleApiError(new Error("Refresh Token Not Found"));
     expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringContaining("session has expired"),
+      expect.stringContaining("session expired"),
       expect.any(Object),
     );
     expect(mockSignOut).toHaveBeenCalled();
@@ -82,14 +82,14 @@ describe("handleApiError", () => {
 
   it("handles this app's own 401 session-expiry body text the same way", async () => {
     // Regression: a stale in-flight request hitting api-auth.ts's own 401
-    // ("Your session expired. Please sign in again.") used to slip past the
+    // ("Your session expired. Sign in again.") used to slip past the
     // exact-cased Supabase-string check above and fall through to the generic
     // "Something went wrong: ..." toast instead of signing out and
     // redirecting — most visible right after logging into a different
     // account while a query from the previous session was still in flight.
-    await handleApiError(new Error("Your session expired. Please sign in again."));
+    await handleApiError(new Error("Your session expired. Sign in again."));
     expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringContaining("session has expired"),
+      expect.stringContaining("session expired"),
       expect.any(Object),
     );
     expect(mockSignOut).toHaveBeenCalledWith("local");

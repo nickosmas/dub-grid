@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
     return NextResponse.json(
-      { success: false, error: "Service temporarily unavailable" },
+      { success: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
     );
   }
@@ -132,6 +132,9 @@ export async function POST(req: NextRequest) {
       { err, path: "/api/notify-impersonation" },
       "Failed to send impersonation notification email",
     );
-    return NextResponse.json({ success: false, error: "Failed to send email" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "We couldn't send that email. Try again." },
+      { status: 500 },
+    );
   }
 }

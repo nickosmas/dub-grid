@@ -43,7 +43,7 @@ function renderAuditLogView() {
       <AuditLogView
         orgId="11111111-1111-4111-8111-111111111111"
         title="Billing Activity"
-        initialActionFilter="billing."
+        initialActionFilter="billing"
       />
     </QueryClientProvider>,
   );
@@ -60,7 +60,7 @@ describe("AuditLogView", () => {
 
     renderAuditLogView();
 
-    await user.click(await screen.findByText("Canceled subscription"));
+    await user.click(await screen.findByText("Canceled the subscription"));
 
     expect(await screen.findByRole("dialog", { name: "Audit log details" })).toBeInTheDocument();
     expect(screen.getByText("Stripe Event Type")).toBeInTheDocument();

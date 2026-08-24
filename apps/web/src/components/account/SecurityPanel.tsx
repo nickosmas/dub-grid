@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
 
 import { SectionCard } from "@/components/settings/shared";
+import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -126,7 +127,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
         toast.error(
           passwordUpdated
             ? "Password updated, but we couldn't sign you out. Please sign out and sign in again."
-            : "Failed to update password. Please try again.",
+            : "We couldn't update your password. Try again.",
         );
       }
     } finally {
@@ -141,9 +142,9 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
     setSigningOut("others");
     try {
       await signOutOthers();
-      toast.success("All other sessions have been signed out.");
+      toast.success("Your other devices are signed out.");
     } catch {
-      toast.error("Failed to sign out other sessions.");
+      toast.error("We couldn't sign out your other devices. Try again.");
     } finally {
       setSigningOut(null);
     }
@@ -169,13 +170,13 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               </p>
             </div>
             {!showPasswordForm && (
-              <button
+              <Button
                 type="button"
                 onClick={openForm}
                 className="dg-btn dg-btn-secondary dg-btn-sm self-start"
               >
                 Change password
-              </button>
+              </Button>
             )}
           </div>
 
@@ -244,13 +245,13 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                     Update Password
                   </ButtonLoading>
                 </button>
-                <button
+                <Button
                   type="button"
                   onClick={hasPasswordChanges ? discardChanges : closeForm}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                 >
                   {getEditorDismissLabel({ hasUnsavedChanges: hasPasswordChanges })}
-                </button>
+                </Button>
               </div>
             </form>
           )}
@@ -291,7 +292,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button
               type="button"
               onClick={handleSignOutOthers}
               disabled={signingOut !== null}
@@ -304,8 +305,8 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               >
                 Sign out other devices
               </ButtonLoading>
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={handleSignOutAll}
               disabled={signingOut !== null}
@@ -318,7 +319,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               >
                 Sign out everywhere
               </ButtonLoading>
-            </button>
+            </Button>
           </div>
           <div className="border-t border-[var(--color-border-light)] pt-4">
             <div className="mb-3">
@@ -342,7 +343,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           confirmPendingLabel="Updating"
           variant="warning"
           isLoading={saving}
-          onConfirm={() => void handlePasswordChange()}
+          onConfirm={() => handlePasswordChange()}
           onCancel={() => {
             if (!saving) setPendingConfirm(false);
           }}

@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
 
     const parsed = bodySchema.safeParse(body);
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       `billing-checkout-complete:${auth.actor.id}:${parsed.data.orgId}`,
     );
     if (misconfigured) {
-      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -75,6 +75,9 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     Sentry.captureException(error, { extra: { context: "checkout-complete" } });
     logger.error({ error }, "Failed to complete checkout billing sync");
-    return NextResponse.json({ error: "Failed to sync checkout" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't confirm that payment. Try again." },
+      { status: 500 },
+    );
   }
 }

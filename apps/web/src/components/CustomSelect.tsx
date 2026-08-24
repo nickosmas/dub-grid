@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useMemo } from "react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { Button } from "@/components/Button";
 
 export interface SelectOption<T extends string | number> {
   value: T;
@@ -48,6 +49,9 @@ export default function CustomSelect<T extends string | number>({
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const selected = useMemo(() => options.find((o) => o.value === value), [options, value]);
+  // Note: a `value` absent from `options` falls through to "—", which reads as
+  // a broken control. Callers that filter their option list must narrow `value`
+  // to match — see the schedule Toolbar's span select.
   const displayLabel = selected?.label ?? placeholder ?? "—";
 
   const setMenuRef = useCallback(
@@ -62,14 +66,16 @@ export default function CustomSelect<T extends string | number>({
 
   const trigger = (
     <div ref={ref} style={{ display: "inline-block", verticalAlign: "middle", ...style }}>
-      <button
+      <Button
         id={id}
         type="button"
         aria-label={ariaLabel}
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-disabled={disabled || undefined}
-        onClick={() => !disabled && setOpen((o) => !o)}
+        onClick={() => {
+          if (!disabled) setOpen((o) => !o);
+        }}
         onKeyDown={(e) => {
           if (disabled) return;
           if (e.key === "ArrowDown") {
@@ -126,7 +132,7 @@ export default function CustomSelect<T extends string | number>({
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
-      </button>
+      </Button>
     </div>
   );
 
@@ -187,7 +193,7 @@ export default function CustomSelect<T extends string | number>({
             const isActive = opt.value === value;
             const isFocused = idx === focusedIndex;
             return (
-              <button
+              <Button
                 key={String(opt.value)}
                 id={`option-${String(opt.value)}`}
                 type="button"
@@ -210,7 +216,7 @@ export default function CustomSelect<T extends string | number>({
                 }}
               >
                 {opt.label}
-              </button>
+              </Button>
             );
           })}
         </PopoverContent>

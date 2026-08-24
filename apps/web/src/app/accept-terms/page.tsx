@@ -70,18 +70,18 @@ export default function AcceptTermsPage() {
         msg.includes("foreign key") ||
         msg.includes("not found");
       if (isStaleSession) {
-        toast.error("Session expired. Please sign in again.");
+        toast.error("Your session expired. Sign in again.");
         await signOutFromBrowser("local");
         window.location.href = "/login";
         return;
       }
-      toast.error("Failed to record acceptance. Please try again.");
+      toast.error("We couldn't record that. Try again.");
     },
   });
 
   function handleAccept() {
     if (!user) {
-      toast.error("Session expired. Please sign in again.");
+      toast.error("Your session expired. Sign in again.");
       return;
     }
     accept.mutate();

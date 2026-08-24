@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "mobile session-presence upsert failed");
-    return json({ error: "Failed to track session" }, { status: 500 });
+    return json({ error: "We couldn't record this device. Try again." }, { status: 500 });
   }
 
   return json({ success: true });

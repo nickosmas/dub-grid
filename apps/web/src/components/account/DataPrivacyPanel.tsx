@@ -3,6 +3,7 @@
 import { ExternalLink } from "lucide-react";
 
 import { SectionCard } from "@/components/settings/shared";
+import { Button } from "@/components/Button";
 import { openConsentPreferences } from "@/components/CookieConsent";
 
 interface PolicyLink {
@@ -42,13 +43,13 @@ export function DataPrivacyPanel() {
               Adjust which cookies and analytics DubGrid uses on this device.
             </p>
           </div>
-          <button
+          <Button
             type="button"
             onClick={openConsentPreferences}
             className="dg-btn dg-btn-secondary self-start"
           >
             Manage cookie preferences
-          </button>
+          </Button>
         </div>
       </SectionCard>
 

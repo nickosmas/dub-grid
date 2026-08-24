@@ -16,6 +16,7 @@ import type { DbOrganizationMembership } from "@/lib/db/types";
 import type { AdminPermissions, OrganizationUser, PlatformRole } from "@/types";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { SELF_ACTION_FORBIDDEN_CODE, SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
+import { READ_ONLY_PERMS } from "@dubgrid/authz";
 import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,18 @@ function selfActionForbiddenResponse() {
   );
 }
 
-const adminPermissionsSchema = z.record(z.string(), z.boolean());
+// READ_ONLY_PERMS is the runtime shape of AdminPermissions (the interface
+// itself is types-only), so it is the list of keys this column may hold.
+const ADMIN_PERMISSION_KEYS = new Set(Object.keys(READ_ONLY_PERMS));
+
+// Keys stay optional — buildPermissionContext resolves a partial object against
+// the read-only base — but unknown keys are rejected rather than persisted into
+// the JSONB and copied verbatim into role_change_log.permissions_after.
+const adminPermissionsSchema = z
+  .record(z.string(), z.boolean())
+  .refine((value) => Object.keys(value).every((key) => ADMIN_PERMISSION_KEYS.has(key)), {
+    message: "Unknown admin permission key",
+  });
 
 const patchSchema = z.object({
   orgId: z.string().uuid(),
@@ -175,7 +187,7 @@ export async function PATCH(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -351,7 +363,7 @@ export async function PATCH(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "organizations/access", orgId, userId } });
     logger.error({ error: err, orgId, userId }, "Organization access update failed");
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }
 
@@ -365,7 +377,7 @@ export async function DELETE(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -470,6 +482,6 @@ export async function DELETE(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "organizations/access", orgId, userId } });
     logger.error({ error: err, orgId, userId }, "Organization access removal failed");
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }

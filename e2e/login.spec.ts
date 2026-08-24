@@ -15,6 +15,9 @@ test("an invalid password is rejected with an inline error, not a redirect", asy
   await page.getByRole("textbox", { name: "Password" }).fill("definitely-the-wrong-password");
   await page.getByRole("button", { name: "Sign In" }).click();
 
-  await expect(page.getByText(/invalid email or password/i)).toBeVisible();
+  // The copy sweep replaced the raw "Invalid email or password" with wording
+  // that says what to do about it. Still deliberately generic: naming which of
+  // the two was wrong would confirm whether an account exists.
+  await expect(page.getByText(/check your email and password and try again/i)).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
 });

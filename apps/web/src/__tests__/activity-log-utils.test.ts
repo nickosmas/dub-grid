@@ -41,10 +41,10 @@ describe("activity log display formatting", () => {
     expect(formatDetails(entry)).toEqual([
       { label: "Status change", value: "Deactivate account" },
       { label: "Organization role", value: "Super Admin" },
-      { label: "Start date", value: "May 4" },
+      { label: "Start date", value: "May 4, 2026" },
     ]);
     expect(summarizeDetails(entry)).toBe(
-      "Status change: Deactivate account · Organization role: Super Admin · Start date: May 4",
+      "Status change: Deactivate account · Organization role: Super Admin · Start date: May 4, 2026",
     );
   });
 

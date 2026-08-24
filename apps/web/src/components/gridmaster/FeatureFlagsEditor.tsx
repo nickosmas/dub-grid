@@ -7,6 +7,7 @@ import {
   updateOrganizationSettings,
 } from "@/features/organization/client";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
+import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import type { Organization } from "@/types";
@@ -79,7 +80,9 @@ export default function FeatureFlagsEditor({
         onUpdated?.(err.latestOrganization);
         toast.error("Runtime controls changed elsewhere. Review the latest values and try again.");
       } else {
-        toast.error(formatClientErrorMessage(err, "Failed to update runtime controls"));
+        toast.error(
+          formatClientErrorMessage(err, "We couldn't update the feature controls. Try again."),
+        );
       }
     } finally {
       setSaving(false);
@@ -139,23 +142,23 @@ export default function FeatureFlagsEditor({
       <EditorActionRow
         secondaryAction={
           hasChanges ? (
-            <button
+            <Button
               className="dg-btn dg-btn-secondary"
               onClick={() => setFlags(savedFlags)}
               disabled={saving}
             >
               {EDITOR_ACTION_LABELS.discard}
-            </button>
+            </Button>
           ) : undefined
         }
         primaryAction={
-          <button
+          <Button
             className="dg-btn dg-btn-primary"
             onClick={() => {
               if (hasHighImpactChanges) {
                 setConfirmOpen(true);
               } else {
-                void handleSave();
+                return handleSave();
               }
             }}
             disabled={saving || !hasChanges}
@@ -163,7 +166,7 @@ export default function FeatureFlagsEditor({
             <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
               {EDITOR_ACTION_LABELS.save}
             </ButtonLoading>
-          </button>
+          </Button>
         }
       />
 
@@ -175,9 +178,7 @@ export default function FeatureFlagsEditor({
           confirmPendingLabel={EDITOR_ACTION_LABELS.saving}
           variant="warning"
           isLoading={saving}
-          onConfirm={() => {
-            void handleSave();
-          }}
+          onConfirm={() => handleSave()}
           onCancel={() => setConfirmOpen(false)}
         />
       )}

@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/Button";
 import { formatDateKey } from "@/lib/utils";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
@@ -308,7 +309,7 @@ function ScrollChevron({
 }) {
   const Icon = direction === "left" ? ChevronLeft : ChevronRight;
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
       aria-label={direction === "left" ? "Scroll earlier days" : "Scroll later days"}
@@ -332,7 +333,7 @@ function ScrollChevron({
       }}
     >
       <Icon size={16} />
-    </button>
+    </Button>
   );
 }
 

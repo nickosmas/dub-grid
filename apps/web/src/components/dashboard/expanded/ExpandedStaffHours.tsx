@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import type { EmployeeHours } from "@/lib/dashboard-stats";
+import { Button } from "@/components/Button";
 import { getAvatarInitials } from "@/lib/utils";
 import type { Employee, FocusArea } from "@/types";
 import Modal from "@/components/Modal";
@@ -100,7 +101,7 @@ export default function ExpandedStaffHours({
             ).map(([key, label]) => {
               const active = sort === key;
               return (
-                <button
+                <Button
                   key={key}
                   onClick={() => setSort(key)}
                   style={{
@@ -116,7 +117,7 @@ export default function ExpandedStaffHours({
                   }}
                 >
                   {label}
-                </button>
+                </Button>
               );
             })}
           </div>

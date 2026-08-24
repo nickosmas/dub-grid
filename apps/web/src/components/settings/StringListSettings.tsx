@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { NamedItem, Department } from "@/types";
+import { Button } from "@/components/Button";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
@@ -466,15 +467,15 @@ export default function StringListSettings({
   const footerActions = isWizardMode ? null : isEditing ? (
     <EditorActionRow
       secondaryAction={
-        <button
+        <Button
           onClick={isDirty ? handleDiscard : handleClose}
           className="dg-btn dg-btn-secondary dg-btn-sm"
         >
           {getEditorDismissLabel({ hasUnsavedChanges: isDirty })}
-        </button>
+        </Button>
       }
       primaryAction={
-        <button
+        <Button
           onClick={handleSave}
           disabled={saving || !isDirty || hasValidationErrors}
           className="dg-btn dg-btn-primary dg-btn-sm"
@@ -482,7 +483,7 @@ export default function StringListSettings({
           <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
             {EDITOR_ACTION_LABELS.save}
           </ButtonLoading>
-        </button>
+        </Button>
       }
       style={{
         marginTop: 12,
@@ -493,9 +494,9 @@ export default function StringListSettings({
   ) : canEdit && displayList.length > 0 ? (
     <EditorActionRow
       primaryAction={
-        <button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
+        <Button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
           Edit
-        </button>
+        </Button>
       }
       style={{
         marginTop: 12,
@@ -514,9 +515,9 @@ export default function StringListSettings({
           title={`No ${label.toLowerCase()} defined yet`}
           action={
             canEdit ? (
-              <button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
+              <Button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
                 + Add {label.replace(/s$/, "")}
-              </button>
+              </Button>
             ) : undefined
           }
         />
@@ -866,11 +867,11 @@ export default function StringListSettings({
                   ))}
 
                 {isEditing && (
-                  <button
+                  <Button
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeleteClick(i);
+                      return handleDeleteClick(i);
                     }}
                     style={{
                       background: "none",
@@ -893,7 +894,7 @@ export default function StringListSettings({
                     }}
                   >
                     Delete
-                  </button>
+                  </Button>
                 )}
               </div>
             );
@@ -902,9 +903,9 @@ export default function StringListSettings({
           {/* Dashed add button — only in edit mode */}
           {isEditing && (
             <div style={{ padding: "8px 16px 12px" }}>
-              <button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
+              <Button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
                 + Add {placeholder.toLowerCase()}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -1037,7 +1038,7 @@ function DeptToggle({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
       aria-pressed={selected}
       onClick={onClick}
@@ -1054,6 +1055,6 @@ function DeptToggle({
       }}
     >
       {label}
-    </button>
+    </Button>
   );
 }

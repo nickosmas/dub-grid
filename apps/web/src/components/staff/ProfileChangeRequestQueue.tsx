@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Department, FocusArea, NamedItem } from "@/types";
+import { Button } from "@/components/Button";
 import {
   fetchPeopleProfileChangeRequests,
   resolvePeopleProfileChangeRequest,
@@ -263,7 +264,12 @@ export function ProfileChangeRequestQueue({
 
   useEffect(() => {
     if (requestsQuery.isError) {
-      toast.error(extractErrorMessage(requestsQuery.error, "Failed to load profile requests."));
+      toast.error(
+        extractErrorMessage(
+          requestsQuery.error,
+          "We couldn't load profile requests. Refresh and try again.",
+        ),
+      );
     }
   }, [requestsQuery.isError, requestsQuery.error]);
 
@@ -286,7 +292,7 @@ export function ProfileChangeRequestQueue({
       toast.success(variables.action === "approve" ? "Request approved." : "Request rejected.");
     },
     onError: (error) => {
-      toast.error(extractErrorMessage(error, "Failed to resolve request."));
+      toast.error(extractErrorMessage(error, "We couldn't resolve request. Try again."));
     },
   });
 
@@ -370,7 +376,7 @@ export function ProfileChangeRequestQueue({
               ) : null}
 
               <div className="flex flex-wrap gap-2">
-                <button
+                <Button
                   type="button"
                   disabled={resolvingId === request.id}
                   className="dg-btn dg-btn-primary dg-btn-sm"
@@ -379,15 +385,15 @@ export function ProfileChangeRequestQueue({
                   <ButtonLoading loading={resolvingId === request.id} loadingLabel="Approving">
                     Approve
                   </ButtonLoading>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   disabled={resolvingId === request.id}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                   onClick={() => setPendingResolution({ request, action: "reject" })}
                 >
                   Reject
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -418,7 +424,7 @@ export function ProfileChangeRequestQueue({
           }
           isLoading={resolvingId === pendingResolution.request.id}
           onConfirm={() => {
-            resolveMutation.mutate({
+            return resolveMutation.mutateAsync({
               requestId: pendingResolution.request.id,
               action: pendingResolution.action,
             });

@@ -1,6 +1,7 @@
 "use client";
 
 import Modal from "@/components/Modal";
+import { Button } from "@/components/Button";
 
 interface UnsavedChangesDialogProps {
   onKeepEditing: () => void;
@@ -30,12 +31,12 @@ export function UnsavedChangesDialog({ onKeepEditing, onDiscard }: UnsavedChange
         You have unsaved changes. Are you sure you want to discard them?
       </div>
       <div style={{ display: "flex", gap: 12, justifyContent: "flex-end", flexWrap: "wrap" }}>
-        <button className="dg-btn dg-btn-secondary" onClick={onKeepEditing}>
+        <Button className="dg-btn dg-btn-secondary" onClick={onKeepEditing}>
           Keep editing
-        </button>
-        <button className="dg-btn dg-btn-danger" onClick={onDiscard}>
+        </Button>
+        <Button className="dg-btn dg-btn-danger" onClick={onDiscard}>
           Discard changes
-        </button>
+        </Button>
       </div>
     </Modal>
   );

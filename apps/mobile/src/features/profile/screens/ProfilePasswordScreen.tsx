@@ -367,7 +367,7 @@ export default function ProfilePasswordScreen() {
               onFocus={() => setFocusedPasswordField("confirmPassword")}
             />
             <Text style={styles.signOutNotice}>
-              You will be logged out of all sessions after changing your password.
+              Changing your password signs you out everywhere else.
             </Text>
           </ProfilePanel>
           <View style={styles.submitRow}>

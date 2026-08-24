@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ArrowRight } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Button } from "@/components/Button";
 import { toast } from "sonner";
 import * as Sentry from "@/lib/sentry";
 
@@ -42,7 +43,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
       router.push(destination);
     } catch (err) {
       Sentry.captureException(err);
-      toast.error("Something went wrong. Please try again.");
+      toast.error("Something went wrong. Try again.");
       setLoading(false);
     }
   }
@@ -100,7 +101,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
         {subtext}
       </p>
 
-      <button
+      <Button
         onClick={handleComplete}
         disabled={loading}
         type="button"
@@ -129,7 +130,7 @@ export default function CompletionStep({ role, onComplete, isOrgSetup }: Complet
           {ctaLabel}
           <ArrowRight size={18} />
         </ButtonLoading>
-      </button>
+      </Button>
 
       {/* Pop animation keyframes */}
       <style>{`

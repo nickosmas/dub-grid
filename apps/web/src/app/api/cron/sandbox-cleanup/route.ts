@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
   const auth = req.headers.get("authorization");
   if (auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: API_ERRORS.UNAUTHORIZED }, { status: 401 });
   }
   if (!(await isFeatureEnabled("cron_sandbox_cleanup"))) {
     // 200, not 503 — this is an intentional gridmaster kill-switch flip, not a
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
     .lt("created_at", cutoff);
   if (error) {
     logger.error({ error }, "sandbox-cleanup: query failed");
-    return NextResponse.json({ error: "Query failed" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
   if (!stale?.length) {
     return NextResponse.json({ ok: true, deleted: 0 });

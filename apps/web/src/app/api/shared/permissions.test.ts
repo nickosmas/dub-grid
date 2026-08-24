@@ -189,7 +189,7 @@ describe("requireOrgPermissions", () => {
       expect(result.response.status).toBe(403);
       await expect(result.response.json()).resolves.toEqual({
         error:
-          "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
+          "Organization unavailable. Your organization opens up once your administrator finishes setup.",
       });
     }
   });
@@ -301,7 +301,7 @@ describe("requireOrgPermissions", () => {
       expect(result.response.status).toBe(403);
       await expect(result.response.json()).resolves.toEqual({
         error:
-          "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
+          "Organization unavailable. Your organization opens up once your administrator finishes setup.",
       });
     }
   });

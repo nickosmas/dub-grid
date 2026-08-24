@@ -25,7 +25,7 @@ export async function requireMobileAuth(
   if (!(await isFeatureEnabled("mobile_api"))) {
     return {
       response: NextResponse.json(
-        { error: "The mobile app is temporarily unavailable. Please try again shortly." },
+        { error: "DubGrid is unavailable right now. Try again in a moment." },
         { status: 503 },
       ),
     };

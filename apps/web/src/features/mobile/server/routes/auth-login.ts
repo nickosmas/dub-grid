@@ -13,6 +13,7 @@ import { getServiceClient } from "@/lib/supabase-service";
 import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 import { createMobileOptionsHandler, withMobileCors } from "./cors";
 import { getSupabasePublishableKey } from "@/lib/supabase-keys";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 async function hashEmail(email: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -56,14 +57,14 @@ export async function POST(req: NextRequest) {
   );
 
   if (misconfigured) {
-    return json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
 
   if (limited) {
     const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 900;
     return json(
       {
-        error: "Too many login attempts. Please try again later.",
+        error: "Too many sign-in attempts. Wait a few minutes and try again.",
         retryAfter,
       },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },

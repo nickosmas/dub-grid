@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchGridmasterFullAuditLog } from "@/features/gridmaster/client";
+import { Button } from "@/components/Button";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import Modal from "@/components/Modal";
 import {
@@ -11,9 +12,17 @@ import {
   formatRelativeTime,
   getAuditActorLabel,
   getAuditActorSecondaryLabel,
+  getAuditCategoryLabel,
   getAuditTargetLabel,
+  getResourceTypeLabel,
+  severityColor,
   summarizeDetails,
 } from "@/lib/activity-log-utils";
+import {
+  AUDIT_CATEGORY_OPTIONS,
+  AUDIT_RESOURCE_TYPE_OPTIONS,
+  getAuditSeverity,
+} from "@/lib/audit/registry";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import { MaybeHint } from "@/components/ui/hint";
@@ -21,119 +30,8 @@ import { queryKeys } from "@/lib/query-keys";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { FullAuditLogEntry } from "@/types";
 
-const ACTION_LABELS: Record<string, string> = {
-  "org.created": "Organization created",
-  "org.updated": "Organization updated",
-  "org.archived": "Organization archived",
-  "org.restored": "Organization restored",
-  "org.suspended": "Organization suspended",
-  "org.unsuspended": "Organization unsuspended",
-  "org.deleted": "Organization deleted",
-  "role.changed": "Role changed",
-  "role.assigned": "Role assigned",
-  "permissions.updated": "Permissions updated",
-  "gridmaster_account.promoted": "Gridmaster promoted",
-  "gridmaster_account.demoted": "Gridmaster demoted",
-  "gridmaster_account.deactivated": "Gridmaster deactivated",
-  "gridmaster_account.reactivated": "Gridmaster reactivated",
-  "user.removed_from_org": "User removed",
-  "user.deactivated": "User deactivated",
-  "user.reactivated": "User reactivated",
-  "user.force_logout": "Force logout",
-  "user.password_reset_sent": "Password reset",
-  "impersonation.started": "Impersonation started",
-  "impersonation.ended": "Impersonation ended",
-  "invitation.sent": "Invitation sent",
-  "invitation.accepted": "Invitation accepted",
-  "invitation.revoked": "Invitation revoked",
-  "invitation.resent": "Invitation resent",
-  "employee.created": "Employee created",
-  "employee.updated": "Employee updated",
-  "employee.deactivated": "Employee marked inactive",
-  "employee.activated": "Employee activated",
-  "employee.removed": "Employee removed",
-  // Historical keys before the bench→deactivate / terminate→remove rename.
-  // Older audit rows still carry these — keep them rendering with the new copy.
-  "employee.benched": "Employee marked inactive",
-  "employee.archived": "Employee removed",
-  "shift.created": "Shift created",
-  "shift.updated": "Shift updated",
-  "shift.deleted": "Shift deleted",
-  "schedule.published": "Schedule published",
-  "schedule.drafts_discarded": "Drafts discarded",
-  "billing.trial_extended": "Trial extended",
-  "billing.subscription_canceled": "Subscription canceled",
-  "billing.synced": "Billing synced",
-  "billing.status_overridden": "Billing status override",
-  "feature_flags.updated": "Runtime controls updated",
-};
-
-function getActionLabel(action: string): string {
-  return (
-    ACTION_LABELS[action] ??
-    action
-      .replace(/[._-]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/\b\w/g, (c) => c.toUpperCase())
-  );
-}
-
-const RESOURCE_TYPE_LABELS: Record<string, string> = {
-  data_export: "Data export",
-  employee: "Employee",
-  impersonation_session: "Impersonation session",
-  invitation: "Invitation",
-  organization: "Organization",
-  organization_membership: "Organization access",
-  schedule: "Schedule",
-  shift: "Shift",
-  user: "User account",
-};
-
-function getResourceTypeLabel(resourceType: string): string {
-  return (
-    RESOURCE_TYPE_LABELS[resourceType] ??
-    resourceType
-      .replace(/[._-]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/\b\w/g, (c) => c.toUpperCase())
-  );
-}
-
 function ActionBadge({ action }: { action: string }) {
-  const isDestructive =
-    action.includes("deleted") ||
-    action.includes("removed") ||
-    action.includes("suspended") ||
-    action.includes("deactivated") ||
-    action.includes("terminated") ||
-    action.includes("revoked") ||
-    action.includes("force_logout");
-  const isCreate =
-    action.includes("created") ||
-    action.includes("restored") ||
-    action.includes("activated") ||
-    action.includes("accepted") ||
-    action.includes("unsuspended") ||
-    action.includes("reactivated");
-  const isImpersonation = action.includes("impersonation");
-
-  const bg = isDestructive
-    ? "var(--color-danger-bg)"
-    : isCreate
-      ? "var(--color-success-bg)"
-      : isImpersonation
-        ? "var(--color-warning-bg)"
-        : "var(--color-bg-secondary)";
-  const color = isDestructive
-    ? "var(--color-danger)"
-    : isCreate
-      ? "var(--color-success)"
-      : isImpersonation
-        ? "var(--color-warning)"
-        : "var(--color-text-secondary)";
+  const colors = severityColor(getAuditSeverity(action));
 
   return (
     <span
@@ -143,12 +41,12 @@ function ActionBadge({ action }: { action: string }) {
         fontWeight: 600,
         padding: "2px 8px",
         borderRadius: 4,
-        background: bg,
-        color,
+        background: colors.bg,
+        color: colors.fg,
         whiteSpace: "nowrap",
       }}
     >
-      {getActionLabel(action)}
+      {getAuditCategoryLabel(action)}
     </span>
   );
 }
@@ -212,22 +110,6 @@ function DetailsSummary({ details, action }: { details: Record<string, unknown>;
   );
 }
 
-// Available action categories for filtering
-const ACTION_CATEGORIES = [
-  { value: "all", label: "All Actions" },
-  { value: "org.", label: "Organization" },
-  { value: "role.", label: "Roles & Permissions" },
-  { value: "gridmaster_account.", label: "Gridmaster Accounts" },
-  { value: "user.", label: "User Management" },
-  { value: "impersonation.", label: "Impersonation" },
-  { value: "invitation.", label: "Invitations" },
-  { value: "employee.", label: "Employees" },
-  { value: "shift.", label: "Shifts" },
-  { value: "schedule.", label: "Schedule" },
-  { value: "billing.", label: "Billing" },
-  { value: "feature_flags.", label: "Runtime Controls" },
-];
-
 export default function AuditLogView({
   orgId,
   title,
@@ -256,7 +138,9 @@ export default function AuditLogView({
     queryFn: () =>
       fetchGridmasterFullAuditLog({
         orgId,
-        actionPrefix: actionFilter === "all" ? undefined : actionFilter,
+        actionPrefixes:
+          AUDIT_CATEGORY_OPTIONS.find((option) => option.value === actionFilter)?.prefixes ??
+          undefined,
         resourceType: resourceType || undefined,
         target: target.trim() || undefined,
         highRiskOnly,
@@ -270,7 +154,10 @@ export default function AuditLogView({
     ? formatClientErrorMessage(auditQuery.error, "We couldn't load the audit log right now.")
     : null;
 
-  const actionOptions = useMemo(() => ACTION_CATEGORIES, []);
+  const actionOptions = useMemo(
+    () => AUDIT_CATEGORY_OPTIONS.map(({ value, label }) => ({ value, label })),
+    [],
+  );
 
   return (
     <>
@@ -305,16 +192,16 @@ export default function AuditLogView({
             style={{ width: "auto", minWidth: 160 }}
             fontSize={12}
           />
-          <input
-            className="dg-input"
+          <CustomSelect
             value={resourceType}
-            onChange={(event) => {
-              setResourceType(event.target.value);
+            options={AUDIT_RESOURCE_TYPE_OPTIONS}
+            onChange={(value) => {
+              setResourceType(value);
               setPage(0);
             }}
-            placeholder="Resource"
-            aria-label="Resource type"
-            style={{ width: 130, fontSize: "var(--dg-fs-caption)" }}
+            aria-label="Record type"
+            style={{ width: "auto", minWidth: 170 }}
+            fontSize={12}
           />
           <input
             className="dg-input"
@@ -323,9 +210,9 @@ export default function AuditLogView({
               setTarget(event.target.value);
               setPage(0);
             }}
-            placeholder="Target / details"
-            aria-label="Target search"
-            style={{ width: 170, fontSize: "var(--dg-fs-caption)" }}
+            placeholder="Search people or details"
+            aria-label="Search people or details"
+            style={{ width: 190, fontSize: "var(--dg-fs-caption)" }}
           />
           <label
             style={{
@@ -423,7 +310,7 @@ export default function AuditLogView({
                         <tr
                           key={e.id}
                           tabIndex={0}
-                          aria-label={`${getActionLabel(e.action)} audit details`}
+                          aria-label={`${describeAction(e)} — activity details`}
                           onClick={() => setSelectedEntry(e)}
                           onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") {
@@ -565,13 +452,13 @@ export default function AuditLogView({
               marginTop: 16,
             }}
           >
-            <button
+            <Button
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={page === 0}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
             >
               Previous
-            </button>
+            </Button>
             <span
               style={{
                 fontSize: "var(--dg-fs-caption)",
@@ -581,13 +468,13 @@ export default function AuditLogView({
             >
               {page * PAGE_SIZE + 1}–{page * PAGE_SIZE + entries.length}
             </span>
-            <button
+            <Button
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={entries.length < PAGE_SIZE}
               onClick={() => setPage((p) => p + 1)}
             >
               Next
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -641,7 +528,7 @@ function AuditEntryDetailsDialog({
               "Organization",
               entry.orgName ?? (entry.orgId ? "Unknown organization" : "Platform-wide"),
             ],
-            ["Action", getActionLabel(entry.action)],
+            ["Category", getAuditCategoryLabel(entry.action)],
           ]}
         />
 

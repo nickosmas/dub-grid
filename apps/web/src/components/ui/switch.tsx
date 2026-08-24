@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { Button } from "@/components/Button";
 
 interface SwitchProps {
   checked: boolean;
@@ -13,7 +14,7 @@ interface SwitchProps {
 
 export function Switch({ checked, onChange, disabled, ariaLabel, id, style }: SwitchProps) {
   return (
-    <button
+    <Button
       id={id}
       type="button"
       role="switch"
@@ -50,6 +51,6 @@ export function Switch({ checked, onChange, disabled, ariaLabel, id, style }: Sw
           boxShadow: "0 1px 3px rgba(0,0,0,.2)",
         }}
       />
-    </button>
+    </Button>
   );
 }

@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   const { limited, reset, misconfigured } = await checkRateLimit(inviteLimiter, user.id);
   if (misconfigured) {
     return NextResponse.json(
-      { success: false, error: "Service temporarily unavailable" },
+      { success: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
     );
   }
@@ -94,14 +94,18 @@ export async function POST(req: NextRequest) {
   const target = await checkRateLimit(emailTargetLimiter, `invite-email:${hashEmail(email)}`);
   if (target.misconfigured) {
     return NextResponse.json(
-      { success: false, error: "Service temporarily unavailable" },
+      { success: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
     );
   }
   if (target.limited) {
     const retryAfter = target.reset ? Math.ceil((target.reset - Date.now()) / 1000) : 60;
     return NextResponse.json(
-      { success: false, error: "Too many invites sent to this address. Please try again later." },
+      {
+        success: false,
+        error:
+          "We've sent several invites to that address already. Wait a few minutes and try again.",
+      },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
     );
   }
@@ -137,6 +141,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "send-invite-email" } });
     logger.error({ err, path: "/api/send-invite-email" }, "Failed to send invite email");
-    return NextResponse.json({ success: false, error: "Failed to send email" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "We couldn't send that email. Try again." },
+      { status: 500 },
+    );
   }
 }

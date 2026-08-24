@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       });
       logger.error({ error: deleteError, userId }, "Failed to delete auth user after GDPR erasure");
       return NextResponse.json(
-        { error: "Failed to delete account after data erasure" },
+        { error: "We erased the personal data, but couldn't delete the account. Try again." },
         { status: 500 },
       );
     }

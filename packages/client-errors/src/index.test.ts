@@ -93,7 +93,7 @@ describe("formatClientErrorMessage", () => {
         new Error("Invitation email could not be sent. Try again in a moment."),
         "fallback",
       ),
-    ).toBe("We couldn't send that email. Please try again shortly.");
+    ).toBe("We couldn't send that invitation email. Try again in a moment.");
   });
 
   it("returns the canonical network message for connectivity failures", () => {

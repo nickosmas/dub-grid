@@ -123,7 +123,7 @@ export function useShiftRequests(
         setRequests(data);
       }
     } catch (err: unknown) {
-      const msg = errMsg(err, "Failed to fetch shift requests");
+      const msg = errMsg(err, "We couldn't fetch shift requests. Try again.");
       Sentry.captureException(err);
       if (orgIdRef.current === orgId) {
         setError(msg);
@@ -328,7 +328,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return id;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "Failed to create request"));
+        toast.error(errMsg(err, "We couldn't create request. Try again."));
         return null;
       }
     },
@@ -350,7 +350,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "Failed to claim shift"));
+        toast.error(errMsg(err, "We couldn't claim shift. Try again."));
         return false;
       }
     },
@@ -379,7 +379,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "Failed to volunteer for shift"));
+        toast.error(errMsg(err, "We couldn't volunteer for shift. Try again."));
         return false;
       }
     },
@@ -395,7 +395,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "Failed to respond"));
+        toast.error(errMsg(err, "We couldn't respond. Try again."));
         return false;
       }
     },
@@ -421,7 +421,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "Failed to resolve request"));
+        toast.error(errMsg(err, "We couldn't resolve request. Try again."));
         return false;
       }
     },
@@ -437,7 +437,7 @@ export function useShiftRequests(
         await refetchAfterMutation();
         return true;
       } catch (err: unknown) {
-        toast.error(errMsg(err, "Failed to cancel"));
+        toast.error(errMsg(err, "We couldn't cancel. Try again."));
         return false;
       }
     },

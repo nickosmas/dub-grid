@@ -375,6 +375,12 @@ export function fetchGridmasterFullAuditLog(options?: {
   orgId?: string;
   action?: string;
   actionPrefix?: string;
+  /**
+   * Action prefixes to include, OR'd together. Lets a category that spans
+   * several prefixes ("Setup", "Access & roles") filter server-side, so
+   * pagination counts stay honest.
+   */
+  actionPrefixes?: string[];
   resourceType?: string;
   actorId?: string;
   target?: string;
@@ -393,6 +399,9 @@ export function fetchGridmasterFullAuditLog(options?: {
   }
   if (options?.actionPrefix) {
     params.set("actionPrefix", options.actionPrefix);
+  }
+  if (options?.actionPrefixes?.length) {
+    params.set("actionPrefixes", options.actionPrefixes.join(","));
   }
   if (options?.resourceType) {
     params.set("resourceType", options.resourceType);

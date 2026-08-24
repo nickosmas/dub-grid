@@ -9,6 +9,7 @@ import {
   updatePlatformFeatureFlag,
 } from "@/features/gridmaster/client";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Modal from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
@@ -120,7 +121,7 @@ export default function PlatformFeatureFlagsView() {
       void queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.platformFlags() });
     },
     onError: (err: unknown) => {
-      toast.error(formatClientErrorMessage(err, "Failed to update feature"));
+      toast.error(formatClientErrorMessage(err, "We couldn't update that control. Try again."));
       void queryClient.invalidateQueries({ queryKey: queryKeys.gridmaster.platformFlags() });
     },
     onSettled: () => setPendingFlag(null),
@@ -134,7 +135,7 @@ export default function PlatformFeatureFlagsView() {
       closeAddModal();
     },
     onError: (err: unknown) => {
-      toast.error(formatClientErrorMessage(err, "Failed to add feature control"));
+      toast.error(formatClientErrorMessage(err, "We couldn't add that control. Try again."));
     },
   });
 
@@ -180,9 +181,9 @@ export default function PlatformFeatureFlagsView() {
           }}
         >
           Platform Feature Controls
-          <button className="dg-btn dg-btn-secondary dg-btn-sm" onClick={() => openAddModal()}>
+          <Button className="dg-btn dg-btn-secondary dg-btn-sm" onClick={() => openAddModal()}>
             + Add Feature Control
-          </button>
+          </Button>
         </div>
         {suggestedKeys.length > 0 && (
           <div
@@ -198,14 +199,14 @@ export default function PlatformFeatureFlagsView() {
               Quick add:
             </span>
             {suggestedKeys.map((key) => (
-              <button
+              <Button
                 key={key}
                 type="button"
                 className="dg-btn dg-btn-secondary dg-btn-sm"
                 onClick={() => openAddModal({ key, description: FLAG_INFO[key].description })}
               >
                 + {FLAG_INFO[key].label}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -307,7 +308,7 @@ export default function PlatformFeatureFlagsView() {
           variant={pendingFlag.enabled ? "danger" : "warning"}
           isLoading={mutation.isPending}
           onConfirm={() => {
-            mutation.mutate({
+            return mutation.mutateAsync({
               key: pendingFlag.key,
               enabled: !pendingFlag.enabled,
               expectedUpdatedAt: pendingFlag.updatedAt,
@@ -378,10 +379,10 @@ export default function PlatformFeatureFlagsView() {
             </label>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-            <button className="dg-btn dg-btn-secondary" onClick={closeAddModal}>
+            <Button className="dg-btn dg-btn-secondary" onClick={closeAddModal}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               className="dg-btn dg-btn-primary"
               onClick={handleCreateSubmit}
               disabled={
@@ -391,7 +392,7 @@ export default function PlatformFeatureFlagsView() {
               <ButtonLoading loading={createMutation.isPending} loadingLabel="Adding">
                 Add Feature Control
               </ButtonLoading>
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

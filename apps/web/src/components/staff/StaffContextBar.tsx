@@ -1,6 +1,7 @@
 "use client";
 
 import { Department, Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import { Button } from "@/components/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useIsInSandbox } from "@/hooks";
@@ -217,12 +218,12 @@ export function StaffContextBar({
           {phonePresenceLabel && (
             <FilterPill label={`Phone: ${phonePresenceLabel}`} onClear={onClearPhonePresence} />
           )}
-          <button
+          <Button
             onClick={onClearAll}
             className="text-xs font-semibold text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors ml-1"
           >
             Clear all
-          </button>
+          </Button>
         </div>
       )}
 
@@ -242,7 +243,7 @@ export function StaffContextBar({
           </div>
           <div className="flex-1" />
           {invitableEmployees.length > 0 && canManageManagementAccess && (
-            <button
+            <Button
               onClick={() => onBulkInvite(invitableEmployees)}
               disabled={isInSandbox}
               className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -251,37 +252,37 @@ export function StaffContextBar({
               }
             >
               Invite ({invitableEmployees.length})
-            </button>
+            </Button>
           )}
           {activatableIds.length > 0 && (
-            <button
+            <Button
               onClick={() => onBulkActivate(activatableIds)}
               className="dg-btn dg-btn-secondary dg-btn-sm"
             >
               Activate
               {activatableIds.length !== selectionCount ? ` (${activatableIds.length})` : ""}
-            </button>
+            </Button>
           )}
           {deactivatableIds.length > 0 && (
-            <button
+            <Button
               onClick={() => onBulkDeactivate(deactivatableIds)}
               className="dg-btn dg-btn-secondary dg-btn-sm"
             >
               Deactivate
               {deactivatableIds.length !== selectionCount ? ` (${deactivatableIds.length})` : ""}
-            </button>
+            </Button>
           )}
           {removableIds.length > 0 && (
-            <button
+            <Button
               onClick={() => onBulkRemove(removableIds)}
               className="dg-btn dg-btn-danger dg-btn-sm"
             >
               Remove{removableIds.length !== selectionCount ? ` (${removableIds.length})` : ""}
-            </button>
+            </Button>
           )}
-          <button onClick={onClearSelection} className="dg-btn dg-btn-secondary dg-btn-sm">
+          <Button onClick={onClearSelection} className="dg-btn dg-btn-secondary dg-btn-sm">
             Cancel
-          </button>
+          </Button>
         </div>
       )}
 
@@ -354,13 +355,13 @@ export function StaffContextBar({
             </div>
           </div>
           <div className="flex-1" />
-          <button onClick={onCancelReorder} className="dg-btn dg-btn-secondary dg-btn-sm">
+          <Button onClick={onCancelReorder} className="dg-btn dg-btn-secondary dg-btn-sm">
             {EDITOR_ACTION_LABELS.close}
-          </button>
+          </Button>
           {isDirty && (
-            <button onClick={onSaveOrder} className="dg-btn dg-btn-primary dg-btn-sm">
+            <Button onClick={onSaveOrder} className="dg-btn dg-btn-primary dg-btn-sm">
               Save Order
-            </button>
+            </Button>
           )}
         </div>
       )}

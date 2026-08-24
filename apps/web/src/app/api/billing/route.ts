@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Timer, withTiming } from "@/lib/server-timing";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { loadOrganizationBillingSummary } from "@/features/billing/server";
@@ -12,7 +13,7 @@ const querySchema = z.object({
   orgId: z.string().uuid(),
 });
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest, timer: Timer) {
   const parsed = querySchema.safeParse({
     orgId: req.nextUrl.searchParams.get("orgId"),
   });
@@ -21,16 +22,18 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const auth = await requireOrgPermissions(
-    req,
-    parsed.data.orgId,
-    (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
-    // ignoreSandbox: billing is read-only and intentionally surfaces
-    // the source organization's real Stripe state even when the caller is
-    // in sandbox mode. Without this, the sandbox-redirect would route
-    // the check to the (subscription_status='active') sandbox clone and
-    // hide all the real billing details.
-    { allowLockedOrganization: true, ignoreSandbox: true },
+  const auth = await timer.time("auth", () =>
+    requireOrgPermissions(
+      req,
+      parsed.data.orgId,
+      (permissions) => permissions.isGridmaster || permissions.isSuperAdmin,
+      // ignoreSandbox: billing is read-only and intentionally surfaces
+      // the source organization's real Stripe state even when the caller is
+      // in sandbox mode. Without this, the sandbox-redirect would route
+      // the check to the (subscription_status='active') sandbox clone and
+      // hide all the real billing details.
+      { allowLockedOrganization: true, ignoreSandbox: true },
+    ),
   );
   if ("response" in auth) {
     return auth.response;
@@ -46,6 +49,11 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     Sentry.captureException(error, { extra: { context: "billing-summary" } });
     logger.error({ error, orgId: parsed.data.orgId }, "Failed to load billing summary");
-    return NextResponse.json({ error: "Failed to load billing" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your billing details. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
+
+export const GET = withTiming(handleGET);

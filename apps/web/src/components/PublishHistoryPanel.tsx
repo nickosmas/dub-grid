@@ -3,10 +3,13 @@
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
+import { Button } from "@/components/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { fetchPublishHistory } from "@/features/schedule/client";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 import { formatRelativeTime } from "@/lib/utils";
 import type {
   PublishHistoryEntryWithName,
@@ -38,9 +41,14 @@ interface PublishHistoryPanelProps {
 function formatDateRange(start: string, end: string): string {
   const s = new Date(start + "T00:00:00");
   const e = new Date(end + "T00:00:00");
-  const opts: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
+  const opts: Intl.DateTimeFormatOptions = {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  };
   if (start === end) return s.toLocaleDateString("en-US", opts);
-  return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${e.toLocaleDateString("en-US", opts)}`;
+  return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} – ${e.toLocaleDateString("en-US", opts)}`;
 }
 
 function ChangeBreakdown({ changes }: { changes: PublishChange[] }) {
@@ -203,6 +211,7 @@ function ChangeRow({
     weekday: "short",
     month: "short",
     day: "numeric",
+    year: "numeric",
   });
   const fromLabel = resolveLabel(
     change.from,
@@ -448,7 +457,10 @@ export default function PublishHistoryPanel({
   const loading = open && historyQuery.isPending;
   const hasMore = entries.length > 0 && entries.length % PAGE_SIZE === 0;
 
-  const loadMore = async () => {
+  // Latched: a second click while the page is still in flight would append the
+  // same slice twice, since the offset is read from `entries.length` and that
+  // has not grown yet.
+  const loadMore = useAsyncAction(async () => {
     try {
       const more = await fetchPublishHistory(orgId, PAGE_SIZE, entries.length);
       queryClient.setQueryData<PublishHistoryEntryWithName[]>(
@@ -458,7 +470,7 @@ export default function PublishHistoryPanel({
     } catch {
       // Silently fail
     }
-  };
+  });
 
   if (!open) return null;
 
@@ -496,7 +508,7 @@ export default function PublishHistoryPanel({
           }}
         >
           {isMobile && (
-            <button
+            <Button
               onClick={onClose}
               aria-label="Back"
               style={{
@@ -525,7 +537,7 @@ export default function PublishHistoryPanel({
               >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-            </button>
+            </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
@@ -593,7 +605,7 @@ export default function PublishHistoryPanel({
               size="compact"
               icon={<History size={22} />}
               title="No publish history yet"
-              description="Published schedules will be listed here."
+              description="Published schedules appear here."
             />
           )}
 
@@ -653,26 +665,26 @@ export default function PublishHistoryPanel({
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                    <button
+                    <Button
                       onClick={() => setExpandedId(isExpanded ? null : entry.id)}
                       className="dg-btn dg-btn-secondary"
                       style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 8px" }}
                     >
                       {isExpanded ? "Hide" : "Details"}
-                    </button>
+                    </Button>
                     <Hint
                       content={hint(
                         "Navigate to this date range and highlight changes on the grid",
                       )}
                       side="bottom"
                     >
-                      <button
+                      <Button
                         onClick={() => onSelectEntry(entry)}
                         className="dg-btn dg-btn-secondary"
                         style={{ fontSize: "var(--dg-fs-footnote)", padding: "3px 8px" }}
                       >
                         Show on Grid
-                      </button>
+                      </Button>
                     </Hint>
                   </div>
                 </div>
@@ -693,13 +705,20 @@ export default function PublishHistoryPanel({
 
           {hasMore && entries.length > 0 && (
             <div style={{ textAlign: "center", padding: "16px 0" }}>
-              <button
-                onClick={loadMore}
+              <Button
+                onClick={loadMore.run}
+                disabled={loadMore.isRunning}
                 className="dg-btn dg-btn-secondary"
                 style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 16px" }}
               >
-                Load More
-              </button>
+                <ButtonLoading
+                  loading={loadMore.isRunning}
+                  loadingLabel="Loading More"
+                  spinnerSize={14}
+                >
+                  Load More
+                </ButtonLoading>
+              </Button>
             </div>
           )}
         </div>

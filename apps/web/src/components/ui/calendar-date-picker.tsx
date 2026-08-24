@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { Button } from "@/components/Button";
 import { addDays, cn } from "@/lib/utils";
 
 const CALENDAR_WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -95,7 +96,7 @@ export default function CalendarDatePicker({
   return (
     <>
       <div ref={triggerRef} style={{ display: "inline-block", width: "100%", ...style }}>
-        <button
+        <Button
           id={id}
           type="button"
           aria-label={label}
@@ -154,7 +155,7 @@ export default function CalendarDatePicker({
               transform: open ? "rotate(180deg)" : "rotate(0deg)",
             }}
           />
-        </button>
+        </Button>
       </div>
 
       {open && !disabled ? (
@@ -200,7 +201,7 @@ export default function CalendarDatePicker({
                 {MONTH_FORMATTER.format(visibleMonth)}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <button
+                <Button
                   type="button"
                   onClick={() => setVisibleMonth((current) => shiftMonth(current, -1))}
                   className="dg-menu-item"
@@ -213,8 +214,8 @@ export default function CalendarDatePicker({
                   }}
                 >
                   <ChevronLeft size={16} />
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => setVisibleMonth((current) => shiftMonth(current, 1))}
                   className="dg-menu-item"
@@ -227,7 +228,7 @@ export default function CalendarDatePicker({
                   }}
                 >
                   <ChevronRight size={16} />
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -261,7 +262,7 @@ export default function CalendarDatePicker({
                 const isDisabled = !!minDate && dateKey < minDate && !isSelected;
 
                 return (
-                  <button
+                  <Button
                     key={dateKey}
                     type="button"
                     onClick={() => {
@@ -292,7 +293,7 @@ export default function CalendarDatePicker({
                         )}
                       />
                     ) : null}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -307,7 +308,7 @@ export default function CalendarDatePicker({
                 borderTop: "1px solid var(--color-border-light)",
               }}
             >
-              <button
+              <Button
                 type="button"
                 className="dg-btn dg-btn-secondary"
                 onClick={() => {
@@ -318,15 +319,15 @@ export default function CalendarDatePicker({
                 style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 10px" }}
               >
                 Clear
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 className="dg-btn dg-btn-secondary"
                 onClick={() => setOpen(false)}
                 style={{ fontSize: "var(--dg-fs-caption)", padding: "6px 10px" }}
               >
                 Close
-              </button>
+              </Button>
             </div>
           </PopoverContent>
         </Popover>

@@ -10,7 +10,9 @@ import {
   MOBILE,
 } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
+import { Button } from "@/components/Button";
 import { fetchAccountIdentity } from "@/features/account/client";
+import dynamic from "next/dynamic";
 import { DubGridLogo } from "@/components/Logo";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getAvatarInitials } from "@/lib/utils";
@@ -27,9 +29,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import GridmasterDashboard from "@/components/gridmaster/GridmasterDashboard";
-import OrganizationDetail from "@/components/gridmaster/OrganizationDetail";
-import OrganizationSetupWizard from "@/components/gridmaster/OrganizationSetupWizard";
 import {
   DashboardIcon,
   PeopleIcon,
@@ -46,15 +45,51 @@ import {
   type NavIconProps,
 } from "@/components/icons/NavIcons";
 
-import AllUsersView from "@/components/gridmaster/AllUsersView";
-import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
-import GridmasterBillingView from "@/components/gridmaster/GridmasterBillingView";
-import GridmasterComplianceView from "@/components/gridmaster/GridmasterComplianceView";
-import GridmasterSecurityView from "@/components/gridmaster/GridmasterSecurityView";
-import PlatformFeatureFlagsView from "@/components/gridmaster/PlatformFeatureFlagsView";
-import AuditLogView from "@/components/gridmaster/AuditLogView";
-import EnhancedImpersonation from "@/components/gridmaster/EnhancedImpersonation";
-import ImpersonationHistory from "@/components/gridmaster/ImpersonationHistory";
+// Each view is fetched when its tab is opened. The portal renders exactly one
+// at a time — the body below is a chain of `view === "..."` guards — but
+// importing them statically pulled all twelve, ~9,500 lines, for whichever
+// single one a gridmaster actually opened. OrganizationSetupWizard alone is
+// 2,258 of those and is reached from one button.
+const GridmasterDashboard = dynamic(() => import("@/components/gridmaster/GridmasterDashboard"), {
+  ssr: false,
+});
+const OrganizationDetail = dynamic(() => import("@/components/gridmaster/OrganizationDetail"), {
+  ssr: false,
+});
+const OrganizationSetupWizard = dynamic(
+  () => import("@/components/gridmaster/OrganizationSetupWizard"),
+  { ssr: false },
+);
+const AllUsersView = dynamic(() => import("@/components/gridmaster/AllUsersView"), { ssr: false });
+const GridmasterAccountsView = dynamic(
+  () => import("@/components/gridmaster/GridmasterAccountsView"),
+  { ssr: false },
+);
+const GridmasterBillingView = dynamic(
+  () => import("@/components/gridmaster/GridmasterBillingView"),
+  { ssr: false },
+);
+const GridmasterComplianceView = dynamic(
+  () => import("@/components/gridmaster/GridmasterComplianceView"),
+  { ssr: false },
+);
+const GridmasterSecurityView = dynamic(
+  () => import("@/components/gridmaster/GridmasterSecurityView"),
+  { ssr: false },
+);
+const PlatformFeatureFlagsView = dynamic(
+  () => import("@/components/gridmaster/PlatformFeatureFlagsView"),
+  { ssr: false },
+);
+const AuditLogView = dynamic(() => import("@/components/gridmaster/AuditLogView"), { ssr: false });
+const EnhancedImpersonation = dynamic(
+  () => import("@/components/gridmaster/EnhancedImpersonation"),
+  { ssr: false },
+);
+const ImpersonationHistory = dynamic(() => import("@/components/gridmaster/ImpersonationHistory"), {
+  ssr: false,
+});
+
 import NotificationBell from "@/components/NotificationBell";
 import ProgressBar from "@/components/ProgressBar";
 import { InboxView as AlertsInboxView } from "@/app/alerts/AlertsInboxPage";
@@ -211,7 +246,7 @@ function OrgSearchCombobox({
                 const isArchived = !!c.archivedAt;
                 const isActive = selectedOrg?.id === c.id;
                 return (
-                  <button
+                  <Button
                     key={c.id}
                     onClick={() => {
                       onSelect(c.id);
@@ -304,7 +339,7 @@ function OrgSearchCombobox({
                         {empCount}
                       </span>
                     </div>
-                  </button>
+                  </Button>
                 );
               })
             )}
@@ -404,7 +439,10 @@ export default function GridmasterPortal() {
     return map;
   }, [dashboardQuery.data?.stats]);
   const error = dashboardQuery.error
-    ? formatClientErrorMessage(dashboardQuery.error, "Failed to load gridmaster dashboard")
+    ? formatClientErrorMessage(
+        dashboardQuery.error,
+        "We couldn't load the dashboard. Refresh and try again.",
+      )
     : null;
 
   // ── Nav item config (must be before early returns to satisfy Rules of Hooks) ──
@@ -743,7 +781,7 @@ export default function GridmasterPortal() {
         </div>
         {!isMobile && (
           <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
-            <button
+            <Button
               onClick={() => setMenuOpen((o) => !o)}
               style={{
                 display: "inline-flex",
@@ -830,14 +868,14 @@ export default function GridmasterPortal() {
               >
                 <polyline points="6 9 12 15 18 9" />
               </svg>
-            </button>
+            </Button>
 
             {menuOpen && (
               <div
                 className="dg-menu"
                 style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200 }}
               >
-                <button
+                <Button
                   className="dg-menu-item"
                   onClick={() => {
                     setMenuOpen(false);
@@ -858,9 +896,9 @@ export default function GridmasterPortal() {
                     <circle cx="12" cy="7" r="4" />
                   </svg>
                   Profile
-                </button>
+                </Button>
                 <div className="dg-menu-divider" />
-                <button
+                <Button
                   className="dg-menu-item dg-menu-item--danger"
                   onClick={() => {
                     setMenuOpen(false);
@@ -882,7 +920,7 @@ export default function GridmasterPortal() {
                     <line x1="21" y1="12" x2="9" y2="12" />
                   </svg>
                   Sign out
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -907,7 +945,7 @@ export default function GridmasterPortal() {
               { key: "impersonation-history", label: "History" },
             ] as { key: GridmasterView; label: string }[]
           ).map((item) => (
-            <button
+            <Button
               key={item.key}
               className={`dg-mobile-section-chip${view === item.key ? " active" : ""}`}
               onClick={() => {
@@ -921,7 +959,7 @@ export default function GridmasterPortal() {
               }}
             >
               {item.label}
-            </button>
+            </Button>
           ))}
         </nav>
       )}
@@ -1086,7 +1124,7 @@ export default function GridmasterPortal() {
 
           {view === "organization" && selectedOrg && (
             <>
-              <button
+              <Button
                 onClick={() => {
                   setView("dashboard");
                   setSelectedId(null);
@@ -1124,7 +1162,7 @@ export default function GridmasterPortal() {
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
                 All Organizations
-              </button>
+              </Button>
               <OrganizationDetail
                 organization={selectedOrg}
                 stats={stats.get(selectedOrg.id)}

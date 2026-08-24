@@ -29,7 +29,10 @@ export async function GET(req: NextRequest) {
   const serviceClient = getServiceClient();
   const { data: userData, error: userError } = await serviceClient.auth.getUser(accessToken);
   if (userError || !userData.user) {
-    return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Your session has expired. Sign in again." },
+      { status: 401 },
+    );
   }
 
   const membershipRows = await fetchMobileOrganizationMembershipRows(

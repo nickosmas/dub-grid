@@ -10,8 +10,11 @@ import { AUTO_ONE_WEEK } from "@/hooks";
 import { formatDateKey } from "@/lib/utils";
 
 describe("schedule view fallback", () => {
-  it("widens the auto one-week breakpoint", () => {
-    expect(AUTO_ONE_WEEK).toBe("(min-width: 768px) and (max-width: 1200px)");
+  it("applies the auto one-week breakpoint to phones as well as cramped desktops", () => {
+    // No lower bound: the mobile grid only ever draws 7 columns, so leaving
+    // phones in 2-week span made the publish window cover an unseen week and
+    // made "next period" a no-op against the pay-period snap.
+    expect(AUTO_ONE_WEEK).toBe("(max-width: 1200px)");
   });
 
   it("auto-resolves preferred 2-week view to 1-week inside the cramped range", () => {

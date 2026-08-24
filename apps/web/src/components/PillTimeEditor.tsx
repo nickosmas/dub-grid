@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { calcTimeDuration } from "@/lib/utils";
+import { Button } from "@/components/Button";
 import CustomSelect from "./CustomSelect";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
@@ -158,7 +159,7 @@ export function PillTimeEditor({
   if (!hasCustomTime && !editing) {
     return (
       <Hint content={hint("Override this shift's start and end times")} side="left">
-        <button
+        <Button
           data-tour="edit-panel-custom-time"
           onClick={() => startEditing()}
           style={{
@@ -203,7 +204,7 @@ export function PillTimeEditor({
                 : ""}
             </span>
           )}
-        </button>
+        </Button>
       </Hint>
     );
   }
@@ -266,7 +267,7 @@ export function PillTimeEditor({
             )}
           </div>
           <div style={{ display: "flex", gap: 6 }}>
-            <button
+            <Button
               onClick={() => startEditing()}
               style={{
                 fontSize: "var(--dg-fs-badge)",
@@ -281,8 +282,8 @@ export function PillTimeEditor({
               }}
             >
               Edit
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 onRemove();
               }}
@@ -299,7 +300,7 @@ export function PillTimeEditor({
               }}
             >
               Remove
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -337,7 +338,7 @@ export function PillTimeEditor({
           Custom Time
         </span>
         <div style={{ display: "flex", gap: 6 }}>
-          <button
+          <Button
             onClick={handleCancel}
             style={{
               fontSize: "var(--dg-fs-badge)",
@@ -352,9 +353,9 @@ export function PillTimeEditor({
             }}
           >
             Cancel
-          </button>
+          </Button>
           {hasCustomTime && (
-            <button
+            <Button
               onClick={() => {
                 onRemove();
                 setEditing(false);
@@ -372,7 +373,7 @@ export function PillTimeEditor({
               }}
             >
               Remove
-            </button>
+            </Button>
           )}
         </div>
       </div>

@@ -25,6 +25,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error({ error }, "account logout cleanup failed");
-    return NextResponse.json({ error: "Failed to clear impersonation sessions" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't end those viewing sessions. Try again." },
+      { status: 500 },
+    );
   }
 }

@@ -3,6 +3,7 @@
 import React, { useId, useRef, useState } from "react";
 
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Button } from "@/components/Button";
 import { Popover, PopoverContent } from "@/components/ui/popover";
 import type { HintContent } from "./hint.types";
 import { hint } from "./hint.types";
@@ -78,7 +79,7 @@ export function HelpHint({ content, side = "top", size = 14 }: HelpHintProps) {
 
   return (
     <>
-      <button
+      <Button
         ref={triggerRef}
         type="button"
         aria-label="Help"
@@ -102,7 +103,7 @@ export function HelpHint({ content, side = "top", size = 14 }: HelpHintProps) {
         }}
       >
         ?
-      </button>
+      </Button>
 
       {open && triggerRef.current ? (
         <Popover open={open} onOpenChange={setOpen}>

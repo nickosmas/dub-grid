@@ -148,7 +148,9 @@ async function postLinkRequest(
   const mismatchError = parseNameMismatchResponse(payload);
   if (mismatchError) throw mismatchError;
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(payload?.error, "Failed to link employee to user"));
+    throw new Error(
+      formatClientErrorMessage(payload?.error, "We couldn't link employee to user. Try again."),
+    );
   }
   return { status: payload?.status ?? "linked" };
 }

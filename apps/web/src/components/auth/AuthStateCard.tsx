@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Mail, CheckCircle, ShieldCheck } from "lucide-react";
 import ButtonSpinner from "@/components/ButtonSpinner";
+import { Button } from "@/components/Button";
 
 type AuthIcon = "mail" | "check" | "shield" | "spinner";
 
@@ -85,14 +86,14 @@ export function AuthStateCard({
             {primaryCta.label}
           </Link>
         ) : (
-          <button
+          <Button
             type="button"
             onClick={primaryCta.onClick}
             className="dg-btn dg-btn-primary dg-btn-lg"
             style={{ width: "100%" }}
           >
             {primaryCta.label}
-          </button>
+          </Button>
         ))}
 
       {secondaryCta && (

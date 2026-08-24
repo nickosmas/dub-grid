@@ -1,6 +1,7 @@
 "use client";
 
 import type { Organization, AuditLogEntry } from "@/types";
+import { Button } from "@/components/Button";
 import {
   fetchGridmasterAuditLog,
   fetchGridmasterOverview,
@@ -153,7 +154,7 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
           fontFamily: "var(--font-dm-mono), monospace",
         }}
       >
-        {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}{" "}
+        {date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}{" "}
         {date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
       </span>
     </div>
@@ -214,9 +215,9 @@ export default function GridmasterDashboard({
         >
           Dashboard
         </h2>
-        <button className="dg-btn dg-btn-brand" onClick={onCreateOrg}>
+        <Button className="dg-btn dg-btn-brand" onClick={onCreateOrg}>
           + New Organization
-        </button>
+        </Button>
       </div>
 
       {overview && (
@@ -426,7 +427,7 @@ export default function GridmasterDashboard({
           {suspendedOrgs.map((o, i) => (
             <span key={o.id}>
               {i > 0 && ", "}
-              <button
+              <Button
                 onClick={() => onSelectOrg(o.id)}
                 style={{
                   background: "none",
@@ -440,7 +441,7 @@ export default function GridmasterDashboard({
                 }}
               >
                 {o.name}
-              </button>
+              </Button>
             </span>
           ))}
         </div>

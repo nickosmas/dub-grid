@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect, forwardRef, useImperativeHandle } from "react";
 import { Employee, FocusArea, NamedItem, Invitation } from "@/types";
+import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -626,7 +627,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                 </div>
                 <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                   {onInvite && (
-                    <button
+                    <Button
                       disabled={revoking}
                       onClick={async () => {
                         if (onRevoke) {
@@ -648,10 +649,10 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       <ButtonLoading loading={revoking} loadingLabel="Sending" spinnerSize={12}>
                         Reinvite
                       </ButtonLoading>
-                    </button>
+                    </Button>
                   )}
                   {onRevoke && (
-                    <button
+                    <Button
                       disabled={revoking}
                       onClick={async () => {
                         setRevoking(true);
@@ -669,12 +670,12 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                       <ButtonLoading loading={revoking} loadingLabel="Revoking" spinnerSize={12}>
                         Revoke
                       </ButtonLoading>
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
             ) : onInvite ? (
-              <button
+              <Button
                 onClick={() => onInvite(employee)}
                 className="dg-btn dg-btn-ghost"
                 style={{
@@ -701,7 +702,7 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   <polyline points="22,6 12,13 2,6" />
                 </svg>
                 Send Invitation
-              </button>
+              </Button>
             ) : null}
           </div>
         )}
@@ -720,12 +721,12 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
           {!hideActions && canEdit && (
             <EditorActionRow
               secondaryAction={
-                <button onClick={handleDismiss} className="dg-btn dg-btn-secondary">
+                <Button onClick={handleDismiss} className="dg-btn dg-btn-secondary">
                   {getEditorDismissLabel({ hasUnsavedChanges: isModified })}
-                </button>
+                </Button>
               }
               primaryAction={
-                <button
+                <Button
                   onClick={handleSave}
                   disabled={
                     !isModified ||
@@ -741,16 +742,16 @@ const EditEmployeePanel = forwardRef<EditEmployeePanelHandle, EditEmployeePanelP
                   className="dg-btn dg-btn-primary"
                 >
                   {EDITOR_ACTION_LABELS.save}
-                </button>
+                </Button>
               }
             />
           )}
           {!hideActions && !canEdit && (
             <EditorActionRow
               secondaryAction={
-                <button onClick={onCancel} className="dg-btn dg-btn-secondary">
+                <Button onClick={onCancel} className="dg-btn dg-btn-secondary">
                   {EDITOR_ACTION_LABELS.close}
-                </button>
+                </Button>
               }
             />
           )}

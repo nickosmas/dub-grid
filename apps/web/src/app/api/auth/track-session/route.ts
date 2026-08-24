@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { trackUserSessionForUser } from "@/features/account/server";
 import { requireAuthenticatedSession } from "@/lib/api-auth";
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not ready" }, { status: 409 });
     }
     logger.error({ err: error }, "track-session upsert error");
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }
 

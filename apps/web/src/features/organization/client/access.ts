@@ -182,7 +182,7 @@ export async function updateOrganizationSettings(
     const message =
       body && typeof body === "object" && "error" in body && typeof body.error === "string"
         ? body.error
-        : "Failed to update organization settings";
+        : "We couldn't update the organization settings. Try again.";
     throw new Error(message);
   }
 
@@ -222,7 +222,7 @@ export async function updateOrganizationMembershipGuarded(input: {
   }
 
   if (!response.ok || !body?.user) {
-    throw new Error(getErrorMessage(body, "Failed to update organization access"));
+    throw new Error(getErrorMessage(body, "We couldn't update organization access. Try again."));
   }
 
   return body.user;
@@ -246,7 +246,7 @@ export async function removeOrganizationMembershipGuarded(input: {
   }
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(body, "Failed to remove organization access"));
+    throw new Error(getErrorMessage(body, "We couldn't remove organization access. Try again."));
   }
 }
 
@@ -275,7 +275,7 @@ export async function updateOrganizationInvitationGuarded(input: {
   }
 
   if (!response.ok || !body?.invitation) {
-    throw new Error(getErrorMessage(body, "Failed to update invitation"));
+    throw new Error(getErrorMessage(body, "We couldn't update invitation. Try again."));
   }
 
   return body.invitation;
@@ -299,7 +299,7 @@ export async function revokeOrganizationInvitationGuarded(input: {
   }
 
   if (!response.ok || !body?.invitation) {
-    throw new Error(getErrorMessage(body, "Failed to revoke invitation"));
+    throw new Error(getErrorMessage(body, "We couldn't cancel that invitation. Try again."));
   }
 
   return body.invitation;
@@ -323,7 +323,7 @@ export async function resendOrganizationInvitationGuarded(input: {
   }
 
   if (!response.ok || !body?.invitation || !body.token || !body.expiresAt) {
-    throw new Error(getErrorMessage(body, "Failed to resend invitation"));
+    throw new Error(getErrorMessage(body, "We couldn't resend invitation. Try again."));
   }
 
   return {

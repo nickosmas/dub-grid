@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import type { AbsenceType, ShiftDisplayMode } from "@/types";
+import { Button } from "@/components/Button";
 import {
   checkAbsenceTypeDependencies,
   deleteAbsenceType,
@@ -406,17 +407,17 @@ function AbsenceTypeRow({
           <EditorActionRow
             destructiveAction={
               canEdit && !absenceType.isNew ? (
-                <button
+                <Button
                   onClick={handleDeleteClick}
                   disabled={deleting}
                   className="dg-btn dg-btn-danger dg-btn-sm"
                 >
                   {deleting ? "…" : "Archive"}
-                </button>
+                </Button>
               ) : undefined
             }
             secondaryAction={
-              <button
+              <Button
                 onClick={() =>
                   absenceType.isNew || !isDirty ? closeEditor() : discardDraft(false)
                 }
@@ -426,10 +427,10 @@ function AbsenceTypeRow({
                   hasUnsavedChanges: isDirty,
                   isCreating: Boolean(absenceType.isNew),
                 })}
-              </button>
+              </Button>
             }
             primaryAction={
-              <button
+              <Button
                 onClick={handleSave}
                 disabled={saving || !canSave || !canEdit}
                 className="dg-btn dg-btn-primary dg-btn-sm"
@@ -437,7 +438,7 @@ function AbsenceTypeRow({
                 <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
                   {EDITOR_ACTION_LABELS.save}
                 </ButtonLoading>
-              </button>
+              </Button>
             }
           />
         </div>
@@ -608,9 +609,9 @@ export default function AbsenceTypesSettings({
             description="Create the off-day and calloff labels your schedulers use."
             action={
               canManageScheduleDefinitions ? (
-                <button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
+                <Button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
                   + Add Absence Type
-                </button>
+                </Button>
               ) : undefined
             }
             style={{ margin: "12px 16px" }}
@@ -618,13 +619,13 @@ export default function AbsenceTypesSettings({
         )}
         {local.length > 0 && canManageScheduleDefinitions && (
           <div style={{ padding: "8px 16px 12px" }}>
-            <button
+            <Button
               onClick={handleAdd}
               className="dg-btn dg-btn-dashed dg-btn-sm"
               style={{ width: "100%" }}
             >
               + Add Absence Type
-            </button>
+            </Button>
           </div>
         )}
       </div>

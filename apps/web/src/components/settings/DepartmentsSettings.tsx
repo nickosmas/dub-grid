@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { Department, FocusArea } from "@/types";
+import { Button } from "@/components/Button";
 import {
   checkDepartmentDependencies,
   checkFocusAreaDependencies,
@@ -211,7 +212,7 @@ function FocusAreaRows({
               </span>
             )}
             {isEditing && (
-              <button
+              <Button
                 onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -238,7 +239,7 @@ function FocusAreaRows({
                 }}
               >
                 Delete
-              </button>
+              </Button>
             )}
           </div>
         );
@@ -824,15 +825,15 @@ function DepartmentSection({
   const footerActions = isWizardMode ? null : isEditing ? (
     <EditorActionRow
       secondaryAction={
-        <button
+        <Button
           onClick={isDirty ? handleDiscard : handleClose}
           className="dg-btn dg-btn-secondary dg-btn-sm"
         >
           {getEditorDismissLabel({ hasUnsavedChanges: isDirty })}
-        </button>
+        </Button>
       }
       primaryAction={
-        <button
+        <Button
           onClick={handleSave}
           disabled={saving || !isDirty || hasValidationErrors}
           className="dg-btn dg-btn-primary dg-btn-sm"
@@ -840,16 +841,16 @@ function DepartmentSection({
           <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
             {EDITOR_ACTION_LABELS.save}
           </ButtonLoading>
-        </button>
+        </Button>
       }
       style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}
     />
   ) : canEdit && displayList.length > 0 ? (
     <EditorActionRow
       primaryAction={
-        <button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
+        <Button onClick={handleEnterEdit} className="dg-btn dg-btn-secondary dg-btn-sm">
           Edit
-        </button>
+        </Button>
       }
       style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}
     />
@@ -899,9 +900,9 @@ function DepartmentSection({
           style={{ border: "none", borderRadius: 0 }}
           action={
             canEdit ? (
-              <button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
+              <Button onClick={handleEnterEdit} className={addBtnClass} style={{ width: "100%" }}>
                 + Add {addLabel}
-              </button>
+              </Button>
             ) : undefined
           }
         />
@@ -1034,11 +1035,11 @@ function DepartmentSection({
 
                   {/* Delete button (edit mode) */}
                   {isEditing && (
-                    <button
+                    <Button
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteClick(i);
+                        return handleDeleteClick(i);
                       }}
                       style={{
                         background: "none",
@@ -1061,7 +1062,7 @@ function DepartmentSection({
                       }}
                     >
                       Delete
-                    </button>
+                    </Button>
                   )}
                 </div>
 
@@ -1082,7 +1083,7 @@ function DepartmentSection({
                     {/* Add focus area button (edit mode) */}
                     {isEditing && (
                       <div style={{ padding: "8px 16px 8px 60px" }}>
-                        <button
+                        <Button
                           onClick={(e) => {
                             e.stopPropagation();
                             addFocusArea(dept.id);
@@ -1091,7 +1092,7 @@ function DepartmentSection({
                           style={{ width: "100%" }}
                         >
                           + Add {focusAreaLabel.replace(/s$/i, "")}
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </>
@@ -1100,7 +1101,7 @@ function DepartmentSection({
                 {/* Single-FA: split option (edit mode only) */}
                 {type === "scheduled" && isEditing && isSingleFA && (
                   <div style={{ padding: "6px 16px 10px 60px" }}>
-                    <button
+                    <Button
                       onClick={(e) => {
                         e.stopPropagation();
                         addFocusArea(dept.id);
@@ -1109,7 +1110,7 @@ function DepartmentSection({
                       style={{ fontSize: "var(--dg-fs-caption)" }}
                     >
                       + Split into {focusAreaLabel}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -1119,9 +1120,9 @@ function DepartmentSection({
           {/* Dashed add button (edit mode) */}
           {isEditing && (
             <div style={{ padding: "8px 16px 12px" }}>
-              <button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
+              <Button onClick={addRow} className={addBtnClass} style={{ width: "100%" }}>
                 + Add {addLabel}
-              </button>
+              </Button>
             </div>
           )}
         </div>

@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Check, Trash2, X } from "lucide-react";
 
 import { SectionCard } from "@/components/settings/shared";
+import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { formatClientLabel } from "@/lib/client-facing";
@@ -206,7 +207,7 @@ export function ProfilePanel({
       setIsEditingAccess(false);
       toast.success("Management access updated.");
     } catch (err) {
-      toast.error(extractErrorMessage(err, "Failed to update management access."));
+      toast.error(extractErrorMessage(err, "We couldn't update management access. Try again."));
     } finally {
       setSavingAccess(false);
     }
@@ -308,7 +309,7 @@ export function ProfilePanel({
         toast.success("Account details updated.");
       }
     } catch (err) {
-      toast.error(extractErrorMessage(err, "Failed to update account details."));
+      toast.error(extractErrorMessage(err, "We couldn't update account details. Try again."));
     } finally {
       setSaving(false);
     }
@@ -359,7 +360,7 @@ export function ProfilePanel({
       setRequestNote("");
       toast.success("Name change request sent.");
     } catch (err) {
-      toast.error(extractErrorMessage(err, "Failed to send name change request."));
+      toast.error(extractErrorMessage(err, "We couldn't send name change request. Try again."));
     } finally {
       setSubmittingRequest(false);
     }
@@ -377,7 +378,7 @@ export function ProfilePanel({
       setChangeRequests((cur) => [result.request, ...cur]);
       toast.success("Account deletion request sent.");
     } catch (err) {
-      toast.error(extractErrorMessage(err, "Failed to request account deletion."));
+      toast.error(extractErrorMessage(err, "We couldn't request account deletion. Try again."));
     } finally {
       setRequestingDeletion(false);
     }
@@ -395,7 +396,7 @@ export function ProfilePanel({
           : "Name change request cancelled.",
       );
     } catch (err) {
-      toast.error(extractErrorMessage(err, "Failed to cancel that request."));
+      toast.error(extractErrorMessage(err, "We couldn't cancel that request. Try again."));
     } finally {
       setCancellingId(null);
     }
@@ -455,13 +456,13 @@ export function ProfilePanel({
               </div>
             </div>
             {!isEditing && (
-              <button
+              <Button
                 type="button"
                 onClick={startEditing}
                 className="dg-btn dg-btn-secondary dg-btn-sm"
               >
                 Edit account details
-              </button>
+              </Button>
             )}
           </div>
 
@@ -538,14 +539,14 @@ export function ProfilePanel({
                     Save changes
                   </ButtonLoading>
                 </button>
-                <button
+                <Button
                   type="button"
                   onClick={hasAnyChanges ? cancelEditing : closeEditor}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                 >
                   <X size={14} />
                   {getEditorDismissLabel({ hasUnsavedChanges: hasAnyChanges })}
-                </button>
+                </Button>
               </div>
             </form>
           ) : (
@@ -574,13 +575,13 @@ export function ProfilePanel({
                 </div>
               </div>
               {canManageManagementAccess && !isEditingAccess && (
-                <button
+                <Button
                   type="button"
                   onClick={startEditingAccess}
                   className="dg-btn dg-btn-secondary dg-btn-sm"
                 >
                   Edit management access
-                </button>
+                </Button>
               )}
             </div>
 
@@ -608,7 +609,7 @@ export function ProfilePanel({
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={saveAccessChanges}
                     disabled={savingAccess || !accessHasChanges || accessWouldOrphan}
@@ -622,8 +623,8 @@ export function ProfilePanel({
                     >
                       Save changes
                     </ButtonLoading>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={cancelEditingAccess}
                     disabled={savingAccess}
@@ -631,7 +632,7 @@ export function ProfilePanel({
                   >
                     <X size={14} />
                     {getEditorDismissLabel({ hasUnsavedChanges: accessHasChanges })}
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
@@ -646,13 +647,13 @@ export function ProfilePanel({
             )}
 
             {canAddToSchedule && (
-              <button
+              <Button
                 type="button"
                 onClick={() => setShowAddToSchedule(true)}
                 className="dg-btn dg-btn-secondary dg-btn-sm self-start"
               >
                 Add to Schedule
-              </button>
+              </Button>
             )}
           </div>
         </SectionCard>
@@ -692,9 +693,9 @@ export function ProfilePanel({
             {pendingNameRequest && (
               <div className="rounded-[var(--dg-radius-md)] border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-3 text-[13px] text-[var(--color-warning-text)]">
                 A name change request is pending admin review.
-                <button
+                <Button
                   type="button"
-                  onClick={() => void cancelRequest(pendingNameRequest)}
+                  onClick={() => cancelRequest(pendingNameRequest)}
                   disabled={cancellingId === pendingNameRequest.id}
                   className="dg-btn dg-btn-secondary dg-btn-sm ml-3"
                 >
@@ -704,7 +705,7 @@ export function ProfilePanel({
                   >
                     Cancel request
                   </ButtonLoading>
-                </button>
+                </Button>
               </div>
             )}
 
@@ -742,7 +743,7 @@ export function ProfilePanel({
               onChange={(e) => setRequestNote(e.target.value)}
             />
             {requestNoteError && <p className="dg-form-error">{requestNoteError}</p>}
-            <button
+            <Button
               type="button"
               disabled={
                 submittingRequest ||
@@ -758,7 +759,7 @@ export function ProfilePanel({
               <ButtonLoading loading={submittingRequest} loadingLabel="Sending Request">
                 Request name change
               </ButtonLoading>
-            </button>
+            </Button>
             {loadingChangeRequests ? (
               <span
                 aria-hidden
@@ -796,9 +797,9 @@ export function ProfilePanel({
             {pendingDeletion ? (
               <div className="rounded-[var(--dg-radius-md)] border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-3 text-[13px] text-[var(--color-warning-text)]">
                 Account deletion request pending admin review.
-                <button
+                <Button
                   type="button"
-                  onClick={() => void cancelRequest(pendingDeletion)}
+                  onClick={() => cancelRequest(pendingDeletion)}
                   disabled={cancellingId === pendingDeletion.id}
                   className="dg-btn dg-btn-secondary dg-btn-sm ml-3"
                 >
@@ -808,10 +809,10 @@ export function ProfilePanel({
                   >
                     Cancel request
                   </ButtonLoading>
-                </button>
+                </Button>
               </div>
             ) : (
-              <button
+              <Button
                 type="button"
                 onClick={() => setPendingConfirm("account-deletion")}
                 disabled={requestingDeletion || !orgId}
@@ -825,7 +826,7 @@ export function ProfilePanel({
                 >
                   Request account deletion
                 </ButtonLoading>
-              </button>
+              </Button>
             )}
           </div>
         </SectionCard>

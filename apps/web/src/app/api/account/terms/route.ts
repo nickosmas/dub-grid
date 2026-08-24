@@ -17,7 +17,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await fetchTermsAcceptanceStatus(auth.user.id));
   } catch (error) {
     logger.error({ error }, "account terms GET failed");
-    return NextResponse.json({ error: "Failed to load terms status" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't check whether you've accepted the terms. Try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -35,6 +38,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error({ error }, "account terms POST failed");
-    return NextResponse.json({ error: "Failed to record terms acceptance" }, { status: 500 });
+    return NextResponse.json({ error: "We couldn't record that. Try again." }, { status: 500 });
   }
 }

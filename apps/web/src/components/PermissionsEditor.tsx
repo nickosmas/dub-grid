@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
+import { Button } from "@/components/Button";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { EditorActionRow } from "@/components/ui/editor-action-row";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
@@ -280,7 +281,7 @@ function ToggleSwitch({
   onChange: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
       role="switch"
       aria-checked={on}
@@ -304,7 +305,7 @@ function ToggleSwitch({
           ${on ? "translate-x-5" : "translate-x-0"}
         `}
       />
-    </button>
+    </Button>
   );
 }
 
@@ -554,12 +555,12 @@ export default function PermissionsEditor({
               </p>
             )}
             <div className="flex gap-2 mt-3">
-              <button className="dg-btn dg-btn-ghost" onClick={selectAll} style={{ fontSize: 12 }}>
+              <Button className="dg-btn dg-btn-ghost" onClick={selectAll} style={{ fontSize: 12 }}>
                 Select All
-              </button>
-              <button className="dg-btn dg-btn-ghost" onClick={clearAll} style={{ fontSize: 12 }}>
+              </Button>
+              <Button className="dg-btn dg-btn-ghost" onClick={clearAll} style={{ fontSize: 12 }}>
                 Clear All
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -602,16 +603,16 @@ export default function PermissionsEditor({
           <EditorActionRow
             className="px-6 py-4 shrink-0 border-t border-[var(--color-border-light)]"
             secondaryAction={
-              <button
+              <Button
                 className="dg-btn dg-btn-secondary"
                 onClick={handleRequestClose}
                 disabled={saving}
               >
                 {EDITOR_ACTION_LABELS.close}
-              </button>
+              </Button>
             }
             primaryAction={
-              <button
+              <Button
                 className="dg-btn dg-btn-primary"
                 onClick={handleSave}
                 disabled={saving || !hasChanges}
@@ -623,7 +624,7 @@ export default function PermissionsEditor({
                 >
                   {EDITOR_ACTION_LABELS.save}
                 </ButtonLoading>
-              </button>
+              </Button>
             }
           />
         </div>
@@ -640,9 +641,7 @@ export default function PermissionsEditor({
           onCancel={() => {
             if (!saving) setReviewConfig(null);
           }}
-          onConfirm={() => {
-            void performSave();
-          }}
+          onConfirm={() => performSave()}
         />
       ) : null}
     </>

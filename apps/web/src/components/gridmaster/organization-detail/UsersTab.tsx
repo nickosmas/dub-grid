@@ -1,5 +1,6 @@
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
+import { Button } from "@/components/Button";
 import PermissionsEditor from "@/components/PermissionsEditor";
 import { assignGridmasterOrgRoleByEmail } from "@/features/gridmaster/client";
 import {
@@ -113,7 +114,7 @@ export function UsersTab({
         toast.error("User access changed elsewhere. Review the latest values and try again.");
         onUsersChanged();
       } else {
-        toast.error(formatClientErrorMessage(err, "Failed to change role"));
+        toast.error(formatClientErrorMessage(err, "We couldn't change role. Try again."));
       }
     } finally {
       setChangingRole(null);
@@ -140,7 +141,7 @@ export function UsersTab({
         toast.error("User access changed elsewhere. Review the latest values and try again.");
         onUsersChanged();
       } else {
-        toast.error(formatClientErrorMessage(err, "Failed to remove user"));
+        toast.error(formatClientErrorMessage(err, "We couldn't remove user. Try again."));
       }
     } finally {
       setRemoving(false);
@@ -165,7 +166,7 @@ export function UsersTab({
       setShowAddForm(false);
       onUsersChanged();
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to add user"));
+      toast.error(formatClientErrorMessage(err, "We couldn't add user. Try again."));
     } finally {
       setAdding(false);
     }
@@ -179,7 +180,7 @@ export function UsersTab({
           {users.length} user{users.length !== 1 ? "s" : ""}
         </span>
         <div style={{ flex: 1 }} />
-        <button
+        <Button
           className="dg-btn dg-btn-primary"
           style={{ padding: "7px 14px", fontSize: "var(--dg-fs-label)" }}
           onClick={() => setShowAddForm(!showAddForm)}
@@ -204,7 +205,7 @@ export function UsersTab({
               Add
             </>
           )}
-        </button>
+        </Button>
       </div>
 
       {/* Add user form */}
@@ -301,13 +302,13 @@ export function UsersTab({
                       }}
                     >
                       {u.orgRole === "admin" ? (
-                        <button
+                        <Button
                           className="dg-btn dg-btn-ghost"
                           style={{ fontSize: "var(--dg-fs-footnote)", padding: "2px 6px" }}
                           onClick={() => setEditingPerms(u)}
                         >
                           {u.adminPermissions ? formatPermissions(u.adminPermissions) : "Configure"}
-                        </button>
+                        </Button>
                       ) : u.orgRole === "super_admin" ? (
                         "All"
                       ) : (
@@ -321,7 +322,7 @@ export function UsersTab({
                           style={{ position: "relative" }}
                           ref={openMenuId === u.id ? menuRef : undefined}
                         >
-                          <button
+                          <Button
                             className="dg-btn dg-btn-ghost"
                             style={{ padding: "4px 8px", lineHeight: 1 }}
                             onClick={() => setOpenMenuId(openMenuId === u.id ? null : u.id)}
@@ -340,7 +341,7 @@ export function UsersTab({
                               <circle cx="12" cy="12" r="1" />
                               <circle cx="12" cy="19" r="1" />
                             </svg>
-                          </button>
+                          </Button>
                           {openMenuId === u.id && (
                             <div
                               className="dg-menu"
@@ -353,7 +354,7 @@ export function UsersTab({
                               }}
                             >
                               {onImpersonate && u.platformRole !== "gridmaster" && (
-                                <button
+                                <Button
                                   className="dg-menu-item"
                                   onClick={() => {
                                     setOpenMenuId(null);
@@ -374,10 +375,10 @@ export function UsersTab({
                                     <circle cx="12" cy="7" r="4" />
                                   </svg>
                                   Impersonate
-                                </button>
+                                </Button>
                               )}
                               {u.orgRole === "admin" && (
-                                <button
+                                <Button
                                   className="dg-menu-item"
                                   onClick={() => {
                                     setOpenMenuId(null);
@@ -398,12 +399,12 @@ export function UsersTab({
                                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                                   </svg>
                                   Permissions
-                                </button>
+                                </Button>
                               )}
                               {u.orgRole !== "super_admin" && (
                                 <>
                                   <div className="dg-menu-divider" />
-                                  <button
+                                  <Button
                                     className="dg-menu-item dg-menu-item--danger"
                                     onClick={() => {
                                       setOpenMenuId(null);
@@ -427,7 +428,7 @@ export function UsersTab({
                                       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
                                     </svg>
                                     Remove
-                                  </button>
+                                  </Button>
                                 </>
                               )}
                             </div>

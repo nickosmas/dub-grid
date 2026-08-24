@@ -422,6 +422,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ shifts });
   } catch (error) {
     logger.error({ error }, "gridmaster schedule GET failed");
-    return NextResponse.json({ error: "Failed to load read-only schedule" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the schedule. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

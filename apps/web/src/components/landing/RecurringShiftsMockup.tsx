@@ -257,7 +257,7 @@ export default function RecurringShiftsMockup() {
               color: "var(--color-text-faint)",
             }}
           >
-            Search...
+            Search
           </div>
         </div>
       </div>

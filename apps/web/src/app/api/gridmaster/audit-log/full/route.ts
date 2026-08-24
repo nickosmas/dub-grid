@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { requireGridmasterSession } from "@/lib/api-auth";
@@ -12,6 +13,22 @@ const querySchema = z.object({
   orgId: z.string().uuid().optional(),
   action: z.string().min(1).optional(),
   actionPrefix: z.string().min(1).optional(),
+  // Comma-separated prefixes, OR'd. A single category can span several
+  // ("Setup" covers focus_area., job., shift_category., …), and filtering
+  // client-side after a paged fetch would drop rows out of the page.
+  actionPrefixes: z
+    .string()
+    .min(1)
+    .max(500)
+    .optional()
+    .transform((value) =>
+      value
+        ? value
+            .split(",")
+            .map((part) => part.trim())
+            .filter((part) => /^[a-z0-9_]+\.$/.test(part))
+        : undefined,
+    ),
   resourceType: z.string().min(1).optional(),
   actorId: z.string().uuid().optional(),
   target: z.string().min(1).max(200).optional(),
@@ -43,6 +60,7 @@ export async function GET(req: NextRequest) {
       orgId: req.nextUrl.searchParams.get("orgId") ?? undefined,
       action: req.nextUrl.searchParams.get("action") ?? undefined,
       actionPrefix: req.nextUrl.searchParams.get("actionPrefix") ?? undefined,
+      actionPrefixes: req.nextUrl.searchParams.get("actionPrefixes") ?? undefined,
       resourceType: req.nextUrl.searchParams.get("resourceType") ?? undefined,
       actorId: req.nextUrl.searchParams.get("actorId") ?? undefined,
       target: req.nextUrl.searchParams.get("target") ?? undefined,
@@ -53,7 +71,7 @@ export async function GET(req: NextRequest) {
       offset: req.nextUrl.searchParams.get("offset") ?? undefined,
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
     }
 
     const serviceClient = parsed.data.orgId
@@ -79,6 +97,13 @@ export async function GET(req: NextRequest) {
     }
     if (parsed.data.actionPrefix) {
       query = query.like("action", `${parsed.data.actionPrefix}%`);
+    }
+    if (parsed.data.actionPrefixes?.length) {
+      // The zod transform already restricted these to `^[a-z0-9_]+\.$`, so
+      // there is nothing here PostgREST could read as a filter delimiter.
+      query = query.or(
+        parsed.data.actionPrefixes.map((prefix) => `action.like.${prefix}*`).join(","),
+      );
     }
     if (parsed.data.resourceType) {
       query = query.eq("resource_type", parsed.data.resourceType);
@@ -115,7 +140,10 @@ export async function GET(req: NextRequest) {
       { err: error, path: "/api/gridmaster/audit-log/full" },
       "gridmaster full audit-log GET failed",
     );
-    return NextResponse.json({ error: "Failed to load full audit log" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the activity log. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 

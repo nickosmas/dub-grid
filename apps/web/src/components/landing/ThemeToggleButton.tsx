@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { Button } from "@/components/Button";
 
 /**
  * Cycles light → dark → system. The third stop matters: a two-state toggle
@@ -38,13 +39,13 @@ export default function ThemeToggleButton({ className = "" }: { className?: stri
   const Icon = current.Icon;
 
   return (
-    <button
+    <Button
       type="button"
       onClick={() => setTheme(next.value)}
       className={`p-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors ${className}`}
       aria-label={current.label}
     >
       {!mounted ? <span style={{ display: "block", width: 20, height: 20 }} /> : <Icon size={20} />}
-    </button>
+    </Button>
   );
 }

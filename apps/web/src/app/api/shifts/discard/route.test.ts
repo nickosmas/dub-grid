@@ -226,6 +226,57 @@ describe("POST /api/shifts/discard", () => {
     );
   });
 
+  it("bounds both the discard and its summary to the requested window", async () => {
+    fetchScheduleDraftBreakdown.mockResolvedValue({
+      newShifts: 1,
+      modifiedShifts: 0,
+      deletedShifts: 0,
+      newNotes: 0,
+      deletedNotes: 0,
+      totalChanges: 1,
+    });
+    discardScheduleDraftsDirect.mockResolvedValue(undefined);
+
+    const response = await POST(
+      makeRequest({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        scope: "mine",
+        startDate: "2026-01-05",
+        endDate: "2026-01-18",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    // The dialog counts one window; deleting more than it counted is silent
+    // data loss across every other pay period.
+    expect(discardScheduleDraftsDirect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startDate: "2026-01-05",
+        endDate: "2026-01-18",
+      }),
+    );
+    expect(fetchScheduleDraftBreakdown).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startDate: "2026-01-05",
+        endDate: "2026-01-18",
+      }),
+    );
+  });
+
+  it("rejects a malformed date range rather than silently discarding org-wide", async () => {
+    const response = await POST(
+      makeRequest({
+        orgId: "11111111-1111-4111-8111-111111111111",
+        scope: "mine",
+        startDate: "05/01/2026",
+        endDate: "2026-01-18",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(discardScheduleDraftsDirect).not.toHaveBeenCalled();
+  });
+
   it("does not 409 even when the live draft count differs from an old client summary", async () => {
     // Regression guard: the strict expectedSummary equality check was removed.
     fetchScheduleDraftBreakdown.mockResolvedValue({

@@ -105,7 +105,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ person
       "Failed to resend mobile management invitation email",
     );
     return NextResponse.json(
-      { error: "Invitation email could not be sent. Try again in a moment." },
+      { error: "We couldn't send that invitation email. Try again in a moment." },
       { status: 502 },
     );
   }

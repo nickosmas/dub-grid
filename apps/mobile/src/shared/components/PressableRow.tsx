@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
 import { hapticSelection } from "../lib/haptics";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import type { MobileColors } from "../theme/tokens";
 
@@ -33,27 +34,36 @@ export function PressableRow({
   disabled?: boolean;
   haptic?: boolean;
   style?: StyleProp<ViewStyle>;
-  onPress: () => void;
+  onPress: () => void | Promise<unknown>;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
+
+  // A row is as easy to double-tap as a button, and a row that navigates or
+  // mutates on press should do it once. The row shows no spinner of its own,
+  // so only the latch matters here; `isRunning` keeps it unpressable until the
+  // work settles.
+  const action = useAsyncAction(() => {
+    if (haptic) hapticSelection();
+    return onPress();
+  });
+  const isDisabled = disabled || action.isRunning;
 
   return (
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={accessibilityRole}
-      accessibilityState={{ disabled, selected }}
-      android_ripple={disabled ? undefined : { color: mobileColors.rippleNeutral }}
-      disabled={disabled}
-      onPress={() => {
-        if (haptic) hapticSelection();
-        onPress();
-      }}
+      accessibilityState={{ disabled: isDisabled, busy: action.isRunning, selected }}
+      android_ripple={isDisabled ? undefined : { color: mobileColors.rippleNeutral }}
+      disabled={isDisabled}
+      onPress={action.run}
       style={({ pressed }) => [
         style,
         // Android draws its ripple over the row, so a highlight on top of it
         // would double up.
-        pressed && !disabled && styles.pressed,
+        pressed && !isDisabled && styles.pressed,
+        // Only an explicitly disabled row dims. A row briefly busy from its own
+        // press must not flicker to 40% opacity mid-tap.
         disabled && styles.disabled,
       ]}
     >

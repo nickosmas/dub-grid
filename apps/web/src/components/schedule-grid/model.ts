@@ -55,7 +55,6 @@ export interface ScheduleGridAccessors {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
-  hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
   publishDiffForKey?: (
     empId: string,
     date: Date,
@@ -113,7 +112,6 @@ export interface ScheduleGridModel {
   openShifts: GridOpenShift[];
   coverageRequirements?: CoverageRequirement[];
   absenceTypeMap?: Map<number, AbsenceType>;
-  recentlyPublishedKeys?: Set<string>;
   cellLocks?: Map<string, { userName: string }>;
   resolvePublisherName?: (userId: string) => string | null;
   accessors: ScheduleGridAccessors;
@@ -183,7 +181,6 @@ export interface BuildScheduleGridModelInput {
   orgRoles?: NamedItem[];
   coverageRequirements?: CoverageRequirement[];
   absenceTypeMap?: Map<number, AbsenceType>;
-  recentlyPublishedKeys?: Set<string>;
   cellLocks?: Map<string, { userName: string }>;
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: GridOpenShift[];
@@ -222,7 +219,6 @@ export function buildScheduleGridModel({
   orgRoles = [],
   coverageRequirements,
   absenceTypeMap,
-  recentlyPublishedKeys,
   cellLocks,
   resolvePublisherName,
   openShifts = [],
@@ -428,7 +424,6 @@ export function buildScheduleGridModel({
     openShifts,
     coverageRequirements,
     absenceTypeMap,
-    recentlyPublishedKeys,
     cellLocks,
     resolvePublisherName,
     accessors,

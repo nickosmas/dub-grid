@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import type { ActivityIconVariant, ActivityItem } from "@/lib/dashboard-stats";
+import { Button } from "@/components/Button";
 import Modal from "@/components/Modal";
 import { EmptyState } from "@/components/EmptyState";
 
@@ -127,7 +128,7 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
           {TYPE_FILTERS.map((f) => {
             const active = typeFilter === f.value;
             return (
-              <button
+              <Button
                 key={f.value}
                 onClick={() => setTypeFilter(f.value)}
                 style={{
@@ -144,7 +145,7 @@ export default function ExpandedActivity({ items, onClose }: ExpandedActivityPro
                 }}
               >
                 {f.label}
-              </button>
+              </Button>
             );
           })}
           <span

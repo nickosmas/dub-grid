@@ -423,9 +423,7 @@ export default function LoginScreen() {
                   setOrgSlug(value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
                   setError(null);
                 }}
-                onSubmitEditing={() => {
-                  void handleOrganizationContinue();
-                }}
+                onSubmitEditing={() => handleOrganizationContinue()}
                 onFocus={() => setFocusedField("organization")}
               />
               <View style={styles.suffix}>
@@ -442,9 +440,7 @@ export default function LoginScreen() {
               label="Continue"
               loading={orgLoading}
               loadingLabel="Checking"
-              onPress={() => {
-                void handleOrganizationContinue();
-              }}
+              onPress={() => handleOrganizationContinue()}
             />
 
             <Pressable
@@ -527,9 +523,7 @@ export default function LoginScreen() {
                 onBlur={() => setFocusedField(null)}
                 onChangeText={setPassword}
                 onFocus={() => setFocusedField("password")}
-                onSubmitEditing={() => {
-                  void handleLogin();
-                }}
+                onSubmitEditing={() => handleLogin()}
               />
               <View style={styles.eyeButton}>
                 <Button
@@ -551,9 +545,7 @@ export default function LoginScreen() {
               label="Sign In"
               loading={submitting}
               loadingLabel="Signing In"
-              onPress={() => {
-                void handleLogin();
-              }}
+              onPress={() => handleLogin()}
             />
 
             <View style={styles.linkRow}>
@@ -611,9 +603,7 @@ export default function LoginScreen() {
                 style={[styles.input, styles.codeInput]}
                 textContentType="oneTimeCode"
                 value={mfaCode}
-                onSubmitEditing={() => {
-                  void handleMfaVerify();
-                }}
+                onSubmitEditing={() => handleMfaVerify()}
               />
             </View>
 
@@ -626,9 +616,7 @@ export default function LoginScreen() {
               label="Verify and Sign In"
               loading={submitting}
               loadingLabel="Verifying"
-              onPress={() => {
-                void handleMfaVerify();
-              }}
+              onPress={() => handleMfaVerify()}
             />
 
             <Pressable

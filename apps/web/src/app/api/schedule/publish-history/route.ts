@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
 import { apiErrorResponse } from "@/lib/error-handling";
@@ -22,7 +23,7 @@ function formatProfileName(profile: {
 export async function GET(req: NextRequest) {
   const parsed = querySchema.safeParse(Object.fromEntries(req.nextUrl.searchParams.entries()));
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
 
   const auth = await requireOrgPermissions(
@@ -96,6 +97,6 @@ export async function GET(req: NextRequest) {
       })),
     });
   } catch (error) {
-    return apiErrorResponse(error, "Failed to load publish history");
+    return apiErrorResponse(error, "We couldn't load publish history. Refresh and try again.");
   }
 }

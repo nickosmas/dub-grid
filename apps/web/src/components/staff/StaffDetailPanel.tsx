@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
+import { Button } from "@/components/Button";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -415,7 +416,7 @@ export function StaffDetailPanel({
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                     {onInvite && (
-                      <button
+                      <Button
                         disabled={revokingInvite || isInSandbox}
                         onClick={() => setPendingInvitationAction("reinvite")}
                         className="dg-btn dg-btn-ghost dg-btn-xs"
@@ -435,10 +436,10 @@ export function StaffDetailPanel({
                         >
                           Reinvite
                         </ButtonLoading>
-                      </button>
+                      </Button>
                     )}
                     {onRevoke && (
-                      <button
+                      <Button
                         disabled={revokingInvite || isInSandbox}
                         onClick={() => setPendingInvitationAction("revoke")}
                         className="dg-btn dg-btn-ghost dg-btn-xs"
@@ -458,14 +459,14 @@ export function StaffDetailPanel({
                         >
                           Revoke
                         </ButtonLoading>
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
               ) : (
                 showInviteActions &&
                 onInvite && (
-                  <button
+                  <Button
                     onClick={() => onInvite(employee)}
                     disabled={isInSandbox}
                     className="dg-btn dg-btn-secondary"
@@ -493,11 +494,11 @@ export function StaffDetailPanel({
                       <polyline points="22,6 12,13 2,6" />
                     </svg>
                     Send Invitation
-                  </button>
+                  </Button>
                 )
               )}
               {showManagementAccessAction && onManageManagementAccess && (
-                <button
+                <Button
                   onClick={() => onManageManagementAccess(employee)}
                   className="dg-btn dg-btn-secondary"
                   style={{ width: "100%" }}
@@ -505,7 +506,7 @@ export function StaffDetailPanel({
                   {hasManagementAccess || hasPendingManagementInvite
                     ? "Edit Management Access"
                     : "Add to Management"}
-                </button>
+                </Button>
               )}
               <MemberAccessControls
                 orgRole={orgRole}
@@ -560,29 +561,29 @@ export function StaffDetailPanel({
           {canEditEmployee ? (
             <EditorActionRow
               secondaryAction={
-                <button
+                <Button
                   onClick={() => editorRef.current?.requestDismiss()}
                   className="dg-btn dg-btn-secondary"
                 >
                   {getEditorDismissLabel({ hasUnsavedChanges })}
-                </button>
+                </Button>
               }
               primaryAction={
-                <button
+                <Button
                   onClick={() => editorRef.current?.save()}
                   disabled={!hasUnsavedChanges}
                   className="dg-btn dg-btn-primary"
                 >
                   {EDITOR_ACTION_LABELS.save}
-                </button>
+                </Button>
               }
             />
           ) : (
             <EditorActionRow
               secondaryAction={
-                <button onClick={handleRequestClose} className="dg-btn dg-btn-secondary">
+                <Button onClick={handleRequestClose} className="dg-btn dg-btn-secondary">
                   {EDITOR_ACTION_LABELS.close}
-                </button>
+                </Button>
               }
             />
           )}
@@ -605,9 +606,7 @@ export function StaffDetailPanel({
           confirmPendingLabel={pendingInvitationAction === "reinvite" ? "Reissuing" : "Revoking"}
           variant={pendingInvitationAction === "reinvite" ? "warning" : "danger"}
           isLoading={revokingInvite}
-          onConfirm={() => {
-            void handleConfirmInvitationAction();
-          }}
+          onConfirm={() => handleConfirmInvitationAction()}
           onCancel={() => {
             if (!revokingInvite) setPendingInvitationAction(null);
           }}

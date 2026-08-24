@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { getServiceClient } from "@/lib/supabase-service";
 import {
   fetchPublishedShiftRows,
@@ -165,7 +166,12 @@ async function exportSchedule(orgId: string, startDate?: string, endDate?: strin
     "Employee",
     ...dates.map((d) => {
       const dt = new Date(d + "T00:00:00");
-      return dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      return dt.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
     }),
   ];
 
@@ -187,7 +193,7 @@ export async function GET(req: NextRequest) {
     // Rate limit by user ID
     const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
     if (misconfigured) {
-      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -200,7 +206,7 @@ export async function GET(req: NextRequest) {
     // used to probe this route for free, unauthenticated and unrate-limited.
     if (!(await isFeatureEnabled("csv_export"))) {
       return NextResponse.json(
-        { error: "Exports are temporarily unavailable. Please try again shortly." },
+        { error: "Exports are unavailable right now. Try again in a moment." },
         { status: 503 },
       );
     }
@@ -214,7 +220,7 @@ export async function GET(req: NextRequest) {
       endDate: searchParams.get("endDate") ?? undefined,
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
     }
 
     const { type, orgId, startDate, endDate } = parsed.data;
