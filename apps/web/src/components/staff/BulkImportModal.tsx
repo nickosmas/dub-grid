@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle, Import as ImportIcon, XCircle } from "lucide-react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Button } from "@/components/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { toast } from "sonner";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
@@ -317,7 +318,7 @@ export function BulkImportModal({
 
   const handleFile = useCallback((file: File) => {
     if (!file.name.endsWith(".csv")) {
-      toast.error("Please upload a CSV file");
+      toast.error("Choose a CSV file");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
@@ -864,7 +865,7 @@ export function BulkImportModal({
                   All rows are duplicates of existing employees.
                 </span>
               )}
-              <button
+              <Button
                 className="dg-btn dg-btn-secondary"
                 onClick={() => {
                   setStep("upload");
@@ -873,8 +874,8 @@ export function BulkImportModal({
                 }}
               >
                 Back
-              </button>
-              <button
+              </Button>
+              <Button
                 className="dg-btn dg-btn-primary"
                 onClick={handleImport}
                 disabled={importing || importableCount === 0}
@@ -888,18 +889,18 @@ export function BulkImportModal({
                   <ImportIcon size={14} style={{ marginRight: 4 }} />
                   Import {importableCount} Employee{importableCount !== 1 ? "s" : ""}
                 </ButtonLoading>
-              </button>
+              </Button>
             </>
           )}
           {step === "result" && (
-            <button className="dg-btn dg-btn-primary" onClick={onClose}>
+            <Button className="dg-btn dg-btn-primary" onClick={onClose}>
               Done
-            </button>
+            </Button>
           )}
           {step === "upload" && (
-            <button className="dg-btn dg-btn-secondary" onClick={handleRequestClose}>
+            <Button className="dg-btn dg-btn-secondary" onClick={handleRequestClose}>
               {EDITOR_ACTION_LABELS.close}
-            </button>
+            </Button>
           )}
         </div>
       </div>

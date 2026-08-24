@@ -181,7 +181,9 @@ export async function updateEmployee(
   }
 
   if (!response.ok) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to update employee"));
+    throw new Error(
+      formatClientErrorMessage(body?.error, "We couldn't save those changes. Try again."),
+    );
   }
 }
 
@@ -264,7 +266,9 @@ async function updateEmployeeStatus(input: {
   }
 
   if (!response.ok || !body?.employee) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to update employee status"));
+    throw new Error(
+      formatClientErrorMessage(body?.error, "We couldn't update their status. Try again."),
+    );
   }
 
   return body.employee;

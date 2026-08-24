@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, auth.user.id);
     if (misconfigured) {
-      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
           { status: 403 },
         );
       }
-      return apiErrorResponse(result.error, "Failed to change role", 400);
+      return apiErrorResponse(result.error, "We couldn't change role. Try again.", 400);
     }
 
     const resultData = (result.data ?? { status: "success" }) as Record<string, unknown>;
@@ -145,6 +145,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ result: resultData });
   } catch (error) {
     logger.error({ error }, "organization role change POST failed");
-    return NextResponse.json({ error: "Failed to change role" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't change that role. Try again." },
+      { status: 500 },
+    );
   }
 }

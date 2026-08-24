@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { AuthChangeEvent } from "@supabase/supabase-js";
 import { PublicRoute } from "@/components/RouteGuards";
+import { Button } from "@/components/Button";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
@@ -62,7 +63,7 @@ function VerifyEmailContent() {
         });
       }, 1000);
     } catch {
-      toast.error("Failed to resend email. Please try again later.");
+      toast.error("We couldn't resend that email. Try again in a moment.");
     } finally {
       setResending(false);
     }
@@ -92,7 +93,7 @@ function VerifyEmailContent() {
           }
         >
           {email && (
-            <button
+            <Button
               onClick={handleResend}
               disabled={resending || cooldown > 0}
               className="dg-btn dg-btn-secondary dg-btn-lg"
@@ -106,7 +107,7 @@ function VerifyEmailContent() {
               >
                 {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend verification email"}
               </ButtonLoading>
-            </button>
+            </Button>
           )}
 
           <p

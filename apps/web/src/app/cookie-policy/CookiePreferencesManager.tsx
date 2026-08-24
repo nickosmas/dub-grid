@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { Button } from "@/components/Button";
 import {
   getCookieConsent,
   setCookieConsent,
@@ -71,23 +72,23 @@ export default function CookiePreferencesManager() {
       {consent !== "none" && (
         <div style={{ display: "flex", gap: 10 }}>
           {analyticsEnabled ? (
-            <button
+            <Button
               onClick={() => updateConsent(false)}
               disabled={saving}
               className="dg-btn dg-btn-secondary"
               style={{ fontSize: "var(--dg-fs-body-sm)", padding: "8px 16px" }}
             >
               Switch to essential only
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               onClick={() => updateConsent(true)}
               disabled={saving}
               className="dg-btn dg-btn-primary"
               style={{ fontSize: "var(--dg-fs-body-sm)", padding: "8px 16px" }}
             >
               Accept analytics cookies
-            </button>
+            </Button>
           )}
         </div>
       )}

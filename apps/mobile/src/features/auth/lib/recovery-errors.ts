@@ -50,7 +50,7 @@ export function getRecoveryErrorMessage(error: unknown): string {
     haystack.includes("fetch") ||
     haystack.includes("failed to fetch")
   ) {
-    return "Network error. Check your connection and try again.";
+    return "We couldn't reach DubGrid. Check your connection and try again.";
   }
 
   return "Something went wrong. Try again.";

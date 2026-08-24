@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import {
   mobileShiftSwapOptionsQuerySchema,
   mobileShiftSwapOptionsResponseSchema,
@@ -143,14 +144,14 @@ export async function GET(req: NextRequest) {
     Object.fromEntries(req.nextUrl.searchParams.entries()),
   );
   if (!queryResult.success) {
-    return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
 
   let range: { startDate: string; endDate: string };
   try {
     range = normalizeMobileScheduleRange(queryResult.data);
   } catch {
-    return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+    return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
 
   const linkedEmployee = await fetchLinkedEmployeeForUser(

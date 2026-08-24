@@ -22,7 +22,12 @@ async function fetchClientFeatureFlags(): Promise<ClientFeatureFlags> {
   const response = await fetch("/api/feature-flags");
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to load feature flags"));
+    throw new Error(
+      formatClientErrorMessage(
+        body?.error,
+        "We couldn't load feature flags. Refresh and try again.",
+      ),
+    );
   }
   return response.json();
 }

@@ -566,7 +566,7 @@ describe("ReportsPageContent", () => {
 
     await waitFor(() => {
       expect(toastInfo).toHaveBeenCalledWith(
-        "Reports are temporarily unavailable. Please try again shortly.",
+        "Reports are unavailable right now. Try again in a moment.",
       );
       expect(routerReplace).toHaveBeenCalledWith("/dashboard");
     });

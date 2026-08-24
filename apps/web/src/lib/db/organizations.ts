@@ -141,7 +141,7 @@ export async function updateOrganizationSettings(
     const message =
       body && typeof body === "object" && "error" in body && typeof body.error === "string"
         ? body.error
-        : "Failed to update organization settings";
+        : "We couldn't update organization settings. Try again.";
     throw new Error(message);
   }
 

@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useCallback, Fragment } from "react";
 import { ArrowUpDown, Check, Import as ImportIcon, Trash2, Upload } from "lucide-react";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { Button } from "@/components/Button";
 import { Hint } from "@/components/ui/hint";
 import { hint } from "@/components/ui/hint.types";
 import { Menu, MenuContent, MenuItem } from "@/components/ui/menu";
@@ -148,7 +149,7 @@ function SortMenuButton({
   return (
     <>
       <Hint content={hint("Sort staff")} side="bottom">
-        <button
+        <Button
           ref={triggerRef}
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
@@ -171,7 +172,7 @@ function SortMenuButton({
         >
           <ArrowUpDown size={13} />
           Sort Staff
-        </button>
+        </Button>
       </Hint>
       {open && (
         <Menu
@@ -535,8 +536,11 @@ export default function Toolbar({
   const scheduleTargetActionsDisabled = !hasGridRows;
   const bulkDeleteDisabled = !isBulkDeleteMode && !hasBulkDeleteEntries;
 
-  const spanOptions =
-    hideTwoWeek || isMobile ? SPAN_OPTIONS.filter((o) => o.value !== "2") : SPAN_OPTIONS;
+  // `hideTwoWeek` already covers every width a phone can be, and the page
+  // resolves the span to match. Filtering on `isMobile` separately once left
+  // the select with a value that wasn't in its own option list, so it rendered
+  // as "—".
+  const spanOptions = hideTwoWeek ? SPAN_OPTIONS.filter((o) => o.value !== "2") : SPAN_OPTIONS;
 
   const weekLabel = useMemo(() => {
     if (spanWeeks === "month") {
@@ -564,7 +568,7 @@ export default function Toolbar({
         {/* Row 1: Time navigation — where in time */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <Hint content={hint("Go to previous period")} side="bottom">
-            <button
+            <Button
               onClick={onPrev}
               className="dg-btn dg-btn-secondary"
               style={{
@@ -591,7 +595,7 @@ export default function Toolbar({
               >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-            </button>
+            </Button>
           </Hint>
           <span
             style={{
@@ -607,7 +611,7 @@ export default function Toolbar({
             {weekLabel}
           </span>
           <Hint content={hint("Go to next period")} side="bottom">
-            <button
+            <Button
               onClick={onNext}
               className="dg-btn dg-btn-secondary"
               style={{
@@ -634,9 +638,9 @@ export default function Toolbar({
               >
                 <polyline points="9 18 15 12 9 6" />
               </svg>
-            </button>
+            </Button>
           </Hint>
-          <button
+          <Button
             onClick={onToday}
             className="dg-btn dg-btn-secondary"
             style={{
@@ -649,7 +653,7 @@ export default function Toolbar({
             }}
           >
             Today
-          </button>
+          </Button>
         </div>
 
         {/* Row 2: View controls — how to view */}
@@ -696,7 +700,7 @@ export default function Toolbar({
             </div>
           )}
           {hasData && (
-            <button
+            <Button
               ref={toolsBtnRef}
               onClick={toggleTools}
               aria-expanded={toolsOpen}
@@ -742,7 +746,7 @@ export default function Toolbar({
                   {requestsBadgeCount > 99 ? "99+" : requestsBadgeCount}
                 </span>
               )}
-            </button>
+            </Button>
           )}
           {hasData && toolsOpen && (
             <ToolsMenu
@@ -790,7 +794,7 @@ export default function Toolbar({
         {/* Chevrons + date label */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <Hint content={hint("Go to previous period")} side="bottom">
-            <button
+            <Button
               onClick={onPrev}
               className="dg-btn dg-btn-secondary"
               style={{
@@ -817,7 +821,7 @@ export default function Toolbar({
               >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-            </button>
+            </Button>
           </Hint>
           <span
             style={{
@@ -833,7 +837,7 @@ export default function Toolbar({
             {weekLabel}
           </span>
           <Hint content={hint("Go to next period")} side="bottom">
-            <button
+            <Button
               onClick={onNext}
               className="dg-btn dg-btn-secondary"
               style={{
@@ -860,12 +864,12 @@ export default function Toolbar({
               >
                 <polyline points="9 18 15 12 9 6" />
               </svg>
-            </button>
+            </Button>
           </Hint>
         </div>
 
         {/* Today button */}
-        <button
+        <Button
           onClick={onToday}
           className="dg-btn dg-btn-secondary"
           style={{
@@ -877,7 +881,7 @@ export default function Toolbar({
           }}
         >
           Today
-        </button>
+        </Button>
 
         {/* Span selector */}
         <CustomSelect
@@ -921,12 +925,12 @@ export default function Toolbar({
                           }}
                         />
                       )}
-                      <button
+                      <Button
                         onClick={() => onFocusAreaChange(w.id)}
                         className={`dg-span-tab${isActive ? " active" : ""}`}
                       >
                         {w.name}
-                      </button>
+                      </Button>
                     </Fragment>
                   );
                 })}
@@ -988,7 +992,7 @@ export default function Toolbar({
               content={hint("View real-time staffing gaps by shift and focus area")}
               side="bottom"
             >
-              <button
+              <Button
                 onClick={onCoverageToggle}
                 className="dg-btn dg-btn-ghost"
                 style={{
@@ -1018,13 +1022,13 @@ export default function Toolbar({
                     {coverageGapCount > 99 ? "99+" : coverageGapCount}
                   </span>
                 )}
-              </button>
+              </Button>
             </Hint>
           )}
 
           {/* Tools dropdown */}
           <Hint content={hint("Print, export, recurring shifts, requests, and more")} side="bottom">
-            <button
+            <Button
               ref={toolsBtnRef}
               onClick={toggleTools}
               aria-expanded={toolsOpen}
@@ -1069,7 +1073,7 @@ export default function Toolbar({
                   {requestsBadgeCount > 99 ? "99+" : requestsBadgeCount}
                 </span>
               )}
-            </button>
+            </Button>
           </Hint>
 
           {toolsOpen && (

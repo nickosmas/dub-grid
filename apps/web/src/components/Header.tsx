@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { Button } from "@/components/Button";
 import {
   DashboardIcon,
   ScheduleIcon,
@@ -456,7 +457,7 @@ export default function Header({ orgName }: HeaderProps) {
           {canShowBillingNotice && orgId && <HeaderBillingNotice orgId={orgId} compact />}
 
           {/* Hamburger */}
-          <button
+          <Button
             onClick={() => setDrawerOpen((o) => !o)}
             aria-label={drawerOpen ? "Close menu" : "Open menu"}
             aria-expanded={drawerOpen}
@@ -475,7 +476,7 @@ export default function Header({ orgName }: HeaderProps) {
             }}
           >
             <HamburgerIcon open={drawerOpen} />
-          </button>
+          </Button>
         </div>
 
         <MobileNavSheet
@@ -586,7 +587,7 @@ export default function Header({ orgName }: HeaderProps) {
           })}
 
           {isGridmaster && (
-            <button
+            <Button
               onClick={() => router.push("/gridmaster")}
               style={{
                 display: "inline-flex",
@@ -628,7 +629,7 @@ export default function Header({ orgName }: HeaderProps) {
                 <line x1="10" y1="14" x2="21" y2="3" />
               </svg>
               Gridmaster
-            </button>
+            </Button>
           )}
         </div>
 
@@ -645,7 +646,7 @@ export default function Header({ orgName }: HeaderProps) {
           </div>
         )}
         <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
-          <button
+          <Button
             onClick={() => setMenuOpen((o) => !o)}
             aria-label="Account menu"
             aria-haspopup="menu"
@@ -735,7 +736,7 @@ export default function Header({ orgName }: HeaderProps) {
             >
               <polyline points="6 9 12 15 18 9" />
             </svg>
-          </button>
+          </Button>
 
           {menuOpen && (
             <div
@@ -747,7 +748,7 @@ export default function Header({ orgName }: HeaderProps) {
                 zIndex: 200,
               }}
             >
-              <button
+              <Button
                 className="dg-menu-item"
                 onClick={() => {
                   setMenuOpen(false);
@@ -768,11 +769,11 @@ export default function Header({ orgName }: HeaderProps) {
                   <circle cx="12" cy="7" r="4" />
                 </svg>
                 Profile
-              </button>
+              </Button>
               {canOpenSandbox && (
                 <>
                   <div className="dg-menu-divider" />
-                  <button
+                  <Button
                     type="button"
                     className="dg-menu-item"
                     onClick={() => {
@@ -795,13 +796,13 @@ export default function Header({ orgName }: HeaderProps) {
                       <line x1="7" y1="14" x2="17" y2="14" />
                     </svg>
                     Test sandbox
-                  </button>
+                  </Button>
                 </>
               )}
               {actualLevel >= 2 && !isImpersonating && (
                 <>
                   <div className="dg-menu-divider" />
-                  <button
+                  <Button
                     className="dg-menu-item"
                     onClick={() => {
                       setMenuOpen(false);
@@ -822,7 +823,7 @@ export default function Header({ orgName }: HeaderProps) {
                       <circle cx="12" cy="12" r="3" />
                     </svg>
                     {isUserViewActive ? "Exit User View" : "View as User"}
-                  </button>
+                  </Button>
                 </>
               )}
               <div className="dg-menu-divider" />
@@ -840,34 +841,34 @@ export default function Header({ orgName }: HeaderProps) {
                   Theme
                 </div>
                 <div className="dg-segment" style={{ display: "flex" }}>
-                  <button
+                  <Button
                     type="button"
                     className={`dg-segment-btn${theme === "light" ? " active" : ""}`}
                     style={{ flex: 1 }}
                     onClick={() => setTheme("light")}
                   >
                     Light
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     className={`dg-segment-btn${theme === "dark" ? " active" : ""}`}
                     style={{ flex: 1 }}
                     onClick={() => setTheme("dark")}
                   >
                     Dark
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     className={`dg-segment-btn${theme === "system" ? " active" : ""}`}
                     style={{ flex: 1 }}
                     onClick={() => setTheme("system")}
                   >
                     System
-                  </button>
+                  </Button>
                 </div>
               </div>
               <div className="dg-menu-divider" />
-              <button
+              <Button
                 className="dg-menu-item dg-menu-item--danger"
                 onClick={() => {
                   setMenuOpen(false);
@@ -889,7 +890,7 @@ export default function Header({ orgName }: HeaderProps) {
                   <line x1="21" y1="12" x2="9" y2="12" />
                 </svg>
                 Sign out
-              </button>
+              </Button>
             </div>
           )}
         </div>

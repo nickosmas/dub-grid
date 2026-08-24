@@ -109,7 +109,7 @@ function getLockedOrgMessage(orgRole: string, billingAccess: BillingAccessResult
     return "Organization unavailable. Sign in on the web to manage billing.";
   }
 
-  return "Organization unavailable. Your organization will be available once your organization administrator finishes setup.";
+  return "Organization unavailable. Your organization opens up once your administrator finishes setup.";
 }
 
 function getIncompleteSetupMessage(orgRole: string): string {
@@ -117,7 +117,7 @@ function getIncompleteSetupMessage(orgRole: string): string {
     return "Organization unavailable. Sign in on the web to finish organization setup.";
   }
 
-  return "Organization unavailable. Your organization will be available once your organization administrator finishes setup.";
+  return "Organization unavailable. Your organization opens up once your administrator finishes setup.";
 }
 
 async function requireMobileOrganization(

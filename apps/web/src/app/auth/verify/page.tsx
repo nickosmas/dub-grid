@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PageShell, Card } from "@/components/auth/AuthCard";
+import { Button } from "@/components/Button";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -78,7 +79,7 @@ export default function AuthVerifyPage() {
                 : "Click the button below to verify your email address."
             }
           >
-            <button
+            <Button
               onClick={handleVerify}
               disabled={loading}
               className="dg-btn dg-btn-primary dg-btn-lg"
@@ -92,7 +93,7 @@ export default function AuthVerifyPage() {
               >
                 Continue
               </ButtonLoading>
-            </button>
+            </Button>
           </AuthStateCard>
         )}
       </Card>

@@ -78,7 +78,7 @@ export async function fetchCertifications(
       orgId,
       includeArchived: includeArchived ? "1" : "0",
     }),
-    { errorMessage: "Failed to fetch certifications." },
+    { errorMessage: "We couldn't fetch certifications. Try again." },
   );
   return body.items;
 }
@@ -91,7 +91,7 @@ export async function saveCertifications(
 ): Promise<NamedItem[]> {
   const body = await postSettingsAction<{ items: NamedItem[] }>(
     { action: "saveCertifications", orgId, items, existing, hardDeleteIds },
-    "Failed to save certifications.",
+    "We couldn't save certifications. Try again.",
   );
   return body.items;
 }
@@ -105,14 +105,14 @@ export function checkCertificationDependencies(
       orgId,
       itemId: String(certId),
     }),
-    { errorMessage: "Failed to check certification dependencies." },
+    { errorMessage: "We couldn't check certification dependencies. Try again." },
   );
 }
 
 export function restoreCertification(certId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreCertification", orgId, itemId: certId },
-    "Failed to restore certification.",
+    "We couldn't restore certification. Try again.",
   ).then(() => undefined);
 }
 
@@ -125,7 +125,7 @@ export async function fetchOrganizationRoles(
       orgId,
       includeArchived: includeArchived ? "1" : "0",
     }),
-    { errorMessage: "Failed to fetch roles." },
+    { errorMessage: "We couldn't fetch roles. Try again." },
   );
   return body.items;
 }
@@ -138,7 +138,7 @@ export async function saveOrganizationRoles(
 ): Promise<NamedItem[]> {
   const body = await postSettingsAction<{ items: NamedItem[] }>(
     { action: "saveOrganizationRoles", orgId, items, existing, hardDeleteIds },
-    "Failed to save roles.",
+    "We couldn't save roles. Try again.",
   );
   return body.items;
 }
@@ -149,14 +149,14 @@ export function checkRoleDependencies(roleId: number, orgId: string): Promise<De
       orgId,
       itemId: String(roleId),
     }),
-    { errorMessage: "Failed to check role dependencies." },
+    { errorMessage: "We couldn't check role dependencies. Try again." },
   );
 }
 
 export function restoreOrganizationRole(roleId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreOrganizationRole", orgId, itemId: roleId },
-    "Failed to restore role.",
+    "We couldn't restore role. Try again.",
   ).then(() => undefined);
 }
 
@@ -169,7 +169,7 @@ export async function fetchDepartments(
       orgId,
       includeArchived: includeArchived ? "1" : "0",
     }),
-    { errorMessage: "Failed to fetch departments." },
+    { errorMessage: "We couldn't fetch departments. Try again." },
   );
   return body.items;
 }
@@ -182,7 +182,7 @@ export async function saveDepartments(
 ): Promise<Department[]> {
   const body = await postSettingsAction<{ items: Department[] }>(
     { action: "saveDepartments", orgId, items, existing, hardDeleteIds },
-    "Failed to save departments.",
+    "We couldn't save departments. Try again.",
   );
   return body.items;
 }
@@ -196,14 +196,14 @@ export function checkDepartmentDependencies(
       orgId,
       itemId: String(deptId),
     }),
-    { errorMessage: "Failed to check department dependencies." },
+    { errorMessage: "We couldn't check department dependencies. Try again." },
   );
 }
 
 export function restoreDepartment(deptId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreDepartment", orgId, itemId: deptId },
-    "Failed to restore department.",
+    "We couldn't restore department. Try again.",
   ).then(() => undefined);
 }
 
@@ -216,7 +216,7 @@ export async function fetchFocusAreas(
       orgId,
       includeArchived: includeArchived ? "1" : "0",
     }),
-    { errorMessage: "Failed to fetch focus areas." },
+    { errorMessage: "We couldn't fetch focus areas. Try again." },
   );
   return body.items;
 }
@@ -226,7 +226,7 @@ export async function upsertFocusArea(
 ): Promise<FocusArea> {
   const body = await postSettingsAction<{ item: FocusArea }>(
     { action: "upsertFocusArea", focusArea },
-    "Failed to save focus area.",
+    "We couldn't save focus area. Try again.",
   );
   return body.item;
 }
@@ -240,7 +240,7 @@ export function checkFocusAreaDependencies(
       orgId,
       itemId: String(focusAreaId),
     }),
-    { errorMessage: "Failed to check focus area dependencies." },
+    { errorMessage: "We couldn't check focus area dependencies. Try again." },
   );
 }
 
@@ -251,14 +251,14 @@ export function deleteFocusArea(
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
     { action: "deleteFocusArea", orgId, itemId: focusAreaId, hard },
-    "Failed to delete focus area.",
+    "We couldn't delete focus area. Try again.",
   );
 }
 
 export function restoreFocusArea(focusAreaId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreFocusArea", orgId, itemId: focusAreaId },
-    "Failed to restore focus area.",
+    "We couldn't restore focus area. Try again.",
   ).then(() => undefined);
 }
 
@@ -271,7 +271,7 @@ export async function fetchShiftCategories(
       orgId,
       includeArchived: includeArchived ? "1" : "0",
     }),
-    { errorMessage: "Failed to fetch shifts." },
+    { errorMessage: "We couldn't fetch shifts. Try again." },
   );
   return body.items;
 }
@@ -285,7 +285,7 @@ export function checkShiftCategoryDependencies(
       orgId,
       itemId: String(categoryId),
     }),
-    { errorMessage: "Failed to check shift dependencies." },
+    { errorMessage: "We couldn't check shift dependencies. Try again." },
   );
 }
 
@@ -294,7 +294,7 @@ export async function upsertShiftCategory(
 ): Promise<ShiftCategory> {
   const body = await postSettingsAction<{ item: ShiftCategory }>(
     { action: "upsertShiftCategory", shiftCategory },
-    "Failed to save shift.",
+    "We couldn't save shift. Try again.",
   );
   return body.item;
 }
@@ -306,14 +306,14 @@ export function deleteShiftCategory(
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
     { action: "deleteShiftCategory", orgId, itemId: categoryId, hard },
-    "Failed to delete shift.",
+    "We couldn't delete shift. Try again.",
   );
 }
 
 export function restoreShiftCategory(categoryId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreShiftCategory", orgId, itemId: categoryId },
-    "Failed to restore shift.",
+    "We couldn't restore shift. Try again.",
   ).then(() => undefined);
 }
 
@@ -326,7 +326,7 @@ export async function fetchJobDefinitions(
       orgId,
       includeArchived: includeArchived ? "1" : "0",
     }),
-    { errorMessage: "Failed to fetch jobs." },
+    { errorMessage: "We couldn't fetch jobs. Try again." },
   );
   return body.items;
 }
@@ -337,7 +337,7 @@ export function checkJobDependencies(jobId: number, orgId: string): Promise<Depe
       orgId,
       itemId: String(jobId),
     }),
-    { errorMessage: "Failed to check job dependencies." },
+    { errorMessage: "We couldn't check job dependencies. Try again." },
   );
 }
 
@@ -346,7 +346,7 @@ export async function upsertJobDefinition(
 ): Promise<JobDefinition> {
   const body = await postSettingsAction<{ item: JobDefinition }>(
     { action: "upsertJobDefinition", job },
-    "Failed to save job.",
+    "We couldn't save job. Try again.",
   );
   return body.item;
 }
@@ -358,21 +358,21 @@ export function deleteJobDefinition(
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
     { action: "deleteJobDefinition", orgId, itemId: jobId, hard },
-    "Failed to delete job.",
+    "We couldn't delete job. Try again.",
   );
 }
 
 export function restoreJobDefinition(jobId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreJobDefinition", orgId, itemId: jobId },
-    "Failed to restore job.",
+    "We couldn't restore job. Try again.",
   ).then(() => undefined);
 }
 
 export async function fetchCoverageRequirements(orgId: string): Promise<CoverageRequirement[]> {
   const body = await requestSettingsJson<{ items: CoverageRequirement[] }>(
     buildQuery("fetchCoverageRequirements", { orgId }),
-    { errorMessage: "Failed to fetch coverage requirements." },
+    { errorMessage: "We couldn't fetch coverage requirements. Try again." },
   );
   return body.items;
 }
@@ -393,7 +393,7 @@ export async function saveCoverageRequirements(
       preferredShiftId,
       requirements,
     },
-    "Failed to save coverage requirements.",
+    "We couldn't save coverage requirements. Try again.",
   );
   return body.items;
 }
@@ -407,7 +407,7 @@ export async function fetchAbsenceTypes(
       orgId,
       includeArchived: includeArchived ? "1" : "0",
     }),
-    { errorMessage: "Failed to fetch absence types." },
+    { errorMessage: "We couldn't fetch absence types. Try again." },
   );
   return body.items;
 }
@@ -421,7 +421,7 @@ export function checkAbsenceTypeDependencies(
       orgId,
       itemId: String(absenceTypeId),
     }),
-    { errorMessage: "Failed to check absence type dependencies." },
+    { errorMessage: "We couldn't check absence type dependencies. Try again." },
   );
 }
 
@@ -430,7 +430,7 @@ export async function upsertAbsenceType(
 ): Promise<AbsenceType> {
   const body = await postSettingsAction<{ item: AbsenceType }>(
     { action: "upsertAbsenceType", absenceType },
-    "Failed to save absence type.",
+    "We couldn't save absence type. Try again.",
   );
   return body.item;
 }
@@ -442,14 +442,14 @@ export function deleteAbsenceType(
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
     { action: "deleteAbsenceType", orgId, itemId: absenceTypeId, hard },
-    "Failed to delete absence type.",
+    "We couldn't delete absence type. Try again.",
   );
 }
 
 export function restoreAbsenceType(absenceTypeId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreAbsenceType", orgId, itemId: absenceTypeId },
-    "Failed to restore absence type.",
+    "We couldn't restore absence type. Try again.",
   ).then(() => undefined);
 }
 
@@ -462,7 +462,7 @@ export async function fetchIndicatorTypes(
       orgId,
       includeArchived: includeArchived ? "1" : "0",
     }),
-    { errorMessage: "Failed to fetch indicator types." },
+    { errorMessage: "We couldn't fetch indicator types. Try again." },
   );
   return body.items;
 }
@@ -472,7 +472,7 @@ export async function upsertIndicatorType(
 ): Promise<IndicatorType> {
   const body = await postSettingsAction<{ item: IndicatorType }>(
     { action: "upsertIndicatorType", indicatorType },
-    "Failed to save indicator type.",
+    "We couldn't save indicator type. Try again.",
   );
   return body.item;
 }
@@ -486,7 +486,7 @@ export function checkIndicatorTypeDependencies(
       orgId,
       itemId: String(indicatorTypeId),
     }),
-    { errorMessage: "Failed to check indicator type dependencies." },
+    { errorMessage: "We couldn't check indicator type dependencies. Try again." },
   );
 }
 
@@ -497,13 +497,13 @@ export function deleteIndicatorType(
 ): Promise<{ success: true }> {
   return postSettingsAction<{ success: true }>(
     { action: "deleteIndicatorType", orgId, itemId: indicatorTypeId, hard },
-    "Failed to delete indicator type.",
+    "We couldn't delete indicator type. Try again.",
   );
 }
 
 export function restoreIndicatorType(indicatorTypeId: number, orgId: string): Promise<void> {
   return postSettingsAction<{ success: true }>(
     { action: "restoreIndicatorType", orgId, itemId: indicatorTypeId },
-    "Failed to restore indicator type.",
+    "We couldn't restore indicator type. Try again.",
   ).then(() => undefined);
 }

@@ -20,6 +20,7 @@ import {
   fmt12hShort,
 } from "@/lib/utils";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
+import { Button } from "@/components/Button";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import { PrintConfig } from "./PrintOptionsModal";
 import {
@@ -1096,13 +1097,13 @@ export default function PrintScheduleView({
           flexShrink: 0,
         }}
       >
-        <button
+        <Button
           onClick={onClose}
           className="dg-btn dg-btn-secondary"
           style={{ padding: "7px 14px" }}
         >
           ← Back
-        </button>
+        </Button>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <PrintBrandLockup
             orgName={orgName}
@@ -1144,7 +1145,7 @@ export default function PrintScheduleView({
               ? `All ${focusAreaLabel.toLowerCase()}`
               : selectedWings.join(", ")}
           </span>
-          <button
+          <Button
             onClick={handlePrint}
             className="dg-btn dg-btn-primary"
             style={{ padding: "8px 18px" }}
@@ -1165,7 +1166,7 @@ export default function PrintScheduleView({
               <rect x="6" y="14" width="12" height="8" />
             </svg>
             Print
-          </button>
+          </Button>
         </div>
       </div>
 

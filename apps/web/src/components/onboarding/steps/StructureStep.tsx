@@ -78,7 +78,7 @@ export default function StructureStep({ onNext, onBack }: StructureStepProps) {
       onNext();
     } catch (err) {
       Sentry.captureException(err);
-      toast.error("We couldn't save your changes. Please try again.");
+      toast.error("We couldn't save your changes. Try again.");
     } finally {
       setSaving(false);
     }

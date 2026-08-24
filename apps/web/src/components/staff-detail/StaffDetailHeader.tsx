@@ -1,6 +1,7 @@
 "use client";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/Button";
 import { Badge } from "@/components/ui/badge";
 import type { Employee } from "@/types";
 import { getInitials, getEmployeeDisplayName } from "@/lib/utils";
@@ -84,13 +85,13 @@ export function StaffDetailHeader({
             </div>
 
             {canEditDetails ? (
-              <button
+              <Button
                 type="button"
                 onClick={onToggleEditDetails}
                 className="dg-btn dg-btn-secondary dg-btn-sm self-start"
               >
                 {showManagementPanel ? "Hide Edit Details" : "Edit Details"}
-              </button>
+              </Button>
             ) : null}
           </div>
 

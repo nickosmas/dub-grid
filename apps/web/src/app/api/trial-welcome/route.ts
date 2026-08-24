@@ -166,7 +166,10 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     Sentry.captureException(error, { extra: { context: "trial-welcome-dismiss" } });
-    return NextResponse.json({ success: false, error: "Failed to update" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "We couldn't save that change. Try again." },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ success: true });

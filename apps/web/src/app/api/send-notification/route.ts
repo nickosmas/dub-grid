@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   // ── Rate limit ──────────────────────────────────────────────────────
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     const retryAfter = reset ? Math.ceil((reset - Date.now()) / 1000) : 60;
@@ -106,7 +106,10 @@ export async function POST(req: NextRequest) {
       Sentry.captureException(new Error(result.error), {
         extra: { context: "send-notification", action: data.action },
       });
-      return NextResponse.json({ error: "Failed to send notification" }, { status: 500 });
+      return NextResponse.json(
+        { error: "We couldn't send that alert. Try again." },
+        { status: 500 },
+      );
     }
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -115,6 +118,6 @@ export async function POST(req: NextRequest) {
     // pipeline failure.
     Sentry.captureException(err, { extra: { context: "send-notification" } });
     logger.error({ err, action: data.action }, "Failed to send notification");
-    return NextResponse.json({ error: "Failed to send notification" }, { status: 500 });
+    return NextResponse.json({ error: "We couldn't send that alert. Try again." }, { status: 500 });
   }
 }

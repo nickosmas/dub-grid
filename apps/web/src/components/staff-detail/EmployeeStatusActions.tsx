@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Employee, Invitation } from "@/types";
+import { Button } from "@/components/Button";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -101,7 +102,7 @@ export function EmployeeStatusActions({
           Invitation pending
         </span>
         <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
-          <button
+          <Button
             disabled={revoking}
             onClick={() => setPendingInvitationAction("reinvite")}
             className="dg-btn dg-btn-ghost dg-btn-xs"
@@ -110,9 +111,9 @@ export function EmployeeStatusActions({
             <ButtonLoading loading={revoking} loadingLabel="Sending" spinnerSize={12}>
               Reinvite
             </ButtonLoading>
-          </button>
+          </Button>
           {onRevoke && (
-            <button
+            <Button
               disabled={revoking}
               onClick={() => setPendingInvitationAction("revoke")}
               className="dg-btn dg-btn-ghost dg-btn-xs"
@@ -121,7 +122,7 @@ export function EmployeeStatusActions({
               <ButtonLoading loading={revoking} loadingLabel="Revoking" spinnerSize={12}>
                 Revoke
               </ButtonLoading>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -250,7 +251,7 @@ export function EmployeeStatusActions({
             marginBottom: showDeactivate ? 8 : 0,
           }}
         >
-          <button
+          <Button
             onClick={() => setShowActivateConfirm(true)}
             className={
               variant === "page"
@@ -280,7 +281,7 @@ export function EmployeeStatusActions({
               <polyline points="20 6 9 17 4 12" />
             </svg>
             Activate
-          </button>
+          </Button>
         </div>
       )}
       {showActivateConfirm && (
@@ -312,9 +313,7 @@ export function EmployeeStatusActions({
           confirmPendingLabel={pendingInvitationAction === "reinvite" ? "Reissuing" : "Revoking"}
           variant={pendingInvitationAction === "reinvite" ? "warning" : "danger"}
           isLoading={revoking}
-          onConfirm={() => {
-            void handleConfirmInvitationAction();
-          }}
+          onConfirm={() => handleConfirmInvitationAction()}
           onCancel={() => {
             if (!revoking) setPendingInvitationAction(null);
           }}
@@ -322,7 +321,7 @@ export function EmployeeStatusActions({
       )}
       {showDeactivate && (
         <div style={actionGroupStyle}>
-          <button
+          <Button
             onClick={() => setShowDeactivateConfirm(true)}
             className="dg-btn dg-btn-warning-filled"
             style={{
@@ -345,7 +344,7 @@ export function EmployeeStatusActions({
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             Deactivate
-          </button>
+          </Button>
         </div>
       )}
     </>

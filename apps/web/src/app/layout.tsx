@@ -84,19 +84,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <AuthProvider>
             <PostHogProvider enabled={posthogEnabled}>
               <QueryProvider>
-                <Suspense fallback={null}>
-                  <OnboardingGate>
-                    <MobileSubNavProvider>
-                      <TooltipProvider delay={TOOLTIP_DELAY_MS}>
-                        {/* Wraps the whole shell so it sees every nav link,
-                            not just the ones inside a given page. */}
-                        <NavigationGuardProvider>
-                          <AppShell>{children}</AppShell>
-                        </NavigationGuardProvider>
-                      </TooltipProvider>
-                    </MobileSubNavProvider>
-                  </OnboardingGate>
-                </Suspense>
+                {/* No Suspense boundary here on purpose. It used to wrap this
+                    whole subtree — every page — to satisfy OnboardingGate's
+                    useSearchParams(). Next renders a boundary's fallback into
+                    the static HTML when something inside reads search params,
+                    so `fallback={null}` meant every prerendered route shipped
+                    HTML with no page content in it, and nothing could paint
+                    until the bundle had downloaded and hydrated. The gate now
+                    owns a tight boundary around only the part that reads
+                    them. */}
+                <OnboardingGate>
+                  <MobileSubNavProvider>
+                    <TooltipProvider delay={TOOLTIP_DELAY_MS}>
+                      {/* Wraps the whole shell so it sees every nav link,
+                          not just the ones inside a given page. */}
+                      <NavigationGuardProvider>
+                        <AppShell>{children}</AppShell>
+                      </NavigationGuardProvider>
+                    </TooltipProvider>
+                  </MobileSubNavProvider>
+                </OnboardingGate>
               </QueryProvider>
             </PostHogProvider>
           </AuthProvider>

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { toast } from "sonner";
 import { Calendar, Copy } from "lucide-react";
 import { OverviewTab } from "@/components/staff-detail/tabs/OverviewTab";
+import { Button } from "@/components/Button";
 import { ScheduleTab } from "@/components/staff-detail/tabs/ScheduleTab";
 import { computeEmployeeWeeklyHours, getWeekDates, getWeekStart } from "@/lib/dashboard-stats";
 import { formatDateKey } from "@/lib/utils";
@@ -152,20 +153,20 @@ export function SelfWorkSchedule({
                   : "/api/calendar"}
               </code>
             </div>
-            <button
+            <Button
               type="button"
               onClick={() => {
                 const url = `${window.location.origin}/api/calendar`;
-                navigator.clipboard.writeText(url).then(
+                return navigator.clipboard.writeText(url).then(
                   () => toast.success("Calendar URL copied to clipboard"),
-                  () => toast.error("Failed to copy calendar URL"),
+                  () => toast.error("We couldn't copy that link. Copy it manually instead."),
                 );
               }}
               className="dg-btn dg-btn-secondary"
             >
               <Copy className="mr-1 size-4" />
               Copy URL
-            </button>
+            </Button>
           </div>
           <p className="m-0 text-[12px] text-[var(--color-text-subtle)]">
             You must be logged in for the feed to work. The URL returns your shifts for the next 4

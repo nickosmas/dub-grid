@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProtectedRoute } from "@/components/RouteGuards";
+import { Button } from "@/components/Button";
 import { PageContainer } from "@/components/PageContainer";
 import { EmptyState } from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -523,7 +524,7 @@ export function InboxView() {
             {activeView.description}
           </p>
         </div>
-        <button
+        <Button
           type="button"
           className="dg-btn dg-btn-secondary"
           onClick={() => setConfirmingMarkAllRead(true)}
@@ -532,7 +533,7 @@ export function InboxView() {
         >
           <CheckCheck size={14} style={{ marginRight: 6 }} />
           Mark all read
-        </button>
+        </Button>
       </header>
 
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
@@ -626,7 +627,7 @@ export function InboxView() {
 
           {hasMore && notifications.length > 0 && (
             <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
-              <button
+              <Button
                 type="button"
                 className="dg-btn dg-btn-secondary"
                 onClick={handleLoadMore}
@@ -635,7 +636,7 @@ export function InboxView() {
                 <ButtonLoading loading={loadingMore} loadingLabel="Loading">
                   Load more
                 </ButtonLoading>
-              </button>
+              </Button>
             </div>
           )}
         </main>
@@ -847,7 +848,7 @@ function FilterChip({
   count?: number;
 }) {
   return (
-    <button
+    <Button
       type="button"
       onClick={onClick}
       aria-pressed={active}
@@ -889,7 +890,7 @@ function FilterChip({
           {count}
         </span>
       )}
-    </button>
+    </Button>
   );
 }
 
@@ -923,7 +924,7 @@ function ReadFilterTabs({
       {tabs.map((tab) => {
         const active = value === tab.value;
         return (
-          <button
+          <Button
             key={tab.value}
             type="button"
             role="tab"
@@ -963,7 +964,7 @@ function ReadFilterTabs({
                 {tab.count}
               </span>
             )}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -1127,14 +1128,14 @@ function Toolbar({
         style={{ minWidth: 140 }}
       />
 
-      <button
+      <Button
         type="button"
         className="dg-btn dg-btn-ghost"
         onClick={onSortToggle}
         aria-label={`Sort ${sort === "desc" ? "newest" : "oldest"} first`}
       >
         {sort === "desc" ? "Newest first" : "Oldest first"}
-      </button>
+      </Button>
 
       {totalSelected > 0 && (
         <BulkActions
@@ -1172,40 +1173,40 @@ function BulkActions({
         background: "var(--color-bg-secondary)",
       }}
     >
-      <button
+      <Button
         type="button"
         className="dg-btn dg-btn-ghost"
         onClick={() => onBulk("read", selectedIds)}
         disabled={busy}
       >
         <CheckCheck size={14} /> Read
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         className="dg-btn dg-btn-ghost"
         onClick={() => onBulk("unread", selectedIds)}
         disabled={busy}
       >
         <Mail size={14} /> Unread
-      </button>
+      </Button>
       {includeArchived ? (
-        <button
+        <Button
           type="button"
           className="dg-btn dg-btn-ghost"
           onClick={() => onBulk("unarchive", selectedIds)}
           disabled={busy}
         >
           <ArchiveRestore size={14} /> Unarchive
-        </button>
+        </Button>
       ) : (
-        <button
+        <Button
           type="button"
           className="dg-btn dg-btn-ghost"
           onClick={() => onBulk("archive", selectedIds)}
           disabled={busy}
         >
           <Archive size={14} /> Archive
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -1278,7 +1279,7 @@ function NotificationRow({
       >
         <NotificationIcon type={notification.type} />
       </div>
-      <button
+      <Button
         type="button"
         onClick={onClick}
         aria-label={`${notification.title}: ${notification.message}${isUnread ? " (unread)" : ""}`}
@@ -1372,7 +1373,7 @@ function NotificationRow({
           {formatRelativeTime(notification.createdAt)}
           {notification.channel === "email" ? " • Sent via email" : ""}
         </span>
-      </button>
+      </Button>
       <div
         style={{
           display: "flex",
@@ -1402,7 +1403,7 @@ function NotificationRow({
             </Link>
           );
         })()}
-        <button
+        <Button
           type="button"
           aria-label={isUnread ? "Mark as read" : "Mark as unread"}
           className="dg-btn dg-btn-ghost"
@@ -1410,9 +1411,9 @@ function NotificationRow({
           title={isUnread ? "Mark as read" : "Mark as unread"}
         >
           {isUnread ? <MailOpen size={14} /> : <Mail size={14} />}
-        </button>
+        </Button>
         {isArchived ? (
-          <button
+          <Button
             type="button"
             aria-label="Restore from archive"
             className="dg-btn dg-btn-ghost"
@@ -1420,9 +1421,9 @@ function NotificationRow({
             title="Restore from archive"
           >
             <ArchiveRestore size={14} />
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             type="button"
             aria-label="Archive"
             className="dg-btn dg-btn-ghost"
@@ -1430,7 +1431,7 @@ function NotificationRow({
             title="Archive"
           >
             <Archive size={14} />
-          </button>
+          </Button>
         )}
       </div>
     </li>

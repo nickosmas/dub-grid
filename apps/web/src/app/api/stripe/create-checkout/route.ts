@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_BODY }, { status: 400 });
     }
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {
@@ -39,7 +39,10 @@ export async function POST(req: NextRequest) {
       req.nextUrl.origin,
     ]);
     if (!returnUrl) {
-      return NextResponse.json({ error: "Invalid return URL" }, { status: 400 });
+      return NextResponse.json(
+        { error: "That link looks wrong. Start again from your billing settings." },
+        { status: 400 },
+      );
     }
 
     const auth = await requireOrgPermissions(
@@ -56,7 +59,7 @@ export async function POST(req: NextRequest) {
       `billing-checkout:${auth.actor.id}:${orgId}`,
     );
     if (misconfigured) {
-      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -137,6 +140,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "create-checkout" } });
     logger.error({ error: err }, "Failed to create checkout session");
-    return NextResponse.json({ error: "Failed to create checkout" }, { status: 500 });
+    return NextResponse.json({ error: "We couldn't start checkout. Try again." }, { status: 500 });
   }
 }

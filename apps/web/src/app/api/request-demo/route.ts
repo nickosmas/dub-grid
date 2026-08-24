@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const { limited, reset, misconfigured } = await checkRateLimit(demoLimiter, ip);
   if (misconfigured) {
     return NextResponse.json(
-      { success: false, error: "Service temporarily unavailable" },
+      { success: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
     );
   }
@@ -155,6 +155,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "request-demo" } });
     logger.error({ err, path: "/api/request-demo" }, "Failed to send demo request email");
-    return NextResponse.json({ success: false, error: "Failed to send email" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "We couldn't send that email. Try again." },
+      { status: 500 },
+    );
   }
 }

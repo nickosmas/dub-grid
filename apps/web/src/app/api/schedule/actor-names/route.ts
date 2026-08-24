@@ -132,6 +132,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ names });
   } catch (error) {
     logger.error({ error }, "schedule actor names POST failed");
-    return NextResponse.json({ error: "Failed to load schedule actor names" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load who made each change. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

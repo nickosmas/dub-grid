@@ -1,4 +1,5 @@
 import type { AdminPermissions, Invitation, OrganizationUser } from "@/types";
+import { PERMISSION_LABELS } from "@/lib/permission-labels";
 import type { ReviewChange } from "@/components/review/ChangeReviewModal";
 
 export interface AccessReviewChange extends ReviewChange {
@@ -10,34 +11,6 @@ const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
   admin: "Admin",
   user: "User",
-};
-
-const PERMISSION_LABELS: Record<keyof AdminPermissions, string> = {
-  canViewSchedule: "View schedule",
-  canEditShifts: "Edit shifts",
-  canPublishSchedule: "Publish schedule",
-  canApplyRecurringSchedule: "Apply recurring schedule",
-  canEditNotes: "Edit notes",
-  canEditScheduleIndicators: "Edit schedule indicators",
-  canViewRecurringShifts: "View recurring shifts",
-  canManageRecurringShifts: "Manage recurring shifts",
-  canManageShiftSeries: "Manage shift series",
-  canViewStaff: "View staff",
-  canViewEmployeeDetails: "View employee details",
-  canManageEmployees: "Manage employees",
-  canViewFocusAreas: "View focus areas",
-  canManageFocusAreas: "Manage focus areas",
-  canViewScheduleDefinitions: "View shifts and jobs",
-  canManageScheduleDefinitions: "Manage shifts and jobs",
-  canViewIndicatorTypes: "View indicator types",
-  canManageIndicatorTypes: "Manage indicator types",
-  canManageOrgSettings: "Manage organization settings",
-  canViewOrgLabels: "View organization labels",
-  canManageOrgLabels: "Manage organization labels",
-  canViewCoverageRequirements: "View coverage requirements",
-  canManageCoverageRequirements: "Manage coverage requirements",
-  canApproveShiftRequests: "Approve shift requests",
-  canViewDashboardAnalytics: "View dashboard analytics",
 };
 
 const EMPTY_VALUE = "Not set";

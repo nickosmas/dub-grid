@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { ShiftCategory, FocusArea } from "@/types";
+import { Button } from "@/components/Button";
 import {
   checkShiftCategoryDependencies,
   deleteShiftCategory,
@@ -333,7 +334,7 @@ function ShiftCategoriesSettings({
       setEditingId(null);
       toast.success(hard ? "Category deleted" : "Category archived");
     } catch (err) {
-      toast.error("Failed to delete category");
+      toast.error("We couldn't remove that shift. Try again.");
       Sentry.captureException(err);
     } finally {
       setDeleting(null);
@@ -488,7 +489,7 @@ function ShiftCategoriesSettings({
             </div>
           </div>
           {canManageScheduleDefinitions && (
-            <button
+            <Button
               onClick={(e) => {
                 e.stopPropagation();
                 attemptOpenCategory(cat.id);
@@ -496,7 +497,7 @@ function ShiftCategoriesSettings({
               className="dg-btn dg-btn-secondary dg-btn-sm"
             >
               Edit
-            </button>
+            </Button>
           )}
         </div>
       );
@@ -694,17 +695,17 @@ function ShiftCategoriesSettings({
         <EditorActionRow
           destructiveAction={
             canManageScheduleDefinitions && !cat.isNew ? (
-              <button
+              <Button
                 onClick={() => handleDeleteClick(cat.id)}
                 disabled={isDeletingThis}
                 className="dg-btn dg-btn-danger dg-btn-sm"
               >
                 {isDeletingThis ? "…" : "Delete"}
-              </button>
+              </Button>
             ) : undefined
           }
           secondaryAction={
-            <button
+            <Button
               onClick={() =>
                 cat.isNew || !isDirty ? handleClose(cat) : discardCategoryChanges(cat, false)
               }
@@ -715,10 +716,10 @@ function ShiftCategoriesSettings({
                 hasUnsavedChanges: isDirty,
                 isCreating: Boolean(cat.isNew),
               })}
-            </button>
+            </Button>
           }
           primaryAction={
-            <button
+            <Button
               onClick={() => handleSave(cat)}
               disabled={
                 isSavingThis ||
@@ -735,7 +736,7 @@ function ShiftCategoriesSettings({
               <ButtonLoading loading={isSavingThis} loadingLabel={EDITOR_ACTION_LABELS.saving}>
                 {EDITOR_ACTION_LABELS.save}
               </ButtonLoading>
-            </button>
+            </Button>
           }
         />
       </div>
@@ -799,12 +800,12 @@ function ShiftCategoriesSettings({
                 title="No shifts yet"
                 action={
                   canManageScheduleDefinitions ? (
-                    <button
+                    <Button
                       onClick={() => handleAdd(focusArea.id)}
                       className="dg-btn dg-btn-secondary dg-btn-sm"
                     >
                       + Add Shift
-                    </button>
+                    </Button>
                   ) : undefined
                 }
                 style={{ margin: "12px 16px" }}
@@ -812,13 +813,13 @@ function ShiftCategoriesSettings({
             )}
             {areaCats.length > 0 && canManageScheduleDefinitions && (
               <div style={{ padding: "8px 16px 12px" }}>
-                <button
+                <Button
                   onClick={() => handleAdd(focusArea.id)}
                   className={addBtnClass}
                   style={{ width: "100%" }}
                 >
                   + Add Shift
-                </button>
+                </Button>
               </div>
             )}
           </div>

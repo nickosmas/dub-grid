@@ -145,6 +145,6 @@ describe("DangerZone", () => {
 
     expect(captureException).toHaveBeenCalled();
     expect(toastSuccess).toHaveBeenCalledWith("Organization deleted.");
-    expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/sign out/i));
+    expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/sign you out/i));
   });
 });

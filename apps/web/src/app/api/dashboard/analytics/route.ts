@@ -46,6 +46,9 @@ export async function GET(req: NextRequest) {
       extra: { context: "dashboard/analytics", orgId, weeks },
     });
     logger.error({ error, orgId, weeks }, "Dashboard analytics failed");
-    return NextResponse.json({ error: "Failed to load dashboard analytics" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the dashboard. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

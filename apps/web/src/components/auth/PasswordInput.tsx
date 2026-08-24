@@ -1,6 +1,7 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
+import { Button } from "@/components/Button";
 
 interface PasswordInputProps {
   id?: string;
@@ -60,7 +61,7 @@ export function PasswordInput({
         aria-describedby={ariaDescribedBy}
         style={mergedStyle}
       />
-      <button
+      <Button
         type="button"
         onClick={onToggle}
         style={{
@@ -79,7 +80,7 @@ export function PasswordInput({
         aria-label={showPassword ? "Hide password" : "Show password"}
       >
         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-      </button>
+      </Button>
     </div>
   );
 }

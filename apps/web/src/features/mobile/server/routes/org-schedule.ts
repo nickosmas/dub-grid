@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { mobileOrgScheduleResponseSchema, mobileScheduleQuerySchema } from "@dubgrid/contracts";
 import {
   loadMobileOrgSchedulePayload,
@@ -26,14 +27,14 @@ export async function GET(req: NextRequest) {
     Object.fromEntries(req.nextUrl.searchParams.entries()),
   );
   if (!queryResult.success) {
-    return json({ error: "Invalid query" }, { status: 400 });
+    return json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
 
   let range: ReturnType<typeof resolveMobileDateRange>;
   try {
     range = resolveMobileDateRange(queryResult.data);
   } catch {
-    return json({ error: "Invalid query" }, { status: 400 });
+    return json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
   try {
     const payload = await loadMobileOrgSchedulePayload(auth, range, {

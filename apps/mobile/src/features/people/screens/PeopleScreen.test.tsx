@@ -120,6 +120,102 @@ describe("PeopleScreen", () => {
     });
   });
 
+  function buildPerson(overrides: Record<string, unknown>) {
+    return {
+      firstName: "Mina",
+      lastName: "Diaz",
+      phone: "555-0100",
+      email: "mina@dubgrid.com",
+      status: "active",
+      employmentType: "full_time",
+      certificationId: null,
+      focusAreaIds: [],
+      roleIds: [],
+      departmentIds: [],
+      deptAdminIds: [],
+      managementDepartmentIds: [],
+      managementDeptAdminIds: [],
+      seniority: 1,
+      userId: null,
+      pendingInvitation: null,
+      contactNotes: "",
+      statusChangedAt: "2026-04-24T12:00:00.000Z",
+      statusNote: "",
+      version: 7,
+      ...overrides,
+    };
+  }
+
+  function buildManagementUser(overrides: Record<string, unknown>) {
+    return {
+      source: "member",
+      userId: null,
+      employeeId: null,
+      employeeStatus: null,
+      firstName: "Nora",
+      lastName: "Blake",
+      email: "nora@dubgrid.com",
+      phone: "",
+      orgRole: "admin",
+      managementDepartmentIds: [10],
+      managementDeptAdminIds: [],
+      updatedAt: null,
+      invitationId: null,
+      invitationExpiresAt: null,
+      ...overrides,
+    };
+  }
+
+  /** A directory with both halves populated, for the tab-scoped filters. */
+  function mockManagementRoster() {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments" } },
+        focusAreas: [{ id: 2, name: "Skilled Nursing" }],
+        certifications: [{ id: 3, name: "RN" }],
+        departments: [{ id: 10, name: "Clinical Leadership", abbr: "CL", type: "management" }],
+        user: { id: "user-1" },
+        permissions: {
+          canManageEmployees: true,
+          canManageManagementAccess: true,
+        },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({ id: "emp-1", firstName: "Mina", lastName: "Diaz" }),
+          buildPerson({ id: "emp-2", firstName: "June", lastName: "Patel", seniority: 2 }),
+        ],
+        managementUsers: [
+          buildManagementUser({
+            id: "mgmt-1",
+            userId: "user-9",
+            firstName: "Nora",
+            lastName: "Blake",
+            orgRole: "super_admin",
+          }),
+          buildManagementUser({
+            id: "mgmt-2",
+            source: "pending_invite",
+            firstName: "Ida",
+            lastName: "Shaw",
+            email: "ida@dubgrid.com",
+            orgRole: "admin",
+          }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+  }
+
   it("shows the loading state while the directory is being fetched", async () => {
     useQuery.mockReturnValue({
       data: undefined,
@@ -719,54 +815,36 @@ describe("PeopleScreen", () => {
     expect(screen.getByText("June Patel")).toBeInTheDocument();
   });
 
-  it("filters the directory by true management department from the filter modal", () => {
+  // The staff sheet only offers what a staff row carries. Management
+  // department moved to the management tab, which is the list it describes.
+  it("filters the staff directory by certification from the filter modal", () => {
+    useBootstrap.mockReturnValue({
+      data: {
+        currentOrg: { labels: { department: "Departments" } },
+        focusAreas: [],
+        certifications: [
+          { id: 3, name: "RN" },
+          { id: 4, name: "LPN" },
+        ],
+        departments: [],
+        permissions: { canManageEmployees: true },
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as never);
     useQuery.mockReturnValue({
       data: {
         people: [
-          {
-            id: "emp-1",
-            firstName: "Mina",
-            lastName: "Diaz",
-            phone: "555-0100",
-            email: "mina@dubgrid.com",
-            status: "active",
-            certificationId: null,
-            focusAreaIds: [2],
-            roleIds: [],
-            departmentIds: [4],
-            deptAdminIds: [],
-            managementDepartmentIds: [],
-            managementDeptAdminIds: [],
-            seniority: 1,
-            userId: null,
-            pendingInvitation: null,
-            contactNotes: "",
-            statusChangedAt: "2026-04-24T12:00:00.000Z",
-            statusNote: "",
-            version: 7,
-          },
-          {
+          buildPerson({ id: "emp-1", firstName: "Mina", lastName: "Diaz", certificationId: 3 }),
+          buildPerson({
             id: "emp-2",
             firstName: "June",
             lastName: "Patel",
-            phone: "555-0101",
-            email: "june@dubgrid.com",
-            status: "active",
-            certificationId: null,
-            focusAreaIds: [],
-            roleIds: [],
-            departmentIds: [],
-            deptAdminIds: [],
-            managementDepartmentIds: [10],
-            managementDeptAdminIds: [],
+            certificationId: 4,
             seniority: 2,
-            userId: "user-2",
-            pendingInvitation: null,
-            contactNotes: "",
-            statusChangedAt: "2026-04-24T12:00:00.000Z",
-            statusNote: "",
-            version: 3,
-          },
+          }),
         ],
       },
       error: null,
@@ -778,9 +856,97 @@ describe("PeopleScreen", () => {
     render(<PeopleScreen />);
 
     fireEvent.click(screen.getByLabelText("Open people filters and sort"));
-    fireEvent.click(screen.getByText("Clinical Leadership"));
+    fireEvent.click(screen.getByText("RN"));
+
+    expect(screen.queryByText("June Patel")).not.toBeInTheDocument();
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
+  });
+
+  it("filters the staff directory by app access from the filter modal", () => {
+    useQuery.mockReturnValue({
+      data: {
+        people: [
+          buildPerson({ id: "emp-1", firstName: "Mina", lastName: "Diaz", userId: "user-3" }),
+          buildPerson({ id: "emp-2", firstName: "June", lastName: "Patel", seniority: 2 }),
+        ],
+      },
+      error: null,
+      isFetching: false,
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getByText("No app access"));
 
     expect(screen.queryByText("Mina Diaz")).not.toBeInTheDocument();
+    expect(screen.getByText("June Patel")).toBeInTheDocument();
+  });
+
+  // The staff sheet's sections would all be dead controls against the roster,
+  // so the management tab swaps in the ones its own rows can answer.
+  it("swaps the filter sheet for management filters on the management tab", () => {
+    mockManagementRoster();
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    expect(screen.getByText("Focus area")).toBeInTheDocument();
+    expect(screen.queryByText("Access level")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Management"));
+
+    expect(screen.queryByText("Focus area")).not.toBeInTheDocument();
+    expect(screen.queryByText("Employment type")).not.toBeInTheDocument();
+    expect(screen.getByText("Management department")).toBeInTheDocument();
+    expect(screen.getByText("Invitation")).toBeInTheDocument();
+    // Twice: the section of access-level filters, and the sort by it.
+    expect(screen.getAllByText("Access level")).toHaveLength(2);
+  });
+
+  it("filters the management roster by access level", () => {
+    mockManagementRoster();
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    // Also a badge on the row behind the sheet; the sheet's row comes first.
+    fireEvent.click(screen.getAllByText("Super Admin")[0]);
+
+    expect(screen.getByText("Nora Blake")).toBeInTheDocument();
+    expect(screen.queryByText("Ida Shaw")).not.toBeInTheDocument();
+  });
+
+  it("filters the management roster down to pending invitations", () => {
+    mockManagementRoster();
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getAllByText("Invitation pending")[0]);
+
+    expect(screen.getByText("Ida Shaw")).toBeInTheDocument();
+    expect(screen.queryByText("Nora Blake")).not.toBeInTheDocument();
+  });
+
+  // Each half keeps its own filters, so one list's narrowing never follows
+  // the tab switch onto the other.
+  it("keeps each tab's filters to itself", () => {
+    mockManagementRoster();
+
+    render(<PeopleScreen />);
+
+    fireEvent.click(screen.getByText("Management"));
+    fireEvent.click(screen.getByLabelText("Open people filters and sort"));
+    fireEvent.click(screen.getAllByText("Invitation pending")[0]);
+    fireEvent.click(screen.getByText("Done"));
+    fireEvent.click(screen.getByText("Schedule"));
+
+    expect(screen.getByText("Mina Diaz")).toBeInTheDocument();
     expect(screen.getByText("June Patel")).toBeInTheDocument();
   });
 });

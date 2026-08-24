@@ -13,6 +13,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await fetchAccountIdentitySnapshot(auth.user.id));
   } catch (error) {
     logger.error({ error }, "account identity GET failed");
-    return NextResponse.json({ error: "Failed to load account identity" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your account. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

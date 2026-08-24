@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
     if (!(await isFeatureEnabled("reports"))) {
       return NextResponse.json(
-        { error: "Reports are temporarily unavailable. Please try again shortly." },
+        { error: "Reports are unavailable right now. Try again in a moment." },
         { status: 503 },
       );
     }
@@ -57,6 +57,9 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     Sentry.captureException(error, { extra: { context: "reports.operations" } });
     logger.error({ error, orgId: parsed.data.orgId }, "Reports load failed");
-    return NextResponse.json({ error: "Failed to load reports" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your reports. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

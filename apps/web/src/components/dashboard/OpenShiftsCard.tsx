@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import type { OpenShift } from "@/lib/dashboard-stats";
+import { Button } from "@/components/Button";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
 import ExpandButton from "./ExpandButton";
 import { EmptyState } from "@/components/EmptyState";
@@ -192,7 +193,7 @@ export default function OpenShiftsCard({
                       {badge.label}
                     </span>
                     {onVolunteer && (
-                      <button
+                      <Button
                         onClick={(e) => {
                           e.preventDefault();
                           onVolunteer(shift);
@@ -210,7 +211,7 @@ export default function OpenShiftsCard({
                         }}
                       >
                         Volunteer
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>

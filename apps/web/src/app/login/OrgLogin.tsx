@@ -7,6 +7,7 @@ import { decodeJwt } from "jose";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
+import { Button } from "@/components/Button";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
 import { getValidPort } from "@/lib/subdomain";
 import { withThemeParam } from "@/lib/theme-preference";
@@ -71,7 +72,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
       queryClient.clear();
     } catch {
       await signOutFromBrowser("local");
-      toast.error("Failed to switch organization. Please try again.");
+      toast.error("We couldn't switch organizations. Try again.");
       return false;
     }
     // First super_admin login starts this org's trial. Idempotent and
@@ -109,7 +110,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     const { organizations: orgs } = await fetchAccessibleOrganizations();
     if (!orgs) {
       await signOutFromBrowser("local");
-      toast.error("Unable to verify organization access. Please try again.");
+      toast.error("We couldn't confirm your access to that organization. Try again.");
       return false;
     }
     const targetOrg = orgs.find((o) => o.org_slug === orgSlug);
@@ -211,7 +212,10 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
       if (!res.ok) {
         if (res.status === 429) {
           toast.error(
-            extractErrorMessage(result.error, "Too many login attempts. Please try again later."),
+            extractErrorMessage(
+              result.error,
+              "Too many sign-in attempts. Wait a few minutes and try again.",
+            ),
           );
           setLoading(false);
           return;
@@ -223,16 +227,16 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
           return;
         }
         if (result.code === "SESSION_REFRESH_FAILED") {
-          toast.error("Your session could not be verified. Please sign in again.");
+          toast.error("We couldn't verify your session. Sign in again.");
           setLoading(false);
           return;
         }
         if (res.status === 401) {
-          toast.error("Invalid email or password. Please try again.");
+          toast.error("Check your email and password and try again.");
           setLoading(false);
           return;
         }
-        toast.error(extractErrorMessage(result.error, "Unable to sign in. Please try again."));
+        toast.error(extractErrorMessage(result.error, "We couldn't sign you in. Try again."));
         setLoading(false);
         return;
       }
@@ -278,9 +282,9 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
-        toast.error("Network issue. Please check your connection and try again.");
+        toast.error("Check your connection and try again.");
       } else {
-        toast.error("Unable to sign in. Please try again.");
+        toast.error("We couldn't sign you in. Try again.");
       }
       setLoading(false);
     }
@@ -296,7 +300,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
       try {
         const session = await getBrowserAuthSession();
         if (!session) {
-          toast.error("Session expired. Please sign in again.");
+          toast.error("Your session expired. Sign in again.");
           setMfaRequired(false);
           return;
         }
@@ -335,7 +339,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
         markAuthTransition();
         navigateToDashboard(await resolvePostLoginDestination(), didSwitchOrg);
       } catch {
-        toast.error("Unable to complete sign in. Please try again.");
+        toast.error("We couldn't finish signing you in. Try again.");
         setMfaRequired(false);
       }
     }
@@ -435,7 +439,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
               gap: "12px",
             }}
           >
-            <button
+            <Button
               type="button"
               onClick={() => {
                 const { protocol, port } = window.location;
@@ -446,7 +450,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
               className="dg-auth-link"
             >
               &larr; Use a different organization
-            </button>
+            </Button>
           </div>
         </Card>
         {accountDisabled && <AccountDisabledModal onClose={() => setAccountDisabled(false)} />}

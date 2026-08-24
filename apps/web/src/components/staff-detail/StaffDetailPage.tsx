@@ -7,13 +7,18 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ChevronLeft } from "lucide-react";
 import ProgressBar from "@/components/ProgressBar";
+import { Button } from "@/components/Button";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmployeeManagementAccessModal } from "@/components/staff/EmployeeManagementAccessModal";
 import { MemberAccessControls } from "@/components/staff/MemberAccessControls";
 import { AddManagementUserToScheduleModal } from "@/components/staff/AddManagementUserToScheduleModal";
 import { useDirectory, useOrganizationData, usePermissions } from "@/hooks";
-import { isSelfAction, SelfActionForbiddenError } from "@dubgrid/domain";
+import {
+  isSelfAction,
+  SELF_ACTION_FORBIDDEN_MESSAGE,
+  SelfActionForbiddenError,
+} from "@dubgrid/domain";
 import { useAuth } from "@/components/AuthProvider";
 import {
   activateEmployee,
@@ -292,7 +297,9 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         }
         setEmployee(previousEmployee);
         toast.error(
-          err instanceof EmployeeContactConflictError ? err.message : "Failed to save employee",
+          err instanceof EmployeeContactConflictError
+            ? formatClientErrorMessage(err, "We couldn't save those details. Try again.")
+            : "We couldn't save those details. Try again.",
         );
       }
     },
@@ -329,10 +336,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           prev ? { ...prev, status: "active" as const, statusNote: "" } : prev,
         );
         if (err instanceof SelfActionForbiddenError) {
-          toast.error(err.message);
+          toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
         }
-        toast.error("Failed to update employee status");
+        toast.error("We couldn't update their status. Try again.");
       }
     },
     [employee, orgId, syncEmployeeCaches],
@@ -365,10 +372,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         }
         setEmployee((prev) => (prev ? { ...prev, status: prevStatus ?? "inactive" } : prev));
         if (err instanceof SelfActionForbiddenError) {
-          toast.error(err.message);
+          toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
         }
-        toast.error("Failed to activate employee");
+        toast.error("We couldn't reactivate them. Try again.");
       }
     },
     [employee, orgId, syncEmployeeCaches],
@@ -396,10 +403,10 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         }
         setEmployee((prev) => (prev ? { ...prev, status: prevStatus ?? "active" } : prev));
         if (err instanceof SelfActionForbiddenError) {
-          toast.error(err.message);
+          toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
         }
-        toast.error("Failed to remove employee");
+        toast.error("We couldn't remove them. Try again.");
       }
     },
     [employee, orgId, syncEmployeeCaches],
@@ -486,7 +493,7 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
         toast.success("Invitation revoked");
         return true;
       } catch {
-        toast.error("Failed to revoke invitation");
+        toast.error("We couldn't cancel that invitation. Try again.");
         return false;
       }
     },
@@ -525,12 +532,12 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">{error}</p>
-          <button
+          <Button
             onClick={() => router.push("/people")}
             className="px-5 py-2 rounded-[var(--dg-radius-md)] border border-border bg-card text-card-foreground font-semibold text-sm cursor-pointer hover:bg-muted transition-colors"
           >
             Back to Staff
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -573,20 +580,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                     <div className="flex flex-wrap gap-2">
                       {perms.canManageEmployees && pendingInvite && (
                         <>
-                          <button
+                          <Button
                             type="button"
                             onClick={() => setShowInviteModal(true)}
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                           >
                             Reinvite
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
                             onClick={() => setQuickRevokeInviteConfirm(pendingInvite)}
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                           >
                             Revoke Invitation
-                          </button>
+                          </Button>
                         </>
                       )}
 
@@ -594,17 +601,17 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                         !pendingInvite &&
                         !employee.userId &&
                         employee.email && (
-                          <button
+                          <Button
                             type="button"
                             onClick={() => setShowInviteModal(true)}
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                           >
                             Send Invitation
-                          </button>
+                          </Button>
                         )}
 
                       {canManageManagementAccess && employee.status !== "removed" && (
-                        <button
+                        <Button
                           type="button"
                           onClick={() => setShowManagementAccessModal(true)}
                           className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -612,20 +619,20 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
                           {directoryPerson?.isManagementUser || hasPendingManagementInvite
                             ? "Edit Management Access"
                             : "Add to Management"}
-                        </button>
+                        </Button>
                       )}
 
                       {perms.canManageEmployees &&
                         !isOnSchedule &&
                         directoryPerson?.isManagementUser &&
                         employee.userId && (
-                          <button
+                          <Button
                             type="button"
                             onClick={() => setShowAddToScheduleModal(true)}
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                           >
                             Add to Schedule
-                          </button>
+                          </Button>
                         )}
                     </div>
 
@@ -835,17 +842,15 @@ export function StaffDetailPage({ employeeId }: StaffDetailPageProps) {
           confirmPendingLabel="Revoking"
           variant="danger"
           isLoading={quickRevokingInvite}
-          onConfirm={() => {
+          onConfirm={async () => {
             const invitationId = quickRevokeInviteConfirm.id;
             setQuickRevokingInvite(true);
-            void (async () => {
-              try {
-                await handleRevokeInvitation(invitationId);
-              } finally {
-                setQuickRevokingInvite(false);
-                setQuickRevokeInviteConfirm(null);
-              }
-            })();
+            try {
+              await handleRevokeInvitation(invitationId);
+            } finally {
+              setQuickRevokingInvite(false);
+              setQuickRevokeInviteConfirm(null);
+            }
           }}
           onCancel={() => {
             if (!quickRevokingInvite) setQuickRevokeInviteConfirm(null);

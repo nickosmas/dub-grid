@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Button } from "@/components/Button";
 import { DubGridLogo } from "@/components/Logo";
 import TermsContent, { TERMS_LAST_UPDATED } from "@/app/terms/TermsContent";
 
@@ -84,7 +85,7 @@ export default function TermsAcceptanceCard({
             maxWidth: 520,
           }}
         >
-          Please read these updated Terms of Service in full before continuing.
+          Read the updated Terms of Service in full before continuing.
         </p>
       </div>
 
@@ -129,7 +130,7 @@ export default function TermsAcceptanceCard({
           {reachedBottom ? "" : "Scroll to the bottom of the Terms to continue."}
         </p>
 
-        <button
+        <Button
           onClick={onAccept}
           disabled={!reachedBottom || loading}
           className="dg-btn dg-btn-primary"
@@ -144,7 +145,7 @@ export default function TermsAcceptanceCard({
           >
             Accept &amp; Continue
           </ButtonLoading>
-        </button>
+        </Button>
 
         <p
           style={{

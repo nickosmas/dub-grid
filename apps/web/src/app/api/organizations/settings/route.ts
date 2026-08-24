@@ -106,7 +106,7 @@ export async function PUT(req: NextRequest) {
   // ── Rate limit by user ID ─────────────────────────────────────────
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -507,6 +507,6 @@ export async function PUT(req: NextRequest) {
       extra: { context: "organizations/settings", orgId: bodyOrgId },
     });
     logger.error({ error: err, orgId: bodyOrgId }, "Organization settings update failed");
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }

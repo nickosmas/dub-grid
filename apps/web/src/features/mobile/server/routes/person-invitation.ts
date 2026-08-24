@@ -355,7 +355,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       );
     });
     return NextResponse.json(
-      { error: "Invitation email could not be sent. Try again in a moment." },
+      { error: "We couldn't send that invitation email. Try again in a moment." },
       { status: 502 },
     );
   }
@@ -462,7 +462,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       "Failed to resend mobile invitation email",
     );
     return NextResponse.json(
-      { error: "Invitation email could not be sent. Try again in a moment." },
+      { error: "We couldn't send that invitation email. Try again in a moment." },
       { status: 502 },
     );
   }

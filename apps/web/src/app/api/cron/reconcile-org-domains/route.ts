@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { getServiceClient } from "@/lib/supabase-service";
 import { registerOrgDomain } from "@/lib/vercel";
 import { clientEnv, serverEnv } from "@/lib/env";
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
   const auth = req.headers.get("authorization");
   if (auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: API_ERRORS.UNAUTHORIZED }, { status: 401 });
   }
   if (!(await isFeatureEnabled("cron_reconcile_org_domains"))) {
     // 200, not 503 — this is an intentional gridmaster kill-switch flip, not a
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
       .range(from, from + PAGE_SIZE - 1);
     if (error) {
       logger.error({ error }, "reconcile-org-domains: query failed");
-      return NextResponse.json({ error: "Query failed" }, { status: 500 });
+      return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
     }
     orgs.push(...(data ?? []));
     if (!data || data.length < PAGE_SIZE) break;

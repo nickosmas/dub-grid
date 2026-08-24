@@ -131,6 +131,39 @@ Shared primitives to reach for before inventing a layout:
   action is running. `loadingLabel` is required for that reason; a button with a
   leading icon passes it as `icon={...}` and the spinner takes its place.
   `<ConfirmDialog>` takes the same wording as `confirmPendingLabel`.
+- **`useAsyncAction`** (`hooks/useAsyncAction.ts`) — how an async button stops
+  double-executing. A `useState` busy flag is not enough on its own: it only
+  reaches the DOM after React re-renders, and a second click lands inside that
+  window and sails past a `disabled` that has not applied yet. This hook's
+  latch is a **ref**, checked synchronously on the first click, so the second
+  is already too late; its `isRunning` only drives the spinner. It is a no-op
+  for a synchronous handler, so wrapping a plain click costs nothing.
+  `<ConfirmDialog>` already wraps `onConfirm` in it — a dialog whose handler
+  is async is covered with no flag threaded, and `isLoading` is only for a
+  pending state that lives outside the dialog. Elsewhere:
+  `const save = useAsyncAction(handleSave)`, then `onClick={save.run}` +
+  `disabled={save.isRunning}` + `<ButtonLoading loading={save.isRunning}>`.
+  Enforced by `design/require-busy-button`
+  (`eslint-rules/require-busy-button.mjs`).
+- **`<Button>`** (`components/Button.tsx`) — a `<button>` that carries the
+  latch. It is a plain passthrough (same `className`, same children, same
+  attributes), so a raw `<button className="dg-btn">` whose click does async
+  work becomes safe by changing only the tag name, keeping whatever
+  `<ButtonLoading>` and `disabled` it already had. Every async button in the
+  app now uses it; a `<button>` stays a `<button>` when its click is
+  synchronous, since there is nothing there to double-execute.
+- **A handler must _return_ its promise**, or none of the above works. The
+  latch holds for exactly as long as the promise it is handed, so
+  `onConfirm={() => { setOpen(false); handlePublish(); }}` releases on the
+  next microtask and the second press publishes again — the button looks
+  guarded, `disabled={isPublishing}` and all, and is not. Write
+  `return handlePublish()`, or make the handler `async`. Never fire the work
+  into a `void` call the primitive cannot await. Enforced by
+  `design/no-floating-async-handler`
+  (`eslint-rules/no-floating-async-handler.mjs`). The same rule applies on
+  mobile, where `<Button>`/`<ConfirmationModal>`/`<PressableRow>` latch the
+  same way; a React Query mutation returns its promise from `mutateAsync`,
+  not `mutate`.
 - `<EditorActionRow>` — dirty-state save/discard footer used by every
   settings panel; the primary button always sits on the right.
 - `<SectionCard>` (`components/settings/shared.tsx`) — bordered/padded card
@@ -171,7 +204,18 @@ Reach for the shared primitive before inventing one:
   label to `loadingLabel` — the same verb in progress ("Saving", not "Save"), no
   ellipsis. `<ConfirmationModal>` takes it as `confirmPendingLabel`. A
   `disabled` that repeats the loading condition is redundant; `loading` already
-  disables.
+  disables. An **`onPress` returning a promise needs no `loading` at all**:
+  `<Button>` awaits it and spins on its own, so pass `loading` only when the
+  pending flag lives outside the button. Do pass `loadingLabel` — enforced by
+  `design/require-busy-button`.
+- **`useAsyncAction()`** (`shared/hooks/useAsyncAction.ts`) is what makes that
+  work, and is how any press stops double-executing. A `useState` busy flag is
+  not enough on its own: it only disables the pressable after React
+  re-renders, and a second tap lands inside that window. The latch is a
+  **ref**, checked synchronously on the first press, so the second is already
+  too late. `<Button>`, `<PressableRow>` and `<ConfirmationModal>` all wrap
+  their handler in it, so a screen usually needs nothing beyond returning its
+  promise instead of firing it into a `void` call the primitive can't await.
 - **`<PressableRow>`** for pressable list rows, **`usePressAnimation()`** for
   anything else pressable. iOS scales on press, Android gets a ripple and **no**
   scale — its ripple is already the state layer.

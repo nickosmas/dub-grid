@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/Button";
+
 interface StaffPaginationProps {
   page: number;
   totalPages: number;
@@ -32,22 +34,22 @@ export function StaffPagination({
         Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, totalCount)} of {totalCount}
       </span>
       <div style={{ display: "flex", gap: 6 }}>
-        <button
+        <Button
           onClick={() => onPageChange(Math.max(1, page - 1))}
           disabled={page === 1}
           className="dg-btn dg-btn-secondary"
           style={{ padding: "5px 12px", fontSize: "var(--dg-fs-caption)" }}
         >
           Previous
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           disabled={page === totalPages}
           className="dg-btn dg-btn-secondary"
           style={{ padding: "5px 12px", fontSize: "var(--dg-fs-caption)" }}
         >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   );

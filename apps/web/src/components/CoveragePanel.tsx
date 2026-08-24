@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import type { PublishedWindowState } from "@/lib/schedule-logic";
+import { Button } from "@/components/Button";
 import type { CoverageGap, FocusArea, ShiftCategory } from "@/types";
 import { CloseButton } from "@/components/ui/CloseButton";
 import CustomSelect from "@/components/CustomSelect";
@@ -98,7 +99,7 @@ export default function CoveragePanel({
           }}
         >
           {isMobile && (
-            <button
+            <Button
               onClick={onClose}
               aria-label="Back"
               style={{
@@ -127,7 +128,7 @@ export default function CoveragePanel({
               >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-            </button>
+            </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div

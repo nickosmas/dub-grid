@@ -26,7 +26,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
     const params = await context.params;
     const parsed = paramsSchema.safeParse(params);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
+      return NextResponse.json(
+        { error: "We couldn't find that account. Refresh the page and try again." },
+        { status: 400 },
+      );
     }
 
     const serviceClient = getServiceClient();
@@ -69,6 +72,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error({ error }, "gridmaster force logout POST failed");
-    return NextResponse.json({ error: "Failed to force logout user" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't sign that person out. Try again." },
+      { status: 500 },
+    );
   }
 }

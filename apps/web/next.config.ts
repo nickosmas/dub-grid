@@ -59,6 +59,10 @@ const nextConfig: NextConfig = {
   // even when the app is started from a workspace subdirectory.
   env: publicEnv,
   experimental: {
+    // Barrel files: importing one icon from lucide-react pulls the whole index
+    // through the bundler unless it is rewritten to a deep import first. 52
+    // files import from lucide-react, and the landing page is one of them.
+    optimizePackageImports: ["lucide-react", "@base-ui/react"],
     // Turbopack's SST filesystem cache has a known corruption bug:
     // "Another write batch or compaction is already active" — concurrent
     // writes corrupt the cache, causing routes to 500 after the first visit.

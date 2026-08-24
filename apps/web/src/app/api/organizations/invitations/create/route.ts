@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -251,6 +251,9 @@ export async function POST(req: NextRequest) {
         { status: 403 },
       );
     }
-    return NextResponse.json({ error: "Failed to create invitation" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't send that invitation. Try again." },
+      { status: 500 },
+    );
   }
 }

@@ -3,6 +3,8 @@
 import type { Factor } from "@supabase/supabase-js";
 import { useState } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Button } from "@/components/Button";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { toast } from "sonner";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { ShieldCheck, ShieldOff, Copy, Check } from "lucide-react";
@@ -34,6 +36,34 @@ const labelStyle: React.CSSProperties = {
   letterSpacing: "0.04em",
   marginBottom: 5,
 };
+
+/**
+ * Supabase reports a rejected TOTP as `mfa_verification_failed`, which covers
+ * both real causes: the app is generating from a different secret than the one
+ * on screen, or the phone's clock has drifted. Both are the user's to fix, so
+ * name them instead of saying "invalid code" and leaving them to guess.
+ *
+ * This used to be a substring match on the message ("invalid", "code",
+ * "verify"), which reported anything matching those as a bad code. A missing
+ * factor, a failed status write, a network blip: all of them surfaced as
+ * "Invalid verification code", which sends the user back to retype a code that
+ * was never the problem. Match on the error code, and let anything unrecognised
+ * say what it actually was.
+ */
+function verificationErrorMessage(err: unknown): string {
+  const code =
+    typeof err === "object" && err !== null && "code" in err
+      ? (err as { code?: unknown }).code
+      : undefined;
+
+  if (code === "mfa_verification_failed") {
+    return "That code didn't match. If you have scanned this before, delete the older DubGrid entry in your authenticator app and scan again, then enter the new code. If it still fails, check that your phone's clock is set automatically.";
+  }
+  if (code === "mfa_factor_not_found") {
+    return "This setup is no longer active. Cancel and start again to get a fresh QR code.";
+  }
+  return extractErrorMessage(err, "Verification failed. Please try again.");
+}
 
 function isVerifiedTotpFactor(factor: Factor): boolean {
   return factor.factor_type === "totp" && factor.status === "verified";
@@ -86,7 +116,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       setFactorId(data.id);
       setStep("verifying");
     } catch (err: unknown) {
-      toast.error(extractErrorMessage(err, "Failed to start MFA enrollment."));
+      toast.error(extractErrorMessage(err, "We couldn't start MFA enrollment. Try again."));
     } finally {
       setLoading(false);
     }
@@ -110,12 +140,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       onStatusChange(true);
       resetState();
     } catch (err: unknown) {
-      const msg = extractErrorMessage(err, "").toLowerCase();
-      if (msg.includes("invalid") || msg.includes("code") || msg.includes("verify")) {
-        setVerifyError("Invalid verification code. Please try again.");
-      } else {
-        setVerifyError(extractErrorMessage(err, "Verification failed. Please try again."));
-      }
+      setVerifyError(verificationErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -141,7 +166,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       onStatusChange(false);
       resetState();
     } catch (err: unknown) {
-      toast.error(extractErrorMessage(err, "Failed to disable MFA."));
+      toast.error(extractErrorMessage(err, "We couldn't disable MFA. Try again."));
     } finally {
       setLoading(false);
     }
@@ -164,9 +189,15 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Failed to copy to clipboard.");
+      toast.error("We couldn't copy that. Copy it manually instead.");
     }
   }
+
+  // Latched rather than spinner-ed: the check-mark swap is already this
+  // button's feedback, and an icon-only control has no label to put in the
+  // progressive form. The latch just stops two overlapping copies racing their
+  // `copied` timers.
+  const copy = useAsyncAction(copySecret);
 
   // ── Idle state: show status and enable/disable button ──
   if (step === "idle") {
@@ -198,15 +229,15 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
             : "Add an extra layer of security by requiring a verification code from an authenticator app."}
         </p>
         {mfaEnabled ? (
-          <button
+          <Button
             onClick={() => setStep("disabling")}
             className="dg-btn dg-btn-danger"
             style={{ alignSelf: "flex-start" }}
           >
             Disable 2FA
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             onClick={startEnrollment}
             disabled={loading}
             className="dg-btn dg-btn-primary"
@@ -220,7 +251,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
             >
               Enable 2FA
             </ButtonLoading>
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -242,14 +273,14 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           less secure.
         </p>
         <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={disableMFA} disabled={loading} className="dg-btn dg-btn-danger">
+          <Button onClick={disableMFA} disabled={loading} className="dg-btn dg-btn-danger">
             <ButtonLoading loading={loading} loadingLabel="Disabling" spinnerSize={14}>
               Confirm Disable
             </ButtonLoading>
-          </button>
-          <button onClick={resetState} disabled={loading} className="dg-btn dg-btn-secondary">
+          </Button>
+          <Button onClick={resetState} disabled={loading} className="dg-btn dg-btn-secondary">
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -314,8 +345,9 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           >
             <span style={{ flex: 1, color: "var(--color-text-primary)" }}>{secret}</span>
             <MaybeHint content="Copy secret" side="top">
-              <button
-                onClick={copySecret}
+              <Button
+                onClick={copy.run}
+                disabled={copy.isRunning}
                 aria-label="Copy secret"
                 style={{
                   background: "none",
@@ -327,7 +359,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
                 }}
               >
                 {copied ? <Check size={16} /> : <Copy size={16} />}
-              </button>
+              </Button>
             </MaybeHint>
           </div>
         </div>
@@ -376,7 +408,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>
-        <button
+        <Button
           onClick={verifyEnrollment}
           disabled={loading || verifyCode.length !== 6}
           className="dg-btn dg-btn-primary"
@@ -389,8 +421,8 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           >
             Verify &amp; Enable
           </ButtonLoading>
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => {
             // Cancel enrollment — unenroll the pending factor
             if (factorId) {
@@ -402,7 +434,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           className="dg-btn dg-btn-secondary"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -49,7 +49,7 @@ export async function handleApiError(error: unknown, action?: string) {
   // a broken page with a confusing "Something went wrong: Your session
   // expired..." message.
   if (isSessionExpiredError(error)) {
-    toast.error("Your session has expired. Please log in again.", {
+    toast.error("Your session expired. Sign in again.", {
       id: "session-expired",
       duration: Infinity,
     });
@@ -63,7 +63,7 @@ export async function handleApiError(error: unknown, action?: string) {
     (error instanceof Error && error.name === "TypeError")
   ) {
     toast.error(
-      "We're having trouble connecting. If you are using an adblocker or privacy shield, please try pausing it.",
+      "We're having trouble connecting. If you use an adblocker or privacy shield, try pausing it.",
       { id: "network-error", duration: 8000 },
     );
     return;

@@ -1,6 +1,7 @@
 "use client";
 
 import { DubGridLogo } from "@/components/Logo";
+import { Button } from "@/components/Button";
 import StepperBar from "./StepperBar";
 import type { StepConfig } from "./useOnboardingState";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -69,7 +70,7 @@ export default function WizardShell({
         </div>
 
         {onSkip && (
-          <button
+          <Button
             onClick={onSkip}
             disabled={skipLoading}
             type="button"
@@ -88,7 +89,7 @@ export default function WizardShell({
             <ButtonLoading loading={Boolean(skipLoading)} loadingLabel="Skipping">
               Skip setup
             </ButtonLoading>
-          </button>
+          </Button>
         )}
       </div>
 

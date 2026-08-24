@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { dispatchNotificationEvent } from "@/features/notifications/server/events";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
   }
   const auth = req.headers.get("authorization");
   if (auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: API_ERRORS.UNAUTHORIZED }, { status: 401 });
   }
   if (!(await isFeatureEnabled("cron_trial_expiry"))) {
     // 200, not 503 — this is an intentional gridmaster kill-switch flip, not a

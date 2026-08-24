@@ -118,7 +118,7 @@ describe("POST /api/auth/login", () => {
     const body = await res.json();
 
     expect(res.status).toBe(401);
-    expect(body.error).toBe("Invalid email or password");
+    expect(body.error).toBe("Check your email and password and try again.");
   });
 
   it("returns 403 ACCOUNT_DISABLED when the JWT hook refuses a removed employee", async () => {
@@ -151,7 +151,7 @@ describe("POST /api/auth/login", () => {
     const body = await res.json();
 
     expect(res.status).toBe(503);
-    expect(body.error).toBe("Service temporarily unavailable. Please try again.");
+    expect(body.error).toBe("DubGrid is unavailable right now. Try again in a moment.");
   });
 
   it("skips org orchestration and returns mfa_required for MFA-enrolled users", async () => {

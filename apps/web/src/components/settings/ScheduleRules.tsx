@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { Organization } from "@/types";
+import { Button } from "@/components/Button";
 import { DEFAULT_OPEN_SHIFT_VISIBILITY, type OpenShiftVisibilityMode } from "@dubgrid/domain";
 import { toast } from "sonner";
 import {
@@ -111,7 +112,7 @@ export default function ScheduleRules({
         );
         toast.error("Schedule rules changed elsewhere. Review the latest values and try again.");
       } else {
-        toast.error("Failed to update setting");
+        toast.error("We couldn't save that setting. Try again.");
       }
     } finally {
       setSaving(false);
@@ -312,7 +313,7 @@ export default function ScheduleRules({
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <button
+          <Button
             onClick={() => setConfirmOpen(true)}
             disabled={!isModified || saving}
             className="dg-btn dg-btn-primary"
@@ -320,7 +321,7 @@ export default function ScheduleRules({
             <ButtonLoading loading={saving} loadingLabel="Saving">
               Save
             </ButtonLoading>
-          </button>
+          </Button>
         </div>
 
         {confirmOpen && (
@@ -331,9 +332,7 @@ export default function ScheduleRules({
             confirmPendingLabel="Saving"
             variant="warning"
             isLoading={saving}
-            onConfirm={() => {
-              void handleSave();
-            }}
+            onConfirm={() => handleSave()}
             onCancel={() => setConfirmOpen(false)}
           />
         )}

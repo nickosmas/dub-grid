@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     `gridmaster-stripe-sync:${user.id}:${parsed.data.orgId}`,
   );
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -77,6 +77,9 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "gridmaster-stripe-sync" } });
     logger.error({ err, path: "/api/gridmaster/stripe-sync" }, "Stripe sync failed");
-    return NextResponse.json({ error: "Sync failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't sync that. Try again in a moment." },
+      { status: 500 },
+    );
   }
 }

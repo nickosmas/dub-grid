@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { requireAuthenticatedSession } from "@/lib/api-auth";
 import { z } from "zod";
 import { requireOrgPermissions } from "@/app/api/shared/permissions";
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     // Rate limit by user ID
     const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
     if (misconfigured) {
-      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     // used to probe this route for free, unauthenticated and unrate-limited.
     if (!(await isFeatureEnabled("csv_import"))) {
       return NextResponse.json(
-        { error: "Employee import is temporarily unavailable. Please try again shortly." },
+        { error: "Importing is unavailable right now. Try again in a moment." },
         { status: 503 },
       );
     }
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
     const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid data", details: parsed.error.flatten() },
+        { error: API_ERRORS.INVALID_INPUT, details: parsed.error.flatten() },
         { status: 400 },
       );
     }
@@ -234,7 +235,8 @@ export async function POST(req: NextRequest) {
             // user account) come back via getEmployeeContactConflict so
             // the admin sees WHICH CSV rows were skipped and why.
             const contactConflict = getEmployeeContactConflict(insertError);
-            const message = contactConflict?.message ?? "Failed to import this employee";
+            const message =
+              contactConflict?.message ?? "We couldn't import this employee. Try again.";
             logger.error({ error: insertError, row: item.index + 1 }, "Employee insert failed");
             errors.push({ row: item.index + 1, error: message });
           } else {

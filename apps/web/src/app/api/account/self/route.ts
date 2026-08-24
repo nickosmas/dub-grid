@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { fetchSelfWorkProfileSnapshot } from "@/features/account/server";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
       orgId: req.nextUrl.searchParams.get("orgId") ?? undefined,
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
     }
 
     const requestedOrgId = parsed.data.orgId ?? null;
@@ -31,6 +32,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await fetchSelfWorkProfileSnapshot(auth.user.id, effectiveOrgId));
   } catch (error) {
     logger.error({ error }, "account self GET failed");
-    return NextResponse.json({ error: "Failed to load your profile" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your profile. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { Button } from "@/components/Button";
 import { useOrganizationData, useOrgClaims } from "@/hooks";
 import { DashboardIcon, ScheduleIcon, PeopleIcon, ShieldIcon } from "@/components/icons/NavIcons";
 
@@ -202,7 +203,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
       </div>
 
       {/* CTA */}
-      <button
+      <Button
         onClick={onNext}
         type="button"
         style={{
@@ -221,7 +222,7 @@ export default function WelcomeStep({ role, onNext, isOrgSetup }: WelcomeStepPro
         }}
       >
         {isSuperAdmin && !isOrgSetup ? "Let\u2019s Get Started" : "Continue"}
-      </button>
+      </Button>
     </div>
   );
 }

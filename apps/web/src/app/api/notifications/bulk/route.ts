@@ -61,6 +61,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, count: ids.length });
   } catch (error) {
     logger.error({ error }, "notifications bulk failed");
-    return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't save your notification settings. Try again." },
+      { status: 500 },
+    );
   }
 }

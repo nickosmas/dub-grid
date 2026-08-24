@@ -1,6 +1,7 @@
 "use client";
 
 import { usePermissions, setUserViewActive } from "@/hooks";
+import { Button } from "@/components/Button";
 
 const BANNER_HEIGHT = 36;
 
@@ -41,7 +42,7 @@ export default function UserViewBanner() {
         </svg>
         Viewing as regular user
       </span>
-      <button
+      <Button
         onClick={() => setUserViewActive(false)}
         style={{
           background: "rgba(255,255,255,0.2)",
@@ -56,7 +57,7 @@ export default function UserViewBanner() {
         }}
       >
         Exit
-      </button>
+      </Button>
     </div>
   );
 }

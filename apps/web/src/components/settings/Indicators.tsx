@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { IndicatorType } from "@/types";
+import { Button } from "@/components/Button";
 import { toDarkPillColors } from "@/lib/colors";
 import {
   checkIndicatorTypeDependencies,
@@ -352,17 +353,17 @@ function IndicatorRow({
               <EditorActionRow
                 destructiveAction={
                   !indicator.isNew ? (
-                    <button
+                    <Button
                       onClick={handleDeleteClick}
                       disabled={deleting}
                       className="dg-btn dg-btn-danger dg-btn-sm"
                     >
                       {deleting ? "…" : "Delete"}
-                    </button>
+                    </Button>
                   ) : undefined
                 }
                 secondaryAction={
-                  <button
+                  <Button
                     onClick={() =>
                       indicator.isNew || !isDirty ? closeEditor() : discardDraft(false)
                     }
@@ -373,10 +374,10 @@ function IndicatorRow({
                       hasUnsavedChanges: isDirty,
                       isCreating: Boolean(indicator.isNew),
                     })}
-                  </button>
+                  </Button>
                 }
                 primaryAction={
-                  <button
+                  <Button
                     onClick={handleSave}
                     disabled={saving || !canSave}
                     className="dg-btn dg-btn-primary dg-btn-sm"
@@ -384,7 +385,7 @@ function IndicatorRow({
                     <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
                       {EDITOR_ACTION_LABELS.save}
                     </ButtonLoading>
-                  </button>
+                  </Button>
                 }
               />
             )}
@@ -594,9 +595,9 @@ export default function Indicators({
             description="Indicators flag readings, conflicts, or notes on shift cells."
             action={
               canManageIndicatorTypes ? (
-                <button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
+                <Button onClick={handleAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
                   + Add Indicator
-                </button>
+                </Button>
               ) : undefined
             }
             style={{ margin: "12px 16px" }}
@@ -604,13 +605,13 @@ export default function Indicators({
         )}
         {local.length > 0 && canManageIndicatorTypes && (
           <div style={{ padding: "8px 16px 12px" }}>
-            <button
+            <Button
               onClick={handleAdd}
               className="dg-btn dg-btn-dashed dg-btn-sm"
               style={{ width: "100%" }}
             >
               + Add Indicator
-            </button>
+            </Button>
           </div>
         )}
       </div>

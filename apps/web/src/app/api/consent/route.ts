@@ -80,13 +80,19 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       logger.error({ error }, "Failed to record consent");
-      return NextResponse.json({ error: "Failed to record consent" }, { status: 500 });
+      return NextResponse.json(
+        { error: "We couldn't save your choices. Try again." },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ success: true });
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "consent" } });
     logger.error({ error: err }, "Consent recording failed");
-    return NextResponse.json({ error: "Failed to record consent" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't save your choices. Try again." },
+      { status: 500 },
+    );
   }
 }

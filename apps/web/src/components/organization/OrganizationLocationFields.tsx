@@ -13,6 +13,7 @@ import {
 import { createPortal } from "react-dom";
 import { MapPin } from "lucide-react";
 import { labelStyle } from "@/lib/styles";
+import { Button } from "@/components/Button";
 import type { StructuredOrganizationAddress } from "@/lib/organization-profile";
 import {
   getGoogleText,
@@ -402,7 +403,7 @@ function AddressLine1Input({
                     const isActive = activeIndex === index;
 
                     return (
-                      <button
+                      <Button
                         key={`${getGoogleText(prediction.text)}-${index}`}
                         id={`${id}-option-${index}`}
                         type="button"
@@ -411,9 +412,7 @@ function AddressLine1Input({
                         className="dg-address-item"
                         onMouseDown={(event) => event.preventDefault()}
                         onMouseEnter={() => setActiveIndex(index)}
-                        onClick={() => {
-                          void handleSelectPrediction(prediction);
-                        }}
+                        onClick={() => handleSelectPrediction(prediction)}
                       >
                         <span className="dg-address-item-icon" aria-hidden="true">
                           <MapPin size={14} strokeWidth={2.2} />
@@ -428,7 +427,7 @@ function AddressLine1Input({
                             </span>
                           ) : null}
                         </span>
-                      </button>
+                      </Button>
                     );
                   })
                 )}

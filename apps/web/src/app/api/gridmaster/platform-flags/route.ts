@@ -76,7 +76,10 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "gridmaster-platform-flags-get" } });
     logger.error({ err }, "Failed to load platform feature flags");
-    return NextResponse.json({ error: "Failed to load feature flags" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the feature controls. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -90,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -166,7 +169,10 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "gridmaster-platform-flags-post" } });
     logger.error({ err, key }, "Failed to update platform feature flag");
-    return NextResponse.json({ error: "Failed to update feature flag" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't update that control. Try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -185,7 +191,7 @@ export async function PUT(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -257,6 +263,9 @@ export async function PUT(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "gridmaster-platform-flags-put" } });
     logger.error({ err, key }, "Failed to create platform feature flag");
-    return NextResponse.json({ error: "Failed to create feature flag" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't create that control. Try again." },
+      { status: 500 },
+    );
   }
 }

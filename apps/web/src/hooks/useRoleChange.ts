@@ -63,7 +63,9 @@ export function useRoleChange() {
       } | null;
 
       if (!response.ok) {
-        throw new Error(formatClientErrorMessage(body?.error, "Failed to change role"));
+        throw new Error(
+          formatClientErrorMessage(body?.error, "We couldn't change role. Try again."),
+        );
       }
 
       return (

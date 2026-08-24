@@ -46,9 +46,63 @@ const devLogger = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _sdk: Record<string, any> | undefined;
 
+/**
+ * In the browser the SDK is loaded asynchronously; on the server it is not.
+ *
+ * @sentry/nextjs is 1.39 MB parsed, and a synchronous require put all of it in
+ * the chunk group every single route loads — 85% of that shared bundle, on the
+ * marketing page and every app screen alike, blocking first paint to deliver
+ * error monitoring that is not needed until something actually throws. Loading
+ * it with a dynamic import moves it to its own async chunk.
+ *
+ * Server and Edge keep the synchronous require. There is no bundle-size cost
+ * there, `instrumentation.ts` expects captureRequestError to exist the moment
+ * it is imported, and the dev dead-code-elimination trick described above still
+ * depends on this exact shape.
+ *
+ * Calls made before the browser load resolves are queued rather than dropped,
+ * so an error thrown during startup is still reported.
+ */
+let _pending: Array<() => void> | null = null;
+let _resolveReady: () => void = () => {};
+
+/** Resolves once the SDK is usable — immediately wherever it loads synchronously. */
+export const sentryReady: Promise<void> = new Promise((resolve) => {
+  _resolveReady = resolve;
+});
+
 if (process.env.NODE_ENV !== "development") {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  _sdk = require("@sentry/nextjs");
+  if (typeof window === "undefined") {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _sdk = require("@sentry/nextjs");
+    _resolveReady();
+  } else {
+    _pending = [];
+    void import("@sentry/nextjs")
+      .then((mod) => {
+        _sdk = mod as unknown as Record<string, unknown>;
+        const queued = _pending ?? [];
+        _pending = null;
+        for (const run of queued) run();
+      })
+      .catch(() => {
+        // Monitoring must never take the app down with it. Drop the queue and
+        // let every call fall through to a no-op from here on.
+        _pending = null;
+      })
+      .finally(() => _resolveReady());
+  }
+} else {
+  _resolveReady();
+}
+
+/** Runs now if the SDK is here, queues if it is still loading, else discards. */
+function dispatch(run: () => void): void {
+  if (_sdk) {
+    run();
+    return;
+  }
+  if (_pending) _pending.push(run);
 }
 
 // ── Platform kill switch (server-side only) ───────────────────────────────────
@@ -100,75 +154,93 @@ function sentryKillSwitchEnabled(): boolean {
 
 // ── Conditional re-exports ────────────────────────────────────────────────────
 
+// Each of these resolves _sdk when *called*, not when this module is evaluated.
+// In the browser the SDK arrives later, so binding at evaluation time would
+// freeze every export as a permanent no-op.
+
 // captureException
-export const captureException: (error: unknown, context?: CaptureContext) => void = _sdk
-  ? (...args) => {
-      if (!sentryKillSwitchEnabled()) return;
-      _sdk!.captureException(...args);
-    }
-  : noop;
+export const captureException: (error: unknown, context?: CaptureContext) => void = (...args) => {
+  if (!sentryKillSwitchEnabled()) return;
+  dispatch(() => _sdk!.captureException(...args));
+};
 
 // captureMessage
-export const captureMessage: (message: string, level?: SeverityLevel) => void = _sdk
-  ? (...args) => {
-      if (!sentryKillSwitchEnabled()) return;
-      _sdk!.captureMessage(...args);
-    }
-  : noop;
+export const captureMessage: (message: string, level?: SeverityLevel) => void = (...args) => {
+  if (!sentryKillSwitchEnabled()) return;
+  dispatch(() => _sdk!.captureMessage(...args));
+};
 
 // setUser
-export const setUser: (user: SentryUser) => void = _sdk
-  ? (...args) => {
-      _sdk!.setUser(...args);
-    }
-  : noop;
+export const setUser: (user: SentryUser) => void = (...args) => {
+  dispatch(() => _sdk!.setUser(...args));
+};
 
 // setTag
-export const setTag: (key: string, value: string) => void = _sdk
-  ? (...args) => {
-      _sdk!.setTag(...args);
-    }
-  : noop;
+export const setTag: (key: string, value: string) => void = (...args) => {
+  dispatch(() => _sdk!.setTag(...args));
+};
 
-// logger (structured logging via Sentry)
-export const logger: typeof devLogger = _sdk?.logger ?? devLogger;
+// logger (structured logging via Sentry). A stable object whose methods resolve
+// per call, so a reference taken at import time still reaches the real logger
+// once the SDK lands.
+export const logger: typeof devLogger = {
+  info: (...args) => dispatch(() => _sdk!.logger?.info?.(...args)),
+  warn: (...args) => dispatch(() => _sdk!.logger?.warn?.(...args)),
+  error: (...args) => dispatch(() => _sdk!.logger?.error?.(...args)),
+  debug: (...args) => dispatch(() => _sdk!.logger?.debug?.(...args)),
+  trace: (...args) => dispatch(() => _sdk!.logger?.trace?.(...args)),
+  log: (...args) => dispatch(() => _sdk!.logger?.log?.(...args)),
+};
 
-// replayIntegration — used by instrumentation-client.ts (client-side only)
+/**
+ * Session Replay, taken from the already-loaded SDK.
+ *
+ * Deliberately not a second `import("@sentry/nextjs")` at the call site: a
+ * separate import specifier gave the bundler a second reason to reference the
+ * package, which kept a 229 KB slice of Replay in the eager root chunk group
+ * even though the rest had moved to an async chunk. Reading it off the module
+ * loaded here keeps Sentry to exactly one chunk.
+ *
+ * Returns null when the SDK is unavailable (dev, or a failed load), so the
+ * caller simply attaches nothing.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const replayIntegration: (...args: any[]) => any = _sdk
-  ? (...args) => _sdk!.replayIntegration(...args)
-  : () => ({});
+export async function loadReplayIntegration(): Promise<any | null> {
+  await sentryReady;
+  return _sdk?.replayIntegration?.() ?? null;
+}
 
 // addIntegration — lets us attach replay lazily once analytics consent is granted
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const addIntegration: (integration: any) => void = _sdk
-  ? (integration) => {
-      _sdk!.addIntegration(integration);
-    }
-  : noop;
+export const addIntegration: (integration: any) => void = (integration) => {
+  dispatch(() => _sdk!.addIntegration(integration));
+};
 
-// getClient — used to detect whether replay was already attached
+// getClient — used to detect whether replay was already attached. Returns
+// undefined until the SDK is loaded; await sentryReady first if that matters.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const getClient: () => any = _sdk ? () => _sdk!.getClient() : () => undefined;
+export const getClient: () => any = () => _sdk?.getClient?.();
 
-// captureRouterTransitionStart — exported from instrumentation-client.ts
+// captureRouterTransitionStart — exported from instrumentation-client.ts.
+// Must stay synchronous and pass its argument through: Next calls it during a
+// navigation and does not wait on it.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const captureRouterTransitionStart: (...args: any[]) => any = _sdk
-  ? (...args) => _sdk!.captureRouterTransitionStart(...args)
-  : <T>(v: T) => v;
+export const captureRouterTransitionStart: (...args: any[]) => any = (...args) => {
+  if (_sdk) return _sdk.captureRouterTransitionStart?.(...args);
+  return args[0];
+};
 
-// captureRequestError — exported from instrumentation.ts on the server
+// captureRequestError — exported from instrumentation.ts on the server, where
+// the SDK is always loaded synchronously by the time this can be called.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const captureRequestError: (...args: any[]) => any = _sdk
-  ? (...args) => _sdk!.captureRequestError(...args)
-  : noop;
+export const captureRequestError: (...args: any[]) => any = (...args) => {
+  dispatch(() => _sdk!.captureRequestError(...args));
+};
 
 // init — used in sentry.server/edge/client config files
-export const init: (options: Record<string, unknown>) => void = _sdk
-  ? (...args) => {
-      _sdk!.init(...args);
-    }
-  : noop;
+export const init: (options: Record<string, unknown>) => void = (...args) => {
+  dispatch(() => _sdk!.init(...args));
+};
 
 // ── Convenience helpers ──────────────────────────────────────────────────────
 

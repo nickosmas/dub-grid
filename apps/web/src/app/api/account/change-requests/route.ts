@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     .eq("org_id", orgId)
     .maybeSingle();
   if (!membership) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
   }
 
   const requests = await listOwnProfileChangeRequests({
@@ -71,6 +71,6 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ request }, { status: 201 });
   } catch (error) {
-    return apiErrorResponse(error, "Failed to create request.", 400);
+    return apiErrorResponse(error, "We couldn't create request. Try again.", 400);
   }
 }

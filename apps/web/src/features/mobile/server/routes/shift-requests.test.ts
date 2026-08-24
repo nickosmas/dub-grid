@@ -4,6 +4,7 @@
 process.env.TZ = "UTC";
 
 import { NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireMobileAuth = vi.fn();
@@ -70,7 +71,7 @@ describe("mobile shift-requests route", () => {
     } as never);
 
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Invalid query" });
+    expect(await response.json()).toEqual({ error: API_ERRORS.INVALID_REQUEST });
     expect(fetchMobileShiftRequests).not.toHaveBeenCalled();
   });
 

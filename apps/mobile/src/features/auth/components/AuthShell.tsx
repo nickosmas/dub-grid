@@ -15,7 +15,10 @@ import { getScreenBottomPadding } from "../../../shared/components/screen-layout
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
 import { mobileSpace } from "../../../shared/theme/tokens";
 
-/** Keeps the form readable on tablets without stretching the fields. */
+/**
+ * Keeps the form readable on tablets without stretching the fields. The brand
+ * header shares it so the two share a left edge.
+ */
 const MAX_COLUMN_WIDTH = 380;
 
 /**
@@ -44,15 +47,19 @@ export function AuthShell({
     <SafeAreaView style={[styles.safeArea, { backgroundColor: mobileColors.background }]}>
       {/* Sits behind the brand header and fades out before the fields start. */}
       <GradientBackdrop height="100%" kind="aurora" />
-      <Pressable style={styles.brandHeader} onLongPress={onBrandLongPress}>
-        <Image
-          accessibilityIgnoresInvertColors
-          accessibilityLabel="DubGrid logo"
-          source={require("../../../../assets/images/logo-blue.png")}
-          style={styles.brandMark}
-        />
-        <DubGridWordmark color={mobileColors.textPrimary} fontSize={20} />
-      </Pressable>
+      {/* Constrained to the same column as the fields below, so the logo's left
+          edge lines up with the copy instead of drifting out on wide screens. */}
+      <View style={styles.brandRow}>
+        <Pressable style={styles.brandHeader} onLongPress={onBrandLongPress}>
+          <Image
+            accessibilityIgnoresInvertColors
+            accessibilityLabel="DubGrid logo"
+            source={require("../../../../assets/images/logo-blue.png")}
+            style={styles.brandMark}
+          />
+          <DubGridWordmark color={mobileColors.textPrimary} fontSize={20} />
+        </Pressable>
+      </View>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.keyboardArea}
@@ -101,13 +108,18 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  brandHeader: {
-    flexDirection: "row",
+  brandRow: {
     alignItems: "center",
-    gap: mobileSpace.sm,
     paddingHorizontal: mobileSpace["2xl"],
     paddingTop: mobileSpace.sm,
     paddingBottom: mobileSpace.xs,
+  },
+  brandHeader: {
+    width: "100%",
+    maxWidth: MAX_COLUMN_WIDTH,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: mobileSpace.sm,
   },
   brandMark: {
     width: 28,

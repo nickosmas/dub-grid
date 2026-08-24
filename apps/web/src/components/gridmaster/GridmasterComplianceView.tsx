@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
 import { exportGridmasterAuditLog, fetchGridmasterCompliance } from "@/features/gridmaster/client";
+import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
@@ -140,7 +141,7 @@ export default function GridmasterComplianceView({
         >
           Compliance Oversight
         </h2>
-        <button
+        <Button
           className="dg-btn dg-btn-secondary"
           onClick={() => setExportConfirm(true)}
           disabled={exporting}
@@ -153,7 +154,7 @@ export default function GridmasterComplianceView({
           >
             Export High-Risk Audit
           </ButtonLoading>
-        </button>
+        </Button>
       </div>
 
       {complianceQuery.error instanceof Error && (
@@ -310,7 +311,7 @@ export default function GridmasterComplianceView({
                             <td style={{ ...tdStyle, fontWeight: 700 }}>
                               {describeAuditEvent(event.action, event.details)}
                             </td>
-                            <td style={tdStyle}>{event.actorEmail ?? event.actorId ?? "—"}</td>
+                            <td style={tdStyle}>{event.actorEmail ?? "Unknown"}</td>
                             <td style={tdStyle}>{formatDateTimeLabel(event.createdAt)}</td>
                           </tr>
                         ),

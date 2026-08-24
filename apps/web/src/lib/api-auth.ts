@@ -78,7 +78,7 @@ export async function requireAuthenticatedSession(req: NextRequest): Promise<Aut
   if (!session?.access_token || !user) {
     return {
       response: NextResponse.json(
-        { error: "Your session expired. Please sign in again." },
+        { error: "Your session expired. Sign in again." },
         { status: 401 },
       ),
     };
@@ -96,7 +96,7 @@ export async function requireAuthenticatedUser(req: NextRequest): Promise<UserAu
   if (!user) {
     return {
       response: NextResponse.json(
-        { error: "Your session expired. Please sign in again." },
+        { error: "Your session expired. Sign in again." },
         { status: 401 },
       ),
     };
@@ -147,7 +147,7 @@ export async function requireAuthenticatedUserWithClaims(
   if (claimsResult.error || !claims) {
     return {
       response: NextResponse.json(
-        { error: "Your session could not be verified. Please sign in again." },
+        { error: "We couldn't verify your session. Sign in again." },
         { status: 401 },
       ),
     };

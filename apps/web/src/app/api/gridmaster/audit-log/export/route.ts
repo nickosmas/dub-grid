@@ -110,7 +110,10 @@ export async function POST(req: NextRequest) {
       { err: error, path: "/api/gridmaster/audit-log/export" },
       "gridmaster audit export POST failed",
     );
-    return NextResponse.json({ error: "Failed to export audit log" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't export the activity log. Try again." },
+      { status: 500 },
+    );
   }
 }
 

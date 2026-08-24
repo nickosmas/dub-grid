@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
+import { Button } from "@/components/Button";
 import { toast } from "sonner";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { Popover, PopoverContent } from "@/components/ui/popover";
@@ -47,6 +48,7 @@ import type {
   ShiftJobSegment,
 } from "@/types";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 type ShiftCellPopoverProps = {
   anchorRef: HTMLElement | null;
@@ -221,7 +223,7 @@ function ShiftCellPopover({
               closeOnSelect={true}
             />
             {(currentSegments.length > 0 || currentAbsenceTypeId) && (
-              <button
+              <Button
                 onClick={() => {
                   onSelect(null);
                   onClose();
@@ -236,7 +238,7 @@ function ShiftCellPopover({
                 }}
               >
                 Clear Shift
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -824,7 +826,7 @@ export function RecurringScheduleSection({
       }
       toast.success("Recurring schedules saved");
     } catch (err: unknown) {
-      toast.error("Failed to save recurring schedules");
+      toast.error("We couldn't save the recurring schedule. Try again.");
       setError(formatClientErrorMessage(err, "We couldn't save recurring schedules."));
     } finally {
       setSaving(false);
@@ -853,6 +855,10 @@ export function RecurringScheduleSection({
       await deleteRecurringDraft(orgId, currentUserId).catch(() => {});
     }
   }
+
+  // Latched so a double-click can't write the same draft twice and stamp two
+  // "Draft saved" toasts on top of each other.
+  const saveDraft = useAsyncAction(handleSaveDraft);
 
   const filteredEmployees = useMemo(
     () =>
@@ -944,14 +950,21 @@ export function RecurringScheduleSection({
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handleSaveDraft}
+            <Button
+              onClick={saveDraft.run}
+              disabled={saveDraft.isRunning}
               className="dg-btn dg-btn-secondary"
               style={{ padding: "6px 14px", fontSize: "var(--dg-fs-caption)" }}
             >
-              Save Draft
-            </button>
-            <button
+              <ButtonLoading
+                loading={saveDraft.isRunning}
+                loadingLabel="Saving Draft"
+                spinnerSize={14}
+              >
+                Save Draft
+              </ButtonLoading>
+            </Button>
+            <Button
               onClick={() => setPendingRecurringAction("discard")}
               className="dg-btn dg-btn-ghost"
               style={{
@@ -961,8 +974,8 @@ export function RecurringScheduleSection({
               }}
             >
               Discard
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setPendingRecurringAction("save")}
               disabled={saving}
               className="dg-btn dg-btn-primary"
@@ -971,7 +984,7 @@ export function RecurringScheduleSection({
               <ButtonLoading loading={saving} loadingLabel="Saving">
                 Save Changes
               </ButtonLoading>
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -1039,7 +1052,7 @@ export function RecurringScheduleSection({
           </svg>
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             style={{
@@ -1098,7 +1111,7 @@ export function RecurringScheduleSection({
           title="No results found"
           description="Try adjusting your search or filter."
           action={
-            <button
+            <Button
               onClick={() => {
                 setSearchQuery("");
                 setFilterFocusArea("");
@@ -1106,7 +1119,7 @@ export function RecurringScheduleSection({
               className="dg-btn dg-btn-secondary"
             >
               Clear filters
-            </button>
+            </Button>
           }
         />
       ) : (
@@ -1395,11 +1408,7 @@ export function RecurringScheduleSection({
           onConfirm={() => {
             const action = pendingRecurringAction;
             setPendingRecurringAction(null);
-            if (action === "save") {
-              void handleSaveAll();
-            } else {
-              void handleDiscardDraft();
-            }
+            return action === "save" ? handleSaveAll() : handleDiscardDraft();
           }}
           onCancel={() => setPendingRecurringAction(null)}
         />

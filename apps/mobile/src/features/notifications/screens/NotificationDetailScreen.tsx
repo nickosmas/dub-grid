@@ -274,9 +274,7 @@ export default function NotificationDetailScreen() {
 
         <View style={styles.actionsRow}>
           <Pressable
-            onPress={() => {
-              void performAction("unread");
-            }}
+            onPress={() => performAction("unread")}
             style={styles.actionButton}
             disabled={busy || !notification.readAt}
             accessibilityRole="button"
@@ -286,9 +284,7 @@ export default function NotificationDetailScreen() {
             <Text style={styles.actionLabel}>Mark unread</Text>
           </Pressable>
           <Pressable
-            onPress={() => {
-              void performAction(isArchived ? "unarchive" : "archive");
-            }}
+            onPress={() => performAction(isArchived ? "unarchive" : "archive")}
             style={styles.actionButton}
             disabled={busy}
             accessibilityRole="button"

@@ -95,6 +95,37 @@ describe("buildPerms", () => {
     expect(perms.isImpersonating).toBe(true);
   });
 
+  // admin_permissions is an unvalidated JSONB column, so the resolver has to
+  // hold these guarantees itself rather than trust whatever wrote the row.
+  it("resolves a partial admin_permissions JSONB against the read-only base", () => {
+    const perms = buildPerms("admin", "org-1", false, {
+      canEditShifts: true,
+    } as unknown as typeof READ_ONLY_PERMS);
+    expect(perms.canEditShifts).toBe(true);
+    expect(perms.canApproveShiftRequests).toBe(false);
+    expect(perms.canManageEmployees).toBe(false);
+  });
+
+  it("keeps canViewStaff true for an admin, as it already was for a user", () => {
+    const stored = { ...READ_ONLY_PERMS, canViewStaff: false };
+    expect(buildPerms("admin", "org-1", false, stored).canViewStaff).toBe(true);
+    expect(buildPerms("user", "org-1", false, stored).canViewStaff).toBe(true);
+  });
+
+  it("never lets a stored JSONB delegate canManageOrgSettings to an admin", () => {
+    const stored = { ...READ_ONLY_PERMS, canManageOrgSettings: true };
+    expect(buildPerms("admin", "org-1", false, stored).canManageOrgSettings).toBe(false);
+    expect(buildPerms("user", "org-1", false, stored).canManageOrgSettings).toBe(false);
+  });
+
+  it("never lets a stored JSONB grant canManageUsers", () => {
+    const perms = buildPerms("admin", "org-1", false, {
+      canManageUsers: true,
+    } as unknown as typeof READ_ONLY_PERMS);
+    expect(perms.canManageUsers).toBe(false);
+    expect(perms.canConfigureAdminPermissions).toBe(false);
+  });
+
   it("atLeast compares against the caller's resolved level", () => {
     const perms = buildPerms("super_admin", "org-1", false);
     expect(perms.atLeast("admin")).toBe(true);

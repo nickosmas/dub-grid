@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import type { OrganizationRole, PlatformRole } from "@dubgrid/domain";
 import { createRequestSupabaseClient, requireGridmasterSession } from "@/lib/api-auth";
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
       offset: req.nextUrl.searchParams.get("offset") ?? undefined,
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
     }
 
     const limit = parsed.data.limit ?? DEFAULT_PAGE_SIZE;
@@ -149,7 +150,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "gridmaster security sessions GET failed");
-    return NextResponse.json({ error: "Failed to load sessions" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your devices. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 

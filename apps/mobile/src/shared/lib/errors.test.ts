@@ -36,10 +36,10 @@ describe("mobile error helpers", () => {
   it("maps invitation email delivery failures to client-friendly copy", () => {
     expect(
       getClientFriendlyErrorMessage(
-        new Error("Invitation email could not be sent. Try again in a moment."),
+        new Error("We couldn't send that invitation email. Try again in a moment."),
         "Fallback message",
       ),
-    ).toBe("We couldn't send that email. Please try again shortly.");
+    ).toBe("We couldn't send that invitation email. Try again in a moment.");
   });
 
   it("detects network connection errors", () => {

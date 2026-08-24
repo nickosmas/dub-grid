@@ -79,7 +79,7 @@ async function orchestratePostSignIn(
         ok: false,
         status: 401,
         code: "SESSION_REFRESH_FAILED",
-        error: "Your session could not be verified. Please sign in again.",
+        error: "We couldn't verify your session. Sign in again.",
       };
     }
     session = {
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
 
   if (misconfigured) {
     return NextResponse.json(
-      { success: false, error: "Service temporarily unavailable" },
+      { success: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
     );
   }
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Too many login attempts. Please try again later.",
+        error: "Too many sign-in attempts. Wait a few minutes and try again.",
         retryAfter,
       },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
@@ -229,12 +229,12 @@ export async function POST(req: NextRequest) {
     // generic "Invalid email or password" (to avoid email enumeration).
     if (typeof error.status === "number" && error.status >= 500) {
       return NextResponse.json(
-        { success: false, error: "Service temporarily unavailable. Please try again." },
+        { success: false, error: "DubGrid is unavailable right now. Try again in a moment." },
         { status: 503 },
       );
     }
     return NextResponse.json(
-      { success: false, error: "Invalid email or password" },
+      { success: false, error: "Check your email and password and try again." },
       { status: 401 },
     );
   }

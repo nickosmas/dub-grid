@@ -394,7 +394,10 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
 
   const loading = !ctx.resolved || bootstrapQuery.isLoading;
   const loadError = bootstrapQuery.isError
-    ? formatClientErrorMessage(bootstrapQuery.error, "Failed to load organization")
+    ? formatClientErrorMessage(
+        bootstrapQuery.error,
+        "We couldn't load organization. Refresh and try again.",
+      )
     : null;
 
   const handledErrorsRef = useRef<Set<string>>(new Set());
@@ -523,7 +526,7 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
         broadcastInvalidation(queryKeys.org.assignments(effectiveOrgId));
       } catch (error) {
         Sentry.captureException(error);
-        toast.error("Failed to refresh schedule assignments");
+        toast.error("We couldn't refresh the schedule options. Refresh and try again.");
       }
     },
     [broadcastOrgInvalidations, queryClient, effectiveOrgId, updateBootstrapCache],

@@ -19,6 +19,7 @@ import {
   upsertJobDefinition,
 } from "@/features/settings/client";
 import type { DependencyInfo } from "@/features/settings/client";
+import { Button } from "@/components/Button";
 import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
@@ -580,7 +581,7 @@ function EligibilityModeToggle({
         ).map(([mode, label]) => {
           const active = value === mode;
           return (
-            <button
+            <Button
               key={mode}
               type="button"
               onClick={() => onChange(mode)}
@@ -597,7 +598,7 @@ function EligibilityModeToggle({
               }}
             >
               {label}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -672,7 +673,7 @@ function DefaultShiftToggle({
         setEnabled(err.latestOrganization.defaultShiftEnabled);
         toast.error("This setting changed elsewhere. Review the latest value and try again.");
       } else {
-        toast.error("Failed to update setting");
+        toast.error("We couldn't save that setting. Try again.");
       }
     } finally {
       setSaving(false);
@@ -726,7 +727,7 @@ function DefaultShiftToggle({
           confirmLabel={pendingValue ? "Enable" : "Disable"}
           variant={pendingValue ? "info" : "warning"}
           isLoading={saving}
-          onConfirm={() => void handleConfirm()}
+          onConfirm={() => handleConfirm()}
           onCancel={() => setPendingValue(null)}
         />
       ) : null}
@@ -808,9 +809,9 @@ function JobSectionCard({
           }
           action={
             canManageScheduleDefinitions ? (
-              <button onClick={onAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
+              <Button onClick={onAdd} className="dg-btn dg-btn-secondary dg-btn-sm">
                 {section === "shiftless" ? "+ Add General Job" : "+ Add Scheduled Job"}
-              </button>
+              </Button>
             ) : undefined
           }
           style={{ margin: "12px 16px" }}
@@ -820,13 +821,13 @@ function JobSectionCard({
       {rows.length > 0 && canManageScheduleDefinitions ? (
         !hideAddButton ? (
           <div style={{ padding: "8px 16px 12px" }}>
-            <button
+            <Button
               onClick={onAdd}
               className="dg-btn dg-btn-dashed dg-btn-sm"
               style={{ width: "100%" }}
             >
               {section === "shiftless" ? "+ Add General Job" : "+ Add Scheduled Job"}
-            </button>
+            </Button>
           </div>
         ) : null
       ) : null}
@@ -1503,7 +1504,7 @@ function JobRow({
                       </p>
                       {canManageScheduleDefinitions ? (
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button
+                          <Button
                             type="button"
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                             onClick={() =>
@@ -1515,8 +1516,8 @@ function JobRow({
                             }
                           >
                             Remove duration
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                             onClick={() =>
@@ -1530,7 +1531,7 @@ function JobRow({
                             }
                           >
                             Set actual times instead
-                          </button>
+                          </Button>
                         </div>
                       ) : null}
                     </>
@@ -1605,7 +1606,7 @@ function JobRow({
                       </p>
                       {canManageScheduleDefinitions ? (
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button
+                          <Button
                             type="button"
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                             onClick={() =>
@@ -1617,8 +1618,8 @@ function JobRow({
                             }
                           >
                             Remove default time
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                             onClick={() =>
@@ -1632,7 +1633,7 @@ function JobRow({
                             }
                           >
                             Use duration instead
-                          </button>
+                          </Button>
                         </div>
                       ) : null}
                     </>
@@ -1652,7 +1653,7 @@ function JobRow({
                       </p>
                       {canManageScheduleDefinitions ? (
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                          <button
+                          <Button
                             type="button"
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                             onClick={() =>
@@ -1666,8 +1667,8 @@ function JobRow({
                             }
                           >
                             Set actual times
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
                             className="dg-btn dg-btn-secondary dg-btn-sm"
                             onClick={() =>
@@ -1681,7 +1682,7 @@ function JobRow({
                             }
                           >
                             Set duration instead
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         <div
@@ -2079,7 +2080,7 @@ function JobRow({
                                 }
                                 disabled={!canManageScheduleDefinitions || isRegularStaffJob}
                               />
-                              <button
+                              <Button
                                 type="button"
                                 className="dg-btn dg-btn-secondary dg-btn-sm"
                                 onClick={() =>
@@ -2098,7 +2099,7 @@ function JobRow({
                                 }
                               >
                                 {colorOverride == null ? "Using shift color" : "Use shift color"}
-                              </button>
+                              </Button>
                             </div>
                           </div>
 
@@ -2375,25 +2376,25 @@ function JobRow({
           <EditorActionRow
             destructiveAction={
               canManageScheduleDefinitions && !job.isNew && !isLockedIdentityJob ? (
-                <button
+                <Button
                   onClick={handleDeleteClick}
                   disabled={deleting}
                   className="dg-btn dg-btn-danger dg-btn-sm"
                 >
                   {deleting ? "…" : "Archive"}
-                </button>
+                </Button>
               ) : undefined
             }
             secondaryAction={
-              <button
+              <Button
                 onClick={() => (job.isNew || !isDirty ? closeEditor() : discardDraft(false))}
                 className="dg-btn dg-btn-secondary dg-btn-sm"
               >
                 {getEditorDismissLabel({ hasUnsavedChanges: isDirty, isCreating: job.isNew })}
-              </button>
+              </Button>
             }
             primaryAction={
-              <button
+              <Button
                 onClick={handleSave}
                 disabled={saving || !canSave || !canManageScheduleDefinitions}
                 className="dg-btn dg-btn-primary dg-btn-sm"
@@ -2401,7 +2402,7 @@ function JobRow({
                 <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
                   {EDITOR_ACTION_LABELS.save}
                 </ButtonLoading>
-              </button>
+              </Button>
             }
           />
         </div>

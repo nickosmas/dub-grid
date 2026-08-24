@@ -1,4 +1,5 @@
 import { getServiceClient } from "@/lib/supabase-service";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { getRateLimitConfigStatus } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ export async function GET() {
     const client = getServiceClient();
     const { error } = await client.from("organizations").select("id").limit(1);
     checks.db = error
-      ? { status: "error", error: "query failed", latencyMs: Date.now() - dbStart }
+      ? { status: "error", error: API_ERRORS.UNEXPECTED, latencyMs: Date.now() - dbStart }
       : { status: "ok", latencyMs: Date.now() - dbStart };
   } catch {
     checks.db = { status: "error", error: "connection failed", latencyMs: Date.now() - dbStart };

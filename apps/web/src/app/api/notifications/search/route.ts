@@ -129,6 +129,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "notifications search failed");
-    return NextResponse.json({ error: "Failed to search notifications" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't search your alerts. Try again." },
+      { status: 500 },
+    );
   }
 }

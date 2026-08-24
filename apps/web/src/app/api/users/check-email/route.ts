@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -80,7 +80,10 @@ export async function POST(req: NextRequest) {
     .limit(1);
   if (authLookupErr) {
     logger.error({ error: authLookupErr }, "check-email auth lookup failed");
-    return NextResponse.json({ error: "Failed to look up user" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't find that account. Try again." },
+      { status: 500 },
+    );
   }
   const matchedUserId = matchedUsers?.[0]?.id ?? null;
   if (!matchedUserId) {

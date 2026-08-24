@@ -34,9 +34,22 @@ export const DEFAULT_ERROR_FALLBACK = "Something went wrong. Please try again.";
  * across the rest of the app and is consistent across every route.
  */
 export const API_ERRORS = {
-  INVALID_INPUT: "Some of the details look off. Please review and try again.",
-  INVALID_BODY: "We couldn't read that request. Please try again.",
-  UNAUTHORIZED: "Please sign in to continue.",
+  INVALID_INPUT: "Some of those details look off. Review them and try again.",
+  INVALID_BODY: "We couldn't read that request. Try again.",
+  /**
+   * A malformed request the user never typed (bad query params, a stale link).
+   * Distinct from INVALID_INPUT, which points at something they can fix.
+   */
+  INVALID_REQUEST: "We couldn't complete that request. Refresh the page and try again.",
+  UNAUTHORIZED: "Sign in to continue.",
+  /** Something broke on our side. Never expose the underlying cause. */
+  UNEXPECTED: "Something went wrong on our end. Try again in a moment.",
+  /**
+   * The 503 an endpoint returns when it fails closed — a misconfigured rate
+   * limiter, a dependency it can't reach. "Service temporarily unavailable"
+   * named the mechanism and left the reader with nothing to do.
+   */
+  SERVICE_UNAVAILABLE: "DubGrid is having trouble right now. Try again in a moment.",
   // Generic fallback — used by CLIENT_FRIENDLY_ERROR_PATTERNS' catch-all regex
   // for any forbidden/unauthorized error that isn't one of the specific
   // causes below. Prefer a specific constant at new call sites.
@@ -165,9 +178,11 @@ export const CLIENT_FRIENDLY_ERROR_PATTERNS: ReadonlyArray<{
     message: "That code didn't work. Check your authenticator app and try again.",
   },
   {
+    // Covers both the old backend wording and the current API response copy,
+    // so an in-flight response from either version still lands here.
     pattern:
-      /email service not configured|invitation email could not be sent|failed to send (?:invitation )?email/i,
-    message: "We couldn't send that email. Please try again shortly.",
+      /email service not configured|invitation email could not be sent|failed to send (?:invitation )?email|couldn't send that (?:invitation )?email/i,
+    message: "We couldn't send that invitation email. Try again in a moment.",
   },
 ];
 

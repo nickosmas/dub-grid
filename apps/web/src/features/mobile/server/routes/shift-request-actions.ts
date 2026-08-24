@@ -1,4 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { formatClientErrorMessage } from "@dubgrid/client-errors";
+import logger from "@/lib/logger";
 import {
   mobileUpdateShiftRequestBodySchema,
   mobileUpdateShiftRequestResponseSchema,
@@ -9,12 +11,16 @@ import { requireMobileAuth } from "@/features/mobile/server";
 
 export const dynamic = "force-dynamic";
 
-function errorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (err && typeof err === "object" && "message" in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return "Unexpected error";
+/**
+ * A shift-request failure is usually a rule the caller broke ("You already
+ * volunteered for this open shift"), so the message is worth surfacing — but
+ * the same catch also sees Postgres and Zod errors. `formatClientErrorMessage`
+ * keeps the intentional copy and swaps anything technical for the fallback.
+ */
+const SHIFT_REQUEST_FALLBACK = "We couldn't complete that request. Try again.";
+
+function clientSafeError(err: unknown): string {
+  return formatClientErrorMessage(err, SHIFT_REQUEST_FALLBACK);
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -52,6 +58,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       }),
     );
   } catch (err) {
-    return NextResponse.json({ error: errorMessage(err) }, { status: 400 });
+    logger.error({ err, route: "mobile/shift-requests" }, "Mobile shift request failed");
+    return NextResponse.json({ error: clientSafeError(err) }, { status: 400 });
   }
 }

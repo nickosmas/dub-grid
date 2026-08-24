@@ -59,6 +59,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ overwriteCount });
   } catch (error) {
     logger.error({ error }, "repeat overwrites POST failed");
-    return NextResponse.json({ error: "Failed to load repeat overwrite count" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't check what this would overwrite. Try again." },
+      { status: 500 },
+    );
   }
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchOrganizationUsers } from "@/features/organization/client";
+import { Button } from "@/components/Button";
 import {
   endGridmasterImpersonation,
   startGridmasterImpersonation,
@@ -120,7 +121,7 @@ export default function EnhancedImpersonation({
     if (!selectedUser || !selectedOrg) return;
     const trimmedJustification = justification.trim();
     if (trimmedJustification.length < 10) {
-      toast.error("Please provide a justification (at least 10 characters)");
+      toast.error("Add a reason, at least 10 characters");
       return;
     }
     setLoading(true);
@@ -159,7 +160,7 @@ export default function EnhancedImpersonation({
       window.location.replace("/schedule");
     } catch (err: unknown) {
       Sentry.captureException(err, { extra: { context: "impersonation-start" } });
-      toast.error(formatClientErrorMessage(err, "Failed to start impersonation"));
+      toast.error(formatClientErrorMessage(err, "We couldn't start impersonation. Try again."));
       setLoading(false);
     }
   }
@@ -167,7 +168,7 @@ export default function EnhancedImpersonation({
   function requestStart() {
     if (!selectedUser || !selectedOrg) return;
     if (justification.trim().length < 10) {
-      toast.error("Please provide a justification (at least 10 characters)");
+      toast.error("Add a reason, at least 10 characters");
       return;
     }
     setStartConfirm(true);
@@ -269,7 +270,7 @@ export default function EnhancedImpersonation({
               </div>
             )}
           </div>
-          <button
+          <Button
             className="dg-btn dg-btn-danger"
             onClick={() => setEndConfirm(true)}
             disabled={loading}
@@ -278,7 +279,7 @@ export default function EnhancedImpersonation({
             <ButtonLoading loading={loading} loadingLabel="Ending Session" spinnerSize={14}>
               End Session
             </ButtonLoading>
-          </button>
+          </Button>
         </div>
       )}
 
@@ -325,7 +326,7 @@ export default function EnhancedImpersonation({
                 filteredOrgs.map((o) => {
                   const isSelected = selectedOrgId === o.id;
                   return (
-                    <button
+                    <Button
                       key={o.id}
                       onClick={() => setSelectedOrgId(o.id)}
                       style={{
@@ -379,7 +380,7 @@ export default function EnhancedImpersonation({
                           Selected
                         </span>
                       )}
-                    </button>
+                    </Button>
                   );
                 })
               )}
@@ -418,7 +419,10 @@ export default function EnhancedImpersonation({
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
-                {formatClientErrorMessage(usersQuery.error, "Failed to load user")}
+                {formatClientErrorMessage(
+                  usersQuery.error,
+                  "We couldn't load the people list. Refresh and try again.",
+                )}
               </div>
             ) : !selectedUser ? (
               <div
@@ -527,7 +531,7 @@ export default function EnhancedImpersonation({
                   )}
                 </div>
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                  <button
+                  <Button
                     className="dg-btn dg-btn-primary"
                     onClick={requestStart}
                     disabled={loading || justification.trim().length < 10}
@@ -537,8 +541,8 @@ export default function EnhancedImpersonation({
                       loadingLabel="Starting Impersonation"
                       spinnerSize={16}
                     >{`Impersonate ${selectedUser.email}`}</ButtonLoading>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     className="dg-btn dg-btn-secondary"
                     onClick={() => {
                       setSelectedUser(null);
@@ -547,7 +551,7 @@ export default function EnhancedImpersonation({
                     }}
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -604,7 +608,10 @@ export default function EnhancedImpersonation({
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
-                {formatClientErrorMessage(usersQuery.error, "Failed to load users")}
+                {formatClientErrorMessage(
+                  usersQuery.error,
+                  "We couldn't load users. Refresh and try again.",
+                )}
               </div>
             ) : (
               <div style={{ maxHeight: 280, overflowY: "auto" }}>
@@ -623,7 +630,7 @@ export default function EnhancedImpersonation({
                   filteredUsers.map((u) => {
                     const isSelected = selectedUser?.id === u.id;
                     return (
-                      <button
+                      <Button
                         key={u.id}
                         onClick={() => setSelectedUser(u)}
                         style={{
@@ -674,7 +681,7 @@ export default function EnhancedImpersonation({
                             Selected
                           </span>
                         )}
-                      </button>
+                      </Button>
                     );
                   })
                 )}
@@ -751,7 +758,7 @@ export default function EnhancedImpersonation({
                   )}
                 </div>
                 <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
-                  <button
+                  <Button
                     className="dg-btn dg-btn-primary"
                     onClick={requestStart}
                     disabled={loading || justification.trim().length < 10}
@@ -761,8 +768,8 @@ export default function EnhancedImpersonation({
                       loadingLabel="Starting Impersonation"
                       spinnerSize={16}
                     >{`Impersonate ${selectedUser.email}`}</ButtonLoading>
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     className="dg-btn dg-btn-secondary"
                     onClick={() => {
                       setSelectedUser(null);
@@ -771,7 +778,7 @@ export default function EnhancedImpersonation({
                     }}
                   >
                     Clear
-                  </button>
+                  </Button>
                 </div>
               </>
             )}

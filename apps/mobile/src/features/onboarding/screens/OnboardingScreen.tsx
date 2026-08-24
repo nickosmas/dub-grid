@@ -164,7 +164,8 @@ const createStyles = (mobileColors: MobileColors) =>
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingHorizontal: 20,
+      // Matches the footer/slide gutter so the logo shares their left edge.
+      paddingHorizontal: 24,
       paddingTop: 8,
       paddingBottom: 4,
     },

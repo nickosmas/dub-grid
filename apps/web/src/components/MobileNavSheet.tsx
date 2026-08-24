@@ -4,6 +4,7 @@ import React, { useEffect, useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useMobileSubNav, SubNavItem } from "@/components/MobileSubNavContext";
+import { Button } from "@/components/Button";
 
 interface MainNavItem {
   id: string;
@@ -156,7 +157,7 @@ export default function MobileNavSheet({
               {mainNavItems.map((item) => {
                 const isActive = activeTab === item.id;
                 return (
-                  <button
+                  <Button
                     key={item.id}
                     onClick={() => handleMainItemClick(item)}
                     className={`dg-bottom-sheet-main-item${isActive ? " active" : ""}`}
@@ -177,11 +178,11 @@ export default function MobileNavSheet({
                         <polyline points="9 18 15 12 9 6" />
                       </svg>
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
               {isGridmaster && (
-                <button
+                <Button
                   onClick={() => navigate("/gridmaster")}
                   className="dg-bottom-sheet-main-item dg-bottom-sheet-main-item--gridmaster"
                 >
@@ -216,7 +217,7 @@ export default function MobileNavSheet({
                       <polyline points="9 18 15 12 9 6" />
                     </svg>
                   </span>
-                </button>
+                </Button>
               )}
             </div>
 
@@ -230,7 +231,7 @@ export default function MobileNavSheet({
                 </div>
               </div>
               <div className="dg-bottom-sheet-footer-actions">
-                <button onClick={() => navigate("/profile")} className="dg-bottom-sheet-footer-btn">
+                <Button onClick={() => navigate("/profile")} className="dg-bottom-sheet-footer-btn">
                   <svg
                     width="16"
                     height="16"
@@ -245,9 +246,9 @@ export default function MobileNavSheet({
                     <circle cx="12" cy="7" r="4" />
                   </svg>
                   Profile
-                </button>
+                </Button>
                 {actualLevel >= 2 && !isImpersonating && onToggleUserView && (
-                  <button
+                  <Button
                     onClick={() => {
                       close();
                       onToggleUserView();
@@ -268,9 +269,9 @@ export default function MobileNavSheet({
                       <circle cx="12" cy="12" r="3" />
                     </svg>
                     {isUserViewActive ? "Exit User View" : "View as User"}
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   onClick={() => {
                     close();
                     onSignOut();
@@ -292,7 +293,7 @@ export default function MobileNavSheet({
                     <line x1="21" y1="12" x2="9" y2="12" />
                   </svg>
                   Sign out
-                </button>
+                </Button>
               </div>
             </div>
           </>
@@ -300,7 +301,7 @@ export default function MobileNavSheet({
           /* ── Drill-Down Level: Back + Sub-navigation ── */
           <>
             <div className="dg-bottom-sheet-drill-header">
-              <button
+              <Button
                 className="dg-bottom-sheet-drill-back"
                 onClick={() => setDrillSection(null)}
                 aria-label="Back to main navigation"
@@ -317,7 +318,7 @@ export default function MobileNavSheet({
                 >
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
-              </button>
+              </Button>
               <span className="dg-bottom-sheet-drill-title">{drillSection.label}</span>
             </div>
 
@@ -330,12 +331,12 @@ export default function MobileNavSheet({
                     {showGroupHeader && (
                       <div className="dg-bottom-sheet-group-label">{item.group}</div>
                     )}
-                    <button
+                    <Button
                       onClick={() => handleSubItemClick(item)}
                       className={`dg-bottom-sheet-drill-item${item.active ? " active" : ""}`}
                     >
                       <span className="dg-bottom-sheet-item-label">{item.label}</span>
-                    </button>
+                    </Button>
                   </React.Fragment>
                 );
               })}

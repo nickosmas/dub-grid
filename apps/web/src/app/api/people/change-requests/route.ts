@@ -28,7 +28,10 @@ export async function GET(req: NextRequest) {
   ];
   const rawStatus = req.nextUrl.searchParams.get("status");
   if (rawStatus !== null && !VALID_STATUSES.includes(rawStatus as ProfileChangeRequestStatus)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    return NextResponse.json(
+      { error: "That status isn't one we recognize. Refresh the page and try again." },
+      { status: 400 },
+    );
   }
   const status = (rawStatus as ProfileChangeRequestStatus | null) ?? undefined;
   const requests = await listAdminProfileChangeRequests({

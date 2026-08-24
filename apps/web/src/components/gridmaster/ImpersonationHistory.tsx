@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchGridmasterImpersonationHistory } from "@/features/gridmaster/client";
+import { Button } from "@/components/Button";
 import type { ImpersonationHistoryEntry } from "@/types";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
@@ -112,7 +113,10 @@ export default function ImpersonationHistory() {
   });
   const entries = historyQuery.data ?? [];
   const error = historyQuery.error
-    ? formatClientErrorMessage(historyQuery.error, "Failed to load impersonation history")
+    ? formatClientErrorMessage(
+        historyQuery.error,
+        "We couldn't load impersonation history. Refresh and try again.",
+      )
     : null;
 
   return (
@@ -364,13 +368,13 @@ export default function ImpersonationHistory() {
               marginTop: 16,
             }}
           >
-            <button
+            <Button
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={page === 0}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
             >
               Previous
-            </button>
+            </Button>
             <span
               style={{
                 fontSize: "var(--dg-fs-caption)",
@@ -380,13 +384,13 @@ export default function ImpersonationHistory() {
             >
               {page * PAGE_SIZE + 1}–{page * PAGE_SIZE + entries.length}
             </span>
-            <button
+            <Button
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={entries.length < PAGE_SIZE}
               onClick={() => setPage((p) => p + 1)}
             >
               Next
-            </button>
+            </Button>
           </div>
         </>
       )}

@@ -9,6 +9,7 @@ import { ButtonLoading } from "@/components/ButtonSpinner";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 import { PasswordStrength } from "@/components/auth/PasswordStrength";
 import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
+import { describeSignInFailure, EXISTING_ACCOUNT_MESSAGE } from "./signInFailure";
 import { parseHost, buildSubdomainHost } from "@/lib/subdomain";
 import * as Sentry from "@/lib/sentry";
 import {
@@ -37,6 +38,11 @@ function AcceptInviteContent() {
   const [emailFromUrl, setEmailFromUrl] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [orgName, setOrgName] = useState<string | null>(null);
+  // Set once the server has confirmed this address already has an account. The
+  // form then asks for that account's password instead of a new one — without
+  // it, someone whose password predates the current strength rules can never
+  // satisfy `isPasswordAcceptable` and the invitation is a dead end.
+  const [existingAccount, setExistingAccount] = useState(false);
 
   // Extract token and email from URL on mount
   useEffect(() => {
@@ -74,20 +80,26 @@ function AcceptInviteContent() {
   }
 
   // Derived so the warning appears as the user types the confirmation.
-  const mismatchError = getPasswordMismatchError(password, confirmPassword);
-  const canSubmit = isPasswordAcceptable(password) && mismatchError === null;
+  const mismatchError = existingAccount
+    ? null
+    : getPasswordMismatchError(password, confirmPassword);
+  const canSubmit = existingAccount
+    ? password.length > 0
+    : isPasswordAcceptable(password) && mismatchError === null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFormError(null);
 
-    if (mismatchError) {
-      setFormError(mismatchError);
-      return;
-    }
-    if (!isPasswordAcceptable(password)) {
-      setFormError("Choose a stronger password.");
-      return;
+    if (!existingAccount) {
+      if (mismatchError) {
+        setFormError(mismatchError);
+        return;
+      }
+      if (!isPasswordAcceptable(password)) {
+        setFormError("Choose a stronger password.");
+        return;
+      }
     }
 
     setLoading(true);
@@ -97,7 +109,12 @@ function AcceptInviteContent() {
       // 1. Create the auth account server-side, already confirmed. The invite
       //    link was mailed to this address, so the address is already proven —
       //    a second "confirm your email" round trip would only stall the invite.
-      const { status } = await registerInvitedUser({ token: token!, email, password });
+      //    Skipped once we know the address already has an account: there is
+      //    nothing left to create, and re-posting only spends the per-address
+      //    rate-limit budget the retry needs.
+      const status = existingAccount
+        ? "existing"
+        : (await registerInvitedUser({ token: token!, email, password })).status;
 
       // 2. Sign in. A new account takes the password just chosen; an address
       //    that already has one needs that account's existing password.
@@ -106,11 +123,14 @@ function AcceptInviteContent() {
         password,
       });
       if (signInError) {
-        throw new Error(
-          status === "existing"
-            ? "This email already has a DubGrid account. Enter that account's password to accept the invitation."
-            : "Unable to sign in. Please try again or contact support.",
-        );
+        // Only a rejected credential means "wrong password for an existing
+        // account" — switch the form over for that case alone, so a throttle
+        // or an outage doesn't relabel a first-time signup as a returning user.
+        const message = describeSignInFailure(signInError, status);
+        if (message === EXISTING_ACCOUNT_MESSAGE) setExistingAccount(true);
+        // Carry the real GoTrue error as `cause` so Sentry's linked-errors
+        // integration reports it alongside the sentence shown to the user.
+        throw new Error(message, { cause: signInError });
       }
 
       // 3. Accept the invitation (now authenticated)
@@ -158,8 +178,14 @@ function AcceptInviteContent() {
       setOrgSlug(slug);
       setState("success");
     } catch (err: unknown) {
-      Sentry.captureException(err, { extra: { context: "accept-invite" } });
-      setFormError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      Sentry.captureException(err, {
+        extra: {
+          context: "accept-invite",
+          existingAccount,
+          cause: err instanceof Error ? (err.cause ?? null) : null,
+        },
+      });
+      setFormError(err instanceof Error ? err.message : "Something went wrong. Try again.");
       setState("form");
       setLoading(false);
     }
@@ -177,7 +203,13 @@ function AcceptInviteContent() {
         {state === "loading" || state === "processing" ? (
           <AuthStateCard
             icon="spinner"
-            heading={state === "processing" ? "Setting up your account" : "Loading"}
+            heading={
+              state === "processing"
+                ? existingAccount
+                  ? "Accepting your invitation"
+                  : "Setting up your account"
+                : "Loading"
+            }
             message="Please wait while we process your invitation."
           />
         ) : state === "no-token" ? (
@@ -202,7 +234,15 @@ function AcceptInviteContent() {
                 marginBottom: "24px",
               }}
             >
-              {orgName ? (
+              {existingAccount ? (
+                orgName ? (
+                  <>
+                    Sign in with your DubGrid password to join <strong>{orgName}</strong>.
+                  </>
+                ) : (
+                  "Sign in with your DubGrid password to join your organization."
+                )
+              ) : orgName ? (
                 <>
                   Set your password to join <strong>{orgName}</strong> on DubGrid.
                 </>
@@ -242,48 +282,72 @@ function AcceptInviteContent() {
 
               <div>
                 <label htmlFor="invite-password" className="dg-auth-field-label">
-                  Password
+                  {existingAccount ? "DubGrid password" : "Password"}
                 </label>
                 <PasswordInput
                   id="invite-password"
-                  placeholder="Create a password"
+                  placeholder={existingAccount ? "Your existing password" : "Create a password"}
                   value={password}
                   onChange={setPassword}
                   showPassword={showPassword}
                   onToggle={() => setShowPassword(!showPassword)}
+                  autoComplete={existingAccount ? "current-password" : "new-password"}
+                  minLength={existingAccount ? 1 : 10}
                   ariaDescribedBy={
-                    "password-strength-label password-strength-hints" +
-                    (formError ? " invite-form-error" : "")
-                  }
-                />
-                {password.length > 0 && <PasswordStrength password={password} />}
-              </div>
-
-              <div>
-                <label htmlFor="invite-confirm-password" className="dg-auth-field-label">
-                  Confirm Password
-                </label>
-                <PasswordInput
-                  id="invite-confirm-password"
-                  placeholder="Confirm password"
-                  value={confirmPassword}
-                  onChange={setConfirmPassword}
-                  showPassword={showPassword}
-                  onToggle={() => setShowPassword(!showPassword)}
-                  ariaDescribedBy={
-                    mismatchError
-                      ? "invite-confirm-error"
-                      : formError
+                    existingAccount
+                      ? formError
                         ? "invite-form-error"
                         : undefined
+                      : "password-strength-label password-strength-hints" +
+                        (formError ? " invite-form-error" : "")
                   }
                 />
-                {mismatchError && (
-                  <p className="dg-form-error" id="invite-confirm-error">
-                    {mismatchError}
-                  </p>
+                {!existingAccount && password.length > 0 && (
+                  <PasswordStrength password={password} />
+                )}
+                {existingAccount && (
+                  <div style={{ textAlign: "right", marginTop: "2px" }}>
+                    <a
+                      href="/forgot-password"
+                      className="dg-auth-link"
+                      style={{ color: "var(--color-text-subtle)" }}
+                    >
+                      Forgot password?
+                    </a>
+                  </div>
                 )}
               </div>
+
+              {/* Unmounted, not hidden: PasswordInput is `required`, and Chrome
+                  refuses to submit a form holding an invalid control it cannot
+                  focus ("An invalid form control is not focusable"). */}
+              {!existingAccount && (
+                <div>
+                  <label htmlFor="invite-confirm-password" className="dg-auth-field-label">
+                    Confirm Password
+                  </label>
+                  <PasswordInput
+                    id="invite-confirm-password"
+                    placeholder="Confirm password"
+                    value={confirmPassword}
+                    onChange={setConfirmPassword}
+                    showPassword={showPassword}
+                    onToggle={() => setShowPassword(!showPassword)}
+                    ariaDescribedBy={
+                      mismatchError
+                        ? "invite-confirm-error"
+                        : formError
+                          ? "invite-form-error"
+                          : undefined
+                    }
+                  />
+                  {mismatchError && (
+                    <p className="dg-form-error" id="invite-confirm-error">
+                      {mismatchError}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {formError && (
                 <p className="dg-form-error" id="invite-form-error">
@@ -343,11 +407,11 @@ function AcceptInviteContent() {
               >
                 <ButtonLoading
                   loading={loading}
-                  loadingLabel="Setting Password"
+                  loadingLabel={existingAccount ? "Signing In" : "Setting Password"}
                   spinnerColor="var(--color-text-inverse)"
                   spinnerSize={20}
                 >
-                  Set Password & Accept
+                  {existingAccount ? "Sign In & Accept" : "Set Password & Accept"}
                 </ButtonLoading>
               </button>
             </form>
@@ -389,9 +453,8 @@ function SuccessState({
       heading="You're all set"
       message={
         <>
-          Your account has been created and invitation accepted. Sign in to get started with your
-          onboarding.
-          {countdown > 0 ? ` Redirecting in ${countdown}...` : " Redirecting..."}
+          Your account is ready and your invitation is accepted. Sign in to start your setup.
+          {countdown > 0 ? ` Redirecting in ${countdown}` : " Redirecting"}
         </>
       }
       primaryCta={{

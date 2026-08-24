@@ -670,14 +670,18 @@ export async function publishSchedule(
     error?: string;
   } | null;
   if (!response.ok || !body?.summary) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to publish schedule"));
+    throw new Error(
+      formatClientErrorMessage(body?.error, "We couldn't publish the schedule. Try again."),
+    );
   }
   return body.summary;
 }
 
 export async function discardScheduleDrafts(
   orgId: string,
-  userId?: string,
+  userId: string | undefined,
+  startDate: string,
+  endDate: string,
 ): Promise<DraftBreakdown> {
   const response = await fetch("/api/shifts/discard", {
     method: "POST",
@@ -685,6 +689,8 @@ export async function discardScheduleDrafts(
     body: JSON.stringify({
       orgId,
       scope: userId ? "mine" : "all",
+      startDate,
+      endDate,
     }),
   });
   const body = (await response.json().catch(() => null)) as {
@@ -692,7 +698,9 @@ export async function discardScheduleDrafts(
     error?: string;
   } | null;
   if (!response.ok || !body?.summary) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to discard schedule drafts"));
+    throw new Error(
+      formatClientErrorMessage(body?.error, "We couldn't discard those changes. Try again."),
+    );
   }
   return body.summary;
 }

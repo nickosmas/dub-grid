@@ -56,7 +56,10 @@ export default function GridmasterLogin() {
       if (!res.ok) {
         if (res.status === 429) {
           toast.error(
-            extractErrorMessage(result.error, "Too many login attempts. Please try again later."),
+            extractErrorMessage(
+              result.error,
+              "Too many sign-in attempts. Wait a few minutes and try again.",
+            ),
           );
           setLoading(false);
           return;
@@ -68,11 +71,11 @@ export default function GridmasterLogin() {
           return;
         }
         if (res.status === 401) {
-          toast.error("Invalid email or password.");
+          toast.error("Check your email and password and try again.");
           setLoading(false);
           return;
         }
-        toast.error(extractErrorMessage(result.error, "Unable to sign in. Please try again."));
+        toast.error(extractErrorMessage(result.error, "We couldn't sign you in. Try again."));
         setLoading(false);
         return;
       }
@@ -98,9 +101,9 @@ export default function GridmasterLogin() {
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
       if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("Network issue. Please check your connection.");
+        toast.error("Check your connection and try again.");
       } else {
-        toast.error("Unable to sign in. Please try again.");
+        toast.error("We couldn't sign you in. Try again.");
       }
       setLoading(false);
     }
@@ -115,7 +118,7 @@ export default function GridmasterLogin() {
       markAuthTransition();
       router.replace(await resolvePostLoginDestination());
     } catch {
-      toast.error("Your session could not be verified. Please sign in again.");
+      toast.error("We couldn't verify your session. Sign in again.");
       void signOutFromBrowser("local");
       setMfaRequired(false);
       setLoading(false);

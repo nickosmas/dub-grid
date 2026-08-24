@@ -113,7 +113,7 @@ export default function ScheduleOperationModal({
             color: "var(--color-text-faint)",
           }}
         >
-          Please wait while we finish this scheduling update.
+          Hang tight while we finish this scheduling update.
         </p>
       </div>
     </Modal>

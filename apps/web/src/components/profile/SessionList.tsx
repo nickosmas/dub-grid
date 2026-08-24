@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Button } from "@/components/Button";
 import { Monitor, Smartphone } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import {
@@ -141,7 +142,7 @@ function SessionRow({
         </div>
       </div>
       {showRevoke && (
-        <button
+        <Button
           onClick={() => onRevoke(session)}
           disabled={revoking}
           className="dg-btn dg-btn-ghost dg-btn-xs"
@@ -150,7 +151,7 @@ function SessionRow({
           <ButtonLoading loading={revoking} loadingLabel="Signing out" spinnerSize={14}>
             Sign out
           </ButtonLoading>
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -229,7 +230,7 @@ export function SessionList() {
 
   useEffect(() => {
     if (sessionsQuery.isError) {
-      toast.error("Failed to load sessions");
+      toast.error("We couldn't load your devices. Refresh and try again.");
     }
   }, [sessionsQuery.isError]);
 
@@ -249,7 +250,7 @@ export function SessionList() {
       toast.success("Session revoked");
     },
     onError: () => {
-      toast.error("Failed to revoke session");
+      toast.error("We couldn't sign out that device. Try again.");
     },
   });
   const revokingId = revokeMutation.isPending ? (revokeMutation.variables?.id ?? null) : null;

@@ -128,6 +128,36 @@ Shared primitives — use before creating alternatives:
 
 Font: DM Sans only (`var(--font-dm-sans)`). Never Geist.
 
+## Double-Press
+
+An action button that fires a request must not run it twice when it is
+double-clicked. **A `useState` busy flag does not achieve that on its own**:
+the flag only reaches the DOM once React re-renders, and a second click inside
+that window passes a `disabled` that has not been applied yet. That is not
+theoretical — reverting the latch in `ConfirmDialog` makes
+`apps/web/src/__tests__/ConfirmDialog.test.tsx` fire the confirm handler twice.
+
+`useAsyncAction` (`src/hooks/useAsyncAction.ts`) is the fix. Its latch is a
+`useRef`, read and set synchronously inside the first click, so re-entry is
+blocked before any render happens; the `isRunning` it returns exists only to
+drive the spinner. **Do not "simplify" that ref into state** — that is the bug.
+
+It is a no-op for a synchronous handler (returns before touching state), which
+is what lets shared primitives wrap every caller's handler blindly:
+
+- `<ConfirmDialog>` wraps `onConfirm` and `onSecondaryConfirm`. An async
+  handler gets the latch and the spinner for free. Pass `isLoading` only when
+  the pending flag lives somewhere else (a shared `actionLoading` keyed by
+  row); an explicit `isLoading` always wins over the internal one.
+- Anywhere else: `const save = useAsyncAction(handleSave)`, then
+  `onClick={save.run}`, `disabled={save.isRunning}`, and
+  `<ButtonLoading loading={save.isRunning} loadingLabel="Saving Draft">` —
+  the progressive form of _that button's own verb_, not a generic "Saving".
+
+`design/require-busy-button` enforces this for `<button>` elements whose
+`onClick` resolves to an async function in the same file. It cannot resolve a
+handler arriving as a prop, so a prop-sourced action button is still on you.
+
 ## Unsaved Changes
 
 Nothing holding user input may be thrown away silently. Two guards, by surface —

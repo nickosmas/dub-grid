@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
       token: req.nextUrl.searchParams.get("token") ?? "",
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
     }
 
     // Only resolve org metadata for a LIVE invitation (not expired, accepted, or
@@ -56,6 +57,9 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "invitation lookup GET failed");
-    return NextResponse.json({ error: "Failed to look up invitation" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't find that invitation. Check the link and try again." },
+      { status: 500 },
+    );
   }
 }

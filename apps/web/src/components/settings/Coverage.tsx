@@ -11,6 +11,7 @@ import type {
   ShiftDisplayMode,
 } from "@/types";
 import { saveCoverageRequirements } from "@/features/settings/client";
+import { Button } from "@/components/Button";
 import { buildShiftDisplayParts, getQualificationSeniorityRank } from "@/lib/assignable-shifts";
 import {
   getJobPlacementShiftPool,
@@ -357,7 +358,7 @@ function CoverageOptionRow({
       className="dg-list-row"
       style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}
     >
-      <button
+      <Button
         type="button"
         className="dg-hover-row"
         aria-expanded={expanded}
@@ -401,7 +402,7 @@ function CoverageOptionRow({
         >
           ▾
         </span>
-      </button>
+      </Button>
 
       {expanded && (
         <div
@@ -625,7 +626,7 @@ function FocusAreaCoverageCard({
       );
     } catch (error) {
       Sentry.captureException(error);
-      toast.error("Failed to save coverage requirements");
+      toast.error("We couldn't save the coverage requirements. Try again.");
     } finally {
       setSaving(false);
     }
@@ -714,17 +715,17 @@ function FocusAreaCoverageCard({
             <EditorActionRow
               secondaryAction={
                 isDirty ? (
-                  <button
+                  <Button
                     onClick={handleDiscard}
                     disabled={saving}
                     className="dg-btn dg-btn-secondary dg-btn-sm"
                   >
                     {EDITOR_ACTION_LABELS.discard}
-                  </button>
+                  </Button>
                 ) : null
               }
               primaryAction={
-                <button
+                <Button
                   onClick={handleSave}
                   disabled={saving || !canEdit || !isDirty}
                   className="dg-btn dg-btn-primary dg-btn-sm"
@@ -732,7 +733,7 @@ function FocusAreaCoverageCard({
                   <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
                     {EDITOR_ACTION_LABELS.save}
                   </ButtonLoading>
-                </button>
+                </Button>
               }
             />
           </div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Timer, withTiming } from "@/lib/server-timing";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isManagementUser, isOnSchedule } from "@dubgrid/domain";
 import type { AdminPermissions, OrganizationRole } from "@/types";
@@ -66,9 +67,9 @@ async function getSelfEmploymentFlags(
   };
 }
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest, timer: Timer) {
   try {
-    const auth = await requireAuthenticatedUserWithClaims(req);
+    const auth = await timer.time("auth", () => requireAuthenticatedUserWithClaims(req));
     if ("response" in auth) {
       return auth.response;
     }
@@ -233,3 +234,5 @@ export async function GET(req: NextRequest) {
     return jsonError("Failed to load permissions");
   }
 }
+
+export const GET = withTiming(handleGET);

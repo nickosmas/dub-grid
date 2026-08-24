@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import { Button } from "@/components/Button";
 
 interface ScrollableTabsProps {
   children: React.ReactNode;
@@ -54,7 +55,7 @@ export default function ScrollableTabs({ children, className, style }: Scrollabl
         className={`dg-scroll-fade dg-scroll-fade--left${canScrollLeft ? " visible" : ""}`}
         aria-hidden={!canScrollLeft}
       >
-        <button
+        <Button
           type="button"
           className="dg-scroll-chevron"
           onClick={() => scroll("left")}
@@ -73,7 +74,7 @@ export default function ScrollableTabs({ children, className, style }: Scrollabl
           >
             <polyline points="15 18 9 12 15 6" />
           </svg>
-        </button>
+        </Button>
       </div>
 
       {/* Scrollable content */}
@@ -86,7 +87,7 @@ export default function ScrollableTabs({ children, className, style }: Scrollabl
         className={`dg-scroll-fade dg-scroll-fade--right${canScrollRight ? " visible" : ""}`}
         aria-hidden={!canScrollRight}
       >
-        <button
+        <Button
           type="button"
           className="dg-scroll-chevron"
           onClick={() => scroll("right")}
@@ -105,7 +106,7 @@ export default function ScrollableTabs({ children, className, style }: Scrollabl
           >
             <polyline points="9 18 15 12 9 6" />
           </svg>
-        </button>
+        </Button>
       </div>
     </div>
   );

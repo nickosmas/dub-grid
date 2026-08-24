@@ -35,7 +35,7 @@ export default function IdentityStep({ onNext, onBack }: IdentityStepProps) {
       onNext();
     } catch (err) {
       Sentry.captureException(err);
-      toast.error("We couldn't save your changes. Please try again.");
+      toast.error("We couldn't save your changes. Try again.");
     } finally {
       setSaving(false);
     }

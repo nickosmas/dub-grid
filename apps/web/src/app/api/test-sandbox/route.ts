@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     // throttled: a user must always be able to leave sandbox mode.
     const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, auth.user.id);
     if (misconfigured) {
-      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(

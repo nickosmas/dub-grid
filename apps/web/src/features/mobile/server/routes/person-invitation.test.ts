@@ -519,7 +519,7 @@ describe("mobile person invitation route", () => {
 
     expect(response.status).toBe(502);
     expect(payload).toEqual({
-      error: "Invitation email could not be sent. Try again in a moment.",
+      error: "We couldn't send that invitation email. Try again in a moment.",
     });
     expect(revokeMobileEmployeeInvitationRow).toHaveBeenCalledWith(serviceClient, {
       orgId: "44444444-4444-4444-8444-444444444444",

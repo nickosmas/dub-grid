@@ -3,6 +3,7 @@ import { useTheme } from "next-themes";
 import { CalendarDays, Check, Clock3, Layers, MapPin, UserRound, Users } from "lucide-react";
 import type { DashboardContentProps } from "./DashboardContentProps";
 import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/Button";
 import { formatDateKey, getAvatarInitials } from "@/lib/utils";
 import { resolveShiftPillColors } from "@/lib/colors";
 import { shouldShowJobOnGrid } from "@/lib/job-placement";
@@ -2873,7 +2874,7 @@ function AsyncActionButton({
   const isDisabled = disabled || isRunning;
 
   return (
-    <button
+    <Button
       className={variant === "primary" ? "dg-btn dg-btn-brand" : "dg-btn dg-btn-secondary"}
       disabled={isDisabled}
       onClick={() => {
@@ -2891,7 +2892,7 @@ function AsyncActionButton({
       type="button"
     >
       {isRunning ? "Working" : label}
-    </button>
+    </Button>
   );
 }
 
