@@ -1,4 +1,5 @@
-"use client";
+import { Button } from "@/components/Button";
+("use client");
 
 interface ProfileSectionTab {
   id: string;
@@ -21,14 +22,14 @@ export function ProfileSectionTabs({
   return (
     <div className={`dg-span-tabs dg-span-tabs--light w-full sm:w-auto ${className ?? ""}`.trim()}>
       {tabs.map((tab) => (
-        <button
+        <Button
           key={tab.id}
           type="button"
           onClick={() => onChange(tab.id)}
           className={`dg-span-tab${activeTab === tab.id ? " active" : ""}`}
         >
           {tab.label}
-        </button>
+        </Button>
       ))}
     </div>
   );

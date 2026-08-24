@@ -7,6 +7,7 @@ import Link from "next/link";
 // see the comment there. A static import here pulls the Supabase auth SDK into
 // the landing page's initial bundle for visitors who are not signed in.
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
+import { Button } from "@/components/Button";
 import { openConsentPreferences } from "@/components/CookieConsent";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { buildSubdomainHost, isApexHost, parseHost } from "@/lib/subdomain";
@@ -264,13 +265,13 @@ export default function RootPage() {
               Sign In
             </Link>
             {/* Mobile hamburger */}
-            <button
+            <Button
               onClick={() => setMobileMenuOpen(true)}
               className="md:hidden p-2 -mr-2 text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
               aria-label="Open menu"
             >
               <Menu size={22} />
-            </button>
+            </Button>
           </div>
         </div>
       </nav>
@@ -547,13 +548,13 @@ export default function RootPage() {
             >
               Terms of Service
             </Link>
-            <button
+            <Button
               type="button"
               onClick={openConsentPreferences}
               className="text-xs text-[var(--color-text-faint)] hover:text-[var(--color-text-muted)] transition-colors"
             >
               Cookie preferences
-            </button>
+            </Button>
           </div>
         </div>
       </footer>

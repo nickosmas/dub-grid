@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Button } from "@/components/Button";
 import { formatShiftRequestTypeLabel } from "@/lib/client-facing";
 import type { ShiftRequest } from "@/types";
 import type { OpenShift } from "@/lib/dashboard-stats";
@@ -232,9 +233,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
           onCancel={() => {
             if (!isRunning) setPendingAction(null);
           }}
-          onConfirm={() => {
-            void confirmAction();
-          }}
+          onConfirm={() => confirmAction()}
         />
       )}
       <div
@@ -283,7 +282,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
         {(item.action || item.secondaryAction) && (
           <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
             {item.action && (
-              <button
+              <Button
                 disabled={isRunning}
                 onClick={() => setPendingAction(item.action ?? null)}
                 style={{
@@ -298,10 +297,10 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
                 }}
               >
                 {item.action.label}
-              </button>
+              </Button>
             )}
             {item.secondaryAction && (
-              <button
+              <Button
                 disabled={isRunning}
                 onClick={() => setPendingAction(item.secondaryAction ?? null)}
                 style={{
@@ -316,7 +315,7 @@ function ActionItemRow({ item, showBorder }: { item: ActionItem; showBorder: boo
                 }}
               >
                 {item.secondaryAction.label}
-              </button>
+              </Button>
             )}
           </div>
         )}

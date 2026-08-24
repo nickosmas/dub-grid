@@ -81,7 +81,7 @@ function lockedOrganizationResponse() {
   return NextResponse.json(
     {
       error:
-        "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
+        "Organization unavailable. Your organization opens up once your administrator finishes setup.",
     },
     { status: 403 },
   );

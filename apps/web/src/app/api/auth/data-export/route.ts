@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
     if ((recentExports ?? 0) > 0) {
       return NextResponse.json(
-        { error: "Data export is limited to once per hour. Please try again later." },
+        { error: "You can export once an hour. Try again a bit later." },
         { status: 429 },
       );
     }

@@ -8,6 +8,7 @@ import {
   normalizeStaffName,
 } from "@dubgrid/contracts";
 import Modal from "@/components/Modal";
+import { Button } from "@/components/Button";
 import { Employee, FocusArea, NamedItem } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
@@ -321,7 +322,7 @@ export default function AddEmployeeModal({
                           </div>
                         )}
                       </div>
-                      <button
+                      <Button
                         onClick={() => removeRow(row._id)}
                         disabled={rows.length === 1}
                         aria-label={`Remove staff member row ${idx + 1}`}
@@ -349,7 +350,7 @@ export default function AddEmployeeModal({
                           <line x1="18" y1="6" x2="6" y2="18" />
                           <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
-                      </button>
+                      </Button>
                     </div>
 
                     <div
@@ -578,7 +579,7 @@ export default function AddEmployeeModal({
                 justifyContent: isMobile ? "stretch" : "flex-end",
               }}
             >
-              <button
+              <Button
                 onClick={addRow}
                 className="dg-btn dg-btn-secondary"
                 style={{
@@ -603,15 +604,15 @@ export default function AddEmployeeModal({
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
                 Add Another Person
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleRequestClose}
                 className="dg-btn dg-btn-ghost"
                 style={{ flex: isMobile ? 1 : undefined }}
               >
                 {EDITOR_ACTION_LABELS.close}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleSubmit}
                 className="dg-btn dg-btn-primary"
                 disabled={validRows.length === 0}
@@ -619,7 +620,7 @@ export default function AddEmployeeModal({
               >
                 Add {validRows.length > 0 ? `${validRows.length} ` : ""}Staff Member
                 {validRows.length !== 1 ? "s" : ""}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

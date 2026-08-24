@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Printer } from "lucide-react";
 import { FocusArea } from "@/types";
+import { Button } from "@/components/Button";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { EDITOR_ACTION_LABELS } from "@/components/ui/editor-action-labels";
 import { useUnsavedChangesPrompt } from "@/components/ui/use-unsaved-changes-prompt";
@@ -92,14 +93,14 @@ export default function PrintOptionsModal({
             <div className="dg-modal-section-label">VIEW</div>
             <div className="dg-span-tabs dg-span-tabs--light" style={{ display: "inline-flex" }}>
               {([1, 2, "month"] as const).map((n) => (
-                <button
+                <Button
                   key={n}
                   onClick={() => setSpanWeeks(n)}
                   className={`dg-span-tab${spanWeeks === n ? " active" : ""}`}
                   style={{ minWidth: 72 }}
                 >
                   {n === "month" ? "Month" : n === 1 ? "1 Week" : "2 Weeks"}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -109,14 +110,14 @@ export default function PrintOptionsModal({
             <div className="dg-modal-section-label">FONT SIZE</div>
             <div className="dg-span-tabs dg-span-tabs--light" style={{ display: "inline-flex" }}>
               {FONT_SIZES.map((f) => (
-                <button
+                <Button
                   key={f.key}
                   onClick={() => setFontSizeKey(f.key)}
                   className={`dg-span-tab${fontSizeKey === f.key ? " active" : ""}`}
                   style={{ minWidth: 72 }}
                 >
                   {f.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -154,10 +155,10 @@ export default function PrintOptionsModal({
 
           {/* Actions */}
           <div className="dg-modal-actions">
-            <button onClick={handleRequestClose} className="dg-btn dg-btn-secondary">
+            <Button onClick={handleRequestClose} className="dg-btn dg-btn-secondary">
               {EDITOR_ACTION_LABELS.close}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={handlePrint}
               disabled={focusAreas.length > 0 && selectedFocusAreas.length === 0}
               className="dg-btn dg-btn-primary"
@@ -165,7 +166,7 @@ export default function PrintOptionsModal({
             >
               <Printer size={13} />
               Preview & Print
-            </button>
+            </Button>
           </div>
         </div>
       </div>

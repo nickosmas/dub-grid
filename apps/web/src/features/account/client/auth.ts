@@ -140,6 +140,14 @@ export async function startBrowserTotpEnrollment() {
   return supabase.auth.mfa.enroll({
     factorType: "totp",
     friendlyName: BROWSER_TOTP_FRIENDLY_NAME,
+    // Without this, GoTrue names the factor after the site URL host, which
+    // makes an otpauth label of `host:email` -- and on a host carrying a port
+    // (`127.0.0.1:3000`) that is two colons deep, so an authenticator splitting
+    // on the first one files the entry under "127.0.0.1" with an account of
+    // "3000:email". The secret still scans, but every enrollment lands under
+    // the same opaque name, so a user who has tried before cannot tell the live
+    // entry from a dead one and reads their code off the wrong entry.
+    issuer: "DubGrid",
   });
 }
 

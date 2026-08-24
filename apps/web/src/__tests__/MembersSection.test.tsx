@@ -283,6 +283,120 @@ describe("MembersSection — management-only view access", () => {
   });
 });
 
+// The staff panel's filters (employment type, focus area, certification,
+// contact) describe scheduled staff; a roster row answers none of them. Each
+// half of the directory gets the filters its own rows can be narrowed by.
+describe("MembersSection — management roster filters", () => {
+  async function showManagementView(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole("button", { name: /On Schedule/i }));
+    await user.click(screen.getByRole("option", { name: /Management/i }));
+  }
+
+  it("swaps the staff filter panel for the roster's own filters", async () => {
+    const user = userEvent.setup();
+    mockDirectory = [makePerson({ personId: "person-1" })];
+
+    renderMembersSection({ canManageEmployees: true, isSuperAdmin: true });
+
+    await user.click(screen.getByRole("button", { name: /Filter/i }));
+    expect(screen.getByText("Employment")).toBeInTheDocument();
+    expect(screen.queryByText("Access level")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    await showManagementView(user);
+    await user.click(screen.getByRole("button", { name: /Filter/i }));
+
+    expect(screen.queryByText("Employment")).not.toBeInTheDocument();
+    expect(screen.queryByText("Qualifications")).not.toBeInTheDocument();
+    expect(screen.getByText("Invitation")).toBeInTheDocument();
+    expect(screen.getByText("Sort by")).toBeInTheDocument();
+    // Twice: the section of access-level filters, and the sort by it.
+    expect(screen.getAllByText("Access level")).toHaveLength(2);
+  });
+
+  it("filters the roster by access level", async () => {
+    const user = userEvent.setup();
+    mockDirectory = [
+      makePerson({ personId: "person-1", firstName: "Jamie", lastName: "Rivera" }),
+      makePerson({
+        personId: "person-2",
+        firstName: "Sam",
+        lastName: "Lee",
+        userId: "user-2",
+        orgRole: "super_admin",
+      }),
+    ];
+
+    renderMembersSection({ canManageEmployees: true, isSuperAdmin: true });
+
+    await showManagementView(user);
+    await user.click(screen.getByRole("button", { name: /Filter/i }));
+    await user.click(screen.getByRole("button", { name: "Super Admin" }));
+
+    expect(screen.getByText("Sam Lee")).toBeInTheDocument();
+    expect(screen.queryByText("Jamie Rivera")).not.toBeInTheDocument();
+  });
+
+  it("filters the roster down to pending invitations", async () => {
+    const user = userEvent.setup();
+    mockDirectory = [
+      makePerson({ personId: "person-1", firstName: "Jamie", lastName: "Rivera" }),
+      makePerson({
+        personId: "person-2",
+        source: "pending_invite",
+        firstName: "Sam",
+        lastName: "Lee",
+        userId: null,
+        hasAppAccess: false,
+        invitationStatus: "pending",
+      }),
+    ];
+
+    renderMembersSection({ canManageEmployees: true, isSuperAdmin: true });
+
+    await showManagementView(user);
+    await user.click(screen.getByRole("button", { name: /Filter/i }));
+    await user.click(screen.getByRole("button", { name: /Invitation pending/ }));
+
+    expect(screen.getByText("Sam Lee")).toBeInTheDocument();
+    expect(screen.queryByText("Jamie Rivera")).not.toBeInTheDocument();
+  });
+
+  it("sorts the roster alphabetically, and by access level on request", async () => {
+    const user = userEvent.setup();
+    // Zoe outranks Alex, so the two sorts disagree and the order is a real
+    // signal rather than alphabetical order twice.
+    mockDirectory = [
+      makePerson({
+        personId: "person-1",
+        firstName: "Zoe",
+        lastName: "Adams",
+        orgRole: "super_admin",
+      }),
+      makePerson({
+        personId: "person-2",
+        firstName: "Alex",
+        lastName: "Brooks",
+        userId: "user-2",
+        orgRole: "user",
+      }),
+    ];
+
+    renderMembersSection({ canManageEmployees: true, isSuperAdmin: true });
+
+    await showManagementView(user);
+    const namesInOrder = () =>
+      screen.getAllByText(/^(Zoe Adams|Alex Brooks)$/).map((node) => node.textContent);
+
+    expect(namesInOrder()).toEqual(["Alex Brooks", "Zoe Adams"]);
+
+    await user.click(screen.getByRole("button", { name: /Filter/i }));
+    await user.click(screen.getByRole("button", { name: "Access level" }));
+
+    expect(namesInOrder()).toEqual(["Zoe Adams", "Alex Brooks"]);
+  });
+});
+
 function makeEmployee(overrides: Partial<Employee> & { id: string }): Employee {
   return {
     firstName: "Pat",

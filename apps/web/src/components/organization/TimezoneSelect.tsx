@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Popover, PopoverContent } from "@/components/ui/popover";
+import { Button } from "@/components/Button";
 import { buildTimezoneOptions, getBrowserTimezone } from "@/lib/timezones";
 
 interface TimezoneSelectProps {
@@ -138,7 +139,7 @@ export default function TimezoneSelect({
                 const isFocused = index === focusedIndex;
 
                 return (
-                  <button
+                  <Button
                     key={option.value}
                     type="button"
                     role="option"
@@ -177,7 +178,7 @@ export default function TimezoneSelect({
                     >
                       {option.value}
                     </span>
-                  </button>
+                  </Button>
                 );
               })
             )}
@@ -189,7 +190,7 @@ export default function TimezoneSelect({
   return (
     <>
       <div ref={triggerRef} style={{ display: "inline-block", width: "100%", ...style }}>
-        <button
+        <Button
           id={id}
           type="button"
           aria-expanded={open}
@@ -250,7 +251,7 @@ export default function TimezoneSelect({
           >
             <polyline points="6 9 12 15 18 9" />
           </svg>
-        </button>
+        </Button>
       </div>
       {menu}
     </>

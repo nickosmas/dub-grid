@@ -99,9 +99,18 @@ export async function publishScheduleDirect(input: {
   if (error) throw error;
 }
 
+/**
+ * Deletes draft schedule state. `startDate`/`endDate` bound it to a date range
+ * the same way `publishScheduleDirect` bounds a publish — callers that show the
+ * user a count for one window must pass that window, or they delete far more
+ * than they counted. Omitting both discards every date in the org, which only
+ * unattended tooling should ask for.
+ */
 export async function discardScheduleDraftsDirect(input: {
   orgId: string;
   userId?: string;
+  startDate?: string;
+  endDate?: string;
   serviceClient?: SupabaseClient;
 }): Promise<void> {
   const serviceClient = input.serviceClient ?? getServiceClient();
@@ -110,6 +119,8 @@ export async function discardScheduleDraftsDirect(input: {
     .select("id, version, snapshots:schedule_cell_snapshots(id, snapshot_kind)")
     .eq("org_id", input.orgId);
 
+  if (input.startDate) scheduleCellQuery = scheduleCellQuery.gte("date", input.startDate);
+  if (input.endDate) scheduleCellQuery = scheduleCellQuery.lte("date", input.endDate);
   if (input.userId) scheduleCellQuery = scheduleCellQuery.eq("updated_by", input.userId);
 
   const { data: scheduleCells, error: fetchError } = await scheduleCellQuery;
@@ -180,6 +191,8 @@ export async function discardScheduleDraftsDirect(input: {
     .delete()
     .eq("org_id", input.orgId)
     .eq("status", "draft");
+  if (input.startDate) noteDeleteQuery = noteDeleteQuery.gte("date", input.startDate);
+  if (input.endDate) noteDeleteQuery = noteDeleteQuery.lte("date", input.endDate);
   if (input.userId) noteDeleteQuery = noteDeleteQuery.eq("updated_by", input.userId);
   const { error: noteDeleteError } = await noteDeleteQuery;
   if (noteDeleteError) throw noteDeleteError;
@@ -189,6 +202,8 @@ export async function discardScheduleDraftsDirect(input: {
     .update({ status: "published" })
     .eq("org_id", input.orgId)
     .eq("status", "draft_deleted");
+  if (input.startDate) noteRevertQuery = noteRevertQuery.gte("date", input.startDate);
+  if (input.endDate) noteRevertQuery = noteRevertQuery.lte("date", input.endDate);
   if (input.userId) noteRevertQuery = noteRevertQuery.eq("updated_by", input.userId);
   const { error: noteRevertError } = await noteRevertQuery;
   if (noteRevertError) throw noteRevertError;

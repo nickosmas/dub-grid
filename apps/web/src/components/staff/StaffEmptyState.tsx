@@ -1,6 +1,7 @@
 "use client";
 
 import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/Button";
 import type { EmployeeTab } from "./useStaffFilters";
 
 interface StaffEmptyStateProps {
@@ -49,13 +50,13 @@ export function StaffEmptyState({ activeTab, hasFilters, onClearFilters }: Staff
       description={description}
       action={
         hasFilters ? (
-          <button
+          <Button
             onClick={onClearFilters}
             className="dg-btn dg-btn-secondary"
             style={{ marginTop: 8 }}
           >
             Clear filters
-          </button>
+          </Button>
         ) : undefined
       }
     />

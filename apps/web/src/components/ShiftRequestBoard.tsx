@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import { useTheme } from "next-themes";
 import type { ReactNode } from "react";
 import type { ShiftRequest, ShiftRequestStatus, AbsenceType } from "@/types";
+import { Button } from "@/components/Button";
 import { useMediaQuery, MOBILE } from "@/hooks";
 import { CloseButton } from "@/components/ui/CloseButton";
 import { EmptyState } from "@/components/EmptyState";
@@ -47,7 +48,7 @@ type PendingConfirmation = {
 
 function formatShiftDate(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function hoursRemaining(expiresAt: string): number {
@@ -394,7 +395,7 @@ export default function ShiftRequestBoard({
       currentEmpId
     ) {
       actions.push(
-        <button
+        <Button
           key="claim"
           className="dg-btn dg-btn-primary"
           disabled={hasRunningAction}
@@ -418,14 +419,14 @@ export default function ShiftRequestBoard({
           style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
         >
           Claim
-        </button>,
+        </Button>,
       );
     }
 
     // Target of a swap or targeted pickup with open status: Accept / Decline
     if (isTarget && (req.type === "swap" || req.type === "pickup") && req.status === "open") {
       actions.push(
-        <button
+        <Button
           key="accept"
           className="dg-btn dg-btn-primary"
           disabled={hasRunningAction}
@@ -447,8 +448,8 @@ export default function ShiftRequestBoard({
           style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
         >
           Accept
-        </button>,
-        <button
+        </Button>,
+        <Button
           key="decline"
           className="dg-btn dg-btn-ghost"
           disabled={hasRunningAction}
@@ -474,7 +475,7 @@ export default function ShiftRequestBoard({
           }}
         >
           Decline
-        </button>,
+        </Button>,
       );
     }
 
@@ -489,7 +490,7 @@ export default function ShiftRequestBoard({
             style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}
           >
             <textarea
-              placeholder="Optional note..."
+              placeholder="Add a note (optional)"
               value={rejectNotes[req.id] ?? ""}
               onChange={(e) => setRejectNotes((prev) => ({ ...prev, [req.id]: e.target.value }))}
               style={{
@@ -506,7 +507,7 @@ export default function ShiftRequestBoard({
               }}
             />
             <div style={{ display: "flex", gap: 6 }}>
-              <button
+              <Button
                 className="dg-btn dg-btn-danger-filled"
                 disabled={hasRunningAction}
                 onClick={() => {
@@ -542,8 +543,8 @@ export default function ShiftRequestBoard({
                 }}
               >
                 Confirm Reject
-              </button>
-              <button
+              </Button>
+              <Button
                 className="dg-btn dg-btn-ghost"
                 onClick={() => setShowRejectInput((prev) => ({ ...prev, [req.id]: false }))}
                 style={{
@@ -553,13 +554,13 @@ export default function ShiftRequestBoard({
                 }}
               >
                 Back
-              </button>
+              </Button>
             </div>
           </div>,
         );
       } else {
         actions.push(
-          <button
+          <Button
             key="approve"
             className="dg-btn dg-btn-primary"
             disabled={hasRunningAction}
@@ -582,8 +583,8 @@ export default function ShiftRequestBoard({
             style={{ fontSize: "var(--dg-fs-caption)", padding: "7px 14px" }}
           >
             Approve
-          </button>,
-          <button
+          </Button>,
+          <Button
             key="reject"
             className="dg-btn dg-btn-ghost"
             onClick={() => setShowRejectInput((prev) => ({ ...prev, [req.id]: true }))}
@@ -595,7 +596,7 @@ export default function ShiftRequestBoard({
             }}
           >
             Reject
-          </button>,
+          </Button>,
         );
       }
     }
@@ -603,7 +604,7 @@ export default function ShiftRequestBoard({
     // Cancel: requester can cancel own open/pending request
     if (isOwnRequest && (req.status === "open" || req.status === "pending_approval")) {
       actions.push(
-        <button
+        <Button
           key="cancel"
           className="dg-btn dg-btn-ghost"
           disabled={hasRunningAction}
@@ -631,7 +632,7 @@ export default function ShiftRequestBoard({
           }}
         >
           Cancel
-        </button>,
+        </Button>,
       );
     }
 
@@ -660,9 +661,7 @@ export default function ShiftRequestBoard({
               setPendingConfirmation(null);
             }
           }}
-          onConfirm={() => {
-            void confirmPendingAction();
-          }}
+          onConfirm={() => confirmPendingAction()}
         />
       )}
       {/* Backdrop */}
@@ -691,7 +690,7 @@ export default function ShiftRequestBoard({
           }}
         >
           {isMobile && (
-            <button
+            <Button
               onClick={onClose}
               aria-label="Back"
               style={{
@@ -720,7 +719,7 @@ export default function ShiftRequestBoard({
               >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-            </button>
+            </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
@@ -774,13 +773,13 @@ export default function ShiftRequestBoard({
                         }}
                       />
                     )}
-                    <button
+                    <Button
                       onClick={() => setActiveTab(tab.key)}
                       className={`dg-span-tab${isActive ? " active" : ""}`}
                     >
                       {tab.label}
                       {tab.count > 0 ? ` (${tab.count})` : ""}
-                    </button>
+                    </Button>
                   </Fragment>
                 );
               })}

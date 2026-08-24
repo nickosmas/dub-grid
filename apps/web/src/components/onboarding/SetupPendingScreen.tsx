@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { DubGridLogo } from "@/components/Logo";
+import { Button } from "@/components/Button";
 import { useLogout } from "@/hooks";
 
 /**
@@ -76,7 +77,7 @@ export default function SetupPendingScreen() {
         </p>
 
         <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <button
+          <Button
             onClick={() => window.location.reload()}
             type="button"
             style={{
@@ -92,8 +93,8 @@ export default function SetupPendingScreen() {
             }}
           >
             Refresh
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => signOut()}
             type="button"
             style={{
@@ -109,7 +110,7 @@ export default function SetupPendingScreen() {
             }}
           >
             Sign Out
-          </button>
+          </Button>
         </div>
       </div>
     </div>

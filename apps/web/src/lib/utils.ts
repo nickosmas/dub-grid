@@ -198,7 +198,14 @@ export function formatRelativeTime(date: Date | string): string {
     return `${d.toLocaleDateString(undefined, { weekday: "long" })} at ${formatRelativeTimeClock(d)}`;
   }
 
-  return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined })} at ${formatRelativeTimeClock(d)}`;
+  // The year is always named. Anything reaching this branch is over a week
+  // old, which is exactly where "May 4" stops being enough to place an event.
+  const absolute = d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${absolute} at ${formatRelativeTimeClock(d)}`;
 }
 
 function formatRelativeTimeClock(d: Date): string {

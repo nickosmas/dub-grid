@@ -252,7 +252,6 @@ interface RenderGridOptions {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
-  hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
   publishDiffForKey?: (
     empId: string,
     date: Date,
@@ -275,7 +274,6 @@ interface RenderGridOptions {
     publishedAt: string;
     publishedBy: string;
   } | null;
-  recentlyPublishedKeys?: Set<string>;
   cellLocks?: Map<string, { userName: string }>;
   showAudit?: boolean;
   createdByNameForKey?: (empId: string, date: Date) => string | null;
@@ -321,7 +319,6 @@ function renderGrid(options: RenderGridOptions = {}) {
     orgRoles: options.orgRoles ?? [],
     coverageRequirements: options.coverageRequirements,
     absenceTypeMap: options.absenceTypeMap,
-    recentlyPublishedKeys: options.recentlyPublishedKeys,
     cellLocks: options.cellLocks,
     resolvePublisherName: options.resolvePublisherName,
     openShifts: options.openShifts as any,
@@ -347,7 +344,6 @@ function renderGrid(options: RenderGridOptions = {}) {
       publishedLabelForKey: options.publishedLabelForKey,
       publishedAssignmentIdsForKey: options.publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey: options.publishedAbsenceTypeIdForKey,
-      hasTimeChangesForKey: options.hasTimeChangesForKey,
       publishDiffForKey: options.publishDiffForKey as any,
       createdByNameForKey: options.createdByNameForKey,
       absenceTypeIdForKey: options.absenceTypeIdForKey,
@@ -751,17 +747,67 @@ describe("ScheduleGrid", () => {
     expect(badge?.textContent).toBe("Was N");
   });
 
-  it("does not add a recent publish cell tint when show changes is off", () => {
-    observedWidth = 1600;
+  it("rings side-by-side pills inward so two shifts in one cell never overlap", () => {
+    const localAssignmentDefinitions = [
+      {
+        ...assignments[0],
+        jobId: 101,
+      },
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "N",
+        name: "Night Shift",
+        color: "#E0F2FE",
+        border: "#0284C7",
+        text: "#0C4A6E",
+        categoryId: 1,
+        focusAreaId: 1,
+        jobId: 102,
+        sortOrder: 2,
+      },
+    ];
 
     renderGrid({
-      recentlyPublishedKeys: new Set(["emp-1_2024-01-07"]),
+      assignments: localAssignmentDefinitions,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      showDiffOverlay: false,
+      showPublishDiffOverlay: true,
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "new",
+        fromState: null,
+        toState: {
+          kind: "worked",
+          segments: [
+            { shiftId: 1, jobId: 101, position: 0 },
+            { shiftId: 1, jobId: 102, position: 1 },
+          ],
+          absenceTypeId: null,
+          customStartTime: null,
+          customEndTime: null,
+          seriesId: null,
+          fromRecurring: false,
+        },
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = Array.from(
+      firstCell.querySelectorAll('[data-shift-pill="multi"]'),
+    ) as HTMLElement[];
 
-    expect(firstCell.dataset.recent).toBeUndefined();
-    expect(firstCell.style.background).toBe("");
+    expect(pills.length).toBe(2);
+    // An outward ring spreads past the pill's box without reserving layout
+    // space, so adjacent pills draw over each other. Every ring must be inset.
+    for (const pill of pills) {
+      expect(pill.style.boxShadow).toContain("inset");
+      expect(pill.style.boxShadow).not.toMatch(/(^|,)\s*0 0 0/);
+    }
   });
 
   it("keeps the normal cell background when show changes is on", () => {
@@ -769,7 +815,6 @@ describe("ScheduleGrid", () => {
 
     renderGrid({
       showDiffOverlay: true,
-      recentlyPublishedKeys: new Set(["emp-1_2024-01-07"]),
       publishDiffForKey: () => ({
         empId: "emp-1",
         date: "2024-01-07",
@@ -2234,7 +2279,8 @@ describe("ScheduleGrid", () => {
       '[data-bulk-selection-ring="true"]',
     ) as HTMLElement | null;
     expect(selectionRing).not.toBeNull();
-    expect(selectionRing?.style.top).toBe("3px");
+    // Row 0 carries no top divider of its own, so the ring insets evenly.
+    expect(selectionRing?.style.top).toBe("2px");
     expect(selectionRing?.style.right).toBe("2px");
     expect(selectionRing?.style.bottom).toBe("2px");
     expect(selectionRing?.style.left).toBe("2px");
@@ -2618,7 +2664,7 @@ describe("ScheduleGrid", () => {
     expect(splitHeader.dataset.weekSplitStart).toBe("true");
   });
 
-  it("keeps the first-row header divider on edited cells", () => {
+  it("leaves the first row's top divider to the header, edited or not", () => {
     observedWidth = 1600;
     renderGrid({
       showDiffOverlay: true,
@@ -2627,11 +2673,14 @@ describe("ScheduleGrid", () => {
 
     const [editedCell, nextCell] = screen.getAllByRole("gridcell") as [HTMLElement, HTMLElement];
 
-    expect(editedCell.dataset.topDivider).toBe("dark");
+    // The header cell paints its own bottom stroke inside its own box. A
+    // second stroke here would stack on it and make edited cells read
+    // thicker than their empty neighbours.
+    expect(editedCell.dataset.topDivider).toBeUndefined();
     expect(nextCell.dataset.topDivider).toBeUndefined();
   });
 
-  it("keeps the open-shifts warning divider above first-row edited cells", () => {
+  it("leaves the first row's top divider to the open-shifts row above it", () => {
     observedWidth = 1600;
     renderGrid({
       showDiffOverlay: true,
@@ -2653,7 +2702,7 @@ describe("ScheduleGrid", () => {
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
 
-    expect(firstCell.dataset.topDivider).toBe("warning");
+    expect(firstCell.dataset.topDivider).toBeUndefined();
   });
 
   it("renders compact author labels under shift pills, including Me for the current user", () => {

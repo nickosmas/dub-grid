@@ -1,3 +1,4 @@
+import { Button } from "@/components/Button";
 interface ExpandButtonProps {
   onClick: () => void;
   label?: string;
@@ -5,7 +6,7 @@ interface ExpandButtonProps {
 
 export default function ExpandButton({ onClick, label = "Expand" }: ExpandButtonProps) {
   return (
-    <button
+    <Button
       onClick={onClick}
       aria-label={label}
       style={{
@@ -42,6 +43,6 @@ export default function ExpandButton({ onClick, label = "Expand" }: ExpandButton
           strokeLinejoin="round"
         />
       </svg>
-    </button>
+    </Button>
   );
 }

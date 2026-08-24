@@ -3,6 +3,7 @@
 import { useState } from "react";
 import StepLayout from "../StepLayout";
 import InviteEmployeeModal from "@/components/InviteEmployeeModal";
+import { Button } from "@/components/Button";
 import { useOrganizationData } from "@/hooks";
 
 interface InviteTeamStepProps {
@@ -27,13 +28,13 @@ export default function InviteTeamStep({ onNext, onBack }: InviteTeamStepProps) 
         nextLabel={inviteCount > 0 ? "Continue" : "Skip for now"}
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-          <button
+          <Button
             type="button"
             className="dg-btn dg-btn-primary"
             onClick={() => setShowInvite(true)}
           >
             Invite a teammate
-          </button>
+          </Button>
 
           {inviteCount > 0 && (
             <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-muted)" }}>

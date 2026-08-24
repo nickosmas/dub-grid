@@ -1,5 +1,6 @@
 import { StatusDot } from "@/components/gridmaster/organization-detail/shared";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
+import { Button } from "@/components/Button";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { type Employee } from "@/types";
 import { useState } from "react";
@@ -45,7 +46,7 @@ export function EmployeesTab({
         ].map((tab) => {
           const isActive = showStatus === tab.key;
           return (
-            <button
+            <Button
               key={tab.key}
               onClick={() => setShowStatus(tab.key)}
               style={{
@@ -80,7 +81,7 @@ export function EmployeesTab({
               >
                 {tab.count}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>

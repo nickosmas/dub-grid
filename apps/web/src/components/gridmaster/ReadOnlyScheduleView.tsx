@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { resolveShiftPillColors } from "@/lib/colors";
+import { Button } from "@/components/Button";
 import { sectionStyle, thStyle, tdStyle } from "@/lib/styles";
 import { EmptyState } from "@/components/EmptyState";
 import { addDays, formatDateKey } from "@/lib/utils";
@@ -115,27 +116,27 @@ export default function ReadOnlyScheduleView({
         }}
       >
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button
+          <Button
             className="dg-btn dg-btn-secondary"
             style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 10px" }}
             onClick={() => setPeriodOffset((current) => current - 1)}
           >
             ← Prev
-          </button>
-          <button
+          </Button>
+          <Button
             className="dg-btn dg-btn-secondary"
             style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 10px" }}
             onClick={() => setPeriodOffset(0)}
           >
             Current Period
-          </button>
-          <button
+          </Button>
+          <Button
             className="dg-btn dg-btn-secondary"
             style={{ fontSize: "var(--dg-fs-caption)", padding: "4px 10px" }}
             onClick={() => setPeriodOffset((current) => current + 1)}
           >
             Next →
-          </button>
+          </Button>
         </div>
         <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
           {formatDate(startDate)} - {formatDate(endDate)} ({shifts.length} shifts)

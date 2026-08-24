@@ -21,6 +21,7 @@ import {
 import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { Users, UserPen } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/Button";
 import { DAY_LABELS, BOX_SHADOW_CARD } from "@/lib/constants";
 import { MaybeHint } from "@/components/ui/hint";
 import { formatDateKey } from "@/lib/utils";
@@ -90,6 +91,7 @@ import {
   isOvernightTimes,
   getDraftBorder,
   getPublishDiffBoxShadow,
+  getPublishDiffInsetRing,
   joinBoxShadows,
   areGridCellIdsEqual,
   getGridCellKey,
@@ -181,13 +183,11 @@ interface LegacyScheduleGridProps {
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
   /** Returns true if the cell's custom times differ from published times. */
-  hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
   publishDiffForKey?: (
     empId: string,
     date: Date,
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
   /** Set of cell keys (empId_date) that were recently published since user's last view */
-  recentlyPublishedKeys?: Set<string>;
   cellLocks?: Map<string, { userName: string }>;
   /** When true, show who created each shift below the cell */
   showAudit?: boolean;
@@ -283,12 +283,10 @@ interface SectionBlockProps {
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
   publishedAbsenceTypeIdForKey?: (empId: string, date: Date) => number | null;
-  hasTimeChangesForKey?: (empId: string, date: Date) => boolean;
   publishDiffForKey?: (
     empId: string,
     date: Date,
   ) => (PublishChange & { publishedAt: string; publishedBy: string }) | null;
-  recentlyPublishedKeys?: Set<string>;
   certifications: NamedItem[];
   orgRoles: NamedItem[];
   cellLocks?: Map<string, { userName: string }>;
@@ -359,7 +357,6 @@ const SectionBlock = memo(function SectionBlock({
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
   publishDiffForKey,
-  recentlyPublishedKeys,
   certifications,
   orgRoles,
   cellLocks,
@@ -810,7 +807,7 @@ const SectionBlock = memo(function SectionBlock({
         }}
       >
         {!fitToContainer && canScrollRight && (
-          <button
+          <Button
             type="button"
             onClick={() => scrollDays("right")}
             aria-label={`Scroll ${sectionName} schedule right`}
@@ -847,10 +844,10 @@ const SectionBlock = memo(function SectionBlock({
             >
               <polyline points="9 18 15 12 9 6" />
             </svg>
-          </button>
+          </Button>
         )}
         {!fitToContainer && canScrollLeft && (
-          <button
+          <Button
             type="button"
             onClick={() => scrollDays("left")}
             aria-label={`Scroll ${sectionName} schedule left`}
@@ -887,7 +884,7 @@ const SectionBlock = memo(function SectionBlock({
               <polyline points="15 18 9 12 15 6" />
             </svg>
             Earlier days
-          </button>
+          </Button>
         )}
         <div
           ref={scrollContainerRef}
@@ -1127,7 +1124,7 @@ const SectionBlock = memo(function SectionBlock({
                             : `${needed} needed — click to volunteer`;
                         return (
                           <MaybeHint key={os.id} content={openShiftHint} side="top">
-                            <button
+                            <Button
                               className="dg-open-shift-btn"
                               onClick={() => onClaimOpenShift?.(os)}
                               aria-label={openShiftHint}
@@ -1212,7 +1209,7 @@ const SectionBlock = memo(function SectionBlock({
                               >
                                 {needed}
                               </span>
-                            </button>
+                            </Button>
                           </MaybeHint>
                         );
                       })}
@@ -1382,14 +1379,12 @@ const SectionBlock = memo(function SectionBlock({
 
                       const showDiffCellTint =
                         (!!showDiffOverlay && !!draftKind) || showsPublishDiff;
-                      const topDivider =
-                        ri > 0
-                          ? "light"
-                          : showDiffCellTint
-                            ? (openShifts?.length ?? 0) > 0
-                              ? "warning"
-                              : "dark"
-                            : undefined;
+                      // The row above paints its own bottom stroke inside its
+                      // own box — the header cells and the open-shifts row both
+                      // do it with a background-image at their bottom edge. Row
+                      // 0 must not repaint that stroke or the two stack and
+                      // content cells read thicker than their empty neighbours.
+                      const topDivider = ri > 0 ? "light" : undefined;
                       const cellId = buildCellId(emp.id, dateKey);
                       const bulkCellKey = getGridCellKey(cellId);
                       const isBulkSelectable =
@@ -1408,10 +1403,11 @@ const SectionBlock = memo(function SectionBlock({
                         ? getStyleByIdOrLabel(shiftLabel.split("/")[0], cellCodeIds[0])
                         : null;
                       const leadingDividerInset = index === 0 ? 0 : 1;
-                      // The first employee row still sits under a painted divider
-                      // from the header or open-shifts row, so account for that
-                      // visible stroke when placing inset pills.
-                      const topDividerInset = ri > 0 ? 1 : (openShifts?.length ?? 0) > 0 ? 2 : 1;
+                      // Only the cell's own top divider eats into its box. The
+                      // header/open-shifts stroke above row 0 lives in that
+                      // row's box, so row 0 needs no inset and its pills line up
+                      // with every other row's.
+                      const topDividerInset = ri > 0 ? 1 : 0;
                       const insetFromVisibleCellLeft = (base: number) =>
                         `${base + leadingDividerInset}px`;
                       const insetFromVisibleCellTop = (base: number) =>
@@ -2208,7 +2204,10 @@ const SectionBlock = memo(function SectionBlock({
                                           style={{
                                             display: "flex",
                                             flexDirection: "row",
-                                            gap: 1,
+                                            // Two hairlines butted together read
+                                            // as one thick rule; 2px keeps the
+                                            // pills legibly separate.
+                                            gap: 2,
                                             flex: 1,
                                             minHeight: 0,
                                             alignItems: "stretch",
@@ -2337,15 +2336,14 @@ const SectionBlock = memo(function SectionBlock({
                                                   border: pillBorder,
                                                   borderRadius: MULTI_SHIFT_PILL_RADIUS,
                                                   color: multiForegroundColor,
-                                                  boxShadow: (() => {
-                                                    return publishRingStatus === "new" ||
-                                                      publishRingStatus === "modified"
-                                                      ? getPublishDiffBoxShadow(
+                                                  boxShadow:
+                                                    publishRingStatus === "new" ||
+                                                    publishRingStatus === "modified"
+                                                      ? getPublishDiffInsetRing(
                                                           publishRingStatus,
                                                           borderColor(multiForegroundColor),
                                                         )
-                                                      : "none";
-                                                  })(),
+                                                      : "none",
                                                   display: "flex",
                                                   flexDirection: "column",
                                                   alignItems: "center",
@@ -2971,9 +2969,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
   publishedAbsenceTypeIdForKey,
-  hasTimeChangesForKey,
   publishDiffForKey,
-  recentlyPublishedKeys,
   cellLocks,
   showAudit,
   createdByNameForKey,
@@ -3296,9 +3292,7 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     publishedLabelForKey={publishedLabelForKey}
                     publishedAssignmentIdsForKey={publishedAssignmentIdsForKey}
                     publishedAbsenceTypeIdForKey={publishedAbsenceTypeIdForKey}
-                    hasTimeChangesForKey={hasTimeChangesForKey}
                     publishDiffForKey={publishDiffForKey}
-                    recentlyPublishedKeys={recentlyPublishedKeys}
                     certifications={certifications}
                     orgRoles={orgRoles}
                     cellLocks={cellLocks}
@@ -3520,9 +3514,7 @@ const ScheduleGrid = memo(function ScheduleGrid({
         publishedLabelForKey={model.accessors.publishedLabelForKey}
         publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}
         publishedAbsenceTypeIdForKey={model.accessors.publishedAbsenceTypeIdForKey}
-        hasTimeChangesForKey={model.accessors.hasTimeChangesForKey}
         publishDiffForKey={model.accessors.publishDiffForKey}
-        recentlyPublishedKeys={model.recentlyPublishedKeys}
         cellLocks={model.cellLocks}
         showAudit={model.options.showAudit}
         createdByNameForKey={model.accessors.createdByNameForKey}

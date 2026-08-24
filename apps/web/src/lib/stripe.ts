@@ -16,7 +16,7 @@ let _stripe: Stripe | null | undefined;
 export async function requireStripeEnabled(): Promise<NextResponse | null> {
   if (await isFeatureEnabled("stripe")) return null;
   return NextResponse.json(
-    { error: "Billing is temporarily unavailable. Please try again shortly." },
+    { error: "Billing is unavailable right now. Try again in a moment." },
     { status: 503 },
   );
 }

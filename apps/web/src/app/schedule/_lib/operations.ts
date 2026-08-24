@@ -58,6 +58,12 @@ export const FETCH_WINDOW_RECENTER_BUFFER_DAYS = 90;
  * matter how far the user has paged.
  */
 export const FETCH_WINDOW_RECENTER_THRESHOLD_DAYS = 300;
+/**
+ * How many times to retry a failed window fetch before giving up. A failure
+ * leaves the loaded window unchanged, so nothing else would ever re-trigger
+ * the fetch — but an uncapped retry would spin forever while offline.
+ */
+export const FETCH_WINDOW_RETRY_LIMIT = 2;
 
 /** Whole-day difference between two YYYY-MM-DD keys (local midnight, matching this file's date-math convention). */
 export function daysBetweenDateKeys(startKey: string, endKey: string): number {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Button } from "@/components/Button";
 import {
   fetchNotifications,
   fetchUnreadNotificationCount,
@@ -308,7 +309,7 @@ export default function NotificationBell({
 
   return (
     <div ref={ref} style={{ position: "relative", display: "flex", alignItems: "center" }}>
-      <button
+      <Button
         onClick={handleToggle}
         aria-label={`Alerts${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
         aria-expanded={open}
@@ -377,7 +378,7 @@ export default function NotificationBell({
             {unreadCountLabel}
           </span>
         )}
-      </button>
+      </Button>
 
       {open && (
         <div
@@ -419,7 +420,7 @@ export default function NotificationBell({
               Alerts
             </span>
             {unreadCount > 0 && (
-              <button
+              <Button
                 onClick={() => setConfirmingMarkAllRead(true)}
                 aria-label="Mark all alerts as read"
                 style={{
@@ -434,7 +435,7 @@ export default function NotificationBell({
                 }}
               >
                 Mark all read
-              </button>
+              </Button>
             )}
           </div>
 
@@ -449,7 +450,7 @@ export default function NotificationBell({
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
-                Loading...
+                Loading
               </div>
             ) : notifications.length === 0 ? (
               <div
@@ -466,10 +467,10 @@ export default function NotificationBell({
               notifications.map((n) => {
                 const isUnread = !n.readAt;
                 return (
-                  <button
+                  <Button
                     key={n.id}
                     onClick={() => {
-                      if (isUnread) handleMarkRead(n.id);
+                      if (isUnread) return handleMarkRead(n.id);
                     }}
                     aria-label={`${n.title}: ${n.message}${isUnread ? " (unread, click to mark as read)" : ""}`}
                     style={{
@@ -544,7 +545,7 @@ export default function NotificationBell({
                         {formatRelativeTime(n.createdAt)}
                       </div>
                     </div>
-                  </button>
+                  </Button>
                 );
               })
             )}
@@ -552,7 +553,7 @@ export default function NotificationBell({
 
           {/* Footer: view all */}
           {onViewAll ? (
-            <button
+            <Button
               type="button"
               onClick={() => {
                 setOpen(false);
@@ -575,7 +576,7 @@ export default function NotificationBell({
               }}
             >
               View all alerts
-            </button>
+            </Button>
           ) : (
             <Link
               href="/alerts"

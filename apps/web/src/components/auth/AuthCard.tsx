@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { openConsentPreferences } from "@/components/CookieConsent";
+import { Button } from "@/components/Button";
 
 export function PageShell({
   children,
@@ -92,7 +93,7 @@ export function PageShell({
                 Terms of Service
               </Link>
               <span style={{ margin: "0 4px" }}>·</span>
-              <button
+              <Button
                 type="button"
                 onClick={openConsentPreferences}
                 className="dg-auth-footer-link"
@@ -106,7 +107,7 @@ export function PageShell({
                 }}
               >
                 Cookie preferences
-              </button>
+              </Button>
             </>
           )}
         </div>

@@ -252,7 +252,7 @@ describe("mobile auth login route", () => {
 
     expect(response.status).toBe(429);
     expect(await response.json()).toMatchObject({
-      error: "Too many login attempts. Please try again later.",
+      error: "Too many sign-in attempts. Wait a few minutes and try again.",
     });
   });
 
@@ -333,7 +333,7 @@ describe("mobile auth login route", () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({
       error:
-        "Organization unavailable. Your organization will be available once your organization administrator finishes setup.",
+        "Organization unavailable. Your organization opens up once your administrator finishes setup.",
     });
   });
 

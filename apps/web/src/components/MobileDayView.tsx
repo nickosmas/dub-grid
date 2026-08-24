@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef } from "react";
 import { DAY_LABELS } from "@/lib/constants";
+import { Button } from "@/components/Button";
 import { formatDateKey } from "@/lib/utils";
 import { computeDailyTallies } from "@/lib/schedule-logic";
 import {
@@ -519,7 +520,7 @@ export default function MobileDayView({
                         });
 
                     return (
-                      <button
+                      <Button
                         key={dk}
                         onClick={() => {
                           if (isCellInteractive) handleCellClick(emp, date, sectionName);
@@ -647,7 +648,7 @@ export default function MobileDayView({
                             }}
                           />
                         )}
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>

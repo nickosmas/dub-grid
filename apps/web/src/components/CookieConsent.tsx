@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { CloseButton } from "@/components/ui/CloseButton";
+import { Button } from "@/components/Button";
 import { Switch } from "@/components/ui/switch";
 import { getCookieDomain, isSecure } from "@/lib/cookies";
 
@@ -220,27 +221,27 @@ export default function CookieConsent() {
             </a>
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-shrink-0">
-            <button
+            <Button
               onClick={() => setView("customize")}
               className="dg-btn dg-btn-ghost"
               style={{ fontSize: "var(--dg-fs-body-sm)", padding: "8px 16px" }}
             >
               Customize
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => close(false)}
               className="dg-btn dg-btn-secondary"
               style={{ fontSize: "var(--dg-fs-body-sm)", padding: "8px 16px" }}
             >
               Essential only
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => close(true)}
               className="dg-btn dg-btn-primary"
               style={{ fontSize: "var(--dg-fs-body-sm)", padding: "8px 16px" }}
             >
               Accept all
-            </button>
+            </Button>
           </div>
         </>
       ) : (
@@ -283,14 +284,14 @@ export default function CookieConsent() {
             >
               Cookie policy
             </a>
-            <button
+            <Button
               onClick={() => close(analyticsDraft)}
               disabled={!hasChanges}
               className="dg-btn dg-btn-primary"
               style={{ fontSize: "var(--dg-fs-body-sm)", padding: "8px 16px" }}
             >
               Save preferences
-            </button>
+            </Button>
           </div>
         </div>
       )}

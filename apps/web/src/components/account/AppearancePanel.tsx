@@ -3,6 +3,7 @@
 import { useTheme } from "next-themes";
 
 import { SectionCard } from "@/components/settings/shared";
+import { Button } from "@/components/Button";
 import { AppearancePreview } from "./AppearancePreview";
 
 const THEME_OPTIONS = [
@@ -26,7 +27,7 @@ export function AppearancePanel() {
         </div>
         <div className="dg-segment" style={{ display: "flex", maxWidth: 320 }}>
           {THEME_OPTIONS.map((option) => (
-            <button
+            <Button
               key={option.value}
               type="button"
               className={`dg-segment-btn${theme === option.value ? " active" : ""}`}
@@ -34,7 +35,7 @@ export function AppearancePanel() {
               onClick={() => setTheme(option.value)}
             >
               {option.label}
-            </button>
+            </Button>
           ))}
         </div>
         <AppearancePreview />

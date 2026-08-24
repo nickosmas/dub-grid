@@ -119,7 +119,7 @@ describe("OrgLogin submit states", () => {
     submitForm(container);
 
     await waitFor(() => {
-      expect(mockToastError).toHaveBeenCalledWith("Invalid email or password. Please try again.");
+      expect(mockToastError).toHaveBeenCalledWith("Check your email and password and try again.");
     });
 
     // Button must be re-enabled — loading=false on error

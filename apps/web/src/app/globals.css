@@ -1798,11 +1798,6 @@ table tbody > tr:last-child > th {
   border-left: 1px solid var(--color-grid-divider-strong);
 }
 
-.dg-grid-cell[data-top-divider]::before,
-.dg-grid-slot[data-bottom-divider]::after {
-  content: none;
-}
-
 .dg-grid-cell[data-top-divider] .dg-grid-cell__chrome,
 .dg-grid-slot[data-bottom-divider] .dg-grid-slot__chrome {
   --dg-grid-divider-inset: 0px;

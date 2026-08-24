@@ -11,6 +11,7 @@ import {
 } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { buildShiftDisplayParts } from "@/lib/assignable-shifts";
+import { Button } from "@/components/Button";
 import {
   SeriesFrequency,
   ScheduleCellInput,
@@ -160,7 +161,7 @@ function CalendarField({
         error ? "border-[var(--color-danger)]" : "border-[var(--color-border)]",
       )}
     >
-      <button
+      <Button
         type="button"
         onClick={toggleExpanded}
         aria-label={selectionLabel}
@@ -191,7 +192,7 @@ function CalendarField({
             className={cn("size-4 transition-transform duration-200", expanded && "rotate-180")}
           />
         </span>
-      </button>
+      </Button>
 
       <div
         aria-hidden={!expanded}
@@ -207,7 +208,7 @@ function CalendarField({
               {MONTH_FORMATTER.format(visibleMonth)}
             </div>
             <div className="flex items-center gap-1">
-              <button
+              <Button
                 type="button"
                 onClick={() => setVisibleMonth((current) => shiftMonth(current, -1))}
                 className="flex size-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)]"
@@ -215,8 +216,8 @@ function CalendarField({
                 tabIndex={expanded ? 0 : -1}
               >
                 <ChevronLeft className="size-4" />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => setVisibleMonth((current) => shiftMonth(current, 1))}
                 className="flex size-7 items-center justify-center rounded-md text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)]"
@@ -224,7 +225,7 @@ function CalendarField({
                 tabIndex={expanded ? 0 : -1}
               >
                 <ChevronRight className="size-4" />
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -252,7 +253,7 @@ function CalendarField({
               const isDisabled = isBeforeMin;
 
               return (
-                <button
+                <Button
                   key={dateKey}
                   type="button"
                   onClick={() => handleSelect(day)}
@@ -282,7 +283,7 @@ function CalendarField({
                       )}
                     />
                   )}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -548,7 +549,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                     }}
                   />
                 )}
-                <button
+                <Button
                   type="button"
                   onClick={() => setFrequency(f)}
                   className={`dg-span-tab${isActive ? " active" : ""}`}
@@ -561,7 +562,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                   }}
                 >
                   {f === "biweekly" ? "Biweekly" : f}
-                </button>
+                </Button>
               </Fragment>
             );
           })}
@@ -576,7 +577,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
             {DAY_NAMES_SHORT.map((name, i) => {
               const active = daysOfWeek.includes(i);
               return (
-                <button
+                <Button
                   key={i}
                   onClick={() => toggleDay(i)}
                   aria-label={DAY_NAMES_FULL[i]}
@@ -597,7 +598,7 @@ const RepeatForm = forwardRef<RepeatFormHandle, RepeatFormProps>(function Repeat
                   }}
                 >
                   {name}
-                </button>
+                </Button>
               );
             })}
           </div>
