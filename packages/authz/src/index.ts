@@ -163,11 +163,25 @@ export function buildPermissionContext(
   let permissions: AdminPermissions;
   if (isGridmaster || isSuperAdmin) {
     permissions = ALL_PERMS;
-  } else if (role === "admin") {
-    permissions = adminPerms ? { ...adminPerms, canViewSchedule: true } : READ_ONLY_PERMS;
-  } else if (role === "user") {
+  } else if (role === "admin" || role === "user") {
+    // READ_ONLY_PERMS is the base, not just the fallback: `adminPerms` is an
+    // unvalidated JSONB column (PUT /api/organizations/access accepts any
+    // `z.record(z.string(), z.boolean())`), so a partial object would otherwise
+    // leave keys `undefined` rather than false. It also means a key added to
+    // AdminPermissions later resolves correctly against rows written before it
+    // existed, instead of reading `undefined` on every stored membership.
+    //
+    // The three overrides restate guarantees the design gives regardless of
+    // what is stored: canViewSchedule/canViewStaff are true for every
+    // authenticated user, and canManageOrgSettings is super_admin-only and
+    // never delegatable. They were previously enforced for `user` but not for
+    // `admin`, and outside authz only by PermissionsEditor's
+    // buildInitialPermissions — so anything writing the column without going
+    // through that component could leave an admin unable to see the roster a
+    // Tier-0 user can see, or holding a permission the design reserves.
     permissions = adminPerms
       ? {
+          ...READ_ONLY_PERMS,
           ...adminPerms,
           canViewSchedule: true,
           canViewStaff: true,

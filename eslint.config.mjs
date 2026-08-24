@@ -5,6 +5,9 @@ import tseslint from "./node_modules/eslint-config-next/node_modules/typescript-
 import eslintConfigPrettier from "eslint-config-prettier";
 import { noHtmlTitleAttribute, noRawTooltipImport } from "./eslint-rules/no-raw-title-tooltip.mjs";
 import { noDecorativeAiIcons } from "./eslint-rules/no-decorative-ai-icons.mjs";
+import { requireBusyButton } from "./eslint-rules/require-busy-button.mjs";
+import { noFloatingAsyncHandler } from "./eslint-rules/no-floating-async-handler.mjs";
+import { noRawErrorInToast, noTechnicalUserCopy } from "./eslint-rules/no-technical-user-copy.mjs";
 
 const tooltipPlugin = {
   rules: {
@@ -16,6 +19,15 @@ const tooltipPlugin = {
 const designPlugin = {
   rules: {
     "no-decorative-ai-icons": noDecorativeAiIcons,
+    "require-busy-button": requireBusyButton,
+    "no-floating-async-handler": noFloatingAsyncHandler,
+  },
+};
+
+const copyPlugin = {
+  rules: {
+    "no-technical-user-copy": noTechnicalUserCopy,
+    "no-raw-error-in-toast": noRawErrorInToast,
   },
 };
 
@@ -141,9 +153,27 @@ const eslintConfig = defineConfig([
       "apps/mobile/app/**/*.{ts,tsx}",
       "packages/*/src/**/*.{ts,tsx}",
     ],
-    plugins: { design: designPlugin },
+    plugins: { design: designPlugin, copy: copyPlugin },
     rules: {
       "design/no-decorative-ai-icons": "error",
+      "design/require-busy-button": "error",
+      "design/no-floating-async-handler": "error",
+    },
+  },
+  {
+    // Keep implementation detail out of the words a customer reads, and keep a
+    // caught error from reaching a toast unfiltered. Tests are excluded: their
+    // string literals are fixtures standing in for server responses, not copy.
+    files: [
+      "apps/web/src/**/*.{ts,tsx}",
+      "apps/mobile/src/**/*.{ts,tsx}",
+      "apps/mobile/app/**/*.{ts,tsx}",
+    ],
+    ignores: ["**/*.test.{ts,tsx}", "**/__tests__/**", "**/*.stories.{ts,tsx}"],
+    plugins: { copy: copyPlugin },
+    rules: {
+      "copy/no-technical-user-copy": "error",
+      "copy/no-raw-error-in-toast": "error",
     },
   },
   {

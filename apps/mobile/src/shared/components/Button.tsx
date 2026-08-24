@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import Animated from "react-native-reanimated";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 import { usePressAnimation, type PressHaptic } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import {
@@ -66,7 +67,7 @@ export function Button({
   selected,
   expanded,
   disabled = false,
-  loading = false,
+  loading,
   loadingLabel,
   fullWidth,
   haptic = "selection",
@@ -89,9 +90,14 @@ export function Button({
   /** Set when the button opens a sheet or panel, so screen readers announce it. */
   expanded?: boolean;
   disabled?: boolean;
+  /**
+   * Overrides the busy state the button works out for itself. Only needed when
+   * the pending flag lives outside this button (a shared `actionLoading` keyed
+   * by row, say); an `onPress` returning a promise already spins on its own.
+   */
   loading?: boolean;
   /**
-   * What the button says while `loading`: the same action in progress
+   * What the button says while it is busy: the same action in progress
    * ("Saving", not "Save"). The label is never dropped for the spinner, so a
    * busy button still says what it is doing; without this it keeps `label`,
    * which reads as work not yet started.
@@ -104,14 +110,22 @@ export function Button({
    * The press event is forwarded, so a button nested inside a pressable row can
    * call `stopPropagation` and keep the row from also firing.
    */
-  onPress: (event: GestureResponderEvent) => void;
+  onPress: (event: GestureResponderEvent) => void | Promise<unknown>;
 }>) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
 
+  // A tap is easy to repeat, and `loading` only disables the pressable after
+  // React re-renders, so a quick double-tap slips through and runs the action
+  // twice. The latch inside `useAsyncAction` is a ref, checked synchronously
+  // on the first press, so the second is already too late. A caller passing
+  // its own `loading` still wins, and a synchronous `onPress` never spins.
+  const action = useAsyncAction(onPress);
+  const isBusy = loading ?? action.isRunning;
+
   const resolvedSize: ButtonSize = size ?? (compact ? "sm" : "md");
   const metrics = SIZE[resolvedSize];
-  const isDisabled = disabled || loading;
+  const isDisabled = disabled || isBusy;
   const stretches = fullWidth ?? !iconOnly;
 
   const labelColor = resolveLabelColor(tone, mobileColors);
@@ -127,7 +141,7 @@ export function Button({
     scale: iconOnly ? mobileMotion.press.iconOnlyScale : mobileMotion.press.scale,
   });
 
-  const content = loading ? (loadingLabel ?? label) : (children ?? label);
+  const content = isBusy ? (loadingLabel ?? label) : (children ?? label);
   const iconNode = icon ? (
     <Ionicons color={labelColor} name={icon} size={metrics.icon} />
   ) : (
@@ -138,10 +152,10 @@ export function Button({
     <AnimatedPressable
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled, busy: loading, selected, expanded }}
+      accessibilityState={{ disabled: isDisabled, busy: isBusy, selected, expanded }}
       android_ripple={androidRipple}
       disabled={isDisabled}
-      onPress={onPress}
+      onPress={action.run}
       {...pressHandlers}
       style={[
         styles.button,
@@ -169,14 +183,14 @@ export function Button({
             label stays beside it: a busy button should still say what it is
             doing. An icon-only button has no label to keep, so it is the
             spinner alone. */}
-        {loading ? <ActivityIndicator color={labelColor} size="small" /> : null}
-        {!loading && (iconOnly || iconPosition === "leading") ? iconNode : null}
+        {isBusy ? <ActivityIndicator color={labelColor} size="small" /> : null}
+        {!isBusy && (iconOnly || iconPosition === "leading") ? iconNode : null}
         {!iconOnly && content ? (
           <Text style={[mobileText[LABEL_VARIANT[resolvedSize]], { color: labelColor }]}>
             {content}
           </Text>
         ) : null}
-        {!loading && !iconOnly && iconPosition === "trailing" ? iconNode : null}
+        {!isBusy && !iconOnly && iconPosition === "trailing" ? iconNode : null}
       </View>
     </AnimatedPressable>
   );
