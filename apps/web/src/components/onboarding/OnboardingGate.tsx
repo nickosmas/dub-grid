@@ -149,11 +149,21 @@ function OnboardingCheck({
     enabled: canRecoverBilling,
     staleTime: 30_000,
   });
-  const shouldCheckOrganization = !canRecoverBilling || Boolean(billing);
+  // These three start together rather than in sequence.
+  //
+  // Both used to be gated on `Boolean(billing)`, which for a super_admin — the
+  // only role that fetches billing at all — meant the org bootstrap and the
+  // onboarding check could not begin until the billing round trip came back.
+  // Every super_admin sign-in therefore paid billing *then* everything else,
+  // staring at AuthSplash for the sum rather than the longest of them.
+  //
+  // The gate bought only the avoidance of two requests for an org that turns
+  // out to be locked, which is rare, and neither endpoint enforces the lock
+  // anyway — the redirect below is what does. Trading a serial round trip on
+  // every sign-in for two wasted ones in a rare state is the wrong way round.
   const { data: onboardingStatus, isLoading: statusLoading } = useQuery({
     queryKey: ["onboarding-status", userId, orgId],
     queryFn: () => fetchOnboardingStatus(orgId),
-    enabled: shouldCheckOrganization && billing?.billingAccess.isLocked !== true,
     staleTime: 30_000,
   });
 
@@ -163,7 +173,6 @@ function OnboardingCheck({
     loading: orgLoading,
   } = useOrganizationData({
     includeAssignmentDefinitionCompatibility: false,
-    enabled: shouldCheckOrganization && billing?.billingAccess.isLocked !== true,
   });
 
   // Consume the post-login auth-transition flag once we've reached a settled
