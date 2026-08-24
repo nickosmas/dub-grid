@@ -1,5 +1,6 @@
+"use client";
+
 import { Button } from "@/components/Button";
-("use client");
 
 interface StaffPaginationProps {
   page: number;
