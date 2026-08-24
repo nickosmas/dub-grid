@@ -245,7 +245,8 @@ export function ManagementUserActionsSheet({
         loading={invitationMutation.isPending}
         onCancel={() => setInvitationConfirmAction(null)}
         onConfirm={() => {
-          if (invitationConfirmAction) invitationMutation.mutate(invitationConfirmAction);
+          if (invitationConfirmAction)
+            return invitationMutation.mutateAsync(invitationConfirmAction);
         }}
         title={invitationConfirmAction === "resend" ? "Reissue invitation?" : "Revoke invitation?"}
         visible={invitationConfirmAction != null}

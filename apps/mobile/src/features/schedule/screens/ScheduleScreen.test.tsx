@@ -1557,7 +1557,7 @@ describe("ScheduleScreen", () => {
     expect(screen.queryByText("Volunteer")).not.toBeInTheDocument();
   });
 
-  it("accepts and declines shift cover requests from Home", () => {
+  it("accepts and declines shift cover requests from Home", async () => {
     render(<HomeScheduleScreen />);
 
     fireEvent.click(screen.getByText("Accept"));
@@ -1574,7 +1574,10 @@ describe("ScheduleScreen", () => {
       },
       expect.objectContaining({ onSettled: expect.any(Function) }),
     );
-    act(() => {
+    // Awaited so the confirm sheet's busy latch reopens: it clears on a
+    // microtask after `onSettled` resolves, and a synchronous `act` would let
+    // the Decline below be dropped as a double-press of the Accept.
+    await act(async () => {
       mutationSpy.mock.calls[0][1].onSettled();
     });
 

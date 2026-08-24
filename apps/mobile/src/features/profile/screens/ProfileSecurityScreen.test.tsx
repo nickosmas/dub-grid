@@ -240,8 +240,11 @@ describe("ProfileSecurityScreen", () => {
   });
 
   it("requests account deletion after confirming, for a user who can't edit their own record", async () => {
-    const mutate = vi.fn();
-    useMutation.mockReturnValue({ isPending: false, mutate, mutateAsync: vi.fn() });
+    // `mutateAsync`, not `mutate`: the confirmation sheet latches on the
+    // promise its handler returns, which is what stops a second confirm from
+    // filing a second deletion request.
+    const mutateAsync = vi.fn(() => Promise.resolve());
+    useMutation.mockReturnValue({ isPending: false, mutate: vi.fn(), mutateAsync });
     useBootstrap.mockReturnValue({
       data: { permissions: { canManageEmployees: false } },
       error: null,
@@ -259,7 +262,7 @@ describe("ProfileSecurityScreen", () => {
       fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Request" }));
     });
 
-    expect(mutate).toHaveBeenCalled();
+    expect(mutateAsync).toHaveBeenCalled();
   });
 
   it("hides account deletion from a user who can edit employee records", () => {

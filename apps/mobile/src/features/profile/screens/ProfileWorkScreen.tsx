@@ -553,7 +553,7 @@ export default function ProfileWorkScreen() {
         onCancel={() => setShowSaveConfirmation(false)}
         onConfirm={() => {
           setShowSaveConfirmation(false);
-          saveMutation.mutate();
+          return saveMutation.mutateAsync();
         }}
         title={isNameRequest ? "Send name change request?" : "Save these changes?"}
         visible={showSaveConfirmation}

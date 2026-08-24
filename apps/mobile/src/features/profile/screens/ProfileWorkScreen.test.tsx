@@ -169,6 +169,9 @@ describe("ProfileWorkScreen", () => {
     useMutation.mockImplementation((options: { mutationFn: () => unknown }) => ({
       isPending: false,
       mutate: vi.fn(() => options.mutationFn()),
+      // The screen confirms through `mutateAsync`, so the sheet's latch has a
+      // promise to hold and a second confirm can't fire the save again.
+      mutateAsync: vi.fn(() => Promise.resolve(options.mutationFn())),
     }));
     updateMobilePerson.mockResolvedValue({
       success: true,

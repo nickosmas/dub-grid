@@ -92,7 +92,7 @@ export default function ProfileSecurityScreen() {
   );
   // Both queries in one gate: the session count is part of this page's first
   // paint, so waiting on it here is what stops the old second loading wave
-  // (an inline "Loading sessions..." that appeared after the skeleton cleared).
+  // (an inline "Loading" that appeared after the skeleton cleared).
   const contentState = useMobileContentState({
     hasData: Boolean(profileQuery.data && sessionsQuery.data),
     isLoading: profileQuery.isLoading || sessionsQuery.isLoading,
@@ -230,7 +230,7 @@ export default function ProfileSecurityScreen() {
         onCancel={() => setIsConfirmingDeletion(false)}
         onConfirm={() => {
           setIsConfirmingDeletion(false);
-          deletionRequestMutation.mutate();
+          return deletionRequestMutation.mutateAsync();
         }}
         title="Request account deletion?"
         visible={isConfirmingDeletion}
