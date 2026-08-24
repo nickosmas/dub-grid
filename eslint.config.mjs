@@ -7,6 +7,7 @@ import { noHtmlTitleAttribute, noRawTooltipImport } from "./eslint-rules/no-raw-
 import { noDecorativeAiIcons } from "./eslint-rules/no-decorative-ai-icons.mjs";
 import { requireBusyButton } from "./eslint-rules/require-busy-button.mjs";
 import { noFloatingAsyncHandler } from "./eslint-rules/no-floating-async-handler.mjs";
+import { noMisplacedUseClient } from "./eslint-rules/no-misplaced-use-client.mjs";
 import { noRawErrorInToast, noTechnicalUserCopy } from "./eslint-rules/no-technical-user-copy.mjs";
 
 const tooltipPlugin = {
@@ -21,6 +22,7 @@ const designPlugin = {
     "no-decorative-ai-icons": noDecorativeAiIcons,
     "require-busy-button": requireBusyButton,
     "no-floating-async-handler": noFloatingAsyncHandler,
+    "no-misplaced-use-client": noMisplacedUseClient,
   },
 };
 
@@ -142,6 +144,19 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // The plugin was registered but no rule from it was ever switched on, so a
+    // hook placed below an early return linted clean and only failed at
+    // runtime, on the render where the branch flipped. Tests are excluded: a
+    // helper there calls a hook directly inside `renderHook`, which is correct
+    // there and nowhere else.
+    files: ["apps/web/src/**/*.{ts,tsx}", "apps/mobile/src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/__tests__/**"],
+    plugins: { "react-hooks": reactHooks },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+    },
+  },
+  {
     // Carries its own `files` on purpose. The Expo Router route files under
     // apps/mobile/app match no other block's globs, so they are currently
     // unlinted entirely — and one of the sparkles this rule bans lived there.
@@ -158,6 +173,7 @@ const eslintConfig = defineConfig([
       "design/no-decorative-ai-icons": "error",
       "design/require-busy-button": "error",
       "design/no-floating-async-handler": "error",
+      "design/no-misplaced-use-client": "error",
     },
   },
   {

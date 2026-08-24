@@ -86,6 +86,13 @@
   Stars and the word "magic" are fine — a star is a real favorite affordance, and
   `MagicLinkEmail` is the standard Supabase term for passwordless sign-in
 - **Testing**: Run `npm test` (vitest) after changes. Tests use jsdom + Testing Library
+- **`next build` catches what nothing else does.** A directive like
+  `"use client"` stops being one the moment anything precedes it — the file
+  still type-checks and still passes vitest, and only the production build
+  rejects it. The pre-push hook runs type-check and tests, not the build, so
+  run `npx next build` in `apps/web` after any codemod that touches the top of
+  files. `design/no-misplaced-use-client` guards that specific failure cheaply,
+  but it is not a substitute for the build
 - **Cookie consent version**: When adding/removing cookies, changing analytics providers,
   or updating the cookie/privacy policy, bump `CONSENT_VERSION` in
   `apps/web/src/components/CookieConsent.tsx`. This re-prompts all users to re-consent on next visit
@@ -145,13 +152,39 @@ Shared primitives to reach for before inventing a layout:
   `disabled={save.isRunning}` + `<ButtonLoading loading={save.isRunning}>`.
   Enforced by `design/require-busy-button`
   (`eslint-rules/require-busy-button.mjs`).
-- **`<Button>`** (`components/Button.tsx`) — a `<button>` that carries the
-  latch. It is a plain passthrough (same `className`, same children, same
-  attributes), so a raw `<button className="dg-btn">` whose click does async
-  work becomes safe by changing only the tag name, keeping whatever
-  `<ButtonLoading>` and `disabled` it already had. Every async button in the
-  app now uses it; a `<button>` stays a `<button>` when its click is
-  synchronous, since there is nothing there to double-execute.
+- **`<Button>`** (`components/Button.tsx`) and **`<Form>`**
+  (`components/Form.tsx`) — a `<button>` and a `<form>` that carry the latch,
+  and the spinner too. **A running latch spins on its own** — no button can
+  sit there looking dead during a slow request, and nothing has to be
+  remembered per call site. That default is load-bearing: most handlers arrive
+  as props typed `=> void` (`onConfirmDraft`, `onBulk`, `onSync`), where
+  nothing local tells you whether the work is async, so an opt-in spinner gets
+  missed. `loadingLabel` upgrades the wording to the same verb in progress
+  (`[spinner] Confirming`, not `[spinner] Confirm`) and is always worth adding.
+  `loading` feeds the same spinner from a pending flag living outside the
+  button (a mutation's `isPending`, a confirmation step that finishes later).
+  `spinner={false}` opts out, for a button whose children are a whole row of
+  content — `NotificationBell`'s row, `OrganizationLocationFields`' address
+  option — where a spinner beside the text reads as breakage. A button already
+  wiring its own `<ButtonLoading>` passes none of them and is left alone; two
+  spinners would fight. Never write `{busy ? "…" : "Delete"}` — that is the
+  banned ellipsis, and `loadingLabel="Deleting"` is the replacement. Mobile's
+  `<Button>` works the same way (`Boolean(loading) || action.isRunning`).
+  Both are plain passthroughs (same `className`, same children, same
+  attributes), so a call site becomes safe by changing only the tag name,
+  keeping whatever `<ButtonLoading>` and `disabled` it already had.
+  **Every `<button onClick>` and every `<form onSubmit>` in `apps/web` uses
+  them** — do not reach for a raw `<button>`/`<form>` with a handler, even one
+  that looks synchronous today. `<Form>` is not redundant with `<Button>`: a
+  `type="submit"` button has no `onClick`, so the work starts from the form's
+  own submit event and only `<Form>` can hold it. The two raw `<button>`s left
+  are `Button.tsx` itself and the sidebar rail's pure toggle.
+  On mobile the same job is done by `shared/components/Pressable.tsx`, a
+  drop-in for React Native's `Pressable` — **swap the import, not the call
+  sites**. It is not usable with `Animated.createAnimatedComponent`, which
+  needs RN's own component; those wrappers latch the `onPress` they receive
+  instead (`Chip`, `SearchBar`, `ExpandButton`, `AppearanceSheet`,
+  `PeopleScreen`'s `AddPersonButton`).
 - **A handler must _return_ its promise**, or none of the above works. The
   latch holds for exactly as long as the promise it is handed, so
   `onConfirm={() => { setOpen(false); handlePublish(); }}` releases on the
@@ -164,6 +197,12 @@ Shared primitives to reach for before inventing a layout:
   mobile, where `<Button>`/`<ConfirmationModal>`/`<PressableRow>` latch the
   same way; a React Query mutation returns its promise from `mutateAsync`,
   not `mutate`.
+- **A handler prop typed `=> void` hides all of this.** `onConfirmDraft?:
+(scope?: SeriesScope) => void` was wired to an `async` handler, so nothing
+  in the type said the promise mattered, and the Confirm button that created a
+  shift ran twice. Type a handler prop `=> unknown` (or `=> void |
+Promise<unknown>`) whenever a caller might hand it async work, and never
+  conclude a button is safe because its prop type says `void`.
 - `<EditorActionRow>` — dirty-state save/discard footer used by every
   settings panel; the primary button always sits on the right.
 - `<SectionCard>` (`components/settings/shared.tsx`) — bordered/padded card
