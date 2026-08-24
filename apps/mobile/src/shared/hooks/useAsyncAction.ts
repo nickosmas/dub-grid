@@ -16,9 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * makes this safe to build into `Button` and `PressableRow`, whose callers
  * pass both.
  */
-export function useAsyncAction<A extends unknown[]>(
-  action: (...args: A) => void | Promise<unknown>,
-) {
+export function useAsyncAction<A extends unknown[]>(action: (...args: A) => unknown) {
   const [isRunning, setIsRunning] = useState(false);
   const inFlight = useRef(false);
 

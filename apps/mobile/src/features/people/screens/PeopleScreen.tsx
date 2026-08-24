@@ -53,6 +53,7 @@ import { ManagementUserActionsSheet } from "../components/ManagementUserActionsS
 import { ManagementUserInviteSheet } from "../components/ManagementUserInviteSheet";
 import { PersonListSkeleton } from "../components/PersonListSkeleton";
 import { ORG_ROLE_LABELS, getMobileOrgRoleBadge } from "../lib/orgRoleBadges";
+import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -950,8 +951,11 @@ function AddPersonButton({
   onPress,
 }: {
   accessibilityLabel: string;
-  onPress: () => void;
+  onPress: () => unknown;
 }) {
+  // Latched like every other press handler, so this stays safe if it is ever
+  // pointed at something that files a request rather than opening a screen.
+  const action = useAsyncAction(onPress);
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
@@ -965,7 +969,7 @@ function AddPersonButton({
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       android_ripple={androidRipple}
-      onPress={onPress}
+      onPress={action.run}
       {...pressHandlers}
       style={[styles.addPersonButton, animatedStyle]}
     >
