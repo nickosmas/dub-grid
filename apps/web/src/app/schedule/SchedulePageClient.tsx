@@ -373,6 +373,12 @@ function SchedulerContent() {
     );
   }, [payPeriodStartDate, spanWeeks]);
   const [scheduleLoading, setScheduleLoading] = useState(true);
+  // Set when the grid has been seeded from the previous visit's snapshot.
+  // Deliberately separate from scheduleLoading, which still has to mean "a
+  // fetch is in flight" — the draft-visibility and window-sync effects below
+  // both gate on it to avoid racing the initial load, so clearing it early
+  // would let them fire mid-flight and fight over setShifts.
+  const [paintedFromSnapshot, setPaintedFromSnapshot] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
   const [scheduleSortBy, setScheduleSortBy] = useState<"seniority" | "name">(() => {
     if (typeof window === "undefined") return "seniority";
@@ -935,6 +941,7 @@ function SchedulerContent() {
       setShifts(cachedWindow.shifts);
       setNotes(cachedWindow.notes);
       setLoadedShiftWindow(cachedWindow.window);
+      setPaintedFromSnapshot(true);
     }
 
     async function fetchCurrentUser(): Promise<{
@@ -5062,6 +5069,10 @@ function SchedulerContent() {
   // ── Loading / error states ───────────────────────────────────────────────────
 
   const isLoading = orgLoading || empLoading || scheduleLoading;
+  // The snapshot only carries shifts and notes, so it can only stand in for the
+  // loading screen once the roster is here too — otherwise the grid would paint
+  // with no rows and read as broken.
+  const canPaintFromSnapshot = paintedFromSnapshot && employees.length > 0;
 
   if (orgLoading || (scheduleLoading && !org)) {
     return <ScheduleLoadingScreen />;
@@ -5195,9 +5206,9 @@ function SchedulerContent() {
         color: "var(--color-text-primary)",
       }}
     >
-      {isLoading && employees.length > 0 && <ScheduleLoadingScreen />}
+      {isLoading && !canPaintFromSnapshot && employees.length > 0 && <ScheduleLoadingScreen />}
 
-      {!isLoading && (
+      {(!isLoading || canPaintFromSnapshot) && (
         <>
           <div
             className="no-print"
