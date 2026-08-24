@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Modal, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Pressable } from "./Pressable";
 import { GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

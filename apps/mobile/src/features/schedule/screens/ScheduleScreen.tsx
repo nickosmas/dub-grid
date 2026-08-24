@@ -13,7 +13,6 @@ import {
   Animated,
   LayoutAnimation,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,6 +22,7 @@ import {
   type AppStateStatus,
   type GestureResponderEvent,
 } from "react-native";
+import { Pressable } from "../../../shared/components/Pressable";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";

@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type LayoutChangeEvent,
-} from "react-native";
+import { ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
+import { Pressable } from "./Pressable";
 import { hapticSelection } from "../lib/haptics";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { getScreenGutter } from "./screen-layout";
