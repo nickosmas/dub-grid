@@ -1,4 +1,5 @@
 import { getServiceClient } from "@/lib/supabase-service";
+import { summarizePermissionChanges } from "@/lib/permission-labels";
 import { fetchPublishedShiftRows } from "@/lib/published-shifts";
 import logger from "@/lib/logger";
 import { sendNotification } from "./sender";
@@ -329,11 +330,12 @@ async function getInvitation(invitationId: string): Promise<{
   invitedBy: string | null;
   email: string | null;
   orgId: string | null;
+  roleToAssign: string | null;
 } | null> {
   const db = getServiceClient();
   const { data } = await db
     .from("invitations")
-    .select("invited_by, email, org_id")
+    .select("invited_by, email, org_id, role_to_assign")
     .eq("id", invitationId)
     .maybeSingle();
   if (!data) return null;
@@ -341,7 +343,59 @@ async function getInvitation(invitationId: string): Promise<{
     invitedBy: (data.invited_by as string | null) ?? null,
     email: (data.email as string | null) ?? null,
     orgId: (data.org_id as string | null) ?? null,
+    roleToAssign: (data.role_to_assign as string | null) ?? null,
   };
+}
+
+/**
+ * The person who took the action, for alerts that would otherwise say "a
+ * member" or use the passive voice. An alert that doesn't name who did
+ * something forces the reader into the activity log to find out.
+ */
+async function getUserName(userId: string | null | undefined): Promise<string | null> {
+  if (!userId) return null;
+  const db = getServiceClient();
+  const { data } = await db
+    .from("profiles")
+    .select("first_name, last_name")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!data) return null;
+  const name = `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
+  return name || null;
+}
+
+/** Actor name with a neutral fallback, so copy always has a subject. */
+async function getActorName(userId: string): Promise<string> {
+  return (await getUserName(userId)) ?? "An administrator";
+}
+
+/**
+ * "2026-05-04" → "May 4, 2026". Alerts show a raw date only because nothing
+ * formatted it; the reader shouldn't have to parse an ISO string.
+ */
+function formatNotificationDate(value: string): string {
+  const date = new Date(value.includes("T") ? value : `${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/**
+ * "May 4 – May 17, 2026". Collapses a same-day range to a single date, and
+ * names the year once when both ends share it rather than twice.
+ */
+function formatNotificationDateRange(start: string, end: string): string {
+  const from = formatNotificationDate(start);
+  const to = formatNotificationDate(end);
+  if (from === to) return from;
+
+  const startYear = start.slice(0, 4);
+  const openEnd = startYear === end.slice(0, 4) ? from.replace(`, ${startYear}`, "") : from;
+  return `${openEnd} \u2013 ${to}`;
 }
 
 async function getOrgName(orgId: string): Promise<string> {
@@ -604,6 +658,8 @@ async function dispatchNotificationEventInternal(
 
     case "schedule_published": {
       const userIds = await getAffectedEmployeeUserIds(event.orgId, event.startDate, event.endDate);
+      const publisherName = await getActorName(actorUserId);
+      const publishedRange = formatNotificationDateRange(event.startDate, event.endDate);
 
       await Promise.all(
         userIds
@@ -614,7 +670,7 @@ async function dispatchNotificationEventInternal(
               event.orgId,
               "schedule_published" as NotificationType,
               "Schedule updated",
-              `A new schedule has been published for ${event.startDate} to ${event.endDate}. Check the schedule page for your shifts.`,
+              `${publisherName} published the schedule for ${publishedRange}. Open the schedule to see your shifts.`,
               {
                 startDate: event.startDate,
                 endDate: event.endDate,
@@ -631,8 +687,8 @@ async function dispatchNotificationEventInternal(
           event.targetUserId,
           event.orgId,
           "system" as NotificationType,
-          "Your role has been updated",
-          `Your role has been changed from ${titleCaseWords(event.fromRole)} to ${titleCaseWords(event.toRole)}.`,
+          "Your role changed",
+          `${await getActorName(actorUserId)} changed your role from ${titleCaseWords(event.fromRole)} to ${titleCaseWords(event.toRole)}.`,
           {
             fromRole: event.fromRole,
             toRole: event.toRole,
@@ -651,7 +707,14 @@ async function dispatchNotificationEventInternal(
       const userId = await getEmployeeUserId(event.empId);
       if (!userId || userId === actorUserId) return;
       const title = event.mode === "delete" ? "Schedule note removed" : "Schedule note added";
-      const message = `Schedule note ${event.mode === "delete" ? "removed" : "added"} for ${event.date}.`;
+      const noteActor = await getActorName(actorUserId);
+      const noteDate = formatNotificationDate(event.date);
+      // The date sits at the end rather than inside the noun phrase — "your
+      // May 20, 2026 shift" reads badly once the year is spelled out.
+      const message =
+        event.mode === "delete"
+          ? `${noteActor} removed the note on your shift on ${noteDate}.`
+          : `${noteActor} added a note to your shift on ${noteDate}.`;
       await sendNotification(
         userId,
         event.orgId,
@@ -676,9 +739,15 @@ async function dispatchNotificationEventInternal(
     case "invitation_accepted": {
       const orgName = await getOrgName(event.orgId);
       const superAdmins = await getOrgSuperAdmins(event.orgId);
-      const inviter = event.invitationId
-        ? ((await getInvitation(event.invitationId))?.invitedBy ?? null)
-        : null;
+      const invitation = event.invitationId ? await getInvitation(event.invitationId) : null;
+      const inviter = invitation?.invitedBy ?? null;
+      // Name the person and the role they came in on — "a new member joined"
+      // sends the reader to the activity log to find out who and as what.
+      const joinerName =
+        (await getUserName(event.acceptedUserId)) ?? invitation?.email ?? "Someone";
+      const joinedAs = invitation?.roleToAssign
+        ? ` as ${titleCaseWords(invitation.roleToAssign)}`
+        : "";
       const recipients = new Set<string>(superAdmins);
       if (inviter) recipients.add(inviter);
       recipients.delete(actorUserId);
@@ -689,7 +758,7 @@ async function dispatchNotificationEventInternal(
             event.orgId,
             "invitation_accepted" as NotificationType,
             "Invitation accepted",
-            `A new member joined ${orgName}.`,
+            `${joinerName} accepted their invitation and joined ${orgName}${joinedAs}.`,
             {
               acceptedUserId: event.acceptedUserId,
               invitationId: event.invitationId ?? null,
@@ -702,6 +771,7 @@ async function dispatchNotificationEventInternal(
 
     case "invitation_revoked": {
       const orgName = await getOrgName(event.orgId);
+      const revokedByName = await getActorName(actorUserId);
       const inv = await getInvitation(event.invitationId);
       const superAdmins = await getOrgSuperAdmins(event.orgId);
       const recipients = new Set<string>(superAdmins);
@@ -714,7 +784,7 @@ async function dispatchNotificationEventInternal(
             event.orgId,
             "invitation_revoked" as NotificationType,
             "Invitation revoked",
-            `An invitation to ${event.inviteeEmail} for ${orgName} was revoked.`,
+            `${revokedByName} canceled the invitation to ${event.inviteeEmail} for ${orgName}.`,
             {
               invitationId: event.invitationId,
               inviteeEmail: event.inviteeEmail,
@@ -733,6 +803,8 @@ async function dispatchNotificationEventInternal(
 
     case "membership_removed": {
       const orgName = await getOrgName(event.orgId);
+      const removedName = (await getUserName(event.removedUserId)) ?? "A member";
+      const removedByName = await getActorName(actorUserId);
       const superAdmins = await getOrgSuperAdmins(event.orgId);
       const recipients = new Set<string>(superAdmins);
       // The removed user themselves always gets notified (they need to know).
@@ -748,8 +820,8 @@ async function dispatchNotificationEventInternal(
               ? "You were removed from an organization"
               : "Member removed",
             userId === event.removedUserId
-              ? `You no longer have access to ${orgName}.`
-              : `A member was removed from ${orgName}.`,
+              ? `${removedByName} removed your access to ${orgName}.`
+              : `${removedByName} removed ${removedName} from ${orgName}.`,
             { removedUserId: event.removedUserId },
           ),
         ),
@@ -759,12 +831,18 @@ async function dispatchNotificationEventInternal(
 
     case "admin_permissions_changed": {
       if (event.targetUserId === actorUserId) return;
+      // Spell out what moved. "Your permissions were updated" tells the reader
+      // nothing they can act on, and they can't see the before/after anywhere.
+      const permissionChanges = summarizePermissionChanges(event.before, event.after);
+      const changedByName = await getActorName(actorUserId);
       await sendNotification(
         event.targetUserId,
         event.orgId,
         "admin_permissions_changed" as NotificationType,
-        "Your admin permissions changed",
-        "Your administrator permissions in this organization were updated.",
+        "Your permissions changed",
+        permissionChanges
+          ? `${changedByName} ${permissionChanges}.`
+          : `${changedByName} updated your permissions for this organization.`,
         {
           before: event.before,
           after: event.after,
@@ -777,6 +855,7 @@ async function dispatchNotificationEventInternal(
 
     case "employee_created": {
       const orgName = await getOrgName(event.orgId);
+      const addedByName = await getActorName(actorUserId);
       const empUserId = await getEmployeeUserId(event.empId);
       const empName = await getEmployeeName(event.empId);
       const superAdmins = await getOrgSuperAdmins(event.orgId);
@@ -791,8 +870,8 @@ async function dispatchNotificationEventInternal(
             "employee_created" as NotificationType,
             userId === empUserId ? "You were added to an organization" : "Employee added",
             userId === empUserId
-              ? `Your employee record was created in ${orgName}.`
-              : `${empName} was added to ${orgName}.`,
+              ? `${addedByName} added you to ${orgName}.`
+              : `${addedByName} added ${empName} to ${orgName}.`,
             { empId: event.empId },
           ),
         ),
@@ -802,6 +881,8 @@ async function dispatchNotificationEventInternal(
 
     case "employee_status_changed": {
       const empUserId = await getEmployeeUserId(event.empId);
+      const statusEmpName = await getEmployeeName(event.empId);
+      const statusActorName = await getActorName(actorUserId);
       const superAdmins = await getOrgSuperAdmins(event.orgId);
       const recipients = new Set<string>(superAdmins);
       if (empUserId) recipients.add(empUserId);
@@ -815,8 +896,8 @@ async function dispatchNotificationEventInternal(
             "employee_status_changed" as NotificationType,
             userId === empUserId ? "Your employment status changed" : "Employee status changed",
             userId === empUserId
-              ? `Your status was changed (${transition}).`
-              : `An employee's status changed (${transition}).`,
+              ? `${statusActorName} changed your status from ${transition}.`
+              : `${statusActorName} changed ${statusEmpName}'s status from ${transition}.`,
             {
               empId: event.empId,
               fromStatus: event.fromStatus,
