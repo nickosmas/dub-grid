@@ -13,28 +13,47 @@ const breakdown = {
 };
 
 describe("DraftBanner", () => {
-  it("shows the change color key only while change highlighting is enabled", () => {
-    const props = {
-      onPublish: vi.fn(),
-      onCancel: vi.fn(),
-      breakdown,
-      onToggleDiff: vi.fn(),
-    };
+  it("keys each count with the grid tone for its kind", () => {
+    render(<DraftBanner onPublish={vi.fn()} onCancel={vi.fn()} breakdown={breakdown} />);
 
-    const { rerender } = render(<DraftBanner {...props} showDiff />);
-
-    const legend = screen.getByLabelText("Change color key");
-    expect(legend).toBeInTheDocument();
-    expect(screen.getByText("New")).toBeInTheDocument();
-    expect(screen.getByText("Edited")).toBeInTheDocument();
-    expect(screen.getByText("Deleted")).toBeInTheDocument();
-    expect(screen.queryByText("Changed / Time")).not.toBeInTheDocument();
-    expect(legend.querySelector('[data-change-legend-dot="modified"]')).toHaveStyle({
+    const counts = screen.getByLabelText("Change counts and color key");
+    expect(screen.getByText("1 new")).toBeInTheDocument();
+    expect(screen.getByText("2 edited")).toBeInTheDocument();
+    expect(screen.getByText("1 deleted")).toBeInTheDocument();
+    expect(counts.querySelector('[data-change-legend-dot="modified"]')).toHaveStyle({
       background: "rgba(217, 119, 6, 0.94)",
     });
+  });
 
-    rerender(<DraftBanner {...props} showDiff={false} />);
+  it("keys only the kinds that are actually present", () => {
+    render(
+      <DraftBanner
+        onPublish={vi.fn()}
+        onCancel={vi.fn()}
+        breakdown={{
+          newShifts: 3,
+          modifiedShifts: 0,
+          deletedShifts: 0,
+          newNotes: 0,
+          deletedNotes: 0,
+          totalChanges: 3,
+        }}
+      />,
+    );
 
-    expect(screen.queryByLabelText("Change color key")).not.toBeInTheDocument();
+    const counts = screen.getByLabelText("Change counts and color key");
+    expect(screen.getByText("3 new")).toBeInTheDocument();
+    expect(screen.queryByText(/edited/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/deleted/)).not.toBeInTheDocument();
+    expect(counts.querySelector('[data-change-legend-dot="deleted"]')).toBeNull();
+  });
+
+  it("offers no highlight toggle — draft changes are always shown", () => {
+    render(<DraftBanner onPublish={vi.fn()} onCancel={vi.fn()} breakdown={breakdown} />);
+
+    expect(screen.queryByText(/Highlight/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Hide Changes/)).not.toBeInTheDocument();
+    expect(screen.getByText("Publish")).toBeInTheDocument();
+    expect(screen.getByText("Discard")).toBeInTheDocument();
   });
 });

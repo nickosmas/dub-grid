@@ -69,7 +69,6 @@ export interface ScheduleGridOptions {
   isCellInteractive: boolean;
   canDragShifts: boolean;
   shiftDisplayMode: ShiftDisplayMode;
-  showDiffOverlay: boolean;
   showPublishDiffOverlay: boolean;
   showAudit: boolean;
 }
@@ -190,15 +189,15 @@ export interface BuildScheduleGridModelInput {
   isCellInteractive?: boolean;
   canDragShifts?: boolean;
   shiftDisplayMode?: ShiftDisplayMode;
-  showDiffOverlay?: boolean;
   showPublishDiffOverlay?: boolean;
   showAudit?: boolean;
   accessors: ScheduleGridAccessors;
 }
 
-function cellNeedsLayoutStack(args: { draftKind: DraftKind; showDiffOverlay: boolean }): boolean {
-  const { draftKind, showDiffOverlay } = args;
-  return showDiffOverlay && !!draftKind && draftKind !== "deleted";
+// Mirrors cellShowsDraftDiffBadge: a draft cell always carries its badge, so
+// it always needs the room for one.
+function cellNeedsLayoutStack(args: { draftKind: DraftKind }): boolean {
+  return !!args.draftKind && args.draftKind !== "deleted";
 }
 
 export function buildScheduleGridModel({
@@ -228,7 +227,6 @@ export function buildScheduleGridModel({
   isCellInteractive = true,
   canDragShifts = isCellInteractive,
   shiftDisplayMode = "code",
-  showDiffOverlay = false,
   showPublishDiffOverlay,
   showAudit = false,
   accessors,
@@ -393,7 +391,6 @@ export function buildScheduleGridModel({
           allDates.some((date) =>
             cellNeedsLayoutStack({
               draftKind: accessors.draftKindForKey?.(employee.id, date) ?? null,
-              showDiffOverlay,
             }),
           ),
         ),
@@ -433,8 +430,7 @@ export function buildScheduleGridModel({
       isCellInteractive,
       canDragShifts,
       shiftDisplayMode,
-      showDiffOverlay,
-      showPublishDiffOverlay: showPublishDiffOverlay ?? showDiffOverlay,
+      showPublishDiffOverlay: showPublishDiffOverlay ?? false,
       showAudit,
     },
     hasOpenShifts: openShifts.length > 0,
