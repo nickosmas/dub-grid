@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useTheme } from "next-themes";
 import Link from "next/link";
 import { getEmployeeProfileHref, isCurrentUsersEmployee } from "@/lib/profile-links";
+import { Button } from "@/components/Button";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Import as ImportIcon, SlidersHorizontal, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -69,6 +70,8 @@ import { StaffDetailPanel } from "./StaffDetailPanel";
 import { StaffReadOnlyDetailPanel } from "./StaffReadOnlyDetailPanel";
 import { StaffEmptyState } from "./StaffEmptyState";
 import { StaffFilterPopover } from "./StaffFilterPopover";
+import { ManagementFilterPopover } from "./ManagementFilterPopover";
+import { isPendingManagementInvite, useManagementFilters } from "./useManagementFilters";
 import { StaffPagination } from "./StaffPagination";
 import { StaffReorderListRow, StaffTableRow } from "./StaffTableRow";
 import { useStaffFilters, type EmployeeTab } from "./useStaffFilters";
@@ -590,34 +593,29 @@ export function MembersSection({
     [directory],
   );
   const [showManagement, setShowManagement] = useState(false);
-  const [deptFilterId, setDeptFilterId] = useState<number | null>(null);
   const [expandedPersonId, setExpandedPersonId] = useState<string | null>(null);
   const [managementAccessEmployee, setManagementAccessEmployee] = useState<Employee | null>(null);
   const [managementSchedulePerson, setManagementSchedulePerson] = useState<DirectoryPerson | null>(
     null,
   );
 
-  const filteredDeptUsers = useMemo(() => {
-    let list = departmentUsers;
-
-    if (deptFilterId === -1) {
-      list = list.filter((user) => user.managementDepartmentIds.length === 0);
-    } else if (deptFilterId !== null) {
-      list = list.filter((user) => user.managementDepartmentIds.includes(deptFilterId));
-    }
-
-    if (showManagement && searchQuery) {
-      const query = searchQuery.toLowerCase();
-      list = list.filter(
-        (user) =>
-          `${user.firstName} ${user.lastName}`.toLowerCase().includes(query) ||
-          user.email.toLowerCase().includes(query) ||
-          (user.phone && user.phone.includes(query)),
-      );
-    }
-
-    return list;
-  }, [departmentUsers, deptFilterId, searchQuery, showManagement]);
+  // The roster filters on its own attributes (department, access level,
+  // invitation) rather than the staff panel's, which its rows can't answer.
+  const managementFilters = useManagementFilters({
+    managementUsers: departmentUsers,
+    searchQuery,
+    searchEnabled: showManagement,
+  });
+  const {
+    deptFilterId,
+    setDeptFilterId,
+    filteredUsers: filteredDeptUsers,
+    hasActiveFilters: managementHasActiveFilters,
+  } = managementFilters;
+  const pendingManagementCount = useMemo(
+    () => departmentUsers.filter(isPendingManagementInvite).length,
+    [departmentUsers],
+  );
 
   const deptCounts = useMemo(() => {
     const counts = new Map<number, number>();
@@ -642,9 +640,10 @@ export function MembersSection({
   const canAddScheduled = canManageEmployees;
   const canAddManagement = canManageManagementAccess && managementDepts.length > 0;
 
+  const clearManagementFilters = managementFilters.clearFilters;
   useEffect(() => {
     if (!showManagement) {
-      setDeptFilterId(null);
+      clearManagementFilters();
       setExpandedPersonId(null);
     }
   }, [showManagement]);
@@ -773,7 +772,7 @@ export function MembersSection({
       toast.success("Invitation revoked");
       return true;
     } catch {
-      toast.error("Failed to revoke invitation");
+      toast.error("We couldn't cancel that invitation. Try again.");
       return false;
     } finally {
       setRevokingId(null);
@@ -946,7 +945,7 @@ export function MembersSection({
               }}
             >
               <span>Not everyone is shown yet. Use search or filters to find specific people.</span>
-              <button
+              <Button
                 type="button"
                 className="dg-btn dg-btn-secondary"
                 onClick={loadMoreDirectory}
@@ -955,7 +954,7 @@ export function MembersSection({
                 <ButtonLoading loading={directoryLoadingMore} loadingLabel="Loading">
                   Load more
                 </ButtonLoading>
-              </button>
+              </Button>
             </div>
           )}
 
@@ -994,6 +993,7 @@ export function MembersSection({
                   ]}
                   onChange={(value) => {
                     setShowManagement(value === "management");
+                    setFilterOpen(false);
                     if (value === "schedule") {
                       setActiveTab("all");
                     }
@@ -1003,23 +1003,23 @@ export function MembersSection({
                 />
               )}
 
-              {!showManagement && (
-                <button
-                  ref={filterBtnRef}
-                  onClick={() => setFilterOpen((current) => !current)}
-                  className="dg-btn dg-btn-secondary dg-btn-sm"
-                  style={{ position: "relative" }}
-                >
-                  <SlidersHorizontal size={14} strokeWidth={2.25} aria-hidden="true" />
-                  {isMobile ? "" : "Filter"}
-                  {hasActiveFilters && (
-                    <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[var(--color-brand)]" />
-                  )}
-                </button>
-              )}
+              <Button
+                ref={filterBtnRef}
+                onClick={() => setFilterOpen((current) => !current)}
+                className="dg-btn dg-btn-secondary dg-btn-sm"
+                style={{ position: "relative" }}
+              >
+                <SlidersHorizontal size={14} strokeWidth={2.25} aria-hidden="true" />
+                {isMobile ? "" : "Filter"}
+                {/* The dot counts the half you're looking at, so it never
+                    reports filters the visible list isn't being narrowed by. */}
+                {(showManagement ? managementHasActiveFilters : hasActiveFilters) && (
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-[var(--color-brand)]" />
+                )}
+              </Button>
 
               {canShowReorder && (
-                <button
+                <Button
                   onClick={() => {
                     if (!hasReorderableStaffRows) return;
                     handleEnterReorder();
@@ -1038,7 +1038,7 @@ export function MembersSection({
                     <rect x="9" y="10" width="2" height="2" rx="1" />
                   </svg>
                   {isMobile ? "" : "Reorder"}
-                </button>
+                </Button>
               )}
 
               {!showManagement && (
@@ -1061,7 +1061,7 @@ export function MembersSection({
                             }}
                           />
                         )}
-                        <button
+                        <Button
                           onClick={() => {
                             setActiveTab(tab.key);
                             setExpandedEmpId(null);
@@ -1093,7 +1093,7 @@ export function MembersSection({
                           >
                             {tab.count}
                           </span>
-                        </button>
+                        </Button>
                       </span>
                     );
                   })}
@@ -1102,7 +1102,7 @@ export function MembersSection({
 
               {showManagement && departmentItems.length > 0 && (
                 <div className="dg-span-tabs dg-span-tabs--light" style={{ flex: "0 1 auto" }}>
-                  <button
+                  <Button
                     onClick={() => setDeptFilterId(null)}
                     className={`dg-span-tab${deptFilterId === null ? " active" : ""}`}
                   >
@@ -1129,7 +1129,7 @@ export function MembersSection({
                     >
                       {departmentUsers.length}
                     </span>
-                  </button>
+                  </Button>
                   {managementDepts
                     .filter((department) => deptCounts.has(department.id))
                     .map((department, index, visibleDepartments) => {
@@ -1151,7 +1151,7 @@ export function MembersSection({
                               alignSelf: "center",
                             }}
                           />
-                          <button
+                          <Button
                             onClick={() => setDeptFilterId(active ? null : department.id)}
                             className={`dg-span-tab${active ? " active" : ""}`}
                           >
@@ -1177,7 +1177,7 @@ export function MembersSection({
                             >
                               {deptCounts.get(department.id) ?? 0}
                             </span>
-                          </button>
+                          </Button>
                         </span>
                       );
                     })}
@@ -1233,18 +1233,18 @@ export function MembersSection({
                 <MaybeHint
                   content={
                     !featureFlags.csvImport
-                      ? "Employee import is temporarily unavailable. Please try again shortly."
+                      ? "Importing is unavailable right now. Try again in a moment."
                       : null
                   }
                 >
-                  <button
+                  <Button
                     onClick={() => setShowImport(true)}
                     className="dg-btn dg-btn-secondary dg-btn-sm"
                     disabled={!featureFlags.csvImport}
                   >
                     <ImportIcon size={14} />
                     Import
-                  </button>
+                  </Button>
                 </MaybeHint>
               )}
 
@@ -1252,24 +1252,24 @@ export function MembersSection({
                 <MaybeHint
                   content={
                     !featureFlags.csvExport
-                      ? "Exports are temporarily unavailable. Please try again shortly."
+                      ? "Exports are unavailable right now. Try again in a moment."
                       : null
                   }
                 >
-                  <button
+                  <Button
                     onClick={() => setExportConfirm(true)}
                     className="dg-btn dg-btn-secondary dg-btn-sm"
                     disabled={!hasExportableStaffRows || !featureFlags.csvExport}
                   >
                     <Upload size={14} />
                     Export
-                  </button>
+                  </Button>
                 </MaybeHint>
               )}
 
               {canAddScheduled && canAddManagement && (
                 <>
-                  <button
+                  <Button
                     ref={addBtnRef}
                     onClick={() => setAddMenuOpen((open) => !open)}
                     aria-expanded={addMenuOpen}
@@ -1278,7 +1278,7 @@ export function MembersSection({
                   >
                     + Add
                     <ChevronDown size={14} />
-                  </button>
+                  </Button>
                   {addMenuOpen && (
                     <Menu
                       open
@@ -1319,18 +1319,18 @@ export function MembersSection({
               )}
 
               {canAddScheduled && !canAddManagement && (
-                <button onClick={onAdd} className="dg-btn dg-btn-primary dg-btn-sm">
+                <Button onClick={onAdd} className="dg-btn dg-btn-primary dg-btn-sm">
                   + Add
-                </button>
+                </Button>
               )}
 
               {!canAddScheduled && canAddManagement && (
-                <button
+                <Button
                   onClick={() => setShowManagementInvite(true)}
                   className="dg-btn dg-btn-primary dg-btn-sm"
                 >
                   + Add
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -1429,6 +1429,23 @@ export function MembersSection({
               onFilterPhonePresenceChange={setFilterPhonePresence}
               onClearAll={clearFilters}
               hasActiveFilters={hasActiveFilters}
+            />
+          )}
+
+          {showManagement && (
+            <ManagementFilterPopover
+              anchorRef={filterBtnRef.current}
+              filterInvitation={managementFilters.filterInvitation}
+              filterRole={managementFilters.filterRole}
+              hasActiveFilters={managementHasActiveFilters}
+              open={filterOpen}
+              pendingCount={pendingManagementCount}
+              sortKey={managementFilters.sortKey}
+              onClearAll={managementFilters.clearFilters}
+              onClose={() => setFilterOpen(false)}
+              onFilterInvitationChange={managementFilters.setFilterInvitation}
+              onFilterRoleChange={managementFilters.setFilterRole}
+              onSortKeyChange={managementFilters.setSortKey}
             />
           )}
 
@@ -1904,10 +1921,14 @@ export function MembersSection({
                     <circle cx="12" cy="7" r="4" />
                   </svg>
                 }
-                title={searchQuery ? "No results found" : "No management members yet"}
+                title={
+                  searchQuery || managementHasActiveFilters
+                    ? "No results found"
+                    : "No management members yet"
+                }
                 description={
-                  searchQuery
-                    ? "Try adjusting your search."
+                  searchQuery || managementHasActiveFilters
+                    ? "Try adjusting your search or filters."
                     : "People assigned to management will show here."
                 }
               />
@@ -2344,7 +2365,7 @@ export function MembersSection({
           variant="warning"
           onConfirm={() => {
             setExportConfirm(false);
-            void handleExport();
+            return handleExport();
           }}
           onCancel={() => setExportConfirm(false)}
         />

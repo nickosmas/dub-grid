@@ -9,6 +9,7 @@ import {
   type ImpersonationData,
 } from "@/lib/impersonation";
 import { endGridmasterImpersonation } from "@/features/gridmaster/client";
+import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 
@@ -154,7 +155,7 @@ export default function ImpersonationBanner() {
           {countdown}
         </span>
       )}
-      <button
+      <Button
         onClick={handleEnd}
         disabled={ending}
         style={{
@@ -173,7 +174,7 @@ export default function ImpersonationBanner() {
         <ButtonLoading loading={ending} loadingLabel="Ending Session">
           End Session
         </ButtonLoading>
-      </button>
+      </Button>
     </div>
   );
 }

@@ -18,6 +18,7 @@ import type { LucideIcon } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import Modal from "@/components/Modal";
+import { Button } from "@/components/Button";
 import { MaybeHint } from "@/components/ui/hint";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
@@ -601,7 +602,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
       });
       window.location.assign(url);
     } catch (error) {
-      toast.error(formatClientErrorMessage(error, "Failed to start checkout"));
+      toast.error(formatClientErrorMessage(error, "We couldn't start checkout. Try again."));
     } finally {
       setOpeningCheckout(false);
     }
@@ -616,7 +617,9 @@ export default function BillingSettings({ organization }: { organization: { id: 
       });
       window.location.assign(url);
     } catch (error) {
-      toast.error(formatClientErrorMessage(error, "Failed to open billing portal"));
+      toast.error(
+        formatClientErrorMessage(error, "We couldn't open the billing portal. Try again."),
+      );
     } finally {
       setOpeningPortal(false);
     }
@@ -729,7 +732,10 @@ export default function BillingSettings({ organization }: { organization: { id: 
                 fontWeight: 700,
               }}
             >
-              {formatClientErrorMessage(billingQuery.error, "Failed to load billing")}
+              {formatClientErrorMessage(
+                billingQuery.error,
+                "We couldn't load your billing details. Refresh and try again.",
+              )}
             </div>
           )}
 
@@ -872,23 +878,23 @@ export default function BillingSettings({ organization }: { organization: { id: 
                 }}
               >
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button
+                  <Button
                     type="button"
                     className="dg-btn dg-btn-secondary"
-                    onClick={() => void billingQuery.refetch()}
+                    onClick={() => billingQuery.refetch()}
                   >
                     <RefreshCw size={15} aria-hidden="true" />
                     Refresh
-                  </button>
+                  </Button>
                   {showSignOut && (
-                    <button
+                    <Button
                       type="button"
                       className="dg-btn dg-btn-secondary"
                       onClick={() => signOut()}
                     >
                       <LogOut size={15} aria-hidden="true" />
                       Sign out
-                    </button>
+                    </Button>
                   )}
                 </div>
                 <div
@@ -903,11 +909,11 @@ export default function BillingSettings({ organization }: { organization: { id: 
                       isInSandbox
                         ? "Billing actions are disabled in sandbox mode."
                         : !featureFlags.stripe
-                          ? "Billing is temporarily unavailable. Please try again shortly."
+                          ? "Billing is unavailable right now. Try again in a moment."
                           : null
                     }
                   >
-                    <button
+                    <Button
                       type="button"
                       className="dg-btn dg-btn-primary"
                       onClick={
@@ -932,7 +938,7 @@ export default function BillingSettings({ organization }: { organization: { id: 
                       >
                         {primaryAction}
                       </ButtonLoading>
-                    </button>
+                    </Button>
                   </MaybeHint>
                 </div>
               </div>

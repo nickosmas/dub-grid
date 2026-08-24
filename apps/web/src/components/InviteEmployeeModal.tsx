@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import Modal from "./Modal";
 import CustomSelect from "./CustomSelect";
 import { Employee, NamedItem, Department } from "@/types";
+import { Button } from "@/components/Button";
 import type { AssignableOrganizationRole } from "@/types";
 import { getEmployeeDisplayName } from "@/lib/utils";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -253,7 +254,7 @@ export default function InviteEmployeeModal({
           ? err.message
           : typeof err === "object" && err !== null && "message" in err
             ? (err as { message: string }).message
-            : "Failed to create invitation";
+            : "We couldn't send that invitation. Try again.";
       setError(message);
     } finally {
       setSending(false);
@@ -536,10 +537,10 @@ export default function InviteEmployeeModal({
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
-            <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+            <Button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
               {EDITOR_ACTION_LABELS.close}
-            </button>
-            <button
+            </Button>
+            <Button
               className="dg-btn dg-btn-primary"
               onClick={handleSend}
               disabled={!canSend}
@@ -548,7 +549,7 @@ export default function InviteEmployeeModal({
               <ButtonLoading loading={sending} loadingLabel="Sending Invitation" spinnerSize={16}>
                 Send Invitation
               </ButtonLoading>
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>

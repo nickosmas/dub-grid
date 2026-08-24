@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useLatestRef } from "@/hooks/useLatestRef";
+import { Button } from "@/components/Button";
 import { useTheme } from "next-themes";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -690,7 +691,7 @@ export function ManagementStaffPanel({
               <EditorActionRow
                 destructiveAction={
                   !isSelf && person.managementDepartmentIds.length > 0 && deptIds.length > 0 ? (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => {
                         markTouched("managementDepartmentIds");
@@ -700,20 +701,20 @@ export function ManagementStaffPanel({
                       style={{ color: "var(--color-danger)" }}
                     >
                       Remove from Management
-                    </button>
+                    </Button>
                   ) : undefined
                 }
                 secondaryAction={
-                  <button
+                  <Button
                     onClick={handleDismissClick}
                     disabled={saving}
                     className="dg-btn dg-btn-secondary"
                   >
                     {dismissLabel}
-                  </button>
+                  </Button>
                 }
                 primaryAction={
-                  <button
+                  <Button
                     onClick={handleSave}
                     disabled={saving || !hasChanges}
                     className="dg-btn dg-btn-primary"
@@ -725,7 +726,7 @@ export function ManagementStaffPanel({
                     >
                       {EDITOR_ACTION_LABELS.save}
                     </ButtonLoading>
-                  </button>
+                  </Button>
                 }
               />
               <div
@@ -908,16 +909,16 @@ export function ManagementStaffPanel({
 
               <EditorActionRow
                 secondaryAction={
-                  <button
+                  <Button
                     onClick={handleDismissClick}
                     disabled={saving}
                     className="dg-btn dg-btn-secondary"
                   >
                     {dismissLabel}
-                  </button>
+                  </Button>
                 }
                 primaryAction={
-                  <button
+                  <Button
                     onClick={handleSave}
                     disabled={
                       saving ||
@@ -935,7 +936,7 @@ export function ManagementStaffPanel({
                     >
                       {EDITOR_ACTION_LABELS.save}
                     </ButtonLoading>
-                  </button>
+                  </Button>
                 }
               />
             </>
@@ -1204,7 +1205,7 @@ export function ManagementStaffPanel({
                 person.isManagementUser &&
                 person.userId &&
                 onAddToSchedule && (
-                  <button
+                  <Button
                     onClick={() => onAddToSchedule(person)}
                     className="dg-btn dg-btn-secondary"
                     style={{ width: "100%" }}
@@ -1226,12 +1227,12 @@ export function ManagementStaffPanel({
                       <line x1="3" y1="10" x2="21" y2="10" />
                     </svg>
                     Add to Schedule
-                  </button>
+                  </Button>
                 )}
 
               {/* Resend invitation */}
               {canManageManagementAccess && isPending && !isExpired && onResendInvitation && (
-                <button
+                <Button
                   onClick={handleResend}
                   disabled={resending}
                   className="dg-btn dg-btn-secondary"
@@ -1240,7 +1241,7 @@ export function ManagementStaffPanel({
                   <ButtonLoading loading={resending} loadingLabel="Sending" spinnerSize={14}>
                     Resend Invitation
                   </ButtonLoading>
-                </button>
+                </Button>
               )}
 
               {/* Revoke invitation (pending invites only — app access revocation is in Settings > User Management) */}
@@ -1248,13 +1249,13 @@ export function ManagementStaffPanel({
                 isPending &&
                 onRevokeInvitation &&
                 (!showRevokeConfirm ? (
-                  <button
+                  <Button
                     onClick={() => setShowRevokeConfirm(true)}
                     className="dg-btn dg-btn-ghost"
                     style={{ width: "100%", color: "var(--color-danger)" }}
                   >
                     Revoke Invitation
-                  </button>
+                  </Button>
                 ) : (
                   <div
                     style={{
@@ -1278,7 +1279,7 @@ export function ManagementStaffPanel({
                       Revoke this invitation? The link will no longer work.
                     </span>
                     <div style={{ display: "flex", gap: 8 }}>
-                      <button
+                      <Button
                         onClick={handleRevoke}
                         disabled={revoking}
                         className="dg-btn dg-btn-primary"
@@ -1291,13 +1292,13 @@ export function ManagementStaffPanel({
                         <ButtonLoading loading={revoking} loadingLabel="Revoking" spinnerSize={14}>
                           Confirm
                         </ButtonLoading>
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => setShowRevokeConfirm(false)}
                         className="dg-btn dg-btn-secondary"
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}

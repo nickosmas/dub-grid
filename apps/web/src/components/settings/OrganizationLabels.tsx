@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import { Organization } from "@/types";
+import { Button } from "@/components/Button";
 import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
@@ -139,7 +140,7 @@ export default function OrganizationLabels({
         });
         toast.error("Labels changed elsewhere. Review the latest values and try again.");
       } else {
-        toast.error("Failed to save labels");
+        toast.error("We couldn't save your labels. Try again.");
         Sentry.captureException(err);
       }
     } finally {
@@ -280,11 +281,11 @@ export default function OrganizationLabels({
             style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}
           >
             {isModified ? (
-              <button onClick={handleCancel} disabled={saving} className="dg-btn dg-btn-secondary">
+              <Button onClick={handleCancel} disabled={saving} className="dg-btn dg-btn-secondary">
                 {EDITOR_ACTION_LABELS.discard}
-              </button>
+              </Button>
             ) : null}
-            <button
+            <Button
               onClick={handleSave}
               disabled={!isModified || saving || hasFieldErrors}
               className="dg-btn dg-btn-primary"
@@ -292,7 +293,7 @@ export default function OrganizationLabels({
               <ButtonLoading loading={saving} loadingLabel={EDITOR_ACTION_LABELS.saving}>
                 {EDITOR_ACTION_LABELS.save}
               </ButtonLoading>
-            </button>
+            </Button>
           </div>
         )}
       </div>

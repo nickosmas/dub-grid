@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { Button } from "@/components/Button";
 import { useRouter } from "next/navigation";
 import { DubGridLogo } from "@/components/Logo";
 import { fetchAccountIdentity } from "@/features/account/client";
@@ -67,7 +68,7 @@ export default function OnboardingPage() {
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
       >
-        Loading...
+        Loading
       </div>
     );
   }
@@ -136,7 +137,7 @@ export default function OnboardingPage() {
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <button
+          <Button
             onClick={() => window.location.reload()}
             style={{
               width: "100%",
@@ -155,15 +156,15 @@ export default function OnboardingPage() {
             <ButtonLoading loading={checking} loadingLabel="Checking">
               I've been invited — refresh
             </ButtonLoading>
-          </button>
+          </Button>
 
           {pollTimedOut && (
             <p style={{ fontSize: "14px", color: "var(--color-warning-text)", margin: 0 }}>
-              Still waiting for your organization assignment. Please contact your administrator.
+              You're not in an organization yet. Ask your administrator to add you.
             </p>
           )}
 
-          <button
+          <Button
             onClick={signOut}
             style={{
               width: "100%",
@@ -179,7 +180,7 @@ export default function OnboardingPage() {
             }}
           >
             Sign Out
-          </button>
+          </Button>
         </div>
 
         <div

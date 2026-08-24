@@ -75,7 +75,7 @@ export default function ProfileSessionsScreen() {
       pushToast({
         tone: "success",
         title: "Session revoked",
-        message: "That device has been signed out.",
+        message: "That device is signed out.",
       });
     },
     onError: (error) => {
@@ -244,7 +244,7 @@ export default function ProfileSessionsScreen() {
               signed in, not on the two ways to sign everything out. */}
           <ProfileSection>
             <Button
-              label="Sign out devices..."
+              label="Signing out devices"
               loading={sessionScopeLoading != null}
               loadingLabel="Signing out"
               onPress={() => setScopeSheetVisible(true)}

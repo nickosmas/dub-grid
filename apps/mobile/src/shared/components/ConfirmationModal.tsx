@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { BottomSheetModal, SheetActions, SheetCopy, SheetHeader } from "./BottomSheetModal";
 import { Button, type ButtonTone } from "./Button";
 import { hapticImpact } from "../lib/haptics";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 
 type ConfirmationTone = Extract<
   ButtonTone,
@@ -23,7 +24,7 @@ export function ConfirmationModal({
   confirmPendingLabel,
   cancelLabel = "Cancel",
   confirmTone = "primary",
-  loading = false,
+  loading,
   onCancel,
   onConfirm,
 }: {
@@ -40,25 +41,35 @@ export function ConfirmationModal({
   confirmPendingLabel?: string;
   cancelLabel?: string;
   confirmTone?: ConfirmationTone;
+  /**
+   * Overrides the busy state `Button` works out for itself. Only needed when
+   * the pending flag lives outside this sheet; an async `onConfirm` already
+   * spins on its own.
+   */
   loading?: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<unknown>;
 }) {
   const isDestructive = confirmTone === "danger";
 
-  const handleConfirm = () => {
+  // The sheet latches the confirm itself rather than leaving it to `Button`,
+  // because the busy state has a second job here: a pending confirmation must
+  // also refuse to be dragged away. Doing it in one place keeps the spinner
+  // and `dismissDisabled` reading from the same flag.
+  const confirm = useAsyncAction(() => {
     if (isDestructive) {
       hapticImpact("medium");
     }
-    onConfirm();
-  };
+    return onConfirm();
+  });
+  const isBusy = loading ?? confirm.isRunning;
 
   return (
     <BottomSheetModal
       accessibilityRole="alert"
       // A pending confirmation can't be dragged or tapped away; the grabber
       // stays, as it does on every sheet, and the drag settles back instead.
-      dismissDisabled={loading}
+      dismissDisabled={isBusy}
       header={<SheetHeader title={title} />}
       // The shared sheet caps its height, which this dialog never used to do.
       // Callers pass a `children` form (the People status-change reason), and
@@ -72,12 +83,12 @@ export function ConfirmationModal({
       <SheetActions>
         <Button
           label={confirmLabel}
-          loading={loading}
+          loading={isBusy}
           loadingLabel={confirmPendingLabel}
-          onPress={handleConfirm}
+          onPress={confirm.run}
           tone={confirmTone}
         />
-        <Button disabled={loading} label={cancelLabel} onPress={onCancel} tone="neutral" />
+        <Button disabled={isBusy} label={cancelLabel} onPress={onCancel} tone="neutral" />
       </SheetActions>
     </BottomSheetModal>
   );

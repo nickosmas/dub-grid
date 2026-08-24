@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createReactNativeModule } from "../../test/native";
 
@@ -88,6 +88,45 @@ describe("Button", () => {
 
     expect(button).toHaveAttribute("aria-busy", "true");
     expect(button).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("runs an async press once when it is double-tapped", async () => {
+    let settle!: () => void;
+    const onPress = vi.fn(() => new Promise<void>((resolve) => (settle = resolve)));
+    render(<Button label="Save" loadingLabel="Saving" onPress={onPress} />);
+
+    // Both taps in one tick. A `loading` prop only disables the pressable once
+    // React has re-rendered, so without the synchronous latch the second tap
+    // lands inside that window and the save runs twice.
+    const button = screen.getByRole("button", { name: "Save" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(button).toHaveAttribute("aria-busy", "true");
+    expect(button).toBeDisabled();
+    expect(screen.getByText("Saving")).toBeInTheDocument();
+
+    // Settling reopens the latch, so a genuine second save is still possible.
+    await act(async () => {
+      settle();
+    });
+    expect(button).not.toHaveAttribute("aria-busy", "true");
+    fireEvent.click(button);
+    expect(onPress).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves a synchronous press untouched", () => {
+    const onPress = vi.fn();
+    render(<Button label="Filter" onPress={onPress} />);
+    const button = screen.getByRole("button", { name: "Filter" });
+
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    // Nothing to await, so nothing latches: a plain toggle still fires per tap.
+    expect(onPress).toHaveBeenCalledTimes(2);
+    expect(button).not.toHaveAttribute("aria-busy", "true");
   });
 
   it("surfaces selected state for segment and filter usage", () => {

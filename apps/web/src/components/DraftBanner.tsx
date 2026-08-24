@@ -1,6 +1,7 @@
 "use client";
 
 import type { DraftBreakdown } from "@/lib/draft-utils";
+import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import ChangeLegend from "@/components/ChangeLegend";
 import { Eye, EyeOff } from "lucide-react";
@@ -91,7 +92,7 @@ export default function DraftBanner({
       <div className="dg-draft-banner-actions">
         {onToggleDiff && (
           <Hint content={hint(diffHint)} side="bottom">
-            <button
+            <Button
               data-tour="draft-banner-diff"
               onClick={onToggleDiff}
               className="dg-btn dg-btn-secondary dg-btn-sm"
@@ -111,11 +112,11 @@ export default function DraftBanner({
                   {diffOffLabel}
                 </>
               )}
-            </button>
+            </Button>
           </Hint>
         )}
         <Hint content={hint("Delete all unpublished draft changes")} side="bottom">
-          <button
+          <Button
             data-tour="draft-banner-discard"
             onClick={onCancel}
             disabled={isDisabled}
@@ -129,10 +130,10 @@ export default function DraftBanner({
             >
               Discard
             </ButtonLoading>
-          </button>
+          </Button>
         </Hint>
         <Hint content={hint(publishHint)} side="bottom">
-          <button
+          <Button
             data-tour="draft-banner-publish"
             onClick={onPublish}
             disabled={isDisabled || !canPublish}
@@ -145,13 +146,13 @@ export default function DraftBanner({
             >
               Publish
             </ButtonLoading>
-          </button>
+          </Button>
         </Hint>
         {onDismiss && (
           <Hint content={hint("Hide this banner for the rest of this session")} side="bottom">
-            <button type="button" onClick={onDismiss} className="dg-btn dg-btn-secondary dg-btn-sm">
+            <Button type="button" onClick={onDismiss} className="dg-btn dg-btn-secondary dg-btn-sm">
               Close
-            </button>
+            </Button>
           </Hint>
         )}
       </div>

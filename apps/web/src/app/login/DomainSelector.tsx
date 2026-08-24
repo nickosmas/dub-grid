@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
+import { Button } from "@/components/Button";
 import { getValidPort, buildSubdomainHost, RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -169,7 +170,7 @@ export default function DomainSelector() {
                   Continue
                 </ButtonLoading>
               </button>
-              <button
+              <Button
                 type="button"
                 onClick={() => setShowHelp(true)}
                 className="dg-auth-link"
@@ -179,7 +180,7 @@ export default function DomainSelector() {
                 }}
               >
                 Need help finding your subdomain?
-              </button>
+              </Button>
             </div>
           </form>
         </Card>
@@ -202,14 +203,14 @@ export default function DomainSelector() {
               <strong>yourorg</strong>.{baseDomain}). If you don&apos;t know it, contact your
               organization administrator.
             </p>
-            <button
+            <Button
               type="button"
               onClick={() => setShowHelp(false)}
               className="dg-btn dg-btn-primary"
               style={{ width: "100%" }}
             >
               Got it
-            </button>
+            </Button>
           </Modal>
         )}
       </PageShell>

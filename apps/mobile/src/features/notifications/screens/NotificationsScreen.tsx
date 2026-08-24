@@ -106,9 +106,11 @@ function formatRelativeTime(value: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
+  // Over a week old — name the year, since "May 4" alone can't place it.
   return new Date(value).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
+    year: "numeric",
   });
 }
 
@@ -340,9 +342,7 @@ export default function NotificationsScreen() {
           fillScreen
           title="Could not load alerts"
           variant="centered"
-          onAction={() => {
-            void notificationsQuery.refetch();
-          }}
+          onAction={() => notificationsQuery.refetch()}
         />
       ) : contentState.kind === "empty" ? (
         <EmptyStateCard
@@ -361,12 +361,8 @@ export default function NotificationsScreen() {
             <AnimatedListItem index={index} key={notification.id}>
               <NotificationCard
                 notification={notification}
-                onPress={() => {
-                  void handleRowPress(notification);
-                }}
-                onArchive={() => {
-                  void handleArchive(notification);
-                }}
+                onPress={() => handleRowPress(notification)}
+                onArchive={() => handleArchive(notification)}
               />
             </AnimatedListItem>
           ))}
@@ -377,9 +373,7 @@ export default function NotificationsScreen() {
               label="Load more"
               loading={notificationsQuery.isFetchingNextPage}
               loadingLabel="Loading"
-              onPress={() => {
-                void notificationsQuery.fetchNextPage();
-              }}
+              onPress={() => notificationsQuery.fetchNextPage()}
             />
           ) : null}
         </View>
@@ -396,9 +390,7 @@ export default function NotificationsScreen() {
         confirmTone="primary"
         loading={busy}
         onCancel={() => setConfirmingMarkAllRead(false)}
-        onConfirm={() => {
-          void handleMarkAllRead();
-        }}
+        onConfirm={() => handleMarkAllRead()}
         title="Mark all read"
         visible={confirmingMarkAllRead}
       />

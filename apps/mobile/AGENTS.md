@@ -199,6 +199,43 @@ import path screens should use. **The package is shared with `apps/web`** — ad
 | An empty state              | `<EmptyStateCard iconName>` — centred; `compact` inside a card adds its panel               |
 | Loading placeholder         | a `*Skeleton` colocated with the screen, built on `shared/components/skeleton`              |
 | Which state a screen is in  | `useMobileContentState({ hasData, isLoading, error, isEmpty })`                             |
+| Stopping a double-tap       | `useAsyncAction()` — already inside `<Button>`, `<PressableRow>`, `<ConfirmationModal>`     |
+
+### Double-tap
+
+An action that fires a request must not run twice when the control is
+double-tapped. **A `useState` busy flag does not achieve that on its own**: it
+only disables the pressable after React re-renders, and a second tap inside
+that window still gets through.
+
+`useAsyncAction()` (`shared/hooks/useAsyncAction.ts`) is the fix, and its latch
+is a `useRef` read and set synchronously on the first press, so re-entry is
+blocked before any render. The `isRunning` it returns exists only to drive the
+spinner. **Do not "simplify" that ref into state** — that is the bug.
+
+`<Button>`, `<PressableRow>` and `<ConfirmationModal>` already wrap their
+handler in it, so screens usually need nothing. The one thing a screen must do
+is **return** its promise rather than fire it into a call the primitive cannot
+await — a `mutation.mutate(...)` returns `undefined`, so wrap it:
+
+```ts
+return new Promise<void>((resolve) => {
+  mutation.mutate(input, {
+    onSettled: () => {
+      setPending(null);
+      resolve();
+    },
+  });
+});
+```
+
+Because a synchronous handler returns `undefined`, the hook is a no-op for one:
+a plain toggle still fires on every tap. `loading` remains a prop for a pending
+flag that lives outside the control, and an explicit `loading` wins over the
+internal one. `loadingLabel` is still required on a `<Button>` that can spin
+(`design/require-busy-button`), in the progressive form of that button's own
+verb — see `request-action-feedback.ts`, where every variant carries its own
+(`Approve` → `Approving`, `Claim shift` → `Claiming shift`).
 
 ### Modals and sheets
 

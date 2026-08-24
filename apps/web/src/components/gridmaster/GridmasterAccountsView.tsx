@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
 import Modal from "@/components/Modal";
@@ -139,7 +140,7 @@ export default function GridmasterAccountsView({
       setPromoteConfirmEmail(null);
       invalidateGridmasterQueries();
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to promote account"));
+      toast.error(formatClientErrorMessage(err, "We couldn't promote account. Try again."));
     } finally {
       setPromoteLoading(false);
     }
@@ -158,7 +159,7 @@ export default function GridmasterAccountsView({
       setDemoteTarget(null);
       invalidateGridmasterQueries(demoteOrgId);
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to demote account"));
+      toast.error(formatClientErrorMessage(err, "We couldn't demote account. Try again."));
     } finally {
       setActionLoading(null);
     }
@@ -175,7 +176,7 @@ export default function GridmasterAccountsView({
       setActivationConfirm(null);
       invalidateGridmasterQueries();
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to update account"));
+      toast.error(formatClientErrorMessage(err, "We couldn't update account. Try again."));
     } finally {
       setActionLoading(null);
     }
@@ -188,7 +189,7 @@ export default function GridmasterAccountsView({
       toast.success("Gridmaster sessions terminated");
       setForceLogoutConfirm(null);
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to force logout"));
+      toast.error(formatClientErrorMessage(err, "We couldn't force logout. Try again."));
     } finally {
       setActionLoading(null);
     }
@@ -269,7 +270,10 @@ export default function GridmasterAccountsView({
             marginBottom: 16,
           }}
         >
-          {formatClientErrorMessage(accountsQuery.error, "Failed to load gridmaster accounts")}
+          {formatClientErrorMessage(
+            accountsQuery.error,
+            "We couldn't load gridmaster accounts. Refresh and try again.",
+          )}
         </div>
       )}
 
@@ -311,7 +315,7 @@ export default function GridmasterAccountsView({
             className="dg-input"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search..."
+            placeholder="Search"
             aria-label="Search gridmaster accounts"
             style={{
               width: "100%",
@@ -412,25 +416,25 @@ export default function GridmasterAccountsView({
                       </td>
                       <td style={tdStyle}>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <button
+                          <Button
                             className="dg-btn dg-btn-secondary"
                             style={{ fontSize: "var(--dg-fs-caption)" }}
                             onClick={() => setForceLogoutConfirm(account)}
                             disabled={isLoading}
                           >
                             Force Logout
-                          </button>
+                          </Button>
                           {account.email && (
-                            <button
+                            <Button
                               className="dg-btn dg-btn-secondary"
                               style={{ fontSize: "var(--dg-fs-caption)" }}
                               onClick={() => setResetConfirm(account)}
                               disabled={isLoading}
                             >
                               Reset Password
-                            </button>
+                            </Button>
                           )}
-                          <button
+                          <Button
                             className="dg-btn dg-btn-secondary"
                             style={{
                               fontSize: "var(--dg-fs-caption)",
@@ -442,8 +446,8 @@ export default function GridmasterAccountsView({
                             disabled={isSelf || isLoading}
                           >
                             {account.deactivatedAt ? "Reactivate" : "Deactivate"}
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             className="dg-btn dg-btn-secondary"
                             style={{
                               fontSize: "var(--dg-fs-caption)",
@@ -457,7 +461,7 @@ export default function GridmasterAccountsView({
                             disabled={isSelf || isLoading || organizations.length === 0}
                           >
                             Demote
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -604,10 +608,10 @@ export default function GridmasterAccountsView({
             </label>
           </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
-            <button className="dg-btn dg-btn-secondary" onClick={() => setDemoteTarget(null)}>
+            <Button className="dg-btn dg-btn-secondary" onClick={() => setDemoteTarget(null)}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               className="dg-btn dg-btn-danger"
               onClick={handleDemote}
               disabled={!demoteOrgId || actionLoading === demoteTarget.id}
@@ -615,7 +619,7 @@ export default function GridmasterAccountsView({
               <ButtonLoading loading={actionLoading === demoteTarget.id} loadingLabel="Demoting">
                 Demote
               </ButtonLoading>
-            </button>
+            </Button>
           </div>
         </Modal>
       )}

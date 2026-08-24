@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { Organization, AssignableOrganizationRole } from "@/types";
+import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
 import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
@@ -602,10 +603,10 @@ export default function OrganizationSetupWizard({
         </div>
 
         <ActionBar>
-          <button type="button" className="dg-btn dg-btn-secondary" onClick={onCancel}>
+          <Button type="button" className="dg-btn dg-btn-secondary" onClick={onCancel}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className="dg-btn dg-btn-brand"
             disabled={saving || !name.trim()}
@@ -614,7 +615,7 @@ export default function OrganizationSetupWizard({
             <ButtonLoading loading={saving} loadingLabel="Validating">
               Next
             </ButtonLoading>
-          </button>
+          </Button>
         </ActionBar>
       </>
     );
@@ -813,14 +814,14 @@ export default function OrganizationSetupWizard({
         </div>
 
         <ActionBar>
-          <button
+          <Button
             type="button"
             className="dg-btn dg-btn-ghost"
             onClick={() => setCurrentStep("details")}
           >
             Back
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className="dg-btn dg-btn-brand"
             disabled={
@@ -834,7 +835,7 @@ export default function OrganizationSetupWizard({
             <ButtonLoading loading={saving} loadingLabel="Creating Organization">
               Create Organization
             </ButtonLoading>
-          </button>
+          </Button>
         </ActionBar>
       </>
     );
@@ -946,7 +947,7 @@ export default function OrganizationSetupWizard({
                   They will join as admin. You can promote them to super admin after they accept.
                 </div>
               </div>
-              <button
+              <Button
                 type="button"
                 className="dg-btn dg-btn-brand"
                 disabled={sendingEmail}
@@ -956,7 +957,7 @@ export default function OrganizationSetupWizard({
                 <ButtonLoading loading={sendingEmail} loadingLabel="Sending Email">
                   Send Email
                 </ButtonLoading>
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -972,22 +973,24 @@ export default function OrganizationSetupWizard({
             Would you like to continue setting up configuration, employees, and invitations?
           </p>
           <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-secondary"
               style={{ padding: "12px 24px" }}
-              onClick={() => createdOrg && onCreated(createdOrg)}
+              onClick={() => {
+                if (createdOrg) onCreated(createdOrg);
+              }}
             >
               Finish — Go to Organization
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="dg-btn dg-btn-brand"
               style={{ padding: "12px 24px" }}
               onClick={() => setCurrentStep("config")}
             >
               Continue Setup
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -1112,7 +1115,7 @@ export default function OrganizationSetupWizard({
                   style={{ width: 140 }}
                 />
                 {departments.length > 1 && (
-                  <button
+                  <Button
                     type="button"
                     className="dg-btn dg-btn-ghost"
                     onClick={() => removeDepartmentRow(idx)}
@@ -1131,11 +1134,11 @@ export default function OrganizationSetupWizard({
                       <line x1="18" y1="6" x2="6" y2="18" />
                       <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-ghost"
               onClick={() =>
@@ -1152,7 +1155,7 @@ export default function OrganizationSetupWizard({
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
               + Add department
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1210,7 +1213,7 @@ export default function OrganizationSetupWizard({
                   style={{ width: 220 }}
                 />
                 {focusAreas.length > 1 && (
-                  <button
+                  <Button
                     type="button"
                     className="dg-btn dg-btn-ghost"
                     onClick={() => removeFocusArea(idx)}
@@ -1229,18 +1232,18 @@ export default function OrganizationSetupWizard({
                       <line x1="18" y1="6" x2="6" y2="18" />
                       <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-ghost"
               onClick={addFocusAreaRow}
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
               + Add {focusAreaLabel.replace(/s$/, "").toLowerCase()}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1290,7 +1293,7 @@ export default function OrganizationSetupWizard({
                   style={{ flex: 1, maxWidth: 100 }}
                 />
                 {certifications.length > 1 && (
-                  <button
+                  <Button
                     type="button"
                     className="dg-btn dg-btn-ghost"
                     onClick={() => removeNamedItem(setCertifications, idx)}
@@ -1309,18 +1312,18 @@ export default function OrganizationSetupWizard({
                       <line x1="18" y1="6" x2="6" y2="18" />
                       <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-ghost"
               onClick={() => addNamedItemRow(setCertifications)}
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
               + Add {certificationLabel.replace(/s$/, "").toLowerCase()}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1362,7 +1365,7 @@ export default function OrganizationSetupWizard({
                   style={{ flex: 1, maxWidth: 100 }}
                 />
                 {orgRoles.length > 1 && (
-                  <button
+                  <Button
                     type="button"
                     className="dg-btn dg-btn-ghost"
                     onClick={() => removeNamedItem(setOrgRoles, idx)}
@@ -1381,18 +1384,18 @@ export default function OrganizationSetupWizard({
                       <line x1="18" y1="6" x2="6" y2="18" />
                       <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-ghost"
               onClick={() => addNamedItemRow(setOrgRoles)}
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
               + Add {roleLabel.replace(/s$/, "").toLowerCase()}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1481,7 +1484,7 @@ export default function OrganizationSetupWizard({
                   style={{ width: 190 }}
                 />
                 {shiftCategories.length > 1 && (
-                  <button
+                  <Button
                     type="button"
                     className="dg-btn dg-btn-ghost"
                     onClick={() => setShiftCategories((prev) => prev.filter((_, i) => i !== idx))}
@@ -1500,11 +1503,11 @@ export default function OrganizationSetupWizard({
                       <line x1="18" y1="6" x2="6" y2="18" />
                       <line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-ghost"
               onClick={() =>
@@ -1522,7 +1525,7 @@ export default function OrganizationSetupWizard({
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
               + Add shift
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1622,7 +1625,7 @@ export default function OrganizationSetupWizard({
                       style={{ flex: 2 }}
                     />
                     {jobs.length > 1 && (
-                      <button
+                      <Button
                         type="button"
                         className="dg-btn dg-btn-ghost"
                         onClick={() => setJobs((prev) => prev.filter((_, i) => i !== idx))}
@@ -1641,7 +1644,7 @@ export default function OrganizationSetupWizard({
                           <line x1="18" y1="6" x2="6" y2="18" />
                           <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
-                      </button>
+                      </Button>
                     )}
                   </div>
                   <div
@@ -1738,7 +1741,7 @@ export default function OrganizationSetupWizard({
                 </div>
               );
             })}
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-ghost"
               onClick={() =>
@@ -1758,19 +1761,19 @@ export default function OrganizationSetupWizard({
               style={{ fontSize: "var(--dg-fs-label)" }}
             >
               + Add job
-            </button>
+            </Button>
           </div>
         </div>
 
         <ActionBar>
-          <button
+          <Button
             type="button"
             className="dg-btn dg-btn-ghost"
             onClick={() => setCurrentStep("employees")}
           >
             Skip
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className="dg-btn dg-btn-brand"
             disabled={saving}
@@ -1779,7 +1782,7 @@ export default function OrganizationSetupWizard({
             <ButtonLoading loading={saving} loadingLabel="Saving">
               Next
             </ButtonLoading>
-          </button>
+          </Button>
         </ActionBar>
       </>
     );
@@ -1906,7 +1909,7 @@ export default function OrganizationSetupWizard({
                   onChange={(e) => updateEmployeeRow(idx, { phone: e.target.value })}
                   placeholder="(555) 123-4567"
                 />
-                <button
+                <Button
                   type="button"
                   className="dg-btn dg-btn-ghost"
                   onClick={() => removeEmployeeRow(idx)}
@@ -1929,23 +1932,23 @@ export default function OrganizationSetupWizard({
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
-                </button>
+                </Button>
               </div>
             ))}
 
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-ghost"
               onClick={() => addEmployeeRows(5)}
               style={{ fontSize: "var(--dg-fs-label)", marginTop: 8 }}
             >
               + Add 5 more rows
-            </button>
+            </Button>
           </div>
         </div>
 
         <ActionBar>
-          <button
+          <Button
             type="button"
             className="dg-btn dg-btn-ghost"
             onClick={() => {
@@ -1956,8 +1959,8 @@ export default function OrganizationSetupWizard({
             }}
           >
             Skip
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className="dg-btn dg-btn-brand"
             disabled={saving || readyEmployeeCount === 0}
@@ -1966,7 +1969,7 @@ export default function OrganizationSetupWizard({
             <ButtonLoading loading={saving} loadingLabel="Creating Employees">
               {`Create ${readyEmployeeCount} Employee${readyEmployeeCount !== 1 ? "s" : ""}`}
             </ButtonLoading>
-          </button>
+          </Button>
         </ActionBar>
       </>
     );
@@ -2142,14 +2145,16 @@ export default function OrganizationSetupWizard({
         </div>
 
         <ActionBar>
-          <button
+          <Button
             type="button"
             className="dg-btn dg-btn-ghost"
-            onClick={() => createdOrg && onCreated(createdOrg)}
+            onClick={() => {
+              if (createdOrg) onCreated(createdOrg);
+            }}
           >
             Skip
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className="dg-btn dg-btn-brand"
             disabled={saving || selectedCount === 0}
@@ -2158,7 +2163,7 @@ export default function OrganizationSetupWizard({
             <ButtonLoading loading={saving} loadingLabel="Sending Invitations">
               {`Send ${selectedCount} Invitation${selectedCount !== 1 ? "s" : ""} & Finish`}
             </ButtonLoading>
-          </button>
+          </Button>
         </ActionBar>
       </>
     );
@@ -2222,9 +2227,9 @@ export default function OrganizationSetupWizard({
           {currentStep === "decision" ? "Organization Created" : "Create Organization"}
         </h2>
         {currentStep !== "decision" && (
-          <button type="button" className="dg-btn dg-btn-ghost" onClick={onCancel}>
+          <Button type="button" className="dg-btn dg-btn-ghost" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
       </div>
 

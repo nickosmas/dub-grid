@@ -7,6 +7,7 @@ import {
   type OrganizationBootstrap,
 } from "@/features/organization/client/api";
 import { queryKeys } from "@/lib/query-keys";
+import { Button } from "@/components/Button";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 
@@ -114,7 +115,7 @@ export default function SandboxBanner() {
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
         {error ? <span style={{ fontWeight: 500, opacity: 0.85 }}>{error}</span> : null}
-        <button
+        <Button
           type="button"
           onClick={handleReset}
           disabled={pendingAction != null}
@@ -129,8 +130,8 @@ export default function SandboxBanner() {
           <ButtonLoading loading={pendingAction === "reset"} loadingLabel="Resetting">
             Reset sandbox
           </ButtonLoading>
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           onClick={handleExit}
           disabled={pendingAction != null}
@@ -144,7 +145,7 @@ export default function SandboxBanner() {
           <ButtonLoading loading={pendingAction === "exit"} loadingLabel="Exiting">
             Exit sandbox
           </ButtonLoading>
-        </button>
+        </Button>
       </div>
     </div>
   );

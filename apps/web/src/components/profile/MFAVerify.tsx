@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Button } from "@/components/Button";
 import { toast } from "sonner";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
 import { PageShell, Card } from "@/components/auth/AuthCard";
@@ -32,14 +33,16 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
     async function loadFactors() {
       const { data, error: listError } = await listBrowserMfaFactors();
       if (listError) {
-        toast.error("Failed to load authentication factors.");
+        toast.error("We couldn't load your sign-in methods. Refresh and try again.");
         return;
       }
       const totpFactor = data.totp.find((f: { status: string }) => f.status === "verified");
       if (totpFactor) {
         setFactorId(totpFactor.id);
       } else {
-        toast.error("No authenticator found. Please contact support.");
+        toast.error(
+          "We couldn't find an authenticator app on this account. Contact support for help.",
+        );
       }
     }
     loadFactors();
@@ -177,14 +180,14 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
         </form>
 
         <div style={{ marginTop: 20, textAlign: "center" }}>
-          <button
+          <Button
             type="button"
             onClick={onCancel}
             className="dg-auth-link"
             style={{ color: "var(--color-text-subtle)" }}
           >
             &larr; Back to login
-          </button>
+          </Button>
         </div>
       </Card>
     </PageShell>

@@ -2,6 +2,8 @@
 
 import { useState, type CSSProperties } from "react";
 import { toast } from "sonner";
+import { formatClientErrorMessage } from "@/lib/client-facing";
+import { Button } from "@/components/Button";
 import type { AdminPermissions, OrganizationRole } from "@/types";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -89,23 +91,26 @@ export function MemberAccessControls({
               title="Change role"
               message={`Change this person's role to ${ROLE_LABELS[pendingRole] ?? pendingRole}? Their access updates immediately.`}
               confirmLabel="Change role"
+              confirmPendingLabel="Changing role"
               variant="warning"
               onCancel={() => setPendingRole(null)}
-              onConfirm={() => {
+              // Awaited rather than fired into a `void` IIFE: the dialog stays
+              // open until the role change lands, so it needs the promise to
+              // hold its own latch and spinner. Discarding it left the confirm
+              // button idle-looking and double-clickable for the whole request.
+              onConfirm={async () => {
                 const next = pendingRole;
                 setChangingRole(true);
-                void (async () => {
-                  try {
-                    await onRoleChange(next);
-                    setPendingRole(null);
-                  } catch (error) {
-                    toast.error(
-                      error instanceof Error ? error.message : "Could not change the role.",
-                    );
-                  } finally {
-                    setChangingRole(false);
-                  }
-                })();
+                try {
+                  await onRoleChange(next);
+                  setPendingRole(null);
+                } catch (error) {
+                  toast.error(
+                    formatClientErrorMessage(error, "We couldn't change that role. Try again."),
+                  );
+                } finally {
+                  setChangingRole(false);
+                }
               }}
             />
           )}
@@ -115,13 +120,13 @@ export function MemberAccessControls({
         <div>
           <label style={fieldLabelStyle}>Permissions</label>
           <div>
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
               onClick={() => setShowPermissions(true)}
             >
               Manage permissions
-            </button>
+            </Button>
           </div>
           {showPermissions && (
             <PermissionsEditor

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
+import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { SelectableTag } from "@/components/ui/selectable-tag";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -351,10 +352,10 @@ export function AddManagementUserToScheduleModal({
           </div>
 
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+            <Button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
               {EDITOR_ACTION_LABELS.close}
-            </button>
-            <button
+            </Button>
+            <Button
               className="dg-btn dg-btn-primary"
               onClick={handleSubmit}
               disabled={!canSubmit}
@@ -363,7 +364,7 @@ export function AddManagementUserToScheduleModal({
               <ButtonLoading loading={saving} loadingLabel="Adding" spinnerSize={16}>
                 Add to Schedule
               </ButtonLoading>
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>

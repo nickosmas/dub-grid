@@ -537,14 +537,21 @@ export default function RequestsScreen() {
     const { requestId, body, feedback } = requestActionConfirmation;
     setRequestActionConfirmation(null);
     setPendingAction({ key: feedback.key });
-    requestActionMutation.mutate(
-      { requestId, body },
-      {
-        onSettled: () => {
-          setPendingAction(null);
+    // Returned so `ConfirmationModal` can latch on it. The guard above reads
+    // state that a same-tick second tap has not seen cleared yet, so without
+    // the promise a double-tap approves the request twice. Settling resolves
+    // rather than rejects: the mutation's own `onError` already toasts.
+    return new Promise<void>((resolve) => {
+      requestActionMutation.mutate(
+        { requestId, body },
+        {
+          onSettled: () => {
+            setPendingAction(null);
+            resolve();
+          },
         },
-      },
-    );
+      );
+    });
   }, [requestActionConfirmation, requestActionMutation]);
 
   const requests = requestsQuery.data?.requests ?? [];
@@ -937,6 +944,9 @@ export default function RequestsScreen() {
       <ConfirmationModal
         body={requestActionConfirmation?.feedback.message}
         confirmLabel={requestActionConfirmation?.feedback.confirmLabel ?? "Confirm"}
+        confirmPendingLabel={
+          requestActionConfirmation?.feedback.confirmPendingLabel ?? "Confirming"
+        }
         confirmTone={
           requestActionConfirmation?.feedback.confirmStyle === "destructive" ? "danger" : "primary"
         }

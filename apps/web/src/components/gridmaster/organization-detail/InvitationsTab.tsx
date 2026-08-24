@@ -4,6 +4,7 @@ import {
   revokeOrganizationInvitationGuarded,
 } from "@/features/organization/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
+import { Button } from "@/components/Button";
 import { sectionStyle, tdStyle, thStyle } from "@/lib/styles";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -67,7 +68,9 @@ export function InvitationsTab({
         toast.error("Invitation changed elsewhere. Review the latest values and try again.");
         onRefresh();
       } else {
-        toast.error(formatClientErrorMessage(err, "Failed to revoke invitation"));
+        toast.error(
+          formatClientErrorMessage(err, "We couldn't cancel that invitation. Try again."),
+        );
       }
     } finally {
       setRevoking(null);
@@ -154,7 +157,7 @@ export function InvitationsTab({
                       </td>
                       <td style={tdStyle}>
                         {isPending && (
-                          <button
+                          <Button
                             className="dg-btn dg-btn-ghost"
                             style={{
                               fontSize: "var(--dg-fs-footnote)",
@@ -167,7 +170,7 @@ export function InvitationsTab({
                             <ButtonLoading loading={revoking === inv.id} loadingLabel="Revoking">
                               Revoke
                             </ButtonLoading>
-                          </button>
+                          </Button>
                         )}
                       </td>
                     </tr>
@@ -187,9 +190,7 @@ export function InvitationsTab({
           confirmPendingLabel="Revoking"
           variant="danger"
           isLoading={revoking === revokeConfirm.id}
-          onConfirm={() => {
-            void handleRevoke(revokeConfirm);
-          }}
+          onConfirm={() => handleRevoke(revokeConfirm)}
           onCancel={() => setRevokeConfirm(null)}
         />
       )}

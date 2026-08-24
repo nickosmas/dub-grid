@@ -1,6 +1,7 @@
 "use client";
 
 import Modal from "@/components/Modal";
+import { Button } from "@/components/Button";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 
 export interface ReviewChange {
@@ -148,15 +149,15 @@ export default function ChangeReviewModal({
             gap: 8,
           }}
         >
-          <button
+          <Button
             type="button"
             className="dg-btn dg-btn-secondary"
             onClick={onCancel}
             disabled={saving}
           >
             Go Back
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             className="dg-btn dg-btn-primary"
             onClick={onConfirm}
@@ -165,7 +166,7 @@ export default function ChangeReviewModal({
             <ButtonLoading loading={saving} loadingLabel="Saving">
               {confirmLabel}
             </ButtonLoading>
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>

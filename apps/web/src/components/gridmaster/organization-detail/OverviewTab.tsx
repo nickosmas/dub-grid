@@ -1,5 +1,6 @@
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
+import { Button } from "@/components/Button";
 import OrganizationChangeReviewModal from "@/components/organization/OrganizationChangeReviewModal";
 import OrganizationLocationFields from "@/components/organization/OrganizationLocationFields";
 import { InfoRow, MiniStat } from "@/components/gridmaster/organization-detail/shared";
@@ -196,7 +197,7 @@ export function OverviewTab({
         onOrgUpdated?.(err.latestOrganization);
         return;
       }
-      toast.error(formatClientErrorMessage(err, "Failed to update"));
+      toast.error(formatClientErrorMessage(err, "We couldn't update. Try again."));
     } finally {
       setSaving(false);
     }
@@ -256,7 +257,7 @@ export function OverviewTab({
       onOrgUpdated?.({ ...organization, suspendedAt: null, suspendedReason: null });
       setUnsuspendConfirm(false);
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to unsuspend"));
+      toast.error(formatClientErrorMessage(err, "We couldn't unsuspend. Try again."));
     } finally {
       setSuspending(false);
     }
@@ -282,7 +283,7 @@ export function OverviewTab({
         >
           <span>Organization Details</span>
           {!editing && (
-            <button
+            <Button
               className="dg-btn dg-btn-ghost"
               style={{ fontSize: "var(--dg-fs-caption)" }}
               onClick={() => {
@@ -291,7 +292,7 @@ export function OverviewTab({
               }}
             >
               Edit
-            </button>
+            </Button>
           )}
         </div>
         <div style={sectionBodyStyle}>
@@ -378,22 +379,22 @@ export function OverviewTab({
               <EditorActionRow
                 style={{ gridColumn: "1 / -1", marginTop: 8 }}
                 secondaryAction={
-                  <button
+                  <Button
                     className="dg-btn dg-btn-secondary"
                     onClick={hasChanges ? handleDiscardEditing : handleCancelEditing}
                     disabled={saving}
                   >
                     {getEditorDismissLabel({ hasUnsavedChanges: hasChanges })}
-                  </button>
+                  </Button>
                 }
                 primaryAction={
-                  <button
+                  <Button
                     className="dg-btn dg-btn-primary"
                     onClick={handleReview}
                     disabled={saving || !hasChanges}
                   >
                     Review &amp; Save
-                  </button>
+                  </Button>
                 }
               />
             </div>
@@ -563,13 +564,13 @@ export function OverviewTab({
                 : "Archiving hides the organization from active listings. Data is preserved."}
             </div>
           </div>
-          <button
+          <Button
             className={organization.archivedAt ? "dg-btn dg-btn-primary" : "dg-btn dg-btn-danger"}
             onClick={() => setArchiveConfirm(true)}
             style={{ flexShrink: 0 }}
           >
             {organization.archivedAt ? "Restore" : "Archive"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -635,7 +636,7 @@ export function OverviewTab({
                   </div>
                 )}
               </div>
-              <button
+              <Button
                 className="dg-btn dg-btn-primary"
                 onClick={() => setUnsuspendConfirm(true)}
                 disabled={suspending}
@@ -644,7 +645,7 @@ export function OverviewTab({
                 <ButtonLoading loading={suspending} loadingLabel="Unsuspending">
                   Unsuspend
                 </ButtonLoading>
-              </button>
+              </Button>
             </>
           ) : (
             <>
@@ -663,13 +664,13 @@ export function OverviewTab({
                   Suspending blocks all members from accessing the app. Data is preserved.
                 </div>
               </div>
-              <button
+              <Button
                 className="dg-btn dg-btn-danger"
                 onClick={() => setSuspendConfirm(true)}
                 style={{ flexShrink: 0 }}
               >
                 Suspend
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -699,7 +700,7 @@ export function OverviewTab({
           isLoading={suspending}
           onConfirm={async () => {
             if (!suspendReason.trim()) {
-              toast.error("Please provide a reason for suspension");
+              toast.error("Add a reason for the suspension");
               return;
             }
             setSuspending(true);
@@ -714,7 +715,7 @@ export function OverviewTab({
               setSuspendConfirm(false);
               setSuspendReason("");
             } catch (err: unknown) {
-              toast.error(formatClientErrorMessage(err, "Failed to suspend"));
+              toast.error(formatClientErrorMessage(err, "We couldn't suspend. Try again."));
             } finally {
               setSuspending(false);
             }
@@ -746,9 +747,7 @@ export function OverviewTab({
           onCancel={() => {
             if (!saving) setReviewOpen(false);
           }}
-          onConfirm={() => {
-            void handleSave();
-          }}
+          onConfirm={() => handleSave()}
         />
       ) : null}
     </div>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Modal from "@/components/Modal";
+import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { ButtonLoading } from "@/components/ButtonSpinner";
 import { SelectableTag } from "@/components/ui/selectable-tag";
@@ -404,19 +405,19 @@ export function EmployeeManagementAccessModal({
           )}
 
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
+            <Button className="dg-btn dg-btn-ghost" onClick={handleRequestClose}>
               {EDITOR_ACTION_LABELS.close}
-            </button>
+            </Button>
             {hasExistingManagementAccess && managementDepartmentIds.length > 0 && (
-              <button
+              <Button
                 className="dg-btn dg-btn-ghost"
                 onClick={() => setManagementDepartmentIds([])}
                 style={{ color: "var(--color-danger)" }}
               >
                 Remove from Management
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               className="dg-btn dg-btn-primary"
               onClick={handleSubmit}
               disabled={!canSubmit}
@@ -425,7 +426,7 @@ export function EmployeeManagementAccessModal({
               <ButtonLoading loading={saving} loadingLabel="Saving" spinnerSize={16}>
                 Save Access
               </ButtonLoading>
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>

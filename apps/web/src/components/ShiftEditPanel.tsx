@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useTheme } from "next-themes";
 import { formatDate, getCertName, formatRelativeTime, calcTimeDuration } from "@/lib/utils";
+import { Button } from "@/components/Button";
 import { addDays as addDaysUtil, formatDateKey } from "@/lib/utils";
 import { timesOverlap } from "@/lib/schedule-logic";
 import { toDarkPillColors, resolveShiftPillColors, darkenColor } from "@/lib/colors";
@@ -1506,7 +1507,7 @@ export default function ShiftEditPanel({
         }
         variant={pendingRequestConfirmation.kind === "calloff" ? "danger" : "info"}
         isLoading={isSubmittingRequestConfirmation}
-        onConfirm={() => void confirmPendingRequest()}
+        onConfirm={() => confirmPendingRequest()}
         onCancel={() => {
           if (!isSubmittingRequestConfirmation) {
             setPendingRequestConfirmation(null);
@@ -1568,7 +1569,7 @@ export default function ShiftEditPanel({
           Choose how you want to drop this shift.
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <button
+          <Button
             type="button"
             data-tour="edit-panel-coverage-pickup-btn"
             onClick={() => {
@@ -1623,9 +1624,9 @@ export default function ShiftEditPanel({
                 approval completes.
               </div>
             </div>
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
             data-tour="edit-panel-coverage-calloff-btn"
             onClick={() => {
@@ -1680,7 +1681,7 @@ export default function ShiftEditPanel({
                 opens coverage automatically.
               </div>
             </div>
-          </button>
+          </Button>
         </div>
 
         {activeAbsenceTypes.length === 0 && (
@@ -1708,7 +1709,7 @@ export default function ShiftEditPanel({
               ...(standalone ? { flex: 1, minHeight: 0 } : null),
             }}
           >
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-primary"
               onClick={() =>
@@ -1719,7 +1720,7 @@ export default function ShiftEditPanel({
               }
             >
               Offer to everyone
-            </button>
+            </Button>
             <div
               style={{
                 display: "flex",
@@ -1776,7 +1777,7 @@ export default function ShiftEditPanel({
                     const { employee } = target;
 
                     return (
-                      <button
+                      <Button
                         key={employee.id}
                         type="button"
                         onClick={() => {
@@ -1833,7 +1834,7 @@ export default function ShiftEditPanel({
                         >
                           {target.absenceTypeLabel}
                         </span>
-                      </button>
+                      </Button>
                     );
                   })
                 )}
@@ -1865,7 +1866,7 @@ export default function ShiftEditPanel({
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {activeAbsenceTypes.map((at) => (
-                <button
+                <Button
                   key={at.id}
                   type="button"
                   onClick={() =>
@@ -1905,10 +1906,10 @@ export default function ShiftEditPanel({
                   >
                     {at.label}
                   </span>
-                </button>
+                </Button>
               ))}
             </div>
-            <button
+            <Button
               type="button"
               onClick={() => setShowCoverageCalloffOptions(false)}
               className="dg-btn dg-btn-ghost"
@@ -1923,7 +1924,7 @@ export default function ShiftEditPanel({
               }}
             >
               Back
-            </button>
+            </Button>
           </div>
         )}
 
@@ -1940,7 +1941,7 @@ export default function ShiftEditPanel({
               zIndex: 1,
             }}
           >
-            <button
+            <Button
               type="button"
               onClick={closeRequestSection}
               className="dg-btn dg-btn-secondary"
@@ -1950,7 +1951,7 @@ export default function ShiftEditPanel({
               }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>
@@ -2150,16 +2151,16 @@ export default function ShiftEditPanel({
             </div>
 
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button
+              <Button
                 type="button"
                 className="dg-btn dg-btn-ghost"
                 onClick={() => setSelectedSwapTarget(null)}
               >
                 Back
-              </button>
-              <button type="button" className="dg-btn dg-btn-primary" onClick={handleSubmitSwap}>
+              </Button>
+              <Button type="button" className="dg-btn dg-btn-primary" onClick={handleSubmitSwap}>
                 Submit Swap Request
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -2199,7 +2200,7 @@ export default function ShiftEditPanel({
                   minWidth: 240,
                 }}
               >
-                <button
+                <Button
                   type="button"
                   className="dg-btn dg-btn-secondary"
                   onClick={() => handleSwapWeek(-1)}
@@ -2215,7 +2216,7 @@ export default function ShiftEditPanel({
                   }}
                 >
                   <ChevronLeft aria-hidden="true" focusable="false" size={24} strokeWidth={2.5} />
-                </button>
+                </Button>
                 <div
                   aria-label={`Current swap week ${swapWeekRangeLabel}`}
                   style={{
@@ -2228,7 +2229,7 @@ export default function ShiftEditPanel({
                 >
                   {swapWeekRangeLabel}
                 </div>
-                <button
+                <Button
                   type="button"
                   className="dg-btn dg-btn-secondary"
                   onClick={() => handleSwapWeek(1)}
@@ -2244,7 +2245,7 @@ export default function ShiftEditPanel({
                   }}
                 >
                   <ChevronRight aria-hidden="true" focusable="false" size={24} strokeWidth={2.5} />
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -2262,7 +2263,7 @@ export default function ShiftEditPanel({
                 const count = swapWeekCounts.get(date) ?? 0;
 
                 return (
-                  <button
+                  <Button
                     key={date}
                     type="button"
                     disabled={disabled}
@@ -2318,7 +2319,7 @@ export default function ShiftEditPanel({
                       <User aria-hidden="true" focusable="false" size={11} strokeWidth={2.4} />
                       {count}
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -2391,7 +2392,7 @@ export default function ShiftEditPanel({
                         : targetLabel;
 
                     return (
-                      <button
+                      <Button
                         key={`${employee.id}-${targetOption.segmentIndex ?? "shift"}`}
                         type="button"
                         onClick={() =>
@@ -2441,7 +2442,7 @@ export default function ShiftEditPanel({
                             {[timeLabel, focusAreaLabel].filter(Boolean).join(" · ")}
                           </span>
                         ) : null}
-                      </button>
+                      </Button>
                     );
                   });
                 })
@@ -2451,7 +2452,7 @@ export default function ShiftEditPanel({
         )}
 
         {!standalone ? (
-          <button
+          <Button
             type="button"
             onClick={closeRequestSection}
             className="dg-btn dg-btn-secondary"
@@ -2461,7 +2462,7 @@ export default function ShiftEditPanel({
             }}
           >
             Cancel
-          </button>
+          </Button>
         ) : null}
       </div>
     );
@@ -2512,24 +2513,24 @@ export default function ShiftEditPanel({
       >
         <div style={{ display: "flex", gap: 8 }}>
           {canRenderCoverage && (
-            <button
+            <Button
               type="button"
               data-tour="edit-panel-coverage-btn"
               onClick={() => openRequestMode("coverage")}
               style={modeButtonStyle(activeRequestMode === "coverage")}
             >
               Drop shift
-            </button>
+            </Button>
           )}
           {canRenderSwap && (
-            <button
+            <Button
               type="button"
               data-tour="edit-panel-swap-btn"
               onClick={() => openRequestMode("swap")}
               style={modeButtonStyle(activeRequestMode === "swap")}
             >
               Swap
-            </button>
+            </Button>
           )}
         </div>
         {activeRequestMode && requesterSegmentOptions.length > 1 ? (
@@ -2558,7 +2559,7 @@ export default function ShiftEditPanel({
                 const isStarted = isRequesterSegmentStarted(option.segmentIndex);
 
                 return (
-                  <button
+                  <Button
                     key={option.segmentIndex}
                     type="button"
                     disabled={isStarted}
@@ -2616,7 +2617,7 @@ export default function ShiftEditPanel({
                         <Check aria-hidden="true" size={15} strokeWidth={3} />
                       </span>
                     ) : null}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -2957,7 +2958,7 @@ export default function ShiftEditPanel({
                 </div>
                 {/* Per-pill remove button */}
                 {allowShiftEdits && (
-                  <button
+                  <Button
                     onClick={() => setPendingDelete({ type: "pill", index: i })}
                     aria-label={`Remove ${previewLabel}`}
                     style={{
@@ -2980,7 +2981,7 @@ export default function ShiftEditPanel({
                     }}
                   >
                     ×
-                  </button>
+                  </Button>
                 )}
                 {/* Note dots — left side to avoid × button */}
                 {renderNoteDots(pillNoteTypes, "left")}
@@ -3127,7 +3128,7 @@ export default function ShiftEditPanel({
             ? getActiveIndicatorIds(focusAreaId).includes(id)
             : false;
           return (
-            <button
+            <Button
               key={id}
               onClick={() => onNoteToggle?.(id, !isActive, focusAreaId)}
               style={{
@@ -3156,7 +3157,7 @@ export default function ShiftEditPanel({
                 }}
               />
               {name}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -3174,7 +3175,7 @@ export default function ShiftEditPanel({
               ? getActiveIndicatorIds(activeTab).includes(id)
               : false;
             return (
-              <button
+              <Button
                 key={id}
                 onClick={() => onNoteToggle?.(id, !isActive, activeTab)}
                 style={{
@@ -3234,7 +3235,7 @@ export default function ShiftEditPanel({
                     ON
                   </div>
                 )}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -3325,7 +3326,7 @@ export default function ShiftEditPanel({
                 background: "var(--color-surface)",
               }}
             >
-              <button
+              <Button
                 type="button"
                 onClick={closeRequestSection}
                 className="dg-btn dg-btn-secondary"
@@ -3335,7 +3336,7 @@ export default function ShiftEditPanel({
                 }}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -3372,7 +3373,7 @@ export default function ShiftEditPanel({
           }}
         >
           {isMobile && (
-            <button
+            <Button
               onClick={onClose}
               aria-label="Back"
               style={{
@@ -3401,7 +3402,7 @@ export default function ShiftEditPanel({
               >
                 <polyline points="15 18 9 12 15 6" />
               </svg>
-            </button>
+            </Button>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
@@ -3582,20 +3583,20 @@ export default function ShiftEditPanel({
                     {isAbsence ? "Repeating — edit scope" : "Repeating shift — edit scope"}
                   </div>
                   <div className="dg-segment" style={{ display: "flex" }}>
-                    <button
+                    <Button
                       onClick={() => setSeriesScope("this")}
                       className={`dg-segment-btn${seriesScope === "this" ? " active" : ""}`}
                       style={{ flex: 1, fontSize: "var(--dg-fs-footnote)" }}
                     >
                       {isAbsence ? "This only" : "This shift"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => setSeriesScope("all")}
                       className={`dg-segment-btn${seriesScope === "all" ? " active" : ""}`}
                       style={{ flex: 1, fontSize: "var(--dg-fs-footnote)" }}
                     >
                       All in series
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -3612,7 +3613,7 @@ export default function ShiftEditPanel({
                       content={hint("Create a recurring pattern (daily, weekly, biweekly)")}
                       side="top"
                     >
-                      <button
+                      <Button
                         data-tour="edit-panel-repeat-btn"
                         onClick={() => {
                           setShowRepeatForm(true);
@@ -3644,7 +3645,7 @@ export default function ShiftEditPanel({
                           <path d="M21 13v2a4 4 0 0 1-4 4H3" />
                         </svg>
                         {isAbsence ? "Make this repeating" : "Make this a repeating shift"}
-                      </button>
+                      </Button>
                     </Hint>
                   </div>
                 )}
@@ -3690,7 +3691,7 @@ export default function ShiftEditPanel({
               {/* Remove shift */}
               {allowShiftEdits && hasActiveShift && (
                 <div style={{ marginTop: 16 }}>
-                  <button
+                  <Button
                     onClick={() => setPendingDelete({ type: "all" })}
                     className="dg-btn dg-btn-danger"
                     style={{
@@ -3720,7 +3721,7 @@ export default function ShiftEditPanel({
                       : currentLabels.length > 1
                         ? "Remove all shifts"
                         : "Remove shift"}
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -3733,7 +3734,7 @@ export default function ShiftEditPanel({
                   return firstCode ? resolveDefaultTimes(firstCode).end != null : true;
                 })() && (
                   <div style={{ marginTop: 8 }}>
-                    <button
+                    <Button
                       onClick={() => setShowPicker(true)}
                       className="dg-btn dg-btn-ghost"
                       style={{
@@ -3761,7 +3762,7 @@ export default function ShiftEditPanel({
                         <line x1="5" y1="12" x2="19" y2="12" />
                       </svg>
                       Add another shift
-                    </button>
+                    </Button>
                   </div>
                 )}
 
@@ -3883,7 +3884,7 @@ export default function ShiftEditPanel({
             <>
               {/* Back button when we already have an active shift */}
               {hasActiveShift && (
-                <button
+                <Button
                   onClick={() => setShowPicker(false)}
                   className="dg-btn dg-btn-ghost"
                   style={{
@@ -3909,7 +3910,7 @@ export default function ShiftEditPanel({
                     <polyline points="15 18 9 12 15 6" />
                   </svg>
                   Back
-                </button>
+                </Button>
               )}
 
               {/* Shift Picker Component */}
@@ -3989,7 +3990,7 @@ export default function ShiftEditPanel({
               background: "var(--color-surface)",
             }}
           >
-            <button
+            <Button
               type="button"
               onClick={closeRequestSection}
               className="dg-btn dg-btn-secondary"
@@ -3999,7 +4000,7 @@ export default function ShiftEditPanel({
               }}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
 
@@ -4014,7 +4015,7 @@ export default function ShiftEditPanel({
               background: "var(--color-surface)",
             }}
           >
-            <button
+            <Button
               onClick={() => setShowRepeatForm(false)}
               className="dg-btn dg-btn-ghost"
               disabled={isCreatingRepeatSeries}
@@ -4026,8 +4027,8 @@ export default function ShiftEditPanel({
               }}
             >
               Back
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => repeatFormRef.current?.submit()}
               className="dg-btn dg-btn-primary"
               style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
@@ -4040,7 +4041,7 @@ export default function ShiftEditPanel({
               >
                 {isAbsence ? "Create Repeating Off Day" : "Create Repeating Shift"}
               </ButtonLoading>
-            </button>
+            </Button>
           </div>
         )}
 
@@ -4071,7 +4072,7 @@ export default function ShiftEditPanel({
               </div>
             )}
             <div style={{ display: "flex", gap: 8 }}>
-              <button
+              <Button
                 onClick={handleUndo}
                 className="dg-btn dg-btn-ghost"
                 style={{
@@ -4082,15 +4083,15 @@ export default function ShiftEditPanel({
                 }}
               >
                 Undo
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => onConfirmDraft?.(seriesId ? seriesScope : undefined)}
                 className="dg-btn dg-btn-primary"
                 style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
                 disabled={confirmBlocked}
               >
                 Confirm
-              </button>
+              </Button>
             </div>
           </div>
         )}
