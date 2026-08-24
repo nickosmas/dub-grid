@@ -5,7 +5,13 @@
 // for everyone. Session Replay records user sessions, so it is gated behind
 // analytics consent and only attached once the user opts in (here at boot if
 // already granted, or live via the consent-changed event).
-import { init, addIntegration, getClient, captureRouterTransitionStart } from "@/lib/sentry";
+import {
+  init,
+  addIntegration,
+  getClient,
+  captureRouterTransitionStart,
+  loadReplayIntegration,
+} from "@/lib/sentry";
 import { getAnalyticsConsentSnapshot, subscribeToConsentChanges } from "@/components/CookieConsent";
 
 function beforeSend(event: Record<string, unknown>) {
@@ -33,10 +39,13 @@ const analyticsConsented = getAnalyticsConsentSnapshot();
  * the same mistake the PostHog provider used to make.
  */
 async function attachSessionReplay(): Promise<void> {
-  if (!getClient()) return;
-  const { replayIntegration } = await import("@sentry/nextjs");
-  if (!getClient()) return;
-  addIntegration(replayIntegration());
+  // loadReplayIntegration waits for the core SDK, which now loads
+  // asynchronously as well — getClient() is undefined for the first moments of
+  // the page, so checking it before that resolves would silently deny replay to
+  // a consenting visitor.
+  const replay = await loadReplayIntegration();
+  if (!replay || !getClient()) return;
+  addIntegration(replay);
 }
 
 init({
