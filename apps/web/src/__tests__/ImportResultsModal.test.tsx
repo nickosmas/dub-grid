@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import ImportResultsModal from "@/components/ImportResultsModal";
-import { summarizeImportPreviousOutcomes } from "@/app/schedule/_lib/operations";
+import { summarizeImportPreviousOutcomes } from "@/app/(app)/schedule/_lib/operations";
 import type { ImportPreviousScheduleOutcome } from "@/features/schedule/client";
 
 function row(

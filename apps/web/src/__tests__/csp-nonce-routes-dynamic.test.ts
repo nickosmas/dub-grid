@@ -49,18 +49,39 @@ function isDynamic(file: string): boolean {
 }
 
 describe("authed routes receive the nonce CSP and must render dynamically (F-4/H-2)", () => {
-  const segments = readdirSync(APP_DIR, { withFileTypes: true })
-    .filter((d) => d.isDirectory() && !d.name.startsWith("(") && !IGNORED.has(d.name))
-    .map((d) => d.name)
-    .filter((name) => !PUBLIC_SEGMENTS.has(name));
+  // Route groups — a directory in parentheses — are not URL segments, so the
+  // real routes live one level down. Skipping them outright (as this did before
+  // the (app) group existed) collected nothing at all, and a suite with no
+  // cases passes by saying nothing. Descend instead, and carry the group's own
+  // layout down as a source of dynamic-ness, since children inherit it.
+  type Seg = { name: string; dir: string; inheritedDynamic: boolean };
 
-  for (const seg of segments) {
-    const dir = join(APP_DIR, seg);
+  function collect(dir: string, inheritedDynamic: boolean): Seg[] {
+    const out: Seg[] = [];
+    for (const d of readdirSync(dir, { withFileTypes: true })) {
+      if (!d.isDirectory() || IGNORED.has(d.name)) continue;
+      const child = join(dir, d.name);
+      if (d.name.startsWith("(")) {
+        out.push(...collect(child, inheritedDynamic || isDynamic(join(child, "layout.tsx"))));
+        continue;
+      }
+      out.push({ name: d.name, dir: child, inheritedDynamic });
+    }
+    return out;
+  }
+
+  const segments = collect(APP_DIR, false).filter((s) => !PUBLIC_SEGMENTS.has(s.name));
+  expect(segments.length, "collected no route segments — the traversal is broken").toBeGreaterThan(
+    0,
+  );
+
+  for (const { name: seg, dir, inheritedDynamic } of segments) {
     const hasPage = existsSync(join(dir, "page.tsx"));
     if (!hasPage) continue; // not a routable leaf at this level
 
     it(`/${seg} is dynamically rendered`, () => {
-      const dynamicHere = isDynamic(join(dir, "layout.tsx")) || isDynamic(join(dir, "page.tsx"));
+      const dynamicHere =
+        inheritedDynamic || isDynamic(join(dir, "layout.tsx")) || isDynamic(join(dir, "page.tsx"));
       expect(
         dynamicHere,
         `/${seg} is an authed route (gets the nonce CSP) but is not dynamic. ` +

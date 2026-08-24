@@ -6,7 +6,7 @@
  */
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import DomainSelector from "@/app/login/DomainSelector";
+import DomainSelector from "@/app/(app)/login/DomainSelector";
 
 vi.mock("@/components/RouteGuards", () => ({
   PublicRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,

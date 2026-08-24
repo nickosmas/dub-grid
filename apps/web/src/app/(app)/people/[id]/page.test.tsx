@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PersonDetailRouteContent } from "@/app/people/[id]/page";
+import { PersonDetailRouteContent } from "@/app/(app)/people/[id]/page";
 
 const mockReplace = vi.fn();
 const mockUseAuth = vi.fn();

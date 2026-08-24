@@ -77,6 +77,8 @@ vi.mock("lucide-react", () => ({
   ChevronLeft: () => <span data-testid="chevron-left-icon" />,
   ChevronRight: () => <span data-testid="chevron-right-icon" />,
   FileUp: () => <span data-testid="file-up-icon" />,
+  // The export buttons now render <ButtonLoading>, whose spinner is this icon.
+  LoaderIcon: () => <span data-testid="loader-icon" />,
   RefreshCw: () => <span data-testid="refresh-icon" />,
   Upload: () => <span data-testid="upload-icon" />,
   X: () => <span data-testid="x-icon" />,

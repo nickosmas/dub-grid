@@ -120,12 +120,15 @@ export function getInsetDividerShadow(args: {
   return `inset ${horizontalOffset}px 0 0 0 ${color}`;
 }
 
-export function cellShowsDraftDiffBadge(args: {
-  draftKind: DraftKind;
-  showDiffOverlay: boolean;
-}): boolean {
-  const { draftKind, showDiffOverlay } = args;
-  return showDiffOverlay && !!draftKind && draftKind !== "deleted";
+/**
+ * Draft annotations ("+ Time", "Changed", the replaced label) are part of
+ * reading a draft, not an overlay to switch on: an unpublished cell is being
+ * worked on, and what changed about it is the whole point of looking at it.
+ * A deleted draft has no pill left to hang a badge off — it shows its
+ * struck-through published label instead.
+ */
+export function cellShowsDraftDiffBadge(args: { draftKind: DraftKind }): boolean {
+  return !!args.draftKind && args.draftKind !== "deleted";
 }
 
 export function formatRelativePublishTime(isoDate: string): string {

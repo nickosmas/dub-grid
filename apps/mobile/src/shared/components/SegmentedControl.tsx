@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
+import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import { Pressable } from "./Pressable";
 import Animated, { useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";
 import { hapticSelection } from "../lib/haptics";
 import { useMotionPreference } from "../motion/useMotionPreference";

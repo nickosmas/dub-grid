@@ -177,7 +177,6 @@ interface LegacyScheduleGridProps {
   } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   fromRecurringForKey?: (empId: string, date: Date) => boolean;
-  showDiffOverlay?: boolean;
   showPublishDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
@@ -278,7 +277,6 @@ interface SectionBlockProps {
   } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
   fromRecurringForKey?: (empId: string, date: Date) => boolean;
-  showDiffOverlay?: boolean;
   showPublishDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
@@ -351,7 +349,6 @@ const SectionBlock = memo(function SectionBlock({
   getPublishedCustomShiftTimes,
   draftKindForKey,
   fromRecurringForKey,
-  showDiffOverlay,
   showPublishDiffOverlay,
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
@@ -488,7 +485,6 @@ const SectionBlock = memo(function SectionBlock({
     colWidth,
     nameColWidth,
     shiftDisplayMode,
-    showDiffOverlay,
     weekDates,
     employees.length,
   ]);
@@ -1348,10 +1344,7 @@ const SectionBlock = memo(function SectionBlock({
                       const draftKind = draftKindForKey?.(emp.id, date) ?? null;
                       const fromRecurring = fromRecurringForKey?.(emp.id, date) ?? false;
                       const publishDiff = publishDiffForKey?.(emp.id, date) ?? null;
-                      const showsPublishDiff = !!(
-                        (showPublishDiffOverlay ?? showDiffOverlay) &&
-                        publishDiff
-                      );
+                      const showsPublishDiff = !!(showPublishDiffOverlay && publishDiff);
                       const publishedLabel = publishedLabelForKey?.(emp.id, date) ?? null;
                       const publishedCodeIds = publishedAssignmentIdsForKey?.(emp.id, date) ?? [];
                       const publishedSegments = publishedSegmentsForKey?.(emp.id, date) ?? [];
@@ -1365,10 +1358,7 @@ const SectionBlock = memo(function SectionBlock({
                       const auditName = createdByNameForKey?.(emp.id, date) ?? null;
                       const shouldShowAuthorName = !!auditName && (showAudit || !!draftKind);
                       const shouldComputeDraftDiff = !!draftKind && draftKind !== "deleted";
-                      const showsDraftBadge = cellShowsDraftDiffBadge({
-                        draftKind,
-                        showDiffOverlay: !!showDiffOverlay,
-                      });
+                      const showsDraftBadge = cellShowsDraftDiffBadge({ draftKind });
                       const currentAbsenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
                       const publishedAbsenceTypeId =
                         publishedAbsenceTypeIdForKey?.(emp.id, date) ?? null;
@@ -1377,8 +1367,7 @@ const SectionBlock = memo(function SectionBlock({
                           ? (absenceTypeMap?.get(currentAbsenceTypeId) ?? null)
                           : null;
 
-                      const showDiffCellTint =
-                        (!!showDiffOverlay && !!draftKind) || showsPublishDiff;
+                      const showDiffCellTint = !!draftKind || showsPublishDiff;
                       // The row above paints its own bottom stroke inside its
                       // own box — the header cells and the open-shifts row both
                       // do it with a background-image at their bottom edge. Row
@@ -2588,7 +2577,7 @@ const SectionBlock = memo(function SectionBlock({
                                   );
                                 })()}
                               </DraggableShift>
-                            ) : (showDiffOverlay && draftKind === "deleted" && publishedLabel) ||
+                            ) : (draftKind === "deleted" && publishedLabel) ||
                               (showsPublishDiff &&
                                 publishDiff?.kind === "deleted" &&
                                 ((publishDiff.from ?? []).length > 0 ||
@@ -2964,7 +2953,6 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
   getPublishedCustomShiftTimes,
   draftKindForKey,
   fromRecurringForKey,
-  showDiffOverlay,
   showPublishDiffOverlay,
   publishedLabelForKey,
   publishedAssignmentIdsForKey,
@@ -3287,7 +3275,6 @@ const LegacyScheduleGrid = memo(function LegacyScheduleGrid({
                     getPublishedCustomShiftTimes={getPublishedCustomShiftTimes}
                     draftKindForKey={draftKindForKey}
                     fromRecurringForKey={fromRecurringForKey}
-                    showDiffOverlay={showDiffOverlay}
                     showPublishDiffOverlay={showPublishDiffOverlay}
                     publishedLabelForKey={publishedLabelForKey}
                     publishedAssignmentIdsForKey={publishedAssignmentIdsForKey}
@@ -3509,7 +3496,6 @@ const ScheduleGrid = memo(function ScheduleGrid({
         getPublishedCustomShiftTimes={model.accessors.getPublishedCustomShiftTimes}
         draftKindForKey={model.accessors.draftKindForKey}
         fromRecurringForKey={model.accessors.fromRecurringForKey}
-        showDiffOverlay={model.options.showDiffOverlay}
         showPublishDiffOverlay={model.options.showPublishDiffOverlay}
         publishedLabelForKey={model.accessors.publishedLabelForKey}
         publishedAssignmentIdsForKey={model.accessors.publishedAssignmentIdsForKey}

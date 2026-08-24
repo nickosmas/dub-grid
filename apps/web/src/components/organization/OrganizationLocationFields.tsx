@@ -408,6 +408,7 @@ function AddressLine1Input({
                         id={`${id}-option-${index}`}
                         type="button"
                         role="option"
+                        spinner={false}
                         aria-selected={isActive}
                         className="dg-address-item"
                         onMouseDown={(event) => event.preventDefault()}

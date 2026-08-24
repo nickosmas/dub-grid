@@ -5,7 +5,7 @@ import {
   formatShortDate,
   getSkipReasonLabel,
   type ImportPreviousBreakdown,
-} from "@/app/schedule/_lib/operations";
+} from "@/app/(app)/schedule/_lib/operations";
 import type { ImportPreviousScheduleOutcome } from "@/features/schedule/client";
 
 interface ImportResultsModalProps {

@@ -247,7 +247,6 @@ interface RenderGridOptions {
     perPill?: { start: string; end: string }[];
   } | null;
   draftKindForKey?: (empId: string, date: Date) => DraftKind;
-  showDiffOverlay?: boolean;
   showPublishDiffOverlay?: boolean;
   publishedLabelForKey?: (empId: string, date: Date) => string | null;
   publishedAssignmentIdsForKey?: (empId: string, date: Date) => number[];
@@ -328,7 +327,6 @@ function renderGrid(options: RenderGridOptions = {}) {
     isCellInteractive: options.isCellInteractive ?? true,
     canDragShifts: options.canDragShifts,
     shiftDisplayMode: options.shiftDisplayMode ?? "code",
-    showDiffOverlay: options.showDiffOverlay,
     showPublishDiffOverlay: options.showPublishDiffOverlay,
     showAudit: options.showAudit,
     accessors: {
@@ -623,8 +621,8 @@ describe("ScheduleGrid", () => {
     ];
 
     renderGrid({
+      showPublishDiffOverlay: true,
       assignments: localAssignmentDefinitions,
-      showDiffOverlay: true,
       publishDiffForKey: () => ({
         empId: "emp-1",
         date: "2024-01-07",
@@ -710,7 +708,6 @@ describe("ScheduleGrid", () => {
 
     renderGrid({
       assignments: localAssignmentDefinitions,
-      showDiffOverlay: false,
       showPublishDiffOverlay: true,
       publishDiffForKey: () => ({
         empId: "emp-1",
@@ -772,7 +769,6 @@ describe("ScheduleGrid", () => {
       assignments: localAssignmentDefinitions,
       shiftForKey: () => "D/N",
       assignmentIdsForKey: () => [1, 2],
-      showDiffOverlay: false,
       showPublishDiffOverlay: true,
       publishDiffForKey: () => ({
         empId: "emp-1",
@@ -814,7 +810,7 @@ describe("ScheduleGrid", () => {
     observedWidth = 1600;
 
     renderGrid({
-      showDiffOverlay: true,
+      showPublishDiffOverlay: true,
       publishDiffForKey: () => ({
         empId: "emp-1",
         date: "2024-01-07",
@@ -837,7 +833,7 @@ describe("ScheduleGrid", () => {
     observedWidth = 1600;
 
     renderGrid({
-      showDiffOverlay: true,
+      showPublishDiffOverlay: true,
       publishDiffForKey: () => ({
         empId: "emp-1",
         date: "2024-01-07",
@@ -893,7 +889,6 @@ describe("ScheduleGrid", () => {
 
     renderGrid({
       assignments: localAssignmentDefinitions,
-      showDiffOverlay: true,
       draftKindForKey: () => "modified",
       publishedAssignmentIdsForKey: () => [2],
       publishedLabelForKey: () => "N",
@@ -919,7 +914,7 @@ describe("ScheduleGrid", () => {
     expect(badge?.getAttribute("aria-label")).toContain("Was N.");
   });
 
-  it("keeps single-pill draft borders dashed when show changes is off", () => {
+  it("annotates a single-pill draft replacement and keeps its border dashed", () => {
     observedWidth = 1600;
 
     renderGrid({
@@ -947,7 +942,7 @@ describe("ScheduleGrid", () => {
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
     const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
 
-    expect(badge).toBeNull();
+    expect(badge?.textContent).toBe("Was N");
     expect(pill).toHaveStyle({
       borderStyle: "dashed",
       borderWidth: "2px",
@@ -955,7 +950,7 @@ describe("ScheduleGrid", () => {
     expect(pill?.style.borderColor).toBe("rgb(217, 119, 6)");
   });
 
-  it("keeps only the added second shift dashed when show changes is off", () => {
+  it("keeps only the added second shift dashed", () => {
     observedWidth = 1600;
 
     const localAssignmentDefinitions: AssignmentDefinition[] = [
@@ -1006,7 +1001,7 @@ describe("ScheduleGrid", () => {
     expect(pills[1]?.style.borderColor).toBe("rgb(22, 163, 74)");
   });
 
-  it("keeps only the newly mentored split-shift pill dashed when show changes is off", () => {
+  it("keeps only the newly mentored split-shift pill dashed", () => {
     observedWidth = 1600;
 
     const localAssignmentDefinitions: AssignmentDefinition[] = [
@@ -1100,7 +1095,6 @@ describe("ScheduleGrid", () => {
       assignments: localAssignmentDefinitions,
       shiftForKey: () => "E · Supv",
       assignmentIdsForKey: () => [2],
-      showDiffOverlay: true,
       draftKindForKey: () => "modified",
       publishedAssignmentIdsForKey: () => [1],
       publishedLabelForKey: () => "D · Supv",
@@ -1136,7 +1130,6 @@ describe("ScheduleGrid", () => {
       assignments: localAssignmentDefinitions,
       shiftForKey: () => "D/N",
       assignmentIdsForKey: () => [1, 2],
-      showDiffOverlay: true,
       draftKindForKey: () => "modified",
       publishedAssignmentIdsForKey: () => [2, 1],
       publishedLabelForKey: () => "N/D",
@@ -1251,7 +1244,7 @@ describe("ScheduleGrid", () => {
     expect(within(firstCell).queryByText("Sheltered Care")).toBeNull();
   });
 
-  it("keeps cross-focus split draft pills on the white shift surface when show changes is on", () => {
+  it("keeps cross-focus split draft pills on the white shift surface", () => {
     observedWidth = 1600;
 
     const localFocusAreas: FocusArea[] = [
@@ -1283,7 +1276,6 @@ describe("ScheduleGrid", () => {
       assignments: localAssignmentDefinitions,
       shiftForKey: () => "D/XT",
       assignmentIdsForKey: () => [1, 2],
-      showDiffOverlay: true,
       draftKindForKey: () => "modified",
       publishedAssignmentIdsForKey: () => [1],
       publishedLabelForKey: () => "D",
@@ -1462,7 +1454,7 @@ describe("ScheduleGrid", () => {
     expect(pill?.style.color).not.toBe("rgb(248, 250, 252)");
   });
 
-  it("keeps cross-focus draft new cells on the white shift surface when show changes is on", () => {
+  it("keeps cross-focus draft new cells on the white shift surface", () => {
     observedWidth = 1600;
 
     const localFocusAreas: FocusArea[] = [
@@ -1493,7 +1485,6 @@ describe("ScheduleGrid", () => {
       assignments: localAssignmentDefinitions,
       shiftForKey: () => "S",
       assignmentIdsForKey: () => [2],
-      showDiffOverlay: true,
       draftKindForKey: () => "new",
     });
 
@@ -1506,7 +1497,7 @@ describe("ScheduleGrid", () => {
     expect(within(firstCell).getByText("SC").style.background).toBe("rgb(219, 234, 254)");
   });
 
-  it("keeps cross-focus draft modified cells on the white shift surface when show changes is on", () => {
+  it("keeps cross-focus draft modified cells on the white shift surface", () => {
     observedWidth = 1600;
 
     const localFocusAreas: FocusArea[] = [
@@ -1537,7 +1528,6 @@ describe("ScheduleGrid", () => {
       assignments: localAssignmentDefinitions,
       shiftForKey: () => "S",
       assignmentIdsForKey: () => [2],
-      showDiffOverlay: true,
       draftKindForKey: () => "modified",
       publishedAssignmentIdsForKey: () => [1],
       publishedLabelForKey: () => "D",
@@ -1555,7 +1545,6 @@ describe("ScheduleGrid", () => {
     observedWidth = 1600;
 
     renderGrid({
-      showDiffOverlay: true,
       draftKindForKey: () => "new",
       getCustomShiftTimes: () => ({
         start: "08:00",
@@ -1589,10 +1578,10 @@ describe("ScheduleGrid", () => {
     ];
 
     renderGrid({
+      showPublishDiffOverlay: true,
       assignments: localAssignmentDefinitions,
       shiftForKey: () => "S",
       assignmentIdsForKey: () => [2],
-      showDiffOverlay: true,
       publishDiffForKey: () => ({
         empId: "emp-1",
         date: "2024-01-07",
@@ -1644,10 +1633,10 @@ describe("ScheduleGrid", () => {
     ];
 
     renderGrid({
+      showPublishDiffOverlay: true,
       assignments: localAssignmentDefinitions,
       shiftForKey: () => "E · Supv",
       assignmentIdsForKey: () => [2],
-      showDiffOverlay: true,
       publishDiffForKey: () => ({
         empId: "emp-1",
         date: "2024-01-07",
@@ -1669,7 +1658,7 @@ describe("ScheduleGrid", () => {
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
   });
 
-  it("keeps draft new historical cross-focus cells on the white shift surface when show changes is on", () => {
+  it("keeps draft new historical cross-focus cells on the white shift surface", () => {
     observedWidth = 1600;
 
     const localFocusAreas: FocusArea[] = [
@@ -1709,7 +1698,6 @@ describe("ScheduleGrid", () => {
           text: "var(--color-text-muted)",
           sortOrder: 999,
         },
-      showDiffOverlay: true,
       draftKindForKey: () => "new",
     });
 
@@ -1737,6 +1725,7 @@ describe("ScheduleGrid", () => {
     };
 
     renderGrid({
+      showPublishDiffOverlay: true,
       assignments,
       historicalAssignments: [historicalAssignmentDefinition],
       shiftForKey: () => "S",
@@ -1752,7 +1741,6 @@ describe("ScheduleGrid", () => {
           text: "var(--color-text-muted)",
           sortOrder: 999,
         },
-      showDiffOverlay: true,
       publishDiffForKey: () => ({
         empId: "emp-1",
         date: "2024-01-07",
@@ -1777,7 +1765,7 @@ describe("ScheduleGrid", () => {
     observedWidth = 1600;
 
     renderGrid({
-      showDiffOverlay: true,
+      showPublishDiffOverlay: true,
       absenceTypeMap: new Map([
         [
           7,
@@ -1852,7 +1840,6 @@ describe("ScheduleGrid", () => {
     observedWidth = 1600;
 
     renderGrid({
-      showDiffOverlay: true,
       draftKindForKey: () => "modified",
       publishedAssignmentIdsForKey: () => [1],
       publishedLabelForKey: () => "D",
@@ -1898,7 +1885,6 @@ describe("ScheduleGrid", () => {
       assignments: localAssignmentDefinitions,
       shiftForKey: () => "D/N",
       assignmentIdsForKey: () => [1, 2],
-      showDiffOverlay: true,
       draftKindForKey: () => "modified",
       publishedAssignmentIdsForKey: () => [1],
       getCustomShiftTimes: () => ({
@@ -1948,10 +1934,10 @@ describe("ScheduleGrid", () => {
     ];
 
     renderGrid({
+      showPublishDiffOverlay: true,
       assignments: localAssignmentDefinitions,
       shiftForKey: () => null,
       assignmentIdsForKey: () => [],
-      showDiffOverlay: true,
       publishDiffForKey: () => ({
         empId: "emp-1",
         date: "2024-01-07",
@@ -2002,8 +1988,8 @@ describe("ScheduleGrid", () => {
     observedWidth = 1600;
 
     renderGrid({
+      showPublishDiffOverlay: true,
       showAudit: true,
-      showDiffOverlay: true,
       createdByNameForKey: () => "M. Example",
       publishDiffForKey: () => ({
         empId: "emp-1",
@@ -2057,7 +2043,6 @@ describe("ScheduleGrid", () => {
           needed: 1,
         },
       ],
-      showDiffOverlay: true,
       draftKindForKey: () => "modified",
       createdByNameForKey: () => "Jamie",
     });
@@ -2588,7 +2573,6 @@ describe("ScheduleGrid", () => {
     renderGrid({
       shiftForKey: () => null,
       assignmentIdsForKey: () => [],
-      showDiffOverlay: true,
       draftKindForKey: () => "deleted" satisfies DraftKind,
       publishedLabelForKey: () => "D",
     });
@@ -2667,7 +2651,6 @@ describe("ScheduleGrid", () => {
   it("leaves the first row's top divider to the header, edited or not", () => {
     observedWidth = 1600;
     renderGrid({
-      showDiffOverlay: true,
       draftKindForKey: (_empId, date) => (formatDateKey(date) === "2024-01-07" ? "modified" : null),
     });
 
@@ -2683,7 +2666,6 @@ describe("ScheduleGrid", () => {
   it("leaves the first row's top divider to the open-shifts row above it", () => {
     observedWidth = 1600;
     renderGrid({
-      showDiffOverlay: true,
       draftKindForKey: (_empId, date) => (formatDateKey(date) === "2024-01-07" ? "modified" : null),
       openShifts: [
         {

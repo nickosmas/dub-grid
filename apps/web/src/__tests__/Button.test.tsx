@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 
 import { Button } from "@/components/Button";
+import { Form } from "@/components/Form";
 
 /** A promise plus the handle to settle it, so a test can hold work in flight. */
 function deferred() {
@@ -112,5 +113,126 @@ describe("Button", () => {
     const button = screen.getByRole("button", { name: "Save" });
     expect(button).toHaveClass("dg-btn", "dg-btn-primary");
     expect(button).toHaveAttribute("type", "submit");
+  });
+
+  it("shows a spinner and the progressive label while the action runs", async () => {
+    const gate = deferred();
+    render(
+      <Button loadingLabel="Publishing" onClick={() => gate.promise}>
+        Publish
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "Publish" });
+    expect(button).not.toHaveAttribute("aria-busy");
+
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    // The label is never dropped for the spinner: a busy button still says
+    // which action is running.
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
+    expect(screen.getByText("Publishing")).toBeInTheDocument();
+    expect(screen.queryByText("Publish")).not.toBeInTheDocument();
+    expect(screen.getByRole("button")).toHaveAttribute("aria-busy", "true");
+
+    await act(async () => {
+      gate.resolve();
+      await gate.promise;
+    });
+    expect(screen.getByText("Publish")).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("shows the same spinner for a pending flag that lives outside the button", () => {
+    render(
+      <Button loading loadingLabel="Deleting" onClick={vi.fn()}>
+        Delete
+      </Button>,
+    );
+    expect(screen.getByText("Deleting")).toBeInTheDocument();
+    expect(screen.getByRole("button")).toBeDisabled();
+  });
+
+  it("still shows a spinner without a loadingLabel, keeping the label as-is", async () => {
+    const gate = deferred();
+    render(<Button onClick={() => gate.promise}>Open</Button>);
+    const button = screen.getByRole("button", { name: /Open/ });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    // Most handlers arrive as props typed `=> void`, so the spinner cannot
+    // wait for someone to remember `loadingLabel`: it is the default, and the
+    // label survives rather than being swapped to a verb nobody supplied.
+    expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
+    expect(screen.getByText("Open")).toBeInTheDocument();
+
+    await act(async () => {
+      gate.resolve();
+      await gate.promise;
+    });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("can opt out of the spinner for a row of content", async () => {
+    const gate = deferred();
+    render(
+      <Button spinner={false} onClick={() => gate.promise}>
+        A whole notification row
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: /notification row/ });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    // A spinner wedged beside a row of text reads as breakage; the row still
+    // latches and disables, and its own state change is the feedback.
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(button).toBeDisabled();
+
+    await act(async () => {
+      gate.resolve();
+      await gate.promise;
+    });
+  });
+});
+
+describe("Form", () => {
+  it("submits once when submitted twice", async () => {
+    let resolve!: () => void;
+    const gate = new Promise<void>((r) => {
+      resolve = r;
+    });
+    const onSubmit = vi.fn((e: React.FormEvent) => {
+      e.preventDefault();
+      return gate;
+    });
+
+    render(
+      <Form onSubmit={onSubmit}>
+        <button type="submit">Sign in</button>
+      </Form>,
+    );
+
+    // A `type="submit"` button has no onClick, so `<Button>` cannot help here:
+    // the work starts from the form's own submit event.
+    const form = screen.getByRole("button", { name: "Sign in" }).closest("form")!;
+    await act(async () => {
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+    });
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolve();
+      await gate;
+    });
+    await act(async () => {
+      fireEvent.submit(form);
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(2);
   });
 });

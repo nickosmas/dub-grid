@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Form } from "@/components/Form";
 import { PasswordInput } from "@/components/auth/PasswordInput";
 
 /**
@@ -34,7 +35,7 @@ export function EmailPasswordForm({
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+    <Form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div>
         <label htmlFor="auth-email" className="dg-auth-field-label">
           Email
@@ -94,6 +95,6 @@ export function EmailPasswordForm({
           {submitLabel}
         </ButtonLoading>
       </button>
-    </form>
+    </Form>
   );
 }

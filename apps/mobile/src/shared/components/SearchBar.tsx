@@ -5,6 +5,7 @@ import Animated from "react-native-reanimated";
 import { usePressAnimation } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileMotion, mobileRadii, type MobileColors } from "../theme/tokens";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 
 const DEFAULT_DEBOUNCE_MS = 300;
 
@@ -88,7 +89,7 @@ export function SearchBar({
   );
 }
 
-function ClearButton({ onPress }: { onPress: () => void }) {
+function ClearButton({ onPress }: { onPress: () => unknown }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
   const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
@@ -96,13 +97,18 @@ function ClearButton({ onPress }: { onPress: () => void }) {
     scale: mobileMotion.press.iconOnlyScale,
   });
 
+  // Latched here rather than at each call site: these press handlers are
+  // synchronous today, and the latch returns early for those, but nothing
+  // stops a caller passing one that fires a request.
+  const action = useAsyncAction(onPress ?? (() => {}));
+
   return (
     <AnimatedPressable
       accessibilityLabel="Clear search"
       accessibilityRole="button"
       android_ripple={androidRipple}
       hitSlop={12}
-      onPress={onPress}
+      onPress={action.run}
       {...pressHandlers}
       style={[styles.clearButton, animatedStyle]}
     >

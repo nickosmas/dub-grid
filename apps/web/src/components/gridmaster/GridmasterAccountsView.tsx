@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import { EmptyState } from "@/components/EmptyState";
@@ -277,7 +278,7 @@ export default function GridmasterAccountsView({
         </div>
       )}
 
-      <form
+      <Form
         onSubmit={handlePromote}
         style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}
       >
@@ -332,7 +333,7 @@ export default function GridmasterAccountsView({
             />
           )}
         </div>
-      </form>
+      </Form>
 
       {filtered.length > 0 ? (
         <div style={sectionStyle}>

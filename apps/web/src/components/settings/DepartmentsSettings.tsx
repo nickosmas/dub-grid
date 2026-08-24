@@ -1060,6 +1060,7 @@ function DepartmentSection({
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "none";
                       }}
+                      loadingLabel="Checking"
                     >
                       Delete
                     </Button>

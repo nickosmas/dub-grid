@@ -261,7 +261,11 @@ export default function RootPage() {
 
           <div className="flex items-center gap-4">
             <ThemeToggleButton />
-            <Link href="/login" className="hidden sm:inline-flex dg-btn dg-btn-primary dg-btn-lg">
+            <Link
+              href="/login"
+              prefetch={false}
+              className="hidden sm:inline-flex dg-btn dg-btn-primary dg-btn-lg"
+            >
               Sign In
             </Link>
             {/* Mobile hamburger */}
@@ -295,7 +299,7 @@ export default function RootPage() {
             </div>
           </div>
           <div className="flex flex-col items-center justify-center flex-1 gap-8">
-            <Link href="/login" className="dg-btn dg-btn-primary dg-btn-lg">
+            <Link href="/login" prefetch={false} className="dg-btn dg-btn-primary dg-btn-lg">
               Sign In
             </Link>
           </div>

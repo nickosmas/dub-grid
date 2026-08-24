@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveGridAuditLabel } from "@/app/schedule/_lib/grid-audit-label";
+import { resolveGridAuditLabel } from "@/app/(app)/schedule/_lib/grid-audit-label";
 import type { ShiftMap } from "@/types";
 
 function makeShiftMap(overrides: Partial<ShiftMap[string]>, key = "emp-1_2024-01-15"): ShiftMap {

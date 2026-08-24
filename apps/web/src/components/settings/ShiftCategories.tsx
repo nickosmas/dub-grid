@@ -697,10 +697,11 @@ function ShiftCategoriesSettings({
             canManageScheduleDefinitions && !cat.isNew ? (
               <Button
                 onClick={() => handleDeleteClick(cat.id)}
-                disabled={isDeletingThis}
+                loading={isDeletingThis}
+                loadingLabel="Deleting"
                 className="dg-btn dg-btn-danger dg-btn-sm"
               >
-                {isDeletingThis ? "…" : "Delete"}
+                Delete
               </Button>
             ) : undefined
           }

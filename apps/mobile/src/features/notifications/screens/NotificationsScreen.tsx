@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { Pressable } from "../../../shared/components/Pressable";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
