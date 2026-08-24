@@ -790,9 +790,11 @@ function ReportsContent() {
               }
               onClick={() => handleExport("pdf")}
               type="button"
+              loading={exportingFormat === "pdf"}
+              loadingLabel="Exporting"
+              icon={<FileUp size={16} />}
             >
-              <FileUp size={16} />
-              {exportingFormat === "pdf" ? "Exporting" : "Export PDF"}
+              Export PDF
             </Button>
             <Button
               className="dg-btn dg-btn-primary"
@@ -804,9 +806,11 @@ function ReportsContent() {
               }
               onClick={() => handleExport("csv")}
               type="button"
+              loading={exportingFormat === "csv"}
+              loadingLabel="Exporting"
+              icon={<Upload size={16} />}
             >
-              <Upload size={16} />
-              {exportingFormat === "csv" ? "Exporting" : "Export CSV"}
+              Export CSV
             </Button>
           </div>
         </div>

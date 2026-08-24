@@ -892,6 +892,7 @@ export default function StringListSettings({
                     onMouseLeave={(e) => {
                       e.currentTarget.style.background = "none";
                     }}
+                    loadingLabel="Checking"
                   >
                     Delete
                   </Button>

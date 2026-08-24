@@ -1,5 +1,6 @@
 import ConfirmDialog from "@/components/ConfirmDialog";
 import CustomSelect from "@/components/CustomSelect";
+import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import PermissionsEditor from "@/components/PermissionsEditor";
 import { assignGridmasterOrgRoleByEmail } from "@/features/gridmaster/client";
@@ -210,7 +211,7 @@ export function UsersTab({
 
       {/* Add user form */}
       {showAddForm && (
-        <form onSubmit={handleAddUser} style={{ ...sectionStyle, padding: 16 }}>
+        <Form onSubmit={handleAddUser} style={{ ...sectionStyle, padding: 16 }}>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 200 }}>
               <label style={labelStyle}>Email</label>
@@ -246,7 +247,7 @@ export function UsersTab({
               </ButtonLoading>
             </button>
           </div>
-        </form>
+        </Form>
       )}
 
       {/* Users table */}

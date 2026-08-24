@@ -14,8 +14,12 @@ import { formatRelativeTime } from "@/lib/utils";
 import type {
   PublishHistoryEntryWithName,
   PublishChange,
+  AbsenceType,
   Employee,
+  FocusArea,
+  JobDefinition,
   ScheduleCellState,
+  ShiftCategory,
   AssignmentDefinition,
 } from "@/types";
 import { useMediaQuery, MOBILE } from "@/hooks";
@@ -26,6 +30,7 @@ import {
   createAssignmentDefinitionIdByPairMap,
   deriveAssignmentDefinitionIdsFromAssignments,
 } from "@/lib/shift-job-segments";
+import { buildAssignableShiftDisplayMap } from "@/lib/assignable-shifts";
 
 interface PublishHistoryPanelProps {
   orgId: string;
@@ -33,9 +38,11 @@ interface PublishHistoryPanelProps {
   onClose: () => void;
   onSelectEntry: (entry: PublishHistoryEntryWithName) => void;
   assignments: AssignmentDefinition[];
-  assignmentLabelMap: Map<number, string>;
+  shiftCategories: ShiftCategory[];
+  jobs: JobDefinition[];
+  focusAreas: FocusArea[];
   employees: Employee[];
-  absenceTypeMap: Map<number, string>;
+  absenceTypes: AbsenceType[];
 }
 
 function formatDateRange(start: string, end: string): string {
@@ -424,9 +431,11 @@ export default function PublishHistoryPanel({
   onClose,
   onSelectEntry,
   assignments,
-  assignmentLabelMap,
+  shiftCategories,
+  jobs,
+  focusAreas,
   employees,
-  absenceTypeMap,
+  absenceTypes,
 }: PublishHistoryPanelProps) {
   const isMobile = useMediaQuery(MOBILE);
   const queryClient = useQueryClient();
@@ -443,6 +452,29 @@ export default function PublishHistoryPanel({
   const assignmentIdByPair = useMemo(
     () => createAssignmentDefinitionIdByPairMap(assignments),
     [assignments],
+  );
+
+  // History spells every shift and absence out in full, whatever the org's
+  // shiftDisplayMode is. A change log is read long after the edit, often by
+  // someone reconstructing what happened, and "D/RN → N/RN" only means
+  // something to a reader who already has the codes memorized.
+  const assignmentLabelMap = useMemo(
+    () =>
+      buildAssignableShiftDisplayMap({
+        assignments,
+        shiftCategories,
+        jobs,
+        focusAreas,
+        shiftDisplayMode: "name",
+      }),
+    [assignments, focusAreas, jobs, shiftCategories],
+  );
+  const absenceTypeMap = useMemo(
+    () =>
+      new Map(
+        absenceTypes.map((absenceType) => [absenceType.id, absenceType.name || absenceType.label]),
+      ),
+    [absenceTypes],
   );
 
   const PAGE_SIZE = 20;

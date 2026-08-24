@@ -5,6 +5,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { usePressAnimation } from "../motion/usePressAnimation";
 import { useMobileColors } from "../providers/ThemeModeProvider";
 import { mobileRadii, mobileSpace, mobileText, type MobileColors } from "../theme/tokens";
+import { useAsyncAction } from "../hooks/useAsyncAction";
 
 export type ChipTone = "neutral" | "brand" | "success" | "warning" | "danger";
 
@@ -36,7 +37,7 @@ export function Chip({
   disabled?: boolean;
   accessibilityLabel?: string;
   /** Omit for a display-only chip, which renders as a plain View. */
-  onPress?: () => void;
+  onPress?: () => unknown;
 }>) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createStyles(mobileColors), [mobileColors]);
@@ -69,6 +70,11 @@ export function Chip({
     disabled && styles.chipDisabled,
   ];
 
+  // Latched here rather than at each call site: these press handlers are
+  // synchronous today, and the latch returns early for those, but nothing
+  // stops a caller passing one that fires a request.
+  const action = useAsyncAction(onPress ?? (() => {}));
+
   if (!onPress) {
     return (
       <View accessibilityLabel={accessibilityLabel} style={chipStyle}>
@@ -84,7 +90,7 @@ export function Chip({
       accessibilityState={{ selected, disabled }}
       android_ripple={androidRipple}
       disabled={disabled}
-      onPress={onPress}
+      onPress={action.run}
       {...pressHandlers}
       style={[...chipStyle, animatedStyle]}
     >

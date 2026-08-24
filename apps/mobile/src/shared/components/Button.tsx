@@ -118,10 +118,15 @@ export function Button({
   // A tap is easy to repeat, and `loading` only disables the pressable after
   // React re-renders, so a quick double-tap slips through and runs the action
   // twice. The latch inside `useAsyncAction` is a ref, checked synchronously
-  // on the first press, so the second is already too late. A caller passing
-  // its own `loading` still wins, and a synchronous `onPress` never spins.
+  // on the first press, so the second is already too late. A synchronous
+  // `onPress` never spins.
+  //
+  // `||`, not `??`: a caller's own `loading` adds a pending state that lives
+  // outside the press, it does not replace this one. With `??`, a screen
+  // passing `loading={mutation.isPending}` silently suppressed the spinner
+  // for any *other* async work the same press did.
   const action = useAsyncAction(onPress);
-  const isBusy = loading ?? action.isRunning;
+  const isBusy = Boolean(loading) || action.isRunning;
 
   const resolvedSize: ButtonSize = size ?? (compact ? "sm" : "md");
   const metrics = SIZE[resolvedSize];

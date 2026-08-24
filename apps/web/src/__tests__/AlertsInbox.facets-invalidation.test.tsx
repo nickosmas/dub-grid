@@ -80,7 +80,7 @@ describe("AlertsInboxPage facets cache subscription", () => {
   });
 
   it("refreshes facets when the bell invalidates the notifications React Query key", async () => {
-    const { InboxView } = await import("@/app/alerts/AlertsInboxPage");
+    const { InboxView } = await import("@/app/(app)/alerts/AlertsInboxPage");
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });

@@ -8,6 +8,7 @@ import { usePressAnimation } from "../../../shared/motion/usePressAnimation";
 import { useMobileColors, useThemeMode } from "../../../shared/providers/ThemeModeProvider";
 import type { ThemePreference } from "../../../shared/lib/theme-preference";
 import { mobileRadii, mobileSpace, type MobileColors } from "../../../shared/theme/tokens";
+import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -95,11 +96,16 @@ function AppearanceOption({
   icon: IconName;
   label: string;
   selected: boolean;
-  onPress: () => void;
+  onPress: () => unknown;
 }) {
   const mobileColors = useMobileColors();
   const styles = useMemo(() => createOptionStyles(mobileColors), [mobileColors]);
   const { animatedStyle, androidRipple, pressHandlers } = usePressAnimation();
+
+  // Latched here rather than at each call site: these press handlers are
+  // synchronous today, and the latch returns early for those, but nothing
+  // stops a caller passing one that fires a request.
+  const action = useAsyncAction(onPress ?? (() => {}));
 
   return (
     <AnimatedPressable
@@ -107,7 +113,7 @@ function AppearanceOption({
       accessibilityRole="button"
       accessibilityState={{ selected }}
       android_ripple={androidRipple}
-      onPress={onPress}
+      onPress={action.run}
       {...pressHandlers}
       style={[styles.option, selected && styles.optionSelected, animatedStyle]}
     >

@@ -19,9 +19,7 @@ import { useLatestRef } from "./useLatestRef";
  * touching state: wrapping a plain click handler is a no-op, which is what
  * makes this safe to build into shared primitives whose callers pass both.
  */
-export function useAsyncAction<A extends unknown[]>(
-  action: (...args: A) => void | Promise<unknown>,
-) {
+export function useAsyncAction<A extends unknown[]>(action: (...args: A) => unknown) {
   const [isRunning, setIsRunning] = useState(false);
   const inFlight = useRef(false);
   const actionRef = useLatestRef(action);

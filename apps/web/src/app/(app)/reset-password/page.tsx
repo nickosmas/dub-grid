@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { AuthChangeEvent } from "@supabase/supabase-js";
 import { PublicRoute } from "@/components/RouteGuards";
+import { Form } from "@/components/Form";
 import { PageShell, Card } from "@/components/auth/AuthCard";
 import { AuthStateCard } from "@/components/auth/AuthStateCard";
 import { PasswordInput } from "@/components/auth/PasswordInput";
@@ -190,7 +191,7 @@ function ResetPasswordContent() {
               numbers, and symbols.
             </p>
 
-            <form
+            <Form
               onSubmit={handleSubmit}
               style={{
                 display: "flex",
@@ -272,7 +273,7 @@ function ResetPasswordContent() {
                   Reset Password
                 </ButtonLoading>
               </button>
-            </form>
+            </Form>
           </>
         )}
       </Card>

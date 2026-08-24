@@ -355,10 +355,11 @@ function IndicatorRow({
                   !indicator.isNew ? (
                     <Button
                       onClick={handleDeleteClick}
-                      disabled={deleting}
+                      loading={deleting}
+                      loadingLabel="Deleting"
                       className="dg-btn dg-btn-danger dg-btn-sm"
                     >
-                      {deleting ? "…" : "Delete"}
+                      Delete
                     </Button>
                   ) : undefined
                 }

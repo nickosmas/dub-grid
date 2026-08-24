@@ -3,6 +3,7 @@ import { Pressable } from "react-native";
 import Animated from "react-native-reanimated";
 import { usePressAnimation } from "../../../shared/motion/usePressAnimation";
 import { useMobileColors } from "../../../shared/providers/ThemeModeProvider";
+import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -20,7 +21,7 @@ export function ExpandButton({
   onPress,
 }: {
   accessibilityLabel: string;
-  onPress: () => void;
+  onPress: () => unknown;
 }) {
   const mobileColors = useMobileColors();
   const { animatedStyle, pressHandlers, androidRipple } = usePressAnimation({
@@ -28,13 +29,18 @@ export function ExpandButton({
     rippleBorderless: true,
   });
 
+  // Latched here rather than at each call site: these press handlers are
+  // synchronous today, and the latch returns early for those, but nothing
+  // stops a caller passing one that fires a request.
+  const action = useAsyncAction(onPress ?? (() => {}));
+
   return (
     <AnimatedPressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       android_ripple={androidRipple}
       hitSlop={12}
-      onPress={onPress}
+      onPress={action.run}
       style={animatedStyle}
       {...pressHandlers}
     >

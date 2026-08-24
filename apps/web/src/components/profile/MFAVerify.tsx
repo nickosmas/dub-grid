@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { ButtonLoading } from "@/components/ButtonSpinner";
+import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import { toast } from "sonner";
 import { DubGridLogo, DubGridWordmark } from "@/components/Logo";
@@ -116,7 +117,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
           </p>
         </div>
 
-        <form
+        <Form
           onSubmit={handleVerify}
           style={{ display: "flex", flexDirection: "column", gap: 16, alignItems: "center" }}
         >
@@ -177,7 +178,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
               Verify
             </ButtonLoading>
           </button>
-        </form>
+        </Form>
 
         <div style={{ marginTop: 20, textAlign: "center" }}>
           <Button

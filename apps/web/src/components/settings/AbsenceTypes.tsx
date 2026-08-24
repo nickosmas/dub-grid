@@ -409,10 +409,11 @@ function AbsenceTypeRow({
               canEdit && !absenceType.isNew ? (
                 <Button
                   onClick={handleDeleteClick}
-                  disabled={deleting}
+                  loading={deleting}
+                  loadingLabel="Archiving"
                   className="dg-btn dg-btn-danger dg-btn-sm"
                 >
-                  {deleting ? "…" : "Archive"}
+                  Archive
                 </Button>
               ) : undefined
             }

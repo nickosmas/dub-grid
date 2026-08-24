@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   shouldRenderScheduleAuthorNames,
   shouldShowScheduleEditorNames,
-} from "@/app/schedule/_lib/editor-visibility";
+} from "@/app/(app)/schedule/_lib/editor-visibility";
 
 describe("shouldShowScheduleEditorNames", () => {
   it("hides editor names when there is only one distinct user online", () => {

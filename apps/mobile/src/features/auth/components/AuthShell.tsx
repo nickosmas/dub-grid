@@ -1,13 +1,6 @@
 import type { ReactNode } from "react";
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
+import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable } from "../../../shared/components/Pressable";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { DubGridWordmark } from "../../../shared/components/DubGridWordmark";
 import { GradientBackdrop } from "../../../shared/components/GradientBackdrop";

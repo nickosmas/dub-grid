@@ -92,7 +92,7 @@ const ImpersonationHistory = dynamic(() => import("@/components/gridmaster/Imper
 
 import NotificationBell from "@/components/NotificationBell";
 import ProgressBar from "@/components/ProgressBar";
-import { InboxView as AlertsInboxView } from "@/app/alerts/AlertsInboxPage";
+import { InboxView as AlertsInboxView } from "@/app/(app)/alerts/AlertsInboxPage";
 import {
   fetchGridmasterDashboardData,
   type GridmasterDashboardData,

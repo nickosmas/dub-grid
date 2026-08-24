@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { getPasswordMismatchError, isPasswordAcceptable } from "@dubgrid/domain";
 
 import { SectionCard } from "@/components/settings/shared";
+import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { ButtonLoading } from "@/components/ButtonSpinner";
@@ -181,7 +182,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
           </div>
 
           {showPasswordForm && (
-            <form
+            <Form
               onSubmit={requestPasswordChange}
               style={{ display: "flex", flexDirection: "column", gap: 14 }}
             >
@@ -253,7 +254,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                   {getEditorDismissLabel({ hasUnsavedChanges: hasPasswordChanges })}
                 </Button>
               </div>
-            </form>
+            </Form>
           )}
         </div>
       </SectionCard>

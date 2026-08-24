@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Check, Trash2, X } from "lucide-react";
 
 import { SectionCard } from "@/components/settings/shared";
+import { Form } from "@/components/Form";
 import { Button } from "@/components/Button";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { extractErrorMessage } from "@/lib/error-handling";
@@ -467,7 +468,7 @@ export function ProfilePanel({
           </div>
 
           {isEditing ? (
-            <form
+            <Form
               onSubmit={(e) => {
                 e.preventDefault();
                 requestSave();
@@ -548,7 +549,7 @@ export function ProfilePanel({
                   {getEditorDismissLabel({ hasUnsavedChanges: hasAnyChanges })}
                 </Button>
               </div>
-            </form>
+            </Form>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div className="grid gap-4 sm:grid-cols-2">

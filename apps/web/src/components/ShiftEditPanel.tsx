@@ -4089,6 +4089,7 @@ export default function ShiftEditPanel({
                 className="dg-btn dg-btn-primary"
                 style={{ flex: 1, fontSize: "var(--dg-fs-caption)", padding: "9px 12px" }}
                 disabled={confirmBlocked}
+                loadingLabel="Confirming"
               >
                 Confirm
               </Button>
