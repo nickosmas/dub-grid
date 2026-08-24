@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Timer, withTiming } from "@/lib/server-timing";
 import type {
   DbAbsenceType,
   DbCoverageRequirement,
@@ -129,17 +130,15 @@ async function resolveOrganizationId(
   return { orgId: (data?.id as string | undefined) ?? null, isGridmaster: false };
 }
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest, timer: Timer) {
   try {
-    const auth = await requireAuthenticatedUserWithClaims(req);
+    const auth = await timer.time("auth", () => requireAuthenticatedUserWithClaims(req));
     if ("response" in auth) {
       return auth.response;
     }
 
-    const { orgId, isGridmaster } = await resolveOrganizationId(
-      req,
-      auth.claims,
-      auth.user?.id ?? null,
+    const { orgId, isGridmaster } = await timer.time("resolve_org", () =>
+      resolveOrganizationId(req, auth.claims, auth.user?.id ?? null),
     );
 
     if (isGridmaster && !orgId) {
@@ -186,54 +185,56 @@ export async function GET(req: NextRequest) {
       departmentResult,
       coverageReqResult,
       absenceTypeResult,
-    ] = await Promise.all([
-      serviceClient.from("organizations").select(ORGANIZATION_COLS).eq("id", orgId).single(),
-      serviceClient
-        .from("focus_areas")
-        .select(FOCUS_AREA_COLS)
-        .eq("org_id", orgId)
-        .order("sort_order", { ascending: true }),
-      serviceClient
-        .from("shift_categories")
-        .select(SHIFT_CATEGORY_COLS)
-        .eq("org_id", orgId)
-        .order("sort_order", { ascending: true }),
-      serviceClient
-        .from("jobs")
-        .select(JOB_COLS)
-        .eq("org_id", orgId)
-        .order("sort_order", { ascending: true }),
-      serviceClient
-        .from("indicator_types")
-        .select(INDICATOR_TYPE_COLS)
-        .eq("org_id", orgId)
-        .is("archived_at", null)
-        .order("sort_order", { ascending: true }),
-      serviceClient
-        .from("certifications")
-        .select(NAMED_ITEM_COLS)
-        .eq("org_id", orgId)
-        .is("archived_at", null)
-        .order("sort_order", { ascending: true }),
-      serviceClient
-        .from("organization_roles")
-        .select(ORG_ROLE_COLS)
-        .eq("org_id", orgId)
-        .is("archived_at", null)
-        .order("sort_order", { ascending: true }),
-      serviceClient
-        .from("departments")
-        .select(DEPARTMENT_COLS)
-        .eq("org_id", orgId)
-        .is("archived_at", null)
-        .order("sort_order", { ascending: true }),
-      serviceClient.from("coverage_requirements").select(COVERAGE_REQ_COLS).eq("org_id", orgId),
-      serviceClient
-        .from("absence_types")
-        .select(ABSENCE_TYPE_COLS)
-        .eq("org_id", orgId)
-        .order("sort_order", { ascending: true }),
-    ]);
+    ] = await timer.time("fanout", () =>
+      Promise.all([
+        serviceClient.from("organizations").select(ORGANIZATION_COLS).eq("id", orgId).single(),
+        serviceClient
+          .from("focus_areas")
+          .select(FOCUS_AREA_COLS)
+          .eq("org_id", orgId)
+          .order("sort_order", { ascending: true }),
+        serviceClient
+          .from("shift_categories")
+          .select(SHIFT_CATEGORY_COLS)
+          .eq("org_id", orgId)
+          .order("sort_order", { ascending: true }),
+        serviceClient
+          .from("jobs")
+          .select(JOB_COLS)
+          .eq("org_id", orgId)
+          .order("sort_order", { ascending: true }),
+        serviceClient
+          .from("indicator_types")
+          .select(INDICATOR_TYPE_COLS)
+          .eq("org_id", orgId)
+          .is("archived_at", null)
+          .order("sort_order", { ascending: true }),
+        serviceClient
+          .from("certifications")
+          .select(NAMED_ITEM_COLS)
+          .eq("org_id", orgId)
+          .is("archived_at", null)
+          .order("sort_order", { ascending: true }),
+        serviceClient
+          .from("organization_roles")
+          .select(ORG_ROLE_COLS)
+          .eq("org_id", orgId)
+          .is("archived_at", null)
+          .order("sort_order", { ascending: true }),
+        serviceClient
+          .from("departments")
+          .select(DEPARTMENT_COLS)
+          .eq("org_id", orgId)
+          .is("archived_at", null)
+          .order("sort_order", { ascending: true }),
+        serviceClient.from("coverage_requirements").select(COVERAGE_REQ_COLS).eq("org_id", orgId),
+        serviceClient
+          .from("absence_types")
+          .select(ABSENCE_TYPE_COLS)
+          .eq("org_id", orgId)
+          .order("sort_order", { ascending: true }),
+      ]),
+    );
 
     if (orgResult.error) throw orgResult.error;
     if (focusAreaResult.error) throw focusAreaResult.error;
@@ -291,6 +292,11 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "organization bootstrap GET failed");
-    return NextResponse.json({ error: "Failed to load organization bootstrap" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your organization. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
+
+export const GET = withTiming(handleGET);

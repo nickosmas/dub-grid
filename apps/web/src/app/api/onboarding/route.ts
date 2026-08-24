@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Timer, withTiming } from "@/lib/server-timing";
 import { z } from "zod";
 import { createRequestSupabaseClient, requireAuthenticatedUser } from "@/lib/api-auth";
 import { validateCsrfOrigin } from "@/lib/csrf";
@@ -13,9 +14,9 @@ const postSchema = z.object({
   orgId: z.string().uuid(),
 });
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest, timer: Timer) {
   try {
-    const auth = await requireAuthenticatedUser(req);
+    const auth = await timer.time("auth", () => requireAuthenticatedUser(req));
     if ("response" in auth) {
       return auth.response;
     }
@@ -79,6 +80,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error({ error }, "onboarding POST failed");
-    return NextResponse.json({ error: "Failed to complete onboarding" }, { status: 500 });
+    return NextResponse.json({ error: "We couldn't finish setup. Try again." }, { status: 500 });
   }
 }
+
+export const GET = withTiming(handleGET);

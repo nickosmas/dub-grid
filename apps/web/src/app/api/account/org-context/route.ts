@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Timer, withTiming } from "@/lib/server-timing";
 import { requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest, timer: Timer) {
   try {
-    const auth = await requireAuthenticatedUserWithClaims(req);
+    const auth = await timer.time("auth", () => requireAuthenticatedUserWithClaims(req));
     if ("response" in auth) {
       return auth.response;
     }
@@ -15,6 +16,11 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "account org context GET failed");
-    return NextResponse.json({ error: "Failed to load account org context" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your organization. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
+
+export const GET = withTiming(handleGET);
