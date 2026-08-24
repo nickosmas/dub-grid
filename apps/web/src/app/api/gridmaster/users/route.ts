@@ -124,7 +124,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "gridmaster users GET failed");
-    return NextResponse.json({ error: "Failed to load users" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the people list. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -189,6 +192,9 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error({ error }, "gridmaster users PATCH failed");
-    return NextResponse.json({ error: "Failed to update user status" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't update their status. Try again." },
+      { status: 500 },
+    );
   }
 }

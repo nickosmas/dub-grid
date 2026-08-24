@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { mobileDashboardResponseSchema, mobileScheduleQuerySchema } from "@dubgrid/contracts";
 import {
   getEffectiveMobileRole,
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
     Object.fromEntries(req.nextUrl.searchParams.entries()),
   );
   if (!queryResult.success) {
-    return json({ error: "Invalid query" }, { status: 400 });
+    return json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
 
   let range: ReturnType<typeof resolveMobileDateRange>;
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest) {
       ? resolveMobileDateRange(queryResult.data)
       : getDefaultDashboardRange();
   } catch {
-    return json({ error: "Invalid query" }, { status: 400 });
+    return json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
   }
 
   try {

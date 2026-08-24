@@ -14,9 +14,16 @@ import { API_ERRORS } from "@dubgrid/client-errors";
 
 export const dynamic = "force-dynamic";
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 const bodySchema = z.object({
   orgId: z.string().uuid(),
   scope: z.enum(["mine", "all"]),
+  // Bounds the discard to one window, mirroring /api/shifts/publish. The two
+  // sit side by side in the same banner under the same count, so they have to
+  // act on the same set of drafts. Optional for callers with no window.
+  startDate: z.string().regex(ISO_DATE).optional(),
+  endDate: z.string().regex(ISO_DATE).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -29,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(
@@ -50,7 +57,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
   }
 
-  const { orgId, scope } = parsed.data;
+  const { orgId, scope, startDate, endDate } = parsed.data;
 
   try {
     const orgAuth = await requireOrgPermissions(
@@ -74,12 +81,16 @@ export async function POST(req: NextRequest) {
     const discardedSummary = await fetchScheduleDraftBreakdown({
       orgId,
       updatedBy: scope === "mine" ? user.id : undefined,
+      startDate,
+      endDate,
       serviceClient,
     });
 
     await discardScheduleDraftsDirect({
       orgId,
       userId: scope === "mine" ? user.id : undefined,
+      startDate,
+      endDate,
       serviceClient,
     });
 
@@ -92,6 +103,8 @@ export async function POST(req: NextRequest) {
       resource_id: orgId,
       details: {
         scope,
+        startDate: startDate ?? null,
+        endDate: endDate ?? null,
         summary: discardedSummary,
       },
     });
@@ -100,6 +113,6 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     Sentry.captureException(err, { extra: { context: "shifts/discard", orgId } });
     logger.error({ error: err, orgId }, "Schedule discard failed");
-    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
+    return NextResponse.json({ error: API_ERRORS.UNEXPECTED }, { status: 500 });
   }
 }

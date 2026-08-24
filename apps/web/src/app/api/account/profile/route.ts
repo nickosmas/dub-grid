@@ -74,6 +74,9 @@ export async function PATCH(req: NextRequest) {
     );
   } catch (error) {
     logger.error({ error }, "account profile PATCH failed");
-    return NextResponse.json({ error: "Failed to update account details" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't save your account details. Try again." },
+      { status: 500 },
+    );
   }
 }

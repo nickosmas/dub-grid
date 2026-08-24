@@ -10,6 +10,7 @@ import {
   MOBILE,
 } from "@/hooks";
 import { useAuth } from "@/components/AuthProvider";
+import { Button } from "@/components/Button";
 import { fetchAccountIdentity } from "@/features/account/client";
 import { DubGridLogo } from "@/components/Logo";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -211,7 +212,7 @@ function OrgSearchCombobox({
                 const isArchived = !!c.archivedAt;
                 const isActive = selectedOrg?.id === c.id;
                 return (
-                  <button
+                  <Button
                     key={c.id}
                     onClick={() => {
                       onSelect(c.id);
@@ -304,7 +305,7 @@ function OrgSearchCombobox({
                         {empCount}
                       </span>
                     </div>
-                  </button>
+                  </Button>
                 );
               })
             )}
@@ -404,7 +405,10 @@ export default function GridmasterPortal() {
     return map;
   }, [dashboardQuery.data?.stats]);
   const error = dashboardQuery.error
-    ? formatClientErrorMessage(dashboardQuery.error, "Failed to load gridmaster dashboard")
+    ? formatClientErrorMessage(
+        dashboardQuery.error,
+        "We couldn't load the dashboard. Refresh and try again.",
+      )
     : null;
 
   // ── Nav item config (must be before early returns to satisfy Rules of Hooks) ──
@@ -743,7 +747,7 @@ export default function GridmasterPortal() {
         </div>
         {!isMobile && (
           <div ref={menuRef} style={{ position: "relative", flexShrink: 0 }}>
-            <button
+            <Button
               onClick={() => setMenuOpen((o) => !o)}
               style={{
                 display: "inline-flex",
@@ -830,14 +834,14 @@ export default function GridmasterPortal() {
               >
                 <polyline points="6 9 12 15 18 9" />
               </svg>
-            </button>
+            </Button>
 
             {menuOpen && (
               <div
                 className="dg-menu"
                 style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200 }}
               >
-                <button
+                <Button
                   className="dg-menu-item"
                   onClick={() => {
                     setMenuOpen(false);
@@ -858,9 +862,9 @@ export default function GridmasterPortal() {
                     <circle cx="12" cy="7" r="4" />
                   </svg>
                   Profile
-                </button>
+                </Button>
                 <div className="dg-menu-divider" />
-                <button
+                <Button
                   className="dg-menu-item dg-menu-item--danger"
                   onClick={() => {
                     setMenuOpen(false);
@@ -882,7 +886,7 @@ export default function GridmasterPortal() {
                     <line x1="21" y1="12" x2="9" y2="12" />
                   </svg>
                   Sign out
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -907,7 +911,7 @@ export default function GridmasterPortal() {
               { key: "impersonation-history", label: "History" },
             ] as { key: GridmasterView; label: string }[]
           ).map((item) => (
-            <button
+            <Button
               key={item.key}
               className={`dg-mobile-section-chip${view === item.key ? " active" : ""}`}
               onClick={() => {
@@ -921,7 +925,7 @@ export default function GridmasterPortal() {
               }}
             >
               {item.label}
-            </button>
+            </Button>
           ))}
         </nav>
       )}
@@ -1086,7 +1090,7 @@ export default function GridmasterPortal() {
 
           {view === "organization" && selectedOrg && (
             <>
-              <button
+              <Button
                 onClick={() => {
                   setView("dashboard");
                   setSelectedId(null);
@@ -1124,7 +1128,7 @@ export default function GridmasterPortal() {
                   <polyline points="15 18 9 12 15 6" />
                 </svg>
                 All Organizations
-              </button>
+              </Button>
               <OrganizationDetail
                 organization={selectedOrg}
                 stats={stats.get(selectedOrg.id)}

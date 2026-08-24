@@ -77,7 +77,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "notifications GET failed");
-    return NextResponse.json({ error: "Failed to load notifications" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your alerts. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -119,6 +122,9 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error({ error }, "notifications PATCH failed");
-    return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't save your notification settings. Try again." },
+      { status: 500 },
+    );
   }
 }

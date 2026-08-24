@@ -41,6 +41,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ employeeCount: count ?? 0 });
   } catch (error) {
     logger.error({ error }, "organization employee count GET failed");
-    return NextResponse.json({ error: "Failed to load employee count" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the team size. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

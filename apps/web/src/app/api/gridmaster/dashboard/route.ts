@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
       "gridmaster dashboard GET failed",
     );
     return NextResponse.json(
-      { error: "Failed to load gridmaster dashboard data" },
+      { error: "We couldn't load the dashboard. Refresh and try again." },
       { status: 500 },
     );
   }

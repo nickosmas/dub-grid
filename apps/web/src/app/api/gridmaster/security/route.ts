@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await loadGridmasterSecurity(getServiceClient()));
   } catch (error) {
     logger.error({ error }, "gridmaster security GET failed");
-    return NextResponse.json({ error: "Failed to load security oversight" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the security overview. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

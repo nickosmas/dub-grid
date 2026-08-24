@@ -25,7 +25,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await fetchUserSessionOverviewForUser(auth.user.id));
   } catch (error) {
     logger.error({ error }, "account sessions GET failed");
-    return NextResponse.json({ error: "Failed to load sessions" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your devices. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -76,6 +79,9 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error({ error }, "account sessions DELETE failed");
-    return NextResponse.json({ error: "Failed to revoke session" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't sign out that device. Try again." },
+      { status: 500 },
+    );
   }
 }

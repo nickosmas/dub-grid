@@ -352,7 +352,7 @@ export default function SettingsPage({
               onCertificationsChange(saved);
               toast.success("Certifications saved");
             } catch (err) {
-              toast.error("Failed to save certifications");
+              toast.error("We couldn't save the certifications. Try again.");
               throw err;
             }
           }}
@@ -381,7 +381,7 @@ export default function SettingsPage({
               onOrgRolesChange(saved);
               toast.success("Roles saved");
             } catch (err) {
-              toast.error("Failed to save roles");
+              toast.error("We couldn't save the roles. Try again.");
               throw err;
             }
           }}

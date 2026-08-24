@@ -55,6 +55,6 @@ export async function POST(req: NextRequest) {
       orgSlug: (data.org_slug as string | null) ?? null,
     });
   } catch (error) {
-    return apiErrorResponse(error, "Failed to accept invitation");
+    return apiErrorResponse(error, "We couldn't accept invitation. Try again.");
   }
 }

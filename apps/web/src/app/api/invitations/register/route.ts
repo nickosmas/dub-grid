@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "anonymous";
   const perIp = await checkRateLimit(apiLimiter, `invite-register:${ip}`);
   if (perIp.misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (perIp.limited) {
     const retryAfter = perIp.reset ? Math.ceil((perIp.reset - Date.now()) / 1000) : 60;
@@ -78,12 +78,12 @@ export async function POST(req: NextRequest) {
   // The IP limit above doesn't stop a distributed run at one address.
   const perEmail = await checkRateLimit(emailTargetLimiter, `invite-register:${hashEmail(email)}`);
   if (perEmail.misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (perEmail.limited) {
     const retryAfter = perEmail.reset ? Math.ceil((perEmail.reset - Date.now()) / 1000) : 60;
     return NextResponse.json(
-      { error: "Too many attempts for this address. Please try again later." },
+      { error: "Too many attempts for that address. Wait a few minutes and try again." },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
     );
   }
@@ -173,6 +173,9 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     Sentry.captureException(error, { extra: { context: "invitation-register" } });
     logger.error({ error, path: "/api/invitations/register" }, "Invitation registration failed");
-    return NextResponse.json({ error: "Failed to create your account" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't create your account. Try again." },
+      { status: 500 },
+    );
   }
 }

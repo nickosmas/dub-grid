@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     // claims are super_admin for THIS org. (The login flow only calls this for
     // the org it just signed into, so claims.org_id matches.)
     if (claims.org_role !== "super_admin" || String(claims.org_id ?? "") !== parsed.data.orgId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: API_ERRORS.FORBIDDEN }, { status: 403 });
     }
 
     const supabase = createRequestSupabaseClient(req);
@@ -50,12 +50,18 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.error) {
-      return NextResponse.json({ error: "Failed to start trial." }, { status: 400 });
+      return NextResponse.json(
+        { error: "We couldn't start your trial. Try again." },
+        { status: 400 },
+      );
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error({ error }, "auth start-trial POST failed");
-    return NextResponse.json({ error: "Failed to start trial" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't start your trial. Try again." },
+      { status: 500 },
+    );
   }
 }

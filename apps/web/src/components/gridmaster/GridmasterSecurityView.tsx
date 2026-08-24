@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import CustomSelect from "@/components/CustomSelect";
+import { Button } from "@/components/Button";
 import GridmasterAccountsView from "@/components/gridmaster/GridmasterAccountsView";
 import { fetchGridmasterSecurity, fetchGridmasterSessions } from "@/features/gridmaster/client";
 import { formatClientErrorMessage, formatOrganizationRoleLabel } from "@/lib/client-facing";
@@ -339,7 +340,7 @@ function SessionsTable({
                 colSpan={7}
                 style={{ ...tdStyle, textAlign: "center", color: "var(--color-text-muted)" }}
               >
-                Loading sessions...
+                Loading
               </td>
             </tr>
           )}
@@ -545,7 +546,10 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
               fontWeight: 600,
             }}
           >
-            {formatClientErrorMessage(sessionsQuery.error, "Failed to load sessions")}
+            {formatClientErrorMessage(
+              sessionsQuery.error,
+              "We couldn't load your devices. Refresh and try again.",
+            )}
           </div>
         )}
 
@@ -641,14 +645,14 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
             borderTop: "1px solid var(--color-border-light)",
           }}
         >
-          <button
+          <Button
             type="button"
             className="dg-btn dg-btn-secondary dg-btn-sm"
             disabled={page === 0}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
           >
             Previous
-          </button>
+          </Button>
           <span
             style={{
               fontSize: "var(--dg-fs-caption)",
@@ -658,14 +662,14 @@ function GridmasterSessionsPanel({ organizations }: { organizations: Organizatio
           >
             Page {page + 1}
           </span>
-          <button
+          <Button
             type="button"
             className="dg-btn dg-btn-secondary dg-btn-sm"
             disabled={sessions.length < SESSIONS_PAGE_SIZE}
             onClick={() => setPage((p) => p + 1)}
           >
             Next
-          </button>
+          </Button>
         </div>
       </div>
       <div style={{ ...sectionStyle, marginBottom: 24 }}>
@@ -764,7 +768,10 @@ export default function GridmasterSecurityView({
             marginBottom: 16,
           }}
         >
-          {formatClientErrorMessage(securityQuery.error, "Failed to load security oversight")}
+          {formatClientErrorMessage(
+            securityQuery.error,
+            "We couldn't load security oversight. Refresh and try again.",
+          )}
         </div>
       )}
 

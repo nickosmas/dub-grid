@@ -119,6 +119,9 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error({ error }, "organization app-only-user PATCH failed");
-    return NextResponse.json({ error: "Failed to update app-only user" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't update that account. Try again." },
+      { status: 500 },
+    );
   }
 }

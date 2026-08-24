@@ -14,6 +14,7 @@ import {
   type BillingConfirmAction,
 } from "@/components/gridmaster/BillingActionDialogs";
 import CustomSelect from "@/components/CustomSelect";
+import { Button } from "@/components/Button";
 import { EmptyState } from "@/components/EmptyState";
 import ProgressBar from "@/components/ProgressBar";
 import { queryKeys } from "@/lib/query-keys";
@@ -178,23 +179,23 @@ function BillingRowActions({
       onClick={(event) => event.stopPropagation()}
       style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
     >
-      <button
+      <Button
         type="button"
         className="dg-btn dg-btn-secondary dg-btn-xs"
         disabled={busy || !org.stripeCustomerId}
         onClick={() => onSync(org)}
       >
         Sync
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         className="dg-btn dg-btn-secondary dg-btn-xs"
         disabled={busy || !org.stripeSubscriptionId || org.seats === org.appUsers}
         onClick={() => onSyncSeats(org)}
       >
         True up seats
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         className="dg-btn dg-btn-secondary dg-btn-xs"
         // Only a trialing org has a trial to extend; for active/canceled/past_due
@@ -203,15 +204,15 @@ function BillingRowActions({
         onClick={() => onExtendTrial(org)}
       >
         Extend trial
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
         className="dg-btn dg-btn-secondary dg-btn-xs"
         disabled={busy || !org.stripeSubscriptionId || org.status === "canceled" || !!org.cancelAt}
         onClick={() => onCancelAtPeriodEnd(org)}
       >
         End period
-      </button>
+      </Button>
       <button
         type="button"
         className="dg-btn dg-btn-danger dg-btn-xs"
@@ -235,14 +236,14 @@ function BillingRowActions({
         height={28}
         fontSize="var(--dg-fs-caption)"
       />
-      <button
+      <Button
         type="button"
         className="dg-btn dg-btn-primary dg-btn-xs"
         disabled={busy || status === org.status}
         onClick={() => onOverrideStatus(org, status)}
       >
         Override
-      </button>
+      </Button>
     </div>
   );
 }
@@ -277,7 +278,9 @@ export default function GridmasterBillingView({
       invalidateBilling();
     },
     onError: (error) => {
-      toast.error(formatClientErrorMessage(error, "Failed to sync billing"));
+      toast.error(
+        formatClientErrorMessage(error, "We couldn't refresh the billing details. Try again."),
+      );
     },
     onSettled: () => {
       setBusyOrgId(null);
@@ -418,14 +421,14 @@ export default function GridmasterBillingView({
             support needs to intervene.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           className="dg-btn dg-btn-secondary dg-btn-sm"
           onClick={() => billingQuery.refetch()}
           disabled={billingQuery.isFetching}
         >
           Refresh
-        </button>
+        </Button>
       </div>
 
       {billingQuery.error instanceof Error && (
@@ -440,7 +443,10 @@ export default function GridmasterBillingView({
             marginBottom: 16,
           }}
         >
-          {formatClientErrorMessage(billingQuery.error, "Failed to load billing")}
+          {formatClientErrorMessage(
+            billingQuery.error,
+            "We couldn't load your billing details. Refresh and try again.",
+          )}
         </div>
       )}
 

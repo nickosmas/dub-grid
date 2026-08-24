@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import StepLayout from "../StepLayout";
 import CompositeSection from "./CompositeSection";
 import { DisplayModeSample, DISPLAY_MODES } from "@/components/settings/DisplayMode";
+import { Button } from "@/components/Button";
 import ShiftCategoriesSettings from "@/components/settings/ShiftCategories";
 import JobsSettings from "@/components/settings/Jobs";
 import { useOrganizationData } from "@/hooks";
@@ -57,7 +58,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
       return true;
     } catch (err) {
       Sentry.captureException(err);
-      toast.error("Failed to save display mode");
+      toast.error("We couldn't save that display setting. Try again.");
       return false;
     } finally {
       setSavingMode(false);
@@ -89,7 +90,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
           {DISPLAY_MODES.map((mode) => {
             const isActive = selectedMode === mode.id;
             return (
-              <button
+              <Button
                 key={mode.id}
                 type="button"
                 onClick={() => setSelectedMode(mode.id)}
@@ -157,7 +158,7 @@ export default function ScheduleStep({ onNext, onBack }: ScheduleStepProps) {
                   {mode.description}
                 </p>
                 <DisplayModeSample mode={mode.id} shiftCategories={shiftCategories} jobs={jobs} />
-              </button>
+              </Button>
             );
           })}
         </div>

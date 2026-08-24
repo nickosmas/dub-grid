@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import type { OrganizationRole } from "@/types";
 import { SELF_ACTION_FORBIDDEN_MESSAGE } from "@dubgrid/domain";
 import CustomSelect from "@/components/CustomSelect";
@@ -82,20 +83,20 @@ export function InlineRoleSelect({
             if (saving) return;
             setPending(null);
           }}
-          onConfirm={() => {
+          onConfirm={async () => {
             const next = pending;
             setSaving(true);
-            void (async () => {
-              try {
-                await onChange(next);
-                toast.success(`Role updated to ${ORG_ROLE_LABELS[next]}.`);
-                setPending(null);
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Could not change the role.");
-              } finally {
-                setSaving(false);
-              }
-            })();
+            try {
+              await onChange(next);
+              toast.success(`Role updated to ${ORG_ROLE_LABELS[next]}.`);
+              setPending(null);
+            } catch (error) {
+              toast.error(
+                formatClientErrorMessage(error, "We couldn't change that role. Try again."),
+              );
+            } finally {
+              setSaving(false);
+            }
           }}
         />
       )}

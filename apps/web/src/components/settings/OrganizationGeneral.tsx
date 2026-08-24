@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Organization } from "@/types";
+import { Button } from "@/components/Button";
 import {
   OrganizationSettingsConflictError,
   updateOrganizationSettings,
@@ -146,7 +147,7 @@ export default function OrganizationGeneral({
         );
         return;
       }
-      toast.error("Failed to save settings");
+      toast.error("We couldn't save those settings. Try again.");
       Sentry.captureException(err);
     } finally {
       setSaving(false);
@@ -229,23 +230,23 @@ export default function OrganizationGeneral({
           <EditorActionRow
             secondaryAction={
               isModified ? (
-                <button
+                <Button
                   onClick={handleCancel}
                   disabled={saving}
                   className="dg-btn dg-btn-secondary"
                 >
                   {EDITOR_ACTION_LABELS.discard}
-                </button>
+                </Button>
               ) : null
             }
             primaryAction={
-              <button
+              <Button
                 onClick={handleReview}
                 disabled={!isModified || saving || hasValidationErrors}
                 className="dg-btn dg-btn-primary"
               >
                 Review & Save
-              </button>
+              </Button>
             }
           />
         )}
@@ -257,9 +258,7 @@ export default function OrganizationGeneral({
             onCancel={() => {
               if (!saving) setReviewOpen(false);
             }}
-            onConfirm={() => {
-              void handleSave();
-            }}
+            onConfirm={() => handleSave()}
           />
         ) : null}
       </div>

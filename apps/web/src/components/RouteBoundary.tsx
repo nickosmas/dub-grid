@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import * as Sentry from "@/lib/sentry";
+import { Button } from "@/components/Button";
 import { DubGridLogo } from "@/components/Logo";
 
 const shellStyle = {
@@ -35,7 +36,7 @@ export function ErrorBoundary({
   error,
   reset,
   title = "Something went wrong",
-  message = "We couldn't load this page. Please try again.",
+  message = "We couldn't load this page. Refresh and try again.",
 }: {
   error: Error & { digest?: string };
   reset: () => void;
@@ -52,9 +53,9 @@ export function ErrorBoundary({
       <p style={titleStyle}>{title}</p>
       <p style={bodyStyle}>{message}</p>
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <button onClick={reset} className="dg-btn dg-btn-primary">
+        <Button onClick={reset} className="dg-btn dg-btn-primary">
           Try again
-        </button>
+        </Button>
       </div>
     </div>
   );

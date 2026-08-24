@@ -17,6 +17,9 @@ export async function GET(req: NextRequest) {
       { err: error, path: "/api/gridmaster/compliance" },
       "gridmaster compliance GET failed",
     );
-    return NextResponse.json({ error: "Failed to load compliance oversight" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the compliance records. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

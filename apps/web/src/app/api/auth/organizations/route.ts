@@ -29,7 +29,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "auth organizations GET failed");
-    return NextResponse.json({ error: "Failed to load organizations" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load your organizations. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -62,7 +65,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (result.error) {
-      return NextResponse.json({ error: "Failed to switch organization." }, { status: 400 });
+      return NextResponse.json(
+        { error: "We couldn't switch organizations. Try again." },
+        { status: 400 },
+      );
     }
 
     // A sandbox must not survive the switch. The cookie is host-only and
@@ -81,6 +87,9 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error) {
     logger.error({ error }, "auth organizations POST failed");
-    return NextResponse.json({ error: "Failed to switch organization" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't switch organizations. Try again." },
+      { status: 500 },
+    );
   }
 }

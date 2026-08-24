@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(await loadGridmasterBilling(getServiceClient()));
   } catch (error) {
     logger.error({ err: error, path: "/api/gridmaster/billing" }, "gridmaster billing GET failed");
-    return NextResponse.json({ error: "Failed to load billing oversight" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the billing overview. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

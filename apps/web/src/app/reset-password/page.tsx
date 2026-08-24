@@ -134,9 +134,9 @@ function ResetPasswordContent() {
       } else if (msg.includes("weak") || msg.includes("short")) {
         setFormError("Password is too weak. Please choose a stronger password.");
       } else if (msg.includes("fetch") || msg.includes("network")) {
-        toast.error("Network error. Check your connection and try again.");
+        toast.error("We couldn't reach DubGrid. Check your connection and try again.");
       } else {
-        toast.error("Failed to update password. Please try again.");
+        toast.error("We couldn't update your password. Try again.");
       }
     } finally {
       setLoading(false);

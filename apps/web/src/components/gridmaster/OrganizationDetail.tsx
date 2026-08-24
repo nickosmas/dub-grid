@@ -1,5 +1,6 @@
 "use client";
 import CustomSelect from "@/components/CustomSelect";
+import { Button } from "@/components/Button";
 import { StatusDot, InfoRow, MiniStat } from "@/components/gridmaster/organization-detail/shared";
 import { ConfigTab } from "./organization-detail/ConfigTab";
 
@@ -243,7 +244,10 @@ export default function OrganizationDetail({
             : null;
   const tabLoading = activeTabQuery?.isLoading ?? false;
   const tabError = activeTabQuery?.error
-    ? formatClientErrorMessage(activeTabQuery.error, "Failed to load this section")
+    ? formatClientErrorMessage(
+        activeTabQuery.error,
+        "We couldn't load this section. Refresh and try again.",
+      )
     : null;
 
   return (
@@ -436,7 +440,7 @@ export default function OrganizationDetail({
         }}
       >
         {TABS.map((t) => (
-          <button
+          <Button
             key={t.id}
             role="tab"
             aria-selected={tab === t.id}
@@ -457,7 +461,7 @@ export default function OrganizationDetail({
             }}
           >
             {t.label}
-          </button>
+          </Button>
         ))}
       </div>
 

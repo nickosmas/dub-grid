@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
     if (!(await isFeatureEnabled("reports"))) {
       return NextResponse.json(
-        { error: "Reports are temporarily unavailable. Please try again shortly." },
+        { error: "Reports are unavailable right now. Try again in a moment." },
         { status: 503 },
       );
     }
@@ -103,6 +103,9 @@ export async function GET(req: NextRequest) {
       extra: { context: "reports.operations.export" },
     });
     logger.error({ error, orgId: parsed.data.orgId }, "Reports export failed");
-    return NextResponse.json({ error: "Failed to export report" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't export that report. Try again." },
+      { status: 500 },
+    );
   }
 }

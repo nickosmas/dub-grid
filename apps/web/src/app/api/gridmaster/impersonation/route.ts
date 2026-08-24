@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
       offset: req.nextUrl.searchParams.get("offset") ?? undefined,
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
     }
 
     const { data, error } = await createRequestSupabaseClient(req).rpc(
@@ -77,7 +77,10 @@ export async function GET(req: NextRequest) {
       { err: error, path: "/api/gridmaster/impersonation" },
       "gridmaster impersonation GET failed",
     );
-    return NextResponse.json({ error: "Failed to load impersonation history" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the viewing history. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }
 
@@ -183,6 +186,9 @@ export async function POST(req: NextRequest) {
       { err: error, path: "/api/gridmaster/impersonation" },
       "gridmaster impersonation POST failed",
     );
-    return NextResponse.json({ error: "Failed to update impersonation session" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't update that viewing session. Try again." },
+      { status: 500 },
+    );
   }
 }

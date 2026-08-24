@@ -60,6 +60,6 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
 
     const rawMessage = extractRawErrorMessage(error) ?? "";
     const status = rawMessage.includes("changed after") ? 409 : 400;
-    return apiErrorResponse(error, "Failed to resolve request.", status);
+    return apiErrorResponse(error, "We couldn't resolve request. Try again.", status);
   }
 }

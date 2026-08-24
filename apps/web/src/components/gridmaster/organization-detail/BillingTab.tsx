@@ -1,5 +1,6 @@
 import AuditLogView from "@/components/gridmaster/AuditLogView";
 import CustomSelect from "@/components/CustomSelect";
+import { Button } from "@/components/Button";
 import {
   BillingConfirmDialog,
   ExtendTrialDialog,
@@ -128,7 +129,9 @@ export function BillingTab({ organization }: { organization: Organization }) {
       invalidateBilling();
     },
     onError: (error) => {
-      toast.error(formatClientErrorMessage(error, "Failed to sync billing"));
+      toast.error(
+        formatClientErrorMessage(error, "We couldn't refresh the billing details. Try again."),
+      );
     },
     onSettled: () => {
       setBusy(false);
@@ -257,7 +260,10 @@ export function BillingTab({ organization }: { organization: Organization }) {
           fontWeight: 600,
         }}
       >
-        {formatClientErrorMessage(billingQuery.error, "Failed to load billing")}
+        {formatClientErrorMessage(
+          billingQuery.error,
+          "We couldn't load your billing details. Refresh and try again.",
+        )}
       </div>
     );
   }
@@ -328,14 +334,14 @@ export function BillingTab({ organization }: { organization: Organization }) {
             billable app-user seat count.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           className="dg-btn dg-btn-secondary dg-btn-sm"
           onClick={() => billingQuery.refetch()}
           disabled={billingQuery.isFetching}
         >
           Refresh
-        </button>
+        </Button>
       </div>
 
       <div
@@ -431,15 +437,15 @@ export function BillingTab({ organization }: { organization: Organization }) {
         <div style={sectionHeaderStyle}>Billing Actions</div>
         <div style={{ ...sectionBodyStyle, display: "grid", gap: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={busy || !billingOrg.stripeCustomerId}
               onClick={() => handleSync(billingOrg)}
             >
               Sync Stripe
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={
@@ -448,16 +454,16 @@ export function BillingTab({ organization }: { organization: Organization }) {
               onClick={() => handleSyncSeats(billingOrg)}
             >
               True up seats
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={busy}
               onClick={() => handleExtendTrial(billingOrg)}
             >
               Extend trial
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="dg-btn dg-btn-secondary dg-btn-sm"
               disabled={
@@ -469,15 +475,15 @@ export function BillingTab({ organization }: { organization: Organization }) {
               onClick={() => handleCancelAtPeriodEnd(billingOrg)}
             >
               End period
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               className="dg-btn dg-btn-danger dg-btn-sm"
               disabled={busy || billingOrg.status === "canceled"}
               onClick={() => handleCancel(billingOrg)}
             >
               Cancel
-            </button>
+            </Button>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -494,14 +500,14 @@ export function BillingTab({ organization }: { organization: Organization }) {
               height={34}
               fontSize="var(--dg-fs-label)"
             />
-            <button
+            <Button
               type="button"
               className="dg-btn dg-btn-primary dg-btn-sm"
               disabled={busy || status === billingOrg.status}
               onClick={() => handleOverrideStatus(billingOrg)}
             >
               Override status
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -509,7 +515,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
       <AuditLogView
         orgId={organization.id}
         title="Billing Activity"
-        initialActionFilter="billing."
+        initialActionFilter="billing"
       />
       <BillingConfirmDialog
         action={confirmAction}

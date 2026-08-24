@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERRORS } from "@dubgrid/client-errors";
 import { z } from "zod";
 import { requireGridmasterSession } from "@/lib/api-auth";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
       orgId: req.nextUrl.searchParams.get("orgId") ?? "",
     });
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid query" }, { status: 400 });
+      return NextResponse.json({ error: API_ERRORS.INVALID_REQUEST }, { status: 400 });
     }
 
     const { data, error } = await getServiceClient()
@@ -41,6 +42,9 @@ export async function GET(req: NextRequest) {
       { err: error, path: "/api/gridmaster/invitations" },
       "gridmaster invitations GET failed",
     );
-    return NextResponse.json({ error: "Failed to load invitations" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the invitations. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

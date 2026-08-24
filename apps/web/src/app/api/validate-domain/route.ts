@@ -5,6 +5,7 @@ import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { getServiceClient } from "@/lib/supabase-service";
 import logger from "@/lib/logger";
 import { getSupabaseSecretKey } from "@/lib/supabase-keys";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 export async function GET(req: NextRequest) {
   // ── Rate limit by IP ──────────────────────────────────────────────────
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, ip);
   if (misconfigured) {
     return NextResponse.json(
-      { valid: false, error: "Service temporarily unavailable" },
+      { valid: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
     );
   }

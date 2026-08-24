@@ -1,6 +1,8 @@
 "use client";
 
 import * as Sentry from "@/lib/sentry";
+import { Button } from "@/components/Button";
+import { formatClientErrorMessage } from "@/lib/client-facing";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Toolbar from "@/components/Toolbar";
@@ -163,6 +165,7 @@ import {
   DRAFT_CHANGED_BROADCAST_KEY,
   FETCH_WINDOW_RECENTER_BUFFER_DAYS,
   FETCH_WINDOW_RECENTER_THRESHOLD_DAYS,
+  FETCH_WINDOW_RETRY_LIMIT,
   formatImportPreviousSkipDescription,
   OPERATION_MODAL_DISMISS_MS,
   PUBLISH_WINDOW_DATE_FORMATTER,
@@ -354,6 +357,8 @@ function SchedulerContent() {
   const notesRef = useRef(notes);
   notesRef.current = notes;
   const [editPanel, setEditPanel] = useState<EditModalState | null>(null);
+  const editPanelRef = useRef<EditModalState | null>(null);
+  editPanelRef.current = editPanel;
   const [editSessionDraft, setEditSessionDraft] = useState<EditSessionDraft | null>(null);
   const editSessionDraftRef = useRef<EditSessionDraft | null>(null);
   editSessionDraftRef.current = editSessionDraft;
@@ -410,17 +415,6 @@ function SchedulerContent() {
   const [publishHistory, setPublishHistory] = useState<PublishHistoryEntry[]>([]);
   const [showPublishDiff, setShowPublishDiff] = useState(false);
   const [showPublishHistory, setShowPublishHistory] = useState(false);
-  // Per-banner dismissals, persisted to sessionStorage so the X actually
-  // sticks for the rest of the tab session — surviving the data-change
-  // re-renders that previously kept re-showing the banner. Hiding is UI-only:
-  // drafts and publish history are not touched, and the dismissal clears on
-  // sign-out via the dg_* sweep in clearDubgridSessionState.
-  const { isDismissed: outOfWindowDraftsDismissed, dismiss: dismissOutOfWindowDrafts } =
-    useDismissibleBanner("schedule-out-of-window-drafts");
-  const { isDismissed: publishBannerDismissed, dismiss: dismissPublishBanner } =
-    useDismissibleBanner("schedule-publish");
-  const { isDismissed: outOfWindowPublishesDismissed, dismiss: dismissOutOfWindowPublishes } =
-    useDismissibleBanner("schedule-out-of-window-publishes");
   const lastViewedRef = useRef<string | null>(null);
   const hasShownChangeToast = useRef(false);
   const [activeOperation, setActiveOperation] = useState<ScheduleOperation | null>(null);
@@ -998,7 +992,7 @@ function SchedulerContent() {
                 endDate: defaultShiftFetchEnd,
               },
             });
-            toast.error("Failed to load available shift opportunities");
+            toast.error("We couldn't load the open shifts. Refresh and try again.");
             return [] as GridOpenShift[];
           }),
           fetchPublishedDateRanges(orgId, defaultShiftFetchStart, defaultShiftFetchEnd).catch(
@@ -1252,6 +1246,33 @@ function SchedulerContent() {
       ),
     [publishHistory, publishWindowDateRange.endDateKey, publishWindowDateRange.startDateKey],
   );
+
+  // Per-banner dismissals, persisted to sessionStorage so the X actually
+  // sticks — surviving the data-change re-renders that previously kept
+  // re-showing the banner. Each is keyed by a signature describing what was
+  // dismissed, so closing one notice never swallows the *next* one. Hiding is
+  // UI-only: drafts and publish history are not touched, and the dismissal
+  // clears on sign-out via the dg_* sweep in clearDubgridSessionState.
+  const { isDismissed: outOfWindowDraftsDismissed, dismiss: dismissOutOfWindowDrafts } =
+    useDismissibleBanner(
+      "schedule-out-of-window-drafts",
+      outOfWindowDraftGroups
+        .map((group) => `${formatDateKey(group.periodStart)}:${group.count}`)
+        .join("|"),
+    );
+  const {
+    isDismissed: publishBannerDismissed,
+    dismiss: dismissPublishBanner,
+    reset: resetPublishBanner,
+  } = useDismissibleBanner(
+    "schedule-publish",
+    inWindowPublishHistory.map((entry) => entry.publishedAt).join("|"),
+  );
+  const { isDismissed: outOfWindowPublishesDismissed, dismiss: dismissOutOfWindowPublishes } =
+    useDismissibleBanner(
+      "schedule-out-of-window-publishes",
+      outOfWindowPublishHistory.map((entry) => entry.publishedAt).join("|"),
+    );
 
   // Build a lookup map from in-window publish history changes for O(1) access.
   // Iterate oldest→newest so the most recent publish wins per cell key.
@@ -1538,7 +1559,21 @@ function SchedulerContent() {
         void refreshPresenceRef.current();
       }
 
-      if (!isVisible && !getCurrentCellRef.current()) {
+      // Coming back with the editor still open: retake the lock we dropped on
+      // hide, unless someone else claimed the cell in the meantime.
+      if (isVisible && canEditShiftsRef.current) {
+        const openPanel = editPanelRef.current;
+        if (openPanel && !getCurrentCellRef.current()) {
+          const cellKey = `${openPanel.empId}_${formatDateKey(openPanel.date)}`;
+          if (!getCellLock(cellKey)) lockCell(cellKey);
+        }
+      }
+
+      // Release whatever cell this tab is holding as soon as it's hidden.
+      // pagehide/beforeunload don't fire on a tab switch, so without this the
+      // lock survives until server-side presence expiry and every other editor
+      // is locked out of that cell. unlockCell is a no-op when nothing is held.
+      if (!isVisible) {
         unlockCell();
         return;
       }
@@ -1554,7 +1589,7 @@ function SchedulerContent() {
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [org, unlockCell]);
+  }, [org, unlockCell, lockCell, getCellLock]);
 
   useEffect(() => {
     const releasePresence = () => {
@@ -1620,6 +1655,9 @@ function SchedulerContent() {
   // that band. Waits on `draftCheckComplete` so this doesn't race the
   // scheduler-visibility re-fetch above (both call fetchShifts + setShifts).
   const isSyncingFetchWindowRef = useRef(false);
+  const fetchWindowFailuresRef = useRef(0);
+  const fetchWindowRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [fetchWindowRetryToken, setFetchWindowRetryToken] = useState(0);
   useEffect(() => {
     if (!org || scheduleLoading || !draftCheckComplete) return;
     if (isSyncingFetchWindowRef.current) return;
@@ -1653,9 +1691,24 @@ function SchedulerContent() {
 
     isSyncingFetchWindowRef.current = true;
     void refetchScheduleData(fetchOpts)
+      .then(() => {
+        fetchWindowFailuresRef.current = 0;
+      })
       .catch((err) => {
         Sentry.captureException(err);
-        toast.error("Couldn't load the schedule for this period.");
+        // A failed fetch leaves loadedShiftWindow untouched, so no dependency
+        // here changes and nothing would ever re-run this effect — the period
+        // would stay blank until the user navigated away and back. Nudge it
+        // with a token instead, a couple of times, then stop and say so.
+        fetchWindowFailuresRef.current += 1;
+        if (fetchWindowFailuresRef.current <= FETCH_WINDOW_RETRY_LIMIT) {
+          toast.error("Couldn't load the schedule for this period. Retrying.");
+          fetchWindowRetryTimerRef.current = setTimeout(() => {
+            setFetchWindowRetryToken((token) => token + 1);
+          }, 3000);
+        } else {
+          toast.error("Couldn't load the schedule for this period. Reload to try again.");
+        }
       })
       .finally(() => {
         isSyncingFetchWindowRef.current = false;
@@ -1667,7 +1720,15 @@ function SchedulerContent() {
     publishWindowDateRange,
     loadedShiftWindow,
     refetchScheduleData,
+    fetchWindowRetryToken,
   ]);
+
+  useEffect(
+    () => () => {
+      if (fetchWindowRetryTimerRef.current) clearTimeout(fetchWindowRetryTimerRef.current);
+    },
+    [],
+  );
 
   const dates = useMemo(
     () =>
@@ -2589,12 +2650,6 @@ function SchedulerContent() {
     [showPublishDiff, publishChangesMap],
   );
 
-  // Set of cell keys published since user's last view — used for subtle background tint
-  const recentlyPublishedKeys = useMemo(() => {
-    if (!publishChangesMap) return undefined;
-    return new Set(publishChangesMap.keys());
-  }, [publishChangesMap]);
-
   const getCustomShiftTimes = useCallback(
     (
       empId: string,
@@ -2653,18 +2708,6 @@ function SchedulerContent() {
           : undefined;
       if (!start && !end && !perPill) return null;
       return { start, end, perPill };
-    },
-    [shifts],
-  );
-
-  const hasTimeChangesForKey = useCallback(
-    (empId: string, date: Date): boolean => {
-      const entry = shifts[`${empId}_${formatDateKey(date)}`];
-      if (!entry) return false;
-      return (
-        (entry.customStartTime ?? null) !== (entry.publishedCustomStartTime ?? null) ||
-        (entry.customEndTime ?? null) !== (entry.publishedCustomEndTime ?? null)
-      );
     },
     [shifts],
   );
@@ -2881,19 +2924,34 @@ function SchedulerContent() {
     setShifts(freshShifts);
   }, [org?.id, canEditShifts, shiftFetchStart, shiftFetchEnd]);
 
-  const enqueueShiftWrite = useCallback(
-    (key: string, write: () => Promise<void>): Promise<void> => {
-      const previous = pendingShiftWrites.current.get(key) ?? Promise.resolve();
-      const queued = previous.catch(() => {}).then(write);
-      pendingShiftWrites.current.set(key, queued);
-      void queued.finally(() => {
-        if (pendingShiftWrites.current.get(key) === queued) {
-          pendingShiftWrites.current.delete(key);
-        }
-      });
+  /**
+   * Serializes a write behind every write already pending on the cells it
+   * touches. A write spanning two cells (a move) must register on both, or a
+   * later edit to either one races it and loses to an optimistic-lock error.
+   */
+  const enqueueShiftWriteAcross = useCallback(
+    (keys: string[], write: () => Promise<void>): Promise<void> => {
+      const previous = keys.map((key) => pendingShiftWrites.current.get(key) ?? Promise.resolve());
+      const queued = Promise.all(previous.map((pending) => pending.catch(() => {}))).then(write);
+      for (const key of keys) pendingShiftWrites.current.set(key, queued);
+      void queued
+        .finally(() => {
+          for (const key of keys) {
+            if (pendingShiftWrites.current.get(key) === queued) {
+              pendingShiftWrites.current.delete(key);
+            }
+          }
+        })
+        .catch(() => {});
       return queued;
     },
     [],
+  );
+
+  const enqueueShiftWrite = useCallback(
+    (key: string, write: () => Promise<void>): Promise<void> =>
+      enqueueShiftWriteAcross([key], write),
+    [enqueueShiftWriteAcross],
   );
 
   const updateEditSessionDraft = useCallback(
@@ -2978,16 +3036,22 @@ function SchedulerContent() {
     [absenceTypeMap, getPublishedSnapshot, segmentCompatibility],
   );
 
+  /**
+   * Applies the deletes and reports how many actually committed. Errors are
+   * still toasted here, but the count comes back so callers can't announce a
+   * success the server never performed — the optimistic `setShifts` above
+   * already emptied those cells, so the grid alone proves nothing.
+   */
   const applyShiftDeleteUpdates = useCallback(
     async (
       updates: ShiftDeleteUpdate[],
       options: { broadcast: boolean; failureMessage: string },
-    ): Promise<void> => {
-      if (updates.length === 0) return;
+    ): Promise<{ deleted: number; failed: number }> => {
+      if (updates.length === 0) return { deleted: 0, failed: 0 };
       const orgId = org?.id;
       if (!orgId) {
         console.error("Cannot modify shifts before org is loaded");
-        return;
+        return { deleted: 0, failed: updates.length };
       }
 
       setShifts((prev) => {
@@ -3011,19 +3075,25 @@ function SchedulerContent() {
       }
 
       if (updates.length > 1) {
+        const deleteItems: DeleteShiftBatchItem[] = updates.map((update) => ({
+          employeeId: update.empId,
+          date: update.dateKey,
+          expectedVersion: update.expectedVersion,
+        }));
+        // Count per chunk. An earlier chunk that committed stays committed
+        // when a later one fails, so a single all-or-nothing tally would
+        // misreport both halves.
+        let deleted = 0;
         try {
           await Promise.all(
             updates.map(
               (update) => pendingShiftWrites.current.get(update.key) ?? Promise.resolve(),
             ),
           );
-          const deleteItems: DeleteShiftBatchItem[] = updates.map((update) => ({
-            employeeId: update.empId,
-            date: update.dateKey,
-            expectedVersion: update.expectedVersion,
-          }));
           for (let i = 0; i < deleteItems.length; i += SCHEDULE_DELETE_BATCH_SIZE) {
-            await deleteShiftBatch(orgId, deleteItems.slice(i, i + SCHEDULE_DELETE_BATCH_SIZE));
+            const chunk = deleteItems.slice(i, i + SCHEDULE_DELETE_BATCH_SIZE);
+            await deleteShiftBatch(orgId, chunk);
+            deleted += chunk.length;
           }
         } catch (err) {
           if (err instanceof OptimisticLockError) {
@@ -3033,14 +3103,16 @@ function SchedulerContent() {
             Sentry.captureException(err);
           }
         }
-        return;
+        return { deleted, failed: updates.length - deleted };
       }
 
+      let deleted = 0;
       await Promise.all(
         updates.map((update) =>
           enqueueShiftWrite(update.key, async () => {
             try {
               await deleteShift(update.empId, update.dateKey, orgId, update.expectedVersion);
+              deleted += 1;
             } catch (err) {
               if (err instanceof OptimisticLockError) {
                 await handleShiftWriteConflict();
@@ -3052,6 +3124,7 @@ function SchedulerContent() {
           }),
         ),
       );
+      return { deleted, failed: updates.length - deleted };
     },
     [broadcastDraftChanged, deleteShiftBatch, enqueueShiftWrite, handleShiftWriteConflict, org?.id],
   );
@@ -3079,7 +3152,7 @@ function SchedulerContent() {
         if (!deleteUpdate) return;
         void applyShiftDeleteUpdates([deleteUpdate], {
           broadcast: true,
-          failureMessage: "Failed to delete shift",
+          failureMessage: "We couldn't delete shift. Try again.",
         });
       } else {
         const derivedCodeIds = getInputAssignmentDefinitionIds(entry);
@@ -3133,7 +3206,7 @@ function SchedulerContent() {
           updatedAt: ex?.updatedAt ?? null,
         });
         if (!provisional) {
-          toast.error("That assignment could not be resolved.");
+          toast.error("We couldn't match that assignment.");
           return;
         }
         const dk = computeScheduleEntryDraftKind(provisional);
@@ -3158,7 +3231,7 @@ function SchedulerContent() {
             if (err instanceof OptimisticLockError) {
               await handleShiftWriteConflict();
             } else {
-              toast.error("Failed to save shift");
+              toast.error("We couldn't save that shift. Try again.");
               Sentry.captureException(err);
             }
           }
@@ -3332,7 +3405,7 @@ function SchedulerContent() {
         updatedAt: currentShift?.updatedAt ?? null,
       });
       if (!provisional) {
-        toast.error("That assignment could not be resolved.");
+        toast.error("We couldn't match that assignment.");
         return currentShift;
       }
 
@@ -3580,7 +3653,7 @@ function SchedulerContent() {
           toast.error("This shift changed in another tab or by another editor.");
           await refetchScheduleDataRef.current();
         } else {
-          toast.error("Failed to save shift changes");
+          toast.error("We couldn't save your shift changes. Try again.");
           Sentry.captureException(err);
         }
       } finally {
@@ -3630,7 +3703,7 @@ function SchedulerContent() {
       }
       toast.success(`Series deleted (${deletedCount} shifts marked for removal on publish)`);
     } catch (err) {
-      toast.error("Failed to delete series");
+      toast.error("We couldn't remove that repeating shift. Try again.");
       Sentry.captureException(err);
     } finally {
       setPendingSeriesDelete(null);
@@ -3758,9 +3831,7 @@ function SchedulerContent() {
       } catch (err) {
         clearScheduleOperation("repeat_series");
         toast.error(
-          err instanceof Error
-            ? err.message || "Failed to create repeating shift"
-            : "Failed to create repeating shift",
+          formatClientErrorMessage(err, "We couldn't create that repeating shift. Try again."),
         );
         Sentry.captureException(err);
       } finally {
@@ -3909,7 +3980,7 @@ function SchedulerContent() {
         updatedAt: shifts[targetKey]?.updatedAt ?? null,
       });
       if (!movedEntry) {
-        toast.error("That assignment could not be moved.");
+        toast.error("We couldn't move that assignment.");
         return;
       }
       const sourceReplacement =
@@ -3964,24 +4035,22 @@ function SchedulerContent() {
         },
       });
 
-      void Promise.all([
-        pendingShiftWrites.current.get(sourceKey) ?? Promise.resolve(),
-        pendingShiftWrites.current.get(targetKey) ?? Promise.resolve(),
-      ])
-        .then(() =>
-          moveShift(
-            org!.id,
-            sourceCellId.empId,
-            sourceCellId.dateKey,
-            targetCellId.empId,
-            targetCellId.dateKey,
-            payload,
-            mode,
-            sourceEntry?.version,
-            targetEntry?.version,
-            targetEntry == null,
-          ),
-        )
+      // Registered on both cells, so an edit saved right after the drop queues
+      // behind the move instead of racing it into a version conflict.
+      void enqueueShiftWriteAcross([sourceKey, targetKey], async () => {
+        await moveShift(
+          org!.id,
+          sourceCellId.empId,
+          sourceCellId.dateKey,
+          targetCellId.empId,
+          targetCellId.dateKey,
+          payload,
+          mode,
+          sourceEntry?.version,
+          targetEntry?.version,
+          targetEntry == null,
+        );
+      })
         .then(() => {
           toast.success(mode === "copy" ? "Entry copied" : "Entry moved");
         })
@@ -3989,10 +4058,25 @@ function SchedulerContent() {
           if (err instanceof OptimisticLockError) {
             toast.error("Entry was modified by another editor or another tab — refreshing");
           } else {
-            toast.error(mode === "copy" ? "Failed to copy entry" : "Failed to move entry");
+            toast.error(
+              mode === "copy"
+                ? "We couldn't copy entry. Try again."
+                : "We couldn't move entry. Try again.",
+            );
             Sentry.captureException(err);
           }
-          await refetchScheduleData();
+          // We already broadcast the optimistic move to everyone else, so
+          // undoing it locally isn't enough — send the server's truth for both
+          // cells or their grids keep showing a move that never happened.
+          const refreshed = await refetchScheduleData();
+          if (refreshed) {
+            broadcastDraftChanged({
+              shifts: {
+                [sourceKey]: refreshed.shiftData[sourceKey] ?? null,
+                [targetKey]: refreshed.shiftData[targetKey] ?? null,
+              },
+            });
+          }
         });
     },
     [
@@ -4006,6 +4090,7 @@ function SchedulerContent() {
       refetchScheduleData,
       segmentCompatibility,
       absenceTypeMap,
+      enqueueShiftWriteAcross,
     ],
   );
 
@@ -4240,7 +4325,7 @@ function SchedulerContent() {
     const dateRange = `${formatDate(startDate)} – ${formatDate(endDate)}`;
     startScheduleOperation({
       kind: "autofill",
-      title: "Auto filling shifts...",
+      title: "Filling shifts",
       detail: autoFillPreview?.count
         ? `Applying recurring templates to ${autoFillPreview.count} empty schedule slot${autoFillPreview.count === 1 ? "" : "s"} for ${dateRange}.`
         : `Applying recurring templates for ${dateRange}.`,
@@ -4286,7 +4371,7 @@ function SchedulerContent() {
       }
     } catch (err) {
       clearScheduleOperation("autofill");
-      toast.error("Failed to apply recurring templates to the schedule");
+      toast.error("We couldn't apply the recurring schedule. Try again.");
       Sentry.captureException(err);
     } finally {
       setIsApplyingRecurring(false);
@@ -4352,35 +4437,36 @@ function SchedulerContent() {
     [updateEditSessionDraft],
   );
 
+  // Step by exactly the span on show. A step shorter than the span lands
+  // inside the current period and the pay-period snap pulls it straight back,
+  // which is how "next period" used to do nothing at all on a phone.
   const handlePrev = useCallback(() => {
     if (spanWeeks === "month") {
       setWeekStart((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
     } else {
-      const step = isMobile ? 7 : spanWeeks * 7;
       setWeekStart((prev) =>
         getScheduleStartForSpan({
-          date: addDays(prev, -step),
+          date: addDays(prev, -spanWeeks * 7),
           span: spanWeeks,
           payPeriodStartDate,
         }),
       );
     }
-  }, [spanWeeks, isMobile, payPeriodStartDate]);
+  }, [spanWeeks, payPeriodStartDate]);
 
   const handleNext = useCallback(() => {
     if (spanWeeks === "month") {
       setWeekStart((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
     } else {
-      const step = isMobile ? 7 : spanWeeks * 7;
       setWeekStart((prev) =>
         getScheduleStartForSpan({
-          date: addDays(prev, step),
+          date: addDays(prev, spanWeeks * 7),
           span: spanWeeks,
           payPeriodStartDate,
         }),
       );
     }
-  }, [spanWeeks, isMobile, payPeriodStartDate]);
+  }, [spanWeeks, payPeriodStartDate]);
 
   const handleToday = useCallback(() => {
     if (spanWeeks === "month") {
@@ -4428,7 +4514,16 @@ function SchedulerContent() {
         endDate = addDays(weekStart, spanWeeks * 7 - 1);
       }
 
+      // Only the publish itself decides the outcome. Everything after it is
+      // bookkeeping on an already-committed change — letting a failed refetch
+      // reach the catch below told the user their publish failed when the
+      // schedule was in fact live, and they'd publish again.
       await publishSchedule(org.id, startDate, endDate);
+
+      setShowPublishDiff(false);
+      closeEditPanel();
+      setShowDiffOverlay(false);
+      toast.success("Schedule published");
 
       // Notify affected employees about the published schedule
       queueNotification({
@@ -4438,6 +4533,13 @@ function SchedulerContent() {
         endDate: formatDateKey(endDate),
       });
 
+      // Tell other tabs/users to refetch before we refetch ourselves, so a
+      // slow local refresh can't leave them stale.
+      clearPendingBroadcast(DRAFT_CHANGED_BROADCAST_KEY);
+      sendReliableBroadcast("schedule_published", {}, { key: "schedule_published" });
+      // Update last-viewed so publisher doesn't see their own changes as "new" on next visit
+      void updateScheduleLastViewed(org.id);
+
       // Cancel any pending draft-changed debounce to prevent stale data
       // from overwriting the fresh post-publish refetch.
       if (draftChangedDebounceRef.current) {
@@ -4445,23 +4547,18 @@ function SchedulerContent() {
         draftChangedDebounceRef.current = null;
       }
 
-      await refetchScheduleData();
-      await refetchPublishedRanges();
-      const recentPublishes = await fetchRecentPublishHistory(org.id, lastViewedRef.current);
-      setPublishHistory(recentPublishes);
-      setShowPublishDiff(false);
-      closeEditPanel();
-      setShowDiffOverlay(false);
-      toast.success("Schedule published");
-      // Update last-viewed so publisher doesn't see their own changes as "new" on next visit
-      void updateScheduleLastViewed(org.id);
-
-      // Notify other tabs/users to refetch the published schedule
-      clearPendingBroadcast(DRAFT_CHANGED_BROADCAST_KEY);
-      sendReliableBroadcast("schedule_published", {}, { key: "schedule_published" });
+      try {
+        await refetchScheduleData();
+        await refetchPublishedRanges();
+        const recentPublishes = await fetchRecentPublishHistory(org.id, lastViewedRef.current);
+        setPublishHistory(recentPublishes);
+      } catch (err: unknown) {
+        Sentry.captureException(err);
+        toast.error("Published, but the view couldn't refresh. Reload to see the latest.");
+      }
     } catch (err: unknown) {
       Sentry.captureException(err);
-      toast.error("Failed to publish schedule");
+      toast.error("We couldn't publish the schedule. Try again.");
     } finally {
       setIsPublishing(false);
     }
@@ -4485,38 +4582,66 @@ function SchedulerContent() {
       try {
         const previousShifts = shiftsRef.current;
         const previousNotes = notesRef.current;
-        await discardScheduleDrafts(org.id, discardAll ? undefined : user.id);
+        // Scoped to the same window Publish commits. The confirm dialog counts
+        // drafts in this range, and the two buttons sit side by side under that
+        // one count — an unscoped discard would delete every other period too.
+        await discardScheduleDrafts(
+          org.id,
+          discardAll ? undefined : user.id,
+          publishWindowDateRange.startDateKey,
+          publishWindowDateRange.endDateKey,
+        );
 
-        const refreshed = await refetchScheduleDataRef.current();
+        // Past this point the drafts are gone; a failed refetch is a stale
+        // view, not a failed discard.
         setShowDiscardConfirm(false);
         closeEditPanel();
         setShowDiffOverlay(false);
+        toast.success(discardAll ? "All changes discarded" : "Your changes discarded");
+
         if (discardAll) {
-          // Dedicated event for discard-all — triggers immediate refetch on all clients
+          // Dedicated event for discard-all — triggers immediate refetch on all
+          // clients. Sent before our own refetch so a slow local refresh can't
+          // leave everyone else looking at drafts that no longer exist.
           clearPendingBroadcast(DRAFT_CHANGED_BROADCAST_KEY);
           sendReliableBroadcast("drafts_discarded", {}, { key: "drafts_discarded" });
-        } else {
-          const realtimeDiff = refreshed
-            ? buildRealtimeDraftDiff(
-                previousShifts,
-                refreshed.shiftData,
-                previousNotes,
-                refreshed.noteMap,
-              )
-            : null;
-          if (realtimeDiff) {
-            broadcastDraftChanged(realtimeDiff);
-          }
         }
-        toast.success(discardAll ? "All changes discarded" : "Your changes discarded");
+
+        try {
+          const refreshed = await refetchScheduleDataRef.current();
+          if (!discardAll) {
+            const realtimeDiff = refreshed
+              ? buildRealtimeDraftDiff(
+                  previousShifts,
+                  refreshed.shiftData,
+                  previousNotes,
+                  refreshed.noteMap,
+                )
+              : null;
+            if (realtimeDiff) {
+              broadcastDraftChanged(realtimeDiff);
+            }
+          }
+        } catch (err: unknown) {
+          Sentry.captureException(err);
+          toast.error("Discarded, but the view couldn't refresh. Reload to see the latest.");
+        }
       } catch (err: unknown) {
-        toast.error("Failed to discard changes");
+        toast.error("We couldn't discard your changes. Try again.");
         Sentry.captureException(err);
       } finally {
         setCancelingMode(null);
       }
     },
-    [org, broadcastDraftChanged, closeEditPanel, clearPendingBroadcast, sendReliableBroadcast],
+    [
+      org,
+      broadcastDraftChanged,
+      closeEditPanel,
+      clearPendingBroadcast,
+      sendReliableBroadcast,
+      publishWindowDateRange.startDateKey,
+      publishWindowDateRange.endDateKey,
+    ],
   );
 
   // Open shifts map to an exact assignment (the shift + job configured in the
@@ -4730,7 +4855,6 @@ function SchedulerContent() {
         orgRoles,
         coverageRequirements,
         absenceTypeMap: absenceTypeObjectMap,
-        recentlyPublishedKeys,
         cellLocks: lockedCells,
         resolvePublisherName: (userId: string) => auditNames.get(userId) ?? null,
         openShifts,
@@ -4757,7 +4881,6 @@ function SchedulerContent() {
           publishedLabelForKey,
           publishedAssignmentIdsForKey,
           publishedAbsenceTypeIdForKey,
-          hasTimeChangesForKey,
           publishDiffForKey: publishDiffKindForKey,
           createdByNameForKey: canRenderAuthorNames ? createdByNameForKey : undefined,
           absenceTypeIdForKey,
@@ -4781,7 +4904,6 @@ function SchedulerContent() {
       orgRoles,
       coverageRequirements,
       absenceTypeObjectMap,
-      recentlyPublishedKeys,
       lockedCells,
       auditNames,
       openShifts,
@@ -4808,7 +4930,6 @@ function SchedulerContent() {
       publishedLabelForKey,
       publishedAssignmentIdsForKey,
       publishedAbsenceTypeIdForKey,
-      hasTimeChangesForKey,
       publishDiffKindForKey,
       canRenderAuthorNames,
       createdByNameForKey,
@@ -4881,6 +5002,24 @@ function SchedulerContent() {
     [visibleBulkDeleteTargets],
   );
 
+  // Every cell the grid is currently drawing, deletable or not. Used to tell a
+  // selection that scrolled out of view (keep it — the user paged away and will
+  // page back) apart from one that stopped being removable while on screen
+  // (drop it — someone locked or emptied the cell).
+  const renderedCellKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const department of scheduleGridModel.departments) {
+      for (const section of department.sections) {
+        for (const emp of section.employees) {
+          for (const column of scheduleGridModel.columns) {
+            keys.add(`${emp.id}_${column.dateKey}`);
+          }
+        }
+      }
+    }
+    return keys;
+  }, [scheduleGridModel.columns, scheduleGridModel.departments]);
+
   const hasVisibleScheduleEntries = useMemo(() => {
     for (const department of scheduleGridModel.departments) {
       for (const section of department.sections) {
@@ -4918,17 +5057,25 @@ function SchedulerContent() {
     [bulkDeleteSelectedKeys, visibleBulkDeleteTargetByKey],
   );
 
+  // Selections kept from periods the user has paged away from. Only the visible
+  // ones can be reviewed and removed, so the banner has to say so rather than
+  // let the count quietly disagree with what Remove does.
+  const offscreenBulkDeleteCount = bulkDeleteSelectedKeys.size - bulkDeleteSelectedTargets.length;
+
   useEffect(() => {
     if (!isBulkDeleteMode) return;
     setBulkDeleteSelectedKeys((prev) => {
       const next = new Set<string>();
       for (const key of prev) {
-        if (visibleBulkDeleteTargetByKey.has(key)) next.add(key);
+        // On screen and no longer removable: someone locked it or emptied it,
+        // so the selection is genuinely stale. Off screen: the user just paged
+        // away — silently emptying their selection for that is maddening.
+        if (visibleBulkDeleteTargetByKey.has(key) || !renderedCellKeys.has(key)) next.add(key);
       }
       if (next.size === prev.size) return prev;
       return next;
     });
-  }, [isBulkDeleteMode, visibleBulkDeleteTargetByKey]);
+  }, [isBulkDeleteMode, visibleBulkDeleteTargetByKey, renderedCellKeys]);
 
   useEffect(() => {
     if (canEditShifts && !isMobile && spanWeeks !== "month") return;
@@ -4950,6 +5097,9 @@ function SchedulerContent() {
     closeEditPanel();
     setBulkDeleteSelectedKeys(new Set());
     setIsBulkDeleteMode(true);
+    // Bulk mode replaces the publish banner, which is where the overlay's
+    // only toggle lives — leaving it on would strand it behind the swap.
+    setShowPublishDiff(false);
   }, [closeEditPanel, isBulkDeleteMode]);
 
   const handleToggleBulkDeleteCell = useCallback((cellId: GridCellId) => {
@@ -4975,6 +5125,36 @@ function SchedulerContent() {
     setBulkDeleteSelectedKeys(new Set());
   }, []);
 
+  // Escape leaves whichever grid-wide mode is on. Every one of these is hosted
+  // by a banner that other UI can unmount, so the keyboard is the one exit that
+  // can't be taken away. Modals stop the event before it reaches us, and the
+  // state guards below keep us off any overlay that owns its own Escape.
+  const canExitModeWithEscape =
+    (showPublishDiff || showDiffOverlay || isBulkDeleteMode) &&
+    !editPanel &&
+    !contextMenu &&
+    !pendingClearShift &&
+    !activeOperation &&
+    !showBulkDeleteReview &&
+    !showDiscardConfirm &&
+    !showPublishConfirm &&
+    !showAutoFillConfirm &&
+    !showPublishHistory &&
+    !showPrintOptions &&
+    !showRequestBoard;
+
+  useEffect(() => {
+    if (!canExitModeWithEscape) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      setShowPublishDiff(false);
+      setShowDiffOverlay(false);
+      handleCancelBulkDeleteMode();
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [canExitModeWithEscape, handleCancelBulkDeleteMode]);
+
   const handleConfirmBulkDelete = useCallback(async () => {
     if (bulkDeleteSelectedTargets.length === 0) {
       setShowBulkDeleteReview(false);
@@ -4994,11 +5174,27 @@ function SchedulerContent() {
 
     setIsBulkDeleting(true);
     try {
-      await applyShiftDeleteUpdates(updates, {
+      const { deleted, failed } = await applyShiftDeleteUpdates(updates, {
         broadcast: true,
-        failureMessage: "Failed to remove one or more entries",
+        failureMessage: "We couldn't remove one or more entries. Try again.",
       });
-      toast.success(`${updates.length} selected entr${updates.length === 1 ? "y" : "ies"} removed`);
+
+      if (failed > 0) {
+        // applyShiftDeleteUpdates already said what went wrong. Stay in bulk
+        // mode with the untouched cells still selected so the user can retry
+        // exactly those, rather than being told everything worked.
+        const failedKeys = new Set(updates.slice(deleted).map((update) => update.key));
+        setBulkDeleteSelectedKeys(failedKeys);
+        setShowBulkDeleteReview(false);
+        if (deleted > 0) {
+          toast.info(
+            `Removed ${deleted} of ${updates.length}. The rest are still selected — try again.`,
+          );
+        }
+        return;
+      }
+
+      toast.success(`${deleted} selected entr${deleted === 1 ? "y" : "ies"} removed`);
       setShowBulkDeleteReview(false);
       setIsBulkDeleteMode(false);
       setBulkDeleteSelectedKeys(new Set());
@@ -5148,7 +5344,7 @@ function SchedulerContent() {
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <button
+            <Button
               onClick={() => window.location.reload()}
               style={{
                 padding: "12px 24px",
@@ -5163,9 +5359,11 @@ function SchedulerContent() {
               }}
             >
               Check Again
-            </button>
-            <button
-              onClick={() => (window.location.href = "mailto:support@dubgrid.com")}
+            </Button>
+            <Button
+              onClick={() => {
+                window.location.href = "mailto:support@dubgrid.com";
+              }}
               style={{
                 padding: "12px 24px",
                 background: "var(--color-bg-secondary)",
@@ -5178,7 +5376,7 @@ function SchedulerContent() {
               }}
             >
               Contact Support
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -5243,9 +5441,12 @@ function SchedulerContent() {
                   }}
                 >
                   {`${bulkDeleteSelectedKeys.size} selected of ${visibleBulkDeleteTargets.length} removable visible entr${visibleBulkDeleteTargets.length === 1 ? "y" : "ies"}`}
+                  {offscreenBulkDeleteCount > 0
+                    ? ` (${offscreenBulkDeleteCount} in another period, not removed from here)`
+                    : ""}
                 </span>
                 <div className="dg-draft-banner-actions">
-                  <button
+                  <Button
                     type="button"
                     className="dg-btn dg-btn-danger"
                     onClick={handleSelectVisibleBulkDeleteEntries}
@@ -5253,8 +5454,8 @@ function SchedulerContent() {
                     style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
                   >
                     Select All
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     className="dg-btn dg-btn-secondary"
                     onClick={() => setBulkDeleteSelectedKeys(new Set())}
@@ -5267,8 +5468,8 @@ function SchedulerContent() {
                     }}
                   >
                     Clear selection
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     className="dg-btn dg-btn-danger-filled"
                     onClick={() => setShowBulkDeleteReview(true)}
@@ -5276,8 +5477,8 @@ function SchedulerContent() {
                     style={{ fontSize: "var(--dg-fs-caption)", padding: "5px 12px" }}
                   >
                     Review removal
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     className="dg-btn dg-btn-ghost"
                     onClick={handleCancelBulkDeleteMode}
@@ -5287,7 +5488,7 @@ function SchedulerContent() {
                     }}
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -5300,6 +5501,7 @@ function SchedulerContent() {
                 breakdown={draftBreakdown}
                 showDiff={showDiffOverlay}
                 onToggleDiff={() => setShowDiffOverlay((v) => !v)}
+                diffMode={hasRevealableDraftChanges ? "changes" : "highlight"}
                 canPublish={canPublishSchedule}
               />
             )}
@@ -5321,13 +5523,16 @@ function SchedulerContent() {
                     className="dg-draft-banner-dot"
                     style={{ background: "var(--color-info-text)" }}
                   />
-                  <span style={{ fontWeight: 600 }}>Also unpublished:</span>
+                  <span style={{ fontWeight: 600 }}>Also unpublished nearby:</span>
                   <span style={{ opacity: 0.85 }}>
                     {(() => {
                       const total = outOfWindowDraftGroups.reduce((s, g) => s + g.count, 0);
                       const unit =
                         spanWeeks === "month" ? "month" : spanWeeks === 2 ? "pay period" : "week";
-                      return `${total} draft${total === 1 ? "" : "s"} in ${outOfWindowDraftGroups.length} other ${unit}${outOfWindowDraftGroups.length === 1 ? "" : "s"} (${outOfWindowDraftGroupRanges.join(", ")})`;
+                      // Counted from the loaded window only, so it can shrink
+                      // after a far jump recenters the fetch. Saying "nearby"
+                      // keeps that from reading as "nothing left to publish".
+                      return `${total} draft${total === 1 ? "" : "s"} in ${outOfWindowDraftGroups.length} other ${unit}${outOfWindowDraftGroups.length === 1 ? "" : "s"} within the loaded dates (${outOfWindowDraftGroupRanges.join(", ")})`;
                     })()}
                   </span>
                   <div className="dg-draft-banner-actions" style={{ flexWrap: "wrap" }}>
@@ -5337,27 +5542,27 @@ function SchedulerContent() {
                         content={hint(`Jump to this period to publish or discard its drafts`)}
                         side="bottom"
                       >
-                        <button
+                        <Button
                           type="button"
                           onClick={() => setWeekStart(group.periodStart)}
                           className="dg-btn dg-btn-secondary dg-btn-sm"
                         >
                           {outOfWindowDraftGroupRanges[index]}{" "}
                           <span style={{ opacity: 0.7, marginLeft: 4 }}>({group.count})</span>
-                        </button>
+                        </Button>
                       </Hint>
                     ))}
                     <Hint
                       content={hint("Hide this banner for the rest of this session")}
                       side="bottom"
                     >
-                      <button
+                      <Button
                         type="button"
                         onClick={dismissOutOfWindowDrafts}
                         className="dg-btn dg-btn-secondary dg-btn-sm"
                       >
                         Close
-                      </button>
+                      </Button>
                     </Hint>
                   </div>
                 </div>
@@ -5423,16 +5628,27 @@ function SchedulerContent() {
                             content={hint("Jump to this period to view what changed")}
                             side="bottom"
                           >
-                            <button
+                            <Button
                               type="button"
-                              onClick={() => setWeekStart(startDate)}
+                              onClick={() =>
+                                // Snap to the current span's own period start.
+                                // A raw publish start (a month's 1st, say) drops
+                                // a 1-week grid onto an arbitrary weekday.
+                                setWeekStart(
+                                  getScheduleStartForSpan({
+                                    date: startDate,
+                                    span: spanWeeks,
+                                    payPeriodStartDate,
+                                  }),
+                                )
+                              }
                               className="dg-btn dg-btn-secondary dg-btn-sm"
                             >
                               {`${formatDate(startDate)}–${formatDate(endDate)}`}{" "}
                               <span style={{ opacity: 0.7, marginLeft: 4 }}>
                                 ({group.changeCount})
                               </span>
-                            </button>
+                            </Button>
                           </Hint>
                         );
                       })}
@@ -5440,13 +5656,13 @@ function SchedulerContent() {
                         content={hint("Hide this banner for the rest of this session")}
                         side="bottom"
                       >
-                        <button
+                        <Button
                           type="button"
                           onClick={dismissOutOfWindowPublishes}
                           className="dg-btn dg-btn-secondary dg-btn-sm"
                         >
                           Close
-                        </button>
+                        </Button>
                       </Hint>
                     </div>
                   </div>
@@ -5496,15 +5712,33 @@ function SchedulerContent() {
                     {!isMobile && showPublishDiff && <ChangeLegend />}
                     <div className="dg-draft-banner-actions">
                       {isMobile ? (
-                        <span
-                          style={{
-                            fontSize: "var(--dg-fs-footnote)",
-                            opacity: 0.6,
-                            fontStyle: "italic",
-                          }}
-                        >
-                          Use a larger screen to view details
-                        </span>
+                        // Publish History's "Show on Grid" reaches the overlay
+                        // on a phone too, so the way back out has to live here
+                        // rather than only on the wide layout.
+                        showPublishDiff ? (
+                          <Button
+                            onClick={() => setShowPublishDiff(false)}
+                            className="dg-btn dg-btn-secondary"
+                            style={{
+                              fontSize: "var(--dg-fs-caption)",
+                              padding: "5px 12px",
+                              background: "var(--color-info-bg)",
+                              color: "var(--color-accent-text)",
+                            }}
+                          >
+                            {publishHasRevealableChanges ? "Hide Changes" : "Hide Highlights"}
+                          </Button>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: "var(--dg-fs-footnote)",
+                              opacity: 0.6,
+                              fontStyle: "italic",
+                            }}
+                          >
+                            Use a larger screen to view details
+                          </span>
+                        )
                       ) : (
                         <>
                           <Hint
@@ -5515,7 +5749,7 @@ function SchedulerContent() {
                             )}
                             side="bottom"
                           >
-                            <button
+                            <Button
                               onClick={() => setShowPublishDiff((v) => !v)}
                               className="dg-btn dg-btn-secondary"
                               style={{
@@ -5532,9 +5766,9 @@ function SchedulerContent() {
                                 : showPublishDiff
                                   ? "Hide Highlights"
                                   : "Highlight New"}
-                            </button>
+                            </Button>
                           </Hint>
-                          <button
+                          <Button
                             onClick={() => setShowPublishHistory(true)}
                             className="dg-btn dg-btn-secondary"
                             style={{
@@ -5543,9 +5777,13 @@ function SchedulerContent() {
                             }}
                           >
                             View History
-                          </button>
-                          <button
-                            onClick={async () => {
+                          </Button>
+                          <Button
+                            // Not async: the write is deliberately
+                            // fire-and-forget and the banner goes away on the
+                            // spot, so there is nothing to await and nothing
+                            // to double-click.
+                            onClick={() => {
                               if (org) {
                                 void updateScheduleLastViewed(org.id);
                                 lastViewedRef.current = new Date().toISOString();
@@ -5560,20 +5798,22 @@ function SchedulerContent() {
                             }}
                           >
                             Mark as Seen
-                          </button>
+                          </Button>
                         </>
                       )}
-                      <Hint
-                        content={hint("Hide this banner for the rest of this session")}
-                        side="bottom"
-                      >
-                        <button
+                      <Hint content={hint("Hide this notice and any highlights")} side="bottom">
+                        <Button
                           type="button"
-                          onClick={dismissPublishBanner}
+                          onClick={() => {
+                            // The banner hosts the only toggle for the
+                            // overlay, so it has to take the overlay with it.
+                            setShowPublishDiff(false);
+                            dismissPublishBanner();
+                          }}
                           className="dg-btn dg-btn-secondary dg-btn-sm"
                         >
                           Close
-                        </button>
+                        </Button>
                       </Hint>
                     </div>
                   </div>
@@ -5794,9 +6034,7 @@ function SchedulerContent() {
                 wrapActions
                 isLoading={isBulkDeleting}
                 confirmDisabled={bulkDeleteSelectedTargets.length === 0}
-                onConfirm={() => {
-                  void handleConfirmBulkDelete();
-                }}
+                onConfirm={() => handleConfirmBulkDelete()}
                 onCancel={() => setShowBulkDeleteReview(false)}
               />
             )}
@@ -5858,14 +6096,14 @@ function SchedulerContent() {
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-                    <button
+                    <Button
                       type="button"
                       className="dg-btn dg-btn-secondary"
                       onClick={() => setCoverageGapSelection(null)}
                     >
                       Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       className="dg-btn dg-btn-primary"
                       onClick={() => {
@@ -5921,7 +6159,7 @@ function SchedulerContent() {
                       }}
                     >
                       Volunteer
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </Modal>
@@ -5945,26 +6183,26 @@ function SchedulerContent() {
                     setPendingCoverageGapVolunteer(null);
                   }
                 }}
-                onConfirm={() => {
-                  if (isCoverageGapVolunteerPending) return;
-
+                // Async so the dialog's latch holds for the whole request:
+                // returning the promise is what blocks a second confirm, which
+                // the old `isCoverageGapVolunteerPending` check could not do
+                // (both clicks read it before React re-rendered).
+                onConfirm={async () => {
                   const pendingVolunteer = pendingCoverageGapVolunteer;
                   setIsCoverageGapVolunteerPending(true);
-                  void (async () => {
-                    try {
-                      const completed = await shiftRequests.volunteer(
-                        currentEmpId,
-                        pendingVolunteer.date,
-                        pendingVolunteer.input,
-                        pendingVolunteer.focusAreaId,
-                      );
-                      if (completed) {
-                        setPendingCoverageGapVolunteer(null);
-                      }
-                    } finally {
-                      setIsCoverageGapVolunteerPending(false);
+                  try {
+                    const completed = await shiftRequests.volunteer(
+                      currentEmpId,
+                      pendingVolunteer.date,
+                      pendingVolunteer.input,
+                      pendingVolunteer.focusAreaId,
+                    );
+                    if (completed) {
+                      setPendingCoverageGapVolunteer(null);
                     }
-                  })();
+                  } finally {
+                    setIsCoverageGapVolunteerPending(false);
+                  }
                 }}
               />
             )}
@@ -5986,56 +6224,56 @@ function SchedulerContent() {
                       <> (called off by {pendingClaimShift.calledOffBy})</>
                     )}
                     <br />
-                    This will be sent to your admin for approval.
+                    We'll send this to your admin for approval.
                   </>
                 }
                 confirmLabel={pendingClaimShift.source === "calloff" ? "Claim" : "Volunteer"}
                 variant="info"
                 isLoading={isClaimShiftPending}
-                onConfirm={() => {
-                  if (isClaimShiftPending) return;
-
+                // Async so the dialog's latch holds for the whole request:
+                // returning the promise is what blocks a second confirm, which
+                // the old `isClaimShiftPending` check could not do (both clicks
+                // read it before React re-rendered).
+                onConfirm={async () => {
                   const os = pendingClaimShift;
                   setIsClaimShiftPending(true);
-                  void (async () => {
-                    try {
-                      let completed = false;
-                      if (os.source === "calloff" && os.requestId) {
-                        completed = await shiftRequests.claim(os.requestId, currentEmpId);
-                      } else if (os.source === "coverage_gap") {
-                        const volunteerInput = buildOpenShiftInput({
-                          segments:
-                            os.segments?.map((segment, index) => ({
-                              shiftId: segment.shiftId ?? null,
-                              jobId: segment.jobId,
-                              position: index,
-                              isMentored: segment.isMentored ?? false,
-                            })) ?? [],
-                          shiftIds: os.shiftIds,
-                          jobIds: os.jobIds,
-                          customStartTime: os.customStartTime,
-                          customEndTime: os.customEndTime,
-                        });
-                        if (!volunteerInput) {
-                          toast.error("That open shift is no longer available.");
-                          setPendingClaimShift(null);
-                          return;
-                        }
-                        completed = await shiftRequests.volunteer(
-                          currentEmpId,
-                          os.date,
-                          volunteerInput,
-                          os.focusAreaId,
-                        );
-                      }
-
-                      if (completed) {
+                  try {
+                    let completed = false;
+                    if (os.source === "calloff" && os.requestId) {
+                      completed = await shiftRequests.claim(os.requestId, currentEmpId);
+                    } else if (os.source === "coverage_gap") {
+                      const volunteerInput = buildOpenShiftInput({
+                        segments:
+                          os.segments?.map((segment, index) => ({
+                            shiftId: segment.shiftId ?? null,
+                            jobId: segment.jobId,
+                            position: index,
+                            isMentored: segment.isMentored ?? false,
+                          })) ?? [],
+                        shiftIds: os.shiftIds,
+                        jobIds: os.jobIds,
+                        customStartTime: os.customStartTime,
+                        customEndTime: os.customEndTime,
+                      });
+                      if (!volunteerInput) {
+                        toast.error("That open shift is no longer available.");
                         setPendingClaimShift(null);
+                        return;
                       }
-                    } finally {
-                      setIsClaimShiftPending(false);
+                      completed = await shiftRequests.volunteer(
+                        currentEmpId,
+                        os.date,
+                        volunteerInput,
+                        os.focusAreaId,
+                      );
                     }
-                  })();
+
+                    if (completed) {
+                      setPendingClaimShift(null);
+                    }
+                  } finally {
+                    setIsClaimShiftPending(false);
+                  }
                 }}
                 onCancel={() => {
                   if (!isClaimShiftPending) {
@@ -6389,8 +6627,8 @@ function SchedulerContent() {
                     }}
                   >
                     {showOrganizationDiscardScope
-                      ? "Published schedule stays live. Choose which drafts to discard."
-                      : "Published schedule stays live. These drafts will be removed."}
+                      ? `Published schedule stays live. Choose which drafts to discard for ${currentPublishWindow.label}. Drafts in other periods are left alone.`
+                      : `Published schedule stays live. These drafts for ${currentPublishWindow.label} will be removed. Drafts in other periods are left alone.`}
                   </p>
                   <div
                     style={{
@@ -6423,9 +6661,7 @@ function SchedulerContent() {
               wrapActions
               isLoading={cancelingMode === "mine"}
               confirmDisabled={mineBreakdown.totalChanges === 0}
-              onConfirm={() => {
-                void handleCancelChanges();
-              }}
+              onConfirm={() => handleCancelChanges()}
               onCancel={closeDiscardConfirm}
               secondaryConfirmLabel={
                 showOrganizationDiscardScope ? "Discard all drafts" : undefined
@@ -6433,11 +6669,7 @@ function SchedulerContent() {
               isSecondaryLoading={cancelingMode === "all"}
               secondaryConfirmDisabled={draftBreakdown.totalChanges === 0}
               onSecondaryConfirm={
-                showOrganizationDiscardScope
-                  ? () => {
-                      void handleCancelChanges(true);
-                    }
-                  : undefined
+                showOrganizationDiscardScope ? () => handleCancelChanges(true) : undefined
               }
             />
           )}
@@ -6456,7 +6688,7 @@ function SchedulerContent() {
               isLoading={isPublishing}
               onConfirm={() => {
                 setShowPublishConfirm(false);
-                handlePublish();
+                return handlePublish();
               }}
               onCancel={() => setShowPublishConfirm(false)}
             />
@@ -6547,6 +6779,9 @@ function SchedulerContent() {
                 setPublishHistory([entry]);
                 setShowPublishDiff(true);
                 setShowPublishHistory(false);
+                // Bring the banner back with the overlay — it carries the
+                // legend and the only control that turns the overlay off.
+                resetPublishBanner();
               }}
               assignments={assignments}
               assignmentLabelMap={assignmentLabelMap}

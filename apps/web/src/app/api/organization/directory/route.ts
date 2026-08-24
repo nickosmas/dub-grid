@@ -116,6 +116,9 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     logger.error({ error }, "organization directory GET failed");
-    return NextResponse.json({ error: "Failed to load organization directory" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the team directory. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

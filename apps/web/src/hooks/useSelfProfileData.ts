@@ -100,7 +100,10 @@ export function useSelfProfileData({ orgId }: UseSelfProfileDataOptions): UseSel
     auditNames,
     isLoading: authLoading || (!!user && selfQuery.isLoading),
     error: selfQuery.error
-      ? extractErrorMessage(selfQuery.error, "Failed to load your profile.")
+      ? extractErrorMessage(
+          selfQuery.error,
+          "We couldn't load your profile. Refresh and try again.",
+        )
       : null,
     setProfile,
     setEmployee,

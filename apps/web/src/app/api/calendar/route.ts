@@ -9,6 +9,7 @@ import {
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
+import { API_ERRORS } from "@dubgrid/client-errors";
 
 /**
  * GET /api/calendar?weeks=4
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     // Rate limit by user ID
     const { limited, reset, misconfigured } = await checkRateLimit(apiLimiter, user.id);
     if (misconfigured) {
-      return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+      return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
     }
     if (limited) {
       return NextResponse.json(

@@ -101,6 +101,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ users });
   } catch (error) {
     logger.error({ error }, "organization users GET failed");
-    return NextResponse.json({ error: "Failed to load organization users" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load the people in that organization. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

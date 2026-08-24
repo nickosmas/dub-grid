@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { PlatformUser, Organization } from "@/types";
+import { Button } from "@/components/Button";
 import CustomSelect from "@/components/CustomSelect";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { EmptyState } from "@/components/EmptyState";
@@ -204,7 +205,7 @@ export default function AllUsersView({
       toast.success("User sessions terminated");
       setForceLogoutConfirm(null);
     } catch (err: unknown) {
-      toast.error(formatClientErrorMessage(err, "Failed to force logout"));
+      toast.error(formatClientErrorMessage(err, "We couldn't force logout. Try again."));
     } finally {
       setActionLoading(null);
     }
@@ -292,7 +293,10 @@ export default function AllUsersView({
             marginBottom: 16,
           }}
         >
-          {formatClientErrorMessage(usersQuery.error, "Failed to load users")}
+          {formatClientErrorMessage(
+            usersQuery.error,
+            "We couldn't load users. Refresh and try again.",
+          )}
         </div>
       )}
 
@@ -345,7 +349,7 @@ export default function AllUsersView({
             fontSize={12}
           />
           {(search || roleFilter !== "all" || orgFilter !== "all" || statusFilter !== "all") && (
-            <button
+            <Button
               onClick={() => {
                 setSearch("");
                 setRoleFilter("all");
@@ -363,7 +367,7 @@ export default function AllUsersView({
               }}
             >
               Clear
-            </button>
+            </Button>
           )}
         </div>
 
@@ -405,7 +409,7 @@ export default function AllUsersView({
               className="dg-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search..."
+              placeholder="Search"
               style={{
                 paddingLeft: 32,
                 paddingRight: search ? 30 : 12,
@@ -468,7 +472,7 @@ export default function AllUsersView({
                       <td style={tdStyle}>{u.orgRole && <RoleBadge role={u.orgRole} />}</td>
                       <td style={tdStyle}>
                         {u.orgName ? (
-                          <button
+                          <Button
                             onClick={(e) => {
                               e.stopPropagation();
                               if (u.orgId) onNavigateToOrg(u.orgId);
@@ -486,7 +490,7 @@ export default function AllUsersView({
                             }}
                           >
                             {u.orgName}
-                          </button>
+                          </Button>
                         ) : (
                           <span style={{ color: "var(--color-text-muted)" }}>—</span>
                         )}
@@ -774,7 +778,7 @@ export default function AllUsersView({
                           Current Org
                         </span>
                         <div style={{ marginTop: 2 }}>
-                          <button
+                          <Button
                             onClick={() => {
                               handleClosePanel();
                               setTimeout(() => u.orgId && onNavigateToOrg(u.orgId), 220);
@@ -792,7 +796,7 @@ export default function AllUsersView({
                             }}
                           >
                             {u.orgName}
-                          </button>
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -944,7 +948,7 @@ export default function AllUsersView({
                         >
                           {formatClientErrorMessage(
                             membershipsQuery.error,
-                            "Failed to load memberships",
+                            "We couldn't load memberships. Refresh and try again.",
                           )}
                         </div>
                       ) : (
@@ -960,7 +964,7 @@ export default function AllUsersView({
                             {memberships.map((m) => (
                               <tr key={m.org_id}>
                                 <td style={{ ...tdStyle, fontWeight: 600 }}>
-                                  <button
+                                  <Button
                                     onClick={() => {
                                       handleClosePanel();
                                       setTimeout(() => onNavigateToOrg(m.org_id), 220);
@@ -978,7 +982,7 @@ export default function AllUsersView({
                                     }}
                                   >
                                     {m.org_name}
-                                  </button>
+                                  </Button>
                                 </td>
                                 <td style={tdStyle}>
                                   <RoleBadge role={m.org_role} />
@@ -1015,7 +1019,7 @@ export default function AllUsersView({
                         borderTop: "1px solid var(--color-border-light)",
                       }}
                     >
-                      <button
+                      <Button
                         className="dg-btn dg-btn-secondary"
                         style={{ fontSize: "var(--dg-fs-label)" }}
                         onClick={() => {
@@ -1024,9 +1028,9 @@ export default function AllUsersView({
                         }}
                       >
                         Impersonate
-                      </button>
+                      </Button>
                       {u.orgId && (
-                        <button
+                        <Button
                           className="dg-btn dg-btn-secondary"
                           style={{
                             fontSize: "var(--dg-fs-label)",
@@ -1038,25 +1042,25 @@ export default function AllUsersView({
                           disabled={actionLoading === u.id}
                         >
                           {isDeactivated ? "Reactivate" : "Deactivate"}
-                        </button>
+                        </Button>
                       )}
-                      <button
+                      <Button
                         className="dg-btn dg-btn-secondary"
                         style={{ fontSize: "var(--dg-fs-label)", color: "var(--color-danger)" }}
                         onClick={() => setForceLogoutConfirm(u)}
                         disabled={actionLoading === u.id}
                       >
                         Force Logout
-                      </button>
+                      </Button>
                       {u.email && (
-                        <button
+                        <Button
                           className="dg-btn dg-btn-secondary"
                           style={{ fontSize: "var(--dg-fs-label)" }}
                           onClick={() => setResetConfirm(u)}
                           disabled={actionLoading === u.id}
                         >
                           Reset Password
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )}

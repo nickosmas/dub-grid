@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   const { limited, reset, misconfigured } = await checkRateLimit(passwordResetLimiter, user.id);
   if (misconfigured) {
     return NextResponse.json(
-      { success: false, error: "Service temporarily unavailable" },
+      { success: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
     );
   }
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   const target = await checkRateLimit(emailTargetLimiter, `pwreset-email:${hashEmail(email)}`);
   if (target.misconfigured) {
     return NextResponse.json(
-      { success: false, error: "Service temporarily unavailable" },
+      { success: false, error: API_ERRORS.SERVICE_UNAVAILABLE },
       { status: 503 },
     );
   }
@@ -76,7 +76,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: "Too many reset emails sent to this address. Please try again later.",
+        error:
+          "We've sent several reset emails to that address already. Wait a few minutes and try again.",
       },
       { status: 429, headers: { "Retry-After": String(retryAfter) } },
     );
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
         "Supabase Admin generateLink failed",
       );
       return NextResponse.json(
-        { success: false, error: "Failed to send password reset" },
+        { success: false, error: "We couldn't send that password reset email. Try again." },
         { status: 500 },
       );
     }
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
     Sentry.captureException(err, { extra: { context: "gridmaster-password-reset" } });
     logger.error({ err, path: "/api/gridmaster/password-reset" }, "Password reset failed");
     return NextResponse.json(
-      { success: false, error: "Failed to send password reset" },
+      { success: false, error: "We couldn't send that password reset email. Try again." },
       { status: 500 },
     );
   }

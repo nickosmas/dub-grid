@@ -44,7 +44,10 @@ async function handleGET(req: NextRequest, timer: Timer) {
     });
   } catch (error) {
     logger.error({ error }, "onboarding GET failed");
-    return NextResponse.json({ error: "Failed to load onboarding status" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't check your setup progress. Try again." },
+      { status: 500 },
+    );
   }
 }
 

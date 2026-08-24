@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     `gridmaster-subscription:${user.id}:${orgId}`,
   );
   if (misconfigured) {
-    return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
+    return NextResponse.json({ error: API_ERRORS.SERVICE_UNAVAILABLE }, { status: 503 });
   }
   if (limited) {
     return NextResponse.json(

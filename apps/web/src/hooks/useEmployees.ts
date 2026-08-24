@@ -10,7 +10,7 @@ import {
   updateEmployee,
 } from "@/features/employees/client";
 import { toast } from "sonner";
-import { SelfActionForbiddenError } from "@dubgrid/domain";
+import { SELF_ACTION_FORBIDDEN_MESSAGE, SelfActionForbiddenError } from "@dubgrid/domain";
 import * as Sentry from "@/lib/sentry";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { queryKeys } from "@/lib/query-keys";
@@ -112,7 +112,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
         invalidateEmployees();
         return added;
       } catch (err) {
-        toast.error(formatClientErrorMessage(err, "Failed to add employee"));
+        toast.error(formatClientErrorMessage(err, "We couldn't add employee. Try again."));
         Sentry.captureException(err);
         return undefined;
       }
@@ -144,7 +144,7 @@ export function useEmployees(orgId: string | null): EmployeesData {
           return;
         }
         setAllLocal(prevAll);
-        toast.error(formatClientErrorMessage(err, "Failed to save employee"));
+        toast.error(formatClientErrorMessage(err, "We couldn't save employee. Try again."));
         Sentry.captureException(err);
       }
     },
@@ -181,10 +181,10 @@ export function useEmployees(orgId: string | null): EmployeesData {
         }
         setAllLocal(prevAll);
         if (err instanceof SelfActionForbiddenError) {
-          toast.error(err.message);
+          toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
         }
-        toast.error("Failed to remove employee");
+        toast.error("We couldn't remove them. Try again.");
         Sentry.captureException(err);
       }
     },
@@ -232,10 +232,10 @@ export function useEmployees(orgId: string | null): EmployeesData {
         }
         setAllLocal(prevAll);
         if (err instanceof SelfActionForbiddenError) {
-          toast.error(err.message);
+          toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
         }
-        toast.error("Failed to update employee status");
+        toast.error("We couldn't update their status. Try again.");
         Sentry.captureException(err);
       }
     },
@@ -274,10 +274,10 @@ export function useEmployees(orgId: string | null): EmployeesData {
         }
         setAllLocal(prevAll);
         if (err instanceof SelfActionForbiddenError) {
-          toast.error(err.message);
+          toast.error(formatClientErrorMessage(err, SELF_ACTION_FORBIDDEN_MESSAGE));
           return;
         }
-        toast.error("Failed to activate employee");
+        toast.error("We couldn't reactivate them. Try again.");
         Sentry.captureException(err);
       }
     },

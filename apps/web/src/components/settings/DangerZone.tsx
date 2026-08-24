@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Organization } from "@/types";
+import { Button } from "@/components/Button";
 import { SectionCard } from "./shared";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { formatClientErrorMessage } from "@/lib/client-facing";
@@ -38,7 +39,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error || "Failed to delete organization");
+        throw new Error(data?.error || "We couldn't delete that organization. Try again.");
       }
       toast.success("Organization deleted.");
       // The org is gone for this user. Sign out globally so every device's
@@ -47,11 +48,13 @@ export default function DangerZone({ organization }: DangerZoneProps) {
         signOut({ scope: "global" });
       } catch (signOutErr) {
         Sentry.captureException(signOutErr);
-        toast.error("Couldn't sign out automatically. Please refresh the page.");
+        toast.error("We couldn't sign you out. Refresh the page and try again.");
         setIsDeleting(false);
       }
     } catch (err) {
-      toast.error(formatClientErrorMessage(err, "Failed to delete organization"));
+      toast.error(
+        formatClientErrorMessage(err, "We couldn't delete that organization. Try again."),
+      );
       setIsDeleting(false);
     }
   }
@@ -90,7 +93,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
             borderTop: "1px solid var(--color-border-light)",
           }}
         >
-          <button
+          <Button
             className="dg-btn dg-btn-danger-filled"
             onClick={() => setConfirmOpen(true)}
             disabled={isInSandbox}
@@ -99,7 +102,7 @@ export default function DangerZone({ organization }: DangerZoneProps) {
             }
           >
             Delete organization
-          </button>
+          </Button>
         </div>
       </div>
 

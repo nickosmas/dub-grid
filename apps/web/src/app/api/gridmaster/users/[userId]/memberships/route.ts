@@ -20,7 +20,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ userId:
     const params = await context.params;
     const parsed = paramsSchema.safeParse(params);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid user id" }, { status: 400 });
+      return NextResponse.json(
+        { error: "We couldn't find that account. Refresh the page and try again." },
+        { status: 400 },
+      );
     }
 
     const serviceClient = getServiceClient();
@@ -66,6 +69,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ userId:
     return NextResponse.json({ memberships });
   } catch (error) {
     logger.error({ error }, "gridmaster memberships GET failed");
-    return NextResponse.json({ error: "Failed to load memberships" }, { status: 500 });
+    return NextResponse.json(
+      { error: "We couldn't load their organizations. Refresh and try again." },
+      { status: 500 },
+    );
   }
 }

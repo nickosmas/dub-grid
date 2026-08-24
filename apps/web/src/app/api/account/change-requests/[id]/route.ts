@@ -21,6 +21,6 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     });
     return NextResponse.json({ success: true, request });
   } catch (error) {
-    return apiErrorResponse(error, "Failed to cancel request.", 400);
+    return apiErrorResponse(error, "We couldn't cancel request. Try again.", 400);
   }
 }

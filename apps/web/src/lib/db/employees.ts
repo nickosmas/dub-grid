@@ -373,7 +373,9 @@ async function updateEmployeeStatus(input: {
   }
 
   if (!response.ok || !body?.employee) {
-    throw new Error(formatClientErrorMessage(body?.error, "Failed to update employee status"));
+    throw new Error(
+      formatClientErrorMessage(body?.error, "We couldn't update their status. Try again."),
+    );
   }
 
   await cacheDel(
@@ -469,7 +471,10 @@ async function postCreateEmployeeFromOrgUser(
   if (mismatchError) throw mismatchError;
   if (!response.ok || !payload?.employee) {
     throw new Error(
-      formatClientErrorMessage(payload?.error, "Failed to add management user to the schedule"),
+      formatClientErrorMessage(
+        payload?.error,
+        "We couldn't add management user to the schedule. Try again.",
+      ),
     );
   }
   return payload.employee;

@@ -43,7 +43,7 @@ export async function sendInvitationEmail(input: {
   inviterName?: string | null;
 }) {
   if (!input.token) {
-    throw new Error("Invitation token unavailable");
+    throw new Error("We couldn't create that invitation link. Try again.");
   }
 
   const baseUrl = emailBaseUrl();

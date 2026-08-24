@@ -84,7 +84,7 @@ export default function OnboardingWizard({
       window.location.reload();
     } catch (err) {
       Sentry.captureException(err);
-      toast.error("Failed to skip setup. Please try again.");
+      toast.error("We couldn't skip setup. Try again.");
       setSkipLoading(false);
     }
   }
