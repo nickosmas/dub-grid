@@ -1,9 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  calculateEffectiveRole,
-  getRoleLevel,
-  resetMiddlewareOrgAccessMemo,
-} from "../../middleware";
+import { calculateEffectiveRole, getRoleLevel, resetMiddlewareOrgAccessMemo } from "../middleware";
 
 // ── Mock next/server ─────────────────────────────────────────────────────────
 // NextResponse.next() and NextResponse.redirect() need to return objects
@@ -205,7 +201,7 @@ describe("getRoleLevel", () => {
 
 // Dynamic import of middleware function — needs mocks set up first
 async function runMiddleware(req: ReturnType<typeof makeNextRequest>) {
-  const mod = await import("../../middleware");
+  const mod = await import("../middleware");
   return mod.middleware(req as Parameters<typeof mod.middleware>[0]) as unknown;
 }
 

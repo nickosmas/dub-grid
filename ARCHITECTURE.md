@@ -119,11 +119,11 @@ Subdomains are simulated using `dubgrid.local` entries in `/etc/hosts`. The `par
 
 ### Three Security Layers
 
-| Layer                                          | Where              | What It Does                                                                             | Failure Mode                  |
-| ---------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------- | ----------------------------- |
-| **Edge Middleware** (`apps/web/middleware.ts`) | Vercel CDN edge    | JWT verification, role-based route blocking, subdomain enforcement, org-suspension check | Redirects to `/login`         |
-| **Custom JWT Claims**                          | Supabase auth hook | Injects `platform_role`, `org_role`, `org_id`, `org_slug` into JWT at sign-in            | User gets default `user` role |
-| **Row-Level Security**                         | PostgreSQL         | Every query filtered by `caller_org_id()` and role checks                                | Query returns empty / blocked |
+| Layer                                              | Where              | What It Does                                                                             | Failure Mode                  |
+| -------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------- | ----------------------------- |
+| **Edge Middleware** (`apps/web/src/middleware.ts`) | Vercel CDN edge    | JWT verification, role-based route blocking, subdomain enforcement, org-suspension check | Redirects to `/login`         |
+| **Custom JWT Claims**                              | Supabase auth hook | Injects `platform_role`, `org_role`, `org_id`, `org_slug` into JWT at sign-in            | User gets default `user` role |
+| **Row-Level Security**                             | PostgreSQL         | Every query filtered by `caller_org_id()` and role checks                                | Query returns empty / blocked |
 
 > **Middleware JWT fallback:** the `jwtVerify` catch block falls back to `decodeJwt` (unverified) for non-gridmaster users — `jwtVerify` can fail in production, and RLS is the real boundary. Gridmaster is always blocked from unverified tokens. This fallback must never be removed.
 
@@ -457,7 +457,7 @@ DubGrid uses Supabase Realtime for three purposes:
 
 - **Edge Middleware** — runs at the CDN edge for low-latency RBAC, subdomain routing, and org-suspension checks.
 - **Static Prerendering** — all routes use simple page files (no catch-all routes) to enable static optimization.
-- **Security Headers** — static headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) are configured in `apps/web/next.config.ts`. The per-request Content-Security-Policy is built in `apps/web/middleware.ts`: authenticated pages get a nonce + `strict-dynamic` policy in production.
+- **Security Headers** — static headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) are configured in `apps/web/next.config.ts`. The per-request Content-Security-Policy is built in `apps/web/src/middleware.ts`: authenticated pages get a nonce + `strict-dynamic` policy in production.
 
 ### Supabase
 

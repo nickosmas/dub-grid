@@ -11,7 +11,7 @@ import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { Timer } from "@/lib/server-timing";
 import { getSupabaseJwks } from "@/lib/auth/verify-token";
 import * as Sentry from "@/lib/sentry";
-import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./src/lib/supabase-keys";
+import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./lib/supabase-keys";
 
 /**
  * Vercel Edge Middleware for RBAC Route Protection

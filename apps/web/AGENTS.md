@@ -3,7 +3,7 @@
 Scope: `apps/web`, package `@dubgrid/web`.
 
 Next.js 16 App Router. Routes under `apps/web/src/app`. Middleware at
-`apps/web/middleware.ts`. API Route Handlers under `apps/web/src/app/api`.
+`apps/web/src/middleware.ts`. API Route Handlers under `apps/web/src/app/api`.
 
 ## Verified Commands
 

@@ -70,10 +70,18 @@ implemented; the rest are fixed). `npm audit` is 0 critical / 0 high / 0 low.
 
 **Impact:** This app performs route gating, billing-lock enforcement, org
 suspension/archival redirects, and impersonation-context rewriting in
-`apps/web/middleware.ts`. The middleware-bypass advisories were therefore
-directly relevant. Data exposure was bounded because the app correctly treats
-RLS as the real security boundary (all org-scoped tables enforce
-`caller_org_id()`), so a bypass alone does not leak another tenant's rows.
+`apps/web/src/middleware.ts`. The middleware-bypass advisories were therefore
+directly relevant.
+
+> **Correction (2026-08-25):** at the time of this audit the middleware file
+> sat at `apps/web/middleware.ts` — outside the `src/` directory Next.js reads
+> when the app lives at `src/app` — so it was never invoked, and none of the
+> enforcement described in this document was actually running. The
+> middleware-bypass advisories above were moot for the same reason. Moved to
+> `apps/web/src/middleware.ts` and confirmed executing; the claims below now
+> hold. See the CHANGELOG entry under Unreleased / Security. Data exposure was bounded because the app correctly treats
+> RLS as the real security boundary (all org-scoped tables enforce
+> `caller_org_id()`), so a bypass alone does not leak another tenant's rows.
 
 **Fix:** `apps/web/package.json` now pins `"next": "^16.2.6"`. Installed version
 confirmed: `next@16.2.6` (`npm ls next`). The XSS-in-App-Router-via-CSP-nonce

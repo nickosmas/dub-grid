@@ -282,7 +282,7 @@ Deployed on **Vercel** with a hosted **Supabase** backend. Edge middleware runs 
 Key configuration:
 
 - All routes are simple pages (no catch-all routes) to enable static prerendering
-- Static security headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) live in `apps/web/next.config.ts`; the per-request Content-Security-Policy (nonce-based on authenticated pages) is built in `apps/web/middleware.ts`
+- Static security headers (HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy) live in `apps/web/next.config.ts`; the per-request Content-Security-Policy (nonce-based on authenticated pages) is built in `apps/web/src/middleware.ts`
 - Custom access token hook must be enabled in the Supabase dashboard
 
 ## Mobile On A Real Phone

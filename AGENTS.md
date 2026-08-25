@@ -9,7 +9,7 @@ for their directories. When instructions conflict, the most specific nested
 - Package manager: `npm@10.9.2` (node `22.13.x`). Lockfile: `package-lock.json`.
 - Workspace runner: Turborepo (`turbo.json`). Workspaces: `apps/*`, `packages/*`.
 - Web app: `apps/web`, package `@dubgrid/web`. Next.js 16 App Router in
-  `apps/web/src/app`. Middleware at `apps/web/middleware.ts`.
+  `apps/web/src/app`. Middleware at `apps/web/src/middleware.ts`.
 - Mobile app: `apps/mobile`, package `@dubgrid/mobile`. Expo SDK 54 with
   Expo Router in `apps/mobile/app`. Feature code in `apps/mobile/src`.
 - Shared packages (all platform-neutral unless noted):
@@ -137,7 +137,7 @@ files unless explicitly requested or required for correctness.
   when adding/removing cookies, changing analytics providers, or updating the cookie policy.
 - **Admin permissions**: 25 per-person permissions stored in `organization_memberships.admin_permissions`.
   Departments do NOT grant permissions. `departments.permissions` is vestigial.
-- **Middleware JWT fallback**: The `jwtVerify` catch block in `apps/web/middleware.ts` MUST
+- **Middleware JWT fallback**: The `jwtVerify` catch block in `apps/web/src/middleware.ts` MUST
   fall back to `decodeJwt` (unverified) for non-gridmaster users. RLS is the real security
   boundary. Gridmaster is blocked from unverified tokens. Never remove this fallback.
 - **OnboardingGate**: The client-side onboarding interstitial is `OnboardingGate`
