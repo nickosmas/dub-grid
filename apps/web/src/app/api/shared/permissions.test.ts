@@ -156,8 +156,12 @@ function makeRequest(method?: string) {
 }
 
 describe("requireOrgPermissions", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // Module-level memo, so it survives between cases in this file — a
+    // previous test's "setup complete" would otherwise leak into the next.
+    const { resetOrgSetupCompleteMemo } = await import("./permissions");
+    resetOrgSetupCompleteMemo();
     requireAuthenticatedUser.mockResolvedValue({
       user: { id: "8af6f242-c060-4920-a7db-91b4cb66fd26" },
     });
@@ -389,6 +393,36 @@ describe("requireOrgPermissions", () => {
           "Organization unavailable. Your organization opens up once your administrator finishes setup.",
       });
     }
+  });
+
+  it("never memoizes an incomplete setup, so finishing it takes effect at once", async () => {
+    // The in-process memo in front of the Redis lookup holds only `true`, for
+    // the same reason Redis does: incomplete -> complete is the transition an
+    // admin is actively waiting on. Memoizing `false` would leave them staring
+    // at a locked org after they finished setting it up.
+    const ORG = "11111111-1111-4111-8111-111111111111";
+    const access = {
+      membership: { org_role: "admin", admin_permissions: null },
+      profile: { platform_role: "none" },
+      organization: {
+        suspended_at: null,
+        subscription_status: "active",
+        trial_ends_at: null,
+      },
+    } as const;
+
+    const { requireOrgPermissions } = await import("./permissions");
+
+    getServiceClient.mockReturnValue(
+      createServiceClientMock({ ...access, setup: { focusAreas: [], activeEmployeeCount: 0 } }),
+    );
+    const blocked = await requireOrgPermissions(makeRequest(), ORG, () => true);
+    expect("response" in blocked).toBe(true);
+
+    // Same org, setup now finished — must be seen on the very next request.
+    getServiceClient.mockReturnValue(createServiceClientMock({ ...access }));
+    const allowed = await requireOrgPermissions(makeRequest(), ORG, () => true);
+    expect("response" in allowed).toBe(false);
   });
 
   it("allows setup-required org APIs while setup is incomplete", async () => {
