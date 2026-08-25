@@ -9,6 +9,10 @@ import {
 import { loginLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { createAnonClient, createTokenScopedClient } from "@/lib/api-auth";
+import { getServiceClient } from "@/lib/supabase-service";
+import { SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
+import { deleteSandboxForUser } from "@/features/test-sandbox/server";
+import type { User } from "@supabase/supabase-js";
 import { parseHost } from "@/lib/subdomain";
 import { fetchTermsAcceptanceStatus } from "@/features/account/server";
 import logger from "@/lib/logger";
@@ -34,26 +38,113 @@ interface SessionTokens {
 }
 
 type OrchestrationOutcome =
-  | { ok: true; session: SessionTokens; destination: string | null; needsClientOrgSwitch: boolean }
+  | {
+      ok: true;
+      session: SessionTokens;
+      destination: string | null;
+      /**
+       * The session was re-scoped to a different organization during this
+       * request. The client must drop its query cache and hard-navigate, and
+       * the response must clear any sandbox cookie.
+       */
+      didSwitchOrg: boolean;
+    }
   | { ok: false; status: number; code: string; error: string };
 
+/** Returned to the client when the caller has no access to the subdomain's org. */
+const ORG_ACCESS_DENIED_CODE = "ORG_ACCESS_DENIED";
+
 /**
- * Resolves trial activation and terms status server-side, right after
- * signInWithPassword, for the common case (JWT's org already matches the
- * subdomain, or the caller is gridmaster) — collapsing what used to be
- * separate start-trial/terms round trips into this one request.
+ * Re-scopes a just-minted session to the organization the caller is signing
+ * in to, when that isn't the one their profile defaults to.
  *
- * Deliberately does NOT also collapse org-switching (get_my_organizations →
- * switch_org → refreshSession) into this request: that was evaluated and
- * reverted (see memory: project_login_double_mint_constraint /
- * feedback_validate_before_navigate) as not worth the regression risk in
- * this historically fragile area. When the JWT's org doesn't match the
- * subdomain, this returns `needsClientOrgSwitch: true` and the client drives
- * that sequence itself, same as before this consolidation existed.
+ * The second token mint is unavoidable: `switch_org` writes
+ * `user_sessions.active_org_id` keyed on a `session_id` that does not exist
+ * until the first token is minted, and the access-token hook only picks the
+ * new org up on the next mint. What this removes is the client having to
+ * drive it — that was `get_my_organizations`, `switch_org`, the refresh, the
+ * trial start, the sandbox teardown and the terms check as six serial HTTP
+ * round trips before a full page load, measured at 4.4s against a
+ * seven-organization account.
+ *
+ * `switch_org` is the authorization boundary here, not the slug lookup: the
+ * RPC itself verifies the caller's membership and that the org is active, so
+ * resolving the slug through the service client grants nothing on its own.
+ */
+async function switchSessionToHostOrganization(
+  session: SessionTokens,
+  hostSlug: string,
+): Promise<
+  | { ok: true; session: SessionTokens; claims: ReturnType<typeof decodeJwt> }
+  | { ok: false; status: number; code: string; error: string }
+> {
+  const { data: org } = await getServiceClient()
+    .from("organizations")
+    .select("id")
+    .eq("slug", hostSlug)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (!org?.id) {
+    return {
+      ok: false,
+      status: 403,
+      code: ORG_ACCESS_DENIED_CODE,
+      error: "Your account is not associated with this organization.",
+    };
+  }
+
+  const client = createTokenScopedClient(session.access_token);
+  const { error: switchError } = await client.rpc("switch_org", { target_org_id: org.id });
+  if (switchError) {
+    // switch_org rejects a caller with no live membership, or an inactive
+    // org. Both mean the same thing to the person signing in.
+    return {
+      ok: false,
+      status: 403,
+      code: ORG_ACCESS_DENIED_CODE,
+      error: "Your account is not associated with this organization.",
+    };
+  }
+
+  const { data, error } = await client.auth.refreshSession({
+    refresh_token: session.refresh_token,
+  });
+  if (error || !data.session) {
+    return {
+      ok: false,
+      status: 401,
+      code: "SESSION_REFRESH_FAILED",
+      error: "We couldn't verify your session. Sign in again.",
+    };
+  }
+
+  const next: SessionTokens = {
+    access_token: data.session.access_token,
+    refresh_token: data.session.refresh_token,
+    expires_in: data.session.expires_in,
+    token_type: data.session.token_type,
+  };
+  return { ok: true, session: next, claims: decodeJwt(next.access_token) };
+}
+
+/**
+ * Everything that has to happen between a correct password and a usable
+ * dashboard: re-scoping the session to the organization being signed in to,
+ * trial activation, sandbox teardown, and the terms check.
+ *
+ * All of it is server-side. Org-switching used to be driven from the browser
+ * as six serial round trips before a full page load — measured at 4.4s on a
+ * seven-organization account, against 1.4s for this. That split was
+ * deliberate once (see memory: project_login_double_mint_constraint) and was
+ * re-opened with explicit sign-off; the constraint it was protecting still
+ * holds and is documented on switchSessionToHostOrganization, namely that the
+ * second token mint is structural and cannot be removed, only relocated.
  *
  * Only runs for the non-MFA path: MFA-required responses return before this
  * is called, so no trial-activation side effect can fire on a password
- * check alone before the second factor is verified.
+ * check alone before the second factor is verified. That path still switches
+ * organizations from the browser, because it cannot re-enter this route.
  */
 async function orchestratePostSignIn(
   initialSession: SessionTokens,
@@ -62,6 +153,8 @@ async function orchestratePostSignIn(
 ): Promise<OrchestrationOutcome> {
   const isGridmaster = claims.platform_role === "gridmaster";
   let session = initialSession;
+  let effectiveClaims = claims;
+  let didSwitchOrg = false;
   // Kicked off (not awaited) inside the non-gridmaster branch below when
   // applicable, then run concurrently with the terms-check — neither
   // depends on the other's result, and both are already best-effort.
@@ -93,14 +186,20 @@ async function orchestratePostSignIn(
     const userSlug = typeof claims.org_slug === "string" ? claims.org_slug : null;
 
     if (hostSlug && userSlug !== hostSlug) {
-      return { ok: true, session, destination: null, needsClientOrgSwitch: true };
+      const switched = await switchSessionToHostOrganization(session, hostSlug);
+      if (!switched.ok) return switched;
+      session = switched.session;
+      effectiveClaims = switched.claims;
+      didSwitchOrg = true;
     }
 
     // First super_admin login starts this org's trial. Idempotent and
     // self-gated server-side, so safe to fire whenever a super_admin signs
-    // in. Non-fatal: never blocks sign-in on failure.
-    const signedInOrgId = typeof claims.org_id === "string" ? claims.org_id : null;
-    if (signedInOrgId && claims.org_role === "super_admin") {
+    // in. Non-fatal: never blocks sign-in on failure. Reads the post-switch
+    // claims, so a switch starts the trial for the org actually signed in to.
+    const signedInOrgId =
+      typeof effectiveClaims.org_id === "string" ? effectiveClaims.org_id : null;
+    if (signedInOrgId && effectiveClaims.org_role === "super_admin") {
       trialPromise = (async () => {
         try {
           await createTokenScopedClient(session.access_token).rpc("start_trial_for_org", {
@@ -113,9 +212,29 @@ async function orchestratePostSignIn(
     }
   }
 
+  // A fresh login ends the previous session, so any sandbox left over from it
+  // must not be resumed. The client used to await this after switching, because
+  // its hard navigation aborted the request often enough that the sandbox
+  // survived — and a surviving sandbox cookie pins every later request to a
+  // clone of the org the user just left, at an elevated role. Done here there
+  // is nothing to abort, so it runs alongside the other two best-effort steps.
+  const sandboxTeardown: Promise<unknown> = didSwitchOrg
+    ? (async () => {
+        try {
+          await deleteSandboxForUser({
+            serviceClient: getServiceClient(),
+            actor: { id: claims.sub as string } as User,
+          });
+        } catch {
+          // Non-fatal: never block sign-in on sandbox teardown.
+        }
+      })()
+    : Promise.resolve();
+
   let destination = POST_LOGIN_DESTINATION;
-  const [, termsResult] = await Promise.allSettled([
+  const [, , termsResult] = await Promise.allSettled([
     trialPromise,
+    sandboxTeardown,
     fetchTermsAcceptanceStatus(claims.sub as string),
   ]);
   // Best-effort: a rejection here means the user lands on the destination
@@ -124,7 +243,7 @@ async function orchestratePostSignIn(
     destination = `/accept-terms?next=${encodeURIComponent(POST_LOGIN_DESTINATION)}`;
   }
 
-  return { ok: true, session, destination, needsClientOrgSwitch: false };
+  return { ok: true, session, destination, didSwitchOrg };
 }
 
 /**
@@ -252,7 +371,7 @@ export async function POST(req: NextRequest) {
     token_type: data.session.token_type,
   };
   let destination: string | null = null;
-  let needsClientOrgSwitch = false;
+  let didSwitchOrg = false;
 
   // Email not yet confirmed: the client redirects to /verify-email without
   // ever calling setBrowserSession, so orchestration (which assumes a
@@ -274,7 +393,7 @@ export async function POST(req: NextRequest) {
     }
     session = outcome.session;
     destination = outcome.destination;
-    needsClientOrgSwitch = outcome.needsClientOrgSwitch;
+    didSwitchOrg = outcome.didSwitchOrg;
   }
 
   // Return the session tokens so the client can set them
@@ -288,8 +407,14 @@ export async function POST(req: NextRequest) {
     },
     mfa_required: mfaRequired,
     destination,
-    needsClientOrgSwitch,
+    didSwitchOrg,
   });
+  // The session now points at a different organization than any sandbox the
+  // cookie names. Leaving it set would route every later request into a clone
+  // of the org the user just left, at super_admin.
+  if (didSwitchOrg) {
+    res.cookies.set(SANDBOX_COOKIE_NAME, "", { path: "/", maxAge: 0 });
+  }
   timer.applyTo(res.headers);
   return res;
 }

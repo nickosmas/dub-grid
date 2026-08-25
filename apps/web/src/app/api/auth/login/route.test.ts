@@ -7,6 +7,8 @@ const signInWithPassword = vi.fn();
 const fetchTermsAcceptanceStatus = vi.fn();
 const rpc = vi.fn();
 const refreshSession = vi.fn();
+const serviceFrom = vi.fn();
+const deleteSandboxForUser = vi.fn();
 
 vi.mock("@/lib/rate-limit", () => ({
   loginLimiter: {},
@@ -34,6 +36,16 @@ vi.mock("@/features/account/server", () => ({
   fetchTermsAcceptanceStatus: (userId: string) => fetchTermsAcceptanceStatus(userId),
 }));
 
+// Service-role client, used only to turn the request's subdomain into an org id
+// before switch_org (which is what actually authorizes the switch).
+vi.mock("@/lib/supabase-service", () => ({
+  getServiceClient: () => ({ from: (table: string) => serviceFrom(table) }),
+}));
+
+vi.mock("@/features/test-sandbox/server", () => ({
+  deleteSandboxForUser: (...args: unknown[]) => deleteSandboxForUser(...args),
+}));
+
 vi.mock("@/lib/logger", () => ({
   default: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
@@ -43,6 +55,7 @@ vi.mock("@/lib/sentry", () => ({
 }));
 
 import { POST } from "@/app/api/auth/login/route";
+import { SANDBOX_COOKIE_NAME } from "@/lib/sandbox-cookie";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const ORG_ID = "22222222-2222-4222-8222-222222222222";
@@ -73,6 +86,19 @@ function makeSession(
   };
 }
 
+/** Makes the subdomain->org lookup resolve (or not) for the switch path. */
+function stubOrgLookup(orgId: string | null) {
+  serviceFrom.mockImplementation(() => ({
+    select: () => ({
+      eq: () => ({
+        is: () => ({
+          maybeSingle: async () => ({ data: orgId ? { id: orgId } : null, error: null }),
+        }),
+      }),
+    }),
+  }));
+}
+
 function makeRequest(
   host: string,
   body: unknown = { email: "user@example.com", password: "password123" },
@@ -87,6 +113,7 @@ function makeRequest(
 describe("POST /api/auth/login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    deleteSandboxForUser.mockResolvedValue({ deletedCount: 0 });
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "anon-key";
     checkRateLimit.mockResolvedValue({ limited: false, misconfigured: false });
@@ -196,7 +223,7 @@ describe("POST /api/auth/login", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.needsClientOrgSwitch).toBe(false);
+    expect(body.didSwitchOrg).toBe(false);
     expect(body.destination).toBe("/dashboard");
     expect(rpc).toHaveBeenCalledWith("start_trial_for_org", { p_org_id: ORG_ID });
     expect(rpc).not.toHaveBeenCalledWith("switch_org", expect.anything());
@@ -222,38 +249,89 @@ describe("POST /api/auth/login", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  // Org-switching (get_my_organizations → switch_org → refreshSession) is
-  // deliberately NOT collapsed into this route — see orchestratePostSignIn's
-  // doc comment and the project_login_double_mint_constraint memory. The
-  // route just signals needsClientOrgSwitch and leaves the actual switch to
-  // the client (OrgLogin.tsx's findAndSwitchToOrg/switchToOrgAndPrepare).
-  it("signals needsClientOrgSwitch without touching org RPCs when the subdomain doesn't match the JWT's org", async () => {
-    signInWithPassword.mockResolvedValueOnce({
-      data: {
-        session: makeSession({ org_id: OTHER_ORG_ID, org_slug: "otherorg", org_role: "user" }),
-        user: {
-          id: USER_ID,
-          email: "user@example.com",
-          email_confirmed_at: "2026-01-01T00:00:00Z",
-          factors: [],
+  // Org-switching used to be six serial client round trips before a full page
+  // load. It is now resolved inside this route; see the
+  // project_login_double_mint_constraint memory for the history, and
+  // switchSessionToHostOrganization for why the second mint is structural.
+  describe("signing in to an organization other than the caller's current one", () => {
+    function signInAsOtherOrg() {
+      signInWithPassword.mockResolvedValueOnce({
+        data: {
+          session: makeSession({ org_id: OTHER_ORG_ID, org_slug: "otherorg", org_role: "user" }),
+          user: {
+            id: USER_ID,
+            email: "user@example.com",
+            email_confirmed_at: "2026-01-01T00:00:00Z",
+            factors: [],
+          },
         },
-      },
-      error: null,
+        error: null,
+      });
+    }
+
+    it("switches server-side and returns the post-switch session", async () => {
+      signInAsOtherOrg();
+      stubOrgLookup(ORG_ID);
+      const switched = makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "super_admin" });
+      refreshSession.mockResolvedValueOnce({ data: { session: switched }, error: null });
+
+      const res = await POST(makeRequest("acme.localhost"));
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.didSwitchOrg).toBe(true);
+      expect(rpc).toHaveBeenCalledWith("switch_org", { target_org_id: ORG_ID });
+      expect(refreshSession).toHaveBeenCalled();
+      // The caller must receive the re-scoped tokens, not the ones sign-in
+      // produced — those still name the previous organization.
+      expect(body.session.access_token).toBe(switched.access_token);
+      expect(body.destination).toBe("/dashboard");
     });
 
-    const res = await POST(makeRequest("acme.localhost"));
-    const body = await res.json();
+    it("clears any sandbox cookie, so the switch can't leave one pointing at the old org", async () => {
+      signInAsOtherOrg();
+      stubOrgLookup(ORG_ID);
+      refreshSession.mockResolvedValueOnce({
+        data: { session: makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "user" }) },
+        error: null,
+      });
 
-    expect(res.status).toBe(200);
-    expect(body.needsClientOrgSwitch).toBe(true);
-    expect(body.destination).toBeNull();
-    expect(rpc).not.toHaveBeenCalled();
-    expect(refreshSession).not.toHaveBeenCalled();
-    // The initial (pre-switch) tokens are returned as-is — the client is
-    // responsible for minting the final, post-switch session itself.
-    expect(body.session.access_token).toBe(
-      makeSession({ org_id: OTHER_ORG_ID, org_slug: "otherorg", org_role: "user" }).access_token,
-    );
+      const res = await POST(makeRequest("acme.localhost"));
+
+      expect(res.status).toBe(200);
+      expect(res.cookies.get(SANDBOX_COOKIE_NAME)?.value).toBe("");
+      expect(deleteSandboxForUser).toHaveBeenCalled();
+    });
+
+    it("refuses when the subdomain names no live organization", async () => {
+      signInAsOtherOrg();
+      stubOrgLookup(null);
+
+      const res = await POST(makeRequest("acme.localhost"));
+      const body = await res.json();
+
+      expect(res.status).toBe(403);
+      expect(body.code).toBe("ORG_ACCESS_DENIED");
+      expect(rpc).not.toHaveBeenCalledWith("switch_org", expect.anything());
+    });
+
+    it("refuses when switch_org rejects the caller, rather than signing them in elsewhere", async () => {
+      // switch_org is the authorization boundary: it verifies membership and
+      // that the org is active. A rejection must not fall through to a session
+      // still scoped to the previous organization.
+      signInAsOtherOrg();
+      stubOrgLookup(ORG_ID);
+      rpc.mockImplementation(async (fn: string) =>
+        fn === "switch_org" ? { error: { message: "not a member" } } : { error: null },
+      );
+
+      const res = await POST(makeRequest("acme.localhost"));
+      const body = await res.json();
+
+      expect(res.status).toBe(403);
+      expect(body.code).toBe("ORG_ACCESS_DENIED");
+      expect(refreshSession).not.toHaveBeenCalled();
+    });
   });
 
   it("gridmaster: always refreshes once and returns the resolved destination", async () => {

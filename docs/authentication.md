@@ -306,6 +306,46 @@ through.
 
 ---
 
+## 4c. Org-Switch on Sign-In (consolidated server-side)
+
+Signing in to a subdomain whose organization isn't the caller's current one is
+resolved inside `POST /api/auth/login`, not by the browser.
+`orchestratePostSignIn` calls `switchSessionToHostOrganization`, which:
+
+1. resolves the subdomain to an org id (service client — this grants nothing on
+   its own),
+2. calls `switch_org` on a token-scoped client — **this is the authorization
+   boundary**, verifying live membership and that the org is active,
+3. refreshes the session, minting the token that actually carries the new org.
+
+Trial activation, sandbox teardown and the terms check then run together in one
+`Promise.allSettled`. The response carries `didSwitchOrg`, and the client does
+only what the server cannot: reset view-as-user, clear the React Query cache,
+and hard-navigate.
+
+**The second token mint is structural.** `switch_org` writes
+`user_sessions.active_org_id` keyed on a `session_id` that does not exist until
+the first token is minted, and the access-token hook only picks the new org up
+on the next mint. Consolidation relocated that mint; it cannot remove it.
+
+**Three things here are load-bearing:**
+
+- The **hard navigation** after a switch. A soft `router.replace` leaves
+  `useOrganizationData`'s one-time org context pinned to the previous org, which
+  destabilises the onboarding gate.
+- **`switch_org` as the authorization check.** The slug lookup must never be
+  treated as one.
+- **The MFA path still switches from the browser** (`findAndSwitchToOrg`),
+  because a second factor is verified directly against Supabase and cannot
+  re-enter this route.
+
+Measured on a seven-organization account: the previous client-orchestrated chain
+(`get_my_organizations` → `switch_org` → refresh → start-trial → sandbox exit →
+terms, then a full page load) was 4.4s of serial round trips; the consolidated
+route is ~0.7s warm.
+
+---
+
 ## 5a. Request Authentication: Local JWT Verification + Revocation
 
 Authenticated Route Handlers do **not** call `supabase.auth.getUser()`. That was a
