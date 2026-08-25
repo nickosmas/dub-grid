@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applyRecurringSchedules, publishSchedule } from "./api";
+import { applyRecurringSchedules, deleteShift, publishSchedule, upsertShift } from "./api";
+import type { ScheduleCellInput } from "@/types";
 
 describe("schedule client api", () => {
   afterEach(() => {
@@ -42,6 +43,95 @@ describe("schedule client api", () => {
         }),
       }),
     );
+  });
+
+  describe("cell echo", () => {
+    const ORG = "11111111-1111-4111-8111-111111111111";
+    const EMP = "22222222-2222-4222-8222-222222222222";
+
+    function stubFetch(payload: unknown) {
+      const fetchMock = vi.fn(async (_url: string, _init: { body: string }) => ({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        json: async () => payload,
+      }));
+      vi.stubGlobal("fetch", fetchMock);
+      return fetchMock;
+    }
+
+    /** A minimal well-formed cell input — the payload shape isn't under test. */
+    const deletedInput: ScheduleCellInput = {
+      kind: "deleted",
+      segments: [],
+      absenceTypeId: null,
+      customStartTime: null,
+      customEndTime: null,
+      seriesId: null,
+      fromRecurring: false,
+    };
+
+    it("sends the label maps as entry arrays the server can rebuild", async () => {
+      const fetchMock = stubFetch({ success: true, cells: {} });
+
+      await deleteShift(EMP, "2026-04-12", ORG, 3, {
+        isScheduler: true,
+        assignmentLabelMap: new Map([[7, "DAY"]]),
+        absenceTypeMap: new Map([[2, "PTO"]]),
+      });
+
+      const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+      expect(body.echo).toEqual({
+        isScheduler: true,
+        assignmentLabels: [[7, "DAY"]],
+        absenceTypeLabels: [[2, "PTO"]],
+      });
+    });
+
+    it("omits echo entirely when the caller doesn't want cells back", async () => {
+      const fetchMock = stubFetch({ success: true });
+
+      await deleteShift(EMP, "2026-04-12", ORG, 3);
+
+      const body = JSON.parse(fetchMock.mock.calls[0]![1].body);
+      expect("echo" in body).toBe(false);
+    });
+
+    it("returns the echoed cells, including nulls for cells that were emptied", async () => {
+      const entry = {
+        label: "DAY",
+        assignmentIds: [1],
+        isDraft: true,
+        draftKind: "new",
+        publishedAssignmentDefinitionIds: [],
+        publishedLabel: "",
+      };
+      stubFetch({
+        success: true,
+        cells: { [`${EMP}_2026-04-12`]: entry, [`${EMP}_2026-04-13`]: null },
+      });
+
+      const cells = await upsertShift(EMP, "2026-04-12", deletedInput, ORG, 1, {
+        isScheduler: true,
+        assignmentLabelMap: new Map(),
+      });
+
+      expect(cells).toEqual({
+        [`${EMP}_2026-04-12`]: entry,
+        [`${EMP}_2026-04-13`]: null,
+      });
+    });
+
+    it("returns null when the server sent no cells, so the caller can refetch", async () => {
+      stubFetch({ success: true });
+
+      const cells = await deleteShift(EMP, "2026-04-12", ORG, 1, {
+        isScheduler: true,
+        assignmentLabelMap: new Map(),
+      });
+
+      expect(cells).toBeNull();
+    });
   });
 
   it("applies recurring schedules to the reviewed local calendar date range", async () => {

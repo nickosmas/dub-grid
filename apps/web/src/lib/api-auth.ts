@@ -23,7 +23,18 @@ type UserAuthResult = { user: User } | { response: NextResponse };
 type ClaimsAuthResult =
   { session: Session; user: User; claims: Claims } | { response: NextResponse };
 
+/**
+ * A user-scoped Supabase client for this request, honouring whichever
+ * transport the caller used.
+ *
+ * The Bearer header has to be forwarded explicitly. Cookies alone leave the
+ * client anonymous for a header-authenticated caller, and every RLS-scoped
+ * query and `auth.uid()` RPC made through it then fails — which reads as a
+ * permission error rather than an auth one, from a request that authenticated
+ * perfectly well.
+ */
 export function createRequestSupabaseClient(req: NextRequest) {
+  const bearer = extractBearerToken(req);
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     requireSupabasePublishableKey(),
@@ -36,6 +47,7 @@ export function createRequestSupabaseClient(req: NextRequest) {
           // Route handlers use the request-bound response separately.
         },
       },
+      ...(bearer ? { global: { headers: { Authorization: `Bearer ${bearer}` } } } : {}),
     },
   );
 }

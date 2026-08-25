@@ -108,6 +108,7 @@ import {
   upsertScheduleNote,
   upsertShift,
   upsertShiftTimes,
+  type EchoedCells,
   type DeleteShiftBatchItem,
 } from "@/features/schedule/client";
 import {
@@ -174,7 +175,7 @@ import {
   type ScheduleOperation,
 } from "./_lib/operations";
 import { useQueryClient } from "@tanstack/react-query";
-import { buildScheduleNoteMap } from "./_lib/schedule-window";
+import { buildScheduleNoteMap, scheduleNoteKey } from "./_lib/schedule-window";
 import { readScheduleWindow, writeScheduleWindow } from "./_lib/schedule-cache";
 import { useScheduleImport } from "./_hooks/useScheduleImport";
 import {
@@ -3510,34 +3511,58 @@ function SchedulerContent() {
 
         let workingShift = currentShift;
         let workingBaseShift = session.baseShift;
+        let seriesRefreshNeeded = false;
         const initialIdentityChanged = !shiftEditableIdentityMatches(
           session.baseShift,
           session.draftShift,
         );
 
         if (seriesScope === "all" && workingBaseShift?.seriesId && initialIdentityChanged) {
+          // The series write is followed by a per-cell write below, which needs
+          // this cell's post-series version. Ask the series endpoint to echo
+          // just that one cell — this used to refetch the entire loaded window
+          // to read a single number.
+          const echoCell = { employeeId: panel.empId, date: formatDateKey(panel.date) };
+          const seriesEcho = {
+            isScheduler: canEditShiftsRef.current,
+            assignmentLabelMap: assignmentLabelMapRef.current,
+            absenceTypeMap: absenceTypeMapRef.current,
+          };
+
+          let seriesCells: EchoedCells | null = null;
           if (shiftIsDeleted(session.draftShift)) {
-            await deleteShiftSeries(workingBaseShift.seriesId, orgId);
+            seriesCells = (
+              await deleteShiftSeries(workingBaseShift.seriesId, orgId, echoCell, seriesEcho)
+            ).cells;
           } else if (session.draftShift) {
-            await updateSeriesAllShifts(
+            seriesCells = await updateSeriesAllShifts(
               workingBaseShift.seriesId,
               buildEntryPayload(session.draftShift),
               orgId,
+              echoCell,
+              seriesEcho,
             );
           }
 
-          const freshShifts = await fetchShifts(
-            orgId,
-            canEditShiftsRef.current,
-            assignmentLabelMapRef.current,
-            absenceTypeMapRef.current,
-            shiftFetchStart,
-            shiftFetchEnd,
-            segmentCompatibility,
-          );
-          setShifts(freshShifts);
-          shiftsRef.current = freshShifts;
-          workingShift = cloneShiftEntry(freshShifts[session.cellKey]);
+          // A series edit touches cells far outside this one, so the grid does
+          // still need a full refresh. It is deferred to the end of the confirm
+          // rather than started here: a refetch launched now would race the
+          // per-cell write below and could resolve with pre-write data,
+          // overwriting the very cell this confirm just changed.
+          seriesRefreshNeeded = true;
+
+          if (seriesCells) {
+            const merged: ShiftMap = { ...shiftsRef.current };
+            for (const [key, entry] of Object.entries(seriesCells)) {
+              if (entry) merged[key] = entry;
+              else delete merged[key];
+            }
+            setShifts(merged);
+            shiftsRef.current = merged;
+            workingShift = cloneShiftEntry(merged[session.cellKey]);
+          } else {
+            workingShift = cloneShiftEntry(shiftsRef.current[session.cellKey]);
+          }
           workingBaseShift = workingShift;
         }
 
@@ -3551,28 +3576,45 @@ function SchedulerContent() {
             (session.draftShift?.customStartTime ?? null) ||
           (workingBaseShift?.customEndTime ?? null) !== (session.draftShift?.customEndTime ?? null);
 
+        // Ask the write to hand the changed cell back, so this confirm can
+        // merge one cell instead of refetching the org's whole loaded window.
+        const echo = {
+          isScheduler: canEditShiftsRef.current,
+          assignmentLabelMap: assignmentLabelMapRef.current,
+          absenceTypeMap: absenceTypeMapRef.current,
+        };
+        let echoedCells: EchoedCells | null = null;
+
         if (remainingIdentityChanged) {
           if (shiftIsDeleted(session.draftShift)) {
             if (workingShift) {
-              await deleteShift(panel.empId, formatDateKey(panel.date), orgId, expectedVersion);
+              echoedCells = await deleteShift(
+                panel.empId,
+                formatDateKey(panel.date),
+                orgId,
+                expectedVersion,
+                echo,
+              );
             }
           } else if (session.draftShift) {
-            await upsertShift(
+            echoedCells = await upsertShift(
               panel.empId,
               formatDateKey(panel.date),
               buildEntryPayload(session.draftShift),
               orgId,
               expectedVersion,
+              echo,
             );
           }
         } else if (remainingTimeChanged && session.draftShift && workingShift) {
-          await upsertShiftTimes(
+          echoedCells = await upsertShiftTimes(
             panel.empId,
             formatDateKey(panel.date),
             session.draftShift.customStartTime ?? null,
             session.draftShift.customEndTime ?? null,
             orgId,
             expectedVersion,
+            echo,
           );
         }
 
@@ -3585,6 +3627,11 @@ function SchedulerContent() {
         // round trip and they target distinct (indicator, focus area) rows on
         // one cell, so awaiting them one at a time only serialised them.
         const noteWrites: Array<() => Promise<unknown>> = [];
+        // The note map this cell will hold once the writes below land. Derived
+        // rather than refetched, and it mirrors each endpoint's own rule for
+        // what a write leaves behind, so it matches what a refetch would return.
+        const noteResults = new Map<number, DraftNoteState[]>();
+
         for (const focusAreaId of focusAreaIds) {
           const baseEntries = session.baseNotes[focusAreaId] ?? [];
           const draftEntries = session.draftNotes[focusAreaId] ?? [];
@@ -3592,6 +3639,10 @@ function SchedulerContent() {
             ...baseEntries.map((note) => note.indicatorTypeId),
             ...draftEntries.map((note) => note.indicatorTypeId),
           ]);
+
+          const resulting = new Map<number, DraftNoteState["status"]>(
+            baseEntries.map((note) => [note.indicatorTypeId, note.status]),
+          );
 
           for (const indicatorTypeId of indicatorIds) {
             const baseStatus = baseEntries.find(
@@ -3603,6 +3654,12 @@ function SchedulerContent() {
             if (baseStatus === draftStatus) continue;
 
             if (draftStatus && draftStatus !== "draft_deleted") {
+              // upsertScheduleNote restores a draft-deleted note to published,
+              // and otherwise stores it as a draft.
+              resulting.set(
+                indicatorTypeId,
+                baseStatus === "draft_deleted" ? "published" : "draft",
+              );
               noteWrites.push(() =>
                 upsertScheduleNote(
                   orgId,
@@ -3614,6 +3671,10 @@ function SchedulerContent() {
                 ),
               );
             } else if (baseStatus) {
+              // deleteScheduleNote removes a draft row outright, but only marks
+              // a published one draft_deleted so the publish can undo it.
+              if (baseStatus === "draft") resulting.delete(indicatorTypeId);
+              else resulting.set(indicatorTypeId, "draft_deleted");
               noteWrites.push(() =>
                 deleteScheduleNote(
                   orgId,
@@ -3626,21 +3687,92 @@ function SchedulerContent() {
               );
             }
           }
+
+          noteResults.set(
+            focusAreaId,
+            [...resulting].map(([indicatorTypeId, status]) => ({ indicatorTypeId, status })),
+          );
         }
         await Promise.all(noteWrites.map((write) => write()));
 
-        const refreshed = await refetchScheduleDataRef.current();
-        const realtimeDiff = refreshed
-          ? buildRealtimeDraftDiff(
-              previousShifts,
-              refreshed.shiftData,
-              previousNotes,
-              refreshed.noteMap,
-            )
-          : null;
+        // ── Merge, don't refetch ──────────────────────────────────────────
+        // The write already told us the cell's new state and the note results
+        // are derived above, so there is nothing left to ask the server for.
+        // This used to await a full ±90-day fetch of every employee's shifts
+        // and notes before the panel could close, which is what made confirming
+        // one cell feel slow.
+        const dateKey = formatDateKey(panel.date);
+        const changedShiftKeys = new Set<string>(
+          echoedCells ? Object.keys(echoedCells) : [session.cellKey],
+        );
+        const changedNoteKeys = new Set<string>();
+
+        let nextShifts = previousShifts;
+        if (echoedCells) {
+          const merged: ShiftMap = { ...previousShifts };
+          for (const [key, entry] of Object.entries(echoedCells)) {
+            if (entry) merged[key] = entry;
+            else delete merged[key];
+          }
+          nextShifts = merged;
+        }
+
+        let nextNotes = previousNotes;
+        if (noteWrites.length > 0) {
+          nextNotes = { ...previousNotes };
+          for (const [focusAreaId, entries] of noteResults) {
+            const noteKey = scheduleNoteKey(
+              panel.empId,
+              dateKey,
+              focusAreaId === -1 ? null : focusAreaId,
+            );
+            changedNoteKeys.add(noteKey);
+            if (entries.length > 0) nextNotes[noteKey] = entries;
+            else delete nextNotes[noteKey];
+          }
+        }
+
+        if (nextShifts !== previousShifts || nextNotes !== previousNotes) {
+          setShifts(nextShifts);
+          setNotes(nextNotes);
+          shiftsRef.current = nextShifts;
+          notesRef.current = nextNotes;
+          writeScheduleWindow(queryClient, orgId, {
+            window: { start: shiftFetchStart, end: shiftFetchEnd },
+            shifts: nextShifts,
+            notes: nextNotes,
+            canEditShifts: canEditShiftsRef.current,
+          });
+        }
+
+        // Scoped to the keys we actually touched — the unscoped diff walks the
+        // whole loaded window and JSON.stringifies every cell twice.
+        const realtimeDiff = buildRealtimeDraftDiff(
+          previousShifts,
+          nextShifts,
+          previousNotes,
+          nextNotes,
+          {
+            shiftKeys: changedShiftKeys,
+            noteKeys: changedNoteKeys,
+          },
+        );
         if (realtimeDiff) {
           broadcastDraftChanged(realtimeDiff);
         }
+
+        // Refresh in the background, without holding the panel open, when this
+        // confirm changed more than the one cell we merged — or when no echo
+        // came back (an older server, or the read-back failed) and the grid
+        // would otherwise be left showing stale state. Started only now that
+        // every write has landed, so it cannot resolve with pre-write data.
+        if (
+          seriesRefreshNeeded ||
+          (!echoedCells && (remainingIdentityChanged || remainingTimeChanged))
+        ) {
+          void refetchScheduleDataRef.current();
+        }
+
         closeEditPanel();
         toast.success("Shift changes saved to draft");
       } catch (err) {
@@ -3672,7 +3804,7 @@ function SchedulerContent() {
     if (!pendingSeriesDelete || !org) return;
     try {
       const prevShifts = shifts;
-      const deletedCount = await deleteShiftSeries(pendingSeriesDelete.seriesId, org.id);
+      const { deletedCount } = await deleteShiftSeries(pendingSeriesDelete.seriesId, org.id);
       const shiftData = await fetchShifts(
         org.id,
         canEditShifts,
