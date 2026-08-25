@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { getServiceClient } from "@/lib/supabase-service";
 import { registerOrgDomain } from "@/lib/vercel";
-import { clientEnv, serverEnv } from "@/lib/env";
+import { clientEnv } from "@/lib/env";
+import { serverEnv } from "@/lib/env.server";
 import logger from "@/lib/logger";
 import { isFeatureEnabled } from "@/lib/feature-flags";
 

@@ -4,7 +4,7 @@ import { DM_Sans, DM_Mono } from "next/font/google";
 import { createStaticWebCssVariables, createThemedCssText } from "@dubgrid/design-tokens";
 import { createThemeSeedScript } from "@/lib/theme-preference";
 import "./globals.css";
-import "@/lib/env";
+import "@/lib/env.server";
 
 const dmSans = DM_Sans({
   subsets: ["latin"],

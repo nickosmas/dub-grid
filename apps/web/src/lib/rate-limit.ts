@@ -1,7 +1,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { createHash } from "node:crypto";
-import { serverEnv } from "@/lib/env";
+import { serverEnv } from "@/lib/env.server";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 
