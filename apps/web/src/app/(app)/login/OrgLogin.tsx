@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { decodeJwt } from "jose";
@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { PublicRoute } from "@/components/RouteGuards";
 import { Button } from "@/components/Button";
 import { ACCOUNT_DISABLED_CODE } from "@dubgrid/domain";
-import { getValidPort } from "@/lib/subdomain";
 import { withThemeParam } from "@/lib/theme-preference";
 import { extractErrorMessage } from "@/lib/error-handling";
 import { markAuthTransition } from "@/lib/auth-transition";
@@ -28,15 +27,27 @@ import {
   startBrowserTrial,
   switchBrowserOrganization,
 } from "@/features/account/client";
+import { ORG_NOT_FOUND_PARAM } from "./constants";
 import {
   AccountDisabledModal,
-  orgNameCacheKey,
+  apexLoginHref,
   resolvePostLoginDestination,
   useClientHost,
   useSessionInvalidToast,
 } from "./shared";
+import { fetchWithTimeout, isRequestTimeout } from "@/lib/fetch-with-timeout";
 
-export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
+/**
+ * What the server already knows about this subdomain. A subdomain with no
+ * organization never reaches this component — app/login/page.tsx redirects it
+ * to the domain selector — so the only two cases here are a resolved name and
+ * `unresolved`, meaning the lookup itself couldn't answer and the client
+ * re-asks.
+ */
+export type OrgLoginSeed =
+  { status: "found"; name: string } | { status: "not-found" } | { status: "unresolved" };
+
+export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: OrgLoginSeed }) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -127,60 +138,46 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
   const [loading, setLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [accountDisabled, setAccountDisabled] = useState(false);
-  const [orgNotFound, setOrgNotFound] = useState(false);
-  // Starts null (not read from window/localStorage here) so the client's
-  // first hydration pass matches the server-rendered HTML — OrgLogin is now
-  // server-rendered (see app/login/page.tsx), so a lazy useState initializer
-  // that branches on `typeof window` would render "null → orgSlug" on the
-  // server and a different value on the client's first paint, which is a
-  // hydration mismatch React has to discard and re-render around. The
-  // ?name=/localStorage-derived value is instead applied in the effect
-  // below, after hydration.
-  const [orgName, setOrgName] = useState<string | null>(null);
+  // Seeded from the server, which already resolved this subdomain (see
+  // app/login/page.tsx). That is what keeps the heading from painting the raw
+  // slug first: a client-only source — an effect, `typeof window`, localStorage
+  // — cannot contribute to the server-rendered HTML, so the first frame would
+  // always be the fallback. A prop is identical on both sides, so there is no
+  // hydration mismatch either.
+  const [orgName, setOrgName] = useState<string | null>(seed.status === "found" ? seed.name : null);
+
+  const { theme } = useTheme();
+  // The re-ask effect below may hop origins, and the apex has its own
+  // localStorage — so it needs the live preference, not whatever `theme` was
+  // at mount (next-themes reports `undefined` until it has resolved). A ref
+  // rather than a dependency, so a theme change doesn't re-run the lookup.
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
 
   useSessionInvalidToast();
 
-  // Seed from the ?name= param forwarded by the domain selector (which
-  // already validated this subdomain before redirecting here), or a cached
-  // value from a prior visit on this subdomain, then re-confirm on arrival —
-  // a cheap, Redis-cached confirmatory check when arriving via
-  // DomainSelector, and the authoritative check for direct/bookmarked
-  // visits that skip DomainSelector entirely.
+  // Only runs when the server couldn't resolve the subdomain (no service key
+  // in local dev, the lookup failed, rate-limited). Everywhere else `seed` is
+  // already authoritative and re-asking would be a wasted round trip.
   useEffect(() => {
-    const n = new URLSearchParams(window.location.search).get("name");
-    if (n && n.trim()) {
-      setOrgName(n);
-      try {
-        window.localStorage.setItem(orgNameCacheKey(orgSlug), n);
-      } catch {
-        /* storage disabled */
-      }
-    } else {
-      try {
-        const cached = window.localStorage.getItem(orgNameCacheKey(orgSlug));
-        if (cached && cached.trim()) setOrgName(cached);
-      } catch {
-        /* storage disabled */
-      }
-    }
+    if (seed.status !== "unresolved") return;
 
     let cancelled = false;
     fetch(`/api/validate-domain?slug=${encodeURIComponent(orgSlug)}`)
-      .then((r) => r.json())
-      .then((d: { valid?: boolean; name?: string | null }) => {
+      .then(async (r) => ({ ok: r.ok, body: await r.json() }))
+      .then(({ ok, body }: { ok: boolean; body: { valid?: boolean; name?: string | null } }) => {
         if (cancelled) return;
-        if (!d?.valid) {
-          setOrgNotFound(true);
+        // `ok` is load-bearing: a 429/503 also answers `valid: false`, and
+        // bouncing a user off a real organization's sign-in page because
+        // Redis or Supabase hiccuped is far worse than leaving the form up.
+        // Only a clean "no such org" gets to redirect.
+        if (ok && !body?.valid) {
+          window.location.replace(
+            withThemeParam(apexLoginHref(`?${ORG_NOT_FOUND_PARAM}=1`), themeRef.current),
+          );
           return;
         }
-        if (d.name) {
-          setOrgName(d.name);
-          try {
-            window.localStorage.setItem(orgNameCacheKey(orgSlug), d.name);
-          } catch {
-            /* storage disabled */
-          }
-        }
+        if (body?.name) setOrgName(body.name);
       })
       .catch(() => {
         /* best-effort: don't block the form on a network blip */
@@ -188,7 +185,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     return () => {
       cancelled = true;
     };
-  }, [orgSlug]);
+  }, [orgSlug, seed.status]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -199,7 +196,11 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
       // session to this subdomain's organization when it isn't the caller's
       // current one, trial activation, sandbox teardown and the terms check.
       // See orchestratePostSignIn in api/auth/login/route.ts.
-      const res = await fetch("/api/auth/login", {
+      // Deadline, not optional: a stalled connection leaves a bare `fetch`
+      // pending indefinitely, and every path that clears this form's loading
+      // state runs after the await — so a bad signal would leave the button
+      // spinning with no way back.
+      const res = await fetchWithTimeout("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -285,7 +286,13 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
       navigateToDashboard(result.destination, false);
     } catch (err: unknown) {
       const msg = extractErrorMessage(err, "").toLowerCase();
-      if (msg.includes("fetch") || msg.includes("network") || msg.includes("failed to fetch")) {
+      if (isRequestTimeout(err)) {
+        toast.error("That took too long. Check your connection and try again.");
+      } else if (
+        msg.includes("fetch") ||
+        msg.includes("network") ||
+        msg.includes("failed to fetch")
+      ) {
         toast.error("Check your connection and try again.");
       } else {
         toast.error("We couldn't sign you in. Try again.");
@@ -356,7 +363,6 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     setLoading(false);
   }
 
-  const { theme } = useTheme();
   const { parsed, protocol } = useClientHost();
   const baseDomain = parsed?.rootDomain ?? "localhost";
 
@@ -381,7 +387,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
 
   return (
     <PublicRoute>
-      <PageShell signInDisclaimer={!orgNotFound}>
+      <PageShell signInDisclaimer>
         <Card>
           {/* Logo — links to apex landing page */}
           <a href={apexHref} className="dg-auth-logo-block" style={{ marginBottom: "32px" }}>
@@ -389,50 +395,30 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
             <DubGridWordmark />
           </a>
 
-          {orgNotFound ? (
-            <>
-              <h1 className="dg-auth-heading">Organization not found</h1>
-              <p
-                style={{
-                  textAlign: "center",
-                  fontSize: "var(--dg-fs-body)",
-                  color: "var(--color-text-secondary)",
-                  fontWeight: 500,
-                  margin: "0 0 4px",
-                }}
-              >
-                We couldn&apos;t find an organization at this subdomain. Check the address, or use a
-                different one below.
-              </p>
-            </>
-          ) : (
-            <>
-              <p
-                style={{
-                  textAlign: "center",
-                  fontSize: "var(--dg-fs-body)",
-                  color: "var(--color-text-secondary)",
-                  fontWeight: 500,
-                  margin: "0 0 4px",
-                }}
-              >
-                Sign in to
-              </p>
-              <h1 className="dg-auth-heading">{orgName ?? orgSlug}</h1>
+          <p
+            style={{
+              textAlign: "center",
+              fontSize: "var(--dg-fs-body)",
+              color: "var(--color-text-secondary)",
+              fontWeight: 500,
+              margin: "0 0 4px",
+            }}
+          >
+            Sign in to
+          </p>
+          <h1 className="dg-auth-heading">{orgName ?? orgSlug}</h1>
 
-              <EmailPasswordForm
-                email={email}
-                setEmail={setEmail}
-                password={password}
-                setPassword={setPassword}
-                loading={loading}
-                onSubmit={handleSubmit}
-                submitLabel="Sign In"
-                submitPendingLabel="Signing In"
-                forgotPasswordHref="/forgot-password"
-              />
-            </>
-          )}
+          <EmailPasswordForm
+            email={email}
+            setEmail={setEmail}
+            password={password}
+            setPassword={setPassword}
+            loading={loading}
+            onSubmit={handleSubmit}
+            submitLabel="Sign In"
+            submitPendingLabel="Signing In"
+            forgotPasswordHref="/forgot-password"
+          />
 
           <div
             style={{
@@ -446,10 +432,7 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
             <Button
               type="button"
               onClick={() => {
-                const { protocol, port } = window.location;
-                const portStr = getValidPort(port);
-                const target = `${protocol}//${baseDomain}${portStr}/login`;
-                window.location.href = withThemeParam(target, theme);
+                window.location.href = withThemeParam(apexLoginHref(), theme);
               }}
               className="dg-auth-link"
             >

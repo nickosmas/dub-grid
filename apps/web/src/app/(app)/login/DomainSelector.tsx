@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
@@ -14,7 +14,13 @@ import { PageShell, Card } from "@/components/auth/AuthCard";
 import { SubdomainField } from "@/components/auth/SubdomainField";
 import Modal from "@/components/Modal";
 import { withThemeParam } from "@/lib/theme-preference";
+import { fetchWithTimeout, isRequestTimeout } from "@/lib/fetch-with-timeout";
+import { ORG_NOT_FOUND_MESSAGE, ORG_NOT_FOUND_PARAM } from "./constants";
 import { useClientHost } from "./shared";
+
+// Shorter than the default: this is a pre-flight check standing between the
+// user and the sign-in form, so it should give up early and let them retry.
+const VALIDATE_DOMAIN_TIMEOUT_MS = 8_000;
 
 export default function DomainSelector() {
   const [slug, setSlug] = useState("");
@@ -51,6 +57,18 @@ export default function DomainSelector() {
     toast.error(msg, { id: "login-error" });
   }
 
+  // Arrived here because a subdomain's /login found no organization and sent
+  // the user back (see app/login/page.tsx). Say why, then strip the param so a
+  // refresh doesn't re-accuse a subdomain they may have since corrected.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(ORG_NOT_FOUND_PARAM) !== "1") return;
+    toast.error(ORG_NOT_FOUND_MESSAGE, { id: "login-error" });
+    params.delete(ORG_NOT_FOUND_PARAM);
+    const query = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  }, []);
+
   async function handleContinue(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const normalized = slug.trim().toLowerCase();
@@ -80,31 +98,44 @@ export default function DomainSelector() {
     // broken "organization not found" page after a full page reload is a
     // worse experience than a one-tick delay here, and /api/validate-domain
     // is Redis-cached (see lib/cache.ts), so repeat lookups are cheap.
-    let orgName: string | null = null;
     try {
-      const res = await fetch(`/api/validate-domain?slug=${encodeURIComponent(normalized)}`);
-      const { valid, name } = await res.json();
+      // Deadline, not optional: a stalled connection leaves a bare `fetch`
+      // pending indefinitely, and this button's only path out of its loading
+      // state runs after the await. Without one, a bad signal means "Checking"
+      // forever with no way back.
+      const res = await fetchWithTimeout(
+        `/api/validate-domain?slug=${encodeURIComponent(normalized)}`,
+        {},
+        VALIDATE_DOMAIN_TIMEOUT_MS,
+      );
+      const { valid } = await res.json();
       if (!valid) {
-        showToast("No organization found for that subdomain. Please check and try again.");
+        showToast(ORG_NOT_FOUND_MESSAGE);
         setLoading(false);
         return;
       }
-      orgName = typeof name === "string" ? name : null;
-    } catch {
-      showToast("Unable to verify that subdomain. Please try again.");
+    } catch (err) {
+      showToast(
+        isRequestTimeout(err)
+          ? "That took too long. Check your connection and try again."
+          : "Unable to verify that subdomain. Please try again.",
+      );
       setLoading(false);
       return;
     }
 
     const { protocol, port } = window.location;
     const portStr = getValidPort(port);
-    // Forward the resolved name so the org login heading renders it instantly.
-    const nameParam = orgName ? `&name=${encodeURIComponent(orgName)}` : "";
+    // The org name is deliberately NOT forwarded: the subdomain's /login
+    // resolves it server-side off the same cached lookup, so the heading is
+    // already correct in its first byte. Passing it through the URL would put
+    // an unvalidated, caller-controlled string into that heading for nothing.
+    //
     // The subdomain is a separate origin with its own localStorage, so hand the
     // theme over explicitly — otherwise the sign-in page resolves whatever that
     // origin happens to remember and the theme visibly flips mid-flow.
     window.location.href = withThemeParam(
-      `${protocol}//${normalized}.${baseDomain}${portStr}/login?verified=1${nameParam}`,
+      `${protocol}//${normalized}.${baseDomain}${portStr}/login?verified=1`,
       theme,
     );
   }

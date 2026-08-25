@@ -33,13 +33,6 @@ export async function resolvePostLoginDestination(): Promise<string> {
   return POST_LOGIN_DESTINATION;
 }
 
-// Persists the last-resolved display name for a subdomain so post-logout
-// redirects to /login can paint the org name immediately instead of flashing
-// the raw slug while validate-domain re-resolves.
-export function orgNameCacheKey(slug: string): string {
-  return `dg:org-name:${slug}`;
-}
-
 /**
  * Surfaces a toast when the middleware redirected back with
  * ?error=session_invalid (JWKS-based jwtVerify failed, e.g. token expired or
@@ -71,6 +64,19 @@ export function useClientHost(): { parsed: ParsedHost | null; protocol: string }
   }, []);
 
   return state;
+}
+
+/**
+ * The apex `/login` — the domain selector — as seen from an org subdomain.
+ *
+ * Reads `window.location` directly rather than `useClientHost`, because both
+ * callers need it before that hook's effect has resolved: its SSR default
+ * would aim the hop at the wrong host.
+ */
+export function apexLoginHref(search = ""): string {
+  const { protocol, host } = window.location;
+  const { rootDomain, port } = parseHost(host);
+  return `${protocol}//${rootDomain}${port}/login${search}`;
 }
 
 export function useSessionInvalidToast() {
