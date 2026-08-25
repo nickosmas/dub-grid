@@ -19,6 +19,17 @@ updates:
       semver-patch-days: 3
       semver-major-days: 14
     open-pull-requests-limit: 5
+    ignore:
+      # Expo SDK 54 owns these versions. They move together at SDK-upgrade time
+      # via `npx expo install --check`, never one at a time from a bot PR, and
+      # react-native's 0.x line makes an SDK-breaking jump (0.81 -> 0.87) look
+      # like a routine minor to Dependabot, which is how it reached the
+      # production-minor-patch group and broke `apps/mobile` type-check.
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
     groups:
       # Grouped so the lockfile diff stays reviewable. A hundred separate bumps
       # is how a bad version slips through unread.
