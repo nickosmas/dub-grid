@@ -6,8 +6,9 @@ import { registerOrgDomain } from "../apps/web/src/lib/vercel";
  * Vercel domain, so each gets an auto-renewing HTTP-01 cert instead of
  * relying on the (broken, non-auto-renewing) *.dubgrid.com wildcard cert.
  *
- * Run from apps/web (so tsx resolves its "@/*" tsconfig path alias):
- *   cd apps/web && npx tsx --env-file=../../.env.remote ../../scripts/backfill-vercel-domains.ts
+ * Run from the repo root (the root tsconfig maps "@/*" at apps/web/src, which
+ * is what the helpers this imports use internally):
+ *   npx tsx --env-file=.env.remote scripts/backfill-vercel-domains.ts
  */
 async function main() {
   const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN;
