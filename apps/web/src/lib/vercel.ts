@@ -1,4 +1,4 @@
-import { serverEnv } from "@/lib/env";
+import { serverEnv } from "@/lib/env.server";
 
 /**
  * Registers a hostname as a domain on the Vercel project so it gets its own

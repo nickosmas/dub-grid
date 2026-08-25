@@ -12,6 +12,22 @@ import { supabase } from "@/lib/supabase";
 export type BrowserRealtimeChannel = ReturnType<typeof supabase.channel>;
 
 export async function signOutFromBrowser(scope: "local" | "others" | "global"): Promise<void> {
+  // Tell the server first, while the session's tokens are still readable.
+  // API routes verify tokens locally, so clearing them in the browser alone
+  // would leave this access token usable until it expires — the server has to
+  // record the revocation. Non-fatal: a failure here must never trap the user
+  // in a signed-in state.
+  try {
+    await fetch("/api/auth/sign-out", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope: scope === "local" ? "local" : "global" }),
+      keepalive: true,
+    });
+  } catch {
+    // Ignore — proceed with the local sign-out regardless.
+  }
+
   const { error } = await supabase.auth.signOut({ scope });
   if (error) {
     throw error;

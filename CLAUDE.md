@@ -165,9 +165,12 @@ Shared primitives to reach for before inventing a layout:
   button (a mutation's `isPending`, a confirmation step that finishes later).
   `spinner={false}` opts out, for a button whose children are a whole row of
   content — `NotificationBell`'s row, `OrganizationLocationFields`' address
-  option — where a spinner beside the text reads as breakage. A button already
-  wiring its own `<ButtonLoading>` passes none of them and is left alone; two
-  spinners would fight. Never write `{busy ? "…" : "Delete"}` — that is the
+  option — where a spinner beside the text reads as breakage. A button that
+  already wires its own `<ButtonLoading>` needs no opt-out: `<Button>` looks
+  through its children and defers to a spinner that is actually spinning, so
+  the hand-wired one stays the only one. That check reads the child's `loading`
+  prop rather than just spotting the element, because a flag covering a shorter
+  span than the latch would otherwise leave the button showing nothing. Never write `{busy ? "…" : "Delete"}` — that is the
   banned ellipsis, and `loadingLabel="Deleting"` is the replacement. Mobile's
   `<Button>` works the same way (`Boolean(loading) || action.isRunning`).
   Both are plain passthroughs (same `className`, same children, same

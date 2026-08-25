@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { getServiceClient } from "@/lib/supabase-service";
+import { revokeSession } from "@/lib/auth/revocation";
 
 export type UserSessionPlatform = "web" | "ios" | "android";
 
@@ -168,11 +169,33 @@ export async function trackUserSessionForUser(input: TrackUserSessionInput): Pro
   }
 }
 
+/**
+ * Revokes one of the user's device sessions.
+ *
+ * Deleting the `user_sessions` row on its own only removes the device from the
+ * "your sessions" list — it does nothing to the access token that device is
+ * holding, which stays valid until it expires. Writing the revocation marker
+ * first is what actually cuts that device off, so it must happen even if the
+ * row is already gone.
+ */
 export async function revokeUserSessionForUser(
   userId: string,
   refreshTokenHash: string,
 ): Promise<void> {
-  const { error } = await getServiceClient()
+  const client = getServiceClient();
+
+  const { data: row } = await client
+    .from("user_sessions")
+    .select("supabase_session_id")
+    .eq("user_id", userId)
+    .eq("refresh_token_hash", refreshTokenHash)
+    .maybeSingle();
+
+  if (row?.supabase_session_id) {
+    await revokeSession(row.supabase_session_id);
+  }
+
+  const { error } = await client
     .from("user_sessions")
     .delete()
     .eq("user_id", userId)

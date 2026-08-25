@@ -107,18 +107,49 @@ function lockedOrganizationResponse() {
  *   boundary, and re-locking a working org a few minutes late is the harmless
  *   half of the trade.
  */
+/**
+ * In-process memo in front of the Redis lookup, holding only `true`.
+ *
+ * Redis is a network round trip, and this check runs on every org-scoped API
+ * request — so on a single page load it was paid once per request in the
+ * fan-out, for an answer that changes at most a few times in an org's life.
+ * Measured against a distant Upstash region it was the single largest cost in
+ * the post-login fan-out, several hundred milliseconds where the underlying
+ * queries total under ten.
+ *
+ * Only `true` is memoized, exactly mirroring what is cached in Redis and for
+ * the same reason: incomplete -> complete is the transition a user is actively
+ * waiting on, so an org mid-setup must keep re-checking. The window is well
+ * inside the Redis TTL, so this shortens how long a `true` is trusted by
+ * nothing — it only avoids re-asking across requests that arrive together.
+ */
+const SETUP_COMPLETE_MEMO_TTL_MS = 30_000;
+const setupCompleteMemo = new Map<string, number>();
+
+/** Test seam: clears the in-process setup-complete memo between cases. */
+export function resetOrgSetupCompleteMemo(): void {
+  setupCompleteMemo.clear();
+}
+
 async function isOrganizationSetupCompleteCached(
   serviceClient: ReturnType<typeof getServiceClient>,
   orgId: string,
 ): Promise<boolean> {
+  const memoizedUntil = setupCompleteMemo.get(orgId);
+  if (memoizedUntil !== undefined && memoizedUntil > Date.now()) {
+    return true;
+  }
+
   const key = CacheKey.orgSetupComplete(orgId);
   if (await cacheGet<boolean>(key)) {
+    setupCompleteMemo.set(orgId, Date.now() + SETUP_COMPLETE_MEMO_TTL_MS);
     return true;
   }
 
   const complete = await isOrganizationSetupComplete(serviceClient, orgId);
   if (complete) {
     await cacheSet(key, true, TTL.STABLE);
+    setupCompleteMemo.set(orgId, Date.now() + SETUP_COMPLETE_MEMO_TTL_MS);
   }
   return complete;
 }

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { apiLimiter, checkRateLimit } from "@/lib/rate-limit";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { requireAuthenticatedUser } from "@/lib/api-auth";
+import { revokeAllUserSessions } from "@/lib/auth/revocation";
 import { isCallerInactive, resolveEffectiveOrgId } from "@/app/api/shared/permissions";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -244,6 +245,25 @@ export async function POST(req: NextRequest) {
     }
 
     const updatedEmployee = rowToEmployee(updatedRow as DbEmployee);
+
+    // Cut the person's live tokens, not just their next sign-in.
+    //
+    // The JWT hook refuses to mint for a terminated employee, so they can't
+    // sign in or refresh again — but an access token they already hold stays
+    // cryptographically valid until it expires, and API routes verify tokens
+    // locally now. Org-scoped routes would still reject them on the
+    // per-request membership check; this covers the routes that only
+    // authenticate. Non-fatal: never fail the status change over it.
+    if ((action === "remove" || action === "deactivate") && currentEmployee.userId) {
+      try {
+        await revokeAllUserSessions(currentEmployee.userId);
+      } catch (err) {
+        logger.error(
+          { error: err, orgId, empId, userId: currentEmployee.userId, action },
+          "Failed to revoke sessions after employee status change",
+        );
+      }
+    }
 
     // Remove/activate a linked user's org membership in lockstep with their
     // employees.status, in the same request that already committed the status

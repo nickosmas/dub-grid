@@ -89,7 +89,28 @@ supabase start
 npm run db:reset
 ```
 
-5. **Start the development server:**
+5. **Start Redis locally:**
+
+```bash
+docker compose up -d
+```
+
+This runs Redis behind [`serverless-redis-http`](https://github.com/hiett/serverless-redis-http),
+which serves the same REST protocol as Upstash, so local development uses the
+identical client and code paths at ~0.5ms instead of a round trip to a hosted
+region. Point `apps/web/.env.local` at it:
+
+```
+UPSTASH_REDIS_REST_URL=http://127.0.0.1:8079
+UPSTASH_REDIS_REST_TOKEN=local_dev_token
+```
+
+Leaving these unset also "works" — every cache helper degrades gracefully — but
+session revocation (`lib/auth/revocation.ts`) is entirely Redis-backed, so it
+would silently no-op and a regression in it would be invisible locally. The rate
+limiter and the org-access and setup-complete memos likewise stop being exercised.
+
+6. **Start the development server:**
 
 ```bash
 npm run dev

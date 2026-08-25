@@ -9,8 +9,11 @@ import {
   extractMobileBearerToken,
   MobileApiRequestError,
   resolveMobileAuthContext,
+  type MobileAuthClaims,
   type ResolvedMobileAuthContext,
 } from "@dubgrid/mobile-api-core";
+import { verifyAccessToken } from "@/lib/auth/verify-token";
+import { isSessionRevoked } from "@/lib/auth/revocation";
 import { rowToOrganization } from "@/lib/db/mappers";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { getServiceClient } from "@/lib/supabase-service";
@@ -50,6 +53,20 @@ export async function requireMobileAuth(
       fetchOrganization: fetchMobileOrganizationRowById,
       fetchPlatformRole: fetchMobileProfilePlatformRole,
       mapOrganization: rowToOrganization,
+      // Claims come from local JWKS verification instead of a second call to
+      // Supabase Auth (`getClaims`), and revocation is checked explicitly
+      // because a locally verified token can't tell that it was signed out.
+      verifyToken: async (accessToken) => {
+        const verified = await verifyAccessToken(accessToken);
+        if (!verified) return null;
+        return {
+          userId: verified.userId,
+          sessionId: verified.sessionId,
+          issuedAtMs: verified.issuedAtMs,
+          claims: verified.claims as MobileAuthClaims,
+        };
+      },
+      isRevoked: (token) => isSessionRevoked(token),
     });
   } catch (error) {
     if (error instanceof MobileApiRequestError) {

@@ -8,6 +8,8 @@ import {
 import { extractMobileBearerToken } from "@dubgrid/mobile-api-core";
 import { rowToOrganization } from "@/lib/db/mappers";
 import { getServiceClient } from "@/lib/supabase-service";
+import { verifyAccessToken } from "@/lib/auth/verify-token";
+import { isSessionRevoked } from "@/lib/auth/revocation";
 
 export const dynamic = "force-dynamic";
 
@@ -26,26 +28,31 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const serviceClient = getServiceClient();
-  const { data: userData, error: userError } = await serviceClient.auth.getUser(accessToken);
-  if (userError || !userData.user) {
+  // Verified locally against Supabase's JWKS, with an explicit revocation
+  // check — no round trip to Supabase Auth. Unlike resolveMobileAuthContext
+  // this route has no MFA-factor check to make, so nothing here needs the
+  // full user record.
+  const verified = await verifyAccessToken(accessToken);
+  if (!verified || (await isSessionRevoked(verified))) {
     return NextResponse.json(
       { error: "Your session has expired. Sign in again." },
       { status: 401 },
     );
   }
 
+  const serviceClient = getServiceClient();
   const membershipRows = await fetchMobileOrganizationMembershipRows(
     serviceClient,
-    userData.user.id,
+    verified.userId,
   );
   if (membershipRows.length === 0) {
     return NextResponse.json({ error: "No active organization membership found" }, { status: 403 });
   }
 
-  const { data: claimsData } = await serviceClient.auth.getClaims(accessToken);
-  const claims = claimsData?.claims as { org_id?: unknown } | undefined;
-  const claimOrgId = typeof claims?.org_id === "string" && claims.org_id ? claims.org_id : null;
+  const claimOrgId =
+    typeof verified.claims.org_id === "string" && verified.claims.org_id
+      ? verified.claims.org_id
+      : null;
   const currentOrgId = claimOrgId ?? membershipRows[0]!.organization.id;
   const currentMembership =
     membershipRows.find((membership) => membership.organization.id === currentOrgId) ??

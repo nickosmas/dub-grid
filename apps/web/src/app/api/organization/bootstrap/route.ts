@@ -185,6 +185,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
       departmentResult,
       coverageReqResult,
       absenceTypeResult,
+      employeeCountResult,
     ] = await timer.time("fanout", () =>
       Promise.all([
         serviceClient.from("organizations").select(ORGANIZATION_COLS).eq("id", orgId).single(),
@@ -233,6 +234,14 @@ async function handleGET(req: NextRequest, timer: Timer) {
           .select(ABSENCE_TYPE_COLS)
           .eq("org_id", orgId)
           .order("sort_order", { ascending: true }),
+        // Count only — SetupGuard needs to know an org has staff before it
+        // paints, and joining that question to this fan-out means first paint
+        // no longer waits on the full roster fetch behind it.
+        serviceClient
+          .from("employees")
+          .select("id", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .eq("status", "active"),
       ]),
     );
 
@@ -279,6 +288,7 @@ async function handleGET(req: NextRequest, timer: Timer) {
     return NextResponse.json({
       org,
       isGridmaster: false,
+      activeEmployeeCount: employeeCountResult.count ?? 0,
       focusAreas,
       allAssignmentDefinitions,
       allAbsenceTypes,

@@ -1,8 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { extractJwtClaims } from "@/features/permissions/shared";
 import SchedulerPageClient, { type SchedulePageInitialState } from "./SchedulePageClient";
 import { requireSupabasePublishableKey } from "@/lib/supabase-keys";
+import { verifyAccessToken } from "@/lib/auth/verify-token";
 
 async function loadInitialScheduleState(): Promise<SchedulePageInitialState> {
   const cookieStore = await cookies();
@@ -21,23 +21,22 @@ async function loadInitialScheduleState(): Promise<SchedulePageInitialState> {
     },
   );
 
-  // getSession (reads cookies) and getUser (validates against the auth server)
-  // are independent, so run them in parallel instead of sequentially.
-  const [
-    {
-      data: { session },
-    },
-    {
-      data: { user },
-    },
-  ] = await Promise.all([supabase.auth.getSession(), supabase.auth.getUser()]);
+  // getSession reads cookies; the token it returns is then verified locally
+  // against Supabase's JWKS. This used to also call getUser(), which blocked
+  // the whole server render on a round trip to Supabase Auth just to learn
+  // the user id — and that id is the token's own `sub` claim.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  // org_id is a top-level claim the JWT hook already baked in — decode it
-  // locally instead of an extra supabase.auth.getClaims() round-trip.
-  const orgId = session?.access_token ? extractJwtClaims(session.access_token).orgId : null;
+  const verified = session?.access_token ? await verifyAccessToken(session.access_token) : null;
+
+  // org_id is a top-level claim the JWT hook already baked in. Read it off the
+  // verified payload rather than an unverified decode.
+  const orgId = typeof verified?.claims.org_id === "string" ? verified.claims.org_id : null;
 
   return {
-    authenticatedUserId: user?.id ?? null,
+    authenticatedUserId: verified?.userId ?? null,
     orgId,
     serverLoadedAt: new Date().toISOString(),
   };
