@@ -1,6 +1,6 @@
 "use client";
 
-import { useOrganizationData, useEmployees, usePermissions } from "@/hooks";
+import { useOrganizationData, usePermissions } from "@/hooks";
 import { Button } from "@/components/Button";
 import { useLogout } from "@/hooks";
 
@@ -19,12 +19,16 @@ export default function SetupGuard({ children }: { children: React.ReactNode }) 
     setupStatus,
     loading: orgLoading,
     org,
+    activeEmployeeCount,
   } = useOrganizationData({ includeAssignmentDefinitionCompatibility: false });
-  const { employees, loading: empLoading } = useEmployees(perms.orgId ?? org?.id ?? null);
   const { signOut } = useLogout();
 
-  const isLoading = orgLoading || empLoading || perms.isLoading;
-  const hasEmployees = employees.length > 0;
+  // Deliberately not gated on useEmployees. This guard only needs to know
+  // whether the org has any staff, and the bootstrap fan-out answers that with
+  // a count — so the first paint after sign-in no longer sits behind a full
+  // roster fetch it never reads.
+  const isLoading = orgLoading || perms.isLoading;
+  const hasEmployees = activeEmployeeCount > 0;
   const isComplete = setupStatus.isComplete && hasEmployees;
   const hasCachedOrgData = !!org && !orgLoading;
   const isGridmasterBypass = perms.isGridmaster && !perms.isImpersonating;

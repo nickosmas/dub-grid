@@ -44,6 +44,39 @@ export interface RevocableToken {
 const MEMO_TTL_MS = 5_000;
 const memo = new Map<string, { revoked: boolean; expiresAt: number; userId: string }>();
 
+/**
+ * How long a request will wait on Redis before giving up and treating the
+ * session as live.
+ *
+ * Redis is normally single-digit milliseconds away, but it is a network hop,
+ * and it is one this check sits directly in front of. Without a bound, a slow
+ * or unreachable Upstash turns every authenticated request into a multi-second
+ * stall — measured at over two seconds against a distant region — for an
+ * answer that is "not revoked" essentially every time.
+ *
+ * Timing out fails open, matching what `cacheGetMany` already does when Redis
+ * is unreachable, so the degradation is a revocation that lands late rather
+ * than a product that stops responding.
+ *
+ * A timed-out answer is memoized like any other, so a persistently slow Redis
+ * costs this budget once per memo window rather than once per request.
+ */
+const REVOCATION_LOOKUP_TIMEOUT_MS = 250;
+
+async function withTimeout<T>(work: Promise<T>, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), REVOCATION_LOOKUP_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /** Test seam: clears the in-process memo between cases. */
 export function resetRevocationMemo(): void {
   memo.clear();
@@ -73,7 +106,10 @@ export async function isSessionRevoked(token: RevocableToken): Promise<boolean> 
   const keys = [CacheKey.revokedAfter(token.userId)];
   if (token.sessionId) keys.push(CacheKey.revokedSession(token.sessionId));
 
-  const [revokedAfter, revokedSession] = await cacheGetMany<number | string>(keys);
+  const [revokedAfter, revokedSession] = await withTimeout(
+    cacheGetMany<number | string>(keys),
+    keys.map(() => null),
+  );
 
   let revoked = false;
   if (token.sessionId && revokedSession != null) {

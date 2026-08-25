@@ -18,6 +18,12 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 export interface OrganizationBootstrap {
   org: Organization | null;
   isGridmaster: boolean;
+  /**
+   * Active employees in the org, as a count rather than the roster.
+   * SetupGuard only needs to know whether the org has any staff, and asking
+   * here keeps first paint off the critical path of the full roster fetch.
+   */
+  activeEmployeeCount: number;
   focusAreas: FocusArea[];
   allAssignmentDefinitions: AssignmentDefinition[];
   allAbsenceTypes: AbsenceType[];

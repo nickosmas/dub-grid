@@ -268,6 +268,19 @@ describe("api auth helpers", () => {
       expect("response" in result).toBe(false);
     });
 
+    it("does not wait indefinitely on a slow Redis", async () => {
+      // A hung lookup must not hold the request open. Redis is a network hop
+      // sitting directly in front of every authenticated request.
+      cacheMocks.cacheGetMany.mockImplementation(() => new Promise(() => {}));
+      const token = await signToken();
+
+      const startedAt = Date.now();
+      const result = await requireAuthenticatedSession(bearerRequest(token));
+
+      expect(Date.now() - startedAt).toBeLessThan(2000);
+      expect("response" in result).toBe(false);
+    });
+
     it("collapses repeat checks for one session into a single Redis round trip", async () => {
       const token = await signToken();
       await requireAuthenticatedSession(bearerRequest(token));
