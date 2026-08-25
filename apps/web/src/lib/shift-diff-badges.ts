@@ -158,7 +158,10 @@ function buildTimeBadge(args: {
   if (hadTime && !hasTime) {
     return {
       kind: "time",
-      text: "Time",
+      // Bare "Time" is what a *changed* time says below, so a removal has to
+      // carry its own sign or the two edits render identically and only the
+      // tooltip tells them apart.
+      text: "\u2212 Time",
       detail: `Removed custom time${detailSuffix}.`,
     };
   }
@@ -178,6 +181,74 @@ function buildTimeBadge(args: {
         ? `Changed custom time${detailSuffix} ${previousTime} to ${nextTime}.`
         : `Updated custom time${detailSuffix}.`,
   };
+}
+
+function buildMentoredBadge(args: {
+  wasMentored: boolean;
+  isMentored: boolean;
+  label: string | null;
+  includeLabel: boolean;
+}): ShiftDiffBadgeDescriptor | null {
+  const { wasMentored, isMentored, label, includeLabel } = args;
+  if (wasMentored === isMentored) return null;
+
+  const detailSuffix = includeLabel && label ? ` for ${label}` : "";
+
+  return isMentored
+    ? {
+        kind: "modified",
+        text: "+ Mentored",
+        detail: `Marked mentored${detailSuffix}.`,
+      }
+    : {
+        kind: "modified",
+        // A bare "Mentored" claims the opposite of what happened, on a pill
+        // that has just lost its "M" — the sign is what makes it a removal.
+        text: "\u2212 Mentored",
+        detail: `Removed mentored${detailSuffix}.`,
+      };
+}
+
+/**
+ * Which before-pill each after-pill came from.
+ *
+ * Pills used to be compared by position alone, which misreads any edit that
+ * removes something other than the last one: dropping the D from D/N left the
+ * surviving N pill labelled "Was D" and the summary claiming N was removed,
+ * when D was. Same-position matches are taken first (so a straight
+ * replacement still reads as one), then equal assignments elsewhere in the
+ * cell, and only then whatever before-pill is left over positionally.
+ * A `null` entry means the pill is genuinely new; a before index nothing
+ * claims was removed.
+ */
+function alignPillsToBefore(before: number[], after: number[]): Array<number | null> {
+  const alignment: Array<number | null> = after.map(() => null);
+  const claimed = new Set<number>();
+
+  const claim = (afterIndex: number, beforeIndex: number) => {
+    alignment[afterIndex] = beforeIndex;
+    claimed.add(beforeIndex);
+  };
+
+  after.forEach((assignmentId, afterIndex) => {
+    if (before[afterIndex] === assignmentId) claim(afterIndex, afterIndex);
+  });
+
+  after.forEach((assignmentId, afterIndex) => {
+    if (alignment[afterIndex] != null) return;
+    const match = before.findIndex(
+      (beforeId, beforeIndex) => beforeId === assignmentId && !claimed.has(beforeIndex),
+    );
+    if (match !== -1) claim(afterIndex, match);
+  });
+
+  after.forEach((_, afterIndex) => {
+    if (alignment[afterIndex] != null) return;
+    const leftover = before.findIndex((_beforeId, beforeIndex) => !claimed.has(beforeIndex));
+    if (leftover !== -1) claim(afterIndex, leftover);
+  });
+
+  return alignment;
 }
 
 function buildNewShiftBadge(label: string): ShiftDiffBadgeDescriptor {
@@ -238,6 +309,11 @@ export function buildShiftDiffDescriptors(
   const usesMultiplePills =
     Math.max(beforeAssignmentDefinitionIds.length, afterAssignmentDefinitionIds.length) > 1;
 
+  const pillAlignment = alignPillsToBefore(
+    beforeAssignmentDefinitionIds,
+    afterAssignmentDefinitionIds,
+  );
+
   const pillDiffs = afterAssignmentDefinitionIds.map<ShiftPillDiffDescriptor>(
     (afterAssignmentDefinitionId, pillIndex) => {
       const afterLabel =
@@ -262,8 +338,10 @@ export function buildShiftDiffDescriptors(
         };
       }
 
-      const beforeAssignmentDefinitionId = beforeAssignmentDefinitionIds[pillIndex];
-      if (beforeAssignmentDefinitionId == null) {
+      const beforeIndex = pillAlignment[pillIndex];
+      const beforeAssignmentDefinitionId =
+        beforeIndex != null ? beforeAssignmentDefinitionIds[beforeIndex] : undefined;
+      if (beforeIndex == null || beforeAssignmentDefinitionId == null) {
         return {
           borderKind: "new",
           badge: buildNewShiftBadge(afterLabel),
@@ -277,7 +355,7 @@ export function buildShiftDiffDescriptors(
             resolveShiftLabelAtIndex({
               assignmentIds: beforeAssignmentDefinitionIds,
               shiftLabels: input.beforeShiftLabels,
-              index: pillIndex,
+              index: beforeIndex,
               resolveAssignmentDefinitionLabel: (assignmentId) =>
                 resolveDiffLabel(input, assignmentId),
             }) ?? resolveDiffLabel(input, beforeAssignmentDefinitionId),
@@ -286,17 +364,32 @@ export function buildShiftDiffDescriptors(
       }
 
       const timeBadge = buildTimeBadge({
-        before: beforeTimeRanges[pillIndex],
+        before: beforeTimeRanges[beforeIndex],
         after: afterTimeRanges[pillIndex],
         label: afterLabel,
         includeLabel: usesMultiplePills,
       });
-      const isMentoredChanged =
-        beforeIsMentoredFlags[pillIndex] !== afterIsMentoredFlags[pillIndex];
+      const mentoredBadge = buildMentoredBadge({
+        wasMentored: beforeIsMentoredFlags[beforeIndex],
+        isMentored: afterIsMentoredFlags[pillIndex],
+        label: afterLabel,
+        includeLabel: usesMultiplePills,
+      });
+      // The same assignment sitting in a different slot is still an edit, so
+      // it keeps its ring — but there is no "Was" to say about it, since the
+      // pill's own content is unchanged.
+      const isReordered = beforeIndex !== pillIndex;
+      // A pill shows one badge. When the time and the mentored flag both
+      // changed, the time keeps the label and the tooltip carries both, rather
+      // than one of the two edits going unmentioned anywhere.
+      const badge =
+        timeBadge && mentoredBadge
+          ? { ...timeBadge, detail: `${timeBadge.detail} ${mentoredBadge.detail}` }
+          : (timeBadge ?? mentoredBadge);
 
       return {
-        borderKind: timeBadge || isMentoredChanged ? "modified" : null,
-        badge: timeBadge,
+        borderKind: badge || isReordered ? "modified" : null,
+        badge,
       };
     },
   );
@@ -376,11 +469,11 @@ export function buildShiftDiffDescriptors(
     beforeAbsenceTypeId == null &&
     beforeAssignmentDefinitionIds.length > afterAssignmentDefinitionIds.length
   ) {
-    for (
-      let index = afterAssignmentDefinitionIds.length;
-      index < beforeAssignmentDefinitionIds.length;
-      index += 1
-    ) {
+    const survivingBeforeIndices = new Set(
+      pillAlignment.filter((beforeIndex): beforeIndex is number => beforeIndex != null),
+    );
+    for (let index = 0; index < beforeAssignmentDefinitionIds.length; index += 1) {
+      if (survivingBeforeIndices.has(index)) continue;
       removedDetails.push(
         `Removed ${
           resolveShiftLabelAtIndex({

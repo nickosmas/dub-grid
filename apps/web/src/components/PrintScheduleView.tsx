@@ -2,6 +2,7 @@
 
 import { useMemo, useRef } from "react";
 import {
+  AbsenceType,
   Employee,
   ShiftCategory,
   AssignmentDefinition,
@@ -164,6 +165,8 @@ interface PrintSectionProps {
   dates: Date[];
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
+  absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  absenceTypeMap?: Map<number, AbsenceType>;
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   assignments: AssignmentDefinition[];
   shiftCategories: ShiftCategory[];
@@ -187,6 +190,8 @@ function PrintSection({
   dates,
   shiftForKey,
   assignmentIdsForKey,
+  absenceTypeIdForKey,
+  absenceTypeMap,
   getShiftStyle,
   assignments,
   shiftCategories,
@@ -478,6 +483,28 @@ function PrintSection({
                   const assignment = shiftForKey(emp.id, date);
                   const cellCodeIds = assignmentIdsForKey?.(emp.id, date) ?? [];
                   const customTimes = getCustomShiftTimes?.(emp.id, date) ?? null;
+                  // An absence carries no assignment id, so the label lookup
+                  // below would resolve it against the assignment list — which
+                  // either finds nothing (printing vacation in the fallback
+                  // grey) or, worse, finds an assignment sharing its label and
+                  // prints someone's day off in that shift's colors.
+                  const cellAbsenceTypeId = absenceTypeIdForKey?.(emp.id, date) ?? null;
+                  const cellAbsenceType =
+                    cellAbsenceTypeId != null
+                      ? (absenceTypeMap?.get(cellAbsenceTypeId) ?? null)
+                      : null;
+                  const absenceStyle: AssignmentDefinition | null = cellAbsenceType
+                    ? {
+                        id: 0,
+                        orgId: cellAbsenceType.orgId,
+                        label: cellAbsenceType.label,
+                        name: cellAbsenceType.name || cellAbsenceType.label,
+                        color: cellAbsenceType.color,
+                        border: cellAbsenceType.border,
+                        text: cellAbsenceType.text,
+                        sortOrder: cellAbsenceType.sortOrder,
+                      }
+                    : null;
 
                   return (
                     <td
@@ -500,19 +527,28 @@ function PrintSection({
                       >
                         {assignment && assignment !== "OFF" ? (
                           (() => {
-                            const labels = assignment.split("/");
+                            // "/" joins the segments of a worked cell, so it
+                            // is what splits that cell into pills. An absence
+                            // is always one pill, whatever the org named it.
+                            const labels = cellAbsenceType ? [assignment] : assignment.split("/");
                             if (labels.length === 1) {
                               const label = labels[0];
-                              const style = getStyleByIdOrLabel(label, cellCodeIds[0]);
+                              const style =
+                                absenceStyle ?? getStyleByIdOrLabel(label, cellCodeIds[0]);
                               const codeEntry0 =
                                 cellCodeIds[0] != null
                                   ? assignmentById.get(cellCodeIds[0])
                                   : undefined;
-                              const displayParts = getDisplayPartsByIdOrLabel(
-                                label,
-                                cellCodeIds[0],
-                              );
+                              const displayParts = cellAbsenceType
+                                ? {
+                                    primaryLabel: isNameMode
+                                      ? cellAbsenceType.name || cellAbsenceType.label
+                                      : label,
+                                    secondaryLabel: null,
+                                  }
+                                : getDisplayPartsByIdOrLabel(label, cellCodeIds[0]);
                               const isCross =
+                                !cellAbsenceType &&
                                 label !== "X" &&
                                 codeEntry0?.focusAreaId != null &&
                                 codeEntry0.focusAreaId !== focusAreaId;
@@ -967,6 +1003,8 @@ interface PrintScheduleViewProps {
   orgRoles: NamedItem[];
   shiftForKey: (empId: string, date: Date) => string | null;
   assignmentIdsForKey?: (empId: string, date: Date) => number[];
+  absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  absenceTypeMap?: Map<number, AbsenceType>;
   getShiftStyle: (type: string, focusAreaName?: string) => AssignmentDefinition;
   getCustomShiftTimes?: (
     empId: string,
@@ -991,6 +1029,8 @@ export default function PrintScheduleView({
   orgRoles,
   shiftForKey,
   assignmentIdsForKey,
+  absenceTypeIdForKey,
+  absenceTypeMap,
   getShiftStyle,
   getCustomShiftTimes,
   onClose,
@@ -1263,6 +1303,8 @@ export default function PrintScheduleView({
                 employees={sectionEmps}
                 dates={dates}
                 shiftForKey={shiftForKey}
+                absenceTypeIdForKey={absenceTypeIdForKey}
+                absenceTypeMap={absenceTypeMap}
                 assignmentIdsForKey={assignmentIdsForKey}
                 getShiftStyle={getShiftStyle}
                 assignments={assignments}

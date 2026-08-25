@@ -185,6 +185,7 @@ import {
   ShiftMap,
   AssignmentDefinition,
   AbsenceType,
+  ActiveShiftRequestSummary,
   RecurringShift,
   SeriesFrequency,
   SeriesScope,
@@ -2634,15 +2635,37 @@ function SchedulerContent() {
     [shifts],
   );
 
-  const hasActiveRequestForShift = useCallback(
-    (empId: string, date: Date): boolean =>
-      shiftRequests.requests.some(
+  /**
+   * The live request sitting on a cell, if any — what the grid's corner fold
+   * tints itself from and what `hasActiveRequestForShift` answers over.
+   *
+   * Matches the *requester's* cell only. A swap therefore marks the person who
+   * asked, not the person being asked: covering the other side needs a second
+   * index keyed on targetEmpId/targetShiftDate, which nothing needs yet.
+   */
+  const activeRequestForKey = useCallback(
+    (empId: string, date: Date): ActiveShiftRequestSummary | null => {
+      const dateKey = formatDateKey(date);
+      const match = shiftRequests.requests.find(
         (r) =>
           r.requesterEmpId === empId &&
-          r.requesterShiftDate === formatDateKey(date) &&
+          r.requesterShiftDate === dateKey &&
           (r.status === "open" || r.status === "pending_approval"),
-      ),
+      );
+      if (!match) return null;
+      // The find above already admitted only these two, so this narrows rather
+      // than decides.
+      return {
+        type: match.type,
+        status: match.status === "pending_approval" ? "pending_approval" : "open",
+      };
+    },
     [shiftRequests.requests],
+  );
+
+  const hasActiveRequestForShift = useCallback(
+    (empId: string, date: Date): boolean => activeRequestForKey(empId, date) !== null,
+    [activeRequestForKey],
   );
 
   const publishDiffKindForKey = useCallback(
@@ -4087,35 +4110,38 @@ function SchedulerContent() {
 
       const sourceEntry = shifts[sourceKey];
       const targetEntry = shifts[targetKey];
-      const targetPublishedAssignmentDefinitionIds =
-        targetEntry?.publishedAssignmentDefinitionIds ?? [];
-      const targetPublishedAbsenceTypeId = targetEntry?.publishedAbsenceTypeId ?? null;
-      const targetPublishedLabel = targetEntry?.publishedLabel ?? "";
-      const targetHasPublished =
-        targetPublishedAssignmentDefinitionIds.length > 0 || targetPublishedAbsenceTypeId != null;
-      const targetDraftKind: DraftKind = targetHasPublished ? "modified" : "new";
-      const movedEntry = buildScheduleCellEntryFromInput({
-        input: {
-          ...payload,
-          customStartTime:
-            payload.kind === "worked"
-              ? (sourceEntry?.customStartTime ?? payload.customStartTime ?? null)
-              : null,
-          customEndTime:
-            payload.kind === "worked"
-              ? (sourceEntry?.customEndTime ?? payload.customEndTime ?? null)
-              : null,
-        },
-        published: getPublishedSnapshot(shifts[targetKey]),
-        segmentCompatibility,
-        absenceTypeMap,
-        draftKind: targetDraftKind,
-        version: shifts[targetKey]?.version != null ? shifts[targetKey]!.version + 1 : undefined,
-        createdBy: shifts[targetKey]?.createdBy ?? null,
-        updatedBy: currentUserRef.current?.id ?? null,
-        createdAt: shifts[targetKey]?.createdAt ?? null,
-        updatedAt: shifts[targetKey]?.updatedAt ?? null,
-      });
+      const buildMovedEntry = (draftKind: DraftKind) =>
+        buildScheduleCellEntryFromInput({
+          input: {
+            ...payload,
+            customStartTime:
+              payload.kind === "worked"
+                ? (sourceEntry?.customStartTime ?? payload.customStartTime ?? null)
+                : null,
+            customEndTime:
+              payload.kind === "worked"
+                ? (sourceEntry?.customEndTime ?? payload.customEndTime ?? null)
+                : null,
+          },
+          published: getPublishedSnapshot(targetEntry),
+          segmentCompatibility,
+          absenceTypeMap,
+          draftKind,
+          version: targetEntry?.version != null ? targetEntry.version + 1 : undefined,
+          createdBy: targetEntry?.createdBy ?? null,
+          updatedBy: currentUserRef.current?.id ?? null,
+          createdAt: targetEntry?.createdAt ?? null,
+          updatedAt: targetEntry?.updatedAt ?? null,
+        });
+
+      // Read the kind back off the built entry instead of assuming a drop onto
+      // a published cell is always a modification: dropping a shift onto the
+      // cell that already published that exact shift changes nothing, and
+      // assuming otherwise dashed a draft border around it.
+      const provisionalEntry = buildMovedEntry(null);
+      const movedEntry = provisionalEntry
+        ? buildMovedEntry(computeScheduleEntryDraftKind(provisionalEntry))
+        : null;
       if (!movedEntry) {
         toast.error("We couldn't move that assignment.");
         return;
@@ -5018,6 +5044,7 @@ function SchedulerContent() {
           publishDiffForKey: publishDiffKindForKey,
           createdByNameForKey: canRenderAuthorNames ? createdByNameForKey : undefined,
           absenceTypeIdForKey,
+          activeRequestForKey,
         },
       }),
     [
@@ -5067,6 +5094,7 @@ function SchedulerContent() {
       canRenderAuthorNames,
       createdByNameForKey,
       absenceTypeIdForKey,
+      activeRequestForKey,
     ],
   );
 
@@ -6716,6 +6744,8 @@ function SchedulerContent() {
               orgRoles={orgRoles}
               shiftForKey={shiftForKey}
               assignmentIdsForKey={assignmentIdsForKey}
+              absenceTypeIdForKey={absenceTypeIdForKey}
+              absenceTypeMap={absenceTypeObjectMap}
               getShiftStyle={getShiftStyle}
               getCustomShiftTimes={getCustomShiftTimes}
               onClose={() => setActivePrintConfig(null)}

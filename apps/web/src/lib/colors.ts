@@ -1,3 +1,5 @@
+import type { ShiftRequestStatus } from "@/types";
+
 export interface PredefinedColor {
   id: string;
   name: string;
@@ -434,4 +436,46 @@ export const DRAFT_BORDER_COLORS: Record<string, string> = {
   new: "#16A34A",
   modified: "#D97706",
   deleted: "#DC2626",
+};
+
+/**
+ * Status tints for shift requests, shared by the requests board and the
+ * schedule grid's request fold so the two cannot drift apart. Open reads as
+ * informational (nothing is owed yet); pending approval reads as a warning
+ * (someone has to act).
+ */
+export const SHIFT_REQUEST_STATUS_COLORS: Record<
+  ShiftRequestStatus,
+  { bg: string; text: string; border: string }
+> = {
+  open: {
+    bg: "var(--color-info-bg)",
+    text: "var(--color-info-text)",
+    border: "var(--color-info-border)",
+  },
+  pending_approval: {
+    bg: "var(--color-warning-bg)",
+    text: "var(--color-warning-text)",
+    border: "var(--color-warning-border)",
+  },
+  approved: {
+    bg: "var(--color-success-bg)",
+    text: "var(--color-success-text)",
+    border: "var(--color-success)",
+  },
+  rejected: {
+    bg: "var(--color-danger-bg)",
+    text: "var(--color-danger-dark)",
+    border: "var(--color-danger-border)",
+  },
+  cancelled: {
+    bg: "var(--color-bg-secondary)",
+    text: "var(--color-text-subtle)",
+    border: "var(--color-border)",
+  },
+  expired: {
+    bg: "var(--color-bg-secondary)",
+    text: "var(--color-text-subtle)",
+    border: "var(--color-border)",
+  },
 };

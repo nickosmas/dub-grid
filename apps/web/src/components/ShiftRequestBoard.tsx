@@ -12,7 +12,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import ProgressBar from "@/components/ProgressBar";
 import ScrollableTabs from "@/components/ScrollableTabs";
 import { joinShiftJobSegmentNames } from "@/lib/shift-job-segments";
-import { resolveShiftPillColors } from "@/lib/colors";
+import { resolveShiftPillColors, SHIFT_REQUEST_STATUS_COLORS } from "@/lib/colors";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,38 +63,9 @@ function timeRemainingLabel(expiresAt: string): string {
   return `${days}d left`;
 }
 
-const STATUS_COLORS: Record<ShiftRequestStatus, { bg: string; text: string; border: string }> = {
-  open: {
-    bg: "var(--color-info-bg)",
-    text: "var(--color-info-text)",
-    border: "var(--color-info-border)",
-  },
-  pending_approval: {
-    bg: "var(--color-warning-bg)",
-    text: "var(--color-warning-text)",
-    border: "var(--color-warning-border)",
-  },
-  approved: {
-    bg: "var(--color-success-bg)",
-    text: "var(--color-success-text)",
-    border: "var(--color-success)",
-  },
-  rejected: {
-    bg: "var(--color-danger-bg)",
-    text: "var(--color-danger-dark)",
-    border: "var(--color-danger-border)",
-  },
-  cancelled: {
-    bg: "var(--color-bg-secondary)",
-    text: "var(--color-text-subtle)",
-    border: "var(--color-border)",
-  },
-  expired: {
-    bg: "var(--color-bg-secondary)",
-    text: "var(--color-text-subtle)",
-    border: "var(--color-border)",
-  },
-};
+// Lives in lib/colors.ts because the schedule grid's request fold tints itself
+// from the same table — two copies would drift the moment one is restyled.
+const STATUS_COLORS = SHIFT_REQUEST_STATUS_COLORS;
 
 // ── Component ────────────────────────────────────────────────────────────────
 

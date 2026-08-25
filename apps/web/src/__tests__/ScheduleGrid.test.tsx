@@ -10,6 +10,7 @@ import { getReadableTextOnSurface } from "@/lib/colors";
 import { formatDateKey } from "@/lib/utils";
 import type {
   AbsenceType,
+  ActiveShiftRequestSummary,
   CoverageRequirement,
   Department,
   DraftKind,
@@ -279,6 +280,7 @@ interface RenderGridOptions {
   coverageRequirements?: CoverageRequirement[];
   absenceTypeMap?: Map<number, AbsenceType>;
   absenceTypeIdForKey?: (empId: string, date: Date) => number | null;
+  activeRequestForKey?: (empId: string, date: Date) => ActiveShiftRequestSummary | null;
   shiftDisplayMode?: "code" | "name";
   resolvePublisherName?: (userId: string) => string | null;
   openShifts?: Array<Record<string, unknown>>;
@@ -345,6 +347,7 @@ function renderGrid(options: RenderGridOptions = {}) {
       publishDiffForKey: options.publishDiffForKey as any,
       createdByNameForKey: options.createdByNameForKey,
       absenceTypeIdForKey: options.absenceTypeIdForKey,
+      activeRequestForKey: options.activeRequestForKey,
     },
   });
 
@@ -1048,7 +1051,12 @@ describe("ScheduleGrid", () => {
     const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
 
     expect(pills).toHaveLength(2);
-    expect(badge).toBeNull();
+    // The mentored pill says so — a dashed border with nothing naming the edit
+    // left the reader guessing which of the two shifts had changed.
+    expect(firstCell.querySelectorAll("[data-draft-badge]")).toHaveLength(1);
+    expect(badge?.textContent).toBe("+ Mentored");
+    expect(badge?.getAttribute("aria-label")).toBe("Marked mentored for N.");
+    expect(pills[1].contains(badge)).toBe(true);
     expect(pills[0]).toHaveStyle({
       borderStyle: "solid",
       borderWidth: "1px",
@@ -1107,32 +1115,56 @@ describe("ScheduleGrid", () => {
     expect(badge?.getAttribute("aria-label")).toContain("Was D · Supv.");
   });
 
+  const twoPillAssignmentDefinitions: AssignmentDefinition[] = [
+    assignments[0],
+    {
+      id: 2,
+      orgId: "org-1",
+      label: "N",
+      name: "Night Shift",
+      color: "#E0F2FE",
+      border: "#0284C7",
+      text: "#0C4A6E",
+      categoryId: 1,
+      focusAreaId: 1,
+      sortOrder: 2,
+    },
+    {
+      id: 3,
+      orgId: "org-1",
+      label: "E",
+      name: "Evening Shift",
+      color: "#FEF3C7",
+      border: "#D97706",
+      text: "#92400E",
+      categoryId: 1,
+      focusAreaId: 1,
+      sortOrder: 3,
+    },
+    {
+      id: 4,
+      orgId: "org-1",
+      label: "S",
+      name: "Swing Shift",
+      color: "#EDE9FE",
+      border: "#7C3AED",
+      text: "#4C1D95",
+      categoryId: 1,
+      focusAreaId: 1,
+      sortOrder: 4,
+    },
+  ];
+
   it("matches stacked edited badge radii to the multi-pill shift container", () => {
     observedWidth = 1600;
 
-    const localAssignmentDefinitions: AssignmentDefinition[] = [
-      assignments[0],
-      {
-        id: 2,
-        orgId: "org-1",
-        label: "N",
-        name: "Night Shift",
-        color: "#E0F2FE",
-        border: "#0284C7",
-        text: "#0C4A6E",
-        categoryId: 1,
-        focusAreaId: 1,
-        sortOrder: 2,
-      },
-    ];
-
     renderGrid({
-      assignments: localAssignmentDefinitions,
+      assignments: twoPillAssignmentDefinitions,
       shiftForKey: () => "D/N",
       assignmentIdsForKey: () => [1, 2],
       draftKindForKey: () => "modified",
-      publishedAssignmentIdsForKey: () => [2, 1],
-      publishedLabelForKey: () => "N/D",
+      publishedAssignmentIdsForKey: () => [3, 4],
+      publishedLabelForKey: () => "E/S",
     });
 
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
@@ -1142,6 +1174,42 @@ describe("ScheduleGrid", () => {
     expect(badge?.style.borderRadius).toBe("3px");
     expect(badge?.style.top).toBe("-8px");
     expect(badge?.style.right).toBe("3px");
+  });
+
+  it("rings a reordered pair without claiming either pill was something else", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [2, 1],
+      publishedLabelForKey: () => "N/D",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+
+    expect(firstCell.querySelector("[data-draft-badge]")).toBeNull();
+  });
+
+  it("names the shift a draft dropped when it was not the last one", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "N",
+      assignmentIdsForKey: () => [2],
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [1, 2],
+      publishedLabelForKey: () => "D/N",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
+
+    expect(badge?.textContent).toBe("Changed");
+    expect(badge?.getAttribute("aria-label")).toBe("Removed D.");
   });
 
   it("renders cross-focus initials in a left-side strip for a single shift card", () => {
@@ -1541,6 +1609,332 @@ describe("ScheduleGrid", () => {
     expect(pill?.style.background).toBe("var(--color-surface)");
   });
 
+  it("names the published shift an absence draft replaced", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      absenceTypeMap: new Map([
+        [
+          7,
+          {
+            id: 7,
+            orgId: "org-1",
+            label: "VAC",
+            name: "Vacation",
+            color: "#FDE68A",
+            border: "#D97706",
+            text: "#92400E",
+            countsTowardAvailability: false,
+            sortOrder: 1,
+          },
+        ],
+      ]),
+      shiftForKey: () => "VAC",
+      assignmentIdsForKey: () => [],
+      absenceTypeIdForKey: () => 7,
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [1],
+      publishedLabelForKey: () => "D",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
+
+    expect(badge?.textContent).toBe("Was D");
+    expect(badge?.getAttribute("aria-label")).toBe("Was D.");
+  });
+
+  it("keeps an absence whose label contains a slash on one pill", () => {
+    observedWidth = 1600;
+    renderGrid({
+      absenceTypeMap: new Map([
+        [
+          7,
+          {
+            id: 7,
+            orgId: "org-1",
+            label: "PTO/Flex",
+            name: "PTO/Flex",
+            color: "#FDE68A",
+            border: "#D97706",
+            text: "#92400E",
+            countsTowardAvailability: false,
+            sortOrder: 1,
+          },
+        ],
+      ]),
+      shiftForKey: () => "PTO/Flex",
+      assignmentIdsForKey: () => [],
+      absenceTypeIdForKey: () => 7,
+    });
+    const cell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const pills = cell.querySelectorAll("[data-shift-pill]");
+
+    expect(pills.length).toBe(1);
+    expect(pills[0].getAttribute("data-shift-pill")).toBe("single");
+    expect(pills[0].textContent).toBe("PTO/Flex");
+  });
+
+  it("steps a cell badge past the mentored circle it would otherwise cover", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D",
+      assignmentIdsForKey: () => [1],
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
+      publishedSegmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: false },
+      ],
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [1, 2],
+      publishedLabelForKey: () => "D/N",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
+
+    expect(badge?.textContent).toBe("Changed");
+    expect(firstCell.querySelector('[data-mentored-badge="true"]')).not.toBeNull();
+    // The "M" sits at right 0.5 and is 16 wide, so a badge anchored at right 4
+    // would land on top of it.
+    expect(Number.parseFloat(badge?.style.right ?? "0")).toBeGreaterThanOrEqual(16.5);
+    expect(badge?.style.maxWidth).toBe("calc(100% - 25px)");
+  });
+
+  it("keeps an unmentored cell badge in the corner", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      shiftForKey: () => "D",
+      assignmentIdsForKey: () => [1],
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: false }],
+      publishedSegmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: false },
+      ],
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [1, 2],
+      publishedLabelForKey: () => "D/N",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
+
+    expect(badge?.textContent).toBe("Changed");
+    expect(badge?.style.right).toBe("4px");
+  });
+
+  it("stacks the split-shift corner so notes, the mentored circle and the badge do not pile up", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      indicatorTypes: [
+        { id: 1, orgId: "org-1", name: "Flag", color: "#ff0000", sortOrder: 1 },
+        { id: 2, orgId: "org-1", name: "Note", color: "#00ff00", sortOrder: 2 },
+      ],
+      activeIndicatorIdsForKey: () => [1, 2],
+      shiftForKey: () => "D/N",
+      assignmentIdsForKey: () => [1, 2],
+      segmentsForKey: () => [
+        { shiftId: 1, jobId: 101, position: 0, isMentored: false },
+        { shiftId: 1, jobId: 102, position: 1, isMentored: true },
+      ],
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [3, 4],
+      publishedLabelForKey: () => "E/S",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
+    const dots = firstCell.querySelector('[data-mentored-badge="true"]')?.parentElement;
+
+    expect(badge?.textContent).toBe("Changed");
+    // Mentored circle ends at 16.5; two 10px dots with a 2px gap start past it
+    // and run to 43; the badge starts past those.
+    expect(badge?.style.right).toBe("47px");
+    expect(dots).not.toBeNull();
+  });
+
+  it("keeps a draft-deleted cell's notes visible", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      shiftForKey: () => null,
+      assignmentIdsForKey: () => [],
+      activeIndicatorIdsForKey: () => [1],
+      draftKindForKey: () => "deleted",
+      publishedAssignmentIdsForKey: () => [1],
+      publishedLabelForKey: () => "D",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+
+    expect(firstCell.querySelector('[data-shift-pill="deleted"]')).not.toBeNull();
+    expect(firstCell.querySelectorAll('div[style*="border-radius: 50%"]')).toHaveLength(1);
+  });
+
+  it("folds the corner of a shift with an open request", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      activeRequestForKey: () => ({ type: "pickup", status: "open" }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const fold = firstCell.querySelector("[data-request-fold]") as HTMLElement | null;
+
+    expect(fold?.getAttribute("data-request-fold")).toBe("open");
+    expect(fold?.getAttribute("aria-label")).toBe("Pickup request open");
+    expect(fold?.style.borderTop).toBe("12px solid var(--color-danger)");
+  });
+
+  it("tints the fold as a warning while a swap waits on an approver", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      activeRequestForKey: () => ({ type: "swap", status: "pending_approval" }),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const fold = firstCell.querySelector("[data-request-fold]") as HTMLElement | null;
+
+    expect(fold?.getAttribute("data-request-fold")).toBe("pending_approval");
+    expect(fold?.getAttribute("aria-label")).toBe("Swap request awaiting approval");
+    expect(fold?.style.borderTop).toBe("12px solid var(--color-warning)");
+  });
+
+  it("leaves a shift with no request unfolded", () => {
+    observedWidth = 1600;
+
+    renderGrid({ activeRequestForKey: () => null });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+
+    expect(firstCell.querySelector("[data-request-fold]")).toBeNull();
+  });
+
+  it("steps a left-anchored pill badge past the request fold", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      assignments: twoPillAssignmentDefinitions,
+      activeRequestForKey: () => ({ type: "pickup", status: "open" }),
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [2],
+      publishedLabelForKey: () => "N",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
+
+    expect(badge?.textContent).toBe("Was N");
+    // The fold's leg is 12px, so a badge at left 4 would sit on top of it.
+    expect(Number.parseFloat(badge?.style.left ?? "0")).toBeGreaterThanOrEqual(12);
+  });
+
+  it("moves the mentored circle clear of the lock avatar holding the cell", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
+      cellLocks: new Map([[`emp-1_2024-01-07`, { userName: "Mina Ray" }]]),
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const mentored = firstCell.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
+
+    expect(within(firstCell).getByText("MR")).toBeInTheDocument();
+    // The avatar is 20px at inset 2, so the "M" has to start past 22.
+    expect(Number.parseFloat(mentored?.style.right ?? "0")).toBeGreaterThanOrEqual(22);
+  });
+
+  it("keeps the mentored circle in the corner when nothing holds the cell", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      segmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const mentored = firstCell.querySelector('[data-mentored-badge="true"]') as HTMLElement | null;
+
+    expect(mentored?.style.right).toBe("0.5px");
+  });
+
+  it("keeps mentored and cross-focus context on a draft-deleted shift", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      focusAreas: [
+        { id: 1, orgId: "org-1", departmentId: 1, name: "North", sortOrder: 1 },
+        { id: 2, orgId: "org-1", departmentId: 1, name: "South Wing", sortOrder: 2 },
+      ],
+      assignments: [{ ...assignments[0], focusAreaId: 2 }],
+      shiftForKey: () => null,
+      assignmentIdsForKey: () => [],
+      draftKindForKey: () => "deleted",
+      publishedAssignmentIdsForKey: () => [1],
+      publishedSegmentsForKey: () => [{ shiftId: 1, jobId: 101, position: 0, isMentored: true }],
+      publishedLabelForKey: () => "D",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const deletedPill = firstCell.querySelector('[data-shift-pill="deleted"]') as HTMLElement;
+
+    expect(deletedPill).not.toBeNull();
+    expect(deletedPill.querySelector('[data-mentored-badge="true"]')).not.toBeNull();
+    expect(within(deletedPill).getByText("SW")).toBeInTheDocument();
+  });
+
+  it("yields the cross-focus strip's top corner to a left-anchored badge", () => {
+    observedWidth = 1600;
+
+    const localFocusAreas: FocusArea[] = [
+      { id: 1, orgId: "org-1", departmentId: 1, name: "North", sortOrder: 1 },
+      { id: 2, orgId: "org-1", departmentId: 1, name: "South", sortOrder: 2 },
+    ];
+    const crossAssignments: AssignmentDefinition[] = [
+      { ...assignments[0], focusAreaId: 2 },
+      {
+        id: 2,
+        orgId: "org-1",
+        label: "N",
+        name: "Night Shift",
+        color: "#E0F2FE",
+        border: "#0284C7",
+        text: "#0C4A6E",
+        categoryId: 1,
+        focusAreaId: 2,
+        sortOrder: 2,
+      },
+    ];
+
+    const withBadge = renderGrid({
+      focusAreas: localFocusAreas,
+      assignments: crossAssignments,
+      draftKindForKey: () => "modified",
+      publishedAssignmentIdsForKey: () => [2],
+      publishedLabelForKey: () => "N",
+    });
+    const strip = within(screen.getAllByRole("gridcell")[0] as HTMLElement).getByText(
+      "S",
+    ) as HTMLElement;
+
+    expect(strip.style.top).toBe("8px");
+    withBadge.unmount();
+
+    renderGrid({ focusAreas: localFocusAreas, assignments: crossAssignments });
+    const cleanStrip = within(screen.getAllByRole("gridcell")[0] as HTMLElement).getByText(
+      "S",
+    ) as HTMLElement;
+
+    expect(cleanStrip.style.top).toBe("0px");
+  });
+
   it("keeps a brand-new shift with custom time badge-free", () => {
     observedWidth = 1600;
 
@@ -1802,6 +2196,52 @@ describe("ScheduleGrid", () => {
 
     expect(badge?.textContent).toBe("Was VAC");
     expect(pill?.style.borderColor).toBe("rgba(26, 61, 27, 0.35)");
+  });
+
+  it("names the published shift an absence replaced", () => {
+    observedWidth = 1600;
+
+    renderGrid({
+      showPublishDiffOverlay: true,
+      absenceTypeMap: new Map([
+        [
+          7,
+          {
+            id: 7,
+            orgId: "org-1",
+            label: "VAC",
+            name: "Vacation",
+            color: "#FDE68A",
+            border: "#D97706",
+            text: "#92400E",
+            countsTowardAvailability: false,
+            sortOrder: 1,
+          },
+        ],
+      ]),
+      shiftForKey: () => "VAC",
+      assignmentIdsForKey: () => [],
+      absenceTypeIdForKey: () => 7,
+      publishDiffForKey: () => ({
+        empId: "emp-1",
+        date: "2024-01-07",
+        kind: "modified",
+        from: [1],
+        to: [],
+        fromAbsenceTypeId: null,
+        toAbsenceTypeId: 7,
+        publishedAt: "2024-01-07T12:00:00.000Z",
+        publishedBy: "user-1",
+      }),
+      resolvePublisherName: () => "Mina",
+    });
+
+    const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
+    const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
+
+    expect(badge?.textContent).toBe("Was D");
+    expect(badge?.getAttribute("aria-label")).toContain("Was D.");
+    expect(badge?.getAttribute("aria-label")).toContain("by Mina");
   });
 
   it("borders absence pills in light mode even when the stored border is transparent", () => {
