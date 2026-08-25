@@ -3,6 +3,7 @@ import { Redis } from "@upstash/redis";
 import { createHash } from "node:crypto";
 import { serverEnv } from "@/lib/env.server";
 import logger from "@/lib/logger";
+import { withTimeoutOrThrow } from "@/lib/with-timeout";
 import * as Sentry from "@/lib/sentry";
 
 /**
@@ -14,6 +15,9 @@ export function hashEmail(email: string): string {
 }
 
 const hasRedisEnv = !!serverEnv?.UPSTASH_REDIS_REST_URL && !!serverEnv?.UPSTASH_REDIS_REST_TOKEN;
+/** Budget for the limiter's Redis round trip. See the call site for why. */
+const RATE_LIMIT_TIMEOUT_MS = 2_000;
+
 const isProduction = process.env.NODE_ENV === "production";
 
 function createRedis() {
@@ -124,12 +128,24 @@ export async function checkRateLimit(
     return { limited: false };
   }
   try {
-    const { success, reset } = await limiter.limit(key);
+    // Bounded: `limiter.limit` is a Redis round trip with no timeout of its own,
+    // and this runs before anything else on public endpoints like
+    // /api/validate-domain. Unbounded, a half-open connection holds the request
+    // open forever and the caller's spinner never stops — a hang is worse than
+    // a failure, because a failure at least reaches an error path.
+    //
+    // A timeout throws into the same catch as an unreachable Redis, so it
+    // inherits the same policy below rather than inventing a second one.
+    const { success, reset } = await withTimeoutOrThrow(
+      limiter.limit(key),
+      RATE_LIMIT_TIMEOUT_MS,
+      "rate limiter",
+    );
     return { limited: !success, reset };
   } catch (err) {
-    // Redis/Upstash unreachable. Don't let it escape as a framework 500 from
-    // whatever callsite invoked us (some call before their try block). Fail
-    // closed in production (treat like misconfigured → 503), open in dev. (M-3)
+    // Redis/Upstash unreachable or too slow. Don't let it escape as a framework
+    // 500 from whatever callsite invoked us (some call before their try block).
+    // Fail closed in production (treat like misconfigured → 503), open in dev. (M-3)
     if (isProduction) {
       const message = "Rate limiter check failed (Redis/Upstash unreachable)";
       logger.error({ error: err }, message);
