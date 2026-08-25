@@ -721,7 +721,14 @@ function themedWebCssVariables(theme: WebTheme): Record<string, string> {
   const tokens = theme === "dark" ? darkColorTokens : lightColorTokens;
   const shadows = theme === "dark" ? darkShadowTokens : shadowTokens;
   const shadcn = theme === "dark" ? darkShadcnTokens : lightShadcnTokens;
-  const textFaint = theme === "dark" ? "#5B5B63" : "#718096";
+  // Both sides failed WCAG AA for small text, which is the only size this
+  // token is ever used at: #718096 gave 4.02 on white and #5B5B63 gave 2.53
+  // against surfaceSecondary — the dark side was much the worse of the two and
+  // no automated run had caught it, since Lighthouse only ever tested light.
+  // These clear 4.5 against every surface they sit on (light 4.67; dark 4.97
+  // to 5.90) and keep the ramp families: slate, blue-tinted, in light; zinc in
+  // dark, where this now sits just under textSubtle #9797A0.
+  const textFaint = theme === "dark" ? "#8A8A93" : "#68758A";
   const todayText = theme === "dark" ? "#93C5FD" : "#1D4ED8";
   const todayBorder = theme === "dark" ? "#2C5282" : "#93C5FD";
   const infoText = theme === "dark" ? "#93C5FD" : "#1D4ED8";
