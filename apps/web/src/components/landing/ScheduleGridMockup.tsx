@@ -510,10 +510,21 @@ export default function ScheduleGridMockup() {
           boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
         }}
       >
-        {/* Grid */}
+        {/* A picture of a schedule, not a schedule. Nothing in here is
+            interactive — no handlers, no focusable cells — so exposing it as
+            role="grid" invited assistive tech and AI agents to navigate a week
+            of fake data cell by cell. The CSS Grid layout also has no row
+            elements to carry the role="row" that a grid requires between
+            itself and its headers, which failed three audits at once:
+            aria-required-children, aria-required-parent, and the agentic
+            accessibility tree. One labelled image says the true thing. */}
         <div
-          role="grid"
-          aria-label="Skilled Nursing schedule grid"
+          role="img"
+          aria-label={
+            "Illustration of a week of the Skilled Nursing schedule: staff " +
+            "listed down the left, their shifts filled in across seven days, " +
+            "with open shifts highlighted."
+          }
           style={{
             display: "grid",
             gridTemplateColumns: gridTemplate,
@@ -521,7 +532,6 @@ export default function ScheduleGridMockup() {
         >
           {/* Header row */}
           <div
-            role="columnheader"
             style={{
               position: "sticky",
               left: 0,
@@ -546,7 +556,6 @@ export default function ScheduleGridMockup() {
             return (
               <div
                 key={day}
-                role="columnheader"
                 style={{
                   position: "relative",
                   textAlign: "center",
@@ -695,7 +704,6 @@ function EmployeeRow({ emp, todayIndex }: { emp: (typeof STAFF)[number]; todayIn
   return (
     <>
       <div
-        role="rowheader"
         style={{
           position: "sticky",
           left: 0,

@@ -912,7 +912,11 @@ describe("Property-based tests", () => {
       })),
     );
 
-  it("seniority sort produces non-decreasing sequence", { timeout: 15000 }, async () => {
+  // 30s to match the name-sort property below it. Both drive fast-check over
+  // the same generator, but this one was left at 15s and timed out whenever the
+  // full workspace ran in parallel — the box is saturated, not the test slow.
+  // Nothing about it fails in isolation.
+  it("seniority sort produces non-decreasing sequence", { timeout: 30000 }, async () => {
     // Validates: Requirements 5.4, 8.2
     await fc.assert(
       fc.asyncProperty(arbUniqueEmployees, async (emps) => {
