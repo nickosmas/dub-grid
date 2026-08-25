@@ -1,7 +1,8 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireAuthenticatedUserWithClaims = vi.fn();
+const requireFreshAuth = vi.fn();
 const forbidIfSandboxCookie = vi.fn();
 const validateCsrfOrigin = vi.fn();
 const checkRateLimit = vi.fn();
@@ -15,6 +16,7 @@ const loggerInfo = vi.fn();
 vi.mock("@/lib/api-auth", () => ({
   requireAuthenticatedUserWithClaims: (req: NextRequest) => requireAuthenticatedUserWithClaims(req),
   forbidIfSandboxCookie: (req: NextRequest) => forbidIfSandboxCookie(req),
+  requireFreshAuth: (req: NextRequest, userId: string) => requireFreshAuth(req, userId),
 }));
 vi.mock("@/lib/csrf", () => ({
   validateCsrfOrigin: (req: NextRequest) => validateCsrfOrigin(req),
@@ -154,6 +156,8 @@ beforeEach(() => {
     user: { id: USER_ID, email: "u@test.com" },
     session: { access_token: "tok" },
   });
+  // null = the caller is still live according to Supabase Auth.
+  requireFreshAuth.mockResolvedValue(null);
 });
 
 async function importRoute() {
@@ -172,6 +176,20 @@ describe("DELETE /api/auth/delete-account", () => {
     const { DELETE } = await importRoute();
     const res = await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
     expect(res.status).toBe(429);
+  });
+
+  it("rejects a caller whose session is no longer live", async () => {
+    // API routes verify tokens locally, so a token can be up to an hour stale.
+    // Irreversible endpoints re-check against Supabase Auth before acting.
+    requireFreshAuth.mockResolvedValueOnce(
+      NextResponse.json({ error: "Your session expired. Sign in again." }, { status: 401 }),
+    );
+    const { client, authDeleteUser } = buildServiceClient({});
+    getServiceClient.mockReturnValue(client);
+    const { DELETE } = await importRoute();
+    const res = await DELETE(makeRequest({ confirmation: "DELETE MY ACCOUNT" }));
+    expect(res.status).toBe(401);
+    expect(authDeleteUser).not.toHaveBeenCalled();
   });
 
   it("rejects gridmaster accounts", async () => {

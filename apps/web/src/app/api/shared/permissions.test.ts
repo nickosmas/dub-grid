@@ -164,6 +164,91 @@ describe("requireOrgPermissions", () => {
     createRequestSupabaseClient.mockReturnValue({});
   });
 
+  // ── Tenant isolation ──────────────────────────────────────────────────
+  //
+  // Authorization is answered by a live membership query, not by the JWT.
+  // That matters more now that tokens are verified locally: a token can be up
+  // to an hour old, so its org claims must never be the thing that grants
+  // access. These lock that in.
+  describe("tenant isolation", () => {
+    const OTHER_ORG = "99999999-9999-4999-8999-999999999999";
+
+    it("rejects a caller with no membership in the requested org", async () => {
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: null,
+          profile: { platform_role: "none" },
+          organization: {
+            suspended_at: null,
+            subscription_status: "active",
+            trial_ends_at: null,
+          },
+        }),
+      );
+
+      const { requireOrgPermissions } = await import("./permissions");
+      const result = await requireOrgPermissions(makeRequest(), OTHER_ORG, () => true);
+
+      expect("response" in result).toBe(true);
+      if ("response" in result) {
+        expect(result.response.status).toBe(403);
+      }
+    });
+
+    it("rejects a caller whose membership in the requested org is archived", async () => {
+      // An archived membership doesn't come back from the query at all — the
+      // lookup filters `archived_at is null` — so it reads as "no membership".
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: null,
+          profile: { platform_role: "none" },
+          organization: {
+            suspended_at: null,
+            subscription_status: "active",
+            trial_ends_at: null,
+          },
+        }),
+      );
+
+      const { requireOrgPermissions } = await import("./permissions");
+      const result = await requireOrgPermissions(makeRequest("POST"), OTHER_ORG, () => true);
+
+      expect("response" in result).toBe(true);
+      if ("response" in result) {
+        expect(result.response.status).toBe(403);
+      }
+    });
+
+    it("derives the caller's role from the membership row, not from a claim", async () => {
+      // The membership row says "user"; nothing the caller could put in a
+      // token changes that.
+      getServiceClient.mockReturnValue(
+        createServiceClientMock({
+          membership: { org_role: "user", admin_permissions: null },
+          profile: { platform_role: "none" },
+          organization: {
+            suspended_at: null,
+            subscription_status: "active",
+            trial_ends_at: null,
+          },
+          employee: { status: "active" },
+        }),
+      );
+
+      const { requireOrgPermissions } = await import("./permissions");
+      const result = await requireOrgPermissions(
+        makeRequest(),
+        "11111111-1111-4111-8111-111111111111",
+        (permissions) => permissions.isSuperAdmin,
+      );
+
+      expect("response" in result).toBe(true);
+      if ("response" in result) {
+        expect(result.response.status).toBe(403);
+      }
+    });
+  });
+
   it("blocks regular users from org-scoped APIs when billing is locked", async () => {
     getServiceClient.mockReturnValue(
       createServiceClientMock({

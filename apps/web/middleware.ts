@@ -1,6 +1,6 @@
 // middleware.ts
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify, decodeJwt, createRemoteJWKSet } from "jose";
+import { jwtVerify, decodeJwt } from "jose";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { getSandboxFromCookie } from "@/lib/sandbox-cookie";
@@ -9,6 +9,7 @@ import { evaluateOrganizationBillingAccess } from "@dubgrid/domain";
 import { buildSubdomainHost, parseHost } from "@/lib/subdomain";
 import { cacheThrough, CacheKey, TTL } from "@/lib/cache";
 import { Timer } from "@/lib/server-timing";
+import { getSupabaseJwks } from "@/lib/auth/verify-token";
 import * as Sentry from "@/lib/sentry";
 import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./src/lib/supabase-keys";
 
@@ -28,21 +29,10 @@ import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./src/lib/s
  */
 
 /**
- * JWKS keyset cached at module level.
- * createRemoteJWKSet returns a function that lazily fetches and caches the
- * public keys from Supabase's JWKS endpoint. Safe to cache at module scope
- * on Vercel Edge — it contains no env-derived secrets, only public keys.
- * Supports both ES256 (asymmetric) and HS256 (symmetric) Supabase projects.
+ * The JWKS keyset now lives in lib/auth/verify-token.ts so middleware and the
+ * API routes share one keyset and one per-isolate cache rather than each
+ * fetching Supabase's public keys separately.
  */
-let _cachedJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
-function getJwks() {
-  if (_cachedJwks) return _cachedJwks;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!supabaseUrl) return null;
-  const jwksUrl = new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`);
-  _cachedJwks = createRemoteJWKSet(jwksUrl);
-  return _cachedJwks;
-}
 
 /**
  * Role hierarchy levels for permission checks.
@@ -243,7 +233,7 @@ export async function middleware(req: NextRequest) {
   // elevated roles (gridmaster) from unverified tokens.
   let claims: JWTClaims;
   try {
-    const jwks = getJwks();
+    const jwks = getSupabaseJwks();
     if (jwks) {
       const { payload } = await timer.time("jwt_verify", () =>
         jwtVerify(session.access_token, jwks),

@@ -1,14 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getUser = vi.fn();
-const getClaims = vi.fn();
+const verifyAccessToken = vi.fn();
+const isSessionRevoked = vi.fn();
 const fetchMobileOrganizationMembershipRows = vi.fn();
 const fetchMobileOrganizationRowById = vi.fn();
 
 vi.mock("@/lib/supabase-service", () => ({
-  getServiceClient: () => ({
-    auth: { getUser, getClaims },
-  }),
+  getServiceClient: () => ({}),
+}));
+
+// This route verifies the token locally against Supabase's JWKS instead of
+// calling Supabase Auth; see lib/auth/verify-token.ts.
+vi.mock("@/lib/auth/verify-token", () => ({
+  verifyAccessToken: (...args: unknown[]) => verifyAccessToken(...args),
+}));
+
+vi.mock("@/lib/auth/revocation", () => ({
+  isSessionRevoked: (...args: unknown[]) => isSessionRevoked(...args),
 }));
 
 vi.mock("@dubgrid/data-access", () => ({
@@ -57,8 +65,14 @@ const ORG_ROW = {
 describe("GET mobile org-status route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
-    getClaims.mockResolvedValue({ data: { claims: { org_id: "org-1" } } });
+    verifyAccessToken.mockResolvedValue({
+      userId: "user-1",
+      sessionId: "session-1",
+      email: "user@example.com",
+      issuedAtMs: Date.now(),
+      claims: { sub: "user-1", org_id: "org-1" },
+    });
+    isSessionRevoked.mockResolvedValue(false);
     fetchMobileOrganizationMembershipRows.mockResolvedValue([
       {
         organization: { id: "org-1", name: "DubGrid Health", slug: "dubgrid-health" },
@@ -75,7 +89,15 @@ describe("GET mobile org-status route", () => {
   });
 
   it("rejects an invalid session", async () => {
-    getUser.mockResolvedValue({ data: { user: null }, error: new Error("bad token") });
+    verifyAccessToken.mockResolvedValue(null);
+
+    const { GET } = await import("./org-status");
+    const response = await GET(makeRequest("Bearer token-123"));
+    expect(response.status).toBe(401);
+  });
+
+  it("rejects a revoked session even though the token still verifies", async () => {
+    isSessionRevoked.mockResolvedValue(true);
 
     const { GET } = await import("./org-status");
     const response = await GET(makeRequest("Bearer token-123"));

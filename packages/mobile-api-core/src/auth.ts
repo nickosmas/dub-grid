@@ -31,7 +31,7 @@ type SignedInSession = {
   token_type: string;
 };
 
-type MobileAuthClaims = {
+export type MobileAuthClaims = {
   aal?: string;
   org_id?: string;
   org_role?: string;
@@ -336,19 +336,64 @@ export async function resolveMobileAuthContext<
     userId: string,
   ) => Promise<PlatformRole | null>;
   mapOrganization: (row: TOrganizationRow) => TOrganization;
+  /**
+   * Verifies the access token and returns its claims, without calling
+   * Supabase Auth. Injected rather than imported so this package stays
+   * platform-neutral; the web app supplies a JWKS-based local verifier.
+   */
+  verifyToken: (accessToken: string) => Promise<{
+    userId: string;
+    sessionId: string | null;
+    /** Token issue time, epoch ms — needed for the revoke-all watermark. */
+    issuedAtMs: number | null;
+    claims: MobileAuthClaims;
+  } | null>;
+  /**
+   * True when the token's session has been revoked (signed out, device
+   * revoked, account deactivated). Local verification can't see that on its
+   * own, so it has to be asked separately.
+   */
+  isRevoked: (input: {
+    userId: string;
+    sessionId: string | null;
+    issuedAtMs: number | null;
+  }) => Promise<boolean>;
 }): Promise<ResolvedMobileAuthContext<TOrganization>> {
-  const [{ data: userData, error: userError }, { data: claimsData, error: claimsError }] =
-    await Promise.all([
-      input.serviceClient.auth.getUser(input.accessToken),
-      input.serviceClient.auth.getClaims(input.accessToken),
-    ]);
+  const verified = await input.verifyToken(input.accessToken);
+  if (!verified) {
+    throw new MobileApiRequestError(401, "Invalid session");
+  }
 
-  if (userError || claimsError || !userData.user || !claimsData?.claims) {
+  const claims = verified.claims;
+
+  if (
+    await input.isRevoked({
+      userId: verified.userId,
+      sessionId: verified.sessionId,
+      issuedAtMs: verified.issuedAtMs,
+    })
+  ) {
+    throw new MobileApiRequestError(401, "Invalid session");
+  }
+
+  // The one call to Supabase Auth still on this path, and it is load-bearing.
+  //
+  // Without it a password-only (aal1) token would satisfy a user who has TOTP
+  // enrolled, which is an MFA bypass. Enrolled factors live in `auth.mfa_factors`,
+  // which PostgREST does not expose, and they are not carried in the JWT — so
+  // there is no way to answer "does this user have a verified factor?" locally
+  // today. `profiles.mfa_enabled` is NOT a substitute: the client writes it
+  // after enrolling, so a client that skips that call leaves it false, and a
+  // stale `false` is exactly the direction that reopens the bypass.
+  const { data: userData, error: userError } = await input.serviceClient.auth.getUser(
+    input.accessToken,
+  );
+
+  if (userError || !userData.user) {
     throw new MobileApiRequestError(401, "Invalid session");
   }
 
   const user = userData.user;
-  const claims = claimsData.claims as MobileAuthClaims;
   const hasVerifiedTotpFactor = (user.factors ?? []).some(
     (factor) => factor.factor_type === "totp" && factor.status === "verified",
   );

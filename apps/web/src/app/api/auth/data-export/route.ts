@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
-import { forbidIfSandboxCookie, requireAuthenticatedUser } from "@/lib/api-auth";
+import { forbidIfSandboxCookie, requireAuthenticatedUser, requireFreshAuth } from "@/lib/api-auth";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 
@@ -20,6 +20,11 @@ export async function GET(req: NextRequest) {
     const auth = await requireAuthenticatedUser(req);
     if ("response" in auth) return auth.response;
     const { user } = auth;
+    // Exfiltrates the caller's full personal data: don't act on a locally
+    // verified token that could be up to an hour old. Confirm with Supabase
+    // Auth that this caller is still live.
+    const stale = await requireFreshAuth(req, user.id);
+    if (stale) return stale;
 
     const userId = user.id;
     const serviceClient = getServiceClient();

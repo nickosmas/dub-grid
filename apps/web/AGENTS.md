@@ -57,7 +57,9 @@ apps/web/
                                     #   schedule, settings, test-sandbox)
     hooks/                          # Shared React hooks
     lib/                            # Server + client utilities
-      api-auth.ts                   # requireOrgPermissions, requireAuthenticatedUserWithClaims
+      api-auth.ts                   # requireAuthenticated* — local JWT verify, no getUser() call
+      auth/verify-token.ts          # JWKS keyset + local ES256 verification (shared w/ middleware)
+      auth/revocation.ts            # Redis revocation markers — the other half of local verify
       csrf.ts                       # validateCsrfOrigin — call on all mutating Route Handlers
       cache.ts                      # Upstash Redis cache helpers
       rate-limit.ts                 # Per-IP and per-recipient rate limiting
