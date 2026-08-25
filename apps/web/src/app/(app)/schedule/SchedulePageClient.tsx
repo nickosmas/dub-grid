@@ -1434,17 +1434,26 @@ function SchedulerContent() {
           >;
           setNotes((prev) => ({ ...prev, ...noteUpdates }));
         }
+        // A broadcast that carried a diff has already been applied above, and
+        // the sender built it from the cells the server handed back, so it is
+        // authoritative — there is nothing left to ask for. Refetching anyway
+        // meant one scheduler editing one cell made every other open tab pull
+        // the org's whole loaded window two seconds later.
+        //
+        // A payload-less broadcast is the gap case: the sender is telling us
+        // something changed without saying what, so that one still refetches.
+        // Reconnect and tab-visibility refetches remain the recovery path for
+        // a tab that missed broadcasts entirely.
+        if (p?.shifts || p?.notes) return;
+
         if (draftChangedDebounceRef.current) clearTimeout(draftChangedDebounceRef.current);
-        draftChangedDebounceRef.current = setTimeout(
-          async () => {
-            try {
-              await refetchScheduleDataRef.current();
-            } catch (err) {
-              Sentry.captureException(err);
-            }
-          },
-          p?.shifts || p?.notes ? 2000 : 150,
-        );
+        draftChangedDebounceRef.current = setTimeout(async () => {
+          try {
+            await refetchScheduleDataRef.current();
+          } catch (err) {
+            Sentry.captureException(err);
+          }
+        }, 150);
       })
       .on(
         "broadcast",

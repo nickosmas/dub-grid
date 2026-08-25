@@ -35,6 +35,47 @@ import { getSupabaseSecretKey, requireSupabasePublishableKey } from "./src/lib/s
  */
 
 /**
+ * Per-isolate memo in front of the org-access lookup below.
+ *
+ * `cacheThrough` still costs a Redis GET on a hit, and this check runs on every
+ * authenticated navigation — including each RSC request — so a user clicking
+ * around paid a network round trip per page. Redis is not always nearby:
+ * measured at 340-670ms from one development machine.
+ *
+ * This is an access-revocation path, so the added staleness is stated plainly:
+ * the org-access answer was already accepted as up to TTL.MIDDLEWARE (30s) old,
+ * and this makes it at most 30s + MW_ORG_ACCESS_MEMO_MS. That sits inside the
+ * window this check exists to cover in the first place — a pre-suspension JWT
+ * remains usable for up to an hour, which is the whole reason for the check.
+ */
+const MW_ORG_ACCESS_MEMO_MS = 10_000;
+type MwOrgAccess = {
+  suspended_at: string | null;
+  archived_at: string | null;
+  subscription_status: string | null;
+  trial_ends_at: string | null;
+} | null;
+const mwOrgAccessMemo = new Map<string, { value: MwOrgAccess; expiresAt: number }>();
+
+/** Test seam: clears the in-process org-access memo between cases. */
+export function resetMiddlewareOrgAccessMemo(): void {
+  mwOrgAccessMemo.clear();
+}
+
+async function readOrgAccess(
+  orgId: string,
+  load: () => Promise<MwOrgAccess>,
+): Promise<MwOrgAccess> {
+  const now = Date.now();
+  const memoized = mwOrgAccessMemo.get(orgId);
+  if (memoized && memoized.expiresAt > now) return memoized.value;
+
+  const value = await cacheThrough(CacheKey.mwOrgAccess(orgId), TTL.MIDDLEWARE, load);
+  mwOrgAccessMemo.set(orgId, { value, expiresAt: now + MW_ORG_ACCESS_MEMO_MS });
+  return value;
+}
+
+/**
  * Role hierarchy levels for permission checks.
  * Higher numbers indicate more permissions.
  */
@@ -487,13 +528,13 @@ export async function middleware(req: NextRequest) {
   if (claims.org_id && !isGridmaster && !isImpersonating) {
     try {
       const orgAccess = await timer.time("mw_org_access", () =>
-        cacheThrough(CacheKey.mwOrgAccess(claims.org_id!), TTL.MIDDLEWARE, async () => {
+        readOrgAccess(claims.org_id!, async () => {
           const { data } = await supabase
             .from("organizations")
             .select("suspended_at, archived_at, subscription_status, trial_ends_at")
             .eq("id", claims.org_id!)
             .maybeSingle();
-          return data ?? null;
+          return (data as MwOrgAccess) ?? null;
         }),
       );
 
