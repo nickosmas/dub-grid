@@ -121,7 +121,21 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       }
 
       void (async () => {
-        const verifiedUser = await getVerifiedBrowserAuthUser().catch(() => null);
+        // On these events the session's user already came from the auth server
+        // in that same exchange: signInWithPassword and refreshSession return
+        // it, and setSession re-reads it before emitting. Calling getUser()
+        // again here was a second network round trip for an answer we were
+        // just handed — and it landed right after sign-in, back-to-back with
+        // setSession's own, on the slowest screen in the app.
+        //
+        // Anything else (INITIAL_SESSION, a session rehydrated from storage)
+        // is not vouched for by the auth server, so it still gets verified.
+        const trustsSessionUser =
+          event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED";
+        const verifiedUser =
+          trustsSessionUser && nextSession.user
+            ? nextSession.user
+            : await getVerifiedBrowserAuthUser().catch(() => null);
         setSession(verifiedUser ? nextSession : null);
         setUser(verifiedUser);
         setIsLoading(false);

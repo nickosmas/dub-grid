@@ -9,6 +9,13 @@ export const TTL = {
   /** 30 seconds — middleware profile/membership fallback */
   MIDDLEWARE: 30,
   /**
+   * 1 hour — auth revocation markers (see lib/auth/revocation.ts). Must be at
+   * least the access-token lifetime (`jwt_expiry` in supabase/config.toml): a
+   * marker only has to outlive the tokens it invalidates, because past that
+   * point the token is expired and local verification rejects it anyway.
+   */
+  ACCESS_TOKEN: 3600,
+  /**
    * 24 hours — public, unauthenticated subdomain→org lookup. Safe this long
    * because organizations.slug is write-once (set at creation, never
    * rewritten); the cached `name` is invalidated explicitly on rename
@@ -76,6 +83,16 @@ export const CacheKey = {
    * `false` is the one thing this must not do.
    */
   orgSetupComplete: (orgId: string) => `dg:org:${orgId}:setupComplete`,
+
+  // ── Auth revocation (see lib/auth/revocation.ts) ──────────────────────
+  /** One device signed out or revoked. Presence alone means "reject". */
+  revokedSession: (sessionId: string) => `dg:auth:revoked:session:${sessionId}`,
+  /**
+   * Epoch-ms watermark. Every token this user holds that was issued before it
+   * is rejected — for changes that must invalidate all devices at once
+   * (account disabled, membership removed, role changed).
+   */
+  revokedAfter: (userId: string) => `dg:auth:revokedAfter:user:${userId}`,
 } as const;
 
 // ── Typed Cache Operations ──────────────────────────────────────────────
@@ -96,6 +113,26 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
       console.warn(`[cache] GET failed for ${key}:`, err instanceof Error ? err.message : err);
     }
     return null;
+  }
+}
+
+/**
+ * Get several keys in one round trip. Returns an array positionally matching
+ * `keys`, with null for a miss. Returns all-null on Redis unavailable, same as
+ * `cacheGet` — callers must treat that as "no cached answer", never as a
+ * meaningful value.
+ */
+export async function cacheGetMany<T>(keys: string[]): Promise<(T | null)[]> {
+  const client = getRedis();
+  if (!client || keys.length === 0) return keys.map(() => null);
+  try {
+    const raw = await client.mget<T[]>(...keys);
+    return keys.map((_, i) => raw?.[i] ?? null);
+  } catch (err) {
+    if (_debugMode) {
+      console.warn(`[cache] MGET failed:`, err instanceof Error ? err.message : err);
+    }
+    return keys.map(() => null);
   }
 }
 

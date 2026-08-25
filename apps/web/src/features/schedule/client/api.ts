@@ -460,20 +460,50 @@ async function requestManageWithLock(body: Record<string, unknown>): Promise<voi
   await requestManageWithLockTyped(body);
 }
 
+/**
+ * Asks a write to hand back the cells it changed, so the caller can merge them
+ * instead of refetching the whole loaded window. Built from the same maps
+ * `fetchShifts` passes, because the server maps the entries identically.
+ */
+export type CellEcho = {
+  isScheduler: boolean;
+  assignmentLabelMap: Map<number, string>;
+  absenceTypeMap?: Map<number, string>;
+};
+
+/** Cells a write echoed back. A `null` value means "drop this key". */
+export type EchoedCells = Record<string, ShiftMap[string] | null>;
+
+function serializeEcho(echo: CellEcho | undefined) {
+  if (!echo) return undefined;
+  return {
+    isScheduler: echo.isScheduler,
+    assignmentLabels: [...echo.assignmentLabelMap.entries()],
+    absenceTypeLabels: echo.absenceTypeMap ? [...echo.absenceTypeMap.entries()] : undefined,
+  };
+}
+
+async function requestManageWithEcho(body: Record<string, unknown>): Promise<EchoedCells | null> {
+  const payload = await requestManageWithLockTyped<{ cells?: EchoedCells }>(body);
+  return payload.cells ?? null;
+}
+
 export function upsertShift(
   employeeId: string,
   date: string,
   input: ScheduleCellInput,
   orgId: string,
   expectedVersion?: number,
-): Promise<void> {
-  return requestManageWithLock({
+  echo?: CellEcho,
+): Promise<EchoedCells | null> {
+  return requestManageWithEcho({
     action: "upsertShift",
     orgId,
     employeeId,
     date,
     input,
     expectedVersion,
+    echo: serializeEcho(echo),
   });
 }
 
@@ -511,13 +541,15 @@ export function deleteShift(
   date: string,
   orgId: string,
   expectedVersion?: number,
-): Promise<void> {
-  return requestManageWithLock({
+  echo?: CellEcho,
+): Promise<EchoedCells | null> {
+  return requestManageWithEcho({
     action: "deleteShift",
     orgId,
     employeeId,
     date,
     expectedVersion,
+    echo: serializeEcho(echo),
   });
 }
 
@@ -542,8 +574,9 @@ export function upsertShiftTimes(
   customEndTime: string | null,
   orgId: string,
   expectedVersion?: number,
-): Promise<void> {
-  return requestManageWithLock({
+  echo?: CellEcho,
+): Promise<EchoedCells | null> {
+  return requestManageWithEcho({
     action: "upsertShiftTimes",
     orgId,
     employeeId,
@@ -551,6 +584,7 @@ export function upsertShiftTimes(
     customStartTime,
     customEndTime,
     expectedVersion,
+    echo: serializeEcho(echo),
   });
 }
 
@@ -611,21 +645,34 @@ export function updateSeriesAllShifts(
   seriesId: string,
   input: ScheduleCellInput,
   orgId: string,
-): Promise<void> {
-  return requestManageWithLock({
+  /** Optional: also return this one cell's post-write state (see CellEcho). */
+  echoCell?: { employeeId: string; date: string },
+  echo?: CellEcho,
+): Promise<EchoedCells | null> {
+  return requestManageWithEcho({
     action: "updateSeriesAllShifts",
     orgId,
     seriesId,
     input,
+    echoCell,
+    echo: serializeEcho(echo),
   });
 }
 
-export function deleteShiftSeries(seriesId: string, orgId: string): Promise<number> {
-  return requestScheduleManage<{ deletedCount: number }>({
+export function deleteShiftSeries(
+  seriesId: string,
+  orgId: string,
+  /** Optional: also return this one cell's post-write state (see CellEcho). */
+  echoCell?: { employeeId: string; date: string },
+  echo?: CellEcho,
+): Promise<{ deletedCount: number; cells: EchoedCells | null }> {
+  return requestScheduleManage<{ deletedCount: number; cells?: EchoedCells }>({
     action: "deleteShiftSeries",
     orgId,
     seriesId,
-  }).then((data) => data.deletedCount);
+    echoCell,
+    echo: serializeEcho(echo),
+  }).then((data) => ({ deletedCount: data.deletedCount, cells: data.cells ?? null }));
 }
 
 export function applyRecurringSchedules(

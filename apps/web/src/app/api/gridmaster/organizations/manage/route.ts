@@ -14,7 +14,8 @@ import { apiErrorResponse } from "@/lib/error-handling";
 import { formatClientErrorMessage } from "@/lib/client-facing";
 import { registerOrgDomain } from "@/lib/vercel";
 import * as Sentry from "@/lib/sentry";
-import { clientEnv, serverEnv } from "@/lib/env";
+import { clientEnv } from "@/lib/env";
+import { serverEnv } from "@/lib/env.server";
 import { isValidOrgSlug } from "@/lib/subdomain";
 
 export const dynamic = "force-dynamic";

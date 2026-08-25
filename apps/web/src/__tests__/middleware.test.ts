@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { calculateEffectiveRole, getRoleLevel } from "../../middleware";
+import {
+  calculateEffectiveRole,
+  getRoleLevel,
+  resetMiddlewareOrgAccessMemo,
+} from "../../middleware";
 
 // ── Mock next/server ─────────────────────────────────────────────────────────
 // NextResponse.next() and NextResponse.redirect() need to return objects
@@ -82,6 +86,9 @@ vi.mock("@/lib/cache", () => ({
 // ── Environment variables ────────────────────────────────────────────────────
 beforeEach(() => {
   vi.clearAllMocks();
+  // Module-level memo in front of the org-access lookup, so it survives between
+  // cases in this file — one test's org state would otherwise leak into the next.
+  resetMiddlewareOrgAccessMemo();
   // SUPABASE_JWT_SECRET is no longer used — middleware now verifies via JWKS.
   process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "test-anon-key";

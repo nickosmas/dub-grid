@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase-service";
 import { validateCsrfOrigin } from "@/lib/csrf";
 import { canManageProfileChangeRequests } from "@/features/account/server";
-import { forbidIfSandboxCookie, requireAuthenticatedUserWithClaims } from "@/lib/api-auth";
+import {
+  forbidIfSandboxCookie,
+  requireAuthenticatedUserWithClaims,
+  requireFreshAuth,
+} from "@/lib/api-auth";
 import { extractJwtClaims } from "@/features/permissions/shared";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
@@ -28,6 +32,10 @@ export async function POST(req: NextRequest) {
     const auth = await requireAuthenticatedUserWithClaims(req);
     if ("response" in auth) return auth.response;
     const { user } = auth;
+    // Irreversible: don't act on a locally verified token that could be up to
+    // an hour old. Confirm with Supabase Auth that this caller is still live.
+    const stale = await requireFreshAuth(req, user.id);
+    if (stale) return stale;
     const { orgId } = extractJwtClaims(auth.session.access_token);
 
     const canEraseDirectly = orgId

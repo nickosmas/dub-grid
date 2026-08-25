@@ -1,7 +1,7 @@
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { createHash } from "node:crypto";
-import { serverEnv } from "@/lib/env";
+import { serverEnv } from "@/lib/env.server";
 import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 
@@ -104,6 +104,15 @@ export async function checkRateLimit(
   limiter: Ratelimit | null,
   key: string,
 ): Promise<{ limited: boolean; reset?: number; misconfigured?: boolean }> {
+  // Outside production, allow through without the round trip. This used to be
+  // true only when Redis was unconfigured, so a developer who had Upstash
+  // configured locally paid a full network hop on every rate-limited request —
+  // most visibly on sign-in, where it was the single largest cost. Set
+  // RATE_LIMIT_IN_DEV=1 to exercise the limiter locally.
+  if (!isProduction && process.env.RATE_LIMIT_IN_DEV !== "1") {
+    return { limited: false };
+  }
+
   if (!limiter) {
     // Fail-closed in production: missing Redis = service unavailable (not "too many requests")
     if (isProduction) {

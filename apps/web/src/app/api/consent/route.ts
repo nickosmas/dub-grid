@@ -8,6 +8,7 @@ import logger from "@/lib/logger";
 import * as Sentry from "@/lib/sentry";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import { requireSupabasePublishableKey } from "@/lib/supabase-keys";
+import { verifyAccessToken } from "@/lib/auth/verify-token";
 
 export const dynamic = "force-dynamic";
 
@@ -57,11 +58,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: API_ERRORS.INVALID_INPUT }, { status: 400 });
     }
 
-    // Get authenticated user if available (nullable for anonymous visitors)
+    // Attribute the consent to a signed-in user when there is one, and stay
+    // anonymous otherwise. Verified locally against Supabase's JWKS rather
+    // than with a getUser() round trip — an unverifiable token just means the
+    // visitor is recorded as anonymous, which is the same outcome as before.
     const userClient = getUserClient(req);
     const {
-      data: { user: authedUser },
-    } = await userClient.auth.getUser();
+      data: { session },
+    } = await userClient.auth.getSession();
+    const verified = session?.access_token ? await verifyAccessToken(session.access_token) : null;
+    const authedUser = verified ? { id: verified.userId } : null;
 
     // Hash IP for privacy-safe audit trail
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";

@@ -58,6 +58,8 @@ export interface OrganizationData {
   loading: boolean;
   loadError: string | null;
   setupStatus: SetupStatus;
+  /** Active employees in the org — see OrganizationBootstrap.activeEmployeeCount. */
+  activeEmployeeCount: number;
   setOrg: (org: Organization) => void;
   setFocusAreas: (areas: FocusArea[]) => void;
   handleAssignmentDefinitionsChange: (codes: AssignmentDefinition[]) => void;
@@ -588,6 +590,7 @@ export function useOrganizationData(options?: UseOrganizationDataOptions): Organ
     loading,
     loadError,
     setupStatus,
+    activeEmployeeCount: bootstrap?.activeEmployeeCount ?? 0,
     setOrg,
     setFocusAreas,
     handleAssignmentDefinitionsChange,

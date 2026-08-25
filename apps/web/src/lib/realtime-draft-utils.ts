@@ -43,11 +43,25 @@ function normalizeNoteList(notes: RealtimeDraftNote[] | undefined) {
   });
 }
 
+/**
+ * Limits the diff to keys the caller already knows changed.
+ *
+ * Without it every call compares the entire loaded window — two
+ * `JSON.stringify` calls per cell, on the main thread. That is unavoidable
+ * after a publish or a discard, which can touch anything, but a single-cell
+ * edit knows exactly what it wrote and shouldn't pay for the whole grid.
+ */
+export interface RealtimeDraftDiffScope {
+  shiftKeys?: Iterable<string>;
+  noteKeys?: Iterable<string>;
+}
+
 export function buildRealtimeDraftDiff(
   previousShifts: ShiftMap,
   nextShifts: ShiftMap,
   previousNotes: RealtimeDraftNotesMap,
   nextNotes: RealtimeDraftNotesMap,
+  scope?: RealtimeDraftDiffScope,
 ): {
   shifts?: Record<string, ShiftMap[string] | null>;
   notes?: RealtimeDraftNotesMap;
@@ -55,7 +69,9 @@ export function buildRealtimeDraftDiff(
   const shiftUpdates: Record<string, ShiftMap[string] | null> = {};
   const noteUpdates: RealtimeDraftNotesMap = {};
 
-  const shiftKeys = new Set([...Object.keys(previousShifts), ...Object.keys(nextShifts)]);
+  const shiftKeys = scope?.shiftKeys
+    ? new Set(scope.shiftKeys)
+    : new Set([...Object.keys(previousShifts), ...Object.keys(nextShifts)]);
   for (const key of shiftKeys) {
     const previous = previousShifts[key] ?? null;
     const next = nextShifts[key] ?? null;
@@ -66,7 +82,9 @@ export function buildRealtimeDraftDiff(
     }
   }
 
-  const noteKeys = new Set([...Object.keys(previousNotes), ...Object.keys(nextNotes)]);
+  const noteKeys = scope?.noteKeys
+    ? new Set(scope.noteKeys)
+    : new Set([...Object.keys(previousNotes), ...Object.keys(nextNotes)]);
   for (const key of noteKeys) {
     const previous = normalizeNoteList(previousNotes[key]);
     const next = normalizeNoteList(nextNotes[key]);

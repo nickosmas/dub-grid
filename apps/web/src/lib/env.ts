@@ -1,57 +1,13 @@
 import { z } from "zod";
-import { getSupabasePublishableKey, getSupabaseSecretKey } from "./supabase-keys";
+import { getSupabasePublishableKey } from "./supabase-keys";
 
 /**
- * Centralized environment variable validation.
- * Imported at startup to fail fast on misconfiguration.
+ * Client-safe environment validation.
+ *
+ * Only NEXT_PUBLIC_* lives here, because this module is reachable from the
+ * browser through lib/supabase.ts. The server schema is in ./env.server, which
+ * must never be imported from a client component — see the note there.
  */
-
-const isStrictProductionEnv =
-  process.env.NODE_ENV === "production" &&
-  (process.env.VERCEL_ENV === "production" || process.env.STRICT_PROD_ENV_VALIDATION === "1");
-
-const serverSchema = z
-  .object({
-    // Note: SUPABASE_JWT_SECRET is no longer required — JWT verification uses JWKS
-    // (ES256 asymmetric keys fetched from Supabase's .well-known/jwks.json endpoint).
-    SUPABASE_SECRET_KEY: z.string().min(1, "SUPABASE_SECRET_KEY is required"),
-    // Shared secret for the scheduled jobs in vercel.json. Vercel only injects
-    // `Authorization: Bearer $CRON_SECRET` when this var exists on the project,
-    // so an unset value makes every cron run return 503 and get reported as a
-    // failed job. Optional here because local dev never runs the crons.
-    CRON_SECRET: z.string().optional(),
-    RESEND_API_KEY: z.string().optional(),
-    EXPO_ACCESS_TOKEN: z.string().optional(),
-    STRIPE_SECRET_KEY: z.string().optional(),
-    STRIPE_WEBHOOK_SECRET: z.string().optional(),
-    STRIPE_PRICE_ID_MONTHLY: z.string().optional(),
-    UPSTASH_REDIS_REST_URL: z.string().url().optional(),
-    UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
-    SENTRY_DSN: z.string().url().optional(),
-    VERCEL_API_TOKEN: z.string().optional(),
-    VERCEL_PROJECT_ID: z.string().optional(),
-    VERCEL_TEAM_ID: z.string().optional(),
-    VERCEL_ENV: z.string().optional(),
-  })
-  .superRefine((env, ctx) => {
-    if (!isStrictProductionEnv) return;
-
-    if (!env.UPSTASH_REDIS_REST_URL) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "UPSTASH_REDIS_REST_URL is required in production",
-        path: ["UPSTASH_REDIS_REST_URL"],
-      });
-    }
-
-    if (!env.UPSTASH_REDIS_REST_TOKEN) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "UPSTASH_REDIS_REST_TOKEN is required in production",
-        path: ["UPSTASH_REDIS_REST_TOKEN"],
-      });
-    }
-  });
 
 const clientSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url("NEXT_PUBLIC_SUPABASE_URL must be a valid URL"),
@@ -67,29 +23,6 @@ const clientSchema = z.object({
   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: z.string().optional(),
   NEXT_PUBLIC_VERCEL_URL: z.string().optional(),
 });
-
-function validateServerEnv() {
-  // Only validate server env in server context (not in browser)
-  if (typeof window !== "undefined") return null;
-
-  const result = serverSchema.safeParse(process.env);
-  if (!result.success) {
-    if (isStrictProductionEnv) {
-      console.error(
-        "[env] Server environment validation failed:\n",
-        result.error.flatten().fieldErrors,
-      );
-      throw new Error("Missing required server environment variables. Check logs for details.");
-    }
-    // Warn in dev so misconfigurations are noticed early
-    console.warn(
-      "[env] Server environment validation issues (non-fatal in dev):\n",
-      result.error.flatten().fieldErrors,
-    );
-    return null;
-  }
-  return result.data;
-}
 
 function validateClientEnv() {
   const result = clientSchema.safeParse({
@@ -111,7 +44,6 @@ function validateClientEnv() {
   return result.data;
 }
 
-export const serverEnv = validateServerEnv();
 // NEXT_PUBLIC_* vars are inlined by Next.js at build time into every bundle
 // (server and client alike), so this validates regardless of runtime context —
 // only test env is skipped, to keep vitest output quiet.

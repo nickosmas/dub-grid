@@ -78,6 +78,23 @@ const deleteShiftBatchItemSchema = z.object({
   expectedVersion: z.number().int().nonnegative().optional(),
 });
 
+/**
+ * Opt-in on a write: "also hand back the cells you just changed".
+ *
+ * The caller supplies the same label maps `fetchShifts` takes, because the
+ * response entries are built by the identical mapper and have to come out
+ * byte-for-byte the same shape. Optional, so a caller that doesn't need the
+ * echo (drag/drop, bulk delete) pays nothing for it.
+ *
+ * This is what lets the shift editor close on the write response instead of
+ * blocking on a refetch of the org's whole loaded window.
+ */
+const cellEchoSchema = z.object({
+  isScheduler: z.boolean(),
+  assignmentLabels: mapEntrySchema,
+  absenceTypeLabels: mapEntrySchema.optional(),
+});
+
 const requestSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("fetchShifts"),
@@ -116,6 +133,7 @@ const requestSchema = z.discriminatedUnion("action", [
     date: z.string().date(),
     input: scheduleCellStateSchema,
     expectedVersion: z.number().int().nonnegative().optional(),
+    echo: cellEchoSchema.optional(),
   }),
   z.object({
     action: z.literal("importPreviousSchedule"),
@@ -132,6 +150,7 @@ const requestSchema = z.discriminatedUnion("action", [
     employeeId: z.string().uuid(),
     date: z.string().date(),
     expectedVersion: z.number().int().nonnegative().optional(),
+    echo: cellEchoSchema.optional(),
   }),
   z.object({
     action: z.literal("deleteShifts"),
@@ -146,6 +165,7 @@ const requestSchema = z.discriminatedUnion("action", [
     customStartTime: z.string().nullable(),
     customEndTime: z.string().nullable(),
     expectedVersion: z.number().int().nonnegative().optional(),
+    echo: cellEchoSchema.optional(),
   }),
   z.object({
     action: z.literal("moveShift"),
@@ -177,11 +197,15 @@ const requestSchema = z.discriminatedUnion("action", [
     orgId: z.string().uuid(),
     seriesId: z.string().uuid(),
     input: scheduleCellStateSchema,
+    echoCell: z.object({ employeeId: z.string().uuid(), date: z.string().date() }).optional(),
+    echo: cellEchoSchema.optional(),
   }),
   z.object({
     action: z.literal("deleteShiftSeries"),
     orgId: z.string().uuid(),
     seriesId: z.string().uuid(),
+    echoCell: z.object({ employeeId: z.string().uuid(), date: z.string().date() }).optional(),
+    echo: cellEchoSchema.optional(),
   }),
   z.object({
     action: z.literal("applyRecurringSchedules"),
@@ -415,6 +439,92 @@ async function writeShiftSnapshot(
       );
     }
     throw error;
+  }
+}
+
+/** The nested select `fetchShifts` uses, so echoed cells map identically. */
+const SCHEDULE_CELL_SELECT =
+  "id, emp_id, date, org_id, version, series_id, from_recurring, created_by, updated_by, created_at, updated_at, snapshots:schedule_cell_snapshots(id, cell_id, org_id, snapshot_kind, state_kind, absence_type_id, custom_start_time, custom_end_time, created_at, updated_at, segments:schedule_cell_segments(id, snapshot_id, org_id, position, shift_id, job_id, is_mentored, created_at, updated_at))";
+
+type CellEcho = z.infer<typeof cellEchoSchema>;
+
+/**
+ * Reads back the cells a write just touched, in the exact shape `fetchShifts`
+ * returns them.
+ *
+ * This is what lets a caller skip the refetch: it already knows which cells it
+ * changed, so it merges these into its map and is done. A key mapping to `null`
+ * means the cell no longer has content and should be dropped from the map —
+ * the same thing a refetch would have conveyed by the key's absence.
+ *
+ * One indexed read of at most a handful of rows, versus the whole loaded window.
+ */
+async function readEchoedCells(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  cells: Array<{ employeeId: string; date: string }>,
+  echo: CellEcho,
+): Promise<Record<string, unknown | null>> {
+  const wanted = new Set(cells.map((cell) => `${cell.employeeId}_${cell.date}`));
+  const result: Record<string, unknown | null> = {};
+  // Seed every requested key as null so a cell the write emptied is reported
+  // as removed rather than silently omitted.
+  for (const key of wanted) result[key] = null;
+
+  const { data, error } = await serviceClient
+    .from("schedule_cells")
+    .select(SCHEDULE_CELL_SELECT)
+    .eq("org_id", orgId)
+    .in(
+      "emp_id",
+      cells.map((cell) => cell.employeeId),
+    )
+    .in(
+      "date",
+      cells.map((cell) => cell.date),
+    );
+
+  if (error) throw error;
+
+  const assignmentIdByPair = await fetchAssignmentIdByPairMap(serviceClient, orgId);
+  const assignmentLabelMap = new Map<number, string>(echo.assignmentLabels);
+  const absenceTypeMap = new Map<number, string>(echo.absenceTypeLabels ?? []);
+
+  for (const row of (data ?? []) as DbScheduleCell[]) {
+    const key = `${row.emp_id}_${row.date}`;
+    // The two `.in(...)` filters are a cross product, so a multi-cell echo can
+    // return pairs nobody asked for. Keep only the requested ones.
+    if (!wanted.has(key)) continue;
+    result[key] = mapNormalizedScheduleCellRowToScheduleEntry(row, {
+      isScheduler: echo.isScheduler,
+      assignmentLabelMap,
+      assignmentIdByPair,
+      absenceTypeMap,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Builds the write response, echoing changed cells when the caller asked for
+ * them. A failure to read them back is non-fatal: the write already committed,
+ * and a caller that gets no `cells` falls back to refetching.
+ */
+async function writeResponse(
+  serviceClient: ScheduleServiceClient,
+  orgId: string,
+  cells: Array<{ employeeId: string; date: string }>,
+  echo: CellEcho | undefined,
+): Promise<NextResponse> {
+  if (!echo) return NextResponse.json({ success: true });
+
+  try {
+    const echoed = await readEchoedCells(serviceClient, orgId, cells, echo);
+    return NextResponse.json({ success: true, cells: echoed });
+  } catch (error) {
+    logger.error({ error, orgId }, "Failed to echo changed schedule cells after write");
+    return NextResponse.json({ success: true });
   }
 }
 
@@ -795,7 +905,12 @@ export async function POST(req: NextRequest) {
           resourceId: `${data.employeeId}:${data.date}`,
           details: { input: data.input },
         });
-        return NextResponse.json({ success: true });
+        return writeResponse(
+          auth.serviceClient,
+          data.orgId,
+          [{ employeeId: data.employeeId, date: data.date }],
+          data.echo,
+        );
       }
 
       case "importPreviousSchedule": {
@@ -871,7 +986,12 @@ export async function POST(req: NextRequest) {
           resourceId: `${data.employeeId}:${data.date}`,
           details: {},
         });
-        return NextResponse.json({ success: true });
+        return writeResponse(
+          auth.serviceClient,
+          data.orgId,
+          [{ employeeId: data.employeeId, date: data.date }],
+          data.echo,
+        );
       }
 
       case "deleteShifts": {
@@ -931,20 +1051,25 @@ export async function POST(req: NextRequest) {
           return auth.response;
         }
 
-        const draftPayload = await fetchScheduleCellSnapshotPayload(
-          auth.serviceClient,
-          data.orgId,
-          data.employeeId,
-          data.date,
-          "draft",
-        );
-        const publishedPayload = await fetchScheduleCellSnapshotPayload(
-          auth.serviceClient,
-          data.orgId,
-          data.employeeId,
-          data.date,
-          "published",
-        );
+        // Two independent reads of the same cell — nothing in the published
+        // lookup depends on the draft one, so they go together rather than as
+        // two serial round trips.
+        const [draftPayload, publishedPayload] = await Promise.all([
+          fetchScheduleCellSnapshotPayload(
+            auth.serviceClient,
+            data.orgId,
+            data.employeeId,
+            data.date,
+            "draft",
+          ),
+          fetchScheduleCellSnapshotPayload(
+            auth.serviceClient,
+            data.orgId,
+            data.employeeId,
+            data.date,
+            "published",
+          ),
+        ]);
         const sourcePayload =
           draftPayload?.state_kind === "worked"
             ? draftPayload
@@ -997,7 +1122,12 @@ export async function POST(req: NextRequest) {
           resourceId: `${data.employeeId}:${data.date}`,
           details: { customStartTime: data.customStartTime, customEndTime: data.customEndTime },
         });
-        return NextResponse.json({ success: true });
+        return writeResponse(
+          auth.serviceClient,
+          data.orgId,
+          [{ employeeId: data.employeeId, date: data.date }],
+          data.echo,
+        );
       }
 
       case "moveShift": {
@@ -1194,7 +1324,12 @@ export async function POST(req: NextRequest) {
           resourceId: data.seriesId,
           details: { input: normalizedInput },
         });
-        return NextResponse.json({ success: true });
+        return writeResponse(
+          auth.serviceClient,
+          data.orgId,
+          data.echoCell ? [data.echoCell] : [],
+          data.echoCell ? data.echo : undefined,
+        );
       }
 
       case "deleteShiftSeries": {
@@ -1228,8 +1363,24 @@ export async function POST(req: NextRequest) {
           resourceId: data.seriesId,
           details: { shiftsAffected: Number(deletedCount ?? 0) },
         });
+        const seriesEcho =
+          data.echoCell && data.echo
+            ? await readEchoedCells(
+                auth.serviceClient,
+                data.orgId,
+                [data.echoCell],
+                data.echo,
+              ).catch((error) => {
+                logger.error(
+                  { error, orgId: data.orgId },
+                  "Failed to echo cell after series delete",
+                );
+                return null;
+              })
+            : null;
         return NextResponse.json({
           deletedCount: Number(deletedCount ?? 0),
+          ...(seriesEcho ? { cells: seriesEcho } : {}),
         });
       }
 

@@ -195,13 +195,10 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
     setLoading(true);
 
     try {
-      // Use server-side login route for brute-force protection. For the
-      // common case (JWT's org already matches this subdomain, or the
-      // caller is gridmaster) it also resolves trial activation and the
-      // terms check server-side (see orchestratePostSignIn in
-      // api/auth/login/route.ts) and returns a destination directly. Org
-      // switching stays client-orchestrated (result.needsClientOrgSwitch) —
-      // see that function's doc comment for why.
+      // The server route does the whole post-sign-in sequence: re-scoping the
+      // session to this subdomain's organization when it isn't the caller's
+      // current one, trial activation, sandbox teardown and the terms check.
+      // See orchestratePostSignIn in api/auth/login/route.ts.
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -260,14 +257,21 @@ export default function OrgLogin({ orgSlug }: { orgSlug: string }) {
         return;
       }
 
-      if (result.needsClientOrgSwitch) {
-        const switched = await findAndSwitchToOrg();
-        if (!switched) {
-          setLoading(false);
-          return;
-        }
+      // The server re-scoped the session to this subdomain's organization
+      // (see switchSessionToHostOrganization). Everything that used to be
+      // driven from here — the org lookup, switch_org, the refresh, the trial
+      // start, the sandbox teardown, the terms check — already happened, and
+      // the tokens set above are the post-switch ones. What is left is
+      // browser-local state the server cannot touch.
+      if (result.didSwitchOrg) {
+        // Don't carry a prior session's "view as user" toggle into the org we
+        // just switched into (it would silently force read-only).
+        setUserViewActive(false);
+        // Drop the prior org's React Query cache so the new org's dashboard
+        // never paints with stale cross-org data.
+        queryClient.clear();
         markAuthTransition();
-        navigateToDashboard(await resolvePostLoginDestination(), true);
+        navigateToDashboard(result.destination, true);
         return;
       }
 

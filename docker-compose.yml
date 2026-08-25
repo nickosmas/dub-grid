@@ -1,0 +1,51 @@
+# Local Redis for development.
+#
+# The app talks to Redis exclusively through Upstash's REST client
+# (`@upstash/redis`, wrapped by apps/web/src/lib/cache.ts), which speaks HTTP
+# rather than the Redis binary protocol. `serverless-redis-http` serves that
+# same REST protocol in front of an ordinary Redis, so local development uses
+# the identical client and the identical code paths.
+#
+# Why this exists rather than just leaving UPSTASH_REDIS_REST_* unset: the app
+# degrades gracefully without Redis, which is the problem. Session revocation
+# (lib/auth/revocation.ts) is entirely Redis-backed — with no Redis, revoking a
+# session silently no-ops and every token reads as live, so a regression in it
+# would be invisible locally. The rate limiter and the org-access and
+# setup-complete memos likewise stop being exercised.
+#
+# Usage:
+#   docker compose up -d
+# then point apps/web/.env.local at it:
+#   UPSTASH_REDIS_REST_URL=http://127.0.0.1:8079
+#   UPSTASH_REDIS_REST_TOKEN=local_dev_token
+#
+# Note: SRH matches Upstash on the core commands this app uses, but differs on
+# RedisJSON responses. Nothing here uses those.
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: dubgrid_redis
+    ports:
+      - "6379:6379"
+    # No persistence: this holds cache entries, rate-limit counters and
+    # revocation markers, all of which are disposable and self-healing.
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-http:
+    image: hiett/serverless-redis-http:latest
+    container_name: dubgrid_redis_http
+    ports:
+      - "8079:80"
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: local_dev_token
+      SRH_CONNECTION_STRING: "redis://redis:6379"
+    depends_on:
+      redis:
+        condition: service_healthy

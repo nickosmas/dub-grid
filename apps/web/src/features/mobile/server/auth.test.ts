@@ -28,6 +28,20 @@ vi.mock("@/lib/feature-flags", () => ({
   isFeatureEnabled: async () => true,
 }));
 
+// Claims now come from local JWKS verification rather than a Supabase Auth
+// call. `getUser` is still mocked below because the MFA-factor check is the
+// one thing that genuinely can't be answered from the token.
+const verifyAccessToken = vi.fn();
+const isSessionRevoked = vi.fn();
+
+vi.mock("@/lib/auth/verify-token", () => ({
+  verifyAccessToken: (...args: unknown[]) => verifyAccessToken(...args),
+}));
+
+vi.mock("@/lib/auth/revocation", () => ({
+  isSessionRevoked: (...args: unknown[]) => isSessionRevoked(...args),
+}));
+
 const ORG_ID = "577a93d3-8f6a-4b45-a93d-b9731122ce11";
 const USER_ID = "8af6f242-c060-4920-a7db-91b4cb66fd26";
 
@@ -63,6 +77,22 @@ function createServiceClient(input?: {
   }>;
 }) {
   const setupComplete = input?.setupComplete ?? true;
+
+  // Keep the locally verified claims in step with what this mock describes,
+  // so call sites configure both through one place.
+  verifyAccessToken.mockResolvedValue({
+    userId: USER_ID,
+    sessionId: "session-1",
+    email: "manager@dubgrid.com",
+    issuedAtMs: Date.now(),
+    claims: {
+      sub: USER_ID,
+      org_id: ORG_ID,
+      platform_role: "none",
+      ...input?.claims,
+    },
+  });
+
   const setupResults: Record<string, unknown> = {
     focus_areas: createSetupResult(
       setupComplete ? [{ id: 1, department_id: 10, archived_at: null }] : [],
@@ -124,6 +154,7 @@ function createServiceClient(input?: {
 describe("requireMobileAuth", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    isSessionRevoked.mockResolvedValue(false);
     fetchMobileOrganizationMembershipRows.mockResolvedValue([
       {
         user_id: USER_ID,
@@ -166,6 +197,38 @@ describe("requireMobileAuth", () => {
     expect(await result.response.json()).toEqual({
       error: "Organization unavailable. Sign in on the web to finish organization setup.",
     });
+  });
+
+  it("rejects a revoked session even though the token still verifies", async () => {
+    getServiceClient.mockReturnValue(createServiceClient({ setupComplete: true }));
+    isSessionRevoked.mockResolvedValue(true);
+
+    const { requireMobileAuth } = await import("./auth");
+    const result = await requireMobileAuth(
+      new Request("http://localhost/api/mobile/v1/bootstrap", {
+        headers: { authorization: "Bearer access-token" },
+      }) as never,
+    );
+
+    expect("response" in result).toBe(true);
+    if (!("response" in result)) return;
+    expect(result.response.status).toBe(401);
+  });
+
+  it("rejects a token that fails local verification", async () => {
+    getServiceClient.mockReturnValue(createServiceClient({ setupComplete: true }));
+    verifyAccessToken.mockResolvedValue(null);
+
+    const { requireMobileAuth } = await import("./auth");
+    const result = await requireMobileAuth(
+      new Request("http://localhost/api/mobile/v1/bootstrap", {
+        headers: { authorization: "Bearer access-token" },
+      }) as never,
+    );
+
+    expect("response" in result).toBe(true);
+    if (!("response" in result)) return;
+    expect(result.response.status).toBe(401);
   });
 
   it("allows mobile auth context once organization setup is complete", async () => {

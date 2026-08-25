@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 
 import { Button } from "@/components/Button";
+import { ButtonLoading } from "@/components/ButtonSpinner";
 import { Form } from "@/components/Form";
 
 /** A promise plus the handle to settle it, so a test can hold work in flight. */
@@ -191,6 +192,75 @@ describe("Button", () => {
     // latches and disables, and its own state change is the feedback.
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(button).toBeDisabled();
+
+    await act(async () => {
+      gate.resolve();
+      await gate.promise;
+    });
+  });
+
+  it("does not add a second spinner when the children already render one", async () => {
+    const gate = deferred();
+    render(
+      <Button onClick={() => gate.promise}>
+        <ButtonLoading loading loadingLabel="Saving">
+          Save
+        </ButtonLoading>
+      </Button>,
+    );
+    const button = screen.getByRole("button");
+    await act(async () => {
+      fireEvent.click(button);
+    });
+
+    // The hand-wired flag and the latch are busy over the same span, so
+    // without deferring to the children this button showed two spinners.
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByText("Saving")).toBeInTheDocument();
+
+    await act(async () => {
+      gate.resolve();
+      await gate.promise;
+    });
+  });
+
+  it("finds a hand-wired spinner nested inside the children", async () => {
+    const gate = deferred();
+    render(
+      <Button onClick={() => gate.promise}>
+        <span>
+          <ButtonLoading loading loadingLabel="Publishing">
+            Publish
+          </ButtonLoading>
+        </span>
+      </Button>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button"));
+    });
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    await act(async () => {
+      gate.resolve();
+      await gate.promise;
+    });
+  });
+
+  it("spins itself when the children's own flag is not covering the work", async () => {
+    const gate = deferred();
+    render(
+      <Button onClick={() => gate.promise}>
+        <ButtonLoading loading={false} loadingLabel="Saving">
+          Save
+        </ButtonLoading>
+      </Button>,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button"));
+    });
+
+    // The children hold a `<ButtonLoading>` but it is not spinning, so
+    // deferring to it blindly would leave the button showing nothing.
+    expect(screen.getAllByRole("status")).toHaveLength(1);
 
     await act(async () => {
       gate.resolve();

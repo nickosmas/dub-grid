@@ -306,6 +306,100 @@ through.
 
 ---
 
+## 4c. Org-Switch on Sign-In (consolidated server-side)
+
+Signing in to a subdomain whose organization isn't the caller's current one is
+resolved inside `POST /api/auth/login`, not by the browser.
+`orchestratePostSignIn` calls `switchSessionToHostOrganization`, which:
+
+1. resolves the subdomain to an org id (service client — this grants nothing on
+   its own),
+2. calls `switch_org` on a token-scoped client — **this is the authorization
+   boundary**, verifying live membership and that the org is active,
+3. refreshes the session, minting the token that actually carries the new org.
+
+Trial activation, sandbox teardown and the terms check then run together in one
+`Promise.allSettled`. The response carries `didSwitchOrg`, and the client does
+only what the server cannot: reset view-as-user, clear the React Query cache,
+and hard-navigate.
+
+**The second token mint is structural.** `switch_org` writes
+`user_sessions.active_org_id` keyed on a `session_id` that does not exist until
+the first token is minted, and the access-token hook only picks the new org up
+on the next mint. Consolidation relocated that mint; it cannot remove it.
+
+**Three things here are load-bearing:**
+
+- The **hard navigation** after a switch. A soft `router.replace` leaves
+  `useOrganizationData`'s one-time org context pinned to the previous org, which
+  destabilises the onboarding gate.
+- **`switch_org` as the authorization check.** The slug lookup must never be
+  treated as one.
+- **The MFA path still switches from the browser** (`findAndSwitchToOrg`),
+  because a second factor is verified directly against Supabase and cannot
+  re-enter this route.
+
+Measured on a seven-organization account: the previous client-orchestrated chain
+(`get_my_organizations` → `switch_org` → refresh → start-trial → sandbox exit →
+terms, then a full page load) was 4.4s of serial round trips; the consolidated
+route is ~0.7s warm.
+
+---
+
+## 5a. Request Authentication: Local JWT Verification + Revocation
+
+Authenticated Route Handlers do **not** call `supabase.auth.getUser()`. That was a
+network round trip to Supabase Auth on every request — paid 3-5× by a single shift
+confirm and 6+ times concurrently by the post-login dashboard fan-out.
+
+Instead, `lib/api-auth.ts`'s `authenticateRequest` does two things:
+
+1. **Verify locally.** `lib/auth/verify-token.ts` checks the token's signature against
+   Supabase's JWKS (ES256), plus `exp`, `iss`, and `aud`. The keyset is module-cached
+   and shared with `middleware.ts`. Tokens arrive either as an `Authorization: Bearer`
+   header (mobile) or the Supabase SSR cookie (web); the cookie path still goes through
+   `getSession()`, which is a local cookie read that only reaches the network to
+   refresh an expired token. There is **no** fallback to an unverified `decodeJwt` —
+   middleware has one because RLS is the real boundary for page navigation, but a route
+   handler acts on these claims.
+2. **Check revocation.** `lib/auth/revocation.ts` reads two Redis markers:
+
+   | Key                                                       | Written on                 | Invalidates  |
+   | --------------------------------------------------------- | -------------------------- | ------------ |
+   | `dg:auth:revoked:session:<session_id>`                    | sign-out, revoke device    | that device  |
+   | `dg:auth:revokedAfter:user:<user_id>` (epoch ms vs `iat`) | employee remove/deactivate | every device |
+
+   Reads are memoized per session for 5s, so a dashboard fan-out costs one Redis round
+   trip. They **fail open** when Redis is unreachable — an Upstash outage must not sign
+   everyone out.
+
+This is why `POST /api/auth/sign-out` exists: sign-out used to be purely client-side,
+which clears the browser's tokens but leaves the access token valid until it expires.
+`signOutFromBrowser` now calls that route first. The same mechanism is what makes
+"revoke this device" real — it previously only deleted the `user_sessions` row and left
+the device fully working.
+
+**Two deliberate exceptions.**
+
+- `requireFreshAuth(req, userId)` re-checks against Supabase Auth over the network, for
+  irreversible or credential-level actions: `delete-account`, `gdpr-erase`,
+  `data-export`. A locally verified token can be up to an hour old, which is fine for
+  ordinary reads and writes and not fine for these.
+- `packages/mobile-api-core/src/auth.ts` still calls `getUser()`, solely to read enrolled
+  MFA factors. `auth.mfa_factors` is not exposed through PostgREST and factors are not in
+  the JWT, so there is no local answer to "does this user have a verified factor?", and
+  without it a password-only (aal1) token would satisfy an MFA-enrolled user.
+  `profiles.mfa_enabled` is **not** a substitute — the client writes it after enrolling,
+  so a stale `false` reopens the bypass.
+
+**Authentication is not authorization.** Local verification answers "who is this?" only.
+Org access is still resolved per request by `requireOrgPermissions` against
+`organization_memberships`, and the effective org by `resolveEffectiveOrgId` — never
+from a client-supplied org id and never from a JWT claim alone. That separation is what
+makes an hour-stale token safe.
+
+---
+
 ## 6. Branded Email Templates
 
 Shared email template system in `apps/web/src/lib/email.ts`:
