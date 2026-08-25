@@ -249,7 +249,7 @@ const eslintConfig = defineConfig([
           object: "process",
           property: "env",
           message:
-            'Import validated env vars from "@/lib/env" (serverEnv/clientEnv) instead of reading process.env directly.',
+            'Import validated env vars instead of reading process.env directly: clientEnv from "@/lib/env", or serverEnv from "@/lib/env.server" (server-only — importing it from a client component ships the server schema to the browser).',
         },
       ],
     },
