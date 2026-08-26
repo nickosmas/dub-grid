@@ -405,6 +405,19 @@ describe("mobileApiRequest", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("uses the native model and app version, with safe platform fallbacks", async () => {
+    const { getNativeSessionMetadata } = await import("./api");
+
+    expect(getNativeSessionMetadata("ios", "iPhone 16 Pro", "1.4.0")).toEqual({
+      deviceLabel: "iPhone 16 Pro",
+      appVersion: "1.4.0",
+    });
+    expect(getNativeSessionMetadata("android", null, null)).toEqual({
+      deviceLabel: "Android device",
+      appVersion: null,
+    });
+  });
+
   it("loads profile notification preferences through the mobile profile endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -441,7 +454,11 @@ describe("mobileApiRequest", () => {
               platform: "ios",
               appVersion: null,
               deviceLabel: "DubGrid Mobile on iOS",
+              browserName: null,
+              browserVersion: null,
               ipAddress: null,
+              locationCity: null,
+              locationCountry: null,
               lastActiveAt: "2024-01-03T00:00:00.000Z",
               createdAt: "2024-01-01T00:00:00.000Z",
               refreshTokenHash: "hash",

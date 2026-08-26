@@ -13,6 +13,7 @@ import {
   signOutFromBrowser,
   subscribeToBrowserAuthChanges,
 } from "@/features/account/client";
+import { getWebSessionMetadata } from "@/features/account/client/session-metadata";
 
 /**
  * Track session via API route so the server can capture the client IP address.
@@ -20,31 +21,13 @@ import {
  * mobile sessions share the same registry.
  */
 async function trackSession() {
-  const deviceLabel = parseUserAgent(navigator.userAgent);
+  const { deviceLabel, browserName, browserVersion } = getWebSessionMetadata(navigator.userAgent);
 
   await fetch("/api/auth/track-session", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ platform: "web", deviceLabel }),
+    body: JSON.stringify({ platform: "web", deviceLabel, browserName, browserVersion }),
   });
-}
-
-function parseUserAgent(ua: string): string {
-  // Extract browser + OS from user agent string
-  let browser = "Unknown";
-  if (ua.includes("Firefox/")) browser = "Firefox";
-  else if (ua.includes("Edg/")) browser = "Edge";
-  else if (ua.includes("Chrome/") && !ua.includes("Edg/")) browser = "Chrome";
-  else if (ua.includes("Safari/") && !ua.includes("Chrome/")) browser = "Safari";
-
-  let os = "Unknown";
-  if (ua.includes("Mac OS")) os = "macOS";
-  else if (ua.includes("Windows")) os = "Windows";
-  else if (ua.includes("Linux")) os = "Linux";
-  else if (ua.includes("Android")) os = "Android";
-  else if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
-
-  return `${browser} on ${os}`;
 }
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {

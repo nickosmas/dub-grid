@@ -34,7 +34,11 @@ export interface AccountSessionRecord {
   platform: "web" | "ios" | "android" | null;
   appVersion: string | null;
   deviceLabel: string | null;
+  browserName: string | null;
+  browserVersion: string | null;
   ipAddress: string | null;
+  locationCity: string | null;
+  locationCountry: string | null;
   lastActiveAt: string;
   createdAt: string;
   refreshTokenHash: string;

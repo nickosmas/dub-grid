@@ -16,7 +16,11 @@ export interface UserSessionRecord {
   platform: UserSessionPlatform | null;
   appVersion: string | null;
   deviceLabel: string | null;
+  browserName: string | null;
+  browserVersion: string | null;
   ipAddress: string | null;
+  locationCity: string | null;
+  locationCountry: string | null;
   lastActiveAt: string;
   createdAt: string;
   refreshTokenHash: string;
@@ -29,7 +33,11 @@ export interface TrackUserSessionInput {
   platform: UserSessionPlatform;
   deviceLabel: string;
   appVersion?: string | null;
+  browserName?: string | null;
+  browserVersion?: string | null;
   ipAddress?: string | null;
+  locationCity?: string | null;
+  locationCountry?: string | null;
 }
 
 interface FetchUserSessionsOptions {
@@ -56,7 +64,7 @@ export async function fetchUserSessionsForUser(
   let query = getServiceClient()
     .from("user_sessions")
     .select(
-      "id, user_id, org_id, supabase_session_id, platform, app_version, device_label, ip_address, last_active_at, created_at, refresh_token_hash",
+      "id, user_id, org_id, supabase_session_id, platform, app_version, device_label, browser_name, browser_version, ip_address, location_city, location_country, last_active_at, created_at, refresh_token_hash",
     )
     .eq("user_id", userId)
     // Filter partial rows created by switch_org before track-session fills in
@@ -83,7 +91,11 @@ export async function fetchUserSessionsForUser(
     platform: isUserSessionPlatform(row.platform) ? row.platform : null,
     appVersion: (row.app_version as string | null) ?? null,
     deviceLabel: (row.device_label as string | null) ?? null,
+    browserName: (row.browser_name as string | null) ?? null,
+    browserVersion: (row.browser_version as string | null) ?? null,
     ipAddress: (row.ip_address as string | null) ?? null,
+    locationCity: (row.location_city as string | null) ?? null,
+    locationCountry: (row.location_country as string | null) ?? null,
     lastActiveAt: row.last_active_at as string,
     createdAt: row.created_at as string,
     refreshTokenHash: row.refresh_token_hash as string,
@@ -158,7 +170,11 @@ export async function trackUserSessionForUser(input: TrackUserSessionInput): Pro
         platform: input.platform,
         app_version: input.appVersion ?? null,
         device_label: input.deviceLabel,
+        browser_name: input.browserName ?? null,
+        browser_version: input.browserVersion ?? null,
         ip_address: input.ipAddress ?? null,
+        location_city: input.locationCity ?? null,
+        location_country: input.locationCountry ?? null,
         last_active_at: new Date().toISOString(),
       },
       { onConflict: "supabase_session_id" },

@@ -68,6 +68,8 @@ import {
   createHeaders,
   createJsonApiRequest,
 } from "@dubgrid/api-client";
+import Constants from "expo-constants";
+import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { getMobileEnvConfig } from "./env";
 
@@ -543,6 +545,12 @@ export function registerMobileSessionPresence(accessToken: string): Promise<{ su
     return Promise.resolve({ success: true });
   }
 
+  const metadata = getNativeSessionMetadata(
+    platform,
+    Device.modelName,
+    Constants.expoConfig?.version,
+  );
+
   return mobileApiRequest(
     "/api/mobile/v1/session-presence",
     accessToken,
@@ -550,7 +558,8 @@ export function registerMobileSessionPresence(accessToken: string): Promise<{ su
       method: "POST",
       body: JSON.stringify({
         platform,
-        deviceLabel: `DubGrid Mobile on ${platform === "ios" ? "iOS" : "Android"}`,
+        deviceLabel: metadata.deviceLabel,
+        ...(metadata.appVersion ? { appVersion: metadata.appVersion } : {}),
       }),
     },
     (value) => {
@@ -565,6 +574,17 @@ export function registerMobileSessionPresence(accessToken: string): Promise<{ su
       throw new Error("We couldn't update your session status.");
     },
   );
+}
+
+export function getNativeSessionMetadata(
+  platform: "ios" | "android",
+  modelName: string | null | undefined,
+  appVersion: string | null | undefined,
+): { deviceLabel: string; appVersion: string | null } {
+  return {
+    deviceLabel: modelName?.trim() || (platform === "ios" ? "iPhone" : "Android device"),
+    appVersion: appVersion?.trim() || null,
+  };
 }
 
 export function getMySchedule(accessToken: string, query?: MobileScheduleRange) {

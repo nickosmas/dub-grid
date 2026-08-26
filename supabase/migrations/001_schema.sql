@@ -836,7 +836,11 @@ CREATE TABLE public.user_sessions (
   platform           TEXT,
   app_version        TEXT,
   device_label       TEXT,
+  browser_name       TEXT,
+  browser_version    TEXT,
   ip_address         INET,
+  location_city      TEXT,
+  location_country   TEXT,
   last_active_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   refresh_token_hash TEXT UNIQUE
@@ -848,8 +852,12 @@ COMMENT ON COLUMN public.user_sessions.active_org_id IS 'Authoritative per-sessi
 COMMENT ON COLUMN public.user_sessions.supabase_session_id IS 'Supabase auth session_id claim for correlating web and mobile sessions';
 COMMENT ON COLUMN public.user_sessions.platform IS 'Client platform for the session (web, ios, android)';
 COMMENT ON COLUMN public.user_sessions.app_version IS 'Client application version when reported';
-COMMENT ON COLUMN public.user_sessions.device_label IS 'User-friendly device identifier (e.g., "Chrome on MacOS")';
-COMMENT ON COLUMN public.user_sessions.ip_address IS 'IP address of the device at session creation';
+COMMENT ON COLUMN public.user_sessions.device_label IS 'User-friendly device identifier (e.g., "iPhone" or "Macintosh")';
+COMMENT ON COLUMN public.user_sessions.browser_name IS 'Browser name reported by web session presence';
+COMMENT ON COLUMN public.user_sessions.browser_version IS 'Browser version reported by web session presence';
+COMMENT ON COLUMN public.user_sessions.ip_address IS 'IP address last observed during session presence';
+COMMENT ON COLUMN public.user_sessions.location_city IS 'Approximate city from trusted hosting geo headers at last session presence';
+COMMENT ON COLUMN public.user_sessions.location_country IS 'Approximate country from trusted hosting geo headers at last session presence';
 COMMENT ON COLUMN public.user_sessions.refresh_token_hash IS 'Hashed refresh token for session identification. UNIQUE prevents duplicates; NULL allowed for rows created by switch_org before the client first calls track-session';
 
 ALTER TABLE ONLY public.user_sessions REPLICA IDENTITY FULL;

@@ -8,6 +8,8 @@ import { Button } from "../../../shared/components/Button";
 import { ProfileInfoRow, ProfileList } from "./ProfilePrimitives";
 import {
   formatSessionDeviceLabel,
+  formatSessionClient,
+  formatSessionLocation,
   formatSessionPlatform,
   formatSessionTimestamp,
 } from "./session-format";
@@ -55,13 +57,13 @@ export function SessionDetailSheet({
             />
             <ProfileInfoRow
               iconName="cube-outline"
-              label="App version"
-              value={session.appVersion ?? "Not recorded"}
+              label={session.platform === "web" ? "Browser" : "App"}
+              value={formatSessionClient(session)}
             />
             <ProfileInfoRow
               iconName="globe-outline"
               label="IP address"
-              value={session.ipAddress ?? "Not recorded"}
+              value={formatSessionLocation(session)}
             />
             <ProfileInfoRow
               iconName="log-in-outline"
