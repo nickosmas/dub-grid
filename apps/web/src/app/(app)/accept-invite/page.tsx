@@ -74,7 +74,6 @@ function AcceptInviteContent() {
     if (!slug) return "/login";
     if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(slug)) return "/login";
     const parsed = parseHost(window.location.host);
-    // Already on this org's subdomain — use relative redirect
     if (parsed.subdomain === slug) return "/login";
     const host = buildSubdomainHost(slug, parsed);
     return `${window.location.protocol}//${host}/login`;
@@ -196,7 +195,7 @@ function AcceptInviteContent() {
     <PageShell>
       <Card>
         {/* Logo */}
-        <div className="dg-auth-logo-block" style={{ gap: "8px" }}>
+        <div className="dg-auth-logo-block dg-auth-logo-block--compact">
           <DubGridLogo size={44} />
           <DubGridWordmark />
         </div>
@@ -223,18 +222,8 @@ function AcceptInviteContent() {
           <SuccessState orgSlug={orgSlug} getLoginUrl={getLoginUrl} />
         ) : (
           <>
-            <h1 className="dg-auth-heading" style={{ marginBottom: "8px" }}>
-              Accept Invitation
-            </h1>
-            <p
-              style={{
-                fontSize: "var(--dg-fs-body-sm)",
-                color: "var(--color-text-muted)",
-                lineHeight: 1.5,
-                textAlign: "center",
-                marginBottom: "24px",
-              }}
-            >
+            <h1 className="dg-auth-heading dg-auth-page-heading">Accept Invitation</h1>
+            <p className="dg-auth-description">
               {existingAccount ? (
                 orgName ? (
                   <>
@@ -252,10 +241,7 @@ function AcceptInviteContent() {
               )}
             </p>
 
-            <Form
-              onSubmit={handleSubmit}
-              style={{ display: "flex", flexDirection: "column", gap: 16 }}
-            >
+            <Form onSubmit={handleSubmit} className="dg-auth-form">
               <div>
                 <label htmlFor="invite-email" className="dg-auth-field-label">
                   Email
@@ -264,20 +250,12 @@ function AcceptInviteContent() {
                   id="invite-email"
                   type="email"
                   placeholder="you@example.com"
-                  className="dg-auth-input"
+                  className={`dg-auth-input${emailFromUrl ? " dg-auth-input--readonly" : ""}`}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   readOnly={emailFromUrl}
                   autoComplete="email"
-                  style={
-                    emailFromUrl
-                      ? {
-                          background: "var(--color-bg-secondary)",
-                          color: "var(--color-text-subtle)",
-                        }
-                      : undefined
-                  }
                 />
               </div>
 
@@ -307,12 +285,8 @@ function AcceptInviteContent() {
                   <PasswordStrength password={password} />
                 )}
                 {existingAccount && (
-                  <div style={{ textAlign: "right", marginTop: "2px" }}>
-                    <a
-                      href="/forgot-password"
-                      className="dg-auth-link"
-                      style={{ color: "var(--color-text-subtle)" }}
-                    >
+                  <div className="dg-auth-forgot">
+                    <a href="/forgot-password" className="dg-auth-link dg-auth-link--subtle">
                       Forgot password?
                     </a>
                   </div>
@@ -356,27 +330,12 @@ function AcceptInviteContent() {
                 </p>
               )}
 
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 10,
-                  cursor: "pointer",
-                  fontSize: "var(--dg-fs-body-sm)",
-                  color: "var(--color-text-secondary)",
-                }}
-              >
+              <label className="dg-auth-agreement">
                 <input
                   type="checkbox"
                   checked={termsAccepted}
                   onChange={(e) => setTermsAccepted(e.target.checked)}
-                  style={{
-                    width: 18,
-                    height: 18,
-                    marginTop: 2,
-                    accentColor: "var(--color-brand)",
-                    cursor: "pointer",
-                  }}
+                  className="dg-auth-agreement-checkbox"
                 />
                 <span>
                   I agree to the{" "}
@@ -384,7 +343,7 @@ function AcceptInviteContent() {
                     href="/terms"
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+                    className="dg-auth-policy-link"
                   >
                     Terms of Service
                   </a>{" "}
@@ -393,7 +352,7 @@ function AcceptInviteContent() {
                     href="/privacy"
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+                    className="dg-auth-policy-link"
                   >
                     Privacy Policy
                   </a>
@@ -403,13 +362,12 @@ function AcceptInviteContent() {
               <button
                 type="submit"
                 disabled={loading || !termsAccepted || !canSubmit}
-                className="dg-btn dg-btn-primary dg-btn-lg"
-                style={{ marginTop: "4px", width: "100%" }}
+                className="dg-btn dg-btn-primary dg-btn-lg dg-auth-submit"
               >
                 <ButtonLoading
                   loading={loading}
                   loadingLabel={existingAccount ? "Signing In" : "Setting Password"}
-                  spinnerColor="var(--color-text-inverse)"
+                  spinnerColor="var(--dg-color-text-inverse)"
                   spinnerSize={20}
                 >
                   {existingAccount ? "Sign In & Accept" : "Set Password & Accept"}

@@ -8,9 +8,9 @@ export default function DashboardLoading() {
           display: "grid",
           gap: 12,
           padding: "20px",
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           borderRadius: "var(--dg-radius-md)",
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
         }}
       >
         <Skeleton className="dg-skeleton dg-skeleton--pill" style={{ width: "22%", height: 20 }} />

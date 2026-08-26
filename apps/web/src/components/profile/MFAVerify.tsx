@@ -83,7 +83,11 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
         </div>
 
         {orgSlug && baseDomain && (
-          <OrganizationBadge slug={orgSlug} baseDomain={baseDomain} style={{ marginBottom: 20 }} />
+          <OrganizationBadge
+            slug={orgSlug}
+            baseDomain={baseDomain}
+            className="dg-auth-badge-wrap--compact"
+          />
         )}
 
         <div
@@ -101,7 +105,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
               marginBottom: 8,
             }}
           >
-            <ShieldCheck size={32} style={{ color: "var(--color-brand)", flexShrink: 0 }} />
+            <ShieldCheck size={32} style={{ color: "var(--dg-color-brand)", flexShrink: 0 }} />
             <h1 className="dg-auth-heading" style={{ marginBottom: 0 }}>
               Two-factor authentication
             </h1>
@@ -109,7 +113,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
           <p
             style={{
               fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               margin: 0,
             }}
           >
@@ -138,22 +142,22 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
             style={{
               width: 200,
               padding: "14px 16px",
-              border: `2px solid ${error ? "var(--color-danger)" : "var(--color-brand)"}`,
+              border: `2px solid ${error ? "var(--dg-color-danger)" : "var(--dg-color-brand)"}`,
               borderRadius: "var(--dg-btn-radius)",
               fontSize: 24,
               fontFamily: "monospace",
               letterSpacing: "0.25em",
               textAlign: "center",
               outline: "none",
-              color: "var(--color-text-primary)",
-              background: "var(--color-surface)",
+              color: "var(--dg-color-text-primary)",
+              background: "var(--dg-color-surface)",
             }}
           />
 
           {error && (
             <p
               style={{
-                color: "var(--color-danger-dark)",
+                color: "var(--dg-color-danger-dark)",
                 fontSize: "var(--dg-fs-body-sm)",
                 margin: 0,
                 textAlign: "center",
@@ -172,7 +176,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
             <ButtonLoading
               loading={loading}
               loadingLabel="Verifying"
-              spinnerColor="var(--color-text-inverse)"
+              spinnerColor="var(--dg-color-text-inverse)"
               spinnerSize={20}
             >
               Verify
@@ -185,7 +189,7 @@ export function MFAVerify({ onVerified, onCancel, orgSlug, baseDomain }: MFAVeri
             type="button"
             onClick={onCancel}
             className="dg-auth-link"
-            style={{ color: "var(--color-text-subtle)" }}
+            style={{ color: "var(--dg-color-text-subtle)" }}
           >
             &larr; Back to login
           </Button>

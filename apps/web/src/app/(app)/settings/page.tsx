@@ -16,9 +16,9 @@ function BillingRecoverySettings({ orgId }: { orgId: string }) {
     <div
       style={{
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "var(--color-bg)",
+        background: "var(--dg-color-bg)",
         minHeight: "100vh",
-        color: "var(--color-text-primary)",
+        color: "var(--dg-color-text-primary)",
       }}
     >
       <ProgressBar loading={false} />
@@ -132,7 +132,7 @@ function SettingsPageContent() {
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
       >
-        <p style={{ color: "var(--color-text-muted)" }}>{loadError}</p>
+        <p style={{ color: "var(--dg-color-text-muted)" }}>{loadError}</p>
       </div>
     );
   }
@@ -141,9 +141,9 @@ function SettingsPageContent() {
     <div
       style={{
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "var(--color-bg)",
+        background: "var(--dg-color-bg)",
         minHeight: "100vh",
-        color: "var(--color-text-primary)",
+        color: "var(--dg-color-text-primary)",
       }}
     >
       <ProgressBar loading={isLoading} />

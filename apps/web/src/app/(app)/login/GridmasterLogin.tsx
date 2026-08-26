@@ -148,17 +148,7 @@ export default function GridmasterLogin() {
         <Card>
           <a href={landingUrl} className="dg-auth-logo-block">
             <DubGridLogo size={52} />
-            <span
-              style={{
-                fontSize: "var(--dg-fs-caption)",
-                fontWeight: 600,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--color-text-subtle)",
-              }}
-            >
-              Gridmaster Portal
-            </span>
+            <span className="dg-auth-portal-label">Gridmaster Portal</span>
           </a>
 
           <h1 className="dg-auth-heading">Platform Admin Sign In</h1>
@@ -176,15 +166,7 @@ export default function GridmasterLogin() {
           />
 
           {/* Navigation links */}
-          <div
-            style={{
-              marginTop: "20px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "10px",
-            }}
-          >
+          <div className="dg-auth-login-navigation">
             <a
               href={`${protocol}//${parsed?.rootDomain ?? "localhost"}${parsed?.port ?? ""}/login`}
               className="dg-auth-link"

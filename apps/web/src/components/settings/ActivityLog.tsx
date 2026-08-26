@@ -56,19 +56,19 @@ const TH_STYLE: React.CSSProperties = {
   textAlign: "left",
   padding: "8px 12px",
   fontWeight: 600,
-  color: "var(--color-text-muted)",
+  color: "var(--dg-color-text-muted)",
   fontSize: "var(--dg-fs-footnote)",
   textTransform: "uppercase",
   letterSpacing: "0.05em",
   whiteSpace: "nowrap",
-  borderBottom: "1px solid var(--color-border)",
+  borderBottom: "1px solid var(--dg-color-border)",
 };
 
 const TD_STYLE: React.CSSProperties = {
   padding: "10px 12px",
   fontSize: "var(--dg-fs-body-sm)",
   verticalAlign: "top",
-  borderBottom: "1px solid var(--color-border-light)",
+  borderBottom: "1px solid var(--dg-color-border-light)",
 };
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ function Toolbar({
             left: 10,
             top: "50%",
             transform: "translateY(-50%)",
-            color: "var(--color-text-faint)",
+            color: "var(--dg-color-text-faint)",
             display: "flex",
             pointerEvents: "none",
           }}
@@ -125,10 +125,10 @@ function Toolbar({
             width: "100%",
             padding: `7px ${searchQuery ? 30 : 12}px 7px 32px`,
             borderRadius: "var(--dg-radius-md, 8px)",
-            border: "1px solid var(--color-border)",
-            background: "var(--color-surface)",
+            border: "1px solid var(--dg-color-border)",
+            background: "var(--dg-color-surface)",
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             outline: "none",
           }}
         />
@@ -161,11 +161,11 @@ function DateGroupRow({ label, colSpan }: { label: string; colSpan: number }) {
           padding: "14px 12px 6px",
           fontSize: "var(--dg-fs-footnote)",
           fontWeight: 700,
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           textTransform: "uppercase",
           letterSpacing: "0.06em",
-          background: "var(--color-bg)",
-          borderBottom: "1px solid var(--color-border-light)",
+          background: "var(--dg-color-bg)",
+          borderBottom: "1px solid var(--dg-color-border-light)",
         }}
       >
         {label}
@@ -202,7 +202,7 @@ function DetailsCell({ description, details }: { description: string; details: D
       <div
         style={{
           fontWeight: 500,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           marginBottom: hasDetails ? 2 : 0,
         }}
       >
@@ -212,14 +212,14 @@ function DetailsCell({ description, details }: { description: string; details: D
         <div
           style={{
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             lineHeight: 1.5,
           }}
         >
           {details.map((item, i) => (
             <span key={i}>
               {i > 0 && (
-                <span style={{ margin: "0 4px", color: "var(--color-text-faint)" }}>·</span>
+                <span style={{ margin: "0 4px", color: "var(--dg-color-text-faint)" }}>·</span>
               )}
               <span style={{ fontWeight: 600 }}>{item.label}:</span> {item.value}
             </span>
@@ -234,9 +234,9 @@ function IdentityStack({ primary, secondary }: { primary: string; secondary?: st
   const showSecondary = secondary && secondary !== primary;
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>{primary}</div>
+      <div style={{ color: "var(--dg-color-text-primary)", fontWeight: 600 }}>{primary}</div>
       {showSecondary && (
-        <div style={{ color: "var(--color-text-muted)", fontSize: "var(--dg-fs-footnote)" }}>
+        <div style={{ color: "var(--dg-color-text-muted)", fontSize: "var(--dg-fs-footnote)" }}>
           {secondary}
         </div>
       )}
@@ -268,7 +268,7 @@ function Pagination({
         alignItems: "center",
         padding: "12px 0 4px",
         fontSize: "var(--dg-fs-footnote)",
-        color: "var(--color-text-muted)",
+        color: "var(--dg-color-text-muted)",
       }}
     >
       <span>
@@ -307,7 +307,7 @@ function SkeletonTable() {
             display: "flex",
             gap: 16,
             padding: "12px 0",
-            borderBottom: "1px solid var(--color-border-light)",
+            borderBottom: "1px solid var(--dg-color-border-light)",
           }}
         >
           <div className="dg-skeleton" style={{ width: 80, height: 12, borderRadius: 4 }} />
@@ -399,7 +399,9 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
 
   if (error) {
     return (
-      <div style={{ textAlign: "center", padding: 40, color: "var(--color-danger)" }}>{error}</div>
+      <div style={{ textAlign: "center", padding: 40, color: "var(--dg-color-danger)" }}>
+        {error}
+      </div>
     );
   }
 
@@ -470,7 +472,7 @@ export default function ActivityLog({ orgId }: { orgId: string }) {
                             style={{
                               ...TD_STYLE,
                               whiteSpace: "nowrap",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                             }}
                           >
                             {formatRelativeTime(entry.createdAt)}

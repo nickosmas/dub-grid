@@ -14,29 +14,29 @@ interface StatusPillProps {
 
 const TONE_VARS: Record<StatusPillTone, { bg: string; text: string; border: string }> = {
   success: {
-    bg: "var(--color-success-bg)",
-    text: "var(--color-success-text)",
-    border: "var(--color-success-border)",
+    bg: "var(--dg-color-success-bg)",
+    text: "var(--dg-color-success-text)",
+    border: "var(--dg-color-success-border)",
   },
   warning: {
-    bg: "var(--color-warning-bg)",
-    text: "var(--color-warning-text)",
-    border: "var(--color-warning-border)",
+    bg: "var(--dg-color-warning-bg)",
+    text: "var(--dg-color-warning-text)",
+    border: "var(--dg-color-warning-border)",
   },
   danger: {
-    bg: "var(--color-danger-bg)",
-    text: "var(--color-danger-text)",
-    border: "var(--color-danger-border)",
+    bg: "var(--dg-color-danger-bg)",
+    text: "var(--dg-color-danger-text)",
+    border: "var(--dg-color-danger-border)",
   },
   info: {
-    bg: "var(--color-info-bg)",
-    text: "var(--color-info-text)",
-    border: "var(--color-info-border)",
+    bg: "var(--dg-color-info-bg)",
+    text: "var(--dg-color-info-text)",
+    border: "var(--dg-color-info-border)",
   },
   neutral: {
-    bg: "var(--color-bg-secondary)",
-    text: "var(--color-text-secondary)",
-    border: "var(--color-border-light)",
+    bg: "var(--dg-color-bg-secondary)",
+    text: "var(--dg-color-text-secondary)",
+    border: "var(--dg-color-border-light)",
   },
 };
 

@@ -443,7 +443,9 @@ export function OverviewTab({
         >
           <span>Custom Labels</span>
           {editing && (
-            <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-subtle)" }}>
+            <span
+              style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-subtle)" }}
+            >
               Editing above
             </span>
           )}
@@ -509,7 +511,7 @@ export function OverviewTab({
                   href={`https://dashboard.stripe.com/customers/${organization.stripeCustomerId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "var(--color-today-text)", textDecoration: "underline" }}
+                  style={{ color: "var(--dg-color-today-text)", textDecoration: "underline" }}
                 >
                   {organization.stripeCustomerId}
                 </a>
@@ -525,16 +527,18 @@ export function OverviewTab({
       <div
         style={{
           ...sectionStyle,
-          borderColor: organization.archivedAt ? "var(--color-warning)" : "var(--color-danger)",
+          borderColor: organization.archivedAt
+            ? "var(--dg-color-warning)"
+            : "var(--dg-color-danger)",
         }}
       >
         <div
           style={{
             ...sectionHeaderStyle,
             borderBottomColor: organization.archivedAt
-              ? "var(--color-warning)"
-              : "var(--color-danger)",
-            color: organization.archivedAt ? "var(--color-warning)" : "var(--color-danger)",
+              ? "var(--dg-color-warning)"
+              : "var(--dg-color-danger)",
+            color: organization.archivedAt ? "var(--dg-color-warning)" : "var(--dg-color-danger)",
           }}
         >
           Danger Zone
@@ -552,13 +556,13 @@ export function OverviewTab({
               style={{
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
                 marginBottom: 4,
               }}
             >
               {organization.archivedAt ? "Restore this organization" : "Archive this organization"}
             </div>
-            <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+            <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
               {organization.archivedAt
                 ? "Restoring will make this organization active again."
                 : "Archiving hides the organization from active listings. Data is preserved."}
@@ -595,14 +599,16 @@ export function OverviewTab({
       <div
         style={{
           ...sectionStyle,
-          borderColor: organization.suspendedAt ? "var(--color-warning)" : "var(--color-border)",
+          borderColor: organization.suspendedAt
+            ? "var(--dg-color-warning)"
+            : "var(--dg-color-border)",
         }}
       >
         <div
           style={{
             ...sectionHeaderStyle,
-            borderBottomColor: organization.suspendedAt ? "var(--color-warning)" : undefined,
-            color: organization.suspendedAt ? "var(--color-warning)" : undefined,
+            borderBottomColor: organization.suspendedAt ? "var(--dg-color-warning)" : undefined,
+            color: organization.suspendedAt ? "var(--dg-color-warning)" : undefined,
           }}
         >
           Suspension
@@ -622,7 +628,7 @@ export function OverviewTab({
                   style={{
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 600,
-                    color: "var(--color-warning)",
+                    color: "var(--dg-color-warning)",
                     marginBottom: 4,
                   }}
                 >
@@ -630,7 +636,10 @@ export function OverviewTab({
                 </div>
                 {organization.suspendedReason && (
                   <div
-                    style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}
+                    style={{
+                      fontSize: "var(--dg-fs-caption)",
+                      color: "var(--dg-color-text-muted)",
+                    }}
                   >
                     Reason: {organization.suspendedReason}
                   </div>
@@ -654,13 +663,15 @@ export function OverviewTab({
                   style={{
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 600,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     marginBottom: 4,
                   }}
                 >
                   Suspend this organization
                 </div>
-                <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+                <div
+                  style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}
+                >
                   Suspending blocks all members from accessing the app. Data is preserved.
                 </div>
               </div>

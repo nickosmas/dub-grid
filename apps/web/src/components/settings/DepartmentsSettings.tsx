@@ -51,10 +51,10 @@ const fieldStyle: React.CSSProperties = {
   padding: "7px 10px",
   fontSize: "var(--dg-fs-label)",
   fontWeight: 500,
-  border: "1px solid var(--color-border)",
+  border: "1px solid var(--dg-color-border)",
   borderRadius: 6,
-  background: "var(--color-surface)",
-  color: "var(--color-text-primary)",
+  background: "var(--dg-color-surface)",
+  color: "var(--dg-color-text-primary)",
   outline: "none",
   transition: "border-color 150ms ease, box-shadow 150ms ease",
 };
@@ -167,8 +167,22 @@ function FocusAreaRows({
               />
             ) : (
               <svg width="20" height="16" viewBox="0 0 20 16" fill="none" style={{ flexShrink: 0 }}>
-                <line x1="4" y1="0" x2="4" y2="16" stroke="var(--color-border)" strokeWidth="1.5" />
-                <line x1="4" y1="8" x2="20" y2="8" stroke="var(--color-border)" strokeWidth="1.5" />
+                <line
+                  x1="4"
+                  y1="0"
+                  x2="4"
+                  y2="16"
+                  stroke="var(--dg-color-border)"
+                  strokeWidth="1.5"
+                />
+                <line
+                  x1="4"
+                  y1="8"
+                  x2="20"
+                  y2="8"
+                  stroke="var(--dg-color-border)"
+                  strokeWidth="1.5"
+                />
               </svg>
             )}
             {isEditing ? (
@@ -183,7 +197,7 @@ function FocusAreaRows({
                   style={{
                     ...fieldStyle,
                     flex: 1,
-                    ...(focusAreaErrors[fa.id] ? { borderColor: "var(--color-danger)" } : {}),
+                    ...(focusAreaErrors[fa.id] ? { borderColor: "var(--dg-color-danger)" } : {}),
                   }}
                 />
                 {focusAreaErrors[fa.id] ? (
@@ -192,7 +206,7 @@ function FocusAreaRows({
                     style={{
                       marginTop: 4,
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                     }}
                   >
                     {focusAreaErrors[fa.id]}
@@ -204,7 +218,7 @@ function FocusAreaRows({
                 style={{
                   fontSize: "var(--dg-fs-label)",
                   fontWeight: 500,
-                  color: "var(--color-text-secondary)",
+                  color: "var(--dg-color-text-secondary)",
                   flex: 1,
                 }}
               >
@@ -220,10 +234,10 @@ function FocusAreaRows({
                 }}
                 style={{
                   background: "none",
-                  border: "1px solid var(--color-danger-border, #FECACA)",
+                  border: "1px solid var(--dg-color-danger-border, #FECACA)",
                   borderRadius: 8,
                   cursor: "pointer",
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                   padding: "5px 10px",
                   fontSize: "var(--dg-fs-caption)",
                   fontWeight: 600,
@@ -232,7 +246,7 @@ function FocusAreaRows({
                   transition: "background 150ms, color 150ms",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)";
+                  e.currentTarget.style.background = "var(--dg-color-danger-bg, #FEF2F2)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "none";
@@ -843,7 +857,7 @@ function DepartmentSection({
           </ButtonLoading>
         </Button>
       }
-      style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}
+      style={{ padding: "12px 16px", borderTop: "1px solid var(--dg-color-border-light)" }}
     />
   ) : canEdit && displayList.length > 0 ? (
     <EditorActionRow
@@ -852,7 +866,7 @@ function DepartmentSection({
           Edit
         </Button>
       }
-      style={{ padding: "12px 16px", borderTop: "1px solid var(--color-border-light)" }}
+      style={{ padding: "12px 16px", borderTop: "1px solid var(--dg-color-border-light)" }}
     />
   ) : null;
 
@@ -866,7 +880,7 @@ function DepartmentSection({
           justifyContent: "space-between",
           gap: 12,
           padding: "16px 16px 14px",
-          borderBottom: "1px solid var(--color-border-light)",
+          borderBottom: "1px solid var(--dg-color-border-light)",
         }}
       >
         <div>
@@ -874,7 +888,7 @@ function DepartmentSection({
             style={{
               fontSize: "var(--dg-fs-body)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               margin: 0,
             }}
           >
@@ -883,7 +897,7 @@ function DepartmentSection({
           <p
             style={{
               fontSize: "var(--dg-fs-label)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               margin: "4px 0 0",
             }}
           >
@@ -932,7 +946,7 @@ function DepartmentSection({
               >
                 {/* Divider between scheduled department groups */}
                 {type === "scheduled" && i > 0 && (
-                  <div style={{ borderTop: "1px solid var(--color-border-light)" }} />
+                  <div style={{ borderTop: "1px solid var(--dg-color-border-light)" }} />
                 )}
 
                 {/* Department row */}
@@ -945,7 +959,7 @@ function DepartmentSection({
                     padding: isEditing ? "10px 16px" : "11px 16px",
                     borderBottom:
                       type === "management" && i < displayList.length - 1
-                        ? "1px solid var(--color-border-light)"
+                        ? "1px solid var(--dg-color-border-light)"
                         : "none",
                     cursor: isEditing ? "grab" : "default",
                     userSelect: isEditing ? "none" : undefined,
@@ -977,7 +991,7 @@ function DepartmentSection({
                           ...fieldStyle,
                           flex: 1,
                           ...(departmentErrors[i]?.name
-                            ? { borderColor: "var(--color-danger)" }
+                            ? { borderColor: "var(--dg-color-danger)" }
                             : {}),
                         }}
                       />
@@ -987,7 +1001,7 @@ function DepartmentSection({
                           style={{
                             marginTop: 4,
                             fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--color-danger)",
+                            color: "var(--dg-color-danger)",
                           }}
                         >
                           {departmentErrors[i]?.name}
@@ -1000,13 +1014,13 @@ function DepartmentSection({
                         style={{
                           fontSize: "var(--dg-fs-label)",
                           fontWeight: 600,
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                         }}
                       >
                         {dept.name || (
                           <span
                             style={{
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                               fontStyle: "italic",
                               fontWeight: 400,
                             }}
@@ -1021,7 +1035,7 @@ function DepartmentSection({
                         <span
                           style={{
                             fontSize: "var(--dg-fs-caption)",
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           {childFAs.length} {focusAreaLabel.toLowerCase()}
@@ -1043,10 +1057,10 @@ function DepartmentSection({
                       }}
                       style={{
                         background: "none",
-                        border: "1px solid var(--color-danger-border, #FECACA)",
+                        border: "1px solid var(--dg-color-danger-border, #FECACA)",
                         borderRadius: 8,
                         cursor: "pointer",
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                         padding: "5px 10px",
                         fontSize: "var(--dg-fs-caption)",
                         fontWeight: 600,
@@ -1055,7 +1069,7 @@ function DepartmentSection({
                         transition: "background 150ms, color 150ms",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "var(--color-danger-bg, #FEF2F2)";
+                        e.currentTarget.style.background = "var(--dg-color-danger-bg, #FEF2F2)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "none";
@@ -1135,10 +1149,10 @@ function DepartmentSection({
           style={{
             margin: "0 16px 12px",
             padding: 12,
-            background: "var(--color-danger-bg)",
-            border: "1px solid var(--color-danger-border)",
+            background: "var(--dg-color-danger-bg)",
+            border: "1px solid var(--dg-color-danger-border)",
             borderRadius: "var(--dg-radius-md)",
-            color: "var(--color-danger-text)",
+            color: "var(--dg-color-danger-text)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 500,
             whiteSpace: "pre-wrap",

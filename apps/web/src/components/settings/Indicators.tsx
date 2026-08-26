@@ -187,7 +187,7 @@ function IndicatorRow({
       className="dg-list-row"
       style={{
         borderBottom: isLast ? "none" : "1px solid",
-        borderBottomColor: expanded || isLast ? "transparent" : "var(--color-border-light)",
+        borderBottomColor: expanded || isLast ? "transparent" : "var(--dg-color-border-light)",
         transition: "border-bottom-color 220ms ease",
       }}
     >
@@ -220,12 +220,12 @@ function IndicatorRow({
             flex: 1,
             fontSize: "var(--dg-fs-label)",
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           {trimmedName || (
             <span
-              style={{ color: "var(--color-text-muted)", fontStyle: "italic", fontWeight: 400 }}
+              style={{ color: "var(--dg-color-text-muted)", fontStyle: "italic", fontWeight: 400 }}
             >
               Untitled indicator
             </span>
@@ -234,7 +234,7 @@ function IndicatorRow({
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-faint)",
+            color: "var(--dg-color-text-faint)",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 150ms ease",
           }}
@@ -254,9 +254,9 @@ function IndicatorRow({
         <div style={{ overflow: "hidden" }}>
           <div
             style={{
-              background: "var(--color-bg-secondary)",
+              background: "var(--dg-color-bg-secondary)",
               borderRadius: "var(--dg-radius-lg)",
-              border: "1px solid var(--color-border-light)",
+              border: "1px solid var(--dg-color-border-light)",
               margin: "0 0 8px",
               padding: "14px 16px",
               display: "flex",
@@ -278,7 +278,7 @@ function IndicatorRow({
                 placeholder="e.g. Readings"
                 disabled={!canEdit}
                 style={
-                  nameError || duplicateName ? { borderColor: "var(--color-danger)" } : undefined
+                  nameError || duplicateName ? { borderColor: "var(--dg-color-danger)" } : undefined
                 }
               />
               {nameError ? (
@@ -287,7 +287,7 @@ function IndicatorRow({
                   style={{
                     margin: "4px 0 0",
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-danger)",
+                    color: "var(--dg-color-danger)",
                   }}
                 >
                   {nameError}
@@ -298,7 +298,7 @@ function IndicatorRow({
                   style={{
                     margin: "4px 0 0",
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-danger)",
+                    color: "var(--dg-color-danger)",
                   }}
                 >
                   Another indicator already uses that name.
@@ -319,9 +319,9 @@ function IndicatorRow({
                     width: 44,
                     height: 36,
                     padding: 4,
-                    border: "1px solid var(--color-border)",
+                    border: "1px solid var(--dg-color-border)",
                     borderRadius: "var(--dg-btn-radius)",
-                    background: "var(--color-surface)",
+                    background: "var(--dg-color-surface)",
                     cursor: canEdit ? "pointer" : "not-allowed",
                     opacity: canEdit ? 1 : 0.55,
                   }}
@@ -340,7 +340,7 @@ function IndicatorRow({
                   style={{
                     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     textTransform: "uppercase",
                   }}
                 >
@@ -557,19 +557,19 @@ export default function Indicators({
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div
         style={{
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           borderRadius: "var(--dg-radius-md)",
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
           overflow: "hidden",
         }}
       >
         <div
           style={{
             padding: "12px 16px",
-            borderBottom: "1px solid var(--color-border-light)",
+            borderBottom: "1px solid var(--dg-color-border-light)",
             fontWeight: 700,
             fontSize: "var(--dg-fs-label)",
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
           }}
         >
           Indicators

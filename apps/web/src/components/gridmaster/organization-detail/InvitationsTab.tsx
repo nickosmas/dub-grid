@@ -41,12 +41,24 @@ export function InvitationsTab({
 
   function getStatus(inv: InvitationRow): { label: string; color: string; bg: string } {
     if (inv.accepted_at)
-      return { label: "Accepted", color: "var(--color-success)", bg: "var(--color-success-bg)" };
+      return {
+        label: "Accepted",
+        color: "var(--dg-color-success)",
+        bg: "var(--dg-color-success-bg)",
+      };
     if (inv.revoked_at)
-      return { label: "Revoked", color: "var(--color-danger)", bg: "var(--color-danger-bg)" };
+      return { label: "Revoked", color: "var(--dg-color-danger)", bg: "var(--dg-color-danger-bg)" };
     if (new Date(inv.expires_at) < new Date())
-      return { label: "Expired", color: "var(--color-warning)", bg: "var(--color-warning-bg)" };
-    return { label: "Pending", color: "var(--color-today-text)", bg: "var(--color-today-bg)" };
+      return {
+        label: "Expired",
+        color: "var(--dg-color-warning)",
+        bg: "var(--dg-color-warning-bg)",
+      };
+    return {
+      label: "Pending",
+      color: "var(--dg-color-today-text)",
+      bg: "var(--dg-color-today-bg)",
+    };
   }
 
   async function handleRevoke(inv: InvitationRow) {
@@ -81,7 +93,7 @@ export function InvitationsTab({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center" }}>
-        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+        <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
           {invitations.length} invitation{invitations.length !== 1 ? "s" : ""}
         </span>
       </div>
@@ -107,7 +119,7 @@ export function InvitationsTab({
                     style={{
                       ...tdStyle,
                       textAlign: "center",
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       padding: 32,
                     }}
                   >
@@ -141,7 +153,7 @@ export function InvitationsTab({
                         style={{
                           ...tdStyle,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                         }}
                       >
                         {new Date(inv.created_at).toLocaleDateString()}
@@ -150,7 +162,7 @@ export function InvitationsTab({
                         style={{
                           ...tdStyle,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                         }}
                       >
                         {new Date(inv.expires_at).toLocaleDateString()}
@@ -162,7 +174,7 @@ export function InvitationsTab({
                             style={{
                               fontSize: "var(--dg-fs-footnote)",
                               padding: "3px 6px",
-                              color: "var(--color-danger)",
+                              color: "var(--dg-color-danger)",
                             }}
                             onClick={() => setRevokeConfirm(inv)}
                             disabled={revoking === inv.id}

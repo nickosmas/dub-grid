@@ -162,10 +162,10 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+              <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
                 Password
               </div>
-              <p className="mb-0 mt-1 text-[13px] text-[var(--color-text-muted)]">
+              <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
                 Choose a strong password: at least 10 characters, with a mix of uppercase letters,
                 numbers, and symbols.
               </p>
@@ -240,7 +240,7 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
                   <ButtonLoading
                     loading={saving}
                     loadingLabel="Updating Password"
-                    spinnerColor="var(--color-text-inverse)"
+                    spinnerColor="var(--dg-color-text-inverse)"
                     spinnerSize={16}
                   >
                     Update Password
@@ -262,10 +262,10 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
       <SectionCard>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+            <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
               Two-factor authentication
             </div>
-            <p className="mb-0 mt-1 text-[13px] text-[var(--color-text-muted)]">
+            <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
               Add a second sign-in step using an authenticator app.
             </p>
           </div>
@@ -285,10 +285,10 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
       <SectionCard>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+            <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
               Sessions
             </div>
-            <p className="mb-0 mt-1 text-[13px] text-[var(--color-text-muted)]">
+            <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
               Manage sign-in state across browsers and devices.
             </p>
           </div>
@@ -322,12 +322,12 @@ export function SecurityPanel({ user, profile, setProfile }: SecurityPanelProps)
               </ButtonLoading>
             </Button>
           </div>
-          <div className="border-t border-[var(--color-border-light)] pt-4">
+          <div className="border-t border-[var(--dg-color-border-light)] pt-4">
             <div className="mb-3">
-              <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+              <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
                 Devices
               </div>
-              <div className="mt-1 text-[13px] text-[var(--color-text-muted)]">
+              <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
                 Inspect authenticated devices and recent sign-in history.
               </div>
             </div>

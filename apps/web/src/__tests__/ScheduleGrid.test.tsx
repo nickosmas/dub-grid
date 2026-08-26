@@ -7,6 +7,7 @@ import ScheduleGrid, {
   type ScheduleGridInteractionState,
 } from "@/components/ScheduleGrid";
 import { getReadableTextOnSurface } from "@/lib/colors";
+import { REQUEST_FOLD_CLEARANCE, REQUEST_FOLD_SIZE } from "@/components/schedule-grid/badges";
 import { formatDateKey } from "@/lib/utils";
 import type {
   AbsenceType,
@@ -530,7 +531,7 @@ describe("ScheduleGrid", () => {
     expect(jordanRows.length).toBeGreaterThan(0);
     expect(caseyRows.length).toBeGreaterThan(0);
     expect(alexRow).toHaveStyle({ opacity: "1" });
-    expect(alexName).toHaveStyle({ color: "var(--color-brand)" });
+    expect(alexName).toHaveStyle({ color: "var(--dg-color-brand)" });
     await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalled());
     for (const row of jordanRows) {
       expect(row).not.toBeNull();
@@ -743,7 +744,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
-    expect(firstCell.style.background).toBe("var(--color-surface)");
+    expect(firstCell.style.background).toBe("var(--dg-color-surface)");
     expect(badge?.textContent).toBe("Was N");
   });
 
@@ -829,7 +830,7 @@ describe("ScheduleGrid", () => {
 
     expect(firstCell.dataset.recent).toBeUndefined();
     expect(firstCell.dataset.today).toBe("true");
-    expect(firstCell.style.background).toBe("var(--color-surface)");
+    expect(firstCell.style.background).toBe("var(--dg-color-surface)");
   });
 
   it("keeps time-only publish diffs compact and exposes the changed time in the tooltip", () => {
@@ -1353,7 +1354,7 @@ describe("ScheduleGrid", () => {
     const initialsBadge = within(firstCell).getByText("SC") as HTMLElement;
     const crossPill = initialsBadge.closest('[data-shift-pill="multi"]') as HTMLElement | null;
 
-    expect(crossPill?.style.background).toBe("var(--color-surface)");
+    expect(crossPill?.style.background).toBe("var(--dg-color-surface)");
     expect(crossPill).toHaveStyle({
       borderStyle: "dashed",
       borderWidth: "2px",
@@ -1517,7 +1518,7 @@ describe("ScheduleGrid", () => {
     const readableTextColor = getReadableTextOnSurface("#1D4ED8", "#F8FAFC");
     const readableTextColorRgb = `rgb(${parseInt(readableTextColor.slice(1, 3), 16)}, ${parseInt(readableTextColor.slice(3, 5), 16)}, ${parseInt(readableTextColor.slice(5, 7), 16)})`;
 
-    expect(pill?.style.background).toBe("var(--color-surface)");
+    expect(pill?.style.background).toBe("var(--dg-color-surface)");
     expect(pill?.style.color).toBe(readableTextColorRgb);
     expect(pill?.style.color).not.toBe("rgb(248, 250, 252)");
   });
@@ -1561,7 +1562,7 @@ describe("ScheduleGrid", () => {
     const badge = firstCell.querySelector('[data-draft-badge="new"]') as HTMLElement | null;
 
     expect(badge).toBeNull();
-    expect(pill?.style.background).toBe("var(--color-surface)");
+    expect(pill?.style.background).toBe("var(--dg-color-surface)");
     expect(within(firstCell).getByText("SC").style.background).toBe("rgb(219, 234, 254)");
   });
 
@@ -1606,7 +1607,7 @@ describe("ScheduleGrid", () => {
     const badge = firstCell.querySelector('[data-draft-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was D");
-    expect(pill?.style.background).toBe("var(--color-surface)");
+    expect(pill?.style.background).toBe("var(--dg-color-surface)");
   });
 
   it("names the published shift an absence draft replaced", () => {
@@ -1789,7 +1790,7 @@ describe("ScheduleGrid", () => {
 
     expect(fold?.getAttribute("data-request-fold")).toBe("open");
     expect(fold?.getAttribute("aria-label")).toBe("Pickup request open");
-    expect(fold?.style.borderTop).toBe("12px solid var(--color-danger)");
+    expect(fold?.style.borderTop).toBe(`${REQUEST_FOLD_SIZE}px solid var(--dg-color-danger)`);
   });
 
   it("tints the fold as a warning while a swap waits on an approver", () => {
@@ -1804,7 +1805,7 @@ describe("ScheduleGrid", () => {
 
     expect(fold?.getAttribute("data-request-fold")).toBe("pending_approval");
     expect(fold?.getAttribute("aria-label")).toBe("Swap request awaiting approval");
-    expect(fold?.style.borderTop).toBe("12px solid var(--color-warning)");
+    expect(fold?.style.borderTop).toBe(`${REQUEST_FOLD_SIZE}px solid var(--dg-color-warning)`);
   });
 
   it("leaves a shift with no request unfolded", () => {
@@ -1832,8 +1833,8 @@ describe("ScheduleGrid", () => {
     const badge = firstCell.querySelector("[data-draft-badge]") as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was N");
-    // The fold's leg is 12px, so a badge at left 4 would sit on top of it.
-    expect(Number.parseFloat(badge?.style.left ?? "0")).toBeGreaterThanOrEqual(12);
+    // The badge starts just past the fold, with the shared breathing room.
+    expect(Number.parseFloat(badge?.style.left ?? "0")).toBe(REQUEST_FOLD_CLEARANCE);
   });
 
   it("moves the mentored circle clear of the lock avatar holding the cell", () => {
@@ -1993,7 +1994,7 @@ describe("ScheduleGrid", () => {
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was D");
-    expect(pill?.style.background).toBe("var(--color-surface)");
+    expect(pill?.style.background).toBe("var(--dg-color-surface)");
   });
 
   it("uses segment labels for publish replacement badges when they include job text", () => {
@@ -2087,9 +2088,9 @@ describe("ScheduleGrid", () => {
           orgId: "org-1",
           label: type,
           name: type,
-          color: "var(--color-bg)",
-          border: "var(--color-border)",
-          text: "var(--color-text-muted)",
+          color: "var(--dg-color-bg)",
+          border: "var(--dg-color-border)",
+          text: "var(--dg-color-text-muted)",
           sortOrder: 999,
         },
       draftKindForKey: () => "new",
@@ -2098,7 +2099,7 @@ describe("ScheduleGrid", () => {
     const firstCell = screen.getAllByRole("gridcell")[0] as HTMLElement;
     const pill = firstCell.querySelector('[data-shift-pill="single"]') as HTMLElement | null;
 
-    expect(pill?.style.background).toBe("var(--color-surface)");
+    expect(pill?.style.background).toBe("var(--dg-color-surface)");
     expect(within(firstCell).getByText("SC").style.background).toBe("rgb(219, 234, 254)");
   });
 
@@ -2130,9 +2131,9 @@ describe("ScheduleGrid", () => {
           orgId: "org-1",
           label: type,
           name: type,
-          color: "var(--color-bg)",
-          border: "var(--color-border)",
-          text: "var(--color-text-muted)",
+          color: "var(--dg-color-bg)",
+          border: "var(--dg-color-border)",
+          text: "var(--dg-color-text-muted)",
           sortOrder: 999,
         },
       publishDiffForKey: () => ({
@@ -2152,7 +2153,7 @@ describe("ScheduleGrid", () => {
     const badge = firstCell.querySelector('[data-publish-badge="modified"]') as HTMLElement | null;
 
     expect(badge?.textContent).toBe("Was D");
-    expect(pill?.style.background).toBe("var(--color-surface)");
+    expect(pill?.style.background).toBe("var(--dg-color-surface)");
   });
 
   it("keeps published edited shift rings orange when a modified entry replaces an absence", () => {
@@ -3074,12 +3075,12 @@ describe("ScheduleGrid", () => {
     // it lands on the same y-position regardless of sticky-column rendering
     // quirks — see ScheduleGrid.tsx.
     expect(staffHeader.style.backgroundImage).toContain(
-      "linear-gradient(var(--color-grid-divider-strong), var(--color-grid-divider-strong))",
+      "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
     );
     expect(staffHeader.style.backgroundPosition).toBe("0px 100%");
     expect(staffHeader.style.backgroundSize).toBe("100% 1px");
     expect(splitHeader.style.backgroundImage).toBe(
-      "linear-gradient(var(--color-grid-divider-strong), var(--color-grid-divider-strong))",
+      "linear-gradient(var(--dg-color-grid-divider-strong), var(--dg-color-grid-divider-strong))",
     );
     expect(splitHeader.style.backgroundPosition).toBe("0px 100%");
     expect(splitHeader.style.backgroundSize).toBe("100% 1px");

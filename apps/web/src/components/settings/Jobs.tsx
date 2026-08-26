@@ -406,8 +406,8 @@ function SectionBlock({
       style={{
         padding: "14px 16px",
         borderRadius: "var(--dg-radius-md)",
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border-light)",
+        background: "var(--dg-color-surface)",
+        border: "1px solid var(--dg-color-border-light)",
         display: "flex",
         flexDirection: "column",
         gap: 12,
@@ -421,7 +421,7 @@ function SectionBlock({
               fontWeight: 800,
               letterSpacing: "0.04em",
               textTransform: "uppercase",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             {title}
@@ -431,7 +431,7 @@ function SectionBlock({
           <div
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               lineHeight: 1.5,
             }}
           >
@@ -473,7 +473,7 @@ function ChecklistPanel({
           <div
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               lineHeight: 1.4,
             }}
           >
@@ -487,10 +487,10 @@ function ChecklistPanel({
           style={{
             padding: "12px 14px",
             borderRadius: "var(--dg-radius-sm)",
-            border: "1px solid var(--color-border-light)",
-            color: "var(--color-text-muted)",
+            border: "1px solid var(--dg-color-border-light)",
+            color: "var(--dg-color-text-muted)",
             fontSize: "var(--dg-fs-label)",
-            background: "var(--color-bg-secondary)",
+            background: "var(--dg-color-bg-secondary)",
           }}
         >
           {emptyMessage}
@@ -522,7 +522,7 @@ function ChecklistPanel({
                   <span
                     style={{
                       fontSize: "var(--dg-fs-caption)",
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       lineHeight: 1.35,
                     }}
                   >
@@ -556,7 +556,7 @@ function EligibilityModeToggle({
         <div
           style={{
             fontSize: "var(--dg-fs-caption)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             lineHeight: 1.35,
           }}
         >
@@ -567,7 +567,7 @@ function EligibilityModeToggle({
         style={{
           display: "inline-flex",
           borderRadius: "var(--dg-btn-radius)",
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
           overflow: "hidden",
           alignSelf: "flex-start",
           opacity: dimmed ? 0.65 : 1,
@@ -590,8 +590,8 @@ function EligibilityModeToggle({
                 height: 34,
                 padding: "0 12px",
                 border: "none",
-                background: active ? "var(--color-bg-secondary)" : "var(--color-surface)",
-                color: active ? "var(--color-text-primary)" : "var(--color-text-secondary)",
+                background: active ? "var(--dg-color-bg-secondary)" : "var(--dg-color-surface)",
+                color: active ? "var(--dg-color-text-primary)" : "var(--dg-color-text-secondary)",
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: active ? 700 : 600,
                 cursor: disabled ? "not-allowed" : "pointer",
@@ -689,12 +689,12 @@ function DefaultShiftToggle({
             style={{
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             Shift-only assignments
           </div>
-          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+          <div style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
             Let staff be scheduled with just a shift, no job attached
           </div>
         </div>
@@ -757,16 +757,16 @@ function JobSectionCard({
   return (
     <div
       style={{
-        background: "var(--color-surface)",
+        background: "var(--dg-color-surface)",
         borderRadius: "var(--dg-radius-md)",
-        border: "1px solid var(--color-border)",
+        border: "1px solid var(--dg-color-border)",
         overflow: "hidden",
       }}
     >
       <div
         style={{
           padding: "12px 16px",
-          borderBottom: "1px solid var(--color-border-light)",
+          borderBottom: "1px solid var(--dg-color-border-light)",
           display: "flex",
           alignItems: "flex-start",
           justifyContent: "space-between",
@@ -778,7 +778,7 @@ function JobSectionCard({
             style={{
               fontWeight: 700,
               fontSize: "var(--dg-fs-label)",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             {header.title}
@@ -786,7 +786,7 @@ function JobSectionCard({
           <div
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               lineHeight: 1.45,
             }}
           >
@@ -1266,7 +1266,9 @@ function JobRow({
   return (
     <div
       className="dg-list-row"
-      style={{ borderBottom: expanded || isLast ? "none" : "1px solid var(--color-border-light)" }}
+      style={{
+        borderBottom: expanded || isLast ? "none" : "1px solid var(--dg-color-border-light)",
+      }}
     >
       <div
         className="dg-hover-row"
@@ -1286,17 +1288,17 @@ function JobRow({
             style={{
               fontSize: "var(--dg-fs-body)",
               fontWeight: 800,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             {form.name || "Untitled job"}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3 }}>
-            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}>
+            <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-text-muted)" }}>
               {placementSummary}
             </span>
             {isLockedIdentityJob ? (
-              <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-brand)" }}>
+              <span style={{ fontSize: "var(--dg-fs-caption)", color: "var(--dg-color-brand)" }}>
                 {isDefaultShiftJob ? "Shift-only" : "System default"}
               </span>
             ) : null}
@@ -1306,7 +1308,7 @@ function JobRow({
         <span
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-faint)",
+            color: "var(--dg-color-text-faint)",
             transform: expanded ? "rotate(180deg)" : "none",
             transition: "transform 150ms ease",
           }}
@@ -1318,9 +1320,9 @@ function JobRow({
       {expanded ? (
         <div
           style={{
-            background: "var(--color-bg-secondary)",
+            background: "var(--dg-color-bg-secondary)",
             borderRadius: "var(--dg-radius-lg)",
-            border: "1px solid var(--color-border-light)",
+            border: "1px solid var(--dg-color-border-light)",
             margin: "0 0 8px",
             padding: "14px 16px",
             display: "flex",
@@ -1355,7 +1357,7 @@ function JobRow({
                   className="dg-input"
                   maxLength={50}
                   disabled={!canManageScheduleDefinitions || isLockedIdentityJob}
-                  style={nameError ? { borderColor: "var(--color-danger)" } : undefined}
+                  style={nameError ? { borderColor: "var(--dg-color-danger)" } : undefined}
                 />
                 {nameError ? (
                   <p
@@ -1363,7 +1365,7 @@ function JobRow({
                     style={{
                       margin: "4px 0 0",
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                     }}
                   >
                     {nameError}
@@ -1379,7 +1381,7 @@ function JobRow({
                   className="dg-input"
                   maxLength={6}
                   disabled={!canManageScheduleDefinitions || isLockedIdentityJob}
-                  style={abbrError ? { borderColor: "var(--color-danger)" } : undefined}
+                  style={abbrError ? { borderColor: "var(--dg-color-danger)" } : undefined}
                 />
                 {abbrError ? (
                   <p
@@ -1387,7 +1389,7 @@ function JobRow({
                     style={{
                       margin: "4px 0 0",
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-danger)",
+                      color: "var(--dg-color-danger)",
                     }}
                   >
                     {abbrError}
@@ -1458,7 +1460,7 @@ function JobRow({
                         <span
                           style={{
                             fontSize: "var(--dg-fs-label)",
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           h
@@ -1485,7 +1487,7 @@ function JobRow({
                         <span
                           style={{
                             fontSize: "var(--dg-fs-label)",
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           m
@@ -1495,7 +1497,7 @@ function JobRow({
                         style={{
                           margin: 0,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           lineHeight: 1.45,
                         }}
                       >
@@ -1556,7 +1558,7 @@ function JobRow({
                         <span
                           style={{
                             fontSize: "var(--dg-fs-label)",
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           to
@@ -1581,11 +1583,13 @@ function JobRow({
                         <div
                           style={{
                             fontSize: "var(--dg-fs-caption)",
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           Duration:{" "}
-                          <span style={{ fontWeight: 600, color: "var(--color-text-secondary)" }}>
+                          <span
+                            style={{ fontWeight: 600, color: "var(--dg-color-text-secondary)" }}
+                          >
                             {calcTimeDuration(
                               normalizedShiftlessTiming.defaultStartTime,
                               normalizedShiftlessTiming.defaultEndTime,
@@ -1597,7 +1601,7 @@ function JobRow({
                         style={{
                           margin: 0,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           lineHeight: 1.45,
                         }}
                       >
@@ -1644,7 +1648,7 @@ function JobRow({
                         style={{
                           margin: 0,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           lineHeight: 1.45,
                         }}
                       >
@@ -1688,7 +1692,7 @@ function JobRow({
                         <div
                           style={{
                             fontSize: "var(--dg-fs-caption)",
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           No default time or duration is set.
@@ -1699,7 +1703,10 @@ function JobRow({
                   {normalizedShiftlessTiming.defaultStartTime != null &&
                   normalizedShiftlessTiming.defaultEndTime != null ? (
                     <div
-                      style={{ fontSize: "var(--dg-fs-caption)", color: "var(--color-text-muted)" }}
+                      style={{
+                        fontSize: "var(--dg-fs-caption)",
+                        color: "var(--dg-color-text-muted)",
+                      }}
                     >
                       {fmt12h(normalizedShiftlessTiming.defaultStartTime)} to{" "}
                       {fmt12h(normalizedShiftlessTiming.defaultEndTime)}
@@ -1960,9 +1967,9 @@ function JobRow({
                   style={{
                     padding: "12px 14px",
                     borderRadius: "var(--dg-radius-sm)",
-                    border: "1px solid var(--color-border-light)",
-                    background: "var(--color-bg-secondary)",
-                    color: "var(--color-text-muted)",
+                    border: "1px solid var(--dg-color-border-light)",
+                    background: "var(--dg-color-bg-secondary)",
+                    color: "var(--dg-color-text-muted)",
                     fontSize: "var(--dg-fs-label)",
                   }}
                 >
@@ -2003,8 +2010,8 @@ function JobRow({
                         style={{
                           padding: "12px 14px",
                           borderRadius: "var(--dg-radius-md)",
-                          border: "1px solid var(--color-border-light)",
-                          background: "var(--color-surface)",
+                          border: "1px solid var(--dg-color-border-light)",
+                          background: "var(--dg-color-surface)",
                           display: "flex",
                           flexDirection: "column",
                           gap: 10,
@@ -2024,7 +2031,7 @@ function JobRow({
                               style={{
                                 fontSize: "var(--dg-fs-label)",
                                 fontWeight: 700,
-                                color: "var(--color-text-primary)",
+                                color: "var(--dg-color-text-primary)",
                               }}
                             >
                               {shiftLabel}
@@ -2032,7 +2039,7 @@ function JobRow({
                             <div
                               style={{
                                 fontSize: "var(--dg-fs-caption)",
-                                color: "var(--color-text-muted)",
+                                color: "var(--dg-color-text-muted)",
                               }}
                             >
                               {shift.startTime && shift.endTime
@@ -2111,7 +2118,7 @@ function JobRow({
                                 alignItems: "center",
                                 gap: 10,
                                 fontSize: "var(--dg-fs-label)",
-                                color: "var(--color-text-secondary)",
+                                color: "var(--dg-color-text-secondary)",
                               }}
                             >
                               <input
@@ -2196,7 +2203,7 @@ function JobRow({
                               <div
                                 style={{
                                   fontSize: "var(--dg-fs-caption)",
-                                  color: "var(--color-text-muted)",
+                                  color: "var(--dg-color-text-muted)",
                                 }}
                               >
                                 Using {resolvedTimes.startTime?.slice(0, 5) ?? "—"}-
@@ -2272,7 +2279,7 @@ function JobRow({
                 <div
                   style={{
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     lineHeight: 1.45,
                     minHeight: "calc(var(--dg-fs-caption) * 1.45 * 2)",
                   }}
@@ -2321,7 +2328,11 @@ function JobRow({
 
           {duplicateName || duplicateAbbr ? (
             <p
-              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+              style={{
+                color: "var(--dg-color-danger)",
+                fontSize: "var(--dg-fs-caption)",
+                margin: 0,
+              }}
             >
               {duplicateName
                 ? "Another job already uses that name."
@@ -2331,7 +2342,11 @@ function JobRow({
 
           {isScheduledLikeSection(section) && form.departmentIds.length === 0 ? (
             <p
-              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+              style={{
+                color: "var(--dg-color-danger)",
+                fontSize: "var(--dg-fs-caption)",
+                margin: 0,
+              }}
             >
               Select at least one scheduled department.
             </p>
@@ -2341,7 +2356,11 @@ function JobRow({
           form.departmentIds.length > 0 &&
           form.focusAreaIds.length === 0 ? (
             <p
-              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+              style={{
+                color: "var(--dg-color-danger)",
+                fontSize: "var(--dg-fs-caption)",
+                margin: 0,
+              }}
             >
               Select at least one focus area.
             </p>
@@ -2351,7 +2370,11 @@ function JobRow({
           form.focusAreaIds.length > 0 &&
           form.applicableShiftIds.length === 0 ? (
             <p
-              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+              style={{
+                color: "var(--dg-color-danger)",
+                fontSize: "var(--dg-fs-caption)",
+                margin: 0,
+              }}
             >
               Select at least one shift.
             </p>
@@ -2359,7 +2382,11 @@ function JobRow({
 
           {incompleteShiftOverride ? (
             <p
-              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+              style={{
+                color: "var(--dg-color-danger)",
+                fontSize: "var(--dg-fs-caption)",
+                margin: 0,
+              }}
             >
               Enter both a start and end time for each enabled time override.
             </p>
@@ -2367,7 +2394,11 @@ function JobRow({
 
           {incompleteGeneralJobTime ? (
             <p
-              style={{ color: "var(--color-danger)", fontSize: "var(--dg-fs-caption)", margin: 0 }}
+              style={{
+                color: "var(--dg-color-danger)",
+                fontSize: "var(--dg-fs-caption)",
+                margin: 0,
+              }}
             >
               Enter both a start and end time, or switch this general job to duration mode.
             </p>
@@ -2750,9 +2781,9 @@ export default function JobsSettings({
           style={{
             padding: "12px 14px",
             borderRadius: "var(--dg-radius-md)",
-            border: "1px solid var(--color-border-light)",
-            background: "var(--color-bg-secondary)",
-            color: "var(--color-text-secondary)",
+            border: "1px solid var(--dg-color-border-light)",
+            background: "var(--dg-color-bg-secondary)",
+            color: "var(--dg-color-text-secondary)",
             fontSize: "var(--dg-fs-label)",
             lineHeight: 1.5,
           }}
@@ -2805,7 +2836,7 @@ export default function JobsSettings({
           style={{
             marginTop: -4,
             fontSize: "var(--dg-fs-caption)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             lineHeight: 1.45,
           }}
         >

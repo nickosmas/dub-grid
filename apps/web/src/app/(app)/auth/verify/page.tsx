@@ -56,7 +56,7 @@ export default function AuthVerifyPage() {
   return (
     <PageShell>
       <Card>
-        <div className="dg-auth-logo-block" style={{ gap: "8px" }}>
+        <div className="dg-auth-logo-block dg-auth-logo-block--compact">
           <DubGridLogo size={44} />
           <DubGridWordmark />
         </div>
@@ -82,13 +82,12 @@ export default function AuthVerifyPage() {
             <Button
               onClick={handleVerify}
               disabled={loading}
-              className="dg-btn dg-btn-primary dg-btn-lg"
-              style={{ width: "100%" }}
+              className="dg-btn dg-btn-primary dg-btn-lg dg-auth-state-primary"
             >
               <ButtonLoading
                 loading={loading}
                 loadingLabel="Verifying"
-                spinnerColor="var(--color-text-inverse)"
+                spinnerColor="var(--dg-color-text-inverse)"
                 spinnerSize={20}
               >
                 Continue

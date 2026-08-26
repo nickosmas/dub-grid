@@ -11,17 +11,14 @@ import { formatClientErrorMessage } from "@/lib/client-facing";
 import { withComposedOrganizationAddress } from "@/lib/organization-profile";
 import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle } from "@/lib/styles";
 import { formatTimezoneLabel } from "@/lib/timezones";
-import { RESERVED_SUBDOMAINS } from "@/lib/subdomain";
 import { ActionBar } from "./organization-setup/ActionBar";
 import { COLOR_PRESETS, type StepKey } from "./organization-setup/constants";
-import { slugify } from "./organization-setup/helpers";
 import {
   createOrganizationEmployees,
   createOrganizationSetup,
   saveOrganizationSetupConfig,
   sendInvitationEmail,
   sendOrganizationInvitations,
-  validateOrganizationSlug,
 } from "./organization-setup/persistence";
 import {
   type DeptRow,
@@ -56,8 +53,6 @@ export default function OrganizationSetupWizard({
 
   // ── Step 1: Org Details ───────────────────────────────────────────────────
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
   const [addressCity, setAddressCity] = useState("");
@@ -69,7 +64,6 @@ export default function OrganizationSetupWizard({
   const [focusAreaLabel, setFocusAreaLabel] = useState("Focus Areas");
   const [certificationLabel, setCertificationLabel] = useState("Certifications");
   const [roleLabel, setRoleLabel] = useState("Roles");
-  const [slugError, setSlugError] = useState<string | null>(null);
   const [createdEmployeeCount, setCreatedEmployeeCount] = useState(0);
 
   // ── Step 2: Super Admin ───────────────────────────────────────────────────
@@ -134,38 +128,17 @@ export default function OrganizationSetupWizard({
   const readyEmployeeCount = employeeRows.filter((r) => r.firstName.trim()).length;
   const selectedInvitationCount = invitationRows.filter((r) => r.selected).length;
 
-  // ── Slug helpers ──────────────────────────────────────────────────────────
-
-  function handleNameChange(val: string) {
-    setName(val);
-    if (!slugTouched) setSlug(slugify(val));
-  }
-
   // ── Step 1 → Step 2 ──────────────────────────────────────────────────────
 
   const handleDetailsNext = useCallback(async () => {
     if (!name.trim()) return;
     setSaving(true);
-    setSlugError(null);
-
     try {
-      if (slug.trim()) {
-        const normalizedSlug = slug.trim();
-        const valid =
-          !RESERVED_SUBDOMAINS.has(normalizedSlug) &&
-          /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(normalizedSlug) &&
-          (await validateOrganizationSlug(normalizedSlug));
-        if (!valid) {
-          setSlugError("This slug is already taken or invalid");
-          setSaving(false);
-          return;
-        }
-      }
       setCurrentStep("super-admin");
     } finally {
       setSaving(false);
     }
-  }, [name, slug]);
+  }, [name]);
 
   // ── Step 2 → Create org + Decision ────────────────────────────────────────
 
@@ -174,7 +147,6 @@ export default function OrganizationSetupWizard({
     try {
       const { org, superAdmin } = await createOrganizationSetup({
         name,
-        slug,
         addressLine1,
         addressLine2,
         addressCity,
@@ -214,7 +186,6 @@ export default function OrganizationSetupWizard({
     }
   }, [
     name,
-    slug,
     addressLine1,
     addressLine2,
     addressCity,
@@ -493,35 +464,10 @@ export default function OrganizationSetupWizard({
                 <input
                   className="dg-input"
                   value={name}
-                  onChange={(e) => handleNameChange(e.target.value)}
+                  onChange={(e) => setName(e.target.value)}
                   placeholder="Acme Healthcare"
                   required
                 />
-              </div>
-              <div>
-                <label style={labelStyle}>Slug</label>
-                <input
-                  className={`dg-input${slugError ? " dg-input-error" : ""}`}
-                  value={slug}
-                  onChange={(e) => {
-                    setSlug(e.target.value);
-                    setSlugTouched(true);
-                    setSlugError(null);
-                  }}
-                  placeholder="acme-healthcare"
-                />
-                {slugError && (
-                  <span
-                    style={{
-                      fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-danger)",
-                      marginTop: 4,
-                      display: "block",
-                    }}
-                  >
-                    {slugError}
-                  </span>
-                )}
               </div>
             </div>
             <OrganizationLocationFields
@@ -559,7 +505,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 12px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Customize terminology used throughout the app for this organization.
@@ -642,7 +588,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 16px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Assign a super admin who will own this organization. They will have full control over
@@ -658,7 +604,7 @@ export default function OrganizationSetupWizard({
             >
               <div>
                 <label style={labelStyle}>
-                  First Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                  First Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
                   className="dg-input"
@@ -669,7 +615,7 @@ export default function OrganizationSetupWizard({
               </div>
               <div>
                 <label style={labelStyle}>
-                  Last Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                  Last Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
                   className="dg-input"
@@ -680,7 +626,7 @@ export default function OrganizationSetupWizard({
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={labelStyle}>
-                  Email <span style={{ color: "var(--color-danger)" }}>*</span>
+                  Email <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                 </label>
                 <input
                   className="dg-input"
@@ -705,7 +651,7 @@ export default function OrganizationSetupWizard({
               <span
                 style={{
                   fontSize: "var(--dg-fs-label)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   marginTop: 8,
                   display: "block",
                   maxWidth: 500,
@@ -729,41 +675,21 @@ export default function OrganizationSetupWizard({
                 fontSize: "var(--dg-fs-label)",
               }}
             >
-              <span style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>
+              <span style={{ fontWeight: 600, color: "var(--dg-color-text-muted)" }}>
                 Organization
               </span>
-              <span style={{ color: "var(--color-text-primary)" }}>{name}</span>
-              {slug && (
-                <>
-                  <span
-                    style={{
-                      fontWeight: 600,
-                      color: "var(--color-text-muted)",
-                    }}
-                  >
-                    Slug
-                  </span>
-                  <span
-                    style={{
-                      color: "var(--color-text-primary)",
-                      fontFamily: "var(--font-dm-mono), monospace",
-                    }}
-                  >
-                    {slug}
-                  </span>
-                </>
-              )}
+              <span style={{ color: "var(--dg-color-text-primary)" }}>{name}</span>
               {timezone && (
                 <>
                   <span
                     style={{
                       fontWeight: 600,
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                     }}
                   >
                     Timezone
                   </span>
-                  <span style={{ color: "var(--color-text-primary)" }}>
+                  <span style={{ color: "var(--dg-color-text-primary)" }}>
                     {formatTimezoneLabel(timezone)} · {timezone}
                   </span>
                 </>
@@ -773,12 +699,12 @@ export default function OrganizationSetupWizard({
                   <span
                     style={{
                       fontWeight: 600,
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                     }}
                   >
                     Address
                   </span>
-                  <span style={{ color: "var(--color-text-primary)" }}>{summaryAddress}</span>
+                  <span style={{ color: "var(--dg-color-text-primary)" }}>{summaryAddress}</span>
                 </>
               )}
               {superAdminFirstName.trim() && superAdminLastName.trim() && (
@@ -786,12 +712,12 @@ export default function OrganizationSetupWizard({
                   <span
                     style={{
                       fontWeight: 600,
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                     }}
                   >
                     Super Admin
                   </span>
-                  <span style={{ color: "var(--color-text-primary)" }}>
+                  <span style={{ color: "var(--dg-color-text-primary)" }}>
                     {superAdminFirstName.trim()} {superAdminLastName.trim()}
                   </span>
                 </>
@@ -801,12 +727,12 @@ export default function OrganizationSetupWizard({
                   <span
                     style={{
                       fontWeight: 600,
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                     }}
                   >
                     Email
                   </span>
-                  <span style={{ color: "var(--color-text-primary)" }}>{superAdminEmail}</span>
+                  <span style={{ color: "var(--dg-color-text-primary)" }}>{superAdminEmail}</span>
                 </>
               )}
             </div>
@@ -870,7 +796,7 @@ export default function OrganizationSetupWizard({
               width: 56,
               height: 56,
               borderRadius: "50%",
-              background: "var(--color-success)",
+              background: "var(--dg-color-success)",
               display: "grid",
               placeItems: "center",
               margin: "0 auto 20px",
@@ -894,7 +820,7 @@ export default function OrganizationSetupWizard({
               margin: "0 0 8px",
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             Organization Created
@@ -903,7 +829,7 @@ export default function OrganizationSetupWizard({
             style={{
               margin: "0 0 24px",
               fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
             }}
           >
             {createdOrg?.name} is ready.
@@ -916,7 +842,7 @@ export default function OrganizationSetupWizard({
             style={{
               ...sectionStyle,
               marginBottom: 24,
-              border: "1px solid var(--color-warning)",
+              border: "1px solid var(--dg-color-warning)",
             }}
           >
             <div
@@ -932,7 +858,7 @@ export default function OrganizationSetupWizard({
                   style={{
                     fontSize: "var(--dg-fs-body-sm)",
                     fontWeight: 600,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     marginBottom: 4,
                   }}
                 >
@@ -941,7 +867,7 @@ export default function OrganizationSetupWizard({
                 <div
                   style={{
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                   }}
                 >
                   They will join as admin. You can promote them to super admin after they accept.
@@ -967,7 +893,7 @@ export default function OrganizationSetupWizard({
             style={{
               margin: "0 0 24px",
               fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
             }}
           >
             Would you like to continue setting up configuration, employees, and invitations?
@@ -1010,7 +936,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 12px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               How shifts appear on the schedule grid.
@@ -1030,9 +956,9 @@ export default function OrganizationSetupWizard({
                     gap: 8,
                     padding: "10px 16px",
                     borderRadius: 8,
-                    border: `2px solid ${shiftDisplayMode === value ? "var(--color-primary)" : "var(--color-border)"}`,
+                    border: `2px solid ${shiftDisplayMode === value ? "var(--dg-color-primary)" : "var(--dg-color-border)"}`,
                     background:
-                      shiftDisplayMode === value ? "var(--color-primary-bg)" : "transparent",
+                      shiftDisplayMode === value ? "var(--dg-color-primary-bg)" : "transparent",
                     cursor: "pointer",
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 500,
@@ -1044,13 +970,13 @@ export default function OrganizationSetupWizard({
                     value={value}
                     checked={shiftDisplayMode === value}
                     onChange={() => setShiftDisplayMode(value)}
-                    style={{ accentColor: "var(--color-primary)" }}
+                    style={{ accentColor: "var(--dg-color-primary)" }}
                   />
                   <span>
-                    <span style={{ color: "var(--color-text-primary)" }}>{label}</span>
+                    <span style={{ color: "var(--dg-color-text-primary)" }}>{label}</span>
                     <span
                       style={{
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                         marginLeft: 6,
                       }}
                     >
@@ -1071,7 +997,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 12px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Organizational departments. &quot;Scheduled&quot; departments appear on the scheduling
@@ -1167,7 +1093,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 12px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Departments, wings, or units that employees are assigned to.
@@ -1255,7 +1181,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 12px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Skill levels or designations that employees can hold.
@@ -1335,7 +1261,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 12px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Configurable display roles for employees (not to be confused with access roles).
@@ -1407,7 +1333,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 12px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Primary shift blocks like Day, Evening, and Night. These set the timing backbone that
@@ -1537,7 +1463,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 12px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Responsibilities that can sit on a shift or stand alone, like Supervisor, Mentor,
@@ -1563,11 +1489,11 @@ export default function OrganizationSetupWizard({
                 <div
                   key={job.id}
                   style={{
-                    border: "1px solid var(--color-border)",
+                    border: "1px solid var(--dg-color-border)",
                     borderRadius: 8,
                     padding: 12,
                     marginBottom: 10,
-                    background: "var(--color-bg-secondary)",
+                    background: "var(--dg-color-bg-secondary)",
                   }}
                 >
                   <div
@@ -1591,7 +1517,7 @@ export default function OrganizationSetupWizard({
                       style={{
                         width: 36,
                         height: 36,
-                        border: "1px solid var(--color-border)",
+                        border: "1px solid var(--dg-color-border)",
                         borderRadius: 6,
                         cursor: "pointer",
                         padding: 2,
@@ -1800,7 +1726,7 @@ export default function OrganizationSetupWizard({
               <span
                 style={{
                   fontWeight: 500,
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   marginLeft: 8,
                 }}
               >
@@ -1813,7 +1739,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 16px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Add your staff members. At minimum, provide a first name. Email is needed if you want
@@ -1865,7 +1791,7 @@ export default function OrganizationSetupWizard({
               }}
             >
               <span style={{ ...labelStyle, marginBottom: 0 }}>
-                First Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                First Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
               </span>
               <span style={{ ...labelStyle, marginBottom: 0 }}>Last Name</span>
               <span style={{ ...labelStyle, marginBottom: 0 }}>Email</span>
@@ -1990,7 +1916,7 @@ export default function OrganizationSetupWizard({
               <span
                 style={{
                   fontWeight: 500,
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   marginLeft: 8,
                 }}
               >
@@ -2003,7 +1929,7 @@ export default function OrganizationSetupWizard({
               style={{
                 margin: "0 0 16px",
                 fontSize: "var(--dg-fs-label)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               Select employees to invite. They will receive an email with a link to set their
@@ -2026,7 +1952,7 @@ export default function OrganizationSetupWizard({
             {invitationRows.length === 0 ? (
               <p
                 style={{
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
@@ -2043,7 +1969,7 @@ export default function OrganizationSetupWizard({
                     marginBottom: 12,
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 600,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     cursor: "pointer",
                   }}
                 >
@@ -2055,7 +1981,7 @@ export default function OrganizationSetupWizard({
                         prev.map((r) => ({ ...r, selected: e.target.checked })),
                       );
                     }}
-                    style={{ accentColor: "var(--color-primary)" }}
+                    style={{ accentColor: "var(--dg-color-primary)" }}
                   />
                   Select All
                 </label>
@@ -2098,13 +2024,13 @@ export default function OrganizationSetupWizard({
                           ),
                         );
                       }}
-                      style={{ accentColor: "var(--color-primary)" }}
+                      style={{ accentColor: "var(--dg-color-primary)" }}
                     />
                     <span
                       style={{
                         fontSize: "var(--dg-fs-label)",
                         fontWeight: 500,
-                        color: "var(--color-text-primary)",
+                        color: "var(--dg-color-text-primary)",
                       }}
                     >
                       {inv.name}
@@ -2112,7 +2038,7 @@ export default function OrganizationSetupWizard({
                     <span
                       style={{
                         fontSize: "var(--dg-fs-label)",
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       {inv.email}
@@ -2221,7 +2147,7 @@ export default function OrganizationSetupWizard({
             margin: 0,
             fontSize: "var(--dg-fs-heading)",
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           {currentStep === "decision" ? "Organization Created" : "Create Organization"}

@@ -52,25 +52,27 @@ export function AppearancePreview() {
         style={{
           fontSize: 13,
           fontWeight: 800,
-          color: "var(--color-text-secondary)",
+          color: "var(--dg-color-text-secondary)",
           marginBottom: 8,
           padding: "5px 8px 5px 7px",
-          background: "var(--color-bg-secondary)",
+          background: "var(--dg-color-bg-secondary)",
           borderRadius: 6,
           display: "flex",
           alignItems: "center",
           gap: 7,
         }}
       >
-        <span style={{ width: 3, height: 14, borderRadius: 2, background: "var(--color-brand)" }} />
+        <span
+          style={{ width: 3, height: 14, borderRadius: 2, background: "var(--dg-color-brand)" }}
+        />
         Nursing
       </div>
 
       <div
         style={{
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
           borderRadius: "var(--dg-radius-md)",
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           overflow: "hidden",
         }}
       >
@@ -83,8 +85,8 @@ export function AppearancePreview() {
               fontSize: 9,
               fontWeight: 600,
               letterSpacing: "0.04em",
-              color: "var(--color-text-subtle)",
-              boxShadow: "1px 0 0 0 var(--color-border-light)",
+              color: "var(--dg-color-text-subtle)",
+              boxShadow: "1px 0 0 0 var(--dg-color-border-light)",
             }}
           >
             Staff
@@ -96,7 +98,7 @@ export function AppearancePreview() {
                 flex: 1,
                 textAlign: "center",
                 padding: "5px 0",
-                boxShadow: "1px 0 0 0 var(--color-border-light)",
+                boxShadow: "1px 0 0 0 var(--dg-color-border-light)",
               }}
             >
               <div
@@ -104,7 +106,7 @@ export function AppearancePreview() {
                   fontSize: 9,
                   fontWeight: 600,
                   letterSpacing: "0.04em",
-                  color: day.isToday ? "var(--color-today-text)" : "var(--color-text-subtle)",
+                  color: day.isToday ? "var(--dg-color-today-text)" : "var(--dg-color-text-subtle)",
                 }}
               >
                 {day.label}
@@ -114,7 +116,9 @@ export function AppearancePreview() {
                   fontSize: 12,
                   fontWeight: 700,
                   lineHeight: 1.2,
-                  color: day.isToday ? "var(--color-today-text)" : "var(--color-text-secondary)",
+                  color: day.isToday
+                    ? "var(--dg-color-today-text)"
+                    : "var(--dg-color-text-secondary)",
                 }}
               >
                 {day.date}
@@ -129,7 +133,9 @@ export function AppearancePreview() {
             style={{
               display: "flex",
               borderTop:
-                ri > 0 ? "1px solid var(--color-border-light)" : "1px solid var(--color-border)",
+                ri > 0
+                  ? "1px solid var(--dg-color-border-light)"
+                  : "1px solid var(--dg-color-border)",
             }}
           >
             <div
@@ -142,7 +148,7 @@ export function AppearancePreview() {
                 justifyContent: "space-between",
                 gap: 4,
                 minWidth: 0,
-                boxShadow: "1px 0 0 0 var(--color-border-light)",
+                boxShadow: "1px 0 0 0 var(--dg-color-border-light)",
               }}
             >
               <div style={{ minWidth: 0 }}>
@@ -150,7 +156,7 @@ export function AppearancePreview() {
                   style={{
                     fontSize: 10,
                     fontWeight: 600,
-                    color: "var(--color-text-secondary)",
+                    color: "var(--dg-color-text-secondary)",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -158,7 +164,7 @@ export function AppearancePreview() {
                 >
                   {row.name}
                 </div>
-                <div style={{ fontSize: 8, color: "var(--color-text-subtle)" }}>{row.role}</div>
+                <div style={{ fontSize: 8, color: "var(--dg-color-text-subtle)" }}>{row.role}</div>
               </div>
               <span
                 style={{
@@ -181,7 +187,7 @@ export function AppearancePreview() {
                   flex: 1,
                   position: "relative",
                   height: 38,
-                  boxShadow: "1px 0 0 0 var(--color-border-light)",
+                  boxShadow: "1px 0 0 0 var(--dg-color-border-light)",
                 }}
               >
                 {cell.kind === "off" && (
@@ -190,8 +196,8 @@ export function AppearancePreview() {
                       position: "absolute",
                       inset: 4,
                       borderRadius: 6,
-                      background: "var(--color-text-subtle)",
-                      color: "var(--color-surface)",
+                      background: "var(--dg-color-text-subtle)",
+                      color: "var(--dg-color-surface)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -211,9 +217,9 @@ export function AppearancePreview() {
                             isDarkTheme,
                           )
                         : {
-                            color: "var(--color-bg-secondary)",
-                            text: "var(--color-text-secondary)",
-                            border: "var(--color-border)",
+                            color: "var(--dg-color-bg-secondary)",
+                            text: "var(--dg-color-text-secondary)",
+                            border: "var(--dg-color-border)",
                           };
                     return (
                       <div

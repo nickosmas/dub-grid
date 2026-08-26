@@ -45,7 +45,7 @@ function ForgotPasswordContent() {
     <PageShell>
       <Card>
         {/* Logo */}
-        <div className="dg-auth-logo-block" style={{ gap: "8px" }}>
+        <div className="dg-auth-logo-block dg-auth-logo-block--compact">
           <DubGridLogo size={44} />
           <DubGridWordmark />
         </div>
@@ -64,29 +64,12 @@ function ForgotPasswordContent() {
           />
         ) : (
           <>
-            <h1 className="dg-auth-heading" style={{ marginBottom: "8px" }}>
-              Forgot Password
-            </h1>
-            <p
-              style={{
-                fontSize: "var(--dg-fs-body-sm)",
-                color: "var(--color-text-muted)",
-                lineHeight: 1.5,
-                textAlign: "center",
-                marginBottom: "24px",
-              }}
-            >
+            <h1 className="dg-auth-heading dg-auth-page-heading">Forgot Password</h1>
+            <p className="dg-auth-description">
               Enter your email address and we&apos;ll send you a link to reset your password.
             </p>
 
-            <Form
-              onSubmit={handleSubmit}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-              }}
-            >
+            <Form onSubmit={handleSubmit} className="dg-auth-form">
               <div>
                 <label htmlFor="forgot-email" className="dg-auth-field-label">
                   Email
@@ -108,16 +91,12 @@ function ForgotPasswordContent() {
               <button
                 type="submit"
                 disabled={loading}
-                className="dg-btn dg-btn-primary dg-btn-lg"
-                style={{
-                  marginTop: "4px",
-                  width: "100%",
-                }}
+                className="dg-btn dg-btn-primary dg-btn-lg dg-auth-submit"
               >
                 <ButtonLoading
                   loading={loading}
                   loadingLabel="Sending Reset Link"
-                  spinnerColor="var(--color-text-inverse)"
+                  spinnerColor="var(--dg-color-text-inverse)"
                   spinnerSize={20}
                 >
                   Send Reset Link
@@ -125,19 +104,8 @@ function ForgotPasswordContent() {
               </button>
             </Form>
 
-            <div
-              style={{
-                marginTop: "20px",
-                textAlign: "center",
-              }}
-            >
-              <Link
-                href="/login"
-                className="dg-auth-link"
-                style={{
-                  color: "var(--color-text-subtle)",
-                }}
-              >
+            <div className="dg-auth-back-link">
+              <Link href="/login" className="dg-auth-link dg-auth-link--subtle">
                 Back to login
               </Link>
             </div>

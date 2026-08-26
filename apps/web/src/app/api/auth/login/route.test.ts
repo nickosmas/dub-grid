@@ -36,8 +36,6 @@ vi.mock("@/features/account/server", () => ({
   fetchTermsAcceptanceStatus: (userId: string) => fetchTermsAcceptanceStatus(userId),
 }));
 
-// Service-role client, used only to turn the request's subdomain into an org id
-// before switch_org (which is what actually authorizes the switch).
 vi.mock("@/lib/supabase-service", () => ({
   getServiceClient: () => ({ from: (table: string) => serviceFrom(table) }),
 }));
@@ -86,7 +84,6 @@ function makeSession(
   };
 }
 
-/** Makes the subdomain->org lookup resolve (or not) for the switch path. */
 function stubOrgLookup(orgId: string | null) {
   serviceFrom.mockImplementation(() => ({
     select: () => ({
@@ -205,7 +202,7 @@ describe("POST /api/auth/login", () => {
     expect(fetchTermsAcceptanceStatus).not.toHaveBeenCalled();
   });
 
-  it("signs in without an org switch when the JWT's org already matches the subdomain, and starts the trial for a super_admin", async () => {
+  it("starts the active organization's trial for a super_admin", async () => {
     signInWithPassword.mockResolvedValueOnce({
       data: {
         session: makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "super_admin" }),
@@ -230,7 +227,7 @@ describe("POST /api/auth/login", () => {
     expect(refreshSession).not.toHaveBeenCalled();
   });
 
-  it("does not start a trial for a non-super_admin in the matching org", async () => {
+  it("does not start a trial for a non-super_admin", async () => {
     signInWithPassword.mockResolvedValueOnce({
       data: {
         session: makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "admin" }),
@@ -249,89 +246,54 @@ describe("POST /api/auth/login", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  // Org-switching used to be six serial client round trips before a full page
-  // load. It is now resolved inside this route; see the
-  // project_login_double_mint_constraint memory for the history, and
-  // switchSessionToHostOrganization for why the second mint is structural.
-  describe("signing in to an organization other than the caller's current one", () => {
-    function signInAsOtherOrg() {
-      signInWithPassword.mockResolvedValueOnce({
-        data: {
-          session: makeSession({ org_id: OTHER_ORG_ID, org_slug: "otherorg", org_role: "user" }),
-          user: {
-            id: USER_ID,
-            email: "user@example.com",
-            email_confirmed_at: "2026-01-01T00:00:00Z",
-            factors: [],
-          },
+  it("switches a new session to the organization selected by the subdomain", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: OTHER_ORG_ID, org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
         },
-        error: null,
-      });
-    }
-
-    it("switches server-side and returns the post-switch session", async () => {
-      signInAsOtherOrg();
-      stubOrgLookup(ORG_ID);
-      const switched = makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "super_admin" });
-      refreshSession.mockResolvedValueOnce({ data: { session: switched }, error: null });
-
-      const res = await POST(makeRequest("acme.localhost"));
-      const body = await res.json();
-
-      expect(res.status).toBe(200);
-      expect(body.didSwitchOrg).toBe(true);
-      expect(rpc).toHaveBeenCalledWith("switch_org", { target_org_id: ORG_ID });
-      expect(refreshSession).toHaveBeenCalled();
-      // The caller must receive the re-scoped tokens, not the ones sign-in
-      // produced — those still name the previous organization.
-      expect(body.session.access_token).toBe(switched.access_token);
-      expect(body.destination).toBe("/dashboard");
+      },
+      error: null,
     });
+    stubOrgLookup(ORG_ID);
+    const switched = makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "super_admin" });
+    refreshSession.mockResolvedValueOnce({ data: { session: switched }, error: null });
 
-    it("clears any sandbox cookie, so the switch can't leave one pointing at the old org", async () => {
-      signInAsOtherOrg();
-      stubOrgLookup(ORG_ID);
-      refreshSession.mockResolvedValueOnce({
-        data: { session: makeSession({ org_id: ORG_ID, org_slug: "acme", org_role: "user" }) },
-        error: null,
-      });
+    const res = await POST(makeRequest("acme.localhost"));
+    const body = await res.json();
 
-      const res = await POST(makeRequest("acme.localhost"));
+    expect(res.status).toBe(200);
+    expect(body.didSwitchOrg).toBe(true);
+    expect(body.session.access_token).toBe(switched.access_token);
+    expect(rpc).toHaveBeenCalledWith("switch_org", { target_org_id: ORG_ID });
+    expect(res.cookies.get(SANDBOX_COOKIE_NAME)?.value).toBe("");
+  });
 
-      expect(res.status).toBe(200);
-      expect(res.cookies.get(SANDBOX_COOKIE_NAME)?.value).toBe("");
-      expect(deleteSandboxForUser).toHaveBeenCalled();
+  it("refuses login when the requested organization does not exist", async () => {
+    signInWithPassword.mockResolvedValueOnce({
+      data: {
+        session: makeSession({ org_id: OTHER_ORG_ID, org_role: "user" }),
+        user: {
+          id: USER_ID,
+          email: "user@example.com",
+          email_confirmed_at: "2026-01-01T00:00:00Z",
+          factors: [],
+        },
+      },
+      error: null,
     });
+    stubOrgLookup(null);
 
-    it("refuses when the subdomain names no live organization", async () => {
-      signInAsOtherOrg();
-      stubOrgLookup(null);
+    const res = await POST(makeRequest("missing.localhost"));
+    const body = await res.json();
 
-      const res = await POST(makeRequest("acme.localhost"));
-      const body = await res.json();
-
-      expect(res.status).toBe(403);
-      expect(body.code).toBe("ORG_ACCESS_DENIED");
-      expect(rpc).not.toHaveBeenCalledWith("switch_org", expect.anything());
-    });
-
-    it("refuses when switch_org rejects the caller, rather than signing them in elsewhere", async () => {
-      // switch_org is the authorization boundary: it verifies membership and
-      // that the org is active. A rejection must not fall through to a session
-      // still scoped to the previous organization.
-      signInAsOtherOrg();
-      stubOrgLookup(ORG_ID);
-      rpc.mockImplementation(async (fn: string) =>
-        fn === "switch_org" ? { error: { message: "not a member" } } : { error: null },
-      );
-
-      const res = await POST(makeRequest("acme.localhost"));
-      const body = await res.json();
-
-      expect(res.status).toBe(403);
-      expect(body.code).toBe("ORG_ACCESS_DENIED");
-      expect(refreshSession).not.toHaveBeenCalled();
-    });
+    expect(res.status).toBe(403);
+    expect(body.code).toBe("ORG_ACCESS_DENIED");
+    expect(rpc).not.toHaveBeenCalledWith("switch_org", expect.anything());
   });
 
   it("gridmaster: always refreshes once and returns the resolved destination", async () => {

@@ -6,16 +6,16 @@ import Modal from "@/components/Modal";
 import CustomSelect from "@/components/CustomSelect";
 
 const STATUS_COLORS = {
-  green: { bg: "var(--color-success-border)", text: "var(--color-success-text)" },
-  amber: { bg: "var(--color-warning-border)", text: "var(--color-warning-text)" },
-  red: { bg: "var(--color-danger-border)", text: "var(--color-danger-text)" },
-  none: { bg: "var(--color-bg-secondary)", text: "var(--color-text-subtle)" },
+  green: { bg: "var(--dg-color-success-border)", text: "var(--dg-color-success-text)" },
+  amber: { bg: "var(--dg-color-warning-border)", text: "var(--dg-color-warning-text)" },
+  red: { bg: "var(--dg-color-danger-border)", text: "var(--dg-color-danger-text)" },
+  none: { bg: "var(--dg-color-bg-secondary)", text: "var(--dg-color-text-subtle)" },
 };
 
 const PCT_COLORS = {
-  green: "var(--color-success)",
-  amber: "var(--color-warning)",
-  red: "var(--color-danger)",
+  green: "var(--dg-color-success)",
+  amber: "var(--dg-color-warning)",
+  red: "var(--dg-color-danger)",
 };
 
 interface ExpandedCoverageProps {
@@ -68,10 +68,10 @@ export default function ExpandedCoverage({
                 style={{
                   padding: "10px 12px",
                   borderRadius: "var(--dg-radius-sm)",
-                  background: "var(--color-bg)",
-                  border: "1px dashed var(--color-border)",
+                  background: "var(--dg-color-bg)",
+                  border: "1px dashed var(--dg-color-border)",
                   fontSize: 11,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                 }}
               >
                 Showing published dates only.
@@ -86,8 +86,8 @@ export default function ExpandedCoverage({
                 alignItems: "center",
                 padding: 16,
                 borderRadius: "var(--dg-radius-md)",
-                background: "var(--color-bg)",
-                border: "1px solid var(--color-border)",
+                background: "var(--dg-color-bg)",
+                border: "1px solid var(--dg-color-border)",
               }}
             >
               <div style={summaryBadgeStyle}>
@@ -100,11 +100,13 @@ export default function ExpandedCoverage({
                 >
                   {overallPct}%
                 </span>
-                <span style={{ color: "var(--color-text-subtle)" }}>overall</span>
+                <span style={{ color: "var(--dg-color-text-subtle)" }}>overall</span>
               </div>
               <div style={summaryBadgeStyle}>
                 <span style={{ fontWeight: 700 }}>{totalFilled}</span>
-                <span style={{ color: "var(--color-text-subtle)" }}>/ {totalRequired} filled</span>
+                <span style={{ color: "var(--dg-color-text-subtle)" }}>
+                  / {totalRequired} filled
+                </span>
               </div>
               <CustomSelect
                 value={filter === "all" ? "all" : String(filter)}
@@ -140,8 +142,8 @@ export default function ExpandedCoverage({
                             gap: 6,
                             padding: "14px 16px",
                             borderRadius: "var(--dg-radius-md)",
-                            border: "1px solid var(--color-border)",
-                            background: "var(--color-bg)",
+                            border: "1px solid var(--dg-color-border)",
+                            background: "var(--dg-color-bg)",
                           }}
                         >
                           <div
@@ -156,14 +158,14 @@ export default function ExpandedCoverage({
                                 style={{
                                   fontSize: 13,
                                   fontWeight: 500,
-                                  color: "var(--color-text-primary)",
+                                  color: "var(--dg-color-text-primary)",
                                 }}
                               >
                                 {sec.focusAreaName}
                               </span>
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <span style={{ fontSize: 12, color: "var(--color-text-subtle)" }}>
+                              <span style={{ fontSize: 12, color: "var(--dg-color-text-subtle)" }}>
                                 {sec.filledTotal} / {sec.requiredTotal} filled
                               </span>
                               <span
@@ -180,7 +182,7 @@ export default function ExpandedCoverage({
                           <div
                             style={{
                               height: 8,
-                              background: "var(--color-border)",
+                              background: "var(--dg-color-border)",
                               borderRadius: 4,
                               overflow: "hidden",
                             }}
@@ -278,14 +280,14 @@ const summaryBadgeStyle = {
   fontSize: 13,
   padding: "8px 12px",
   borderRadius: "var(--dg-radius-md)",
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-border)",
+  background: "var(--dg-color-surface)",
+  border: "1px solid var(--dg-color-border)",
 };
 
 const heatmapLabelStyle = {
   fontSize: 11,
   fontWeight: 600 as const,
-  color: "var(--color-text-subtle)",
+  color: "var(--dg-color-text-subtle)",
   marginBottom: 10,
   textTransform: "uppercase" as const,
   letterSpacing: "0.04em",
@@ -293,7 +295,7 @@ const heatmapLabelStyle = {
 
 const heatmapHeaderStyle = {
   fontSize: 10,
-  color: "var(--color-text-subtle)",
+  color: "var(--dg-color-text-subtle)",
   textAlign: "center" as const,
   fontWeight: 500,
   padding: "2px 0",
@@ -301,7 +303,7 @@ const heatmapHeaderStyle = {
 
 const heatmapRowLabelStyle = {
   fontSize: 11,
-  color: "var(--color-text-subtle)",
+  color: "var(--dg-color-text-subtle)",
   textAlign: "right" as const,
   paddingRight: 8,
   lineHeight: "32px",
@@ -312,7 +314,7 @@ const heatmapRowLabelStyle = {
 
 const emptyStyle = {
   fontSize: 13,
-  color: "var(--color-text-subtle)",
+  color: "var(--dg-color-text-subtle)",
   textAlign: "center" as const,
   padding: "32px 0",
 };

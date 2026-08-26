@@ -37,7 +37,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
         style={{
           fontSize: "var(--dg-fs-footnote)",
           fontWeight: 600,
-          color: "var(--color-text-faint)",
+          color: "var(--dg-color-text-faint)",
           marginRight: 8,
           whiteSpace: "nowrap",
           display: "flex",
@@ -51,7 +51,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             width: 6,
             height: 6,
             borderRadius: "50%",
-            background: "var(--color-success)",
+            background: "var(--dg-color-success)",
           }}
         />
         <span role="status">{onlineUsers.length} online</span>
@@ -82,10 +82,10 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             justifyContent: "center",
             fontSize: "var(--dg-fs-footnote)",
             fontWeight: 700,
-            color: "var(--color-text-inverse)",
+            color: "var(--dg-color-text-inverse)",
             flexShrink: 0,
             marginLeft: i === 0 ? 0 : -8,
-            border: "2px solid var(--color-surface)",
+            border: "2px solid var(--dg-color-surface)",
             cursor: "default",
             zIndex: MAX_VISIBLE - i,
           }}
@@ -99,8 +99,8 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
               width: 8,
               height: 8,
               borderRadius: "50%",
-              background: user.editingCell ? "var(--color-brand)" : "var(--color-success)",
-              border: "2px solid var(--color-surface)",
+              background: user.editingCell ? "var(--dg-color-brand)" : "var(--dg-color-success)",
+              border: "2px solid var(--dg-color-surface)",
             }}
           />
         </div>
@@ -112,16 +112,16 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
             width: 28,
             height: 28,
             borderRadius: "50%",
-            background: "var(--color-bg-secondary)",
+            background: "var(--dg-color-bg-secondary)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: "var(--dg-fs-badge)",
             fontWeight: 700,
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             flexShrink: 0,
             marginLeft: -8,
-            border: "2px solid var(--color-surface)",
+            border: "2px solid var(--dg-color-surface)",
             zIndex: 0,
           }}
         >
@@ -139,14 +139,14 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
               left: tooltipPos.x,
               top: tooltipPos.y - 8,
               transform: "translate(-50%, -100%)",
-              background: "var(--color-surface)",
+              background: "var(--dg-color-surface)",
               padding: "6px 12px",
               borderRadius: 8,
               boxShadow: "0 4px 12px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05)",
               zIndex: 10000,
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               whiteSpace: "nowrap",
               pointerEvents: "none",
             }}
@@ -156,7 +156,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
               <span
                 style={{
                   fontWeight: 400,
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   marginLeft: 6,
                 }}
               >
@@ -167,7 +167,7 @@ export default function PresenceAvatars({ onlineUsers }: PresenceAvatarsProps) {
               <span
                 style={{
                   fontWeight: 400,
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   marginLeft: 6,
                 }}
               >

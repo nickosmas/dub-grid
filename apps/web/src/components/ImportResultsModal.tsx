@@ -46,7 +46,7 @@ export default function ImportResultsModal({
         style={{
           margin: "0 0 16px",
           fontSize: "var(--dg-fs-body-sm)",
-          color: "var(--color-text-secondary)",
+          color: "var(--dg-color-text-secondary)",
         }}
       >
         Imported {breakdown.imported} of {breakdown.totalSource} shift
@@ -69,7 +69,7 @@ export default function ImportResultsModal({
                   margin: "0 0 8px",
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 {label} ({rows.length})
@@ -81,7 +81,7 @@ export default function ImportResultsModal({
                   listStyle: "none",
                   display: "grid",
                   gap: 0,
-                  borderTop: "1px solid var(--color-border-light)",
+                  borderTop: "1px solid var(--dg-color-border-light)",
                 }}
               >
                 {rows.map((row, index) => (
@@ -92,9 +92,9 @@ export default function ImportResultsModal({
                       justifyContent: "space-between",
                       gap: 12,
                       padding: "6px 0",
-                      borderBottom: "1px solid var(--color-border-light)",
+                      borderBottom: "1px solid var(--dg-color-border-light)",
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-text-secondary)",
+                      color: "var(--dg-color-text-secondary)",
                     }}
                   >
                     <span>{nameByEmpId.get(row.employeeId) ?? "an employee"}</span>

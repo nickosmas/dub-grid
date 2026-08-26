@@ -980,7 +980,7 @@ export default function DashboardView({
           ? {
               display: "flex",
               flexDirection: "column",
-              height: "calc(100vh - var(--app-shell-header-h, 56px))",
+              height: "calc(100vh - var(--header-height))",
               overflow: "hidden",
             }
           : {}),
@@ -1147,14 +1147,14 @@ export default function DashboardView({
 
 const stickyBarStyle = {
   position: "sticky" as const,
-  top: "var(--app-shell-header-h, 56px)",
+  top: "var(--header-height)",
   zIndex: 99,
-  background: "var(--color-bg)",
+  background: "var(--dg-color-bg)",
 };
 
 const toolbarContainerStyle = {
   // Horizontally on the canonical page gutter, like Schedule's toolbar and
   // the header logo (see globals.css).
   padding: "12px var(--dg-page-gutter) 0",
-  borderBottom: "1px solid var(--color-border)",
+  borderBottom: "1px solid var(--dg-color-border)",
 };

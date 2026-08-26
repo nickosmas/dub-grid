@@ -123,9 +123,7 @@ async function resolveOrganizationId(
     .eq("slug", parsedHost.subdomain)
     .maybeSingle();
 
-  if (error) {
-    throw error;
-  }
+  if (error) throw error;
 
   return { orgId: (data?.id as string | undefined) ?? null, isGridmaster: false };
 }

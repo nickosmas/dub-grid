@@ -390,22 +390,12 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
       <PageShell signInDisclaimer>
         <Card>
           {/* Logo — links to apex landing page */}
-          <a href={apexHref} className="dg-auth-logo-block" style={{ marginBottom: "32px" }}>
+          <a href={apexHref} className="dg-auth-logo-block dg-auth-logo-block--spacious">
             <DubGridLogo size={52} />
             <DubGridWordmark />
           </a>
 
-          <p
-            style={{
-              textAlign: "center",
-              fontSize: "var(--dg-fs-body)",
-              color: "var(--color-text-secondary)",
-              fontWeight: 500,
-              margin: "0 0 4px",
-            }}
-          >
-            Sign in to
-          </p>
+          <p className="dg-auth-org-prefix">Sign in to</p>
           <h1 className="dg-auth-heading">{orgName ?? orgSlug}</h1>
 
           <EmailPasswordForm
@@ -420,15 +410,7 @@ export default function OrgLogin({ orgSlug, seed }: { orgSlug: string; seed: Org
             forgotPasswordHref="/forgot-password"
           />
 
-          <div
-            style={{
-              marginTop: "20px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "12px",
-            }}
-          >
+          <div className="dg-auth-org-navigation">
             <Button
               type="button"
               onClick={() => {

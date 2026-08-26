@@ -46,8 +46,13 @@ export const MENTORED_CORNER_CLEARANCE = 21;
 export const LOCK_CORNER_CLEARANCE = 26;
 
 /** Leg length of the request corner fold, and the room a neighbour must leave it. */
-export const REQUEST_FOLD_SIZE = 12;
-export const REQUEST_FOLD_CLEARANCE = 16;
+export const REQUEST_FOLD_SIZE = 16;
+/**
+ * Derived, not a second literal: the clearance only ever means "the fold plus a
+ * little air", so resizing the fold used to mean remembering to move this too,
+ * and a stale value here parks the diff badge on top of the triangle.
+ */
+export const REQUEST_FOLD_CLEARANCE = REQUEST_FOLD_SIZE + 4;
 
 export function GridDiffBadge({ badge }: { badge: GridDiffBadgeConfig }) {
   const topOffset = badge.topOffset ?? 1;
@@ -155,8 +160,8 @@ export function MentoredShiftBadge({
  * keeps pending approval on the same warning axis the board already puts it on.
  */
 const REQUEST_FOLD_COLORS: Record<ActiveShiftRequestStatus, string> = {
-  open: "var(--color-danger)",
-  pending_approval: "var(--color-warning)",
+  open: "var(--dg-color-danger)",
+  pending_approval: "var(--dg-color-warning)",
 };
 
 /**
@@ -234,9 +239,9 @@ export function AuthorBadge({
           fontWeight: 600,
           lineHeight: 1.3,
           textAlign: "left",
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           padding: "2px 7px",
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           borderRadius: 999,
           border: "1px solid rgba(0,0,0,0.08)",
           boxShadow: "0 0.5px 1px rgba(0,0,0,0.06)",

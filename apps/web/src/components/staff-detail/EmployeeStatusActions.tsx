@@ -80,7 +80,13 @@ export function EmployeeStatusActions({
   // Self-action guard: you can't deactivate / remove / activate your own record.
   if (isSelf) {
     return (
-      <p style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)", margin: 0 }}>
+      <p
+        style={{
+          fontSize: "var(--dg-fs-footnote)",
+          color: "var(--dg-color-text-muted)",
+          margin: 0,
+        }}
+      >
         {SELF_ACTION_FORBIDDEN_MESSAGE}
       </p>
     );
@@ -98,7 +104,7 @@ export function EmployeeStatusActions({
           flexWrap: "wrap",
         }}
       >
-        <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+        <span style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
           Invitation pending
         </span>
         <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
@@ -106,7 +112,7 @@ export function EmployeeStatusActions({
             disabled={revoking}
             onClick={() => setPendingInvitationAction("reinvite")}
             className="dg-btn dg-btn-ghost dg-btn-xs"
-            style={{ color: "var(--color-link)" }}
+            style={{ color: "var(--dg-color-link)" }}
           >
             <ButtonLoading loading={revoking} loadingLabel="Sending" spinnerSize={12}>
               Reinvite
@@ -117,7 +123,7 @@ export function EmployeeStatusActions({
               disabled={revoking}
               onClick={() => setPendingInvitationAction("revoke")}
               className="dg-btn dg-btn-ghost dg-btn-xs"
-              style={{ color: "var(--color-danger)" }}
+              style={{ color: "var(--dg-color-danger)" }}
             >
               <ButtonLoading loading={revoking} loadingLabel="Revoking" spinnerSize={12}>
                 Revoke
@@ -152,7 +158,7 @@ export function EmployeeStatusActions({
                 value="inactive"
                 checked={!isRemove}
                 onChange={() => setOutcome("inactive")}
-                className="appearance-none aspect-square w-4 h-4 shrink-0 mt-0.5 rounded-full border-2 border-[var(--color-border)] box-border cursor-pointer relative checked:border-[var(--color-warning)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--color-warning)]"
+                className="appearance-none aspect-square w-4 h-4 shrink-0 mt-0.5 rounded-full border-2 border-[var(--dg-color-border)] box-border cursor-pointer relative checked:border-[var(--dg-color-warning)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--dg-color-warning)]"
               />
               <span>
                 <span style={{ display: "block", fontWeight: 600 }}>Mark inactive</span>
@@ -160,7 +166,7 @@ export function EmployeeStatusActions({
                   style={{
                     display: "block",
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                   }}
                 >
                   {isScheduled
@@ -183,7 +189,7 @@ export function EmployeeStatusActions({
                 value="remove"
                 checked={isRemove}
                 onChange={() => setOutcome("remove")}
-                className="appearance-none aspect-square w-4 h-4 shrink-0 mt-0.5 rounded-full border-2 border-[var(--color-border)] box-border cursor-pointer relative checked:border-[var(--color-danger)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--color-danger)]"
+                className="appearance-none aspect-square w-4 h-4 shrink-0 mt-0.5 rounded-full border-2 border-[var(--dg-color-border)] box-border cursor-pointer relative checked:border-[var(--dg-color-danger)] checked:before:absolute checked:before:inset-[2px] checked:before:rounded-full checked:before:bg-[var(--dg-color-danger)]"
               />
               <span>
                 <span style={{ display: "block", fontWeight: 600 }}>Remove from staff</span>
@@ -191,7 +197,7 @@ export function EmployeeStatusActions({
                   style={{
                     display: "block",
                     fontSize: "var(--dg-fs-label)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                   }}
                 >
                   They&apos;ll lose access and won&apos;t appear in active staff. You can reactivate
@@ -261,11 +267,11 @@ export function EmployeeStatusActions({
             style={
               variant === "page"
                 ? {
-                    color: "var(--color-success)",
-                    borderColor: "var(--color-success-border)",
-                    background: "var(--color-success-bg)",
+                    color: "var(--dg-color-success)",
+                    borderColor: "var(--dg-color-success-border)",
+                    background: "var(--dg-color-success-bg)",
                   }
-                : { color: "var(--color-success)" }
+                : { color: "var(--dg-color-success)" }
             }
           >
             <svg

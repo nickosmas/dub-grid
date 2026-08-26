@@ -238,10 +238,10 @@ export default function StaffView({
       {!isMobile && links.length > 1 && (
         <Sidebar
           collapsible="icon"
-          className="border-r border-[var(--color-border)] bg-[var(--color-surface)]"
+          className="border-r border-[var(--dg-color-border)] bg-[var(--dg-color-surface)]"
           style={{
-            top: "var(--app-shell-header-h, 56px)",
-            height: "calc(100dvh - var(--app-shell-header-h, 56px))",
+            top: "var(--header-height)",
+            height: "calc(100dvh - var(--header-height))",
           }}
           onWheel={(event: WheelEvent) => event.preventDefault()}
         >
@@ -262,13 +262,13 @@ export default function StaffView({
                         }
                         isActive={activeSection === link.id}
                         tooltip={link.label}
-                        className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)]"
+                        className="h-9 transition-all duration-150 ease-in-out data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-color-text-primary)]"
                       >
                         <span
                           className={
                             activeSection === link.id
-                              ? "flex shrink-0 items-center justify-center text-[var(--color-text-primary)] transition-colors"
-                              : "flex shrink-0 items-center justify-center text-[var(--color-text-faint)] transition-colors"
+                              ? "flex shrink-0 items-center justify-center text-[var(--dg-color-text-primary)] transition-colors"
+                              : "flex shrink-0 items-center justify-center text-[var(--dg-color-text-faint)] transition-colors"
                           }
                         >
                           {link.icon}
@@ -287,7 +287,7 @@ export default function StaffView({
                 <SidebarMenuButton
                   onClick={() => handleSidebarOpenChange(!sidebarOpen)}
                   tooltip={sidebarOpen ? "Collapse Menu" : "Expand Menu"}
-                  className="h-9 text-[var(--color-text-faint)] transition-all duration-150 ease-in-out hover:text-black"
+                  className="h-9 text-[var(--dg-color-text-faint)] transition-all duration-150 ease-in-out hover:text-black"
                 >
                   <span className="flex shrink-0 items-center justify-center">
                     <svg
@@ -316,7 +316,7 @@ export default function StaffView({
         </Sidebar>
       )}
 
-      <SidebarInset className="dg-page-enter bg-[var(--color-bg)]">
+      <SidebarInset className="dg-page-enter bg-[var(--dg-color-bg)]">
         {activeSection === "directory" && (
           <MembersSection
             employees={employees}

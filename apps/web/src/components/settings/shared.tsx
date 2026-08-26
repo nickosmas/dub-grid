@@ -24,13 +24,13 @@ export const inputStyle: React.CSSProperties = {
   padding: "0 10px",
   borderWidth: 1,
   borderStyle: "solid",
-  borderColor: "var(--color-border)",
+  borderColor: "var(--dg-color-border)",
   borderRadius: "var(--dg-btn-radius)",
   fontSize: 13,
   fontWeight: 500,
   fontFamily: "inherit",
-  color: "var(--color-text-secondary)",
-  background: "var(--color-surface)",
+  color: "var(--dg-color-text-secondary)",
+  background: "var(--dg-color-surface)",
   outline: "none",
 };
 
@@ -109,8 +109,8 @@ export function PresetColorPicker({
               height: 40,
               padding: 4,
               borderRadius: "9999px",
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
+              border: "1px solid var(--dg-color-border)",
+              background: "var(--dg-color-surface)",
               cursor: disabled ? "not-allowed" : "pointer",
               opacity: disabled ? 0.55 : 1,
             }}
@@ -157,8 +157,8 @@ export function PresetColorPicker({
               overscrollBehavior: "contain",
               padding: 14,
               borderRadius: "var(--dg-radius-lg)",
-              background: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
+              background: "var(--dg-color-surface)",
+              border: "1px solid var(--dg-color-border)",
               boxShadow: "var(--shadow-menu)",
             }}
           >
@@ -178,7 +178,7 @@ export function PresetColorPicker({
                     fontWeight: 800,
                     letterSpacing: "0.08em",
                     textTransform: "uppercase",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                   }}
                 >
                   Palette
@@ -187,7 +187,7 @@ export function PresetColorPicker({
                   style={{
                     fontSize: "var(--dg-fs-label)",
                     fontWeight: 700,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                   }}
                 >
                   {active.name}
@@ -215,7 +215,7 @@ export function PresetColorPicker({
                       fontWeight: 800,
                       letterSpacing: "0.08em",
                       textTransform: "uppercase",
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                     }}
                   >
                     {group.label}
@@ -249,7 +249,7 @@ export function PresetColorPicker({
                               border:
                                 active.id === color.id
                                   ? `2px solid ${colorDisplay.text}`
-                                  : "1px solid var(--color-border)",
+                                  : "1px solid var(--dg-color-border)",
                               cursor: disabled ? "not-allowed" : "pointer",
                               padding: 0,
                               display: "flex",
@@ -331,7 +331,7 @@ export function TimeInput12h({
         fontSize={13}
         style={{ width: 72 }}
       />
-      <span style={{ fontWeight: 700, color: "var(--color-text-muted)" }}>:</span>
+      <span style={{ fontWeight: 700, color: "var(--dg-color-text-muted)" }}>:</span>
       <CustomSelect
         value={minute}
         options={minuteOptions}

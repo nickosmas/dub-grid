@@ -205,7 +205,7 @@ export default function EnhancedImpersonation({
           margin: "0 0 4px",
           fontSize: "var(--dg-fs-page-title)",
           fontWeight: 700,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
         }}
       >
         User Impersonation
@@ -214,7 +214,7 @@ export default function EnhancedImpersonation({
         style={{
           margin: "0 0 20px",
           fontSize: "var(--dg-fs-label)",
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
         }}
       >
         {preSelected
@@ -226,8 +226,8 @@ export default function EnhancedImpersonation({
       {sessionId && (
         <div
           style={{
-            background: "var(--color-info-bg)",
-            border: "1px solid var(--color-info)",
+            background: "var(--dg-color-info-bg)",
+            border: "1px solid var(--dg-color-info)",
             borderRadius: "var(--dg-radius-lg)",
             padding: "14px 20px",
             marginBottom: 20,
@@ -241,7 +241,7 @@ export default function EnhancedImpersonation({
               style={{
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
-                color: "var(--color-info)",
+                color: "var(--dg-color-info)",
               }}
             >
               Active Session
@@ -249,7 +249,7 @@ export default function EnhancedImpersonation({
             <div
               style={{
                 fontSize: "var(--dg-fs-caption)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 marginTop: 4,
               }}
             >
@@ -261,7 +261,7 @@ export default function EnhancedImpersonation({
                 style={{
                   fontSize: "var(--dg-fs-card-title)",
                   fontWeight: 700,
-                  color: "var(--color-info)",
+                  color: "var(--dg-color-info)",
                   marginTop: 6,
                   fontFamily: "var(--font-dm-mono), monospace",
                 }}
@@ -316,7 +316,7 @@ export default function EnhancedImpersonation({
                   style={{
                     padding: 16,
                     textAlign: "center",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     fontSize: "var(--dg-fs-label)",
                   }}
                 >
@@ -334,9 +334,9 @@ export default function EnhancedImpersonation({
                         alignItems: "center",
                         width: "100%",
                         padding: "8px 12px",
-                        background: isSelected ? "var(--color-bg-secondary)" : "transparent",
+                        background: isSelected ? "var(--dg-color-bg-secondary)" : "transparent",
                         border: isSelected
-                          ? "1px solid var(--color-border)"
+                          ? "1px solid var(--dg-color-border)"
                           : "1px solid transparent",
                         borderRadius: 8,
                         cursor: "pointer",
@@ -351,7 +351,7 @@ export default function EnhancedImpersonation({
                           style={{
                             fontSize: "var(--dg-fs-label)",
                             fontWeight: 600,
-                            color: "var(--color-text-primary)",
+                            color: "var(--dg-color-text-primary)",
                           }}
                         >
                           {o.name}
@@ -360,7 +360,7 @@ export default function EnhancedImpersonation({
                           <div
                             style={{
                               fontSize: "var(--dg-fs-footnote)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                               fontFamily: "var(--font-dm-mono), monospace",
                               marginTop: 1,
                             }}
@@ -373,7 +373,7 @@ export default function EnhancedImpersonation({
                         <span
                           style={{
                             fontSize: "var(--dg-fs-caption)",
-                            color: "var(--color-info)",
+                            color: "var(--dg-color-info)",
                             fontWeight: 600,
                           }}
                         >
@@ -399,8 +399,8 @@ export default function EnhancedImpersonation({
                 aria-hidden
                 style={{
                   padding: "10px 14px",
-                  background: "var(--color-bg-secondary)",
-                  border: "1px solid var(--color-border)",
+                  background: "var(--dg-color-bg-secondary)",
+                  border: "1px solid var(--dg-color-border)",
                   borderRadius: "var(--dg-radius-md)",
                   display: "flex",
                   flexDirection: "column",
@@ -415,7 +415,7 @@ export default function EnhancedImpersonation({
               <div
                 style={{
                   padding: 20,
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
@@ -428,7 +428,7 @@ export default function EnhancedImpersonation({
               <div
                 style={{
                   padding: 20,
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
@@ -439,8 +439,8 @@ export default function EnhancedImpersonation({
                 <div
                   style={{
                     padding: "10px 14px",
-                    background: "var(--color-bg-secondary)",
-                    border: "1px solid var(--color-border)",
+                    background: "var(--dg-color-bg-secondary)",
+                    border: "1px solid var(--dg-color-border)",
                     borderRadius: "var(--dg-radius-md)",
                   }}
                 >
@@ -448,7 +448,7 @@ export default function EnhancedImpersonation({
                     style={{
                       fontSize: "var(--dg-fs-label)",
                       fontWeight: 600,
-                      color: "var(--color-text-primary)",
+                      color: "var(--dg-color-text-primary)",
                     }}
                   >
                     {selectedUser.email}
@@ -456,7 +456,7 @@ export default function EnhancedImpersonation({
                   <div
                     style={{
                       fontSize: "var(--dg-fs-footnote)",
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       marginTop: 2,
                     }}
                   >
@@ -469,7 +469,7 @@ export default function EnhancedImpersonation({
                       display: "block",
                       fontSize: "var(--dg-fs-label)",
                       fontWeight: 600,
-                      color: "var(--color-text-primary)",
+                      color: "var(--dg-color-text-primary)",
                     }}
                   >
                     Role Override{" "}
@@ -477,7 +477,7 @@ export default function EnhancedImpersonation({
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
                         fontWeight: 400,
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       (optional)
@@ -504,10 +504,10 @@ export default function EnhancedImpersonation({
                       display: "block",
                       fontSize: "var(--dg-fs-label)",
                       fontWeight: 600,
-                      color: "var(--color-text-primary)",
+                      color: "var(--dg-color-text-primary)",
                     }}
                   >
-                    Justification <span style={{ color: "var(--color-danger)" }}>*</span>
+                    Justification <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                   </label>
                   <textarea
                     className="dg-input"
@@ -521,7 +521,7 @@ export default function EnhancedImpersonation({
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                         marginTop: 4,
                       }}
                     >
@@ -594,7 +594,7 @@ export default function EnhancedImpersonation({
                 style={{
                   padding: 20,
                   textAlign: "center",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
@@ -604,7 +604,7 @@ export default function EnhancedImpersonation({
               <div
                 style={{
                   padding: 20,
-                  color: "var(--color-danger)",
+                  color: "var(--dg-color-danger)",
                   fontSize: "var(--dg-fs-label)",
                 }}
               >
@@ -620,7 +620,7 @@ export default function EnhancedImpersonation({
                     style={{
                       padding: 16,
                       textAlign: "center",
-                      color: "var(--color-text-muted)",
+                      color: "var(--dg-color-text-muted)",
                       fontSize: "var(--dg-fs-label)",
                     }}
                   >
@@ -638,9 +638,9 @@ export default function EnhancedImpersonation({
                           alignItems: "center",
                           width: "100%",
                           padding: "8px 12px",
-                          background: isSelected ? "var(--color-bg-secondary)" : "transparent",
+                          background: isSelected ? "var(--dg-color-bg-secondary)" : "transparent",
                           border: isSelected
-                            ? "1px solid var(--color-border)"
+                            ? "1px solid var(--dg-color-border)"
                             : "1px solid transparent",
                           borderRadius: 8,
                           cursor: "pointer",
@@ -655,7 +655,7 @@ export default function EnhancedImpersonation({
                             style={{
                               fontSize: "var(--dg-fs-label)",
                               fontWeight: 600,
-                              color: "var(--color-text-primary)",
+                              color: "var(--dg-color-text-primary)",
                             }}
                           >
                             {u.email ?? "No email"}
@@ -663,7 +663,7 @@ export default function EnhancedImpersonation({
                           <div
                             style={{
                               fontSize: "var(--dg-fs-footnote)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                               marginTop: 1,
                             }}
                           >
@@ -674,7 +674,7 @@ export default function EnhancedImpersonation({
                           <span
                             style={{
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-info)",
+                              color: "var(--dg-color-info)",
                               fontWeight: 600,
                             }}
                           >
@@ -696,7 +696,7 @@ export default function EnhancedImpersonation({
                       display: "block",
                       fontSize: "var(--dg-fs-label)",
                       fontWeight: 600,
-                      color: "var(--color-text-primary)",
+                      color: "var(--dg-color-text-primary)",
                     }}
                   >
                     Role Override{" "}
@@ -704,7 +704,7 @@ export default function EnhancedImpersonation({
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
                         fontWeight: 400,
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                       }}
                     >
                       (optional)
@@ -731,10 +731,10 @@ export default function EnhancedImpersonation({
                       display: "block",
                       fontSize: "var(--dg-fs-label)",
                       fontWeight: 600,
-                      color: "var(--color-text-primary)",
+                      color: "var(--dg-color-text-primary)",
                     }}
                   >
-                    Justification <span style={{ color: "var(--color-danger)" }}>*</span>
+                    Justification <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                   </label>
                   <textarea
                     className="dg-input"
@@ -748,7 +748,7 @@ export default function EnhancedImpersonation({
                     <div
                       style={{
                         fontSize: "var(--dg-fs-footnote)",
-                        color: "var(--color-danger)",
+                        color: "var(--dg-color-danger)",
                         marginTop: 4,
                       }}
                     >

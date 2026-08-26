@@ -28,21 +28,8 @@ import type {
   ShiftCatRow,
 } from "./types";
 
-export async function validateOrganizationSlug(slug: string): Promise<boolean> {
-  if (!slug) return false;
-
-  try {
-    const response = await fetch(`/api/validate-domain?slug=${encodeURIComponent(slug)}`);
-    const json = await response.json();
-    return json.valid === false;
-  } catch {
-    return false;
-  }
-}
-
 type CreateOrganizationSetupInput = {
   name: string;
-  slug: string;
   addressLine1: string;
   addressLine2: string;
   addressCity: string;

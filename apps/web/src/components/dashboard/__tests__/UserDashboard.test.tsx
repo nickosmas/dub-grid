@@ -466,7 +466,7 @@ describe("UserDashboard", () => {
     expect(todayDateTile.style.height).toBe("68px");
     expect(todayDateTile.style.alignSelf).toBe("center");
     expect(todayDateTile.style.borderRadius).toBe("16px");
-    expect(todayDateTile.style.background).toBe("var(--color-bg-secondary)");
+    expect(todayDateTile.style.background).toBe("var(--dg-color-bg-secondary)");
     expect(screen.getByTestId("user-dashboard-date-tile-today-dot")).toBeInTheDocument();
     expect(
       Array.from(myWeek.querySelectorAll("svg")).some(

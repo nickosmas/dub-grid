@@ -85,7 +85,7 @@ function Field({ label, value }: { label: string; value: string | null | undefin
       <span
         style={{
           fontSize: "var(--dg-fs-body-sm)",
-          color: value ? "var(--color-text-primary)" : "var(--color-text-subtle)",
+          color: value ? "var(--dg-color-text-primary)" : "var(--dg-color-text-subtle)",
         }}
       >
         {value || "—"}
@@ -449,10 +449,10 @@ export function ProfilePanel({
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+              <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
                 Account details
               </div>
-              <div className="mt-1 text-[13px] text-[var(--color-text-muted)]">
+              <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
                 Name, email, and phone for this account.
               </div>
             </div>
@@ -473,7 +473,7 @@ export function ProfilePanel({
                 e.preventDefault();
                 requestSave();
               }}
-              className="flex flex-col gap-5 rounded-[var(--dg-radius-md)] border border-[var(--color-border)] bg-[var(--color-bg)] p-3"
+              className="flex flex-col gap-5 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] p-3"
             >
               {canEditProfileDirectly && (
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -568,10 +568,10 @@ export function ProfilePanel({
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+                <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
                   Management access
                 </div>
-                <div className="mt-1 text-[13px] text-[var(--color-text-muted)]">
+                <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
                   Your organization role and management department assignment.
                 </div>
               </div>
@@ -589,7 +589,7 @@ export function ProfilePanel({
             <Field label="Role" value={ROLE_LABELS[role] ?? role} />
 
             {isEditingAccess ? (
-              <div className="flex flex-col gap-3 rounded-[var(--dg-radius-md)] border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+              <div className="flex flex-col gap-3 rounded-[var(--dg-radius-md)] border border-[var(--dg-color-border)] bg-[var(--dg-color-bg)] p-3">
                 <div>
                   <label className="dg-label">Management departments</label>
                   <div className="flex flex-wrap gap-1.5">
@@ -683,16 +683,16 @@ export function ProfilePanel({
         <SectionCard>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div>
-              <div className="text-[14px] font-semibold text-[var(--color-text-primary)]">
+              <div className="text-[14px] font-semibold text-[var(--dg-color-text-primary)]">
                 Name change requests
               </div>
-              <div className="mt-1 text-[13px] text-[var(--color-text-muted)]">
+              <div className="mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
                 Ask an admin to update your name. Email and phone are managed in Account details.
               </div>
             </div>
 
             {pendingNameRequest && (
-              <div className="rounded-[var(--dg-radius-md)] border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-3 text-[13px] text-[var(--color-warning-text)]">
+              <div className="rounded-[var(--dg-radius-md)] border border-[var(--dg-color-warning-border)] bg-[var(--dg-color-warning-bg)] p-3 text-[13px] text-[var(--dg-color-warning-text)]">
                 A name change request is pending admin review.
                 <Button
                   type="button"
@@ -768,7 +768,7 @@ export function ProfilePanel({
                 style={{ display: "inline-block", width: 180, height: 12, borderRadius: 4 }}
               />
             ) : changeRequests.length > 0 ? (
-              <p className="m-0 text-[13px] text-[var(--color-text-muted)]">
+              <p className="m-0 text-[13px] text-[var(--dg-color-text-muted)]">
                 Latest request: {formatClientLabel(changeRequests[0].status)}
               </p>
             ) : null}
@@ -783,20 +783,23 @@ export function ProfilePanel({
               display: "flex",
               flexDirection: "column",
               gap: 12,
-              borderTop: "1px solid var(--color-danger-bg)",
+              borderTop: "1px solid var(--dg-color-danger-bg)",
               paddingTop: 16,
             }}
           >
             <div>
-              <div className="text-[14px] font-semibold" style={{ color: "var(--color-danger)" }}>
+              <div
+                className="text-[14px] font-semibold"
+                style={{ color: "var(--dg-color-danger)" }}
+              >
                 Delete account
               </div>
-              <p className="mb-0 mt-1 text-[13px] text-[var(--color-text-muted)]">
+              <p className="mb-0 mt-1 text-[13px] text-[var(--dg-color-text-muted)]">
                 Request that an admin delete your account. This is irreversible.
               </p>
             </div>
             {pendingDeletion ? (
-              <div className="rounded-[var(--dg-radius-md)] border border-[var(--color-warning-border)] bg-[var(--color-warning-bg)] p-3 text-[13px] text-[var(--color-warning-text)]">
+              <div className="rounded-[var(--dg-radius-md)] border border-[var(--dg-color-warning-border)] bg-[var(--dg-color-warning-bg)] p-3 text-[13px] text-[var(--dg-color-warning-text)]">
                 Account deletion request pending admin review.
                 <Button
                   type="button"

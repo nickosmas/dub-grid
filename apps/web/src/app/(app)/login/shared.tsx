@@ -100,23 +100,15 @@ export function useSessionInvalidToast() {
 
 export function AccountDisabledModal({ onClose }: { onClose: () => void }) {
   return (
-    <Modal title="Account disabled" onClose={onClose} style={{ maxWidth: 400 }}>
-      <p
-        style={{
-          margin: "0 0 20px",
-          fontSize: "var(--dg-fs-body-sm)",
-          lineHeight: 1.5,
-          color: "var(--color-text-secondary)",
-        }}
-      >
+    <Modal title="Account disabled" onClose={onClose} className="dg-modal--account-disabled">
+      <p className="dg-auth-modal-copy">
         Your organization disabled this account. Contact your administrator if you think that's a
         mistake.
       </p>
       <Button
         type="button"
         onClick={onClose}
-        className="dg-btn dg-btn-primary"
-        style={{ width: "100%" }}
+        className="dg-btn dg-btn-primary dg-auth-state-primary"
       >
         OK
       </Button>

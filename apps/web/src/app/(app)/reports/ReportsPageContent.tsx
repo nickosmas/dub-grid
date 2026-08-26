@@ -485,7 +485,7 @@ function TargetDropdown({
         <ChevronDown
           size={16}
           style={{
-            color: "var(--color-text-faint)",
+            color: "var(--dg-color-text-faint)",
             flexShrink: 0,
             transform: open ? "rotate(180deg)" : "rotate(0deg)",
             transition: "transform 150ms ease",
@@ -741,9 +741,9 @@ function ReportsContent() {
   return (
     <main
       style={{
-        minHeight: "calc(100vh - var(--app-shell-header-h, 56px))",
-        background: "var(--color-bg)",
-        color: "var(--color-text-primary)",
+        minHeight: "calc(100vh - var(--header-height))",
+        background: "var(--dg-color-bg)",
+        color: "var(--dg-color-text-primary)",
         padding: "28px var(--dg-page-gutter)",
       }}
     >
@@ -762,7 +762,7 @@ function ReportsContent() {
           <div>
             <h1
               style={{
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
                 fontSize: "var(--dg-fs-page-title)",
                 fontWeight: 800,
                 lineHeight: 1.1,
@@ -1013,7 +1013,7 @@ function ReportsContent() {
 const controlLabelStyle: CSSProperties = {
   display: "grid",
   gap: 6,
-  color: "var(--color-text-muted)",
+  color: "var(--dg-color-text-muted)",
   fontSize: "var(--dg-fs-label)",
   fontWeight: 700,
   minWidth: 0,
@@ -1064,8 +1064,8 @@ const datePickerLabelStyle: CSSProperties = {
 };
 
 const calendarPopoverStyle: CSSProperties = {
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-border)",
+  background: "var(--dg-color-surface)",
+  border: "1px solid var(--dg-color-border)",
   borderRadius: 8,
   boxShadow: "0 18px 40px rgba(15, 23, 42, 0.14)",
   padding: 12,
@@ -1092,7 +1092,7 @@ const calendarNavButtonStyle: CSSProperties = {
 };
 
 const calendarMonthLabelStyle: CSSProperties = {
-  color: "var(--color-text-primary)",
+  color: "var(--dg-color-text-primary)",
   flex: 1,
   fontSize: "var(--dg-fs-body)",
   fontWeight: 800,
@@ -1100,14 +1100,14 @@ const calendarMonthLabelStyle: CSSProperties = {
 };
 
 const calendarInstructionStyle: CSSProperties = {
-  color: "var(--color-text-muted)",
+  color: "var(--dg-color-text-muted)",
   fontSize: "var(--dg-fs-caption)",
   fontWeight: 800,
   marginBottom: 10,
 };
 
 const calendarWeekdayGridStyle: CSSProperties = {
-  color: "var(--color-text-muted)",
+  color: "var(--dg-color-text-muted)",
   display: "grid",
   fontSize: "var(--dg-fs-caption)",
   fontWeight: 800,
@@ -1129,7 +1129,7 @@ const calendarDayStyle: CSSProperties = {
   borderRadius: 8,
   borderStyle: "solid",
   borderWidth: 1,
-  color: "var(--color-text-primary)",
+  color: "var(--dg-color-text-primary)",
   cursor: "pointer",
   display: "flex",
   fontFamily: "inherit",
@@ -1140,19 +1140,19 @@ const calendarDayStyle: CSSProperties = {
 };
 
 const calendarDaySelectedStyle: CSSProperties = {
-  background: "var(--color-brand-bg)",
-  borderColor: "var(--color-brand-border)",
-  color: "var(--color-brand)",
+  background: "var(--dg-color-brand-bg)",
+  borderColor: "var(--dg-color-brand-border)",
+  color: "var(--dg-color-brand)",
 };
 
 const calendarDayInRangeStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--color-brand-bg) 68%, transparent)",
+  background: "color-mix(in srgb, var(--dg-color-brand-bg) 68%, transparent)",
   borderColor: "transparent",
-  color: "var(--color-brand)",
+  color: "var(--dg-color-brand)",
 };
 
 const calendarDayMutedStyle: CSSProperties = {
-  color: "var(--color-text-subtle)",
+  color: "var(--dg-color-text-subtle)",
 };
 
 const calendarDayDisabledStyle: CSSProperties = {
@@ -1161,14 +1161,14 @@ const calendarDayDisabledStyle: CSSProperties = {
 };
 
 const metricStyle: CSSProperties = {
-  border: "1px solid var(--color-border)",
+  border: "1px solid var(--dg-color-border)",
   borderRadius: 8,
-  background: "var(--color-surface)",
+  background: "var(--dg-color-surface)",
   padding: 14,
 };
 
 const metricLabelStyle: CSSProperties = {
-  color: "var(--color-text-muted)",
+  color: "var(--dg-color-text-muted)",
   fontSize: "var(--dg-fs-caption)",
   fontWeight: 700,
   marginBottom: 6,
@@ -1193,13 +1193,13 @@ const targetDropdownButtonStyle: CSSProperties = {
 };
 
 const targetDropdownTitleStyle: CSSProperties = {
-  color: "var(--color-text-primary)",
+  color: "var(--dg-color-text-primary)",
   fontSize: "var(--dg-fs-body)",
   fontWeight: 800,
 };
 
 const targetDropdownSummaryStyle: CSSProperties = {
-  color: "var(--color-text-secondary)",
+  color: "var(--dg-color-text-secondary)",
   flex: 1,
   fontSize: "var(--dg-fs-body)",
   fontWeight: 500,
@@ -1210,8 +1210,8 @@ const targetDropdownSummaryStyle: CSSProperties = {
 };
 
 const targetDropdownPopoverStyle: CSSProperties = {
-  background: "var(--color-surface)",
-  border: "1px solid var(--color-border)",
+  background: "var(--dg-color-surface)",
+  border: "1px solid var(--dg-color-border)",
   borderRadius: 8,
   boxShadow: "0 18px 40px rgba(15, 23, 42, 0.14)",
   maxHeight: "min(420px, calc(100vh - 80px))",
@@ -1250,14 +1250,14 @@ const targetCheckStyle: CSSProperties = {
 };
 
 const targetEmptyStyle: CSSProperties = {
-  color: "var(--color-text-muted)",
+  color: "var(--dg-color-text-muted)",
   fontSize: "var(--dg-fs-caption)",
 };
 
 const tableShellStyle: CSSProperties = {
-  border: "1px solid var(--color-border)",
+  border: "1px solid var(--dg-color-border)",
   borderRadius: 8,
-  background: "var(--color-surface)",
+  background: "var(--dg-color-surface)",
   overflow: "hidden",
 };
 
@@ -1270,8 +1270,8 @@ const tableStyle: CSSProperties = {
 const thStyle: CSSProperties = {
   textAlign: "left",
   padding: "12px 14px",
-  borderBottom: "1px solid var(--color-border)",
-  color: "var(--color-text-muted)",
+  borderBottom: "1px solid var(--dg-color-border)",
+  color: "var(--dg-color-text-muted)",
   fontSize: "var(--dg-fs-caption)",
   fontWeight: 800,
   whiteSpace: "nowrap",
@@ -1279,20 +1279,20 @@ const thStyle: CSSProperties = {
 
 const tdStyle: CSSProperties = {
   padding: "12px 14px",
-  borderBottom: "1px solid var(--color-border-subtle)",
+  borderBottom: "1px solid var(--dg-color-border-subtle)",
   verticalAlign: "top",
   whiteSpace: "nowrap",
 };
 
 const stripedRowStyle: CSSProperties = {
-  background: "var(--color-bg-secondary)",
+  background: "var(--dg-color-bg-secondary)",
 };
 
 const emptyStateStyle: CSSProperties = {
   minHeight: 180,
   display: "grid",
   placeItems: "center",
-  color: "var(--color-text-muted)",
+  color: "var(--dg-color-text-muted)",
   fontSize: "var(--dg-fs-body)",
   padding: 24,
 };

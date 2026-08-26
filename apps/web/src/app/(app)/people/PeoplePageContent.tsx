@@ -87,7 +87,7 @@ function PeopleContent() {
           fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
         }}
       >
-        <p style={{ color: "var(--color-text-muted)" }}>{loadError}</p>
+        <p style={{ color: "var(--dg-color-text-muted)" }}>{loadError}</p>
       </div>
     );
   }

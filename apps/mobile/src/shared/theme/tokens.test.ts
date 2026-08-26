@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  colorTokens,
-  createWebCssVariables,
-  radiusTokens,
-  spacingTokens,
-} from "@dubgrid/design-tokens";
+import { colorTokens, radiusTokens, spacingTokens } from "@dubgrid/design-tokens";
 import {
   darkMobileColors,
   mobileBorderColorFromText,
@@ -68,9 +63,7 @@ describe("mobileDarkenTone", () => {
 });
 
 describe("shared design token derivation", () => {
-  it("keeps web runtime variables and mobile tokens sourced from the shared package", () => {
-    const webCssVariables = createWebCssVariables();
-
+  it("keeps mobile tokens sourced from the shared package", () => {
     expect({
       source: {
         brand: colorTokens.brand,
@@ -78,11 +71,6 @@ describe("shared design token derivation", () => {
         cardRadius: radiusTokens.card,
         screenX: spacingTokens.screenX,
         screenTitle: mobileTypography.text.screenTitle,
-      },
-      web: {
-        brand: webCssVariables["--dg-color-brand"],
-        surface: webCssVariables["--dg-color-surface"],
-        controlRadius: webCssVariables["--dg-btn-radius"],
       },
       mobile: {
         brand: mobileColors.brand,
@@ -113,11 +101,6 @@ describe("shared design token derivation", () => {
             "lineHeight": 28,
           },
           "screenX": 16,
-          "surface": "#FFFFFF",
-        },
-        "web": {
-          "brand": "#2563EB",
-          "controlRadius": "6px",
           "surface": "#FFFFFF",
         },
       }

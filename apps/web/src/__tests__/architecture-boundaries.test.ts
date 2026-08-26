@@ -83,18 +83,17 @@ function isIgnoredUiLayerSourceFile(relativePath: string): boolean {
 }
 
 describe("framework file placement", () => {
-  // Next.js only invokes middleware from the directory holding the app dir —
+  // Next.js only invokes Proxy from the directory holding the app dir —
   // `apps/web/src/`, since this app lives at `src/app`. A copy one level up at
-  // `apps/web/middleware.ts` still gets compiled into `middleware-manifest.json`
-  // and still type-checks and still passes every unit test in
+  // `apps/web/proxy.ts` still type-checks and still passes every unit test in
   // `middleware.test.ts`, because those import the module directly. It just
   // never runs on a request. That is how every guard in it — the
   // unauthenticated redirect, subdomain enforcement, org suspension/archival,
   // billing lock, impersonation rewriting, the per-request CSP — sat inert
   // through the whole monorepo layout without one failing check.
   it("lives beside the app directory, where Next.js will actually invoke it", () => {
-    expect(existsSync(path.join(repoRoot, "apps/web/src/middleware.ts"))).toBe(true);
-    expect(existsSync(path.join(repoRoot, "apps/web/middleware.ts"))).toBe(false);
+    expect(existsSync(path.join(repoRoot, "apps/web/src/proxy.ts"))).toBe(true);
+    expect(existsSync(path.join(repoRoot, "apps/web/proxy.ts"))).toBe(false);
   });
 
   // Vercel reads vercel.json from the project's Root Directory, which is

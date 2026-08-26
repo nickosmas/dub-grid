@@ -148,26 +148,13 @@ export default function DomainSelector() {
           <Link
             href="/"
             onClick={handleLogoTap}
-            className="dg-auth-logo-block"
-            style={{
-              marginBottom: "32px",
-              userSelect: "none",
-              WebkitTapHighlightColor: "transparent",
-            }}
+            className="dg-auth-logo-block dg-auth-logo-block--spacious"
           >
             <DubGridLogo size={52} />
             <DubGridWordmark />
           </Link>
 
-          <p
-            style={{
-              textAlign: "center",
-              fontSize: "var(--dg-fs-body)",
-              color: "var(--color-text-secondary)",
-              marginBottom: "28px",
-              fontWeight: 500,
-            }}
-          >
+          <p className="dg-auth-selector-description">
             Enter your organization&apos;s subdomain to sign in.
           </p>
 
@@ -184,14 +171,7 @@ export default function DomainSelector() {
               disabled={loading}
             />
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: "12px",
-              }}
-            >
+            <div className="dg-auth-selector-actions">
               <button type="submit" disabled={loading} className="dg-btn dg-btn-primary dg-btn-lg">
                 <ButtonLoading
                   loading={loading}
@@ -205,11 +185,7 @@ export default function DomainSelector() {
               <Button
                 type="button"
                 onClick={() => setShowHelp(true)}
-                className="dg-auth-link"
-                style={{
-                  color: "var(--color-text-subtle)",
-                  fontSize: "var(--dg-fs-body-sm)",
-                }}
+                className="dg-auth-link dg-auth-link--subtle dg-auth-help-link"
               >
                 Need help finding your subdomain?
               </Button>
@@ -221,16 +197,9 @@ export default function DomainSelector() {
           <Modal
             title="How to find your subdomain"
             onClose={() => setShowHelp(false)}
-            style={{ maxWidth: 360 }}
+            className="dg-modal--auth-help"
           >
-            <p
-              style={{
-                margin: "0 0 20px",
-                fontSize: "var(--dg-fs-body-sm)",
-                lineHeight: 1.5,
-                color: "var(--color-text-secondary)",
-              }}
-            >
+            <p className="dg-auth-modal-copy">
               Your organization subdomain is the first part of your URL (e.g.{" "}
               <strong>yourorg</strong>.{baseDomain}). If you don&apos;t know it, contact your
               organization administrator.
@@ -238,8 +207,7 @@ export default function DomainSelector() {
             <Button
               type="button"
               onClick={() => setShowHelp(false)}
-              className="dg-btn dg-btn-primary"
-              style={{ width: "100%" }}
+              className="dg-btn dg-btn-primary dg-auth-state-primary"
             >
               Got it
             </Button>

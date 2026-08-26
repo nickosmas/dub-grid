@@ -37,7 +37,7 @@ export default function InviteTeamStep({ onNext, onBack }: InviteTeamStepProps) 
           </Button>
 
           {inviteCount > 0 && (
-            <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-muted)" }}>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--dg-color-text-muted)" }}>
               {inviteCount} teammate{inviteCount > 1 ? "s" : ""} invited.
             </p>
           )}

@@ -258,10 +258,10 @@ export default function MobileDayView({
             <div
               style={{
                 position: "sticky",
-                top: "var(--app-shell-header-h, 56px)",
+                top: "var(--header-height)",
                 zIndex: 10,
-                background: "var(--color-bg)",
-                borderBottom: "1px solid var(--color-border)",
+                background: "var(--dg-color-bg)",
+                borderBottom: "1px solid var(--dg-color-border)",
               }}
             >
               {/* Section name */}
@@ -270,7 +270,7 @@ export default function MobileDayView({
                   padding: "8px 16px 4px",
                   fontSize: "var(--dg-fs-caption)",
                   fontWeight: 700,
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   textTransform: "uppercase",
                   letterSpacing: "0.5px",
                   display: "flex",
@@ -284,7 +284,7 @@ export default function MobileDayView({
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
                     fontWeight: 500,
-                    color: "var(--color-text-faint)",
+                    color: "var(--dg-color-text-faint)",
                   }}
                 >
                   ({sectionEmps.length})
@@ -311,14 +311,16 @@ export default function MobileDayView({
                         textAlign: "center",
                         padding: "2px 0",
                         borderRadius: 8,
-                        background: isToday ? "var(--color-today-bg)" : "transparent",
+                        background: isToday ? "var(--dg-color-today-bg)" : "transparent",
                       }}
                     >
                       <div
                         style={{
                           fontSize: 9,
                           fontWeight: 500,
-                          color: isToday ? "var(--color-today-text)" : "var(--color-text-faint)",
+                          color: isToday
+                            ? "var(--dg-color-today-text)"
+                            : "var(--dg-color-text-faint)",
                           textTransform: "uppercase",
                           letterSpacing: "0.3px",
                         }}
@@ -330,8 +332,8 @@ export default function MobileDayView({
                           fontSize: "var(--dg-fs-label)",
                           fontWeight: 700,
                           color: isToday
-                            ? "var(--color-today-text)"
-                            : "var(--color-text-secondary)",
+                            ? "var(--dg-color-today-text)"
+                            : "var(--dg-color-text-secondary)",
                           lineHeight: 1.2,
                         }}
                       >
@@ -349,12 +351,14 @@ export default function MobileDayView({
               const isHighlighted = hasHighlightedSearch
                 ? (highlightEmpIds?.has(emp.id) ?? false)
                 : true;
-              const baseRowBg = isGuest ? "var(--color-bg-secondary)" : "var(--color-surface)";
+              const baseRowBg = isGuest
+                ? "var(--dg-color-bg-secondary)"
+                : "var(--dg-color-surface)";
               const rowBg =
                 hasHighlightedSearch && isHighlighted
                   ? isGuest
-                    ? "linear-gradient(90deg, var(--color-brand-bg) 0%, var(--color-bg-secondary) 100%)"
-                    : "var(--color-brand-bg)"
+                    ? "linear-gradient(90deg, var(--dg-color-brand-bg) 0%, var(--dg-color-bg-secondary) 100%)"
+                    : "var(--dg-color-brand-bg)"
                   : baseRowBg;
               const certAbbr =
                 emp.certificationId != null
@@ -373,10 +377,10 @@ export default function MobileDayView({
                     alignItems: "center",
                     minHeight: 44,
                     background: rowBg,
-                    borderBottom: "1px solid var(--color-border)",
+                    borderBottom: "1px solid var(--dg-color-border)",
                     boxShadow:
                       hasHighlightedSearch && isHighlighted
-                        ? "inset 4px 0 0 0 var(--color-brand)"
+                        ? "inset 4px 0 0 0 var(--dg-color-brand)"
                         : undefined,
                     opacity: isHighlighted ? 1 : 0.35,
                     transition: "opacity 150ms ease, background 150ms ease, box-shadow 150ms ease",
@@ -390,8 +394,8 @@ export default function MobileDayView({
                         fontWeight: 600,
                         color:
                           hasHighlightedSearch && isHighlighted
-                            ? "var(--color-brand)"
-                            : "var(--color-text-secondary)",
+                            ? "var(--dg-color-brand)"
+                            : "var(--dg-color-text-secondary)",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -403,7 +407,7 @@ export default function MobileDayView({
                       <div
                         style={{
                           fontSize: "var(--dg-fs-footnote)",
-                          color: "var(--color-text-faint)",
+                          color: "var(--dg-color-text-faint)",
                           fontWeight: 500,
                         }}
                       >
@@ -468,8 +472,8 @@ export default function MobileDayView({
                             const foreignInitials = isForeign
                               ? (focusAreaInitials.get(style.focusAreaId!) ?? null)
                               : null;
-                            const foreignBg = isForeign ? "var(--color-bg-secondary)" : null;
-                            const foreignText = isForeign ? "var(--color-text-secondary)" : null;
+                            const foreignBg = isForeign ? "var(--dg-color-bg-secondary)" : null;
+                            const foreignText = isForeign ? "var(--dg-color-text-secondary)" : null;
                             const resolved = resolveShiftPillColors(
                               {
                                 color: style.color,
@@ -498,8 +502,8 @@ export default function MobileDayView({
                             : null;
                           // BUG 1.10: Use distinct background color for the foreign header strip
                           // Use the shift code's own color as the home area identifier
-                          const foreignBg = isForeign ? "var(--color-bg-secondary)" : null;
-                          const foreignText = isForeign ? "var(--color-text-secondary)" : null;
+                          const foreignBg = isForeign ? "var(--dg-color-bg-secondary)" : null;
+                          const foreignText = isForeign ? "var(--dg-color-text-secondary)" : null;
                           const resolved = resolveShiftPillColors(
                             {
                               color: sc.color,
@@ -531,9 +535,9 @@ export default function MobileDayView({
                           flexDirection: "column",
                           alignItems: "center",
                           justifyContent: "center",
-                          background: isToday ? "var(--color-today-bg)" : "transparent",
+                          background: isToday ? "var(--dg-color-today-bg)" : "transparent",
                           border: "none",
-                          borderLeft: "1px solid var(--color-border)",
+                          borderLeft: "1px solid var(--dg-color-border)",
                           cursor: isCellInteractive ? "pointer" : "default",
                           padding: "2px 1px",
                           fontFamily: "inherit",
@@ -550,7 +554,7 @@ export default function MobileDayView({
                                   fontSize: fs,
                                   fontWeight: 700,
                                   background: pill.foreignInitials
-                                    ? "var(--color-surface)"
+                                    ? "var(--dg-color-surface)"
                                     : pill.bg,
                                   color: pill.text,
                                   borderRadius: pill.foreignInitials ? "0 0 2px 2px" : 3,
@@ -562,7 +566,7 @@ export default function MobileDayView({
                                     ? "none"
                                     : draftKind
                                       ? getDraftBorderStyle(draftKind)
-                                      : "1px solid var(--color-border)",
+                                      : "1px solid var(--dg-color-border)",
                                   whiteSpace: "nowrap",
                                   overflow: "hidden",
                                   display: "block",
@@ -593,7 +597,7 @@ export default function MobileDayView({
                                     overflow: "hidden",
                                     border: draftKind
                                       ? getDraftBorderStyle(draftKind)
-                                      : "1px solid var(--color-border)",
+                                      : "1px solid var(--dg-color-border)",
                                     display: "flex",
                                     flexDirection: "column",
                                   }}
@@ -602,7 +606,7 @@ export default function MobileDayView({
                                     style={{
                                       fontSize: fs,
                                       fontWeight: 700,
-                                      color: pill.foreignText || "var(--color-text-secondary)",
+                                      color: pill.foreignText || "var(--dg-color-text-secondary)",
                                       textAlign: "center",
                                       lineHeight: 1.2,
                                       padding: "1px 2px 0",
@@ -622,7 +626,7 @@ export default function MobileDayView({
                             style={{
                               fontSize: "var(--dg-fs-footnote)",
                               fontWeight: 500,
-                              color: "var(--color-text-faint)",
+                              color: "var(--dg-color-text-faint)",
                               lineHeight: 1.2,
                               textAlign: "center",
                               borderRadius: 3,
@@ -630,7 +634,7 @@ export default function MobileDayView({
                               width: "calc(100% - 2px)",
                               border: draftKind
                                 ? getDraftBorderStyle(draftKind)
-                                : "1px solid var(--color-border)",
+                                : "1px solid var(--dg-color-border)",
                             }}
                           >
                             —
@@ -643,7 +647,7 @@ export default function MobileDayView({
                               width: 4,
                               height: 4,
                               borderRadius: "50%",
-                              background: "var(--color-info)",
+                              background: "var(--dg-color-info)",
                               flexShrink: 0,
                             }}
                           />
@@ -663,8 +667,8 @@ export default function MobileDayView({
                   display: "flex",
                   gap: 8,
                   flexWrap: "wrap",
-                  background: "var(--color-bg-secondary)",
-                  borderBottom: "1px solid var(--color-border)",
+                  background: "var(--dg-color-bg-secondary)",
+                  borderBottom: "1px solid var(--dg-color-border)",
                 }}
               >
                 {Object.entries(tallies).map(([catId, tally]) =>
@@ -681,8 +685,8 @@ export default function MobileDayView({
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
                             fontWeight: 600,
-                            color: sc ? borderColor(sc.color) : "var(--color-text-muted)",
-                            background: sc ? `${sc.color}30` : "var(--color-border-light)",
+                            color: sc ? borderColor(sc.color) : "var(--dg-color-text-muted)",
+                            background: sc ? `${sc.color}30` : "var(--dg-color-border-light)",
                             padding: "2px 8px",
                             borderRadius: 8,
                             maxWidth: isNameMode ? 140 : undefined,

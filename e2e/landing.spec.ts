@@ -1,9 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-// Marketing pages only render on the apex domain — middleware redirects any
-// subdomain back to it (see middleware.ts). The shared Playwright baseURL is
-// tenant-subdomain-scoped for authenticated-flow tests, so this test targets
-// the apex explicitly instead of relying on that redirect.
+// Marketing pages render on the canonical apex. This explicit target keeps the
+// test independent of whichever origin authenticated-flow tests use.
 const port = process.env.PORT || 3000;
 const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || "localhost";
 const apexURL = `http://${baseDomain}:${port}/`;

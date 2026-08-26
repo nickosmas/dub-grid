@@ -4,6 +4,26 @@ Root instruction file for DubGrid. Nested `AGENTS.md` files add stricter rules
 for their directories. When instructions conflict, the most specific nested
 `AGENTS.md` wins, then this file, then the user's latest request.
 
+## Claude Code Continuity
+
+This file is the Codex-facing counterpart to the project guidance previously
+maintained in `CLAUDE.md`. Keep their shared project rules aligned when changing
+either file; do not assume the shorter document is complete just because a rule
+is absent here. The scoped `AGENTS.md` files remain the source of detailed,
+surface-specific conventions.
+
+- For non-trivial work, establish the concrete outcome and verification before
+  changing code. If evidence invalidates the approach, stop and revise it rather
+  than layering a workaround on top.
+- Diagnose from the reported behavior, code, tests, and logs; solve the root
+  cause with the smallest maintainable change.
+- Keep implementation direct: prefer a clean, established project pattern over
+  a new abstraction or a speculative refactor.
+- Do not add decorative AI iconography (`sparkles*`, `Sparkle`, `Sparkles`,
+  `Wand*`, `✨`, or `🪄`) in either app. DubGrid has no AI feature to represent;
+  choose an icon whose meaning matches the action. This is enforced by
+  `design/no-decorative-ai-icons`.
+
 ## Verified Repository Structure
 
 - Package manager: `npm@10.9.2` (node `22.13.x`). Lockfile: `package-lock.json`.
@@ -105,6 +125,15 @@ files unless explicitly requested or required for correctness.
   `SENTRY_AUTH_TOKEN`, `EXPO_ACCESS_TOKEN`, DB passwords and tokens.
 - Public web: `NEXT_PUBLIC_*` (browser-visible). Public mobile: `EXPO_PUBLIC_*` (bundled).
 - Document new env var names and purpose; never invent real values.
+- Never render untrusted HTML with `dangerouslySetInnerHTML` unless it is
+  necessary and sanitized. Never interpolate untrusted input into SQL, shell
+  commands, file paths, scripts, or event-handler attributes.
+- Client responses and UI errors must be safe and actionable. Do not return
+  stack traces, database errors, internal paths, or raw provider errors to the
+  browser; retain detailed diagnostics in server-side logs instead.
+- Public side-effecting endpoints need the project's established rate-limit
+  pattern. Validate uploaded-file contents and size, not just an extension or
+  client-provided MIME type.
 
 ## Dependency Discipline
 
@@ -199,12 +228,19 @@ High-risk changes include:
 
 ## Design System Rules
 
-Two button/input vocabularies — not interchangeable:
+Buttons use one vocabulary everywhere:
 
-- **`dg-btn-*` / `dg-input` / `dg-label` / `dg-form-error`** — authenticated app surfaces
-  (settings, profile, schedule, people, dashboard, reports).
-- **`dg-auth-submit` / `dg-auth-input` / `dg-auth-link` / `dg-auth-heading`** — public auth
-  flows only (login, forgot-password, reset-password, accept-invite, verify-email).
+- **`dg-btn-*`** — use for authenticated surfaces, public auth flows, and the
+  landing page. The old `dg-auth-submit` pill is retired; do not reintroduce it.
+
+Inputs and labels retain two vocabularies — not interchangeable:
+
+- **`dg-input` / `dg-label` / `dg-form-error`** — authenticated app surfaces
+  (settings, profile, schedule, people, dashboard, reports). Use `dg-input`,
+  `dg-label`, and `dg-form-error` for form fields rather than re-creating them
+  with inline styles or ad-hoc Tailwind chains.
+- **`dg-auth-input` / `dg-auth-link` / `dg-auth-heading`** — public auth flows
+  only (login, forgot-password, reset-password, accept-invite, verify-email).
 
 Shared primitives to use before inventing a layout:
 
@@ -217,6 +253,13 @@ Shared primitives to use before inventing a layout:
 - `<Modal>` — info dialogs only.
 - `<ErrorBoundary>` / `<NotFoundBoundary>` — from `components/RouteBoundary.tsx`.
 - `<CustomSelect>` — always use instead of native `<select>` (`components/CustomSelect.tsx`).
+- `<Button>` and `<Form>` — required for handled web clicks and submissions;
+  they latch async work and prevent double execution. An async handler must
+  return its promise. Use a progressive loading label such as `Saving`, never
+  replace the label with an ellipsis or hide it behind a spinner.
+- Use `useUnsavedChangesPrompt` for modal editors and
+  `useNavigationGuard(id, { isDirty })` for page editors. Do not hand-roll a
+  competing `beforeunload` guard or silently discard input.
 
 ## React and UI Rules
 
@@ -226,6 +269,47 @@ Shared primitives to use before inventing a layout:
 - Use stable keys (never array index for reorderable lists).
 - Preserve accessibility: labels, semantic elements, keyboard behavior, contrast.
 - Do not introduce a new UI library without explicit request.
+
+## Web Architecture Conventions
+
+- Default to Server Components. Add `"use client"` only where browser APIs,
+  event handlers, or hooks are needed, and push client boundaries to leaves.
+- This application uses typed Route Handlers for all reads and writes; it has no
+  Server Actions. Validate external input with the relevant Zod schema at the
+  handler boundary, and route client mutations through the feature's
+  `client/api.ts` adapter.
+- Keep domain logic, hooks, and client API wrappers in `features/<domain>/`.
+  Route directories own presentation; reserve `_components/` for genuinely
+  multi-file route-local UI.
+- Fetch server data in Server Components. For client-side or real-time data,
+  use the established React Query/SWR pattern rather than `useEffect` + `fetch`.
+  Select caching and revalidation deliberately; do not blanket-disable caching.
+- Use `next/link` for internal navigation, `next/image` for content images, and
+  `next/font` for web fonts. Use `metadata`/`generateMetadata`, not pages-router
+  `<Head>` patterns.
+- Keep `apps/web/src/middleware.ts` Edge-safe and dependency-light. It is a
+  first filter, never the only authentication or authorization check.
+
+## Mobile Design Conventions
+
+- Import mobile design tokens through
+  `apps/mobile/src/shared/theme/tokens.ts`; add `mobile*` tokens in
+  `@dubgrid/design-tokens` rather than changing shared web tokens.
+- Use the established primitives before creating a variant: `<AppText>` for
+  text, `<Button>` for actions, `<PressableRow>` for list rows,
+  `<EmptyStateCard>` for empty states, and skeleton primitives for loading.
+  A mobile async action must return its promise so the shared latch can prevent
+  duplicate taps and show the progressive loading label.
+- `<BottomSheetModal>` is the only mobile modal design. Use `<SheetHeader>`,
+  `<SheetActions>`, and `<ConfirmationModal>` as appropriate; do not introduce
+  full-screen or centered alert modals, an X close button, or silent dismissal
+  of unsaved input.
+- Use `useUnsavedChangesGuard` and `useNavigationDiscardGuard` for mobile
+  editors; `mobileElevation` for shadows; and `useMotionPreference()` for
+  motion. Do not hard-code animation durations.
+- Use `mobileText`, `mobileTextWeighted`, or `mobileTypography.fontFamily.*`
+  for text weights. Do not set `fontWeight` on a DM Sans `<Text>` style
+  (`<TextInput>` is the exception), because Android may fall back to Roboto.
 
 ## Verification Requirements
 

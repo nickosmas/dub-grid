@@ -924,7 +924,7 @@ describe("ShiftEditPanel", () => {
       expect(container.querySelector('[data-shift-diff-index="0"]')?.textContent).toBe("Time");
       expect(
         (container.querySelector('[data-shift-diff-index="0"]') as HTMLElement)?.style.background,
-      ).toBe("var(--color-warning)");
+      ).toBe("var(--dg-color-warning)");
       expect(container.querySelector('[data-shift-diff-index="1"]')).toBeNull();
     });
 

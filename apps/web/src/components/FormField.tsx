@@ -19,7 +19,7 @@ const labelStyle: CSSProperties = {
   display: "block",
   fontSize: "var(--dg-fs-footnote)",
   fontWeight: 600,
-  color: "var(--color-text-muted)",
+  color: "var(--dg-color-text-muted)",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   marginBottom: 5,
@@ -27,7 +27,7 @@ const labelStyle: CSSProperties = {
 
 const errorStyle: CSSProperties = {
   fontSize: "var(--dg-fs-footnote)",
-  color: "var(--color-danger)",
+  color: "var(--dg-color-danger)",
   marginTop: 4,
   display: "flex",
   alignItems: "center",
@@ -73,7 +73,7 @@ export function FormField({
       {label && (
         <label htmlFor={fieldId} style={labelStyle}>
           {label}
-          {required && <span style={{ color: "var(--color-danger)", marginLeft: 2 }}>*</span>}
+          {required && <span style={{ color: "var(--dg-color-danger)", marginLeft: 2 }}>*</span>}
         </label>
       )}
       {enhancedChildren}

@@ -179,9 +179,9 @@ function buildWorkedShifts(input: {
       jobName: jobName && normalizeLabel(jobName) !== normalizeLabel(label) ? jobName : null,
       timeRange:
         startTime && endTime ? `${formatTime12h(startTime)} - ${formatTime12h(endTime)}` : null,
-      background: resolved?.color ?? "var(--color-bg-secondary)",
-      border: resolved?.border ?? "var(--color-border)",
-      textColor: resolved?.text ?? "var(--color-text-primary)",
+      background: resolved?.color ?? "var(--dg-color-bg-secondary)",
+      border: resolved?.border ?? "var(--dg-color-border)",
+      textColor: resolved?.text ?? "var(--dg-color-text-primary)",
     });
   });
 
@@ -221,9 +221,9 @@ function buildMyScheduleDay(input: {
           label: absence?.name ?? entry.label ?? "Away",
           jobName: null,
           timeRange: null,
-          background: resolved?.color ?? "var(--color-bg-secondary)",
-          border: resolved?.border ?? "var(--color-border)",
-          textColor: resolved?.text ?? "var(--color-text-secondary)",
+          background: resolved?.color ?? "var(--dg-color-bg-secondary)",
+          border: resolved?.border ?? "var(--dg-color-border)",
+          textColor: resolved?.text ?? "var(--dg-color-text-secondary)",
         },
       ],
     };
@@ -324,9 +324,9 @@ function ScrollChevron({
         width: 28,
         height: 28,
         borderRadius: "50%",
-        border: "1px solid var(--color-border)",
-        background: "var(--color-bg)",
-        color: "var(--color-text-secondary)",
+        border: "1px solid var(--dg-color-border)",
+        background: "var(--dg-color-bg)",
+        color: "var(--dg-color-text-secondary)",
         boxShadow: "var(--shadow-raised)",
         cursor: "pointer",
         zIndex: 1,
@@ -416,7 +416,7 @@ function EmptyDayPlaceholder() {
         boxSizing: "border-box",
         fontSize: 14,
         fontWeight: 400,
-        color: "var(--color-text-subtle)",
+        color: "var(--dg-color-text-subtle)",
       }}
     >
       {"—"}
@@ -452,7 +452,7 @@ function DayBox({ day }: { day: MyScheduleDay }) {
           style={{
             fontSize: 13,
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             marginBottom: 6,
             flexShrink: 0,
           }}

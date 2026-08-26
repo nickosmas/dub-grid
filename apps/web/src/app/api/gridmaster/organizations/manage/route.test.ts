@@ -202,9 +202,9 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         resource_id: ORG_ID,
       }),
     );
-    // The subdomain-lookup cache must be invalidated so the archived org's
-    // subdomain stops resolving immediately instead of waiting out the TTL.
-    expect(cacheDel).toHaveBeenCalledWith("dg:org:slug:acme");
+    // Archiving no longer touches host-routing caches: organizations are
+    // selected by authenticated session context, never by a subdomain.
+    expect(cacheDel).not.toHaveBeenCalled();
   });
 
   it("assigns an org role by email and writes an audit event", async () => {
@@ -242,7 +242,6 @@ describe("POST /api/gridmaster/organizations/manage", () => {
         action: "createOrganizationSetup",
         input: {
           name: "Acme Health",
-          slug: "acme",
           addressLine1: "",
           addressLine2: "",
           addressCity: "",
@@ -280,9 +279,49 @@ describe("POST /api/gridmaster/organizations/manage", () => {
     // trial_ends_at is left unset until the first super_admin signs in.
     expect(organizationInsert).toHaveBeenCalledWith(
       expect.objectContaining({
+        slug: "acme-health",
         subscription_status: "trialing",
       }),
     );
     expect(organizationInsert.mock.calls[0][0]).not.toHaveProperty("trial_ends_at");
+  });
+
+  it("retries with a numeric suffix when the generated slug already exists", async () => {
+    organizationInsert.mockReturnValueOnce({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: null, error: { code: "23505" } })),
+      })),
+    });
+
+    const response = await POST(
+      makeRequest({
+        action: "createOrganizationSetup",
+        input: {
+          name: "Acme Health",
+          addressLine1: "",
+          addressLine2: "",
+          addressCity: "",
+          addressState: "",
+          addressPostalCode: "",
+          addressCountry: "",
+          phone: "",
+          timezone: "America/Los_Angeles",
+          focusAreaLabel: "",
+          certificationLabel: "",
+          roleLabel: "",
+          shiftDisplayMode: "code",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(organizationInsert).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ slug: "acme-health" }),
+    );
+    expect(organizationInsert).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ slug: "acme-health-2" }),
+    );
   });
 });

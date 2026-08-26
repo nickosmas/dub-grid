@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse, after } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { API_ERRORS } from "@dubgrid/client-errors";
 import type { DbOrganization } from "@dubgrid/db-types";
@@ -8,27 +8,34 @@ import { composeOrganizationAddress } from "@/lib/organization-profile";
 import { rowToOrganization } from "@/lib/db/mappers";
 import { ORGANIZATION_WITH_BILLING_COLS } from "@/lib/db/shared";
 import { getServiceClient } from "@/lib/supabase-service";
-import { cacheDel, CacheKey } from "@/lib/cache";
 import { writeGridmasterAuditLog } from "@/app/api/gridmaster/_lib/audit";
 import { apiErrorResponse } from "@/lib/error-handling";
 import { formatClientErrorMessage } from "@/lib/client-facing";
-import { registerOrgDomain } from "@/lib/vercel";
-import * as Sentry from "@/lib/sentry";
-import { clientEnv } from "@/lib/env";
-import { serverEnv } from "@/lib/env.server";
-import { isValidOrgSlug } from "@/lib/subdomain";
 
 export const dynamic = "force-dynamic";
 
+const MAX_ORGANIZATION_SLUG_LENGTH = 48;
+const MAX_ORGANIZATION_SLUG_ATTEMPTS = 100;
+
+function organizationSlugBase(name: string): string {
+  const normalized = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, MAX_ORGANIZATION_SLUG_LENGTH);
+
+  return normalized || "organization";
+}
+
+function organizationSlugCandidate(base: string, attempt: number): string {
+  if (attempt === 1) return base;
+
+  const suffix = `-${attempt}`;
+  return `${base.slice(0, MAX_ORGANIZATION_SLUG_LENGTH - suffix.length)}${suffix}`;
+}
+
 const createSetupSchema = z.object({
   name: z.string().trim().min(1),
-  slug: z
-    .string()
-    .trim()
-    .optional()
-    .refine((slug) => !slug || isValidOrgSlug(slug), {
-      message: "Subdomain must be lowercase alphanumeric with hyphens, and not a reserved word",
-    }),
   addressLine1: z.string().trim(),
   addressLine2: z.string().trim(),
   addressCity: z.string().trim(),
@@ -132,16 +139,10 @@ export async function POST(req: NextRequest) {
           .from("organizations")
           .update({ archived_at: new Date().toISOString() })
           .eq("id", parsed.data.orgId)
-          .select("slug")
+          .select("id")
           .maybeSingle();
         if (error) {
           throw error;
-        }
-        // The public subdomain lookup caches {id, name} by slug with a long
-        // TTL — invalidate immediately so this org's subdomain stops
-        // resolving right away instead of appearing valid until it expires.
-        if (archived?.slug) {
-          void cacheDel(CacheKey.orgBySlug(archived.slug));
         }
         await writeGridmasterAuditLog({
           serviceClient,
@@ -258,43 +259,64 @@ export async function POST(req: NextRequest) {
           addressCountry: input.addressCountry,
         });
 
-        const { data: row, error } = await serviceClient
-          .from("organizations")
-          .insert({
-            name: input.name,
-            slug: input.slug?.trim() || null,
-            address,
-            address_line_1: input.addressLine1,
-            address_line_2: input.addressLine2,
-            address_city: input.addressCity,
-            address_state: input.addressState,
-            address_postal_code: input.addressPostalCode,
-            address_country: input.addressCountry,
-            phone: input.phone,
-            employee_count: null,
-            focus_area_label: input.focusAreaLabel || "Focus Areas",
-            certification_label: input.certificationLabel || "Certifications",
-            role_label: input.roleLabel || "Roles",
-            department_label: "Scheduled Departments",
-            shift_display_mode: input.shiftDisplayMode,
-            timezone: input.timezone || null,
-            pay_period_start_date: null,
-            subscription_status: "trialing",
-            // trial_ends_at intentionally left NULL: the trial is "pending" until
-            // the first super_admin logs in (the start_trial_for_org RPC, called
-            // from the login flow, then starts the 14-day clock). See
-            // packages/domain/src/billing.ts trial_pending.
-            enforce_conflict_prevention: false,
-            data_retention_days: 365,
-            feature_overrides: {},
-          })
-          .select(ORGANIZATION_WITH_BILLING_COLS)
-          .single();
-        if (error) {
-          throw error;
+        const slugBase = organizationSlugBase(input.name);
+        let row: DbOrganization | null = null;
+
+        for (let attempt = 1; attempt <= MAX_ORGANIZATION_SLUG_ATTEMPTS; attempt += 1) {
+          const slug = organizationSlugCandidate(slugBase, attempt);
+          const { data, error } = await serviceClient
+            .from("organizations")
+            .insert({
+              name: input.name,
+              // This names the wildcard subdomain, e.g. calmhaven.dubgrid.com.
+              // Vercel serves it through the project's wildcard domain; no
+              // per-organization domain registration is needed.
+              slug,
+              address,
+              address_line_1: input.addressLine1,
+              address_line_2: input.addressLine2,
+              address_city: input.addressCity,
+              address_state: input.addressState,
+              address_postal_code: input.addressPostalCode,
+              address_country: input.addressCountry,
+              phone: input.phone,
+              employee_count: null,
+              focus_area_label: input.focusAreaLabel || "Focus Areas",
+              certification_label: input.certificationLabel || "Certifications",
+              role_label: input.roleLabel || "Roles",
+              department_label: "Scheduled Departments",
+              shift_display_mode: input.shiftDisplayMode,
+              timezone: input.timezone || null,
+              pay_period_start_date: null,
+              subscription_status: "trialing",
+              // trial_ends_at intentionally left NULL: the trial is "pending" until
+              // the first super_admin logs in (the start_trial_for_org RPC, called
+              // from the login flow, then starts the 14-day clock). See
+              // packages/domain/src/billing.ts trial_pending.
+              enforce_conflict_prevention: false,
+              data_retention_days: 365,
+              feature_overrides: {},
+            })
+            .select(ORGANIZATION_WITH_BILLING_COLS)
+            .single();
+
+          if (!error && data) {
+            row = data as DbOrganization;
+            break;
+          }
+
+          // `organizations.slug` is uniquely constrained. A concurrent
+          // creation with the same name retries using -2, -3, and so on.
+          if (error?.code !== "23505") {
+            throw error;
+          }
         }
 
-        const org = rowToOrganization(row as DbOrganization);
+        if (!row) {
+          throw new Error("Unable to generate a unique organization subdomain.");
+        }
+
+        const org = rowToOrganization(row);
 
         const email = input.superAdminEmail?.trim() ?? "";
         const firstName = input.superAdminFirstName?.trim() ?? "";
@@ -395,35 +417,10 @@ export async function POST(req: NextRequest) {
           orgId: org.id,
           details: {
             name: org.name,
-            slug: org.slug,
             super_admin: superAdmin,
           },
           request: req,
         });
-
-        // Fired last in this case, after every other DB write has succeeded, so a
-        // later failure (e.g. the audit log write) can no longer leave a live
-        // Vercel domain registered for an org whose creation was reported as failed.
-        // Gated to real production deploys — VERCEL_ENV distinguishes that from
-        // Preview (both have NODE_ENV=production on Vercel), so Preview/local runs
-        // never register domains against the real project.
-        if (serverEnv?.VERCEL_ENV === "production" && org.slug) {
-          const baseDomain = clientEnv?.NEXT_PUBLIC_BASE_DOMAIN;
-          if (baseDomain) {
-            after(() =>
-              registerOrgDomain(`${org.slug}.${baseDomain}`).catch((err) =>
-                Sentry.captureException(err, {
-                  extra: { context: "org-domain-registration", orgId: org.id },
-                }),
-              ),
-            );
-          } else {
-            Sentry.captureMessage(
-              `Skipped org domain registration for org ${org.id}: NEXT_PUBLIC_BASE_DOMAIN unavailable`,
-              "warning",
-            );
-          }
-        }
 
         return NextResponse.json({
           success: true,

@@ -191,8 +191,8 @@ function classificationTitle(classification: EnrichedClassification): string | u
 function classificationRowBackground(
   status: RowDuplicateClassification["status"],
 ): string | undefined {
-  if (status === "blocked") return "var(--color-danger-bg)";
-  if (status === "warning") return "var(--color-warning-bg)";
+  if (status === "blocked") return "var(--dg-color-danger-bg)";
+  if (status === "warning") return "var(--dg-color-warning-bg)";
   return undefined;
 }
 
@@ -409,7 +409,7 @@ export function BulkImportModal({
         <div
           style={{
             padding: "16px 24px",
-            borderBottom: "1px solid var(--color-border)",
+            borderBottom: "1px solid var(--dg-color-border)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -437,7 +437,7 @@ export function BulkImportModal({
                 onDrop={handleDrop}
                 onClick={() => fileRef.current?.click()}
                 style={{
-                  border: `2px dashed ${isDragActive ? "var(--color-border-focus)" : "var(--color-border)"}`,
+                  border: `2px dashed ${isDragActive ? "var(--dg-color-border-focus)" : "var(--dg-color-border)"}`,
                   borderRadius: "var(--dg-radius-md)",
                   padding: "48px 24px",
                   textAlign: "center",
@@ -446,7 +446,7 @@ export function BulkImportModal({
                   flexDirection: "column",
                   alignItems: "center",
                   gap: 12,
-                  background: isDragActive ? "var(--color-bg-secondary)" : "transparent",
+                  background: isDragActive ? "var(--dg-color-bg-secondary)" : "transparent",
                   transition:
                     "border-color var(--dg-duration-fast) ease, background var(--dg-duration-fast) ease",
                 }}
@@ -454,7 +454,9 @@ export function BulkImportModal({
                 <ImportIcon
                   size={32}
                   style={{
-                    color: isDragActive ? "var(--color-border-focus)" : "var(--color-text-muted)",
+                    color: isDragActive
+                      ? "var(--dg-color-border-focus)"
+                      : "var(--dg-color-text-muted)",
                   }}
                 />
                 <p style={{ margin: 0, fontWeight: 600, fontSize: "var(--dg-fs-body)" }}>
@@ -464,7 +466,7 @@ export function BulkImportModal({
                   style={{
                     margin: 0,
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                   }}
                 >
                   Max 500 rows, 2MB
@@ -487,7 +489,7 @@ export function BulkImportModal({
                 </div>
                 <div
                   style={{
-                    border: "1px solid var(--color-border)",
+                    border: "1px solid var(--dg-color-border)",
                     borderRadius: "var(--dg-radius-md)",
                     overflow: "hidden",
                   }}
@@ -501,7 +503,7 @@ export function BulkImportModal({
                       }}
                     >
                       <thead>
-                        <tr style={{ background: "var(--color-bg)" }}>
+                        <tr style={{ background: "var(--dg-color-bg)" }}>
                           {EXPECTED_HEADERS.map((header) => (
                             <th
                               key={header}
@@ -509,8 +511,8 @@ export function BulkImportModal({
                                 padding: "6px 10px",
                                 textAlign: "left",
                                 fontWeight: 600,
-                                color: "var(--color-text-muted)",
-                                borderBottom: "1px solid var(--color-border)",
+                                color: "var(--dg-color-text-muted)",
+                                borderBottom: "1px solid var(--dg-color-border)",
                                 whiteSpace: "nowrap",
                               }}
                             >
@@ -528,11 +530,11 @@ export function BulkImportModal({
                                 style={{
                                   padding: "6px 10px",
                                   whiteSpace: "nowrap",
-                                  color: "var(--color-text-secondary)",
+                                  color: "var(--dg-color-text-secondary)",
                                   borderBottom:
                                     i === SAMPLE_CSV_ROWS.length - 1
                                       ? "none"
-                                      : "1px solid var(--color-border-light)",
+                                      : "1px solid var(--dg-color-border-light)",
                                 }}
                               >
                                 {cell || "—"}
@@ -548,7 +550,7 @@ export function BulkImportModal({
                   style={{
                     margin: "8px 0 0",
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                   }}
                 >
                   Separate multiple focus areas or roles with semicolons (;). Names must match
@@ -566,11 +568,11 @@ export function BulkImportModal({
                     <div
                       style={{
                         padding: 12,
-                        background: "var(--color-danger-bg)",
-                        border: "1px solid var(--color-danger-border)",
+                        background: "var(--dg-color-danger-bg)",
+                        border: "1px solid var(--dg-color-danger-border)",
                         borderRadius: "var(--dg-radius-md)",
                         fontSize: "var(--dg-fs-caption)",
-                        color: "var(--color-danger-text)",
+                        color: "var(--dg-color-danger-text)",
                         display: "flex",
                         gap: 8,
                       }}
@@ -587,11 +589,11 @@ export function BulkImportModal({
                     <div
                       style={{
                         padding: 12,
-                        background: "var(--color-warning-bg)",
-                        border: "1px solid var(--color-warning-border)",
+                        background: "var(--dg-color-warning-bg)",
+                        border: "1px solid var(--dg-color-warning-border)",
                         borderRadius: "var(--dg-radius-md)",
                         fontSize: "var(--dg-fs-caption)",
-                        color: "var(--color-warning-text)",
+                        color: "var(--dg-color-warning-text)",
                         display: "flex",
                         gap: 8,
                       }}
@@ -611,12 +613,12 @@ export function BulkImportModal({
                 <div
                   style={{
                     padding: 12,
-                    background: "var(--color-warning-bg)",
-                    border: "1px solid var(--color-warning-border)",
+                    background: "var(--dg-color-warning-bg)",
+                    border: "1px solid var(--dg-color-warning-border)",
                     borderRadius: "var(--dg-radius-md)",
                     marginBottom: 16,
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-warning-text)",
+                    color: "var(--dg-color-warning-text)",
                     display: "flex",
                     gap: 8,
                   }}
@@ -636,7 +638,7 @@ export function BulkImportModal({
 
               <div
                 style={{
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid var(--dg-color-border)",
                   borderRadius: "var(--dg-radius-md)",
                   overflow: "hidden",
                 }}
@@ -650,14 +652,14 @@ export function BulkImportModal({
                     }}
                   >
                     <thead>
-                      <tr style={{ background: "var(--color-bg)" }}>
+                      <tr style={{ background: "var(--dg-color-bg)" }}>
                         <th
                           style={{
                             padding: "8px 12px",
                             textAlign: "left",
-                            borderBottom: "1px solid var(--color-border)",
+                            borderBottom: "1px solid var(--dg-color-border)",
                             fontWeight: 600,
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           #
@@ -666,9 +668,9 @@ export function BulkImportModal({
                           style={{
                             padding: "8px 12px",
                             textAlign: "left",
-                            borderBottom: "1px solid var(--color-border)",
+                            borderBottom: "1px solid var(--dg-color-border)",
                             fontWeight: 600,
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           Status
@@ -679,9 +681,9 @@ export function BulkImportModal({
                             style={{
                               padding: "8px 12px",
                               textAlign: "left",
-                              borderBottom: "1px solid var(--color-border)",
+                              borderBottom: "1px solid var(--dg-color-border)",
                               fontWeight: 600,
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                               whiteSpace: "nowrap",
                             }}
                           >
@@ -696,7 +698,7 @@ export function BulkImportModal({
                         const isLastRow = i === Math.min(rows.length, 20) - 1;
                         const borderBottom = isLastRow
                           ? "none"
-                          : "1px solid var(--color-border-light)";
+                          : "1px solid var(--dg-color-border-light)";
                         return (
                           <tr
                             key={`preview-${row.firstName}-${row.lastName}-${i}`}
@@ -708,7 +710,7 @@ export function BulkImportModal({
                               style={{
                                 padding: "8px 12px",
                                 borderBottom,
-                                color: "var(--color-text-muted)",
+                                color: "var(--dg-color-text-muted)",
                               }}
                             >
                               {i + 1}
@@ -718,12 +720,15 @@ export function BulkImportModal({
                               title={classificationTitle(classification)}
                             >
                               {classification.status === "blocked" && (
-                                <XCircle size={16} style={{ color: "var(--color-danger-text)" }} />
+                                <XCircle
+                                  size={16}
+                                  style={{ color: "var(--dg-color-danger-text)" }}
+                                />
                               )}
                               {classification.status === "warning" && (
                                 <AlertTriangle
                                   size={16}
-                                  style={{ color: "var(--color-warning-text)" }}
+                                  style={{ color: "var(--dg-color-warning-text)" }}
                                 />
                               )}
                             </td>
@@ -734,7 +739,8 @@ export function BulkImportModal({
                                 style={{
                                   padding: "8px 12px",
                                   borderBottom,
-                                  color: col.key === "name" ? undefined : "var(--color-text-muted)",
+                                  color:
+                                    col.key === "name" ? undefined : "var(--dg-color-text-muted)",
                                   ...(col.maxWidth
                                     ? {
                                         maxWidth: col.maxWidth,
@@ -760,7 +766,7 @@ export function BulkImportModal({
                   style={{
                     margin: "8px 0 0",
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                   }}
                 >
                   Showing first 20 of {rows.length} rows
@@ -778,20 +784,22 @@ export function BulkImportModal({
                   gap: 12,
                   padding: 16,
                   background:
-                    result.inserted > 0 ? "var(--color-success-bg)" : "var(--color-danger-bg)",
-                  border: `1px solid ${result.inserted > 0 ? "var(--color-success-border)" : "var(--color-danger-border)"}`,
+                    result.inserted > 0
+                      ? "var(--dg-color-success-bg)"
+                      : "var(--dg-color-danger-bg)",
+                  border: `1px solid ${result.inserted > 0 ? "var(--dg-color-success-border)" : "var(--dg-color-danger-border)"}`,
                   borderRadius: "var(--dg-radius-lg)",
                 }}
               >
                 {result.inserted > 0 ? (
                   <CheckCircle
                     size={24}
-                    style={{ flexShrink: 0, color: "var(--color-success-text)" }}
+                    style={{ flexShrink: 0, color: "var(--dg-color-success-text)" }}
                   />
                 ) : (
                   <AlertTriangle
                     size={24}
-                    style={{ flexShrink: 0, color: "var(--color-danger)" }}
+                    style={{ flexShrink: 0, color: "var(--dg-color-danger)" }}
                   />
                 )}
                 <div>
@@ -802,7 +810,7 @@ export function BulkImportModal({
                     <div
                       style={{
                         fontSize: "var(--dg-fs-caption)",
-                        color: "var(--color-text-muted)",
+                        color: "var(--dg-color-text-muted)",
                         marginTop: 2,
                       }}
                     >
@@ -819,11 +827,11 @@ export function BulkImportModal({
                 <div
                   style={{
                     padding: 12,
-                    background: "var(--color-danger-bg)",
-                    border: "1px solid var(--color-danger-border)",
+                    background: "var(--dg-color-danger-bg)",
+                    border: "1px solid var(--dg-color-danger-border)",
                     borderRadius: "var(--dg-radius-md)",
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-danger-text)",
+                    color: "var(--dg-color-danger-text)",
                   }}
                 >
                   <strong>Errors:</strong>
@@ -846,7 +854,7 @@ export function BulkImportModal({
           className="dg-modal-actions"
           style={{
             padding: "12px 24px",
-            borderTop: "1px solid var(--color-border)",
+            borderTop: "1px solid var(--dg-color-border)",
             flexShrink: 0,
           }}
         >
@@ -859,7 +867,7 @@ export function BulkImportModal({
                     display: "flex",
                     alignItems: "center",
                     fontSize: "var(--dg-fs-caption)",
-                    color: "var(--color-danger-text)",
+                    color: "var(--dg-color-danger-text)",
                   }}
                 >
                   All rows are duplicates of existing employees.
@@ -883,7 +891,7 @@ export function BulkImportModal({
                 <ButtonLoading
                   loading={importing}
                   loadingLabel="Importing"
-                  spinnerColor="var(--color-text-inverse)"
+                  spinnerColor="var(--dg-color-text-inverse)"
                   spinnerSize={16}
                 >
                   <ImportIcon size={14} style={{ marginRight: 4 }} />

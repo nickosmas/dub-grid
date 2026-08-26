@@ -5,7 +5,7 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 ## Features
 
 - **Schedule Grid** — 1-week, 2-week, and month views with drag-and-drop shift management
-- **Multi-Tenant** — Subdomain-based org isolation (e.g., `acme.dubgrid.com`). Per-session org context: switching organizations only affects the calling device.
+- **Multi-Tenant** — Wildcard subdomain-based organization isolation (e.g., `acme.dubgrid.com`). Per-session organization context: switching organizations only affects the calling device.
 - **RBAC** — Four-tier role hierarchy (Gridmaster > Super Admin > Admin > User) with 25 per-person admin permissions, plus self-action and admin-tier guards
 - **Free Trial** — 14-day trial that starts on the first super admin login; non-super-admins are gated until billing is active
 - **Draft/Publish Workflow** — All edits are drafts until published; discard or recover across sessions
@@ -18,7 +18,7 @@ Multi-tenant employee scheduling platform for care facilities. Replaces spreadsh
 - **Shift Requests** — Pickup, swap, and call-off request workflow with admin approval and a full request board
 - **Gridmaster Portal** — Platform-wide org management, user impersonation, audit logs, permission configuration, and org-lifecycle notifications
 - **Onboarding Gate** — Role-aware onboarding rendered inline (no standalone route); non-admins on an unconfigured org see a setup-pending screen
-- **Test Sandbox** — Clone an org's config into an isolated, time-limited sandbox you enter via an HttpOnly cookie (no JWT/subdomain hop)
+- **Test Sandbox** — Clone an org's config into an isolated, time-limited sandbox you enter via an HttpOnly cookie (no JWT/session-context hop)
 - **Invite-Only Registration** — No public sign-up; 72-hour invitation tokens linked to employee records
 - **Password Reset & Email Verification** — Forgot password flow, password strength meter, email verification for new accounts
 - **Print & Export** — Configurable print layout with legend, focus area selection, and date range; PDF/CSV export plus an iCalendar (`.ics`) feed

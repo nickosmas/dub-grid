@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import type { CSSProperties } from "react";
 import { DM_Sans, DM_Mono } from "next/font/google";
-import { createStaticWebCssVariables, createThemedCssText } from "@dubgrid/design-tokens";
-import { createThemeSeedScript } from "@/lib/theme-preference";
+import Script from "next/script";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import "@/lib/env.server";
 
@@ -42,31 +41,21 @@ import AppToaster from "@/components/AppToaster";
 import WebVitals from "@/components/WebVitals";
 import ThemeProvider from "@/components/ThemeProvider";
 
-const staticWebCssVariables = createStaticWebCssVariables() as CSSProperties;
-const themedCssText = createThemedCssText();
-const themeSeedScript = createThemeSeedScript();
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
       suppressHydrationWarning
-      style={staticWebCssVariables}
       className={cn(dmSans.variable, dmMono.variable, "font-sans")}
     >
       <head>
-        <style id="dg-theme-vars" dangerouslySetInnerHTML={{ __html: themedCssText }} />
         {/* Adopts a theme handed over from the other origin (apex ↔ org
             subdomain) before next-themes' own script reads localStorage.
-            Must stay in <head> and ahead of <body> so it lands on the first
-            paint — see createThemeSeedScript(). */}
-        <script
-          id="dg-theme-seed"
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{ __html: themeSeedScript }}
-        />
+            This is an external, cacheable first-party asset rather than an
+            inline runtime string. */}
+        <Script id="dg-theme-seed" src="/dg-theme-seed.js" strategy="beforeInteractive" />
       </head>
-      <body suppressHydrationWarning>
+      <body className="min-h-screen bg-[var(--dg-color-bg)] text-[var(--dg-color-text-primary)] antialiased">
         <ThemeProvider>
           {/* Only what every page needs. The auth, query and nav-shell
               providers moved to (app)/layout.tsx so the marketing pages stop
@@ -76,6 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CookieConsent />
           <ConsentGatedAnalytics />
           <WebVitals />
+          <SpeedInsights />
         </ThemeProvider>
       </body>
     </html>

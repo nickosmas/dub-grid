@@ -73,7 +73,7 @@ function VerifyEmailContent() {
     <PageShell>
       <Card>
         {/* Logo */}
-        <div className="dg-auth-logo-block" style={{ gap: "8px" }}>
+        <div className="dg-auth-logo-block dg-auth-logo-block--compact">
           <DubGridLogo size={44} />
           <DubGridWordmark />
         </div>
@@ -96,13 +96,12 @@ function VerifyEmailContent() {
             <Button
               onClick={handleResend}
               disabled={resending || cooldown > 0}
-              className="dg-btn dg-btn-secondary dg-btn-lg"
-              style={{ marginBottom: "16px", width: "100%" }}
+              className="dg-btn dg-btn-secondary dg-btn-lg dg-auth-resend"
             >
               <ButtonLoading
                 loading={resending}
                 loadingLabel="Sending"
-                spinnerColor="var(--color-text-muted)"
+                spinnerColor="var(--dg-color-text-muted)"
                 spinnerSize={20}
               >
                 {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend verification email"}
@@ -110,23 +109,12 @@ function VerifyEmailContent() {
             </Button>
           )}
 
-          <p
-            style={{
-              fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-subtle)",
-              textAlign: "center",
-              marginBottom: "16px",
-            }}
-          >
+          <p className="dg-auth-footnote">
             Didn&apos;t receive the email? Check your spam folder or try resending.
           </p>
 
-          <div style={{ textAlign: "center" }}>
-            <Link
-              href="/login"
-              className="dg-auth-link"
-              style={{ color: "var(--color-text-subtle)" }}
-            >
+          <div className="dg-auth-centered">
+            <Link href="/login" className="dg-auth-link dg-auth-link--subtle">
               Back to login
             </Link>
           </div>

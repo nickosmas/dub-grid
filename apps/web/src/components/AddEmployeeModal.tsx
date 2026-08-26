@@ -208,7 +208,7 @@ export default function AddEmployeeModal({
   const fieldLabelStyle: React.CSSProperties = {
     fontSize: "var(--dg-fs-footnote)",
     fontWeight: 600,
-    color: "var(--color-text-muted)",
+    color: "var(--dg-color-text-muted)",
     letterSpacing: "0.02em",
   };
 
@@ -232,7 +232,7 @@ export default function AddEmployeeModal({
               margin: "-8px 0 0",
               fontSize: "var(--dg-fs-label)",
               lineHeight: 1.5,
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               maxWidth: 760,
             }}
           >
@@ -244,7 +244,7 @@ export default function AddEmployeeModal({
             <div
               style={{
                 fontSize: "var(--dg-fs-footnote)",
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
               }}
             >
               {rows.length} row{rows.length === 1 ? "" : "s"} total
@@ -259,9 +259,9 @@ export default function AddEmployeeModal({
                 maxHeight: scrollMaxHeight,
                 overflowY: "auto",
                 paddingRight: isMobile ? 0 : 4,
-                border: "1px solid var(--color-border)",
+                border: "1px solid var(--dg-color-border)",
                 borderRadius: "var(--dg-radius-md)",
-                background: "var(--color-surface)",
+                background: "var(--dg-color-surface)",
               }}
             >
               {rows.map((row, idx) => {
@@ -289,7 +289,7 @@ export default function AddEmployeeModal({
                       flexDirection: "column",
                       gap: 12,
                       padding: isMobile ? "14px" : "16px",
-                      borderTop: idx === 0 ? "none" : "1px solid var(--color-border-light)",
+                      borderTop: idx === 0 ? "none" : "1px solid var(--dg-color-border-light)",
                     }}
                   >
                     <div
@@ -305,7 +305,7 @@ export default function AddEmployeeModal({
                           style={{
                             fontSize: "var(--dg-fs-label)",
                             fontWeight: 700,
-                            color: "var(--color-text-primary)",
+                            color: "var(--dg-color-text-primary)",
                           }}
                         >
                           {rowName}
@@ -315,7 +315,7 @@ export default function AddEmployeeModal({
                             style={{
                               marginTop: 2,
                               fontSize: "var(--dg-fs-footnote)",
-                              color: "var(--color-text-muted)",
+                              color: "var(--dg-color-text-muted)",
                             }}
                           >
                             {rowStatus}
@@ -326,10 +326,10 @@ export default function AddEmployeeModal({
                         onClick={() => removeRow(row._id)}
                         disabled={rows.length === 1}
                         aria-label={`Remove staff member row ${idx + 1}`}
-                        className={`flex items-center justify-center rounded-lg text-[var(--color-text-faint)] transition-colors duration-120 ${
+                        className={`flex items-center justify-center rounded-lg text-[var(--dg-color-text-faint)] transition-colors duration-120 ${
                           rows.length === 1
                             ? "opacity-30 cursor-default"
-                            : "hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
+                            : "hover:bg-[var(--dg-color-bg-secondary)] hover:text-[var(--dg-color-text-primary)] cursor-pointer"
                         }`}
                         style={{
                           width: 30,
@@ -364,7 +364,7 @@ export default function AddEmployeeModal({
                     >
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={fieldLabelStyle}>
-                          First Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                          First Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                         </label>
                         <input
                           ref={idx === rows.length - 1 ? newRowFirstNameRef : undefined}
@@ -385,7 +385,7 @@ export default function AddEmployeeModal({
                             role="alert"
                             style={{
                               fontSize: "var(--dg-fs-footnote)",
-                              color: "var(--color-danger)",
+                              color: "var(--dg-color-danger)",
                             }}
                           >
                             {errors.firstName}
@@ -395,7 +395,7 @@ export default function AddEmployeeModal({
 
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                         <label style={fieldLabelStyle}>
-                          Last Name <span style={{ color: "var(--color-danger)" }}>*</span>
+                          Last Name <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                         </label>
                         <input
                           className="dg-input"
@@ -414,7 +414,7 @@ export default function AddEmployeeModal({
                             role="alert"
                             style={{
                               fontSize: "var(--dg-fs-footnote)",
-                              color: "var(--color-danger)",
+                              color: "var(--dg-color-danger)",
                             }}
                           >
                             {errors.lastName}
@@ -468,7 +468,7 @@ export default function AddEmployeeModal({
                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                       <label style={fieldLabelStyle}>
                         Email{" "}
-                        <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+                        <span style={{ fontWeight: 400, color: "var(--dg-color-text-muted)" }}>
                           (optional)
                         </span>
                       </label>
@@ -478,14 +478,14 @@ export default function AddEmployeeModal({
                         value={row.email}
                         onChange={(e) => updateRow(row._id, { email: e.target.value })}
                         placeholder="name@example.com"
-                        style={errors.email ? { borderColor: "var(--color-danger)" } : undefined}
+                        style={errors.email ? { borderColor: "var(--dg-color-danger)" } : undefined}
                       />
                       {errors.email ? (
                         <div
                           role="alert"
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--color-danger)",
+                            color: "var(--dg-color-danger)",
                           }}
                         >
                           {errors.email}
@@ -504,12 +504,13 @@ export default function AddEmployeeModal({
                         }}
                       >
                         <label style={fieldLabelStyle}>
-                          {focusAreaLabel} <span style={{ color: "var(--color-danger)" }}>*</span>
+                          {focusAreaLabel}{" "}
+                          <span style={{ color: "var(--dg-color-danger)" }}>*</span>
                         </label>
                         <span
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                           }}
                         >
                           Select one or more
@@ -525,9 +526,9 @@ export default function AddEmployeeModal({
                               onClick={() => toggleFocusArea(row._id, focusArea.id)}
                               padding="4px 12px"
                               fontSize="var(--dg-fs-caption)"
-                              unselectedBackground="var(--color-bg-secondary)"
+                              unselectedBackground="var(--dg-color-bg-secondary)"
                               unselectedBorderColor="transparent"
-                              unselectedTextColor="var(--color-text-faint)"
+                              unselectedTextColor="var(--dg-color-text-faint)"
                               style={{ whiteSpace: "nowrap" }}
                             >
                               {focusArea.name}
@@ -540,7 +541,7 @@ export default function AddEmployeeModal({
                           role="alert"
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--color-danger)",
+                            color: "var(--dg-color-danger)",
                           }}
                         >
                           {errors.focusAreaIds}
@@ -561,11 +562,11 @@ export default function AddEmployeeModal({
               gap: 12,
               marginTop: 4,
               paddingTop: 16,
-              borderTop: "1px solid var(--color-border-light)",
+              borderTop: "1px solid var(--dg-color-border-light)",
               flexWrap: "wrap",
             }}
           >
-            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+            <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}>
               {validRows.length === 0
                 ? "Complete the fields marked with * to create a profile."
                 : `Ready to add ${validRows.length} staff member${validRows.length === 1 ? "" : "s"}.`}

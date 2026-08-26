@@ -18,9 +18,9 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
     <div
       style={{
         padding: "32px 24px",
-        background: "var(--color-surface)",
+        background: "var(--dg-color-surface)",
         borderRadius: "var(--dg-radius-md)",
-        border: "1px dashed var(--color-border)",
+        border: "1px dashed var(--dg-color-border)",
         marginBottom: 16,
       }}
     >
@@ -40,7 +40,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
               margin: "0 0 4px",
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             Get started with DubGrid
@@ -49,7 +49,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
             style={{
               margin: 0,
               fontSize: "var(--dg-fs-body)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
             }}
           >
             Complete these steps to set up your organization. {doneCount} of {steps.length} done.
@@ -59,7 +59,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
           <div
             style={{
               fontSize: "var(--dg-fs-caption)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontWeight: 600,
             }}
           >
@@ -73,7 +73,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
           height: 8,
           width: "100%",
           borderRadius: 999,
-          background: "var(--color-border)",
+          background: "var(--dg-color-border)",
           overflow: "hidden",
           marginBottom: 20,
         }}
@@ -82,7 +82,7 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
           style={{
             width: `${progress}%`,
             height: "100%",
-            background: "var(--color-brand)",
+            background: "var(--dg-color-brand)",
             transition: "width 200ms ease",
           }}
         />
@@ -100,9 +100,9 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
               gap: 12,
               padding: "10px 14px",
               borderRadius: "var(--dg-radius-md)",
-              background: step.done ? "var(--color-success-bg)" : "var(--color-bg)",
-              border: `1px solid ${step.done ? "var(--color-success)" : "var(--color-border)"}`,
-              color: step.done ? "var(--color-success-text)" : "var(--color-text-primary)",
+              background: step.done ? "var(--dg-color-success-bg)" : "var(--dg-color-bg)",
+              border: `1px solid ${step.done ? "var(--dg-color-success)" : "var(--dg-color-border)"}`,
+              color: step.done ? "var(--dg-color-success-text)" : "var(--dg-color-text-primary)",
               textDecoration: "none",
               fontSize: "var(--dg-fs-body)",
               fontWeight: 500,
@@ -116,8 +116,8 @@ export default function DashboardChecklist({ steps }: DashboardChecklistProps) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: step.done ? "var(--color-success)" : "transparent",
-                border: step.done ? "none" : "2px solid var(--color-border)",
+                background: step.done ? "var(--dg-color-success)" : "transparent",
+                border: step.done ? "none" : "2px solid var(--dg-color-border)",
                 color: "#fff",
                 fontSize: 12,
                 fontWeight: 700,

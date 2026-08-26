@@ -28,62 +28,31 @@ export function SubdomainField({
   const showError = Boolean(error) || hasInvalidChars;
 
   return (
-    <div style={{ marginBottom: hint ? "8px" : "24px" }}>
+    <div
+      className={hint ? "dg-subdomain-field dg-subdomain-field--has-hint" : "dg-subdomain-field"}
+    >
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          border: `1.5px solid ${showError ? "var(--color-danger)" : "var(--color-brand)"}`,
-          borderRadius: "var(--dg-radius-md)",
-          overflow: "hidden",
-          background: "var(--color-surface)",
-        }}
+        className={`dg-subdomain-field__control${showError ? " dg-subdomain-field__control--error" : ""}`}
       >
         <input
           id="organization-subdomain"
           type="text"
           autoFocus={autoFocus}
           disabled={disabled}
-          className="dg-standalone-input"
+          className="dg-standalone-input dg-subdomain-field__input"
           value={value}
           onChange={(e) => onChange(e.target.value.toLowerCase().replace(/\s/g, ""))}
           placeholder="yourorg"
           aria-label="Organization subdomain"
           aria-invalid={showError}
           aria-describedby={hint ? "organization-subdomain-hint" : undefined}
-          style={{
-            flex: 1,
-            padding: "14px 14px 14px 16px",
-            border: "none",
-            outline: "none",
-            fontSize: "var(--dg-fs-body)",
-            color: "var(--color-text-primary)",
-            background: "transparent",
-            minWidth: 0,
-          }}
         />
-        <span
-          style={{
-            padding: "14px 16px",
-            fontSize: "var(--dg-fs-body)",
-            color: "var(--color-text-subtle)",
-            background: "var(--color-bg)",
-            borderLeft: "1px solid var(--color-border-light)",
-            whiteSpace: "nowrap",
-            flexShrink: 0,
-          }}
-        >
-          .{baseDomain}
-        </span>
+        <span className="dg-subdomain-field__suffix">.{baseDomain}</span>
       </div>
       {hint && (
         <p
           id="organization-subdomain-hint"
-          style={{
-            color: showError ? "var(--color-danger)" : "var(--color-text-subtle)",
-            fontSize: "var(--dg-fs-label)",
-            margin: "8px 0 16px",
-          }}
+          className={`dg-subdomain-field__hint${showError ? " dg-subdomain-field__hint--error" : ""}`}
         >
           {hint}
         </p>

@@ -43,10 +43,10 @@ function MiniCard({
 }) {
   const color =
     tone === "danger"
-      ? "var(--color-danger)"
+      ? "var(--dg-color-danger)"
       : tone === "warning"
-        ? "var(--color-warning)"
-        : "var(--color-text-primary)";
+        ? "var(--dg-color-warning)"
+        : "var(--dg-color-text-primary)";
   return (
     <div style={{ ...sectionStyle, padding: "14px 16px", flex: "1 1 160px" }}>
       <div
@@ -63,7 +63,7 @@ function MiniCard({
         style={{
           fontSize: "var(--dg-fs-caption)",
           fontWeight: 700,
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           marginTop: 2,
         }}
       >
@@ -86,11 +86,11 @@ function formatTrialEnds(org: GridmasterBillingOrgSummary) {
 }
 
 function statusTone(status: string | null) {
-  if (status === "active" || status === "trialing") return "var(--color-success)";
-  if (status === "past_due" || status === "incomplete") return "var(--color-warning)";
+  if (status === "active" || status === "trialing") return "var(--dg-color-success)";
+  if (status === "past_due" || status === "incomplete") return "var(--dg-color-warning)";
   if (status === "canceled" || status === "unpaid" || status === "incomplete_expired")
-    return "var(--color-danger)";
-  return "var(--color-text-muted)";
+    return "var(--dg-color-danger)";
+  return "var(--dg-color-text-muted)";
 }
 
 // A trialing org with no end date hasn't started its trial yet (no super_admin
@@ -105,7 +105,7 @@ function statusLabelFor(org: GridmasterBillingOrgSummary) {
 }
 
 function statusToneFor(org: GridmasterBillingOrgSummary) {
-  return isTrialPending(org) ? "var(--color-text-muted)" : statusTone(org.status);
+  return isTrialPending(org) ? "var(--dg-color-text-muted)" : statusTone(org.status);
 }
 
 function BillingOversightSkeleton() {
@@ -404,7 +404,7 @@ export default function GridmasterBillingView({
               margin: 0,
               fontSize: "var(--dg-fs-page-title)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             Billing Oversight
@@ -413,7 +413,7 @@ export default function GridmasterBillingView({
             style={{
               margin: "4px 0 0",
               fontSize: "var(--dg-fs-label)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontWeight: 600,
             }}
           >
@@ -435,8 +435,8 @@ export default function GridmasterBillingView({
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-danger-bg)",
-            color: "var(--color-danger)",
+            background: "var(--dg-color-danger-bg)",
+            color: "var(--dg-color-danger)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -542,7 +542,7 @@ export default function GridmasterBillingView({
                           onClick={() => onSelectOrg(org.orgId, "billing")}
                           style={{
                             cursor: "pointer",
-                            background: risky ? "var(--color-danger-bg)" : undefined,
+                            background: risky ? "var(--dg-color-danger-bg)" : undefined,
                           }}
                         >
                           <td style={{ ...tdStyle, fontWeight: 700 }}>{org.orgName}</td>
@@ -562,8 +562,8 @@ export default function GridmasterBillingView({
                             style={{
                               ...tdStyle,
                               color: org.cancelAt
-                                ? "var(--color-warning)"
-                                : "var(--color-text-muted)",
+                                ? "var(--dg-color-warning)"
+                                : "var(--dg-color-text-muted)",
                               fontWeight: org.cancelAt ? 700 : undefined,
                             }}
                           >
@@ -576,8 +576,8 @@ export default function GridmasterBillingView({
                               ...tdStyle,
                               color:
                                 org.seatDelta != null && org.seatDelta < 0
-                                  ? "var(--color-danger)"
-                                  : "var(--color-text-muted)",
+                                  ? "var(--dg-color-danger)"
+                                  : "var(--dg-color-text-muted)",
                               fontWeight: 700,
                             }}
                           >
@@ -590,7 +590,7 @@ export default function GridmasterBillingView({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(event) => event.stopPropagation()}
-                                style={{ color: "var(--color-brand)", fontWeight: 700 }}
+                                style={{ color: "var(--dg-color-brand)", fontWeight: 700 }}
                               >
                                 Connected
                               </a>

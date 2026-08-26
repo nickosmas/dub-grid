@@ -8,23 +8,11 @@ import { CloseButton } from "@/components/ui/CloseButton";
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-const headerStyle: React.CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: 20,
-};
-
-const titleStyle: React.CSSProperties = {
-  fontWeight: 700,
-  fontSize: "var(--dg-fs-title)",
-  color: "var(--color-text-primary)",
-};
-
 interface ModalProps {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  className?: string;
   style?: React.CSSProperties;
   onRequestClose?: () => boolean;
   showCloseButton?: boolean;
@@ -42,6 +30,7 @@ export default function Modal({
   title,
   onClose,
   children,
+  className,
   style,
   onRequestClose,
   showCloseButton = true,
@@ -136,12 +125,12 @@ export default function Modal({
         aria-modal="true"
         aria-label={title}
         aria-describedby={ariaDescribedby}
-        className="dg-modal"
+        className={`dg-modal${className ? ` ${className}` : ""}`}
         style={style}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={headerStyle}>
-          <span style={titleStyle}>{title}</span>
+        <div className="dg-modal-header">
+          <span className="dg-modal-title">{title}</span>
           {showCloseButton ? (
             <CloseButton size="lg" onClick={handleClose} aria-label="Close modal" />
           ) : null}

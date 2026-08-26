@@ -125,14 +125,14 @@ export function StaffFilterPopover({
               {department.name}
             </FilterChip>
           ))}
-          <label className="mt-2 flex w-full cursor-pointer items-center gap-2.5 rounded-[var(--dg-radius-sm)] px-2 py-2 transition-colors hover:bg-[var(--color-bg-secondary)]">
+          <label className="mt-2 flex w-full cursor-pointer items-center gap-2.5 rounded-[var(--dg-radius-sm)] px-2 py-2 transition-colors hover:bg-[var(--dg-color-bg-secondary)]">
             <input
               type="checkbox"
               checked={filterDepartmentAdminOnly}
               onChange={(event) => onFilterDepartmentAdminOnlyChange(event.target.checked)}
-              className="h-3.5 w-3.5 accent-[var(--color-brand)]"
+              className="h-3.5 w-3.5 accent-[var(--dg-color-brand)]"
             />
-            <span className="text-xs font-medium text-[var(--color-text-secondary)]">
+            <span className="text-xs font-medium text-[var(--dg-color-text-secondary)]">
               Department admins only
             </span>
           </label>

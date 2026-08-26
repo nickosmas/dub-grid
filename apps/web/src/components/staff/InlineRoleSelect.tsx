@@ -57,7 +57,7 @@ export function InlineRoleSelect({
         {ORG_ROLE_LABELS[orgRole]}
       </span>
     ) : (
-      <span className="text-[12px] text-[var(--color-text-muted)]">{"—"}</span>
+      <span className="text-[12px] text-[var(--dg-color-text-muted)]">{"—"}</span>
     );
   }
 

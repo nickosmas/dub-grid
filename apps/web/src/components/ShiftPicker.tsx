@@ -385,7 +385,7 @@ export default function ShiftPicker({
     marginBottom: 10,
     fontSize: "var(--dg-fs-footnote)",
     fontWeight: 700,
-    color: "var(--color-text-subtle)",
+    color: "var(--dg-color-text-subtle)",
     textTransform: "uppercase",
     letterSpacing: "0.06em",
     display: "flex",
@@ -396,8 +396,8 @@ export default function ShiftPicker({
   const countPill: React.CSSProperties = {
     fontSize: "var(--dg-fs-badge)",
     fontWeight: 600,
-    color: "var(--color-text-faint)",
-    background: "var(--color-bg-secondary)",
+    color: "var(--dg-color-text-faint)",
+    background: "var(--dg-color-bg-secondary)",
     padding: "1px 6px",
     borderRadius: 10,
   };
@@ -405,7 +405,7 @@ export default function ShiftPicker({
   const headingLine: React.CSSProperties = {
     flex: 1,
     height: 1,
-    background: "var(--color-border-light)",
+    background: "var(--dg-color-border-light)",
   };
 
   function renderGroupedOptions(options: typeof assignableOptions) {
@@ -463,7 +463,7 @@ export default function ShiftPicker({
                     style={{
                       width: 1,
                       height: 16,
-                      background: showDivider ? "var(--color-border)" : "transparent",
+                      background: showDivider ? "var(--dg-color-border)" : "transparent",
                       flexShrink: 0,
                       alignSelf: "center",
                     }}
@@ -608,7 +608,7 @@ export default function ShiftPicker({
             style={{
               padding: "24px 16px",
               textAlign: "center",
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               fontSize: "var(--dg-fs-label)",
             }}
           >

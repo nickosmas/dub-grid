@@ -50,7 +50,7 @@ export default function ScheduleOperationModal({
               fontWeight: 700,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
             }}
           >
             In Progress
@@ -60,7 +60,7 @@ export default function ScheduleOperationModal({
               fontSize: "calc(var(--dg-fs-section-title) + 8px)",
               fontWeight: 800,
               lineHeight: 1,
-              color: "var(--color-brand)",
+              color: "var(--dg-color-brand)",
             }}
           >
             {safeProgress}%
@@ -76,9 +76,9 @@ export default function ScheduleOperationModal({
           style={{
             height: 12,
             borderRadius: 999,
-            background: "var(--color-bg-secondary)",
+            background: "var(--dg-color-bg-secondary)",
             overflow: "hidden",
-            border: "1px solid var(--color-border)",
+            border: "1px solid var(--dg-color-border)",
           }}
         >
           <div
@@ -86,7 +86,7 @@ export default function ScheduleOperationModal({
               height: "100%",
               width: `${safeProgress}%`,
               background:
-                "linear-gradient(90deg, var(--color-brand) 0%, var(--color-primary) 100%)",
+                "linear-gradient(90deg, var(--dg-color-brand) 0%, var(--dg-color-primary) 100%)",
               transition: "width 180ms ease",
             }}
           />
@@ -99,7 +99,7 @@ export default function ScheduleOperationModal({
               margin: 0,
               fontSize: "var(--dg-fs-body-sm)",
               lineHeight: 1.5,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             {detail}
@@ -110,7 +110,7 @@ export default function ScheduleOperationModal({
           style={{
             margin: 0,
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-faint)",
+            color: "var(--dg-color-text-faint)",
           }}
         >
           Hang tight while we finish this scheduling update.

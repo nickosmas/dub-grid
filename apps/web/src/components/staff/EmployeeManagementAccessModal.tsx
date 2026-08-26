@@ -307,14 +307,14 @@ export function EmployeeManagementAccessModal({
               value={effectiveEmail}
               onChange={(e) => setEmail(e.target.value)}
               disabled={!!linkedUser}
-              style={emailError ? { borderColor: "var(--color-danger)" } : undefined}
+              style={emailError ? { borderColor: "var(--dg-color-danger)" } : undefined}
             />
             {linkedUser && (
               <div
                 style={{
                   marginTop: 4,
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                 }}
               >
                 This employee is already linked to an org member. Their login email is managed on
@@ -338,7 +338,7 @@ export function EmployeeManagementAccessModal({
             <label style={fieldLabelStyle}>
               Management departments
               {!hasExistingManagementAccess && (
-                <span style={{ color: "var(--color-danger)" }}> *</span>
+                <span style={{ color: "var(--dg-color-danger)" }}> *</span>
               )}
             </label>
             {managementDepartments.length === 0 ? (
@@ -346,7 +346,7 @@ export function EmployeeManagementAccessModal({
                 style={{
                   marginTop: 4,
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                 }}
               >
                 You don't have any management departments yet. Add one in Settings, under
@@ -361,9 +361,9 @@ export function EmployeeManagementAccessModal({
                       selected={managementDepartmentIds.includes(department.id)}
                       onClick={() => toggleDepartment(department.id)}
                       padding="5px 12px"
-                      unselectedBackground="var(--color-bg-secondary)"
+                      unselectedBackground="var(--dg-color-bg-secondary)"
                       unselectedBorderColor="transparent"
-                      unselectedTextColor="var(--color-text-faint)"
+                      unselectedTextColor="var(--dg-color-text-faint)"
                     >
                       {department.name}
                     </SelectableTag>
@@ -379,7 +379,7 @@ export function EmployeeManagementAccessModal({
                 style={{
                   marginTop: 6,
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                 }}
               >
                 Saving now removes their management access. They'll stay on the schedule.
@@ -390,12 +390,12 @@ export function EmployeeManagementAccessModal({
           {isInSandbox && (
             <p
               style={{
-                color: "var(--color-info-text)",
+                color: "var(--dg-color-info-text)",
                 fontSize: "var(--dg-fs-body-sm)",
                 margin: 0,
                 padding: "8px 12px",
-                background: "var(--color-info-bg)",
-                border: "1px solid var(--color-info-border)",
+                background: "var(--dg-color-info-bg)",
+                border: "1px solid var(--dg-color-info-border)",
                 borderRadius: "var(--dg-radius-md)",
               }}
             >
@@ -412,7 +412,7 @@ export function EmployeeManagementAccessModal({
               <Button
                 className="dg-btn dg-btn-ghost"
                 onClick={() => setManagementDepartmentIds([])}
-                style={{ color: "var(--color-danger)" }}
+                style={{ color: "var(--dg-color-danger)" }}
               >
                 Remove from Management
               </Button>
@@ -439,7 +439,7 @@ function FieldError({ message }: { message: string }) {
   return (
     <div
       style={{
-        color: "var(--color-danger)",
+        color: "var(--dg-color-danger)",
         fontSize: "var(--dg-fs-footnote)",
         marginTop: 4,
       }}
@@ -454,6 +454,6 @@ const fieldLabelStyle: React.CSSProperties = {
   display: "block",
   fontSize: "var(--dg-fs-label)",
   fontWeight: 600,
-  color: "var(--color-text-secondary)",
+  color: "var(--dg-color-text-secondary)",
   marginBottom: 6,
 };

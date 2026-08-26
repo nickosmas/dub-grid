@@ -8,15 +8,6 @@ import { expect, test } from "@playwright/test";
 export const QA_SUPER_ADMIN_EMAIL = "qa-super-admin@dubgrid.test";
 export const QA_SUPER_ADMIN_PASSWORD = "password123";
 
-// Deliberately the account's own preferred_org, not playwright.config.ts's
-// shared "calmhaven" baseURL: logging in on a subdomain that doesn't match
-// the JWT's current org forces the slower, client-orchestrated org-switch
-// path (fetchAccessibleOrganizations -> switchBrowserOrganization ->
-// refreshBrowserSession, each its own Supabase round-trip) instead of the
-// fast, server-resolved path api/auth/login already takes when the JWT's org
-// matches the subdomain. That extra path is exactly what a first-ever login
-// on a freshly seeded CI database doesn't need on top of the terms/onboarding/
-// trial gates below — and any failure in it signs the user back out silently.
 const PORT = process.env.PORT || 3000;
 const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || "localhost";
 const QA_SUPER_ADMIN_ORIGIN = `http://ardenwood.${BASE_DOMAIN}:${PORT}`;
@@ -52,10 +43,7 @@ async function clearBlockingOverlays(page: Page): Promise<void> {
   }
 }
 
-/**
- * Logs in as the seeded QA super admin on its own home subdomain (ardenwood)
- * and waits for the authenticated app shell to render.
- */
+/** Logs in as the seeded QA super admin on its organization subdomain. */
 export async function loginAsQaSuperAdmin(page: Page): Promise<void> {
   // A first-ever login for a fresh seed runs through up to four sequential
   // gates (terms, onboarding, trial modal, cookie consent), each with its

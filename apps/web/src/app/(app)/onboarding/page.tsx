@@ -82,7 +82,8 @@ export default function OnboardingPage() {
         minHeight: "100vh",
         padding: "24px",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        background: "linear-gradient(to bottom, var(--color-bg) 0%, var(--color-brand-bg) 100%)",
+        background:
+          "linear-gradient(to bottom, var(--dg-color-bg) 0%, var(--dg-color-brand-bg) 100%)",
       }}
     >
       <div
@@ -102,12 +103,12 @@ export default function OnboardingPage() {
           <div
             style={{
               padding: "16px",
-              background: "var(--color-brand)",
+              background: "var(--dg-color-brand)",
               borderRadius: "20px",
               boxShadow: "0 8px 16px rgba(37, 99, 235, 0.25)",
             }}
           >
-            <DubGridLogo size={40} color="var(--color-text-inverse)" />
+            <DubGridLogo size={40} color="var(--dg-color-text-inverse)" />
           </div>
         </div>
 
@@ -116,7 +117,7 @@ export default function OnboardingPage() {
             fontSize: "var(--dg-fs-page-title)",
             fontWeight: 800,
             marginBottom: "16px",
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             letterSpacing: "-0.03em",
           }}
         >
@@ -126,7 +127,7 @@ export default function OnboardingPage() {
         <p
           style={{
             fontSize: "16px",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             lineHeight: 1.6,
             marginBottom: "40px",
           }}
@@ -142,8 +143,8 @@ export default function OnboardingPage() {
             style={{
               width: "100%",
               padding: "14px",
-              background: "var(--color-brand)",
-              color: "var(--color-text-inverse)",
+              background: "var(--dg-color-brand)",
+              color: "var(--dg-color-text-inverse)",
               border: "none",
               borderRadius: "12px",
               fontSize: "16px",
@@ -159,7 +160,7 @@ export default function OnboardingPage() {
           </Button>
 
           {pollTimedOut && (
-            <p style={{ fontSize: "14px", color: "var(--color-warning-text)", margin: 0 }}>
+            <p style={{ fontSize: "14px", color: "var(--dg-color-warning-text)", margin: 0 }}>
               You're not in an organization yet. Ask your administrator to add you.
             </p>
           )}
@@ -169,8 +170,8 @@ export default function OnboardingPage() {
             style={{
               width: "100%",
               padding: "14px",
-              background: "var(--color-bg-secondary)",
-              color: "var(--color-text-muted)",
+              background: "var(--dg-color-bg-secondary)",
+              color: "var(--dg-color-text-muted)",
               border: "none",
               borderRadius: "12px",
               fontSize: "15px",
@@ -187,14 +188,14 @@ export default function OnboardingPage() {
           style={{
             marginTop: "40px",
             paddingTop: "24px",
-            borderTop: "1px solid var(--color-bg-secondary)",
+            borderTop: "1px solid var(--dg-color-bg-secondary)",
           }}
         >
-          <p style={{ fontSize: "14px", color: "var(--color-text-subtle)" }}>
+          <p style={{ fontSize: "14px", color: "var(--dg-color-text-subtle)" }}>
             Setting up a new facility? <br />
             <a
               href="mailto:support@dubgrid.com"
-              style={{ color: "var(--color-link)", fontWeight: 600, textDecoration: "none" }}
+              style={{ color: "var(--dg-color-link)", fontWeight: 600, textDecoration: "none" }}
             >
               Contact us
             </a>

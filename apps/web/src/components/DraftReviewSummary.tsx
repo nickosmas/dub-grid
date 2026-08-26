@@ -51,9 +51,9 @@ export default function DraftReviewSummary({
     <section
       aria-label={`${title} summary`}
       style={{
-        border: "1px solid var(--color-border)",
+        border: "1px solid var(--dg-color-border)",
         borderRadius: 14,
-        background: "var(--color-bg)",
+        background: "var(--dg-color-bg)",
         padding: 16,
       }}
     >
@@ -73,7 +73,7 @@ export default function DraftReviewSummary({
               margin: 0,
               fontSize: "var(--dg-fs-body-sm)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             {title}
@@ -84,7 +84,7 @@ export default function DraftReviewSummary({
                 margin: "4px 0 0",
                 fontSize: "var(--dg-fs-footnote)",
                 lineHeight: 1.4,
-                color: "var(--color-text-subtle)",
+                color: "var(--dg-color-text-subtle)",
               }}
             >
               {description}
@@ -106,7 +106,7 @@ export default function DraftReviewSummary({
               fontSize: "var(--dg-fs-card-title)",
               fontWeight: 700,
               lineHeight: 1,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             {breakdown.totalChanges}
@@ -114,7 +114,7 @@ export default function DraftReviewSummary({
           <span
             style={{
               fontSize: "var(--dg-fs-footnote)",
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
             }}
           >
             {breakdown.totalChanges === 1 ? "change" : "changes"}
@@ -128,7 +128,7 @@ export default function DraftReviewSummary({
             display: "grid",
             gap: 0,
             margin: 0,
-            borderTop: "1px solid var(--color-border-light)",
+            borderTop: "1px solid var(--dg-color-border-light)",
             paddingTop: 4,
           }}
         >
@@ -142,14 +142,14 @@ export default function DraftReviewSummary({
                 justifyContent: "space-between",
                 gap: 12,
                 padding: "9px 0",
-                borderTop: index === 0 ? undefined : "1px solid var(--color-border-light)",
+                borderTop: index === 0 ? undefined : "1px solid var(--dg-color-border-light)",
               }}
             >
               <dt
                 style={{
                   margin: 0,
                   fontSize: "var(--dg-fs-footnote)",
-                  color: "var(--color-text-secondary)",
+                  color: "var(--dg-color-text-secondary)",
                 }}
               >
                 {item.label}
@@ -159,7 +159,7 @@ export default function DraftReviewSummary({
                   margin: 0,
                   fontSize: "var(--dg-fs-body-sm)",
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 {item.count}
@@ -173,7 +173,7 @@ export default function DraftReviewSummary({
             margin: 0,
             fontSize: "var(--dg-fs-footnote)",
             lineHeight: 1.5,
-            color: "var(--color-text-secondary)",
+            color: "var(--dg-color-text-secondary)",
           }}
         >
           {emptyMessage}

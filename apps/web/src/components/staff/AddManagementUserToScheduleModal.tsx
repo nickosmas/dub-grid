@@ -203,8 +203,8 @@ export function AddManagementUserToScheduleModal({
             style={{
               padding: "12px 16px",
               borderRadius: "var(--dg-radius-lg)",
-              background: "var(--color-bg-secondary)",
-              color: "var(--color-text-secondary)",
+              background: "var(--dg-color-bg-secondary)",
+              color: "var(--dg-color-text-secondary)",
               fontSize: "var(--dg-fs-label)",
             }}
           >
@@ -226,7 +226,9 @@ export function AddManagementUserToScheduleModal({
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 onBlur={() => markTouched("firstName")}
-                style={fieldErrors.firstName ? { borderColor: "var(--color-danger)" } : undefined}
+                style={
+                  fieldErrors.firstName ? { borderColor: "var(--dg-color-danger)" } : undefined
+                }
               />
               {fieldErrors.firstName && <FieldError message={fieldErrors.firstName} />}
             </div>
@@ -237,7 +239,7 @@ export function AddManagementUserToScheduleModal({
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 onBlur={() => markTouched("lastName")}
-                style={fieldErrors.lastName ? { borderColor: "var(--color-danger)" } : undefined}
+                style={fieldErrors.lastName ? { borderColor: "var(--dg-color-danger)" } : undefined}
               />
               {fieldErrors.lastName && <FieldError message={fieldErrors.lastName} />}
             </div>
@@ -247,7 +249,7 @@ export function AddManagementUserToScheduleModal({
             <div>
               <label style={fieldLabelStyle}>
                 Email{" "}
-                <span style={{ fontWeight: 400, color: "var(--color-text-muted)" }}>
+                <span style={{ fontWeight: 400, color: "var(--dg-color-text-muted)" }}>
                   (optional)
                 </span>
               </label>
@@ -257,7 +259,7 @@ export function AddManagementUserToScheduleModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={() => markTouched("email")}
-                style={fieldErrors.email ? { borderColor: "var(--color-danger)" } : undefined}
+                style={fieldErrors.email ? { borderColor: "var(--dg-color-danger)" } : undefined}
               />
               {fieldErrors.email && <FieldError message={fieldErrors.email} />}
             </div>
@@ -273,7 +275,7 @@ export function AddManagementUserToScheduleModal({
                     setPhone(normalizeOptionalUsPhone(phone));
                   }
                 }}
-                style={fieldErrors.phone ? { borderColor: "var(--color-danger)" } : undefined}
+                style={fieldErrors.phone ? { borderColor: "var(--dg-color-danger)" } : undefined}
               />
               {fieldErrors.phone && <FieldError message={fieldErrors.phone} />}
             </div>
@@ -281,7 +283,7 @@ export function AddManagementUserToScheduleModal({
 
           <div>
             <label style={fieldLabelStyle}>
-              {focusAreaLabel} <span style={{ color: "var(--color-danger)" }}>*</span>
+              {focusAreaLabel} <span style={{ color: "var(--dg-color-danger)" }}>*</span>
             </label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {focusAreas.map((focusArea) => {
@@ -292,9 +294,9 @@ export function AddManagementUserToScheduleModal({
                     selected={active}
                     onClick={() => toggleFocusArea(focusArea.id)}
                     padding="5px 12px"
-                    unselectedBackground="var(--color-bg-secondary)"
+                    unselectedBackground="var(--dg-color-bg-secondary)"
                     unselectedBorderColor="transparent"
-                    unselectedTextColor="var(--color-text-faint)"
+                    unselectedTextColor="var(--dg-color-text-faint)"
                   >
                     {focusArea.name}
                   </SelectableTag>
@@ -330,9 +332,9 @@ export function AddManagementUserToScheduleModal({
                   selected={roleIds.includes(role.id)}
                   onClick={() => toggleRole(role.id)}
                   padding="5px 12px"
-                  unselectedBackground="var(--color-bg-secondary)"
+                  unselectedBackground="var(--dg-color-bg-secondary)"
                   unselectedBorderColor="transparent"
-                  unselectedTextColor="var(--color-text-faint)"
+                  unselectedTextColor="var(--dg-color-text-faint)"
                 >
                   {role.abbr}
                 </SelectableTag>
@@ -377,7 +379,7 @@ function FieldError({ message }: { message: string }) {
   return (
     <div
       style={{
-        color: "var(--color-danger)",
+        color: "var(--dg-color-danger)",
         fontSize: "var(--dg-fs-footnote)",
         marginTop: 4,
       }}
@@ -392,6 +394,6 @@ const fieldLabelStyle: React.CSSProperties = {
   display: "block",
   fontSize: "var(--dg-fs-label)",
   fontWeight: 600,
-  color: "var(--color-text-secondary)",
+  color: "var(--dg-color-text-secondary)",
   marginBottom: 6,
 };

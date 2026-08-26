@@ -5,10 +5,10 @@ import ExpandButton from "./ExpandButton";
 import { EmptyState } from "@/components/EmptyState";
 
 const ICON_STYLES: Record<ActivityIconVariant, { bg: string; stroke: string }> = {
-  success: { bg: "var(--color-success-bg)", stroke: "var(--color-success-text)" },
-  danger: { bg: "var(--color-danger-bg)", stroke: "var(--color-danger)" },
-  warning: { bg: "var(--color-warning-bg)", stroke: "var(--color-warning)" },
-  neutral: { bg: "var(--color-bg-secondary)", stroke: "var(--color-text-secondary)" },
+  success: { bg: "var(--dg-color-success-bg)", stroke: "var(--dg-color-success-text)" },
+  danger: { bg: "var(--dg-color-danger-bg)", stroke: "var(--dg-color-danger)" },
+  warning: { bg: "var(--dg-color-warning-bg)", stroke: "var(--dg-color-warning)" },
+  neutral: { bg: "var(--dg-color-bg-secondary)", stroke: "var(--dg-color-text-secondary)" },
 };
 
 function ActivityIcon({ variant }: { variant: ActivityIconVariant }) {
@@ -135,7 +135,7 @@ export default function ActivityFeed({
                 style={{
                   fontSize: "var(--dg-fs-micro)",
                   fontWeight: 500,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                 }}
               >
                 {items.length} event{items.length !== 1 ? "s" : ""}
@@ -145,7 +145,7 @@ export default function ActivityFeed({
               <span
                 style={{
                   fontSize: 10,
-                  color: "var(--color-text-subtle)",
+                  color: "var(--dg-color-text-subtle)",
                   transition: "transform 0.15s",
                   transform: collapsed ? "rotate(0deg)" : "rotate(180deg)",
                   display: "inline-block",
@@ -183,7 +183,7 @@ export default function ActivityFeed({
                       padding: "12px 0",
                       borderBottom:
                         i < visible.length - 1 || remainingCount > 0
-                          ? "1px solid var(--color-border-light)"
+                          ? "1px solid var(--dg-color-border-light)"
                           : "none",
                     }}
                   >
@@ -192,7 +192,7 @@ export default function ActivityFeed({
                       <div
                         style={{
                           fontSize: 12,
-                          color: "var(--color-text-secondary)",
+                          color: "var(--dg-color-text-secondary)",
                           lineHeight: 1.35,
                         }}
                       >
@@ -201,7 +201,7 @@ export default function ActivityFeed({
                       <div
                         style={{
                           fontSize: 10,
-                          color: "var(--color-text-subtle)",
+                          color: "var(--dg-color-text-subtle)",
                           marginTop: 3,
                           textTransform: "uppercase",
                           letterSpacing: "0.05em",
@@ -219,7 +219,7 @@ export default function ActivityFeed({
                     paddingTop: 10,
                     fontSize: 11,
                     fontWeight: 600,
-                    color: "var(--color-text-subtle)",
+                    color: "var(--dg-color-text-subtle)",
                   }}
                 >
                   {remainingCount} more

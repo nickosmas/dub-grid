@@ -120,9 +120,9 @@ type GridmasterView =
 // ── Sidebar nav items ────────────────────────────────────────────────────────
 
 const SIDEBAR_MENU_BTN_CLASS =
-  "h-9 data-[active=true]:bg-[var(--color-nav-active-bg)] data-[active=true]:text-[var(--color-text-primary)] transition-all ease-in-out duration-150";
+  "h-9 data-[active=true]:bg-[var(--dg-color-nav-active-bg)] data-[active=true]:text-[var(--dg-color-text-primary)] transition-all ease-in-out duration-150";
 const SIDEBAR_GROUP_LABEL_CLASS =
-  "text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--color-text-faint)] px-3 pb-0";
+  "text-[10px] font-bold tracking-[0.08em] uppercase text-[var(--dg-color-text-faint)] px-3 pb-0";
 
 // ── Organization search combobox (header) ────────────────────────────────────
 
@@ -165,11 +165,11 @@ function OrgSearchCombobox({
             style={{
               fontSize: "var(--dg-fs-caption)",
               fontWeight: 600,
-              background: "var(--color-bg-secondary)",
-              border: "1px solid var(--color-border)",
+              background: "var(--dg-color-bg-secondary)",
+              border: "1px solid var(--dg-color-border)",
               borderRadius: 8,
               padding: "3px 10px",
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               whiteSpace: "nowrap",
               flexShrink: 0,
             }}
@@ -204,8 +204,8 @@ function OrgSearchCombobox({
             top: "calc(100% + 6px)",
             left: 0,
             width: 380,
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
+            background: "var(--dg-color-surface)",
+            border: "1px solid var(--dg-color-border)",
             borderRadius: "var(--dg-radius-lg)",
             boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
             zIndex: 100,
@@ -218,10 +218,10 @@ function OrgSearchCombobox({
               padding: "8px 14px",
               fontSize: "var(--dg-fs-footnote)",
               fontWeight: 700,
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               textTransform: "uppercase",
               letterSpacing: "0.05em",
-              borderBottom: "1px solid var(--color-border-light)",
+              borderBottom: "1px solid var(--dg-color-border-light)",
             }}
           >
             {query
@@ -234,7 +234,7 @@ function OrgSearchCombobox({
                 style={{
                   padding: "20px 14px",
                   fontSize: "var(--dg-fs-label)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   textAlign: "center",
                 }}
               >
@@ -258,9 +258,9 @@ function OrgSearchCombobox({
                       alignItems: "center",
                       width: "100%",
                       padding: "8px 14px",
-                      background: isActive ? "var(--color-bg-secondary)" : "transparent",
+                      background: isActive ? "var(--dg-color-bg-secondary)" : "transparent",
                       border: "none",
-                      borderBottom: "1px solid var(--color-border-light)",
+                      borderBottom: "1px solid var(--dg-color-border-light)",
                       cursor: "pointer",
                       fontFamily: "inherit",
                       textAlign: "left",
@@ -269,7 +269,7 @@ function OrgSearchCombobox({
                     }}
                     onMouseEnter={(e) => {
                       (e.currentTarget as HTMLElement).style.background =
-                        "var(--color-bg-secondary)";
+                        "var(--dg-color-bg-secondary)";
                     }}
                     onMouseLeave={(e) => {
                       if (!isActive)
@@ -281,7 +281,7 @@ function OrgSearchCombobox({
                         style={{
                           fontSize: "var(--dg-fs-label)",
                           fontWeight: 600,
-                          color: "var(--color-text-primary)",
+                          color: "var(--dg-color-text-primary)",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -293,7 +293,7 @@ function OrgSearchCombobox({
                         <div
                           style={{
                             fontSize: "var(--dg-fs-footnote)",
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                             fontFamily: "var(--font-dm-mono), monospace",
                             marginTop: 1,
                           }}
@@ -316,8 +316,8 @@ function OrgSearchCombobox({
                           style={{
                             fontSize: "var(--dg-fs-badge)",
                             fontWeight: 600,
-                            color: "var(--color-text-subtle)",
-                            background: "var(--color-bg-secondary)",
+                            color: "var(--dg-color-text-subtle)",
+                            background: "var(--dg-color-bg-secondary)",
                             padding: "1px 6px",
                             borderRadius: 4,
                             textTransform: "uppercase",
@@ -330,8 +330,8 @@ function OrgSearchCombobox({
                         style={{
                           fontSize: "var(--dg-fs-footnote)",
                           fontWeight: 600,
-                          color: "var(--color-text-subtle)",
-                          background: "var(--color-bg-secondary)",
+                          color: "var(--dg-color-text-subtle)",
+                          background: "var(--dg-color-bg-secondary)",
                           padding: "1px 8px",
                           borderRadius: 4,
                         }}
@@ -616,7 +616,7 @@ export default function GridmasterPortal() {
 
   if (permLoading || signingOut || (isGridmaster && dashboardQuery.isLoading)) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--color-bg)" }}>
+      <div style={{ minHeight: "100vh", background: "var(--dg-color-bg)" }}>
         <ProgressBar loading />
       </div>
     );
@@ -627,7 +627,7 @@ export default function GridmasterPortal() {
       <div
         style={{
           minHeight: "100vh",
-          background: "var(--color-bg)",
+          background: "var(--dg-color-bg)",
           display: "grid",
           placeItems: "center",
           padding: 24,
@@ -638,12 +638,12 @@ export default function GridmasterPortal() {
             style={{
               marginBottom: 8,
               fontSize: "var(--dg-fs-section-title)",
-              color: "var(--color-danger)",
+              color: "var(--dg-color-danger)",
             }}
           >
             Access denied
           </h1>
-          <p style={{ margin: 0, color: "var(--color-text-muted)" }}>
+          <p style={{ margin: 0, color: "var(--dg-color-text-muted)" }}>
             The gridmaster portal is restricted to gridmaster accounts.
           </p>
         </div>
@@ -711,7 +711,7 @@ export default function GridmasterPortal() {
     <div
       style={{
         minHeight: "100vh",
-        background: "var(--color-bg)",
+        background: "var(--dg-color-bg)",
         display: "flex",
         flexDirection: "column",
       }}
@@ -723,8 +723,8 @@ export default function GridmasterPortal() {
           position: "sticky",
           top: 0,
           zIndex: 300,
-          background: "var(--color-surface)",
-          borderBottom: "1px solid var(--color-border)",
+          background: "var(--dg-color-surface)",
+          borderBottom: "1px solid var(--dg-color-border)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -741,7 +741,7 @@ export default function GridmasterPortal() {
             style={{
               fontSize: "var(--dg-fs-body)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             Gridmaster
@@ -787,8 +787,8 @@ export default function GridmasterPortal() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 8,
-                background: menuOpen ? "var(--color-bg-secondary)" : "transparent",
-                border: "1px solid " + (menuOpen ? "var(--color-border)" : "transparent"),
+                background: menuOpen ? "var(--dg-color-bg-secondary)" : "transparent",
+                border: "1px solid " + (menuOpen ? "var(--dg-color-border)" : "transparent"),
                 borderRadius: 8,
                 padding: "4px 8px 4px 4px",
                 minHeight: 44,
@@ -798,8 +798,8 @@ export default function GridmasterPortal() {
               }}
               onMouseEnter={(e) => {
                 if (!menuOpen) {
-                  e.currentTarget.style.background = "var(--color-bg-secondary)";
-                  e.currentTarget.style.borderColor = "var(--color-border)";
+                  e.currentTarget.style.background = "var(--dg-color-bg-secondary)";
+                  e.currentTarget.style.borderColor = "var(--dg-color-border)";
                 }
               }}
               onMouseLeave={(e) => {
@@ -814,13 +814,13 @@ export default function GridmasterPortal() {
                   width: 28,
                   height: 28,
                   borderRadius: "50%",
-                  background: "var(--color-brand)",
+                  background: "var(--dg-color-brand)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   fontSize: "var(--dg-fs-footnote)",
                   fontWeight: 700,
-                  color: "var(--color-text-inverse)",
+                  color: "var(--dg-color-text-inverse)",
                   flexShrink: 0,
                 }}
               >
@@ -831,7 +831,7 @@ export default function GridmasterPortal() {
                   style={{
                     fontSize: "var(--dg-fs-caption)",
                     fontWeight: 600,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                     lineHeight: 1.2,
                     maxWidth: 120,
                     overflow: "hidden",
@@ -844,7 +844,7 @@ export default function GridmasterPortal() {
                 <div
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     lineHeight: 1.2,
                   }}
                 >
@@ -856,7 +856,7 @@ export default function GridmasterPortal() {
                 height="12"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="var(--color-text-muted)"
+                stroke="var(--dg-color-text-muted)"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -970,7 +970,7 @@ export default function GridmasterPortal() {
         {!isMobile && (
           <Sidebar
             collapsible="icon"
-            className="border-r border-[var(--color-border)] bg-[var(--color-surface)]"
+            className="border-r border-[var(--dg-color-border)] bg-[var(--dg-color-surface)]"
             style={{ top: 56, height: "calc(100dvh - 56px)" }}
           >
             <SidebarContent className="pt-2 overscroll-contain">
@@ -992,8 +992,8 @@ export default function GridmasterPortal() {
                             <span
                               className={
                                 view === item.key
-                                  ? "text-[var(--color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
-                                  : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
+                                  ? "text-[var(--dg-color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
+                                  : "text-[var(--dg-color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                               }
                             >
                               <item.Icon />
@@ -1008,7 +1008,7 @@ export default function GridmasterPortal() {
               ))}
             </SidebarContent>
             <SidebarFooter>
-              <div className="-mx-2 border-t border-[var(--color-border)]" />
+              <div className="-mx-2 border-t border-[var(--dg-color-border)]" />
               {bottomActionGroups.map((group) => (
                 <SidebarGroup key={group.id} className="p-0">
                   {group.id !== "actions" && (
@@ -1029,8 +1029,8 @@ export default function GridmasterPortal() {
                             <span
                               className={
                                 view === item.key
-                                  ? "text-[var(--color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
-                                  : "text-[var(--color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
+                                  ? "text-[var(--dg-color-text-primary)] flex shrink-0 items-center justify-center transition-colors"
+                                  : "text-[var(--dg-color-text-faint)] flex shrink-0 items-center justify-center transition-colors"
                               }
                             >
                               <item.Icon />
@@ -1065,8 +1065,8 @@ export default function GridmasterPortal() {
             <div
               style={{
                 padding: "12px 16px",
-                background: "var(--color-danger-bg)",
-                color: "var(--color-danger)",
+                background: "var(--dg-color-danger-bg)",
+                color: "var(--dg-color-danger)",
                 borderRadius: "var(--dg-radius-lg)",
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
@@ -1138,15 +1138,15 @@ export default function GridmasterPortal() {
                   cursor: "pointer",
                   fontFamily: "inherit",
                   fontSize: "var(--dg-fs-label)",
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   padding: "0 0 12px",
                   transition: "color 150ms ease",
                 }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.color = "var(--color-text-primary)";
+                  (e.currentTarget as HTMLElement).style.color = "var(--dg-color-text-primary)";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.color = "var(--color-text-muted)";
+                  (e.currentTarget as HTMLElement).style.color = "var(--dg-color-text-muted)";
                 }}
               >
                 <svg
@@ -1218,7 +1218,7 @@ function GridmasterSidebarCollapseButton() {
     <SidebarMenuButton
       onClick={toggleSidebar}
       tooltip={open ? "Collapse Menu (b)" : "Expand Menu (b)"}
-      className="h-9 text-[var(--color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
+      className="h-9 text-[var(--dg-color-text-faint)] hover:text-black transition-all ease-in-out duration-150"
     >
       <span className="flex shrink-0 items-center justify-center">
         <svg

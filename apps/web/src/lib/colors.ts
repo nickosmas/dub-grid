@@ -449,33 +449,33 @@ export const SHIFT_REQUEST_STATUS_COLORS: Record<
   { bg: string; text: string; border: string }
 > = {
   open: {
-    bg: "var(--color-info-bg)",
-    text: "var(--color-info-text)",
-    border: "var(--color-info-border)",
+    bg: "var(--dg-color-info-bg)",
+    text: "var(--dg-color-info-text)",
+    border: "var(--dg-color-info-border)",
   },
   pending_approval: {
-    bg: "var(--color-warning-bg)",
-    text: "var(--color-warning-text)",
-    border: "var(--color-warning-border)",
+    bg: "var(--dg-color-warning-bg)",
+    text: "var(--dg-color-warning-text)",
+    border: "var(--dg-color-warning-border)",
   },
   approved: {
-    bg: "var(--color-success-bg)",
-    text: "var(--color-success-text)",
-    border: "var(--color-success)",
+    bg: "var(--dg-color-success-bg)",
+    text: "var(--dg-color-success-text)",
+    border: "var(--dg-color-success)",
   },
   rejected: {
-    bg: "var(--color-danger-bg)",
-    text: "var(--color-danger-dark)",
-    border: "var(--color-danger-border)",
+    bg: "var(--dg-color-danger-bg)",
+    text: "var(--dg-color-danger-dark)",
+    border: "var(--dg-color-danger-border)",
   },
   cancelled: {
-    bg: "var(--color-bg-secondary)",
-    text: "var(--color-text-subtle)",
-    border: "var(--color-border)",
+    bg: "var(--dg-color-bg-secondary)",
+    text: "var(--dg-color-text-subtle)",
+    border: "var(--dg-color-border)",
   },
   expired: {
-    bg: "var(--color-bg-secondary)",
-    text: "var(--color-text-subtle)",
-    border: "var(--color-border)",
+    bg: "var(--dg-color-bg-secondary)",
+    text: "var(--dg-color-text-subtle)",
+    border: "var(--dg-color-border)",
   },
 };

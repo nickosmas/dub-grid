@@ -33,7 +33,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
           fontSize: "var(--dg-fs-page-title)",
           fontWeight: 700,
           fontFamily: "var(--font-dm-mono), 'DM Mono', monospace",
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           marginBottom: 4,
         }}
       >
@@ -43,7 +43,7 @@ function StatCard({ label, value }: { label: string; value: number }) {
         style={{
           fontSize: "var(--dg-fs-caption)",
           fontWeight: 600,
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           textTransform: "uppercase",
           letterSpacing: "0.05em",
         }}
@@ -67,12 +67,12 @@ function OversightCard({
 }) {
   const color =
     tone === "danger"
-      ? "var(--color-danger)"
+      ? "var(--dg-color-danger)"
       : tone === "warning"
-        ? "var(--color-warning)"
+        ? "var(--dg-color-warning)"
         : tone === "good"
-          ? "var(--color-success)"
-          : "var(--color-text-primary)";
+          ? "var(--dg-color-success)"
+          : "var(--dg-color-text-primary)";
   return (
     <div style={{ ...sectionStyle, padding: "14px 16px", minWidth: 160, flex: "1 1 170px" }}>
       <div
@@ -89,7 +89,7 @@ function OversightCard({
         style={{
           fontSize: "var(--dg-fs-caption)",
           fontWeight: 700,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           marginTop: 2,
         }}
       >
@@ -98,7 +98,7 @@ function OversightCard({
       <div
         style={{
           fontSize: "var(--dg-fs-footnote)",
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           marginTop: 2,
         }}
       >
@@ -119,16 +119,16 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
         alignItems: "center",
         gap: 12,
         padding: "10px 0",
-        borderBottom: "1px solid var(--color-border-light)",
+        borderBottom: "1px solid var(--dg-color-border-light)",
         fontSize: "var(--dg-fs-label)",
       }}
     >
-      <div style={{ flex: 1, color: "var(--color-text-secondary)" }}>
+      <div style={{ flex: 1, color: "var(--dg-color-text-secondary)" }}>
         <span style={{ fontWeight: 600 }}>{entry.changedByEmail ?? "Unknown"}</span>
         {" changed "}
         <span style={{ fontWeight: 600 }}>{entry.targetEmail ?? "Unknown"}</span>
         {" from "}
-        <span style={{ fontWeight: 600, color: "var(--color-text-muted)" }}>
+        <span style={{ fontWeight: 600, color: "var(--dg-color-text-muted)" }}>
           {formatOrganizationRoleLabel(entry.fromRole)}
         </span>
         {" → "}
@@ -138,7 +138,7 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
         <span
           style={{
             fontSize: "var(--dg-fs-footnote)",
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             flexShrink: 0,
           }}
         >
@@ -148,7 +148,7 @@ function ActivityRow({ entry }: { entry: AuditLogEntry }) {
       <span
         style={{
           fontSize: "var(--dg-fs-footnote)",
-          color: "var(--color-text-subtle)",
+          color: "var(--dg-color-text-subtle)",
           flexShrink: 0,
           whiteSpace: "nowrap",
           fontFamily: "var(--font-dm-mono), monospace",
@@ -210,7 +210,7 @@ export default function GridmasterDashboard({
             margin: 0,
             fontSize: "var(--dg-fs-page-title)",
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
           }}
         >
           Dashboard
@@ -228,7 +228,7 @@ export default function GridmasterDashboard({
                 margin: "0 0 10px",
                 fontSize: "var(--dg-fs-body-sm)",
                 fontWeight: 700,
-                color: "var(--color-text-secondary)",
+                color: "var(--dg-color-text-secondary)",
               }}
             >
               Platform Oversight
@@ -288,7 +288,7 @@ export default function GridmasterDashboard({
                   margin: "0 0 10px",
                   fontSize: "var(--dg-fs-body-sm)",
                   fontWeight: 700,
-                  color: "var(--color-text-secondary)",
+                  color: "var(--dg-color-text-secondary)",
                 }}
               >
                 Highest Risk Organizations
@@ -306,7 +306,7 @@ export default function GridmasterDashboard({
                               key={h}
                               style={{
                                 ...thStyle,
-                                borderBottom: "1px solid var(--color-border-light)",
+                                borderBottom: "1px solid var(--dg-color-border-light)",
                               }}
                             >
                               {h}
@@ -327,7 +327,7 @@ export default function GridmasterDashboard({
                               padding: "10px 14px",
                               fontSize: "var(--dg-fs-label)",
                               fontWeight: 700,
-                              borderBottom: "1px solid var(--color-border-light)",
+                              borderBottom: "1px solid var(--dg-color-border-light)",
                             }}
                           >
                             {org.orgName}
@@ -339,9 +339,9 @@ export default function GridmasterDashboard({
                               fontWeight: 700,
                               color:
                                 org.oversightScore < 60
-                                  ? "var(--color-danger)"
-                                  : "var(--color-warning)",
-                              borderBottom: "1px solid var(--color-border-light)",
+                                  ? "var(--dg-color-danger)"
+                                  : "var(--dg-color-warning)",
+                              borderBottom: "1px solid var(--dg-color-border-light)",
                             }}
                           >
                             {org.oversightScore}
@@ -350,8 +350,8 @@ export default function GridmasterDashboard({
                             style={{
                               padding: "10px 14px",
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-text-muted)",
-                              borderBottom: "1px solid var(--color-border-light)",
+                              color: "var(--dg-color-text-muted)",
+                              borderBottom: "1px solid var(--dg-color-border-light)",
                             }}
                           >
                             {org.riskFlags.length
@@ -362,7 +362,7 @@ export default function GridmasterDashboard({
                             style={{
                               padding: "10px 14px",
                               fontSize: "var(--dg-fs-label)",
-                              borderBottom: "1px solid var(--color-border-light)",
+                              borderBottom: "1px solid var(--dg-color-border-light)",
                             }}
                           >
                             {org.supportSnapshot.activeUsers30d}
@@ -371,7 +371,7 @@ export default function GridmasterDashboard({
                             style={{
                               padding: "10px 14px",
                               fontSize: "var(--dg-fs-label)",
-                              borderBottom: "1px solid var(--color-border-light)",
+                              borderBottom: "1px solid var(--dg-color-border-light)",
                             }}
                           >
                             {org.supportSnapshot.openShiftRequests}
@@ -380,7 +380,7 @@ export default function GridmasterDashboard({
                             style={{
                               padding: "10px 14px",
                               fontSize: "var(--dg-fs-caption)",
-                              borderBottom: "1px solid var(--color-border-light)",
+                              borderBottom: "1px solid var(--dg-color-border-light)",
                             }}
                           >
                             {formatBillingStatusLabel(org.billing.subscriptionStatus)}
@@ -413,12 +413,12 @@ export default function GridmasterDashboard({
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-warning-bg)",
-            border: "1px solid var(--color-warning)",
+            background: "var(--dg-color-warning-bg)",
+            border: "1px solid var(--dg-color-warning)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
-            color: "var(--color-warning)",
+            color: "var(--dg-color-warning)",
             marginBottom: 20,
           }}
         >
@@ -455,7 +455,7 @@ export default function GridmasterDashboard({
               margin: "0 0 12px",
               fontSize: "var(--dg-fs-body-sm)",
               fontWeight: 700,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             Platform Activity
@@ -468,12 +468,14 @@ export default function GridmasterDashboard({
                 style={{
                   fontSize: "var(--dg-fs-card-title)",
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 {overview.activitySummary.last24hCount}
               </div>
-              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+              <div
+                style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}
+              >
                 Last 24h
               </div>
             </div>
@@ -484,12 +486,14 @@ export default function GridmasterDashboard({
                 style={{
                   fontSize: "var(--dg-fs-card-title)",
                   fontWeight: 700,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                 }}
               >
                 {overview.activitySummary.last7dCount}
               </div>
-              <div style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--color-text-muted)" }}>
+              <div
+                style={{ fontSize: "var(--dg-fs-footnote)", color: "var(--dg-color-text-muted)" }}
+              >
                 Last 7 days
               </div>
             </div>
@@ -502,7 +506,7 @@ export default function GridmasterDashboard({
                   style={{
                     fontSize: "var(--dg-fs-card-title)",
                     fontWeight: 700,
-                    color: "var(--color-text-primary)",
+                    color: "var(--dg-color-text-primary)",
                   }}
                 >
                   {category.count}
@@ -510,7 +514,7 @@ export default function GridmasterDashboard({
                 <div
                   style={{
                     fontSize: "var(--dg-fs-footnote)",
-                    color: "var(--color-text-muted)",
+                    color: "var(--dg-color-text-muted)",
                     textTransform: "capitalize",
                   }}
                 >
@@ -530,7 +534,7 @@ export default function GridmasterDashboard({
                           key={h}
                           style={{
                             ...thStyle,
-                            borderBottom: "1px solid var(--color-border-light)",
+                            borderBottom: "1px solid var(--dg-color-border-light)",
                           }}
                         >
                           {h}
@@ -550,7 +554,7 @@ export default function GridmasterDashboard({
                             padding: "10px 14px",
                             fontSize: "var(--dg-fs-label)",
                             fontWeight: 700,
-                            borderBottom: "1px solid var(--color-border-light)",
+                            borderBottom: "1px solid var(--dg-color-border-light)",
                           }}
                         >
                           {signal.orgName}
@@ -559,7 +563,7 @@ export default function GridmasterDashboard({
                           style={{
                             padding: "10px 14px",
                             fontSize: "var(--dg-fs-label)",
-                            borderBottom: "1px solid var(--color-border-light)",
+                            borderBottom: "1px solid var(--dg-color-border-light)",
                           }}
                         >
                           {signal.actionCount} actions
@@ -568,9 +572,9 @@ export default function GridmasterDashboard({
                           style={{
                             padding: "10px 14px",
                             fontSize: "var(--dg-fs-caption)",
-                            color: "var(--color-text-muted)",
+                            color: "var(--dg-color-text-muted)",
                             textTransform: "capitalize",
-                            borderBottom: "1px solid var(--color-border-light)",
+                            borderBottom: "1px solid var(--dg-color-border-light)",
                           }}
                         >
                           {signal.dominantCategory ?? "Activity"}
@@ -581,10 +585,10 @@ export default function GridmasterDashboard({
                             fontSize: "var(--dg-fs-caption)",
                             color:
                               signal.classification === "review_recommended"
-                                ? "var(--color-warning)"
-                                : "var(--color-text-muted)",
+                                ? "var(--dg-color-warning)"
+                                : "var(--dg-color-text-muted)",
                             fontWeight: signal.classification === "review_recommended" ? 700 : 500,
-                            borderBottom: "1px solid var(--color-border-light)",
+                            borderBottom: "1px solid var(--dg-color-border-light)",
                           }}
                         >
                           {signal.reason}
@@ -607,7 +611,7 @@ export default function GridmasterDashboard({
               margin: "0 0 12px",
               fontSize: "var(--dg-fs-body-sm)",
               fontWeight: 700,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             Recent Activity
@@ -631,7 +635,7 @@ export default function GridmasterDashboard({
           margin: "0 0 12px",
           fontSize: "var(--dg-fs-body-sm)",
           fontWeight: 700,
-          color: "var(--color-text-secondary)",
+          color: "var(--dg-color-text-secondary)",
         }}
       >
         All Organizations
@@ -656,7 +660,7 @@ export default function GridmasterDashboard({
                     key={h}
                     style={{
                       ...thStyle,
-                      borderBottom: "1px solid var(--color-border-light)",
+                      borderBottom: "1px solid var(--dg-color-border-light)",
                     }}
                   >
                     {h}
@@ -676,7 +680,7 @@ export default function GridmasterDashboard({
                       style={{ cursor: "pointer", transition: "background 150ms ease" }}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLElement).style.background =
-                          "var(--color-bg-secondary)";
+                          "var(--dg-color-bg-secondary)";
                       }}
                       onMouseLeave={(e) => {
                         (e.currentTarget as HTMLElement).style.background = "transparent";
@@ -687,8 +691,8 @@ export default function GridmasterDashboard({
                           padding: "10px 14px",
                           fontSize: "var(--dg-fs-label)",
                           fontWeight: 600,
-                          color: "var(--color-text-primary)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          color: "var(--dg-color-text-primary)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {c.name}
@@ -697,9 +701,9 @@ export default function GridmasterDashboard({
                         style={{
                           padding: "10px 14px",
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           fontFamily: "var(--font-dm-mono), monospace",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {c.slug ?? "—"}
@@ -708,15 +712,15 @@ export default function GridmasterDashboard({
                         style={{
                           padding: "10px 14px",
                           fontSize: "var(--dg-fs-footnote)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {c.suspendedAt ? (
                           <span
                             style={{
                               fontWeight: 600,
-                              color: "var(--color-danger)",
-                              background: "var(--color-danger-bg)",
+                              color: "var(--dg-color-danger)",
+                              background: "var(--dg-color-danger-bg)",
                               padding: "1px 6px",
                               borderRadius: 4,
                               textTransform: "uppercase",
@@ -728,8 +732,8 @@ export default function GridmasterDashboard({
                           <span
                             style={{
                               fontWeight: 600,
-                              color: "var(--color-success)",
-                              background: "var(--color-success-bg)",
+                              color: "var(--dg-color-success)",
+                              background: "var(--dg-color-success-bg)",
                               padding: "1px 6px",
                               borderRadius: 4,
                               textTransform: "uppercase",
@@ -744,8 +748,8 @@ export default function GridmasterDashboard({
                           padding: "10px 14px",
                           fontSize: "var(--dg-fs-label)",
                           fontWeight: 600,
-                          color: "var(--color-text-secondary)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          color: "var(--dg-color-text-secondary)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {s?.userCount ?? 0}
@@ -755,8 +759,8 @@ export default function GridmasterDashboard({
                           padding: "10px 14px",
                           fontSize: "var(--dg-fs-label)",
                           fontWeight: 600,
-                          color: "var(--color-text-secondary)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          color: "var(--dg-color-text-secondary)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {s?.employeeCount ?? 0}
@@ -765,53 +769,53 @@ export default function GridmasterDashboard({
                         style={{
                           padding: "10px 14px",
                           fontSize: "var(--dg-fs-caption)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {c.focusAreaLabel && c.focusAreaLabel !== "Focus Areas" ? (
-                          <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+                          <span style={{ color: "var(--dg-color-text-primary)", fontWeight: 600 }}>
                             {c.focusAreaLabel}
                           </span>
                         ) : (
-                          <span style={{ color: "var(--color-text-subtle)" }}>—</span>
+                          <span style={{ color: "var(--dg-color-text-subtle)" }}>—</span>
                         )}
                       </td>
                       <td
                         style={{
                           padding: "10px 14px",
                           fontSize: "var(--dg-fs-caption)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {c.certificationLabel && c.certificationLabel !== "Certifications" ? (
-                          <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+                          <span style={{ color: "var(--dg-color-text-primary)", fontWeight: 600 }}>
                             {c.certificationLabel}
                           </span>
                         ) : (
-                          <span style={{ color: "var(--color-text-subtle)" }}>—</span>
+                          <span style={{ color: "var(--dg-color-text-subtle)" }}>—</span>
                         )}
                       </td>
                       <td
                         style={{
                           padding: "10px 14px",
                           fontSize: "var(--dg-fs-caption)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {c.roleLabel && c.roleLabel !== "Roles" ? (
-                          <span style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+                          <span style={{ color: "var(--dg-color-text-primary)", fontWeight: 600 }}>
                             {c.roleLabel}
                           </span>
                         ) : (
-                          <span style={{ color: "var(--color-text-subtle)" }}>—</span>
+                          <span style={{ color: "var(--dg-color-text-subtle)" }}>—</span>
                         )}
                       </td>
                       <td
                         style={{
                           padding: "10px 14px",
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-subtle)",
-                          borderBottom: "1px solid var(--color-border-light)",
+                          color: "var(--dg-color-text-subtle)",
+                          borderBottom: "1px solid var(--dg-color-border-light)",
                         }}
                       >
                         {c.timezone ?? "—"}

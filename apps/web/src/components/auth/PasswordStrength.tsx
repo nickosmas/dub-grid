@@ -15,18 +15,12 @@ export function PasswordStrength({ password }: { password: string }) {
   const hints = getPasswordStrengthHints(password);
   const level = getPasswordStrengthLevel(password);
   const hasStartedTyping = password.length > 0;
-  const colors = [
-    "var(--color-danger)",
-    "var(--color-warning)",
-    "var(--color-warning)",
-    "var(--color-success)",
-  ];
 
   return (
-    <div style={{ marginTop: 8 }}>
+    <div className={`dg-password-strength dg-password-strength--level-${level}`}>
       {hasStartedTyping ? (
         <div
-          style={{ display: "flex", gap: 4, marginBottom: 4 }}
+          className="dg-password-strength__meter"
           role="meter"
           aria-label="Password strength"
           aria-valuenow={level}
@@ -34,62 +28,25 @@ export function PasswordStrength({ password }: { password: string }) {
           aria-valuemax={3}
         >
           {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                height: 4,
-                borderRadius: 2,
-                background: i <= level ? colors[level] : "var(--color-border-light)",
-                transition: "background 150ms ease",
-              }}
-            />
+            <div key={i} className={`dg-password-strength__bar${i <= level ? " is-active" : ""}`} />
           ))}
         </div>
       ) : null}
       <span
         id="password-strength-label"
         aria-live="polite"
-        style={{
-          fontSize: "var(--dg-fs-caption)",
-          color: hasStartedTyping ? colors[level] : "var(--color-text-muted)",
-          fontWeight: 500,
-        }}
+        className={`dg-password-strength__label${hasStartedTyping ? " is-active" : ""}`}
       >
         {hasStartedTyping ? PASSWORD_STRENGTH_LABELS[level] : "Password requirements"}
       </span>
       <ul
         id="password-strength-hints"
         aria-label="Password strength hints"
-        style={{
-          display: "grid",
-          gap: 4,
-          listStyle: "none",
-          margin: "8px 0 0",
-          padding: 0,
-        }}
+        className="dg-password-strength__hints"
       >
         {hints.map((hint) => (
-          <li
-            key={hint.id}
-            style={{
-              alignItems: "center",
-              color: hint.met ? "var(--color-success-text)" : "var(--color-text-muted)",
-              display: "flex",
-              fontSize: "var(--dg-fs-caption)",
-              gap: 6,
-            }}
-          >
-            <span
-              aria-hidden="true"
-              style={{
-                background: hint.met ? "var(--color-success)" : "var(--color-border)",
-                borderRadius: 999,
-                flex: "0 0 6px",
-                height: 6,
-                width: 6,
-              }}
-            />
+          <li key={hint.id} className={`dg-password-strength__hint${hint.met ? " is-met" : ""}`}>
+            <span aria-hidden="true" className="dg-password-strength__hint-dot" />
             <span>{hint.label}</span>
           </li>
         ))}

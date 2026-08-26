@@ -15,9 +15,9 @@ export default function PrivacyPolicyPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "var(--color-surface)",
+        background: "var(--dg-color-surface)",
         fontFamily: "var(--font-dm-sans), 'DM Sans', sans-serif",
-        color: "var(--color-text-primary)",
+        color: "var(--dg-color-text-primary)",
         padding: "48px 24px 80px",
       }}
     >
@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
           style={{
             display: "inline-block",
             marginBottom: "32px",
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             fontSize: "var(--dg-fs-body-sm)",
             textDecoration: "none",
           }}
@@ -47,7 +47,7 @@ export default function PrivacyPolicyPage() {
         <p
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             marginBottom: "40px",
           }}
         >
@@ -60,7 +60,7 @@ export default function PrivacyPolicyPage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             1. Introduction
@@ -69,7 +69,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             DubGrid LLC (&ldquo;DubGrid,&rdquo; &ldquo;we,&rdquo; &ldquo;our,&rdquo; or
@@ -83,7 +83,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginTop: "12px",
             }}
           >
@@ -99,7 +99,7 @@ export default function PrivacyPolicyPage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             2. Information We Collect
@@ -108,7 +108,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginBottom: "16px",
             }}
           >
@@ -119,7 +119,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               paddingLeft: "24px",
               marginBottom: "16px",
             }}
@@ -169,7 +169,7 @@ export default function PrivacyPolicyPage() {
               and performance metrics. This data is not collected until you provide consent. See our{" "}
               <Link
                 href="/cookie-policy"
-                style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+                style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
               >
                 Cookie Policy
               </Link>{" "}
@@ -190,7 +190,7 @@ export default function PrivacyPolicyPage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             3. How We Use Your Information
@@ -199,7 +199,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginBottom: "16px",
             }}
           >
@@ -209,7 +209,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               paddingLeft: "24px",
             }}
           >
@@ -245,7 +245,7 @@ export default function PrivacyPolicyPage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             4. Data Storage, Security, and PHI Prohibition
@@ -254,7 +254,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             Your data is stored on secure servers provided by our infrastructure and database
@@ -272,8 +272,8 @@ export default function PrivacyPolicyPage() {
             style={{
               marginTop: "16px",
               padding: "16px",
-              background: "var(--color-warning-bg)",
-              borderLeft: "4px solid var(--color-warning)",
+              background: "var(--dg-color-warning-bg)",
+              borderLeft: "4px solid var(--dg-color-warning)",
               borderRadius: "4px",
             }}
           >
@@ -281,7 +281,7 @@ export default function PrivacyPolicyPage() {
               style={{
                 fontSize: "var(--dg-fs-body-sm)",
                 fontWeight: 600,
-                color: "var(--color-warning-text)",
+                color: "var(--dg-color-warning-text)",
                 marginBottom: "8px",
               }}
             >
@@ -291,7 +291,7 @@ export default function PrivacyPolicyPage() {
               style={{
                 fontSize: "var(--dg-fs-body-sm)",
                 lineHeight: 1.5,
-                color: "var(--color-warning-text)",
+                color: "var(--dg-color-warning-text)",
               }}
             >
               DubGrid is designed for operational staff scheduling and is <strong>not</strong> a
@@ -312,7 +312,7 @@ export default function PrivacyPolicyPage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             5. Data Retention
@@ -321,7 +321,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             We retain your account and profile data for as long as your account is active and as
@@ -336,7 +336,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginTop: "12px",
             }}
           >
@@ -354,7 +354,7 @@ export default function PrivacyPolicyPage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             6. Your California Privacy Rights
@@ -363,7 +363,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginBottom: "16px",
             }}
           >
@@ -375,7 +375,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginBottom: "16px",
             }}
           >
@@ -387,7 +387,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               paddingLeft: "24px",
               marginBottom: "16px",
             }}
@@ -417,7 +417,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginBottom: "16px",
             }}
           >
@@ -430,7 +430,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginBottom: "16px",
             }}
           >
@@ -440,7 +440,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               paddingLeft: "24px",
               marginBottom: "16px",
             }}
@@ -465,14 +465,14 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             You can update profile details directly in the Service, and request a data export or
             account deletion from your profile settings. To make any other request, email us at{" "}
             <a
               href="mailto:support@dubgrid.com"
-              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+              style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
             >
               support@dubgrid.com
             </a>
@@ -490,7 +490,7 @@ export default function PrivacyPolicyPage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             7. Third-Party Service Providers
@@ -499,7 +499,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginBottom: "16px",
             }}
           >
@@ -511,7 +511,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               paddingLeft: "24px",
             }}
           >
@@ -558,7 +558,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginTop: "16px",
             }}
           >
@@ -569,14 +569,14 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginTop: "16px",
             }}
           >
             For a full list of cookies and how to manage them, see our{" "}
             <Link
               href="/cookie-policy"
-              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+              style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
             >
               Cookie Policy
             </Link>
@@ -590,7 +590,7 @@ export default function PrivacyPolicyPage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             8. Children&apos;s Privacy
@@ -599,7 +599,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             DubGrid is a business tool intended for use by adult employees and administrators. The
@@ -615,7 +615,7 @@ export default function PrivacyPolicyPage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             9. Changes to This Policy
@@ -624,7 +624,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             We may update this Privacy Policy from time to time. We will post the updated policy on
@@ -640,7 +640,7 @@ export default function PrivacyPolicyPage() {
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 600,
               marginBottom: "12px",
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             10. Contact Us
@@ -649,7 +649,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
             }}
           >
             If you have questions about this Privacy Policy or our data practices, or wish to
@@ -659,7 +659,7 @@ export default function PrivacyPolicyPage() {
             style={{
               fontSize: "var(--dg-fs-body)",
               lineHeight: 1.7,
-              color: "var(--color-text-secondary)",
+              color: "var(--dg-color-text-secondary)",
               marginTop: "12px",
             }}
           >
@@ -669,7 +669,7 @@ export default function PrivacyPolicyPage() {
             <br />
             <a
               href="mailto:support@dubgrid.com"
-              style={{ color: "var(--color-brand)", textDecoration: "underline" }}
+              style={{ color: "var(--dg-color-brand)", textDecoration: "underline" }}
             >
               support@dubgrid.com
             </a>

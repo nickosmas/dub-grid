@@ -28,8 +28,8 @@ export function getCrossFocusBadgePalette(
   style?: Pick<AssignmentDefinition, "color" | "text"> | null,
 ) {
   return {
-    background: style?.color ?? "var(--color-bg)",
-    color: style?.text ?? "var(--color-text-muted)",
+    background: style?.color ?? "var(--dg-color-bg)",
+    color: style?.text ?? "var(--dg-color-text-muted)",
   };
 }
 
@@ -54,7 +54,7 @@ export function getDraftBorder(draftKind: DraftKind, fallback: string): string {
 
 export function getPublishDiffBoxShadow(kind: string, fallback: string): string {
   const color = DRAFT_BORDER_COLORS[kind] ?? fallback;
-  return `0 0 0 1px var(--color-surface), 0 0 0 2.5px ${color}`;
+  return `0 0 0 1px var(--dg-color-surface), 0 0 0 2.5px ${color}`;
 }
 
 /**

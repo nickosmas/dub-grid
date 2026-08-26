@@ -1,0 +1,64 @@
+/* The global error boundary replaces the root layout, so it owns a tiny,
+   self-contained static stylesheet instead of relying on app tokens. */
+body {
+  margin: 0;
+}
+
+.dg-fatal {
+  --bg: #ffffff;
+  --fg: #0f172a;
+  --muted: #475569;
+  --brand: #2563eb;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  background: var(--bg);
+  color: var(--fg);
+  font-family:
+    "DM Sans",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.dg-fatal h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.dg-fatal p {
+  margin: 0;
+  max-width: 420px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.dg-fatal button {
+  margin-top: 8px;
+  padding: 10px 20px;
+  background: var(--brand);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  .dg-fatal {
+    --bg: #02070f;
+    --fg: #f1f1f3;
+    --muted: #a1a1aa;
+    --brand: #2075ff;
+  }
+}

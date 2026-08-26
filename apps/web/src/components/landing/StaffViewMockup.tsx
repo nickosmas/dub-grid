@@ -14,24 +14,24 @@ type Tone = "success" | "warning" | "danger" | "neutral";
 /* ── StatusPill tone palette — mirrors components/ui/status-pill.tsx ── */
 const TONES: Record<Tone, { bg: string; text: string; border: string }> = {
   success: {
-    bg: "var(--color-success-bg)",
-    text: "var(--color-success-text)",
-    border: "var(--color-success-border)",
+    bg: "var(--dg-color-success-bg)",
+    text: "var(--dg-color-success-text)",
+    border: "var(--dg-color-success-border)",
   },
   warning: {
-    bg: "var(--color-warning-bg)",
-    text: "var(--color-warning-text)",
-    border: "var(--color-warning-border)",
+    bg: "var(--dg-color-warning-bg)",
+    text: "var(--dg-color-warning-text)",
+    border: "var(--dg-color-warning-border)",
   },
   danger: {
-    bg: "var(--color-danger-bg)",
-    text: "var(--color-danger-text)",
-    border: "var(--color-danger-border)",
+    bg: "var(--dg-color-danger-bg)",
+    text: "var(--dg-color-danger-text)",
+    border: "var(--dg-color-danger-border)",
   },
   neutral: {
-    bg: "var(--color-bg-secondary)",
-    text: "var(--color-text-secondary)",
-    border: "var(--color-border-light)",
+    bg: "var(--dg-color-bg-secondary)",
+    text: "var(--dg-color-text-secondary)",
+    border: "var(--dg-color-border-light)",
   },
 };
 
@@ -163,9 +163,9 @@ export default function StaffViewMockup() {
   return (
     <div
       style={{
-        background: "var(--color-surface)",
+        background: "var(--dg-color-surface)",
         borderRadius: 12,
-        border: "1px solid var(--color-border)",
+        border: "1px solid var(--dg-color-border)",
         overflow: "hidden",
         boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.06)",
       }}
@@ -177,8 +177,8 @@ export default function StaffViewMockup() {
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 24px",
-          background: "var(--color-bg)",
-          borderBottom: "1px solid var(--color-border)",
+          background: "var(--dg-color-bg)",
+          borderBottom: "1px solid var(--dg-color-border)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center" }}>
@@ -193,9 +193,9 @@ export default function StaffViewMockup() {
                 padding: "12px 14px",
                 fontSize: 13,
                 fontWeight: tab.active ? 600 : 500,
-                color: tab.active ? "var(--color-text-primary)" : "var(--color-text-muted)",
+                color: tab.active ? "var(--dg-color-text-primary)" : "var(--dg-color-text-muted)",
                 borderBottom: tab.active
-                  ? "2px solid var(--color-text-primary)"
+                  ? "2px solid var(--dg-color-text-primary)"
                   : "2px solid transparent",
                 cursor: "default",
                 display: "flex",
@@ -212,8 +212,8 @@ export default function StaffViewMockup() {
                   minWidth: 18,
                   borderRadius: 10,
                   padding: "0 6px",
-                  background: "var(--color-bg-secondary)",
-                  color: "var(--color-text-muted)",
+                  background: "var(--dg-color-bg-secondary)",
+                  color: "var(--dg-color-text-muted)",
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -234,7 +234,7 @@ export default function StaffViewMockup() {
               left: 10,
               top: "50%",
               transform: "translateY(-50%)",
-              color: "var(--color-text-faint)",
+              color: "var(--dg-color-text-faint)",
             }}
             width="13"
             height="13"
@@ -252,12 +252,12 @@ export default function StaffViewMockup() {
             style={{
               height: 32,
               borderRadius: 6,
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
+              border: "1px solid var(--dg-color-border)",
+              background: "var(--dg-color-surface)",
               paddingLeft: 32,
               fontSize: 13,
               fontWeight: 500,
-              color: "var(--color-text-faint)",
+              color: "var(--dg-color-text-faint)",
               display: "flex",
               alignItems: "center",
             }}
@@ -273,8 +273,8 @@ export default function StaffViewMockup() {
           display: "grid",
           gridTemplateColumns: GRID_TEMPLATE,
           padding: "12px 24px",
-          background: "var(--color-bg)",
-          borderBottom: "1px solid var(--color-border-light)",
+          background: "var(--dg-color-bg)",
+          borderBottom: "1px solid var(--dg-color-border-light)",
         }}
       >
         {/* Rank/checkbox column header — empty (placeholder for # and checkbox) */}
@@ -285,7 +285,7 @@ export default function StaffViewMockup() {
             gap: 8,
             fontSize: 11,
             fontWeight: 700,
-            color: "var(--color-text-subtle)",
+            color: "var(--dg-color-text-subtle)",
             letterSpacing: "0.06em",
             textTransform: "uppercase" as const,
           }}
@@ -295,8 +295,8 @@ export default function StaffViewMockup() {
               width: 14,
               height: 14,
               borderRadius: 3,
-              border: "1.5px solid var(--color-border)",
-              background: "var(--color-surface)",
+              border: "1.5px solid var(--dg-color-border)",
+              background: "var(--dg-color-surface)",
               flexShrink: 0,
             }}
           />
@@ -308,7 +308,7 @@ export default function StaffViewMockup() {
             style={{
               fontSize: 11,
               fontWeight: 700,
-              color: "var(--color-text-subtle)",
+              color: "var(--dg-color-text-subtle)",
               letterSpacing: "0.06em",
               textTransform: "uppercase" as const,
               display: "flex",
@@ -330,7 +330,7 @@ export default function StaffViewMockup() {
             gridTemplateColumns: GRID_TEMPLATE,
             alignItems: "center",
             padding: "12px 24px",
-            borderTop: idx > 0 ? "1px solid var(--color-border-light)" : undefined,
+            borderTop: idx > 0 ? "1px solid var(--dg-color-border-light)" : undefined,
           }}
         >
           {/* # rank + checkbox */}
@@ -339,7 +339,7 @@ export default function StaffViewMockup() {
               display: "flex",
               alignItems: "center",
               gap: 8,
-              color: "var(--color-text-faint)",
+              color: "var(--dg-color-text-faint)",
             }}
           >
             <div
@@ -347,8 +347,8 @@ export default function StaffViewMockup() {
                 width: 14,
                 height: 14,
                 borderRadius: 3,
-                border: "1.5px solid var(--color-border)",
-                background: "var(--color-surface)",
+                border: "1.5px solid var(--dg-color-border)",
+                background: "var(--dg-color-surface)",
                 flexShrink: 0,
               }}
             />
@@ -388,7 +388,7 @@ export default function StaffViewMockup() {
                 style={{
                   fontSize: 14,
                   fontWeight: 500,
-                  color: "var(--color-text-primary)",
+                  color: "var(--dg-color-text-primary)",
                   lineHeight: 1.3,
                   whiteSpace: "nowrap" as const,
                   overflow: "hidden",
@@ -400,7 +400,7 @@ export default function StaffViewMockup() {
               <div
                 style={{
                   fontSize: 12,
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   marginTop: 2,
                   whiteSpace: "nowrap" as const,
                   overflow: "hidden",
@@ -442,7 +442,7 @@ export default function StaffViewMockup() {
             <span
               style={{
                 fontSize: 12,
-                color: "var(--color-text-muted)",
+                color: "var(--dg-color-text-muted)",
                 whiteSpace: "nowrap" as const,
               }}
             >
@@ -461,7 +461,7 @@ export default function StaffViewMockup() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "var(--color-text-faint)",
+              color: "var(--dg-color-text-faint)",
             }}
           >
             <svg

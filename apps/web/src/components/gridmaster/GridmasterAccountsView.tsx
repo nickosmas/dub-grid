@@ -34,8 +34,8 @@ function StatusBadge({ deactivatedAt }: { deactivatedAt: string | null | undefin
         fontWeight: 600,
         padding: "2px 8px",
         borderRadius: 4,
-        background: "var(--color-danger-bg)",
-        color: "var(--color-danger)",
+        background: "var(--dg-color-danger-bg)",
+        color: "var(--dg-color-danger)",
         textTransform: "uppercase",
       }}
     >
@@ -53,9 +53,9 @@ function GridmasterBadge() {
         fontWeight: 700,
         padding: "2px 8px",
         borderRadius: 4,
-        background: "var(--color-brand-bg)",
-        color: "var(--color-brand)",
-        border: "1px solid var(--color-brand-border)",
+        background: "var(--dg-color-brand-bg)",
+        color: "var(--dg-color-brand)",
+        border: "1px solid var(--dg-color-brand-border)",
         textTransform: "uppercase",
         letterSpacing: "0.03em",
       }}
@@ -232,7 +232,7 @@ export default function GridmasterAccountsView({
                 display: "flex",
                 gap: 16,
                 padding: "12px 14px",
-                borderBottom: "1px solid var(--color-border-light)",
+                borderBottom: "1px solid var(--dg-color-border-light)",
               }}
             >
               <div className="dg-skeleton dg-skeleton--text" style={{ width: "30%" }} />
@@ -253,7 +253,7 @@ export default function GridmasterAccountsView({
           margin: "0 0 16px",
           fontSize: "var(--dg-fs-page-title)",
           fontWeight: 700,
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
         }}
       >
         Gridmaster Accounts
@@ -263,8 +263,8 @@ export default function GridmasterAccountsView({
         <div
           style={{
             padding: "12px 16px",
-            background: "var(--color-danger-bg)",
-            color: "var(--color-danger)",
+            background: "var(--dg-color-danger-bg)",
+            color: "var(--dg-color-danger)",
             borderRadius: "var(--dg-radius-lg)",
             fontSize: "var(--dg-fs-label)",
             fontWeight: 600,
@@ -305,7 +305,7 @@ export default function GridmasterAccountsView({
           aria-live="polite"
           style={{
             fontSize: "var(--dg-fs-caption)",
-            color: "var(--color-text-muted)",
+            color: "var(--dg-color-text-muted)",
             whiteSpace: "nowrap",
           }}
         >
@@ -369,7 +369,7 @@ export default function GridmasterAccountsView({
                             <span
                               style={{
                                 fontSize: "var(--dg-fs-footnote)",
-                                color: "var(--color-text-muted)",
+                                color: "var(--dg-color-text-muted)",
                               }}
                             >
                               You
@@ -384,7 +384,7 @@ export default function GridmasterAccountsView({
                         style={{
                           ...tdStyle,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           whiteSpace: "nowrap",
                           fontFamily: "var(--font-dm-mono), monospace",
                         }}
@@ -404,7 +404,7 @@ export default function GridmasterAccountsView({
                         style={{
                           ...tdStyle,
                           fontSize: "var(--dg-fs-caption)",
-                          color: "var(--color-text-muted)",
+                          color: "var(--dg-color-text-muted)",
                           whiteSpace: "nowrap",
                           fontFamily: "var(--font-dm-mono), monospace",
                         }}
@@ -440,8 +440,8 @@ export default function GridmasterAccountsView({
                             style={{
                               fontSize: "var(--dg-fs-caption)",
                               color: account.deactivatedAt
-                                ? "var(--color-success, green)"
-                                : "var(--color-warning, orange)",
+                                ? "var(--dg-color-success, green)"
+                                : "var(--dg-color-warning, orange)",
                             }}
                             onClick={() => setActivationConfirm(account)}
                             disabled={isSelf || isLoading}
@@ -452,7 +452,7 @@ export default function GridmasterAccountsView({
                             className="dg-btn dg-btn-secondary"
                             style={{
                               fontSize: "var(--dg-fs-caption)",
-                              color: "var(--color-danger)",
+                              color: "var(--dg-color-danger)",
                             }}
                             onClick={() => {
                               setDemoteTarget(account);
@@ -563,7 +563,7 @@ export default function GridmasterAccountsView({
             style={{
               margin: "0 0 16px",
               fontSize: "var(--dg-fs-label)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
             }}
           >
             Move {demoteTarget.email ?? "this account"} into an organization as a normal org user.
@@ -575,7 +575,7 @@ export default function GridmasterAccountsView({
                 gap: 6,
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Organization
@@ -592,7 +592,7 @@ export default function GridmasterAccountsView({
                 gap: 6,
                 fontSize: "var(--dg-fs-label)",
                 fontWeight: 600,
-                color: "var(--color-text-primary)",
+                color: "var(--dg-color-text-primary)",
               }}
             >
               Organization Role

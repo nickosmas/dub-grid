@@ -31,7 +31,7 @@ const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: "var(--dg-fs-footnote)",
   fontWeight: 600,
-  color: "var(--color-text-muted)",
+  color: "var(--dg-color-text-muted)",
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   marginBottom: 5,
@@ -205,14 +205,14 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {mfaEnabled ? (
-            <ShieldCheck size={18} style={{ color: "var(--color-success-text)" }} />
+            <ShieldCheck size={18} style={{ color: "var(--dg-color-success-text)" }} />
           ) : (
-            <ShieldOff size={18} style={{ color: "var(--color-text-muted)" }} />
+            <ShieldOff size={18} style={{ color: "var(--dg-color-text-muted)" }} />
           )}
           <span
             style={{
               fontSize: "var(--dg-fs-body-sm)",
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
               fontWeight: 500,
             }}
           >
@@ -222,7 +222,11 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           </span>
         </div>
         <p
-          style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}
+          style={{
+            fontSize: "var(--dg-fs-body-sm)",
+            color: "var(--dg-color-text-muted)",
+            margin: 0,
+          }}
         >
           {mfaEnabled
             ? "Your account is protected with an authenticator app. You can disable it below."
@@ -246,7 +250,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
             <ButtonLoading
               loading={loading}
               loadingLabel="Starting"
-              spinnerColor="var(--color-text-inverse)"
+              spinnerColor="var(--dg-color-text-inverse)"
               spinnerSize={14}
             >
               Enable 2FA
@@ -264,7 +268,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         <p
           style={{
             fontSize: "var(--dg-fs-body-sm)",
-            color: "var(--color-danger-dark)",
+            color: "var(--dg-color-danger-dark)",
             margin: 0,
             fontWeight: 500,
           }}
@@ -292,14 +296,16 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
       <p
         style={{
           fontSize: "var(--dg-fs-body-sm)",
-          color: "var(--color-text-primary)",
+          color: "var(--dg-color-text-primary)",
           margin: 0,
           fontWeight: 500,
         }}
       >
         Scan this QR code with your authenticator app
       </p>
-      <p style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--color-text-muted)", margin: 0 }}>
+      <p
+        style={{ fontSize: "var(--dg-fs-body-sm)", color: "var(--dg-color-text-muted)", margin: 0 }}
+      >
         Use an app like Google Authenticator, Authy, or 1Password to scan the QR code below.
       </p>
 
@@ -311,7 +317,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
             padding: 16,
             background: "white",
             borderRadius: "var(--dg-radius-md)",
-            border: "1px solid var(--color-border)",
+            border: "1px solid var(--dg-color-border)",
             width: "fit-content",
             alignSelf: "center",
           }}
@@ -335,15 +341,15 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
               alignItems: "center",
               gap: 8,
               padding: "8px 12px",
-              background: "var(--color-bg-secondary)",
+              background: "var(--dg-color-bg-secondary)",
               borderRadius: "var(--dg-radius-md)",
-              border: "1px solid var(--color-border)",
+              border: "1px solid var(--dg-color-border)",
               fontFamily: "monospace",
               fontSize: "var(--dg-fs-body-sm)",
               wordBreak: "break-all",
             }}
           >
-            <span style={{ flex: 1, color: "var(--color-text-primary)" }}>{secret}</span>
+            <span style={{ flex: 1, color: "var(--dg-color-text-primary)" }}>{secret}</span>
             <MaybeHint content="Copy secret" side="top">
               <Button
                 onClick={copy.run}
@@ -354,7 +360,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
                   border: "none",
                   cursor: "pointer",
                   padding: 4,
-                  color: "var(--color-text-muted)",
+                  color: "var(--dg-color-text-muted)",
                   flexShrink: 0,
                 }}
               >
@@ -384,7 +390,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
             width: "100%",
             maxWidth: 200,
             padding: "10px 13px",
-            border: `1.5px solid ${verifyError ? "var(--color-danger)" : "var(--color-border)"}`,
+            border: `1.5px solid ${verifyError ? "var(--dg-color-danger)" : "var(--dg-color-border)"}`,
             borderRadius: "var(--dg-btn-radius)",
             fontSize: "var(--dg-fs-heading)",
             fontFamily: "monospace",
@@ -397,7 +403,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
         {verifyError && (
           <p
             style={{
-              color: "var(--color-danger-dark)",
+              color: "var(--dg-color-danger-dark)",
               fontSize: "var(--dg-fs-body-sm)",
               margin: 0,
             }}
@@ -416,7 +422,7 @@ export function MFASetup({ mfaEnabled, onStatusChange }: MFASetupProps) {
           <ButtonLoading
             loading={loading}
             loadingLabel="Verifying"
-            spinnerColor="var(--color-text-inverse)"
+            spinnerColor="var(--dg-color-text-inverse)"
             spinnerSize={14}
           >
             Verify &amp; Enable

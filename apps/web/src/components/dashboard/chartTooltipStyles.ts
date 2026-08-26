@@ -1,8 +1,8 @@
 export const chartTooltipContentStyle = {
-  backgroundColor: "var(--color-surface)",
+  backgroundColor: "var(--dg-color-surface)",
   borderRadius: "var(--dg-radius-sm)",
   boxShadow: "var(--tooltip-shadow)",
-  color: "var(--color-text-primary)",
+  color: "var(--dg-color-text-primary)",
   fontSize: 12,
 };
 

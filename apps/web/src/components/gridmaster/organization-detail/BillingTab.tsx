@@ -37,11 +37,11 @@ export function formatBillingDate(value: string | null) {
 }
 
 export function billingStatusTone(status: string | null) {
-  if (status === "active" || status === "trialing") return "var(--color-success)";
-  if (status === "past_due" || status === "incomplete") return "var(--color-warning)";
+  if (status === "active" || status === "trialing") return "var(--dg-color-success)";
+  if (status === "past_due" || status === "incomplete") return "var(--dg-color-warning)";
   if (status === "canceled" || status === "unpaid" || status === "incomplete_expired")
-    return "var(--color-danger)";
-  return "var(--color-text-muted)";
+    return "var(--dg-color-danger)";
+  return "var(--dg-color-text-muted)";
 }
 
 export function billingStatusIsPending(status: string | null, trialEndsAt: string | null) {
@@ -59,12 +59,12 @@ export function BillingMetric({
 }) {
   const color =
     tone === "good"
-      ? "var(--color-success)"
+      ? "var(--dg-color-success)"
       : tone === "warning"
-        ? "var(--color-warning)"
+        ? "var(--dg-color-warning)"
         : tone === "danger"
-          ? "var(--color-danger)"
-          : "var(--color-text-primary)";
+          ? "var(--dg-color-danger)"
+          : "var(--dg-color-text-primary)";
 
   return (
     <div style={{ ...sectionStyle, padding: "14px 16px" }}>
@@ -82,7 +82,7 @@ export function BillingMetric({
         style={{
           fontSize: "var(--dg-fs-caption)",
           fontWeight: 700,
-          color: "var(--color-text-muted)",
+          color: "var(--dg-color-text-muted)",
           marginTop: 2,
         }}
       >
@@ -240,7 +240,11 @@ export function BillingTab({ organization }: { organization: Organization }) {
     return (
       <div style={sectionStyle}>
         <div
-          style={{ padding: 24, color: "var(--color-text-muted)", fontSize: "var(--dg-fs-label)" }}
+          style={{
+            padding: 24,
+            color: "var(--dg-color-text-muted)",
+            fontSize: "var(--dg-fs-label)",
+          }}
         >
           Loading billing…
         </div>
@@ -253,8 +257,8 @@ export function BillingTab({ organization }: { organization: Organization }) {
       <div
         style={{
           padding: "12px 16px",
-          background: "var(--color-danger-bg)",
-          color: "var(--color-danger)",
+          background: "var(--dg-color-danger-bg)",
+          color: "var(--dg-color-danger)",
           borderRadius: "var(--dg-radius-lg)",
           fontSize: "var(--dg-fs-label)",
           fontWeight: 600,
@@ -276,13 +280,17 @@ export function BillingTab({ organization }: { organization: Organization }) {
             style={{
               margin: "0 0 6px",
               fontSize: "var(--dg-fs-section-title)",
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             Billing summary unavailable
           </h3>
           <p
-            style={{ margin: 0, fontSize: "var(--dg-fs-label)", color: "var(--color-text-muted)" }}
+            style={{
+              margin: 0,
+              fontSize: "var(--dg-fs-label)",
+              color: "var(--dg-color-text-muted)",
+            }}
           >
             Refresh billing oversight to rebuild this organization&apos;s billing snapshot.
           </p>
@@ -317,7 +325,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
               margin: 0,
               fontSize: "var(--dg-fs-heading)",
               fontWeight: 700,
-              color: "var(--color-text-primary)",
+              color: "var(--dg-color-text-primary)",
             }}
           >
             Billing
@@ -326,7 +334,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
             style={{
               margin: "4px 0 0",
               fontSize: "var(--dg-fs-label)",
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               fontWeight: 600,
             }}
           >
@@ -367,7 +375,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
               label="Status"
               value={
                 billingStatusIsPending(billingOrg.status, billingOrg.trialEndsAt) ? (
-                  <span style={{ color: "var(--color-text-muted)", fontWeight: 800 }}>
+                  <span style={{ color: "var(--dg-color-text-muted)", fontWeight: 800 }}>
                     Trial pending
                   </span>
                 ) : (
@@ -415,7 +423,7 @@ export function BillingTab({ organization }: { organization: Organization }) {
                     href={`https://dashboard.stripe.com/customers/${billingOrg.stripeCustomerId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: "var(--color-brand)", fontWeight: 700 }}
+                    style={{ color: "var(--dg-color-brand)", fontWeight: 700 }}
                   >
                     {billingOrg.stripeCustomerId}
                   </a>

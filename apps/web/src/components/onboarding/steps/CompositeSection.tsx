@@ -23,7 +23,7 @@ export default function CompositeSection({
           style={{
             fontSize: 17,
             fontWeight: 700,
-            color: "var(--color-text-primary)",
+            color: "var(--dg-color-text-primary)",
             margin: "0 0 4px",
             letterSpacing: "-0.01em",
           }}
@@ -34,7 +34,7 @@ export default function CompositeSection({
           <p
             style={{
               fontSize: 13,
-              color: "var(--color-text-muted)",
+              color: "var(--dg-color-text-muted)",
               margin: 0,
               lineHeight: 1.5,
             }}
@@ -45,9 +45,9 @@ export default function CompositeSection({
       </div>
       <div
         style={{
-          background: "var(--color-surface)",
+          background: "var(--dg-color-surface)",
           borderRadius: "var(--dg-radius-xl)",
-          border: "1px solid var(--color-border)",
+          border: "1px solid var(--dg-color-border)",
           padding: "20px",
         }}
       >
